@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.0 (unreleased)
+## 3.0.0 (2026-08-09)
 
 ### Added
 
@@ -17,6 +17,9 @@
 - Restored `.cpmmodel` discovery, import, preview, selection, and CPM lifecycle integration on both
   Minecraft 1.21.8 loader lanes.
 - Restored optional 3D Skin Layers preview integration for the supported 1.21.8 render path.
+- Added high-resolution cape support, together with a cape editor that repositions, scales, and
+  zooms a cape, previews it on the front, the back, and the elytra, and can flatten cape
+  transparency onto a colour chosen with red, green, and blue sliders or a hex field.
 - Added packaged-artifact E2E coverage for the two release files and their two exact runtime
   combinations.
 - Skin and cape menus now pick up files copied into `quickskin/uploads/` from outside the game, without a client restart.
@@ -43,6 +46,7 @@
 - Isolated the active Minecraft 1.21.8 Fabric and NeoForge release lanes on their own thin branch.
 - Adapted the first-generation `GuiRenderState` and picture-in-picture APIs while preserving the
   pre-1.21.9 player-skin identity and input-event contracts.
+- Quick Skin's source code is now published at <https://github.com/The-Plum-Team/Quick-Skin-Mod>.
 
 ## 2.6.2.5
 
