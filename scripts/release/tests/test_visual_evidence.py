@@ -23,6 +23,7 @@ from check_visual_review import (  # noqa: E402
     render,
     validate,
     validate_input,
+    validate_manifest,
     write_normalized_report,
 )
 from visual_evidence import (  # noqa: E402
@@ -36,6 +37,8 @@ from visual_evidence import (  # noqa: E402
 from visual_review import (  # noqa: E402
     build_manifest,
     curate_manifest,
+    load_reference_frames,
+    reference_identity,
     validate_expected_row,
 )
 
@@ -195,6 +198,84 @@ class VisualEvidenceTest(unittest.TestCase):
         result_path.write_text(json.dumps(result), encoding="utf-8")
         return result_path
 
+    def write_compact_reference(
+        self,
+        capture_id: str,
+        *,
+        dimensions: tuple[int, int] = (800, 450),
+        color: tuple[int, int, int] = (80, 60, 40),
+    ) -> Path:
+        catalog = load_catalog(self.catalog_path)
+        capture = catalog.by_id[capture_id]
+        branch = "forge-and-fabric-1.20.1"
+        artifact_node = "fabric-1.20.1"
+        bundle = self.root / "reference-evidence" / branch
+        images = bundle / "images"
+        images.mkdir(parents=True)
+        encoded = io.BytesIO()
+        Image.new("RGB", dimensions, color).save(
+            encoded,
+            format="WEBP",
+            quality=82,
+            method=6,
+            exact=True,
+        )
+        payload = encoded.getvalue()
+        file_sha256 = hashlib.sha256(payload).hexdigest()
+        asset = images / f"{file_sha256}.webp"
+        asset.write_bytes(payload)
+        with Image.open(io.BytesIO(payload)) as image:
+            rendered = image.convert("RGB")
+            pixel_sha256 = hashlib.sha256(rendered.tobytes()).hexdigest()
+        frame = {
+            "artifact_node": artifact_node,
+            "version": "1.20.1",
+            "loader": "fabric",
+            "scenario": capture["scenario"],
+            "role": capture["role"],
+            "step": capture["step"],
+            "frame_id": (
+                f"{artifact_node}/{capture['scenario']}/{capture['role']}/"
+                f"{capture['step']}"
+            ),
+            "capture_id": capture_id,
+            "title": capture["title"],
+            "expectation": capture["expectation"],
+            "review_tier": capture["review_tier"],
+            "derivative": {
+                "asset": f"images/{file_sha256}.webp",
+                "format": "webp",
+                "file_sha256": file_sha256,
+                "width": dimensions[0],
+                "height": dimensions[1],
+                "pixel_validation": {
+                    "file_sha256": file_sha256,
+                    "pixel_sha256": pixel_sha256,
+                    "width": dimensions[0],
+                    "height": dimensions[1],
+                },
+            },
+        }
+        manifest = {
+            "schema_version": 2,
+            "contract_sha256": self.contract_hash,
+            "release": {
+                "branch": branch,
+                "artifacts": [
+                    {
+                        "artifact_node": artifact_node,
+                        "version": "1.20.1",
+                        "loader": "fabric",
+                    }
+                ],
+            },
+            "frames": [frame],
+        }
+        (bundle / "manifest.json").write_text(
+            json.dumps(manifest) + "\n", encoding="utf-8"
+        )
+        return self.root / "reference-evidence"
+
     def test_catalog_exactly_covers_runtime_screenshot_contract(self) -> None:
         catalog = load_catalog()
         runtime = {
@@ -347,6 +428,104 @@ class VisualEvidenceTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(VisualEvidenceError, "must not already exist"):
             curate_manifest(manifest, output)
+
+    def test_paired_manifest_matches_every_capture_to_the_1_20_1_anchor(self) -> None:
+        capture_id = "phase0-smoke.client_a.baseline"
+        self.write_catalog([("phase0-smoke", "client_a", "baseline")])
+        self.write_result("phase0-smoke")
+        reference_root = self.write_compact_reference(capture_id)
+        references = load_reference_frames(
+            reference_root,
+            self.catalog_path,
+            branch="forge-and-fabric-1.20.1",
+            artifact_node="fabric-1.20.1",
+        )
+        manifest = build_manifest(
+            self.e2e_root,
+            self.catalog_path,
+            include_all=True,
+            combos=None,
+            reference_frames=references,
+        )
+
+        curated = curate_manifest(manifest, self.root / "review-input")
+
+        self.assertEqual(1, len(curated))
+        self.assertEqual(capture_id, curated[0]["capture_id"])
+        self.assertEqual(
+            "fabric-1.20.1/phase0-smoke/client_a/baseline",
+            curated[0]["reference_label"],
+        )
+        self.assertNotEqual(curated[0]["path"], curated[0]["reference_path"])
+        with Image.open(self.root / curated[0]["path"]) as candidate:
+            self.assertEqual((800, 450), candidate.size)
+        with Image.open(self.root / curated[0]["reference_path"]) as reference:
+            self.assertEqual((800, 450), reference.size)
+        self.assertEqual(1, validate_input(curated, self.root / "review-input"))
+        self.assertEqual(
+            2,
+            len(list((self.root / "review-input" / "images").glob("*.png"))),
+        )
+
+    def test_paired_manifest_fails_closed_on_a_missing_or_changed_reference(self) -> None:
+        capture_id = "phase0-smoke.client_a.baseline"
+        self.write_catalog([("phase0-smoke", "client_a", "baseline")])
+        self.write_result("phase0-smoke")
+        reference_root = self.write_compact_reference(capture_id)
+        references = load_reference_frames(
+            reference_root,
+            self.catalog_path,
+            branch="forge-and-fabric-1.20.1",
+            artifact_node="fabric-1.20.1",
+        )
+        with self.assertRaisesRegex(VisualEvidenceError, "missing capture"):
+            build_manifest(
+                self.e2e_root,
+                self.catalog_path,
+                include_all=True,
+                combos=None,
+                reference_frames={},
+            )
+
+        manifest = build_manifest(
+            self.e2e_root,
+            self.catalog_path,
+            include_all=True,
+            combos=None,
+            reference_frames=references,
+        )
+        Path(str(manifest[0]["reference_path"])).write_bytes(b"changed")
+        with self.assertRaisesRegex(VisualEvidenceError, "visual reference"):
+            curate_manifest(manifest, self.root / "changed-review-input")
+
+    def test_visual_reference_identity_is_derived_from_protected_master(self) -> None:
+        identity = reference_identity(ROOT / "release" / "release-matrix.json")
+
+        self.assertEqual(
+            {
+                "release_branch": "forge-and-fabric-1.20.1",
+                "artifact_node": "fabric-1.20.1",
+                "version": "1.20.1",
+                "loader": "fabric",
+            },
+            identity,
+        )
+
+        with mock.patch(
+            "visual_review.load_matrix",
+            return_value={
+                "unit_test_version": "1.21.1",
+                "project": {"release_branch": "fabric-and-neoforge-1.21.1"},
+                "artifacts": [
+                    {
+                        "artifact_node": "fabric-1.21.1",
+                        "artifact_version": "1.21.1",
+                        "loader": "fabric",
+                    }
+                ],
+            },
+        ), self.assertRaisesRegex(VisualEvidenceError, "keep Minecraft 1.20.1"):
+            reference_identity(self.root / "unused-matrix.json")
 
     def test_review_input_rejects_unreferenced_content(self) -> None:
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
@@ -709,6 +888,22 @@ class VisualReviewContractTest(unittest.TestCase):
         for manifest, report in cases:
             with self.subTest(manifest=manifest, report=report), self.assertRaises(ReviewError):
                 validate(manifest, report)
+
+    def test_manifest_cannot_mix_paired_and_unpaired_entries(self) -> None:
+        paired = {
+            **self.manifest[0],
+            "label": "other/scenario/client/step",
+            "reference_path": "/tmp/reference.png",
+            "reference_label": "reference/scenario/client/step",
+        }
+
+        with self.assertRaisesRegex(ReviewError, "cannot mix"):
+            validate_manifest([self.manifest[0], paired])
+        with self.assertRaisesRegex(ReviewError, "must pair every candidate"):
+            validate_manifest(self.manifest, require_paired=True)
+        self.assertEqual(
+            [paired], validate_manifest([paired], require_paired=True)[0]
+        )
 
     def test_rejects_control_characters_and_bounded_output_overflow(self) -> None:
         cases = (
