@@ -172,16 +172,25 @@ class E2EJobGraphTest(unittest.TestCase):
             )
 
     def test_snapshot_matrix_cli_does_not_require_a_source_checkout(self) -> None:
+        checked_out_matrix_path = ROOT / "release/release-matrix.json"
+        checked_out_matrix = graph.load_matrix(checked_out_matrix_path)
+        expected_scenarios = graph.expected_scenario_jobs_for(
+            checked_out_matrix_path, "pr-anchors"
+        )
+        expected_loaders = sorted(
+            {artifact["loader"] for artifact in checked_out_matrix["artifacts"]}
+        )
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             matrix_path = root / "source-release-matrix.json"
             properties_path = root / "source-gradle.properties"
             jobs_path = root / "source-jobs.json"
-            matrix_path.write_bytes(
-                (ROOT / "release/release-matrix.json").read_bytes()
-            )
+            matrix_path.write_bytes(checked_out_matrix_path.read_bytes())
             properties_path.write_bytes((ROOT / "gradle.properties").read_bytes())
-            jobs_path.write_text(json.dumps(self.payload()), encoding="utf-8")
+            jobs_path.write_text(
+                json.dumps(self.payload(expected_scenarios)), encoding="utf-8"
+            )
             head_sha = subprocess.run(
                 ("git", "rev-parse", "HEAD"),
                 cwd=ROOT,
@@ -220,10 +229,10 @@ class E2EJobGraphTest(unittest.TestCase):
             self.assertEqual(0, result)
             validated = json.loads(output.getvalue())
             self.assertEqual(
-                list(self.expected), validated["observed_scenario_jobs"]
+                list(expected_scenarios), validated["observed_scenario_jobs"]
             )
             self.assertEqual(
-                ["fabric", "forge"], validated["active_loader_bootstraps"]
+                expected_loaders, validated["active_loader_bootstraps"]
             )
 
     def test_controller_parity_is_bound_to_the_exact_checkout_and_protected_blob(
