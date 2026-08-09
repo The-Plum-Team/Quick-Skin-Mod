@@ -424,6 +424,12 @@ public class UploadToMojangScreen extends Screen {
         // Disable the default Minecraft blur effect - we handle blur with BlurHandler
     }
         //?}
+        //? if <1.21.2 {
+    @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Minecraft 1.21.1 invokes this from super.render() after our modal has been drawn.
+    }
+        //?}
     //?}
     //? if >=26.1.2 {
 
