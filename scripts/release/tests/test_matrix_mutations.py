@@ -418,6 +418,37 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
         self.artifact(fabric, "fabric")["metadata"]["pack_format"] = 15
         self.assert_invalid(fabric, "must not declare FML pack formats")
 
+    def test_inert_matrix_snapshot_uses_its_explicit_build_properties(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            matrix_path = root / "source-release-matrix.json"
+            properties_path = root / "source-gradle.properties"
+            matrix_path.write_text(json.dumps(self.base), encoding="utf-8")
+            properties_path.write_bytes((ROOT / "gradle.properties").read_bytes())
+
+            loaded = release_matrix.load_matrix_snapshot(
+                matrix_path, properties_path
+            )
+
+            self.assertEqual(self.base, loaded)
+            self.assertEqual(
+                "3.0.0",
+                release_matrix.read_mod_version_from_properties(
+                    properties_path, loaded
+                ),
+            )
+
+            properties_path.write_text(
+                properties_path.read_text(encoding="utf-8")
+                + "\nminecraft_version_99_9=99.9\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                release_matrix.MatrixError,
+                "belongs to no supported Minecraft version",
+            ):
+                release_matrix.load_matrix_snapshot(matrix_path, properties_path)
+
     def test_orphan_versioned_gradle_property_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
