@@ -347,6 +347,7 @@ jobs:
             > "$RUNNER_TEMP/e2e-job-graph.json"
           python3 scripts/release/matrix.py \
             --matrix "$source_matrix" \
+            --matrix-properties "$source_properties" \
             --kind "$matrix_kind" \
             > "$RUNNER_TEMP/expected-e2e-matrix.json"
           expected_artifacts="$(jq -c \
