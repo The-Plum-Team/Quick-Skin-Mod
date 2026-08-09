@@ -705,9 +705,8 @@ def gha_matrix(
                 "artifact_node": artifact["artifact_node"],
                 "file": f"build/release/files/{filename}",
                 "name": (
-                    f"Quick Skin {mod_version} ["
-                    f"{LOADER_DISPLAY_NAMES[artifact['loader']]}] "
-                    f"[MC {artifact['artifact_version']}]"
+                    f"Quick-Skin-{artifact['artifact_version']}-v{mod_version} "
+                    f"[{LOADER_DISPLAY_NAMES[artifact['loader']]}]"
                 ),
                 "loader": artifact["loader"],
                 "artifact_version": artifact["artifact_version"],
