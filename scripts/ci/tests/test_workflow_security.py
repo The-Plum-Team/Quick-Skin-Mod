@@ -91,10 +91,10 @@ class WorkflowSecurityTest(unittest.TestCase):
                     self.assertIn("--no-session-persistence", block)
                     self.assertIn("--permission-mode dontAsk", block)
                     self.assertNotIn("--permission-mode acceptEdits", block)
-                    self.assertRegex(block, r'--tools "Read(?:,Edit)?,Write"')
                     self.assertNotRegex(block, r'--tools "[^"]*Bash')
                     self.assertNotIn("--allowedTools Read", block)
                     if workflow.name == "visual-review.yml":
+                        self.assertIn('--tools "Read"', block)
                         self.assertNotIn('"Read(./**)"', block)
                         self.assertNotIn("e2e-out", block)
                         self.assertIn(
@@ -102,16 +102,16 @@ class WorkflowSecurityTest(unittest.TestCase):
                             block,
                         )
                         self.assertIn('"Read(./review-input/images/**)"', block)
-                        self.assertIn(
-                            '"Write(./visual-review-report.raw.json)"', block
-                        )
+                        self.assertIn("> visual-review-report.raw.json", block)
                         self.assertIn("unset GH_TOKEN GITHUB_TOKEN", block)
                         self.assertNotIn("Edit", block)
+                        self.assertNotIn('"Write(', block)
                     else:
+                        self.assertRegex(block, r'--tools "Read(?:,Edit)?,Write"')
                         self.assertIn('"Read(./**)"', block)
                         if ",Edit," in block:
                             self.assertIn('"Edit(./**)"', block)
-                    self.assertIn('"Write(', block)
+                        self.assertIn('"Write(', block)
         self.assertEqual(secret_steps, 3)
 
     def test_external_actions_are_pinned_to_full_commit_shas(self) -> None:
@@ -253,6 +253,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         visual_workflow = (WORKFLOWS / "visual-review.yml").read_text(
             encoding="utf-8"
         )
+        visual_prompt = (ROOT / "e2e" / "visual_review_prompt.md").read_text(
+            encoding="utf-8"
+        )
         authenticate = job_block("visual-review.yml", "authenticate")
         curate = job_block("visual-review.yml", "curate")
         visual = job_block("visual-review.yml", "review")
@@ -272,6 +275,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("permissions: {}", visual_workflow)
         self.assertIn("visual-review-requested", visual_workflow)
         self.assertIn("workflows:\n      - Packaged E2E", visual_workflow)
+        self.assertIn("open BOTH the candidate and its 1.20.1 reference", visual_prompt)
+        self.assertIn("becoming softer or blurred", visual_prompt)
+        self.assertIn("only the Minecraft world behind an overlay", visual_prompt)
         self.assertEqual(
             {"authenticate", "curate", "review", "cleanup-curated-input"},
             set(re.findall(r"(?m)^  ([a-z0-9-]+):\n", visual_workflow)),
@@ -302,10 +308,37 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("actions/artifacts/$artifact_id", curate)
         self.assertIn("scripts/ci/bounded_zip.py", curate)
         self.assertIn("scripts/ci/e2e_job_graph.py", curate)
+        self.assertNotIn("path: source", curate)
+        self.assertNotIn("git -C source", curate)
+        self.assertIn('git fetch --no-tags origin "$SOURCE_SHA"', curate)
+        self.assertIn(
+            'git show "$SOURCE_SHA:e2e/scenario-contract.json"', curate
+        )
+        self.assertIn(
+            'git show "$SOURCE_SHA:release/release-matrix.json"', curate
+        )
+        self.assertIn('--repository-head-sha "$IMPLEMENTATION_SHA"', curate)
+        self.assertIn("--reference-identity", curate)
+        self.assertIn("scripts/pages/select_artifact.py", curate)
+        self.assertNotIn(
+            "Resolve the authenticated 1.20.1 visual reference", visual_workflow
+        )
+        self.assertNotIn("steps.reference.outputs", curate)
+        self.assertLess(
+            curate.index("scripts/ci/e2e_job_graph.py"),
+            curate.index("--reference-identity"),
+        )
+        self.assertIn("actions/artifacts/$REFERENCE_ARTIFACT_ID", curate)
+        self.assertIn("scripts/pages/evidence.py compact", curate)
+        self.assertIn("scripts/pages/evidence.py validate", curate)
+        self.assertIn("--reference-evidence-root", curate)
+        self.assertIn("--reference-artifact-node", curate)
+        self.assertIn("--all", curate)
         self.assertIn("--validate-row-json", curate)
         self.assertIn("--curate-output", curate)
         self.assertIn("e2e/check_visual_review.py", curate)
         self.assertEqual(1, curate.count("--validate-input-only"))
+        self.assertEqual(1, curate.count("--require-paired"))
         self.assertIn("curation-proof.json", curate)
         self.assertIn("Upload only the curated review input", curate)
         self.assertIn("if-no-files-found: error", curate)
@@ -317,6 +350,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("scripts/ci/bounded_zip.py", visual)
         self.assertIn("--max-entries 520", visual)
         self.assertEqual(2, visual.count("--validate-input-only"))
+        self.assertEqual(3, visual.count("--require-paired"))
         self.assertIn("visual-review-capsule", visual)
         self.assertNotIn("actions/download-artifact@", visual_workflow)
         self.assertNotIn("merge-multiple", visual)
@@ -326,6 +360,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", notify)
         self.assertIn("visual-review-manifest.sha256", visual)
         self.assertIn("visual-review-checker.py", visual)
+        self.assertIn("visual_reference", visual)
+        self.assertIn("visual-review-model-${{ needs.authenticate.outputs.source_run_id }}", visual)
+        self.assertNotIn("group: visual-review-model\n", visual)
         self.assertIn("sha256sum --check", visual)
         self.assertIn('git -C "$GITHUB_WORKSPACE" diff --exit-code', visual)
         self.assertIn('python3 "$RUNNER_TEMP/visual-review-checker.py"', visual)
