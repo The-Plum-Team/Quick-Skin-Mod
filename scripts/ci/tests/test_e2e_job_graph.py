@@ -214,6 +214,22 @@ class E2EJobGraphTest(unittest.TestCase):
                 ),
             )
 
+            # A privileged protected checkout may compare an authenticated source commit that is
+            # present only in the object database; source files never need to be checked out.
+            git("checkout", "--quiet", protected_sha)
+            self.assertEqual(
+                ("controller.txt", "variant.txt"),
+                graph.validate_controller_parity(
+                    repository,
+                    protected_sha=protected_sha,
+                    head_sha=unrelated_sha,
+                    repository_head_sha=protected_sha,
+                    paths=("controller.txt", "variant.txt"),
+                    version_specific_paths=("variant.txt",),
+                ),
+            )
+            git("checkout", "--quiet", unrelated_sha)
+
             controller.write_text("weakened\n", encoding="utf-8")
             git("add", ".")
             git("commit", "--quiet", "-m", "weaken controller")
@@ -232,6 +248,16 @@ class E2EJobGraphTest(unittest.TestCase):
                     repository,
                     protected_sha=protected_sha,
                     head_sha=unrelated_sha,
+                    paths=("controller.txt", "variant.txt"),
+                    version_specific_paths=("variant.txt",),
+                )
+
+            with self.assertRaisesRegex(graph.JobGraphError, "protected or evidence"):
+                graph.validate_controller_parity(
+                    repository,
+                    protected_sha=protected_sha,
+                    head_sha=unrelated_sha,
+                    repository_head_sha=weakened_sha,
                     paths=("controller.txt", "variant.txt"),
                     version_specific_paths=("variant.txt",),
                 )
