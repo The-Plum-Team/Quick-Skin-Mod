@@ -810,6 +810,18 @@ public class SettingsScreen extends Screen {
     //?}
     }
 
+    // Minecraft 1.21.1 calls renderBackground() from Screen.render() before it renders widgets.
+    // This screen has already drawn and blurred its parent by then, so allowing that second
+    // background pass would blur the modal panel while leaving the later widgets sharp.
+    //? if >=1.21 {
+        //? if <1.21.2 {
+    @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // The modal owns its complete background pass.
+    }
+        //?}
+    //?}
+
     @Override
     public void removed() {
         super.removed();
