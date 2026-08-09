@@ -18,6 +18,7 @@ from typing import Any
 
 VERDICT_KEYS = {"label", "matches", "visible", "anomalies", "defect"}
 MANIFEST_KEYS = {"path", "label", "capture_id", "kind", "expectation"}
+PAIRED_MANIFEST_KEYS = MANIFEST_KEYS | {"reference_path", "reference_label"}
 SHA256_PNG = re.compile(r"^(?P<digest>[0-9a-f]{64})\.png$")
 MAX_REVIEW_FRAMES = 512
 MAX_REVIEW_IMAGE_BYTES = 32 * 1024 * 1024
@@ -106,7 +107,9 @@ def _text(value: Any, label: str, *, maximum: int) -> str:
     return value.strip()
 
 
-def validate_manifest(manifest: Any) -> tuple[list[dict[str, Any]], list[str]]:
+def validate_manifest(
+    manifest: Any, *, require_paired: bool = False
+) -> tuple[list[dict[str, Any]], list[str]]:
     if (
         not isinstance(manifest, list)
         or not manifest
@@ -116,18 +119,23 @@ def validate_manifest(manifest: Any) -> tuple[list[dict[str, Any]], list[str]]:
             f"review manifest must contain between 1 and {MAX_REVIEW_FRAMES} entries"
         )
     labels: list[str] = []
+    schemas: set[frozenset[str]] = set()
     for index, item in enumerate(manifest):
-        if not isinstance(item, dict) or set(item) != MANIFEST_KEYS:
+        keys = frozenset(item) if isinstance(item, dict) else frozenset()
+        if not isinstance(item, dict) or keys not in {
+            frozenset(MANIFEST_KEYS),
+            frozenset(PAIRED_MANIFEST_KEYS),
+        }:
             raise ReviewError(
-                f"manifest entry {index} must contain exactly {sorted(MANIFEST_KEYS)}"
+                f"manifest entry {index} must use the single or paired review schema"
             )
-        labels.append(
-            _text(
-                item.get("label"),
-                f"manifest entry {index}.label",
-                maximum=MAX_LABEL_LENGTH,
-            )
+        schemas.add(keys)
+        label = _text(
+            item.get("label"),
+            f"manifest entry {index}.label",
+            maximum=MAX_LABEL_LENGTH,
         )
+        labels.append(label)
         _text(
             item.get("path"),
             f"manifest entry {index}.path",
@@ -149,8 +157,34 @@ def validate_manifest(manifest: Any) -> tuple[list[dict[str, Any]], list[str]]:
             f"manifest entry {index}.expectation",
             maximum=MAX_EXPECTATION_LENGTH,
         )
+        label_parts = label.split("/")
+        if len(label_parts) != 4 or ".".join(label_parts[1:]) != capture_id:
+            raise ReviewError(f"manifest entry {index}.label disagrees with capture_id")
+        if set(item) == PAIRED_MANIFEST_KEYS:
+            reference_label = _text(
+                item.get("reference_label"),
+                f"manifest entry {index}.reference_label",
+                maximum=MAX_LABEL_LENGTH,
+            )
+            _text(
+                item.get("reference_path"),
+                f"manifest entry {index}.reference_path",
+                maximum=MAX_PATH_LENGTH,
+            )
+            reference_parts = reference_label.split("/")
+            if (
+                len(reference_parts) != 4
+                or ".".join(reference_parts[1:]) != capture_id
+            ):
+                raise ReviewError(
+                    f"manifest entry {index}.reference_label disagrees with capture_id"
+                )
     if len(set(labels)) != len(labels):
         raise ReviewError("review manifest contains duplicate labels")
+    if len(schemas) != 1:
+        raise ReviewError("review manifest cannot mix single and paired entries")
+    if require_paired and schemas != {frozenset(PAIRED_MANIFEST_KEYS)}:
+        raise ReviewError("review manifest must pair every candidate with a reference")
     return manifest, labels
 
 
@@ -162,10 +196,12 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def validate_input(manifest: Any, input_root: Path) -> int:
+def validate_input(
+    manifest: Any, input_root: Path, *, require_paired: bool = False
+) -> int:
     """Validate the exact bounded, content-addressed handoff before revealing a secret."""
 
-    entries, _labels = validate_manifest(manifest)
+    entries, _labels = validate_manifest(manifest, require_paired=require_paired)
     try:
         root_metadata = input_root.lstat()
     except OSError as exc:
@@ -192,18 +228,24 @@ def validate_input(manifest: Any, input_root: Path) -> int:
 
     expected_images: set[str] = set()
     for index, item in enumerate(entries):
-        raw_path = item["path"]
-        path = PurePosixPath(raw_path)
-        if (
-            len(path.parts) != 3
-            or path.parts[:2] != (input_root.name, "images")
-            or raw_path != path.as_posix()
-        ):
-            raise ReviewError(f"manifest entry {index}.path escapes the curated image root")
-        match = SHA256_PNG.fullmatch(path.name)
-        if match is None:
-            raise ReviewError(f"manifest entry {index}.path is not content-addressed")
-        expected_images.add(path.name)
+        path_fields = ("path", "reference_path") if "reference_path" in item else ("path",)
+        for field in path_fields:
+            raw_path = item[field]
+            path = PurePosixPath(raw_path)
+            if (
+                len(path.parts) != 3
+                or path.parts[:2] != (input_root.name, "images")
+                or raw_path != path.as_posix()
+            ):
+                raise ReviewError(
+                    f"manifest entry {index}.{field} escapes the curated image root"
+                )
+            match = SHA256_PNG.fullmatch(path.name)
+            if match is None:
+                raise ReviewError(
+                    f"manifest entry {index}.{field} is not content-addressed"
+                )
+            expected_images.add(path.name)
 
     observed_images: set[str] = set()
     total_bytes = 0
@@ -248,8 +290,10 @@ def validate_input(manifest: Any, input_root: Path) -> int:
     return len(entries)
 
 
-def validate(manifest: Any, report: Any) -> list[dict[str, Any]]:
-    _entries, labels = validate_manifest(manifest)
+def validate(
+    manifest: Any, report: Any, *, require_paired: bool = False
+) -> list[dict[str, Any]]:
+    _entries, labels = validate_manifest(manifest, require_paired=require_paired)
 
     if (
         not isinstance(report, list)
@@ -383,17 +427,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", default="visual-review-manifest.json")
     parser.add_argument("--input-root", default="review-input")
     parser.add_argument("--validate-input-only", action="store_true")
+    parser.add_argument("--require-paired", action="store_true")
     parser.add_argument("--normalized-report")
     args = parser.parse_args(argv)
     try:
         manifest = load(Path(args.manifest), "review manifest")
         if args.validate_input_only:
-            count = validate_input(manifest, Path(args.input_root))
+            count = validate_input(
+                manifest,
+                Path(args.input_root),
+                require_paired=args.require_paired,
+            )
             print(f"Validated {count} curated visual review frames")
             return 0
         verdicts = validate(
             manifest,
             load(Path(args.report), "review report"),
+            require_paired=args.require_paired,
         )
         if args.normalized_report is not None:
             write_normalized_report(Path(args.normalized_report), verdicts)
