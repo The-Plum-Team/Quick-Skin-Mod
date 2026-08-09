@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import http.client
 import json
 import os
 import sys
@@ -19,14 +21,29 @@ from matrix import MatrixError, load_matrix
 
 
 MODRINTH_API = "https://api.modrinth.com/v2"
-CURSEFORGE_API = "https://api.curseforge.com/v1"
+# CurseForge's hash-bearing Core API (api.curseforge.com) requires a separately approved key that
+# the author upload token cannot satisfy, so reconciliation reads the unauthenticated first-party
+# listing for identity and proves byte equality from the CDN copy a downloader actually receives.
+CURSEFORGE_PUBLIC_API = "https://www.curseforge.com/api/v1"
+CURSEFORGE_CDN = "https://mediafilez.forgecdn.net/files"
+# Only an approved file is served by the CDN and protected by CurseForge's own duplicate check.
+CURSEFORGE_APPROVED_STATUS = 4
+# The listing silently caps a larger request at 50 rows per page.
+CURSEFORGE_PAGE_SIZE = 50
 MAX_CURSEFORGE_FILES = 2_000
+# Bound the walk by requests issued, not by rows kept, so a page of unusable rows cannot spin.
+MAX_CURSEFORGE_PAGES = MAX_CURSEFORGE_FILES // CURSEFORGE_PAGE_SIZE
+DOWNLOAD_CHUNK_BYTES = 1 << 16
 REQUEST_ATTEMPTS = 5
 REQUEST_BACKOFF_SECONDS = (2.0, 2.5, 3.0, 4.0)
 
 
 class ReconciliationError(RuntimeError):
     pass
+
+
+class PublicationPendingError(ReconciliationError):
+    """The marketplace holds the expected file but has not finished accepting it yet."""
 
 
 @dataclass(frozen=True)
@@ -114,25 +131,59 @@ def classify_modrinth(
     return Reconciliation(False, str(hash_version.get("id")))
 
 
+def curseforge_download_url(file_id: int, filename: str) -> str:
+    # CurseForge shards CDN paths by the file id split into thousands and remainder. The remainder
+    # is never zero-padded; a padded path is rejected with HTTP 403.
+    return (
+        f"{CURSEFORGE_CDN}/{file_id // 1000}/{file_id % 1000}/"
+        f"{urllib.parse.quote(filename)}"
+    )
+
+
 def classify_curseforge(
-    files: list[dict[str, Any]], expected: ExpectedArtifact
+    files: list[dict[str, Any]],
+    expected: ExpectedArtifact,
+    project_id: int,
+    fetch_bytes: Callable[[str, int], bytes],
 ) -> Reconciliation:
-    named = [row for row in files if row.get("fileName") == expected.filename]
+    named = [
+        row for row in files
+        if row.get("fileName") == expected.filename and row.get("projectId") == project_id
+    ]
     if not named:
         return Reconciliation(True, None)
     if len(named) != 1:
         raise ReconciliationError("CurseForge contains duplicate files with the expected name")
     remote = named[0]
-    hashes = {
-        int(item.get("algo", -1)): str(item.get("value", "")).lower()
-        for item in remote.get("hashes", [])
-        if isinstance(item, dict)
-    }
-    if hashes.get(1) != expected.sha1 or remote.get("fileLength") != expected.bytes:
+    if remote.get("fileLength") != expected.bytes:
         raise ReconciliationError(
             f"CurseForge file {expected.filename} exists with different bytes"
         )
-    return Reconciliation(False, str(remote.get("id")))
+    # A same-named file that is not approved yet is an upload still settling, which is exactly the
+    # window in which republishing would create a second live copy. Fail closed rather than race it.
+    if remote.get("status") != CURSEFORGE_APPROVED_STATUS:
+        # Before publishing this is a settling upload and must fail closed. While verifying our own
+        # upload it only means CurseForge has not finished approving it, so the caller may poll.
+        raise PublicationPendingError(
+            f"CurseForge file {expected.filename} exists but is not approved "
+            f"(status {remote.get('status')!r}); rerun once it settles"
+        )
+    file_id = remote.get("id")
+    if not isinstance(file_id, int) or isinstance(file_id, bool) or file_id < 0:
+        raise ReconciliationError("CurseForge file record has no usable id")
+    # The public listing carries no hash of any algorithm, so byte identity is proven from the
+    # published bytes themselves. That is strictly stronger than trusting a marketplace-asserted
+    # digest, and it lets the strong SHA-256 participate instead of SHA-1 alone.
+    payload = fetch_bytes(curseforge_download_url(file_id, expected.filename), expected.bytes)
+    if (
+        len(payload) != expected.bytes
+        or hashlib.sha1(payload).hexdigest() != expected.sha1.lower()
+        or hashlib.sha256(payload).hexdigest() != expected.sha256.lower()
+    ):
+        raise ReconciliationError(
+            f"CurseForge file {expected.filename} exists with different bytes"
+        )
+    return Reconciliation(False, str(file_id))
 
 
 def request_json(
@@ -179,6 +230,74 @@ def request_json(
     ) from last_error
 
 
+def request_bytes(
+    url: str,
+    limit: int,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+) -> bytes:
+    """Download exactly ``limit`` bytes, retrying only transient failures."""
+    if limit <= 0:
+        raise ReconciliationError("refusing to download against an unknown expected size")
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/octet-stream",
+            "User-Agent": "Quick-Skin-release-reconciler/1",
+        },
+    )
+    last_error: Exception | None = None
+    for attempt in range(REQUEST_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                payload = bytearray()
+                while True:
+                    chunk = response.read(DOWNLOAD_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    payload.extend(chunk)
+                    # A published file bigger than the staged artifact can never match it, so stop
+                    # reading instead of buffering an unbounded remote body. This is definitive
+                    # rather than transient, so it is not retried.
+                    if len(payload) > limit:
+                        raise ReconciliationError(
+                            "published CurseForge file is larger than the staged artifact"
+                        )
+            if len(payload) == limit:
+                return bytes(payload)
+            # A content-length response that ends early yields a short body without raising, and
+            # hashing it would report a published artifact as byte-divergent. Retry the transfer
+            # instead of manufacturing a false integrity conflict.
+            last_error = ReconciliationError(
+                f"truncated transfer: {len(payload)} of {limit} bytes"
+            )
+        except urllib.error.HTTPError as exc:
+            if exc.code < 500:
+                raise ReconciliationError(f"CurseForge CDN returned HTTP {exc.code}") from exc
+            last_error = exc
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            ConnectionError,
+            http.client.IncompleteRead,
+        ) as exc:
+            # A multi-megabyte transfer fails mid-body far more often than it fails to connect, and
+            # urllib only wraps connect-time errors in URLError, so those types are named directly.
+            last_error = exc
+        except OSError as exc:
+            raise ReconciliationError(f"CurseForge CDN request failed: {exc}") from exc
+        if attempt + 1 < REQUEST_ATTEMPTS:
+            print(
+                f"CurseForge CDN attempt {attempt + 1}/{REQUEST_ATTEMPTS} failed "
+                f"transiently ({last_error}); retrying",
+                file=sys.stderr,
+            )
+            sleep(REQUEST_BACKOFF_SECONDS[min(attempt, len(REQUEST_BACKOFF_SECONDS) - 1)])
+    raise ReconciliationError(
+        f"CurseForge CDN request failed after {REQUEST_ATTEMPTS} attempts: {last_error}"
+    ) from last_error
+
+
 def inspect_modrinth(
     expected: ExpectedArtifact,
     project_id: str,
@@ -202,30 +321,37 @@ def inspect_modrinth(
 def inspect_curseforge(
     expected: ExpectedArtifact,
     project_id: int,
-    token: str,
+    fetch_bytes: Callable[[str, int], bytes] = request_bytes,
 ) -> Reconciliation:
-    if not token:
-        raise ReconciliationError("CURSEFORGE_TOKEN is required for reconciliation")
-    headers = {"x-api-key": token}
     files: list[dict[str, Any]] = []
-    index = 0
-    while index < MAX_CURSEFORGE_FILES:
-        query = urllib.parse.urlencode({"index": index, "pageSize": 50})
-        response = request_json(
-            f"{CURSEFORGE_API}/mods/{project_id}/files?{query}", headers
+    for page in range(MAX_CURSEFORGE_PAGES):
+        # `pageIndex` is a page ordinal, not an item offset; the listing ignores an `index`
+        # parameter entirely and would otherwise re-read the first page forever.
+        query = urllib.parse.urlencode(
+            {"pageIndex": page, "pageSize": CURSEFORGE_PAGE_SIZE}
         )
-        page = response.get("data", []) if isinstance(response, dict) else []
-        if not isinstance(page, list):
+        response = request_json(
+            f"{CURSEFORGE_PUBLIC_API}/mods/{project_id}/files?{query}", {}
+        )
+        if not isinstance(response, dict):
             raise ReconciliationError("unexpected CurseForge files response")
-        files.extend(row for row in page if isinstance(row, dict))
-        pagination = response.get("pagination", {}) if isinstance(response, dict) else {}
-        total = int(pagination.get("totalCount", len(files)))
-        if not page or len(files) >= total:
+        rows = response.get("data", [])
+        if not isinstance(rows, list):
+            raise ReconciliationError("unexpected CurseForge files response")
+        files.extend(row for row in rows if isinstance(row, dict))
+        pagination = response.get("pagination", {})
+        # The envelope echoes the requested page size rather than the served one, so page
+        # progress is driven by the rows actually returned.
+        total = (
+            int(pagination.get("totalCount", len(files)))
+            if isinstance(pagination, dict)
+            else len(files)
+        )
+        if not rows or len(files) >= total:
             break
-        index += len(page)
-    if index >= MAX_CURSEFORGE_FILES:
+    else:
         raise ReconciliationError("CurseForge file inventory exceeded the reconciliation bound")
-    return classify_curseforge(files, expected)
+    return classify_curseforge(files, expected, project_id, fetch_bytes)
 
 
 def settle_publication(
@@ -241,7 +367,14 @@ def settle_publication(
     total = max(1, attempts if verify else 1)
     result = Reconciliation(True, None)
     for attempt in range(total):
-        result = inspector()
+        try:
+            result = inspector()
+        except PublicationPendingError:
+            # Pre-publication this is a settling upload that must never be republished over.
+            # Post-publication it is our own upload still being accepted, so keep polling.
+            if not verify:
+                raise
+            result = Reconciliation(True, None)
         if not verify or not result.publish:
             return result
         if attempt + 1 < total:
@@ -314,7 +447,6 @@ def main() -> int:
             inspector = lambda: inspect_curseforge(
                 expected,
                 int(matrix["project"]["curseforge_id"]),
-                os.environ.get("CURSEFORGE_TOKEN", ""),
             )
 
         result = settle_publication(
