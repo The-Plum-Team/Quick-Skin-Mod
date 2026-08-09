@@ -8,13 +8,23 @@ never identity, so visually similar captures from different scenarios cannot col
 from __future__ import annotations
 
 import argparse
+import hashlib
+import io
 import json
+import math
 import os
 import re
 import shutil
+import stat
 import sys
 import tempfile
 from pathlib import Path
+
+
+RELEASE_SCRIPTS = Path(__file__).resolve().parents[1] / "scripts" / "release"
+sys.path.insert(0, str(RELEASE_SCRIPTS))
+
+from matrix import MatrixError, load_matrix  # noqa: E402
 
 from visual_evidence import (
     DEFAULT_CATALOG,
@@ -33,7 +43,35 @@ MAX_REVIEW_IMAGE_BYTES = 480 * 1024 * 1024
 MAX_REVIEW_IMAGE_PIXELS = 512 * 1024 * 1024
 SAFE_DIRECTORY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 PUBLIC_MANIFEST_FIELDS = ("path", "label", "capture_id", "kind", "expectation")
+PUBLIC_REFERENCE_FIELDS = ("reference_path", "reference_label")
+MAX_REFERENCE_MANIFEST_BYTES = 10 * 1024 * 1024
+MAX_SINGLE_IMAGE_BYTES = 32 * 1024 * 1024
+VISUAL_REFERENCE_VERSION = "1.20.1"
+VISUAL_REFERENCE_LOADER = "fabric"
+
+
+def _reject_duplicate_reference_keys(
+    pairs: list[tuple[str, object]],
+) -> dict[str, object]:
+    parsed: dict[str, object] = {}
+    for key, value in pairs:
+        if key in parsed:
+            raise ValueError(f"duplicate JSON object key {key!r}")
+        parsed[key] = value
+    return parsed
+
+
+def _reject_nonfinite_reference_constant(value: str) -> None:
+    raise ValueError(f"non-finite JSON number {value!r}")
+
+
+def _parse_finite_reference_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"non-finite JSON number {value!r}")
+    return parsed
 
 
 def parse_combos(raw: str | None) -> set[tuple[str, str]] | None:
@@ -58,6 +96,7 @@ def build_manifest(
     *,
     include_all: bool,
     combos: set[tuple[str, str]] | None,
+    reference_frames: dict[str, dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
     catalog = load_catalog(catalog_path)
     _, frames, _ = collect_evidence(e2e_root, catalog)
@@ -67,8 +106,13 @@ def build_manifest(
         if unknown:
             formatted = ", ".join(f"{version}/{loader}" for version, loader in sorted(unknown))
             raise VisualEvidenceError(f"combo filter matched no packaged evidence: {formatted}")
-    manifest = [
-        {
+    manifest: list[dict[str, object]] = []
+    for frame in frames:
+        if not (include_all or frame["review_tier"] == "key"):
+            continue
+        if combos is not None and (frame["version"], frame["loader"]) not in combos:
+            continue
+        item: dict[str, object] = {
             "path": frame["source_path"],
             "label": frame["frame_id"],
             "capture_id": frame["capture_id"],
@@ -79,10 +123,24 @@ def build_manifest(
             "_verified_width": frame["width"],
             "_verified_height": frame["height"],
         }
-        for frame in frames
-        if (include_all or frame["review_tier"] == "key")
-        and (combos is None or (frame["version"], frame["loader"]) in combos)
-    ]
+        if reference_frames is not None:
+            reference = reference_frames.get(frame["capture_id"])
+            if reference is None:
+                raise VisualEvidenceError(
+                    f"visual reference is missing capture {frame['capture_id']!r}"
+                )
+            item.update(
+                {
+                    "reference_path": reference["path"],
+                    "reference_label": reference["label"],
+                    "_reference_verified_file_sha256": reference["file_sha256"],
+                    "_reference_verified_pixel_sha256": reference["pixel_sha256"],
+                    "_reference_verified_width": reference["width"],
+                    "_reference_verified_height": reference["height"],
+                    "_reference_verified_format": reference["format"],
+                }
+            )
+        manifest.append(item)
     if not manifest:
         raise VisualEvidenceError("visual review manifest would be empty")
     return manifest
@@ -93,10 +151,317 @@ def public_manifest(manifest: list[dict[str, object]]) -> list[dict[str, str]]:
 
     public: list[dict[str, str]] = []
     for index, item in enumerate(manifest):
-        if any(not isinstance(item.get(field), str) for field in PUBLIC_MANIFEST_FIELDS):
+        fields = list(PUBLIC_MANIFEST_FIELDS)
+        has_reference = any(field in item for field in PUBLIC_REFERENCE_FIELDS)
+        if has_reference:
+            fields.extend(PUBLIC_REFERENCE_FIELDS)
+        if any(not isinstance(item.get(field), str) for field in fields):
             raise VisualEvidenceError(f"visual review manifest entry {index} is invalid")
-        public.append({field: str(item[field]) for field in PUBLIC_MANIFEST_FIELDS})
+        public.append({field: str(item[field]) for field in fields})
     return public
+
+
+def reference_identity(matrix_path: Path) -> dict[str, str]:
+    """Derive the one protected visual anchor without introducing a version list."""
+
+    try:
+        matrix = load_matrix(matrix_path)
+    except MatrixError as exc:
+        raise VisualEvidenceError(str(exc)) from exc
+    version = matrix.get("unit_test_version")
+    project = matrix.get("project")
+    branch = project.get("release_branch") if isinstance(project, dict) else None
+    artifacts = matrix.get("artifacts")
+    if (
+        not isinstance(version, str)
+        or not SAFE_ID.fullmatch(version)
+        or not isinstance(branch, str)
+        or not branch
+        or not isinstance(artifacts, list)
+    ):
+        raise VisualEvidenceError("release matrix has no valid visual reference identity")
+    if version != VISUAL_REFERENCE_VERSION:
+        raise VisualEvidenceError(
+            "protected master must keep Minecraft 1.20.1 as the visual reference"
+        )
+    candidates = [
+        artifact
+        for artifact in artifacts
+        if isinstance(artifact, dict)
+        and artifact.get("artifact_version") == version
+        and artifact.get("loader") == VISUAL_REFERENCE_LOADER
+    ]
+    if len(candidates) != 1:
+        raise VisualEvidenceError(
+            "protected visual reference requires exactly one Fabric artifact at "
+            f"the unit-test version {version}"
+        )
+    artifact_node = candidates[0].get("artifact_node")
+    if not isinstance(artifact_node, str) or not SAFE_ID.fullmatch(artifact_node):
+        raise VisualEvidenceError("protected visual reference artifact is invalid")
+    return {
+        "release_branch": branch,
+        "artifact_node": artifact_node,
+        "version": version,
+        "loader": VISUAL_REFERENCE_LOADER,
+    }
+
+
+def _read_reference_manifest(path: Path) -> dict[str, object]:
+    try:
+        metadata = path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or path.is_symlink()
+            or metadata.st_size <= 0
+            or metadata.st_size > MAX_REFERENCE_MANIFEST_BYTES
+        ):
+            raise ValueError("manifest is not a bounded regular file")
+        payload = path.read_bytes()
+        if len(payload) != metadata.st_size:
+            raise ValueError("manifest changed while reading")
+        parsed = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_reference_keys,
+            parse_constant=_reject_nonfinite_reference_constant,
+            parse_float=_parse_finite_reference_float,
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise VisualEvidenceError(f"cannot read compact visual reference manifest: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise VisualEvidenceError("compact visual reference manifest must be an object")
+    return parsed
+
+
+def load_reference_frames(
+    evidence_root: Path,
+    catalog_path: Path,
+    *,
+    branch: str,
+    artifact_node: str,
+) -> dict[str, dict[str, object]]:
+    """Load one already validated compact Pages lane as the cross-version anchor."""
+
+    try:
+        root = evidence_root.resolve(strict=True)
+        unresolved_bundle = root / branch
+        if unresolved_bundle.is_symlink():
+            raise OSError("reference bundle is a symbolic link")
+        bundle = unresolved_bundle.resolve(strict=True)
+    except OSError as exc:
+        raise VisualEvidenceError(f"cannot resolve compact visual reference: {exc}") from exc
+    if bundle.parent != root or not bundle.is_dir() or bundle.is_symlink():
+        raise VisualEvidenceError("compact visual reference bundle escapes its evidence root")
+    manifest = _read_reference_manifest(bundle / "manifest.json")
+    catalog = load_catalog(catalog_path)
+    if manifest.get("schema_version") != 2:
+        raise VisualEvidenceError("visual reference must be compact Pages evidence")
+    if manifest.get("contract_sha256") != catalog.contract_sha256:
+        raise VisualEvidenceError("visual reference uses a different scenario contract")
+    release = manifest.get("release")
+    if not isinstance(release, dict) or release.get("branch") != branch:
+        raise VisualEvidenceError("visual reference release identity is invalid")
+    artifacts = release.get("artifacts")
+    matches = (
+        [
+            artifact
+            for artifact in artifacts
+            if isinstance(artifact, dict) and artifact.get("artifact_node") == artifact_node
+        ]
+        if isinstance(artifacts, list)
+        else []
+    )
+    if len(matches) != 1:
+        raise VisualEvidenceError("visual reference artifact is missing or duplicated")
+    reference_version = matches[0].get("version")
+    reference_loader = matches[0].get("loader")
+    if (
+        reference_version != VISUAL_REFERENCE_VERSION
+        or reference_loader != VISUAL_REFERENCE_LOADER
+    ):
+        raise VisualEvidenceError("visual reference artifact metadata is invalid")
+
+    raw_frames = manifest.get("frames")
+    if not isinstance(raw_frames, list):
+        raise VisualEvidenceError("visual reference frames must be an array")
+    selected: dict[str, dict[str, object]] = {}
+    for index, frame in enumerate(raw_frames):
+        if not isinstance(frame, dict) or frame.get("artifact_node") != artifact_node:
+            continue
+        if (
+            frame.get("version") != reference_version
+            or frame.get("loader") != reference_loader
+        ):
+            raise VisualEvidenceError(
+                f"visual reference frame {index} disagrees with its artifact"
+            )
+        capture_id = frame.get("capture_id")
+        reference = catalog.by_id.get(capture_id) if isinstance(capture_id, str) else None
+        if reference is None or any(
+            frame.get(field) != reference[field]
+            for field in (
+                "scenario",
+                "role",
+                "step",
+                "title",
+                "expectation",
+                "review_tier",
+            )
+        ):
+            raise VisualEvidenceError(
+                f"visual reference frame {index} disagrees with the scenario contract"
+            )
+        expected_label = (
+            f"{artifact_node}/{reference['scenario']}/{reference['role']}/{reference['step']}"
+        )
+        if frame.get("frame_id") != expected_label or capture_id in selected:
+            raise VisualEvidenceError(
+                f"visual reference frame {index} has invalid or duplicate identity"
+            )
+        derivative = frame.get("derivative")
+        if not isinstance(derivative, dict) or derivative.get("format") != "webp":
+            raise VisualEvidenceError(f"visual reference frame {index} has no WebP derivative")
+        asset = derivative.get("asset")
+        file_sha256 = derivative.get("file_sha256")
+        metrics = derivative.get("pixel_validation")
+        width = derivative.get("width")
+        height = derivative.get("height")
+        if (
+            not isinstance(asset, str)
+            or not isinstance(file_sha256, str)
+            or not SHA256.fullmatch(file_sha256)
+            or asset != f"images/{file_sha256}.webp"
+            or not isinstance(metrics, dict)
+            or metrics.get("file_sha256") != file_sha256
+            or not isinstance(metrics.get("pixel_sha256"), str)
+            or not SHA256.fullmatch(metrics["pixel_sha256"])
+            or isinstance(width, bool)
+            or not isinstance(width, int)
+            or isinstance(height, bool)
+            or not isinstance(height, int)
+            or width < 640
+            or height < 360
+            or metrics.get("width") != width
+            or metrics.get("height") != height
+        ):
+            raise VisualEvidenceError(f"visual reference frame {index} derivative is invalid")
+        unresolved_source = bundle / asset
+        try:
+            images = (bundle / "images").resolve(strict=True)
+            if unresolved_source.is_symlink():
+                raise OSError("reference asset is a symbolic link")
+            source = unresolved_source.resolve(strict=True)
+        except OSError as exc:
+            raise VisualEvidenceError(
+                f"cannot resolve visual reference frame {index}: {exc}"
+            ) from exc
+        if source.parent != images:
+            raise VisualEvidenceError(f"visual reference frame {index} asset escapes its bundle")
+        selected[capture_id] = {
+            "path": str(source),
+            "label": expected_label,
+            "file_sha256": file_sha256,
+            "pixel_sha256": metrics["pixel_sha256"],
+            "width": width,
+            "height": height,
+            "format": "WEBP",
+            "version": reference_version,
+            "loader": reference_loader,
+        }
+    if not selected:
+        raise VisualEvidenceError("visual reference contains no frames for its anchor artifact")
+    return selected
+
+
+def _canonicalize_verified_reference(
+    path: Path,
+    *,
+    expected_format: object,
+    expected_file_sha256: object,
+    expected_pixel_sha256: object,
+    expected_dimensions: tuple[object, object],
+) -> tuple[tuple[int, int], str, bytes]:
+    """Revalidate one compact derivative and return a metadata-free RGB PNG."""
+
+    if (
+        expected_format != "WEBP"
+        or not isinstance(expected_file_sha256, str)
+        or not SHA256.fullmatch(expected_file_sha256)
+        or not isinstance(expected_pixel_sha256, str)
+        or not SHA256.fullmatch(expected_pixel_sha256)
+        or any(isinstance(value, bool) or not isinstance(value, int) for value in expected_dimensions)
+    ):
+        raise VisualEvidenceError("visual reference descriptor is invalid")
+    try:
+        from PIL import Image, UnidentifiedImageError
+    except ImportError as exc:  # pragma: no cover - CI installs the locked decoder
+        raise VisualEvidenceError("Pillow is required to curate visual references") from exc
+    try:
+        metadata = path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or path.is_symlink()
+            or metadata.st_size <= 0
+            or metadata.st_size > MAX_SINGLE_IMAGE_BYTES
+        ):
+            raise ValueError("reference image is not a bounded regular file")
+        payload = path.read_bytes()
+        if len(payload) != metadata.st_size:
+            raise ValueError("reference image changed while reading")
+        if hashlib.sha256(payload).hexdigest() != expected_file_sha256:
+            raise ValueError("reference image digest changed")
+        with Image.open(io.BytesIO(payload)) as image:
+            if image.format != expected_format or getattr(image, "n_frames", 1) != 1:
+                raise ValueError("reference image format changed")
+            image.load()
+            rendered = image.convert("RGB")
+            dimensions = rendered.size
+            if dimensions != expected_dimensions:
+                raise ValueError("reference image dimensions changed")
+            if hashlib.sha256(rendered.tobytes()).hexdigest() != expected_pixel_sha256:
+                raise ValueError("reference image pixels changed")
+            output = io.BytesIO()
+            rendered.save(output, format="PNG", optimize=False, compress_level=9)
+    except VisualEvidenceError:
+        raise
+    except (OSError, UnidentifiedImageError, ValueError) as exc:
+        raise VisualEvidenceError(f"cannot canonicalize visual reference {path}: {exc}") from exc
+    canonical = output.getvalue()
+    return dimensions, hashlib.sha256(canonical).hexdigest(), canonical
+
+
+def _resize_canonical_png(
+    payload: bytes,
+    source_dimensions: tuple[int, int],
+    target_dimensions: tuple[int, int],
+) -> tuple[str, bytes]:
+    if source_dimensions == target_dimensions:
+        return hashlib.sha256(payload).hexdigest(), payload
+    if (
+        source_dimensions[0] * target_dimensions[1]
+        != source_dimensions[1] * target_dimensions[0]
+    ):
+        raise VisualEvidenceError(
+            "candidate and 1.20.1 reference screenshots use different aspect ratios"
+        )
+    try:
+        from PIL import Image, UnidentifiedImageError
+
+        with Image.open(io.BytesIO(payload)) as image:
+            if image.format != "PNG" or getattr(image, "n_frames", 1) != 1:
+                raise ValueError("candidate canonical image is not a static PNG")
+            image.load()
+            rendered = image.convert("RGB").resize(
+                target_dimensions, Image.Resampling.LANCZOS
+            )
+            output = io.BytesIO()
+            rendered.save(output, format="PNG", optimize=False, compress_level=9)
+    except ImportError as exc:  # pragma: no cover - CI installs the locked decoder
+        raise VisualEvidenceError("Pillow is required to normalize review screenshots") from exc
+    except (OSError, UnidentifiedImageError, ValueError) as exc:
+        raise VisualEvidenceError(f"cannot normalize candidate screenshot: {exc}") from exc
+    normalized = output.getvalue()
+    return hashlib.sha256(normalized).hexdigest(), normalized
 
 
 def validate_expected_row(
@@ -195,9 +560,51 @@ def curate_manifest(
     total_bytes = 0
     total_pixels = 0
     copied: dict[str, Path] = {}
+    reference_snapshots: dict[str, tuple[tuple[int, int], str, bytes]] = {}
     try:
         images = staging / "images"
         images.mkdir(mode=0o700)
+
+        def retain(
+            digest: str,
+            payload: bytes,
+            source: Path,
+        ) -> Path:
+            nonlocal total_bytes
+            asset = copied.get(digest)
+            if asset is not None:
+                return asset
+            if len(copied) >= MAX_REVIEW_FRAMES:
+                raise VisualEvidenceError(
+                    f"curated visual review exceeds {MAX_REVIEW_FRAMES} distinct images"
+                )
+
+            total_bytes += len(payload)
+            if total_bytes > MAX_REVIEW_IMAGE_BYTES:
+                raise VisualEvidenceError(
+                    "curated visual review exceeds its total image byte limit"
+                )
+            asset = images / f"{digest}.png"
+            with asset.open("xb") as output_stream:
+                output_stream.write(payload)
+                output_stream.flush()
+                os.fsync(output_stream.fileno())
+            if asset.stat().st_size != len(payload):
+                raise VisualEvidenceError(
+                    f"review frame changed while curating: {source}"
+                )
+            os.chmod(asset, 0o644)
+            copied[digest] = asset
+            return asset
+
+        def account_pixels(dimensions: tuple[int, int]) -> None:
+            nonlocal total_pixels
+            total_pixels += dimensions[0] * dimensions[1]
+            if total_pixels > MAX_REVIEW_IMAGE_PIXELS:
+                raise VisualEvidenceError(
+                    "curated visual review exceeds its total pixel limit"
+                )
+
         for index, item in enumerate(manifest):
             source_value = item.get("path")
             if not isinstance(source_value, str):
@@ -222,31 +629,55 @@ def curate_manifest(
                 raise VisualEvidenceError(
                     f"review frame changed after evidence validation: {source}"
                 )
-            total_pixels += dimensions[0] * dimensions[1]
-            if total_pixels > MAX_REVIEW_IMAGE_PIXELS:
-                raise VisualEvidenceError(
-                    "curated visual review exceeds its total pixel limit"
+
+            reference_asset: Path | None = None
+            reference_value = item.get("reference_path")
+            if reference_value is not None:
+                if not isinstance(reference_value, str):
+                    raise VisualEvidenceError(
+                        f"review frame {index} has an invalid reference path"
+                    )
+                reference = Path(reference_value)
+                reference_key = str(item.get("_reference_verified_file_sha256"))
+                reference_snapshot = reference_snapshots.get(reference_key)
+                if reference_snapshot is None:
+                    reference_snapshot = _canonicalize_verified_reference(
+                        reference,
+                        expected_format=item.get("_reference_verified_format"),
+                        expected_file_sha256=item.get(
+                            "_reference_verified_file_sha256"
+                        ),
+                        expected_pixel_sha256=item.get(
+                            "_reference_verified_pixel_sha256"
+                        ),
+                        expected_dimensions=(
+                            item.get("_reference_verified_width"),
+                            item.get("_reference_verified_height"),
+                        ),
+                    )
+                    reference_snapshots[reference_key] = reference_snapshot
+                reference_dimensions, reference_digest, reference_payload = (
+                    reference_snapshot
                 )
-            asset = copied.get(digest)
-            if asset is None:
-                total_bytes += len(payload)
-                if total_bytes > MAX_REVIEW_IMAGE_BYTES:
-                    raise VisualEvidenceError(
-                        "curated visual review exceeds its total image byte limit"
-                    )
-                asset = images / f"{digest}.png"
-                with asset.open("xb") as output_stream:
-                    output_stream.write(payload)
-                    output_stream.flush()
-                    os.fsync(output_stream.fileno())
-                if asset.stat().st_size != len(payload):
-                    raise VisualEvidenceError(
-                        f"review frame changed while curating: {source}"
-                    )
-                os.chmod(asset, 0o644)
-                copied[digest] = asset
+                digest, payload = _resize_canonical_png(
+                    payload, dimensions, reference_dimensions
+                )
+                dimensions = reference_dimensions
+                account_pixels(reference_dimensions)
+                reference_asset = retain(
+                    reference_digest,
+                    reference_payload,
+                    reference,
+                )
+
+            account_pixels(dimensions)
+            asset = retain(digest, payload, source)
             rewritten = public_manifest([item])[0]
             rewritten["path"] = f"{destination.name}/images/{digest}.png"
+            if reference_asset is not None:
+                rewritten["reference_path"] = (
+                    f"{destination.name}/images/{reference_asset.name}"
+                )
             curated.append(rewritten)
 
         manifest_path = staging / "visual-review-manifest.json"
@@ -275,6 +706,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--e2e-root", type=Path, default=REPO / "e2e-out")
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument(
+        "--matrix",
+        type=Path,
+        default=REPO / "release" / "release-matrix.json",
+    )
+    parser.add_argument(
+        "--reference-identity",
+        action="store_true",
+        help="print the visual anchor derived from the protected release matrix",
+    )
+    parser.add_argument(
+        "--reference-evidence-root",
+        type=Path,
+        help="already validated compact Pages evidence containing the 1.20.1 anchor",
+    )
+    parser.add_argument("--reference-branch")
+    parser.add_argument("--reference-artifact-node")
+    parser.add_argument(
         "--curate-output",
         type=Path,
         help="atomically copy only selected frames into this fresh directory",
@@ -285,8 +733,47 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
+        reference_arguments = (
+            args.reference_evidence_root,
+            args.reference_branch,
+            args.reference_artifact_node,
+        )
+        has_reference = any(value is not None for value in reference_arguments)
+        if has_reference and not all(value is not None for value in reference_arguments):
+            raise VisualEvidenceError(
+                "paired review requires --reference-evidence-root, --reference-branch, "
+                "and --reference-artifact-node together"
+            )
+        if has_reference and not args.all:
+            raise VisualEvidenceError(
+                "paired cross-version review must use --all to cover every capture"
+            )
+        if args.reference_identity:
+            if (
+                args.validate_row_json is not None
+                or args.curate_output is not None
+                or args.all
+                or args.combos is not None
+                or has_reference
+            ):
+                raise VisualEvidenceError(
+                    "--reference-identity cannot be combined with evidence selection"
+                )
+            print(
+                json.dumps(
+                    reference_identity(args.matrix),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+            return 0
         if args.validate_row_json is not None:
-            if args.curate_output is not None or args.all or args.combos is not None:
+            if (
+                args.curate_output is not None
+                or args.all
+                or args.combos is not None
+                or has_reference
+            ):
                 raise VisualEvidenceError(
                     "--validate-row-json cannot be combined with manifest selection"
                 )
@@ -297,11 +784,28 @@ def main(argv: list[str] | None = None) -> int:
             validated = validate_expected_row(args.e2e_root, args.catalog, row)
             print(json.dumps(validated, sort_keys=True, separators=(",", ":")))
             return 0
+        reference_frames = None
+        if has_reference:
+            anchor = reference_identity(args.matrix)
+            if (
+                args.reference_branch != anchor["release_branch"]
+                or args.reference_artifact_node != anchor["artifact_node"]
+            ):
+                raise VisualEvidenceError(
+                    "paired review reference disagrees with protected master identity"
+                )
+            reference_frames = load_reference_frames(
+                args.reference_evidence_root,
+                args.catalog,
+                branch=args.reference_branch,
+                artifact_node=args.reference_artifact_node,
+            )
         manifest = build_manifest(
             args.e2e_root,
             args.catalog,
             include_all=args.all,
             combos=parse_combos(args.combos),
+            reference_frames=reference_frames,
         )
         if args.curate_output is not None:
             manifest = curate_manifest(manifest, args.curate_output)
