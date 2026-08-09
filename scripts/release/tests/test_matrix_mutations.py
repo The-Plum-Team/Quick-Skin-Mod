@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import copy
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -448,6 +450,44 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
                 "belongs to no supported Minecraft version",
             ):
                 release_matrix.load_matrix_snapshot(matrix_path, properties_path)
+
+    def test_snapshot_cli_emits_actions_matrix_without_source_checkout(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            matrix_path = root / "source-release-matrix.json"
+            properties_path = root / "source-gradle.properties"
+            matrix_path.write_text(json.dumps(self.base), encoding="utf-8")
+            properties_path.write_bytes((ROOT / "gradle.properties").read_bytes())
+            output = io.StringIO()
+
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "matrix.py",
+                        "--matrix",
+                        str(matrix_path),
+                        "--matrix-properties",
+                        str(properties_path),
+                        "--kind",
+                        "pr-anchors",
+                    ],
+                ),
+                redirect_stdout(output),
+            ):
+                result = release_matrix.main()
+
+            mod_version = release_matrix.read_mod_version_from_properties(
+                properties_path, self.base
+            )
+            self.assertEqual(0, result)
+            self.assertEqual(
+                release_matrix.gha_matrix(
+                    self.base, "pr-anchors", mod_version
+                ),
+                json.loads(output.getvalue()),
+            )
 
     def test_orphan_versioned_gradle_property_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
