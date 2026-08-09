@@ -499,7 +499,33 @@ class VisualEvidenceTest(unittest.TestCase):
             curate_manifest(manifest, self.root / "changed-review-input")
 
     def test_visual_reference_identity_is_derived_from_protected_master(self) -> None:
-        identity = reference_identity(ROOT / "release" / "release-matrix.json")
+        # This test is synchronized byte-for-byte onto every release branch. The
+        # runtime caller supplies the protected master's matrix, so model that
+        # input explicitly instead of accidentally reading the target branch's
+        # matrix after a port.
+        protected_matrix = {
+            "unit_test_version": "1.20.1",
+            "project": {"release_branch": "forge-and-fabric-1.20.1"},
+            "artifacts": [
+                {
+                    "artifact_node": "fabric-1.20.1",
+                    "artifact_version": "1.20.1",
+                    "loader": "fabric",
+                },
+                {
+                    "artifact_node": "forge-1.20.1",
+                    "artifact_version": "1.20.1",
+                    "loader": "forge",
+                },
+            ],
+        }
+        protected_matrix_path = self.root / "protected-master-matrix.json"
+        with mock.patch(
+            "visual_review.load_matrix", return_value=protected_matrix
+        ) as load_matrix:
+            identity = reference_identity(protected_matrix_path)
+
+        load_matrix.assert_called_once_with(protected_matrix_path)
 
         self.assertEqual(
             {
