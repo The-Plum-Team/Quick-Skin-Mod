@@ -300,7 +300,6 @@ jobs:
         id: reconcile
         env:
           MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' && secrets.MODRINTH_TOKEN || '' }}
-          CURSEFORGE_TOKEN: ${{ matrix.marketplace == 'curseforge' && secrets.CURSEFORGE_TOKEN || '' }}
         run: >-
           python scripts/release/reconcile_publication.py
           --artifact-node "${{ matrix.artifact_node }}"
@@ -344,19 +343,24 @@ jobs:
           game-version-filter: none
           dependencies: ${{ matrix.dependencies }}
           java: ${{ matrix.java }}
-          retry-attempts: 3
+          # CurseForge deduplicates only against an already approved file, so an in-action retry
+          # can land a second live copy of the same jar. The reconciler is the only safe retry
+          # authority here; Modrinth keeps three attempts because it rejects duplicates
+          # synchronously.
+          retry-attempts: 1
           retry-delay: 10000
           fail-mode: fail
 
       - name: Verify marketplace ID and exact bytes after publication
         env:
           MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' && secrets.MODRINTH_TOKEN || '' }}
-          CURSEFORGE_TOKEN: ${{ matrix.marketplace == 'curseforge' && secrets.CURSEFORGE_TOKEN || '' }}
         run: >-
           python scripts/release/reconcile_publication.py
           --artifact-node "${{ matrix.artifact_node }}"
           --marketplace "${{ matrix.marketplace }}"
           --publication-id "${{ matrix.publication_id }}"
+          --attempts "${{ matrix.marketplace == 'curseforge' && 40 || 6 }}"
+          --delay-seconds "${{ matrix.marketplace == 'curseforge' && 20 || 10 }}"
           --verify
           --record "build/publication/${{ matrix.id }}.json"
 
