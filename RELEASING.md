@@ -55,7 +55,12 @@ The workflow then performs this fixed sequence:
 4. run all matrix-declared packaged Minecraft scenarios against those staged bytes;
 5. create or reconcile an exact draft GitHub Release without overwriting assets;
 6. publish every artifact independently to Modrinth and CurseForge, reconciling the remote
-   publication ID, filename, size, and supported hash before and after each upload;
+   publication ID, filename, size, and bytes before and after each upload. Modrinth is reconciled
+   by SHA-512 through its own API. CurseForge publishes no hash on any endpoint its author token
+   can reach, so reconciliation locates the file through the unauthenticated first-party listing
+   and then proves byte equality by downloading the published copy and hashing it locally against
+   the staged SHA-1 and SHA-256. A same-named file that is not yet approved fails closed rather
+   than racing an upload that is still settling;
 7. publish the GitHub Release only after every marketplace row is verified.
 
 The GitHub Release contains the production JARs, `artifacts.json`, `quick-skin.cdx.json`, and
