@@ -1137,13 +1137,27 @@ class WorkflowSecurityTest(unittest.TestCase):
             ),
             2,
         )
+        # CurseForge reconciliation reads only unauthenticated first-party endpoints, so the
+        # upload step is the single place that may see the token at all.
+        self.assertNotIn("CURSEFORGE_TOKEN: ", workflow)
         self.assertEqual(
-            workflow.count(
-                "CURSEFORGE_TOKEN: ${{ matrix.marketplace == 'curseforge' "
-                "&& secrets.CURSEFORGE_TOKEN || '' }}"
-            ),
-            2,
+            workflow.count("curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}"), 1
         )
+
+    def test_curseforge_upload_is_never_retried_inside_the_action(self) -> None:
+        workflow = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
+
+        def publish_step(marketplace: str) -> str:
+            tail = workflow.split(
+                f"Publish exact verified artifact to {marketplace}", 1
+            )[1]
+            return tail.split("- name: ", 1)[0]
+
+        # CurseForge approves asynchronously and deduplicates only against an approved file, so a
+        # retried upload can publish a second live copy that no pre-publish gate can prevent.
+        self.assertIn("retry-attempts: 1", publish_step("CurseForge"))
+        # Modrinth rejects a duplicate synchronously, so its retries stay safe.
+        self.assertIn("retry-attempts: 3", publish_step("Modrinth"))
 
 
 if __name__ == "__main__":
