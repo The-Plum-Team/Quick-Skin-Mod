@@ -308,6 +308,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("actions/artifacts/$artifact_id", curate)
         self.assertIn("scripts/ci/bounded_zip.py", curate)
         self.assertIn("scripts/ci/e2e_job_graph.py", curate)
+        self.assertNotIn("path: source", curate)
+        self.assertNotIn("git -C source", curate)
+        self.assertIn('git fetch --no-tags origin "$SOURCE_SHA"', curate)
+        self.assertIn(
+            'git show "$SOURCE_SHA:e2e/scenario-contract.json"', curate
+        )
+        self.assertIn(
+            'git show "$SOURCE_SHA:release/release-matrix.json"', curate
+        )
+        self.assertIn('--repository-head-sha "$IMPLEMENTATION_SHA"', curate)
         self.assertIn("--reference-identity", curate)
         self.assertIn("scripts/pages/select_artifact.py", curate)
         self.assertIn("actions/artifacts/$REFERENCE_ARTIFACT_ID", curate)

@@ -167,6 +167,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Secret-bearing visual review has the fixed boundary `authenticate -> curate without secrets ->
   review in a fresh capsule -> exact-id cleanup`. Curating must authenticate every source artifact
   by numeric id, size, digest, run, protected matrix row, complete scenario product, and one JAR;
+  it must import the authenticated source commit only as inert Git objects and never check out or
+  execute source-head files in the privileged default-branch workflow;
   authenticate the exact current-head 1.20.1 Pages source and its run provenance; fully decode,
   dimension-normalize, and canonically re-encode bounded RGB PNG pairs without source metadata; and
   emit a source/implementation/candidate/reference-artifact-bound proof. The review runner accepts

@@ -185,8 +185,10 @@ The stable cross-version anchor decision is recorded in
 [ADR 0004](../docs/architecture/decisions/0004-anchor-ai-visual-review-to-1-20-1.md).
 
 That workflow never exposes raw packaged artifacts to the model credential. A secretless curator
-authenticates every artifact and exact matrix row, fully decodes the complete scenario product,
-requires one production JAR, and re-encodes every captured frame as a bounded metadata-free RGB PNG
+authenticates every artifact and exact matrix row. It imports the exact source commit only as inert
+Git objects—never as a checkout executed by the privileged workflow—then fully decodes the complete
+scenario product, requires one production JAR, and re-encodes every captured frame as a bounded
+metadata-free RGB PNG
 named by its served-byte SHA-256. For each semantic `capture_id`, it pairs the candidate with the
 authenticated current-head Fabric 1.20.1 frame selected from the protected Pages handoff/cache.
 Candidate and reference are normalized to the same dimensions without changing aspect ratio. The

@@ -251,14 +251,6 @@ jobs:
           ref: ${{ needs.authenticate.outputs.implementation_sha }}
           persist-credentials: false
 
-      - name: Check out the exact evidence source separately
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.authenticate.outputs.source_sha }}
-          fetch-depth: 1
-          path: source
-          persist-credentials: false
-
       - name: Install Python for protected evidence validation
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -340,18 +332,6 @@ jobs:
             <<< "$ARTIFACT_INVENTORY" > /dev/null
           printf 'contract_skew=false\n' >> "$GITHUB_OUTPUT"
 
-          # Protected master code and master's scenario contract review evidence produced by the
-          # source tree. A contract mismatch between the two trees would fail step-set validation
-          # red, so skew skips this advisory review loudly instead.
-          master_contract_sha256="$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)"
-          source_contract_sha256="$(sha256sum source/e2e/scenario-contract.json | cut -d ' ' -f 1)"
-          if [[ "$master_contract_sha256" != "$source_contract_sha256" ]]; then
-            printf 'contract_skew=true\n' >> "$GITHUB_OUTPUT"
-            printf 'scenario-contract skew between master and source head; skipping advisory review\n' \
-              | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
           source_run="$(gh api \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
           jq -e \
@@ -365,6 +345,26 @@ jobs:
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == $repository' \
             <<< "$source_run" > /dev/null
+
+          # Import the authenticated source commit as inert Git objects only. Never check out or
+          # execute source-head files in this privileged default-branch workflow.
+          git fetch --no-tags origin "$SOURCE_SHA"
+          [[ "$(git rev-parse FETCH_HEAD)" == "$SOURCE_SHA" ]]
+          source_matrix="$RUNNER_TEMP/source-release-matrix.json"
+          source_contract="$RUNNER_TEMP/source-scenario-contract.json"
+          git show "$SOURCE_SHA:release/release-matrix.json" > "$source_matrix"
+          git show "$SOURCE_SHA:e2e/scenario-contract.json" > "$source_contract"
+
+          # Protected master code validates review evidence produced from the authenticated source
+          # commit. Contract skew would make step parity ambiguous, so it skips advisory review.
+          master_contract_sha256="$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)"
+          source_contract_sha256="$(sha256sum "$source_contract" | cut -d ' ' -f 1)"
+          if [[ "$master_contract_sha256" != "$source_contract_sha256" ]]; then
+            printf 'contract_skew=true\n' >> "$GITHUB_OUTPUT"
+            printf 'scenario-contract skew between master and source head; skipping advisory review\n' \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           matrix_kind=pr-anchors
           if [[ "$(jq -r .event <<< "$source_run")" == schedule ]]; then
             matrix_kind=native-anchors
@@ -380,12 +380,11 @@ jobs:
              ([.[].jobs[]] | length > 0 and length <= 100)' \
             "$jobs" > /dev/null
 
-          git -C source fetch --no-tags origin "$IMPLEMENTATION_SHA"
-          [[ "$(git -C source rev-parse FETCH_HEAD)" == "$IMPLEMENTATION_SHA" ]]
           python3 scripts/ci/e2e_job_graph.py \
-            --matrix source/release/release-matrix.json \
+            --matrix "$source_matrix" \
             --jobs "$jobs" \
-            --repository source \
+            --repository . \
+            --repository-head-sha "$IMPLEMENTATION_SHA" \
             --protected-sha "$IMPLEMENTATION_SHA" \
             --head-sha "$SOURCE_SHA" \
             --bootstrap-contract e2e/loader-bootstrap-contract.json \
@@ -393,7 +392,7 @@ jobs:
             --runtime-policy full \
             > "$RUNNER_TEMP/e2e-job-graph.json"
           python3 scripts/release/matrix.py \
-            --matrix source/release/release-matrix.json \
+            --matrix "$source_matrix" \
             --kind "$matrix_kind" \
             > "$RUNNER_TEMP/expected-e2e-matrix.json"
           expected_artifacts="$(jq -c \
