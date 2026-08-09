@@ -114,9 +114,11 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   hash and exact graph, PNG containment, full decode, dimensions, SHA-256, probes, and comparisons,
   and exposes the shared evidence model used by the AI review and public site.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
-  scenario product, requires one production JAR digest, and atomically re-encodes selected frames as
-  metadata-free RGB PNGs. `e2e/check_visual_review.py` validates the bounded capsule and normalizes
-  bounded model output; raw model output is never uploaded.
+  scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
+  identity from protected `master`, and pairs every candidate with the same semantic capture from
+  authenticated compact Pages evidence. It atomically re-encodes both sides as same-sized,
+  metadata-free RGB PNGs. `e2e/check_visual_review.py` validates the all-single or all-paired bounded
+  capsule and normalizes bounded model output; raw model output is never uploaded.
 - `scripts/pages/evidence.py` creates and validates a small branch-scoped raw handoff, then
   atomically compacts a validated bundle to protected WebP derivatives. It may copy only contracted
   screenshots and structured provenance—never runtime logs or arbitrary HTML. The compact schema
