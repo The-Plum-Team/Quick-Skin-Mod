@@ -302,8 +302,10 @@ jobs:
           git fetch --no-tags origin "$SOURCE_SHA"
           [[ "$(git rev-parse FETCH_HEAD)" == "$SOURCE_SHA" ]]
           source_matrix="$RUNNER_TEMP/source-release-matrix.json"
+          source_properties="$RUNNER_TEMP/source-gradle.properties"
           source_contract="$RUNNER_TEMP/source-scenario-contract.json"
           git show "$SOURCE_SHA:release/release-matrix.json" > "$source_matrix"
+          git show "$SOURCE_SHA:gradle.properties" > "$source_properties"
           git show "$SOURCE_SHA:e2e/scenario-contract.json" > "$source_contract"
 
           # Protected master code validates review evidence produced from the authenticated source
@@ -333,6 +335,7 @@ jobs:
 
           python3 scripts/ci/e2e_job_graph.py \
             --matrix "$source_matrix" \
+            --matrix-properties "$source_properties" \
             --jobs "$jobs" \
             --repository . \
             --repository-head-sha "$IMPLEMENTATION_SHA" \
