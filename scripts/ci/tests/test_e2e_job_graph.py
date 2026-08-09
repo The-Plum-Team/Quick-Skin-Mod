@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -167,6 +169,61 @@ class E2EJobGraphTest(unittest.TestCase):
         with self.assertRaises(graph.JobGraphError):
             graph.validate_job_graph(
                 duplicated, policy="full", expected_scenarios=self.expected
+            )
+
+    def test_snapshot_matrix_cli_does_not_require_a_source_checkout(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            matrix_path = root / "source-release-matrix.json"
+            properties_path = root / "source-gradle.properties"
+            jobs_path = root / "source-jobs.json"
+            matrix_path.write_bytes(
+                (ROOT / "release/release-matrix.json").read_bytes()
+            )
+            properties_path.write_bytes((ROOT / "gradle.properties").read_bytes())
+            jobs_path.write_text(json.dumps(self.payload()), encoding="utf-8")
+            head_sha = subprocess.run(
+                ("git", "rev-parse", "HEAD"),
+                cwd=ROOT,
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            ).stdout.strip()
+            output = io.StringIO()
+
+            with redirect_stdout(output):
+                result = graph.main(
+                    [
+                        "--matrix",
+                        str(matrix_path),
+                        "--matrix-properties",
+                        str(properties_path),
+                        "--jobs",
+                        str(jobs_path),
+                        "--repository",
+                        str(ROOT),
+                        "--repository-head-sha",
+                        head_sha,
+                        "--protected-sha",
+                        head_sha,
+                        "--head-sha",
+                        head_sha,
+                        "--bootstrap-contract",
+                        str(graph.DEFAULT_BOOTSTRAP_CONTRACT),
+                        "--matrix-kind",
+                        "pr-anchors",
+                        "--runtime-policy",
+                        "full",
+                    ]
+                )
+
+            self.assertEqual(0, result)
+            validated = json.loads(output.getvalue())
+            self.assertEqual(
+                list(self.expected), validated["observed_scenario_jobs"]
+            )
+            self.assertEqual(
+                ["fabric", "forge"], validated["active_loader_bootstraps"]
             )
 
     def test_controller_parity_is_bound_to_the_exact_checkout_and_protected_blob(

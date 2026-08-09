@@ -17,7 +17,14 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "release"))
 
-from matrix import MatrixError, gha_matrix, load_matrix, read_mod_version  # noqa: E402
+from matrix import (  # noqa: E402
+    MatrixError,
+    gha_matrix,
+    load_matrix,
+    load_matrix_snapshot,
+    read_mod_version,
+    read_mod_version_from_properties,
+)
 
 
 POLICY_JOB = "Classify packaged runtime impact"
@@ -212,10 +219,20 @@ def expected_scenario_jobs_for(
     matrix_path: Path, matrix_kind: str
 ) -> tuple[str, ...]:
     data = load_matrix(matrix_path)
-    matrix = gha_matrix(
+    return expected_scenario_jobs_from_data(
         data,
         matrix_kind,
         read_mod_version(matrix_path, data),
+    )
+
+
+def expected_scenario_jobs_from_data(
+    data: dict[str, Any], matrix_kind: str, mod_version: str
+) -> tuple[str, ...]:
+    matrix = gha_matrix(
+        data,
+        matrix_kind,
+        mod_version,
     )
     rows = matrix.get("include")
     if not isinstance(rows, list) or not rows:
@@ -350,12 +367,13 @@ def validate_loader_bootstraps(
     head_sha: str,
     matrix_path: Path,
     contract_path: Path = DEFAULT_BOOTSTRAP_CONTRACT,
+    matrix_data: dict[str, Any] | None = None,
 ) -> tuple[str, ...]:
     """Authenticate each active loader entrypoint, manifest, and final Gradle binding."""
 
     if not SHA.fullmatch(head_sha):
         raise JobGraphError("loader bootstrap validation requires an exact commit SHA")
-    matrix = load_matrix(matrix_path)
+    matrix = matrix_data if matrix_data is not None else load_matrix(matrix_path)
     artifacts = matrix.get("artifacts")
     if not isinstance(artifacts, list) or not artifacts:
         raise JobGraphError("release matrix has no artifacts for loader bootstrap validation")
@@ -534,6 +552,14 @@ def _read_json(path: Path) -> Any:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, required=True)
+    parser.add_argument(
+        "--matrix-properties",
+        type=Path,
+        help=(
+            "separately authenticated Gradle properties for an inert matrix snapshot; "
+            "omitting this option requires a complete checked-out source tree"
+        ),
+    )
     parser.add_argument("--jobs", type=Path, required=True)
     parser.add_argument("--repository", type=Path, required=True)
     parser.add_argument(
@@ -562,13 +588,24 @@ def main(argv: list[str] | None = None) -> int:
             repository_head_sha=args.repository_head_sha,
             version_specific_paths=VERSION_SPECIFIC_CONTROLLER_PATHS,
         )
+        if args.matrix_properties is None:
+            matrix_data = load_matrix(args.matrix)
+            mod_version = read_mod_version(args.matrix, matrix_data)
+        else:
+            matrix_data = load_matrix_snapshot(args.matrix, args.matrix_properties)
+            mod_version = read_mod_version_from_properties(
+                args.matrix_properties, matrix_data
+            )
         active_loaders = validate_loader_bootstraps(
             args.repository,
             head_sha=args.head_sha,
             matrix_path=args.matrix,
             contract_path=args.bootstrap_contract,
+            matrix_data=matrix_data,
         )
-        expected = expected_scenario_jobs_for(args.matrix, args.matrix_kind)
+        expected = expected_scenario_jobs_from_data(
+            matrix_data, args.matrix_kind, mod_version
+        )
         validated = validate_job_graph(
             _read_json(args.jobs),
             policy=args.runtime_policy,
