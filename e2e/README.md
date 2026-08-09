@@ -181,17 +181,28 @@ shown by each branch-specific Packaged E2E badge in the root README.
 Programmatic screenshot probes and comparisons are part of that required runtime gate. AI image
 judgment is a separate, authenticated `AI visual review` workflow and is advisory: it can annotate
 evidence without delaying or weakening Build, Packaged E2E, or version-port completion.
+The stable cross-version anchor decision is recorded in
+[ADR 0004](../docs/architecture/decisions/0004-anchor-ai-visual-review-to-1-20-1.md).
 
 That workflow never exposes raw packaged artifacts to the model credential. A secretless curator
-authenticates every artifact and exact matrix row, fully decodes the complete scenario product,
-requires one production JAR, and re-encodes selected frames as bounded metadata-free RGB PNGs named
-by their served-byte SHA-256. It applies the protected review checker before upload and reserves
+authenticates every artifact and exact matrix row. It imports the exact source commit only as inert
+Git objects—never as a checkout executed by the privileged workflow—then fully decodes the complete
+scenario product, requires one production JAR, and re-encodes every captured frame as a bounded
+metadata-free RGB PNG
+named by its served-byte SHA-256. For each semantic `capture_id`, it pairs the candidate with the
+authenticated current-head Fabric 1.20.1 frame selected from the protected Pages handoff/cache.
+Candidate and reference are normalized to the same dimensions without changing aspect ratio. The
+reference is a semantic visual anchor, not a strict whole-pixel golden image: legitimate Vanilla,
+loader, camera, lighting, and framing differences remain acceptable. A missing pair fails curation.
+
+The curator applies the protected review checker before upload and reserves
 32 MiB of the handoff envelope for the bounded manifest, proof, archive metadata, and structure. A
 source/run/implementation proof and bounded manifest cross into a fresh capsule. The model can read
-only the manifest/images and write one raw verdict file;
-protected code revalidates the capsule, uploads only a schema-normalized bounded report, and an
-independent cleanup job deletes the one-use handoff immediately. The final small report remains for
-one day.
+only the manifest/images; its stdout is captured as one raw verdict file without granting a write
+tool. Protected code revalidates the capsule, uploads only a schema-normalized bounded report, and
+an independent cleanup job deletes the one-use handoff immediately. Review concurrency is scoped to
+the authenticated source run, so a later version port cannot silently cancel an older pending
+review. The final small report remains for one day.
 
 ## Public visual evidence
 
