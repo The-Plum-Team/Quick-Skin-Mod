@@ -99,11 +99,14 @@ immutable workflow and governance activation contract.
   publish logs/crash reports, or make Pages a protected release check.
 - Credential-bearing AI visual judgment runs in its own authenticated advisory workflow. The run
   pins the exact workflow `github.sha`, authenticates the complete protected job graph, and curates
-  raw artifacts on a secretless runner. Only canonical, content-addressed RGB PNGs, a bounded
-  manifest, and provenance cross the handoff into a fresh model capsule; raw E2E ZIPs never share a
-  runner with the credential. The handoff is revalidated before and after review and deleted by
-  exact artifact id immediately afterward. This advisory path must never delay, weaken, or become
-  part of the required Packaged E2E conclusion.
+  raw artifacts on a secretless runner. Every contracted candidate capture is paired by semantic
+  `capture_id` with authenticated current-head Fabric 1.20.1 Pages evidence; no review-tier filter
+  may omit a pair. Only canonical, same-sized, content-addressed RGB PNG pairs, a bounded manifest,
+  and provenance cross the handoff into a fresh model capsule; raw E2E ZIPs never share a runner
+  with the credential. The anchor guides semantic comparison and is not a whole-pixel equality
+  oracle. The handoff is revalidated before and after review and deleted by exact artifact id
+  immediately afterward. This advisory path must never delay, weaken, or become part of the
+  required Packaged E2E conclusion.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
   the only longer-lived uploads are the SHA-bound Pages cache and the immutable
   `release-<release-id>` bundle, both retained for 90 days. The release bundle spans protected
