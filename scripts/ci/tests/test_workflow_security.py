@@ -317,6 +317,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn(
             'git show "$SOURCE_SHA:release/release-matrix.json"', curate
         )
+        self.assertIn(
+            'git show "$SOURCE_SHA:gradle.properties" > "$source_properties"',
+            curate,
+        )
+        self.assertIn('--matrix-properties "$source_properties"', curate)
         self.assertIn('--repository-head-sha "$IMPLEMENTATION_SHA"', curate)
         self.assertIn("--reference-identity", curate)
         self.assertIn("scripts/pages/select_artifact.py", curate)
