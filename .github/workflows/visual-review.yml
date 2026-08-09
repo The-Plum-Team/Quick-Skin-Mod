@@ -262,33 +262,6 @@ jobs:
           --only-binary=:all: --require-hashes
           -r scripts/pages/requirements.txt
 
-      - name: Resolve the authenticated 1.20.1 visual reference
-        id: reference
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          identity="$(python3 e2e/visual_review.py \
-            --matrix release/release-matrix.json \
-            --reference-identity)"
-          reference_branch="$(jq -er .release_branch <<< "$identity")"
-          reference_artifact_node="$(jq -er .artifact_node <<< "$identity")"
-          reference_version="$(jq -er .version <<< "$identity")"
-          reference_loader="$(jq -er .loader <<< "$identity")"
-          [[ "$reference_branch" =~ ^[A-Za-z0-9._/-]+$ ]]
-          [[ "$reference_artifact_node" =~ ^[A-Za-z0-9._-]+$ ]]
-          [[ "$reference_version" == 1.20.1 ]]
-          [[ "$reference_loader" == fabric ]]
-          printf 'branch=%s\n' "$reference_branch" >> "$GITHUB_OUTPUT"
-          printf 'artifact_node=%s\n' "$reference_artifact_node" >> "$GITHUB_OUTPUT"
-          printf 'version=%s\n' "$reference_version" >> "$GITHUB_OUTPUT"
-          printf 'loader=%s\n' "$reference_loader" >> "$GITHUB_OUTPUT"
-          python3 scripts/pages/select_artifact.py \
-            --repository "$GITHUB_REPOSITORY" \
-            --branch "$reference_branch" \
-            --github-output "$GITHUB_OUTPUT"
-
       # This job has no secrets. It reauthenticates the full protected job graph, downloads each
       # immutable artifact by numeric ID, then passes only decoded, content-addressed PNG pairs
       # onward. The reference is the current authenticated Fabric 1.20.1 Pages evidence.
@@ -299,33 +272,11 @@ jobs:
           ARTIFACT_INVENTORY: ${{ needs.authenticate.outputs.artifact_inventory }}
           GH_TOKEN: ${{ github.token }}
           IMPLEMENTATION_SHA: ${{ needs.authenticate.outputs.implementation_sha }}
-          REFERENCE_ARTIFACT_ID: ${{ steps.reference.outputs.artifact_id }}
-          REFERENCE_ARTIFACT_NAME: ${{ steps.reference.outputs.name }}
-          REFERENCE_ARTIFACT_NODE: ${{ steps.reference.outputs.artifact_node }}
-          REFERENCE_ARTIFACT_RUN_ID: ${{ steps.reference.outputs.run_id }}
-          REFERENCE_ARTIFACT_SIZE: ${{ steps.reference.outputs.size_in_bytes }}
-          REFERENCE_BRANCH: ${{ steps.reference.outputs.branch }}
-          REFERENCE_LOADER: ${{ steps.reference.outputs.loader }}
-          REFERENCE_SHA: ${{ steps.reference.outputs.sha }}
-          REFERENCE_VERSION: ${{ steps.reference.outputs.version }}
           SOURCE_RUN_ID: ${{ needs.authenticate.outputs.source_run_id }}
           SOURCE_SHA: ${{ needs.authenticate.outputs.source_sha }}
         run: |
           set -euo pipefail
           [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$REFERENCE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$REFERENCE_ARTIFACT_NAME" =~ ^pages-(e2e|cache)-[A-Za-z0-9._/-]+$ ]]
-          [[ "$REFERENCE_ARTIFACT_NODE" =~ ^[A-Za-z0-9._-]+$ ]]
-          [[ "$REFERENCE_ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$REFERENCE_ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
-          (( REFERENCE_ARTIFACT_SIZE <= 536870912 ))
-          [[ "$REFERENCE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
-          [[ "$REFERENCE_LOADER" == fabric ]]
-          [[ "$REFERENCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$REFERENCE_VERSION" == 1.20.1 ]]
-          [[ "$REFERENCE_ARTIFACT_NAME" == "pages-e2e-$REFERENCE_BRANCH" \
-            || "$REFERENCE_ARTIFACT_NAME" == "pages-cache-$REFERENCE_BRANCH--$REFERENCE_SHA" \
-            || "$REFERENCE_ARTIFACT_NAME" == "pages-cache-$REFERENCE_BRANCH" ]]
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           jq -e 'type == "array" and length > 0 and length <= 8' \
@@ -400,6 +351,42 @@ jobs:
             "$RUNNER_TEMP/expected-e2e-matrix.json")"
           [[ "$expected_artifacts" == \
             "$(jq -c '[.[].name] | sort' <<< "$ARTIFACT_INVENTORY")" ]]
+
+          # Resolve the reference only after the candidate run, source commit, controller parity,
+          # job graph, and artifact inventory have all been authenticated by protected code.
+          reference_identity="$(python3 e2e/visual_review.py \
+            --matrix release/release-matrix.json \
+            --reference-identity)"
+          REFERENCE_BRANCH="$(jq -er .release_branch <<< "$reference_identity")"
+          REFERENCE_ARTIFACT_NODE="$(jq -er .artifact_node <<< "$reference_identity")"
+          REFERENCE_VERSION="$(jq -er .version <<< "$reference_identity")"
+          REFERENCE_LOADER="$(jq -er .loader <<< "$reference_identity")"
+          reference_output="$(mktemp "$RUNNER_TEMP/reference-selection.XXXXXX")"
+          python3 scripts/pages/select_artifact.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --branch "$REFERENCE_BRANCH" \
+            --github-output "$reference_output"
+          [[ "$(wc -l < "$reference_output" | tr -d ' ')" == 5 ]]
+          REFERENCE_ARTIFACT_ID="$(sed -n 's/^artifact_id=//p' "$reference_output")"
+          REFERENCE_ARTIFACT_NAME="$(sed -n 's/^name=//p' "$reference_output")"
+          REFERENCE_ARTIFACT_RUN_ID="$(sed -n 's/^run_id=//p' "$reference_output")"
+          REFERENCE_SHA="$(sed -n 's/^sha=//p' "$reference_output")"
+          REFERENCE_ARTIFACT_SIZE="$(sed -n 's/^size_in_bytes=//p' "$reference_output")"
+          rm -f -- "$reference_output"
+
+          [[ "$REFERENCE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$REFERENCE_ARTIFACT_NAME" =~ ^pages-(e2e|cache)-[A-Za-z0-9._/-]+$ ]]
+          [[ "$REFERENCE_ARTIFACT_NODE" =~ ^[A-Za-z0-9._-]+$ ]]
+          [[ "$REFERENCE_ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$REFERENCE_ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
+          (( REFERENCE_ARTIFACT_SIZE <= 536870912 ))
+          [[ "$REFERENCE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
+          [[ "$REFERENCE_LOADER" == fabric ]]
+          [[ "$REFERENCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$REFERENCE_VERSION" == 1.20.1 ]]
+          [[ "$REFERENCE_ARTIFACT_NAME" == "pages-e2e-$REFERENCE_BRANCH" \
+            || "$REFERENCE_ARTIFACT_NAME" == "pages-cache-$REFERENCE_BRANCH--$REFERENCE_SHA" \
+            || "$REFERENCE_ARTIFACT_NAME" == "pages-cache-$REFERENCE_BRANCH" ]]
 
           # Reauthenticate and normalize the exact current-head 1.20.1 Pages artifact. The
           # selector already validated its owner workflow; the numeric-ID fetch below binds the

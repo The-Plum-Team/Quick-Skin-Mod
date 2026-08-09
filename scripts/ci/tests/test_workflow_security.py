@@ -320,6 +320,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('--repository-head-sha "$IMPLEMENTATION_SHA"', curate)
         self.assertIn("--reference-identity", curate)
         self.assertIn("scripts/pages/select_artifact.py", curate)
+        self.assertNotIn(
+            "Resolve the authenticated 1.20.1 visual reference", visual_workflow
+        )
+        self.assertNotIn("steps.reference.outputs", curate)
+        self.assertLess(
+            curate.index("scripts/ci/e2e_job_graph.py"),
+            curate.index("--reference-identity"),
+        )
         self.assertIn("actions/artifacts/$REFERENCE_ARTIFACT_ID", curate)
         self.assertIn("scripts/pages/evidence.py compact", curate)
         self.assertIn("scripts/pages/evidence.py validate", curate)
