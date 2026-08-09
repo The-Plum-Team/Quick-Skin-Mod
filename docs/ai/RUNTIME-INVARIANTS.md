@@ -105,6 +105,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - The current contract is deliberately a cross-version parity contract: every supported loader and
   version publishes every checkpoint. Do not add a version-only capture without first extending
   the contract schema and protected validator with explicit applicability rules.
+- Advisory AI review must pair every candidate checkpoint with the identical semantic `capture_id`
+  from authenticated current-head Fabric 1.20.1 evidence. It must not fall back to filenames,
+  ordinals, review tiers, a latest-version baseline, or strict whole-pixel equality. Reject a
+  missing pair, contract skew, aspect-ratio drift, stale reference head, or mixed paired/unpaired
+  capsule before the credential-bearing job starts.
 - Java harness reports, packaged results, raw handoffs, compact caches, and public manifests must
   carry the exact validated contract SHA-256. Reject missing, extra, reordered, hash-mismatched, or
   assertion-free steps and reject a screenshot both when a capture is missing and when a
@@ -162,10 +167,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Secret-bearing visual review has the fixed boundary `authenticate -> curate without secrets ->
   review in a fresh capsule -> exact-id cleanup`. Curating must authenticate every source artifact
   by numeric id, size, digest, run, protected matrix row, complete scenario product, and one JAR;
-  fully decode and canonically re-encode bounded RGB PNGs without source metadata; and emit a
-  source/implementation/artifact-bound proof. The review runner accepts only that immutable
-  handoff, exposes only its manifest/images to the model, revalidates it after the model exits,
+  it must import the authenticated source commit only as inert Git objects and never check out or
+  execute source-head files in the privileged default-branch workflow;
+  authenticate the exact current-head 1.20.1 Pages source and its run provenance; fully decode,
+  dimension-normalize, and canonically re-encode bounded RGB PNG pairs without source metadata; and
+  emit a source/implementation/candidate/reference-artifact-bound proof. The review runner accepts
+  only that immutable handoff, exposes only its manifest/images to the model with a read-only tool
+  surface, captures the verdict from stdout, revalidates the capsule after the model exits,
   publishes only a bounded normalized report, and immediately deletes the intermediate artifact.
+  Concurrency must not let one authenticated source run cancel another pending review.
 - Optimized gallery images are derivatives, not the source proof. Publish separate source and
   derivative hashes/dimensions, and content-address each public image URL with the bytes actually
   served. Original PNGs may exist only in the one-day `pages-e2e-*` handoff. Protected conversion
