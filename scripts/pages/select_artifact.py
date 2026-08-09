@@ -185,9 +185,11 @@ def main(argv: list[str] | None = None) -> int:
             current_sha=current_sha,
         )
         with args.github_output.open("a", encoding="utf-8") as output:
+            output.write(f"artifact_id={selected.artifact_id}\n")
             output.write(f"name={selected.name}\n")
             output.write(f"run_id={selected.run_id}\n")
             output.write(f"sha={current_sha}\n")
+            output.write(f"size_in_bytes={selected.size_in_bytes}\n")
         return 0
     except (OSError, RotationError) as exc:
         print(f"Pages evidence selection error: {exc}", file=sys.stderr)
