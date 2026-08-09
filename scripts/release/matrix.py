@@ -152,8 +152,9 @@ def read_properties(path: Path) -> dict[str, str]:
     return properties
 
 
-def validate_build_properties(matrix_path: Path, data: dict[str, Any]) -> None:
-    properties = read_properties(matrix_path.resolve().parents[1] / "gradle.properties")
+def validate_build_property_values(
+    data: dict[str, Any], properties: dict[str, str]
+) -> None:
     runtimes = {row["artifact_node"]: row for row in data["runtimes"]}
     versions: dict[str, dict[str, Any]] = {}
     for artifact in data["artifacts"]:
@@ -207,6 +208,25 @@ def validate_build_properties(matrix_path: Path, data: dict[str, Any]) -> None:
                 )
             if key.startswith(prefix):
                 break
+
+
+def validate_build_properties(matrix_path: Path, data: dict[str, Any]) -> None:
+    properties = read_properties(matrix_path.resolve().parents[1] / "gradle.properties")
+    validate_build_property_values(data, properties)
+
+
+def load_matrix_snapshot(matrix_path: Path, properties_path: Path) -> dict[str, Any]:
+    """Validate inert matrix/property bytes without requiring a checked-out source tree.
+
+    Snapshot consumers must separately authenticate any source-tree contract they rely on.
+    This mode keeps the complete matrix and Gradle-property validation while deliberately
+    omitting the checkout-bound overlay inventory validation performed by ``load_matrix``.
+    """
+
+    data = read_matrix_data(matrix_path)
+    validate_matrix(data)
+    validate_build_property_values(data, read_properties(properties_path))
+    return data
 
 
 def validate_source_roots(matrix_path: Path, data: dict[str, Any]) -> None:
@@ -667,13 +687,19 @@ def validate_metadata_range(node: str, loader: str, version: str, value: Any) ->
         )
 
 
-def read_mod_version(matrix_path: Path, data: dict[str, Any]) -> str:
-    properties_path = matrix_path.resolve().parents[1] / "gradle.properties"
+def read_mod_version_from_properties(
+    properties_path: Path, data: dict[str, Any]
+) -> str:
     key = data["project"]["mod_version_property"]
     properties = read_properties(properties_path)
     if key not in properties:
         raise MatrixError(f"{key} is missing from {properties_path}")
     return properties[key]
+
+
+def read_mod_version(matrix_path: Path, data: dict[str, Any]) -> str:
+    properties_path = matrix_path.resolve().parents[1] / "gradle.properties"
+    return read_mod_version_from_properties(properties_path, data)
 
 
 def release_id(data: dict[str, Any], mod_version: str) -> str:
