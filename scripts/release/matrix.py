@@ -793,6 +793,14 @@ def main() -> int:
         help="checked-in release matrix",
     )
     parser.add_argument(
+        "--matrix-properties",
+        type=Path,
+        help=(
+            "explicit Gradle properties for an inert matrix snapshot; "
+            "requires --kind and omits checkout-bound source-root validation"
+        ),
+    )
+    parser.add_argument(
         "--kind",
         choices=("artifacts", "publications", "runtime", "native-anchors", "pr-anchors"),
         help="emit a compact GitHub Actions matrix",
@@ -813,7 +821,14 @@ def main() -> int:
     try:
         if args.write and not args.normalize_e2e_policy:
             raise MatrixError("--write requires --normalize-e2e-policy")
+        if args.matrix_properties is not None and args.kind is None:
+            raise MatrixError("--matrix-properties requires --kind")
         if args.normalize_e2e_policy:
+            if args.matrix_properties is not None:
+                raise MatrixError(
+                    "--normalize-e2e-policy cannot be combined with "
+                    "--matrix-properties"
+                )
             if args.kind is not None:
                 raise MatrixError(
                     "--normalize-e2e-policy cannot be combined with --kind"
@@ -826,12 +841,19 @@ def main() -> int:
                 write_matrix_atomic(args.matrix, data)
             output: Any = None
         else:
-            data = load_matrix(args.matrix)
+            if args.matrix_properties is None:
+                data = load_matrix(args.matrix)
+                mod_version = read_mod_version(args.matrix, data)
+            else:
+                data = load_matrix_snapshot(args.matrix, args.matrix_properties)
+                mod_version = read_mod_version_from_properties(
+                    args.matrix_properties, data
+                )
             output = (
                 gha_matrix(
                     data,
                     args.kind,
-                    read_mod_version(args.matrix, data),
+                    mod_version,
                 )
                 if args.kind
                 else data
