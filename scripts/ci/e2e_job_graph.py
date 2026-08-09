@@ -120,18 +120,33 @@ def validate_controller_parity(
     *,
     protected_sha: str,
     head_sha: str,
+    repository_head_sha: str | None = None,
     paths: tuple[str, ...] = PROTECTED_CONTROLLER_PATHS,
     version_specific_paths: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
-    """Require exact protected controllers while preserving declared version adapters."""
+    """Require exact protected controllers while preserving declared version adapters.
 
-    if not SHA.fullmatch(protected_sha) or not SHA.fullmatch(head_sha):
+    The repository may have either the evidence head or the protected policy head checked out;
+    both commits must already exist in its object database.
+    """
+
+    expected_repository_head = repository_head_sha or head_sha
+    if (
+        not SHA.fullmatch(protected_sha)
+        or not SHA.fullmatch(head_sha)
+        or not SHA.fullmatch(expected_repository_head)
+    ):
         raise JobGraphError("controller parity requires exact lowercase commit SHAs")
+    if expected_repository_head not in {protected_sha, head_sha}:
+        raise JobGraphError(
+            "checked-out repository head must be the protected or evidence commit"
+        )
     repository = repository.resolve()
     current = _git(repository, "rev-parse", "HEAD").decode("ascii").strip()
-    if current != head_sha:
+    if current != expected_repository_head:
         raise JobGraphError(
-            f"checked-out head {current!r} does not match requested head {head_sha!r}"
+            f"checked-out head {current!r} does not match requested repository head "
+            f"{expected_repository_head!r}"
         )
     if not paths or len(paths) != len(set(paths)):
         raise JobGraphError("protected controller paths must be non-empty and unique")
@@ -521,6 +536,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--matrix", type=Path, required=True)
     parser.add_argument("--jobs", type=Path, required=True)
     parser.add_argument("--repository", type=Path, required=True)
+    parser.add_argument(
+        "--repository-head-sha",
+        help="exact commit checked out in --repository (defaults to --head-sha)",
+    )
     parser.add_argument("--protected-sha", required=True)
     parser.add_argument("--head-sha", required=True)
     parser.add_argument(
@@ -540,6 +559,7 @@ def main(argv: list[str] | None = None) -> int:
             args.repository,
             protected_sha=args.protected_sha,
             head_sha=args.head_sha,
+            repository_head_sha=args.repository_head_sha,
             version_specific_paths=VERSION_SPECIFIC_CONTROLLER_PATHS,
         )
         active_loaders = validate_loader_bootstraps(
