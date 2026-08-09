@@ -235,7 +235,7 @@ jobs:
     needs: authenticate
     if: needs.authenticate.outputs.eligible == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       actions: read
       contents: read
@@ -270,8 +270,36 @@ jobs:
           --only-binary=:all: --require-hashes
           -r scripts/pages/requirements.txt
 
+      - name: Resolve the authenticated 1.20.1 visual reference
+        id: reference
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          identity="$(python3 e2e/visual_review.py \
+            --matrix release/release-matrix.json \
+            --reference-identity)"
+          reference_branch="$(jq -er .release_branch <<< "$identity")"
+          reference_artifact_node="$(jq -er .artifact_node <<< "$identity")"
+          reference_version="$(jq -er .version <<< "$identity")"
+          reference_loader="$(jq -er .loader <<< "$identity")"
+          [[ "$reference_branch" =~ ^[A-Za-z0-9._/-]+$ ]]
+          [[ "$reference_artifact_node" =~ ^[A-Za-z0-9._-]+$ ]]
+          [[ "$reference_version" == 1.20.1 ]]
+          [[ "$reference_loader" == fabric ]]
+          printf 'branch=%s\n' "$reference_branch" >> "$GITHUB_OUTPUT"
+          printf 'artifact_node=%s\n' "$reference_artifact_node" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\n' "$reference_version" >> "$GITHUB_OUTPUT"
+          printf 'loader=%s\n' "$reference_loader" >> "$GITHUB_OUTPUT"
+          python3 scripts/pages/select_artifact.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --branch "$reference_branch" \
+            --github-output "$GITHUB_OUTPUT"
+
       # This job has no secrets. It reauthenticates the full protected job graph, downloads each
-      # immutable artifact by numeric ID, then passes only decoded, content-addressed PNGs onward.
+      # immutable artifact by numeric ID, then passes only decoded, content-addressed PNG pairs
+      # onward. The reference is the current authenticated Fabric 1.20.1 Pages evidence.
       - name: Validate and curate exact packaged evidence
         id: evidence
         shell: bash
@@ -279,11 +307,33 @@ jobs:
           ARTIFACT_INVENTORY: ${{ needs.authenticate.outputs.artifact_inventory }}
           GH_TOKEN: ${{ github.token }}
           IMPLEMENTATION_SHA: ${{ needs.authenticate.outputs.implementation_sha }}
+          REFERENCE_ARTIFACT_ID: ${{ steps.reference.outputs.artifact_id }}
+          REFERENCE_ARTIFACT_NAME: ${{ steps.reference.outputs.name }}
+          REFERENCE_ARTIFACT_NODE: ${{ steps.reference.outputs.artifact_node }}
+          REFERENCE_ARTIFACT_RUN_ID: ${{ steps.reference.outputs.run_id }}
+          REFERENCE_ARTIFACT_SIZE: ${{ steps.reference.outputs.size_in_bytes }}
+          REFERENCE_BRANCH: ${{ steps.reference.outputs.branch }}
+          REFERENCE_LOADER: ${{ steps.reference.outputs.loader }}
+          REFERENCE_SHA: ${{ steps.reference.outputs.sha }}
+          REFERENCE_VERSION: ${{ steps.reference.outputs.version }}
           SOURCE_RUN_ID: ${{ needs.authenticate.outputs.source_run_id }}
           SOURCE_SHA: ${{ needs.authenticate.outputs.source_sha }}
         run: |
           set -euo pipefail
           [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$REFERENCE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$REFERENCE_ARTIFACT_NAME" =~ ^pages-(e2e|cache)-[A-Za-z0-9._/-]+$ ]]
+          [[ "$REFERENCE_ARTIFACT_NODE" =~ ^[A-Za-z0-9._-]+$ ]]
+          [[ "$REFERENCE_ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$REFERENCE_ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
+          (( REFERENCE_ARTIFACT_SIZE <= 536870912 ))
+          [[ "$REFERENCE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
+          [[ "$REFERENCE_LOADER" == fabric ]]
+          [[ "$REFERENCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$REFERENCE_VERSION" == 1.20.1 ]]
+          [[ "$REFERENCE_ARTIFACT_NAME" == "pages-e2e-$REFERENCE_BRANCH" \
+            || "$REFERENCE_ARTIFACT_NAME" == "pages-cache-$REFERENCE_BRANCH--$REFERENCE_SHA" \
+            || "$REFERENCE_ARTIFACT_NAME" == "pages-cache-$REFERENCE_BRANCH" ]]
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           jq -e 'type == "array" and length > 0 and length <= 8' \
@@ -351,6 +401,105 @@ jobs:
             "$RUNNER_TEMP/expected-e2e-matrix.json")"
           [[ "$expected_artifacts" == \
             "$(jq -c '[.[].name] | sort' <<< "$ARTIFACT_INVENTORY")" ]]
+
+          # Reauthenticate and normalize the exact current-head 1.20.1 Pages artifact. The
+          # selector already validated its owner workflow; the numeric-ID fetch below binds the
+          # bytes used by this run to that selection and to its immutable artifact digest.
+          reference_metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$REFERENCE_ARTIFACT_ID")"
+          reference_artifact_digest="$(jq -er .digest <<< "$reference_metadata")"
+          [[ "$reference_artifact_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          jq -e \
+            --arg digest "$reference_artifact_digest" \
+            --arg name "$REFERENCE_ARTIFACT_NAME" \
+            --argjson artifact_id "$REFERENCE_ARTIFACT_ID" \
+            --argjson run_id "$REFERENCE_ARTIFACT_RUN_ID" \
+            --argjson size "$REFERENCE_ARTIFACT_SIZE" \
+            '.id == $artifact_id and .name == $name and .size_in_bytes == $size and
+             .digest == $digest and .expired == false and
+             .workflow_run.id == $run_id' \
+            <<< "$reference_metadata" > /dev/null
+          reference_archive="$RUNNER_TEMP/reference-artifact-$REFERENCE_ARTIFACT_ID.zip"
+          gh api -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$REFERENCE_ARTIFACT_ID/zip" \
+            > "$reference_archive"
+          [[ "$(stat -c %s "$reference_archive")" == "$REFERENCE_ARTIFACT_SIZE" ]]
+          [[ "sha256:$(sha256sum "$reference_archive" | cut -d ' ' -f 1)" \
+            == "$reference_artifact_digest" ]]
+          reference_selected="$RUNNER_TEMP/reference-selected"
+          python3 scripts/ci/bounded_zip.py \
+            "$reference_archive" "$reference_selected" \
+            --max-archive-bytes 536870912 \
+            --max-entries 512 \
+            --max-total-bytes 536870912 \
+            --max-file-bytes 33554432 \
+            --max-compression-ratio 200 \
+            > "$RUNNER_TEMP/reference-extraction.json"
+          rm -f -- "$reference_archive"
+
+          reference_target_run_argument=()
+          reference_input_kind_argument=()
+          if [[ "$REFERENCE_ARTIFACT_NAME" == "pages-e2e-$REFERENCE_BRANCH" ]]; then
+            reference_target_run_argument=(
+              --target-run-id "$REFERENCE_ARTIFACT_RUN_ID"
+            )
+            reference_input_kind_argument=(--input-kind raw)
+          fi
+          reference_compact="$RUNNER_TEMP/reference-compact"
+          python3 scripts/pages/evidence.py compact \
+            --evidence-root "$reference_selected" \
+            --output "$reference_compact" \
+            --branch "$REFERENCE_BRANCH" \
+            --repository "$GITHUB_REPOSITORY" \
+            --target-sha "$REFERENCE_SHA" \
+            "${reference_target_run_argument[@]}" \
+            "${reference_input_kind_argument[@]}"
+          python3 scripts/pages/evidence.py validate \
+            --evidence-root "$reference_compact" \
+            --branch "$REFERENCE_BRANCH" \
+            --only-branch \
+            --kind compact \
+            --repository "$GITHUB_REPOSITORY" \
+            --target-sha "$REFERENCE_SHA" \
+            "${reference_target_run_argument[@]}"
+          reference_manifest="$reference_compact/$REFERENCE_BRANCH/manifest.json"
+          reference_manifest_sha256="$(sha256sum "$reference_manifest" | cut -d ' ' -f 1)"
+          reference_source_run_id="$(jq -er .provenance.source.run_id "$reference_manifest")"
+          reference_source_branch="$(jq -er .provenance.source.branch "$reference_manifest")"
+          reference_source_sha="$(jq -er .provenance.source.sha "$reference_manifest")"
+          reference_source_created_at="$(jq -er \
+            .provenance.source.created_at "$reference_manifest")"
+          reference_target_run_id="$(jq -er .provenance.target.run_id "$reference_manifest")"
+          reference_target_created_at="$(jq -er \
+            .provenance.target.created_at "$reference_manifest")"
+          reference_source_run="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$reference_source_run_id")"
+          reference_target_run="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$reference_target_run_id")"
+          jq -e \
+            --arg branch "$reference_source_branch" \
+            --arg created "$reference_source_created_at" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sha "$reference_source_sha" \
+            '.status == "completed" and .conclusion == "success" and
+             .event == "workflow_dispatch" and .head_branch == $branch and
+             .head_sha == $sha and .created_at == $created and
+             .path == ".github/workflows/on-demand-e2e.yml" and
+             .head_repository.full_name == $repository' \
+            <<< "$reference_source_run" > /dev/null
+          jq -e \
+            --arg branch "$REFERENCE_BRANCH" \
+            --arg created "$reference_target_created_at" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sha "$REFERENCE_SHA" \
+            '.status == "completed" and .conclusion == "success" and
+             .event == "workflow_dispatch" and .head_branch == $branch and
+             .head_sha == $sha and .created_at == $created and
+             .path == ".github/workflows/on-demand-e2e.yml" and
+             .head_repository.full_name == $repository' \
+            <<< "$reference_target_run" > /dev/null
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$REFERENCE_BRANCH" \
+            --jq .commit.sha)" == "$REFERENCE_SHA" ]]
 
           raw_root="$RUNNER_TEMP/raw-review-evidence"
           mkdir -p "$raw_root/artifacts" "$raw_root/e2e-out/profiles"
@@ -439,7 +588,11 @@ jobs:
           )
 
           python3 e2e/visual_review.py \
+            --all \
             --e2e-root "$raw_root/e2e-out" \
+            --reference-evidence-root "$reference_compact" \
+            --reference-branch "$REFERENCE_BRANCH" \
+            --reference-artifact-node "$REFERENCE_ARTIFACT_NODE" \
             --curate-output "$RUNNER_TEMP/review-input" \
             > "$RUNNER_TEMP/manifest.stdout.json"
           cmp --silent \
@@ -447,6 +600,7 @@ jobs:
             "$RUNNER_TEMP/review-input/visual-review-manifest.json"
           python3 e2e/check_visual_review.py \
             --validate-input-only \
+            --require-paired \
             --manifest \
               "$RUNNER_TEMP/review-input/visual-review-manifest.json" \
             --input-root "$RUNNER_TEMP/review-input"
@@ -464,6 +618,14 @@ jobs:
             --arg implementation_sha "$IMPLEMENTATION_SHA" \
             --arg manifest_sha256 "$manifest_sha256" \
             --arg matrix_kind "$matrix_kind" \
+            --arg reference_artifact_digest "$reference_artifact_digest" \
+            --arg reference_artifact_name "$REFERENCE_ARTIFACT_NAME" \
+            --arg reference_artifact_node "$REFERENCE_ARTIFACT_NODE" \
+            --arg reference_branch "$REFERENCE_BRANCH" \
+            --arg reference_loader "$REFERENCE_LOADER" \
+            --arg reference_manifest_sha256 "$reference_manifest_sha256" \
+            --arg reference_sha "$REFERENCE_SHA" \
+            --arg reference_version "$REFERENCE_VERSION" \
             --arg scenario_contract_sha256 \
               "$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)" \
             --arg source_sha "$SOURCE_SHA" \
@@ -472,12 +634,24 @@ jobs:
             --argjson image_bytes "$image_bytes" \
             --argjson image_count "$image_count" \
             --argjson job_graph "$(cat "$RUNNER_TEMP/e2e-job-graph.json")" \
+            --argjson reference_artifact_id "$REFERENCE_ARTIFACT_ID" \
+            --argjson reference_artifact_run_id "$REFERENCE_ARTIFACT_RUN_ID" \
+            --argjson reference_artifact_size "$REFERENCE_ARTIFACT_SIZE" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
-            '{schema_version:1, source_run_id:$source_run_id,
+            '{schema_version:2, source_run_id:$source_run_id,
               source_sha:$source_sha, implementation_sha:$implementation_sha,
               matrix_kind:$matrix_kind,
               scenario_contract_sha256:$scenario_contract_sha256,
               artifact_inventory:$artifact_inventory, job_graph:$job_graph,
+              visual_reference:{artifact_id:$reference_artifact_id,
+                artifact_name:$reference_artifact_name,
+                artifact_run_id:$reference_artifact_run_id,
+                artifact_size_in_bytes:$reference_artifact_size,
+                artifact_digest:$reference_artifact_digest,
+                branch:$reference_branch, sha:$reference_sha,
+                artifact_node:$reference_artifact_node,
+                version:$reference_version, loader:$reference_loader,
+                manifest_sha256:$reference_manifest_sha256},
               manifest_sha256:$manifest_sha256, frame_count:$frame_count,
               image_count:$image_count, image_bytes:$image_bytes}' \
             > "$RUNNER_TEMP/curation-proof.json"
@@ -516,12 +690,10 @@ jobs:
       needs.authenticate.outputs.eligible == 'true' &&
       needs.curate.result == 'success' &&
       needs.curate.outputs.artifact_id != ''
-    # One shared group caps a 16-branch propagation to a single running model pipeline while the
-    # cheap authenticate/curate jobs stay parallel. GitHub keeps one running plus one pending job
-    # per group and cancels the older pending job; the review is advisory, so losing superseded
-    # reviews is acceptable versus sixteen concurrent Claude review pipelines.
+    # Keep duplicate deliveries for one source run serialized without allowing a later version
+    # port to cancel an older pending review. Every authenticated source run gets its own group.
     concurrency:
-      group: visual-review-model
+      group: visual-review-model-${{ needs.authenticate.outputs.source_run_id }}
       cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -616,9 +788,20 @@ jobs:
           manifest_sha256="$(sha256sum "$manifest" | cut -d ' ' -f 1)"
           frame_count="$(jq length "$manifest")"
           scenario_contract_sha256="$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)"
+          reference_identity="$(python3 e2e/visual_review.py \
+            --matrix release/release-matrix.json \
+            --reference-identity)"
+          reference_branch="$(jq -er .release_branch <<< "$reference_identity")"
+          reference_artifact_node="$(jq -er .artifact_node <<< "$reference_identity")"
+          reference_version="$(jq -er .version <<< "$reference_identity")"
+          reference_loader="$(jq -er .loader <<< "$reference_identity")"
           jq -e \
             --arg implementation_sha "$IMPLEMENTATION_SHA" \
             --arg manifest_sha256 "$manifest_sha256" \
+            --arg reference_artifact_node "$reference_artifact_node" \
+            --arg reference_branch "$reference_branch" \
+            --arg reference_loader "$reference_loader" \
+            --arg reference_version "$reference_version" \
             --arg scenario_contract_sha256 "$scenario_contract_sha256" \
             --arg source_sha "$SOURCE_SHA" \
             --argjson artifact_inventory "$ARTIFACT_INVENTORY" \
@@ -629,22 +812,57 @@ jobs:
             '(keys | sort) == (["artifact_inventory", "frame_count",
               "image_bytes", "image_count", "implementation_sha", "job_graph",
               "manifest_sha256", "matrix_kind", "scenario_contract_sha256",
-              "schema_version", "source_run_id", "source_sha"] | sort) and
-             .schema_version == 1 and .source_run_id == $source_run_id and
+              "schema_version", "source_run_id", "source_sha",
+              "visual_reference"] | sort) and
+             .schema_version == 2 and .source_run_id == $source_run_id and
              .source_sha == $source_sha and
              .implementation_sha == $implementation_sha and
              (.matrix_kind == "pr-anchors" or .matrix_kind == "native-anchors") and
              .scenario_contract_sha256 == $scenario_contract_sha256 and
              .artifact_inventory == $artifact_inventory and
              (.job_graph | type == "object" and .runtime_policy == "full") and
+             (.visual_reference | (keys | sort) == (["artifact_digest",
+               "artifact_id", "artifact_name", "artifact_node", "artifact_run_id",
+               "artifact_size_in_bytes", "branch", "loader", "manifest_sha256",
+               "sha", "version"] | sort)) and
+             (.visual_reference.artifact_id | type == "number" and . > 0) and
+             (.visual_reference.artifact_name | type == "string" and
+               test("^pages-(e2e|cache)-[A-Za-z0-9._/-]+$")) and
+             (.visual_reference.artifact_run_id | type == "number" and . > 0) and
+             (.visual_reference.artifact_size_in_bytes |
+               type == "number" and . > 0 and . <= 536870912) and
+             (.visual_reference.artifact_digest | type == "string" and
+               test("^sha256:[0-9a-f]{64}$")) and
+             .visual_reference.branch == $reference_branch and
+             (.visual_reference.sha | type == "string" and
+               test("^[0-9a-f]{40}$")) and
+             (.visual_reference.artifact_name ==
+                ("pages-e2e-" + .visual_reference.branch) or
+              .visual_reference.artifact_name ==
+                ("pages-cache-" + .visual_reference.branch + "--" +
+                  .visual_reference.sha) or
+              .visual_reference.artifact_name ==
+                ("pages-cache-" + .visual_reference.branch)) and
+             .visual_reference.artifact_node == $reference_artifact_node and
+             .visual_reference.version == $reference_version and
+             .visual_reference.loader == $reference_loader and
+             (.visual_reference.manifest_sha256 | type == "string" and
+               test("^[0-9a-f]{64}$")) and
              .manifest_sha256 == $manifest_sha256 and
              .frame_count == $frame_count and .image_count == $image_count and
              .image_bytes == $image_bytes' \
             "$capsule/curation-proof.json" > /dev/null
 
+          reference_proof="$(jq -c .visual_reference \
+            "$capsule/curation-proof.json")"
+          reference_sha="$(jq -er .sha <<< "$reference_proof")"
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$reference_branch" \
+            --jq .commit.sha)" == "$reference_sha" ]]
+
           python3 e2e/check_visual_review.py \
             --manifest "$manifest" \
             --input-root "$capsule/review-input" \
+            --require-paired \
             --validate-input-only
           sha256sum "$manifest" > \
             "$RUNNER_TEMP/visual-review-manifest.sha256"
@@ -689,12 +907,13 @@ jobs:
             --model claude-opus-5 \
             --safe-mode \
             --no-session-persistence \
-            --tools "Read,Write" \
+            --tools "Read" \
             --allowedTools \
               "Read(./review-input/visual-review-manifest.json)" \
               "Read(./review-input/images/**)" \
-              "Write(./visual-review-report.raw.json)" \
-            --permission-mode dontAsk
+            --permission-mode dontAsk \
+            > visual-review-report.raw.json
+          test -s visual-review-report.raw.json
 
       - name: Check the advisory review
         working-directory: ${{ runner.temp }}/visual-review-capsule
@@ -704,11 +923,13 @@ jobs:
           python3 "$RUNNER_TEMP/visual-review-checker.py" \
             --manifest review-input/visual-review-manifest.json \
             --input-root review-input \
+            --require-paired \
             --validate-input-only
           git -C "$GITHUB_WORKSPACE" diff --exit-code
           python3 "$RUNNER_TEMP/visual-review-checker.py" \
             --report visual-review-report.raw.json \
             --normalized-report visual-review-report.json \
+            --require-paired \
             --manifest review-input/visual-review-manifest.json
 
       - name: Upload the source-bound review report

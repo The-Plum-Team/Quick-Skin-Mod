@@ -952,6 +952,44 @@ class SelectArtifactProbeTest(unittest.TestCase):
             select_artifact.parse_args(["--repository", REPOSITORY, "--branch", BRANCH])
         self.assertTrue(select_artifact.parse_args(self.probe_argv()).probe)
 
+    def test_selection_outputs_the_exact_numeric_artifact_identity(self) -> None:
+        keep = artifact(
+            200,
+            f"pages-cache-{BRANCH}--{TARGET_SHA}",
+            "2026-08-03T12:00:00Z",
+            run_id=900,
+            head_branch="master",
+            head_sha=PAGES_SHA,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "github-output"
+            argv = [
+                "--repository",
+                REPOSITORY,
+                "--branch",
+                BRANCH,
+                "--github-output",
+                str(output),
+            ]
+            with patch.dict(os.environ, {"GH_TOKEN": "token"}), patch.object(
+                select_artifact, "GitHubApi"
+            ) as api_factory, patch.object(
+                select_artifact, "select_source", return_value=keep
+            ):
+                api_factory.return_value.get_branch_sha.return_value = TARGET_SHA
+                self.assertEqual(select_artifact.main(argv), 0)
+
+            self.assertEqual(
+                [
+                    "artifact_id=200",
+                    f"name=pages-cache-{BRANCH}--{TARGET_SHA}",
+                    "run_id=900",
+                    f"sha={TARGET_SHA}",
+                    "size_in_bytes=100",
+                ],
+                output.read_text(encoding="utf-8").splitlines(),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
