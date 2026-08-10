@@ -199,10 +199,11 @@ The curator applies the protected review checker before upload and reserves
 32 MiB of the handoff envelope for the bounded manifest, proof, archive metadata, and structure. A
 source/run/implementation proof and bounded manifest cross into a fresh capsule. The model can read
 only the manifest/images; its stdout is captured as one raw result envelope without granting a
-write tool. The pinned CLI must first validate its structured output against the exact frame count;
-protected code then extracts the verdict array, revalidates the capsule and semantic report
-contract, and uploads only a schema-normalized bounded report. An independent cleanup job deletes
-the one-use handoff immediately. Review concurrency is scoped to
+write tool. The pinned CLI validates supported structural types, required keys, and manifest-bound
+label values. Protected code then extracts the verdict array and independently enforces the exact
+frame count, labels, text/list bounds, coherence, capsule, and semantic report contract before it
+uploads only a schema-normalized bounded report. An independent cleanup job deletes the one-use
+handoff immediately. Review concurrency is scoped to
 the authenticated source run, so a later version port cannot silently cancel an older pending
 review. The final small report remains for one day.
 
