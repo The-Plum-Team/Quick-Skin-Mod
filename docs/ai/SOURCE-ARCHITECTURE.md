@@ -115,21 +115,30 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every candidate with the same semantic capture from
-  authenticated compact Pages evidence. It atomically re-encodes both sides as same-sized,
-  metadata-free RGB PNGs. `e2e/check_visual_review.py` validates the all-single or all-paired bounded
-  capsule and normalizes bounded model output; raw model output is never uploaded.
+  authenticated lossless raw Pages handoff evidence. It atomically re-encodes both sides as
+  same-sized, metadata-free RGB PNGs. `e2e/check_visual_review.py` validates the all-single or
+  all-paired bounded capsule and normalizes bounded model output. `e2e/visual_review_runner.py`
+  removes byte-identical pairs, runs bounded Sonnet triage chunks, selectively escalates bounded
+  Opus verification chunks, and keeps raw provider output private.
 - `scripts/pages/evidence.py` creates and validates a small branch-scoped raw handoff, then
   atomically compacts a validated bundle to protected WebP derivatives. It may copy only contracted
   screenshots and structured provenance—never runtime logs or arbitrary HTML. The compact schema
   preserves separate source and derivative identities, hashes, dimensions, pixel metrics, and
-  comparison metrics; raw PNG bytes stop at the one-day E2E handoff.
+  comparison metrics. Raw PNG bytes normally stop at the one-day E2E handoff; the single
+  matrix-derived Fabric 1.20.1 visual anchor is retained losslessly and rotated as current state.
 - `scripts/pages/select_artifact.py` authenticates exact-current E2E handoffs and SHA-bound rolling
-  caches, then selects the newest valid source. A branch-only cache name is migration fallback only.
+  caches, then selects the newest valid source. Its AI mode requires a raw handoff and refuses a
+  compact fallback. A branch-only cache name is migration fallback only.
 - `scripts/pages/rotate_artifacts.py` owns post-deployment retention. It may delete only exact
   Actions artifact IDs whose protected run provenance, branch, SHA, age, and successful replacement
   have all been revalidated, including Pages-run intermediates; it never implements screenshot or
-  version discovery itself. Raw E2E artifacts remain retention-bound inputs for concurrent
-  attestations and are outside rotation ownership.
+  version discovery itself. It preserves exactly the current validated raw visual-anchor handoff
+  and retires only its older generations. Raw packaged-E2E artifacts remain retention-bound inputs
+  for concurrent attestations and are outside rotation ownership.
+- `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
+  sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
+  the oldest eligible source. Queue state lives in Actions artifacts rather than pending workflow
+  runs, so GitHub concurrency coalescing cannot lose a review.
 - `scripts/ci/gradle_cache_policy.py` is the fail-closed writer policy for Gradle state. It permits
   writes only from protected `master`; release branches, packaged E2E, and release jobs remain
   read-only.
