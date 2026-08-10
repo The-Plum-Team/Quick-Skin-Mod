@@ -250,6 +250,19 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual("key", skin_menu.review_tier)
         self.assertIn("dark, subtly starred background", skin_menu.expectation)
 
+        for capture_id in (
+            "phase0-smoke.client_a.baseline",
+            "propagation.client_a.baseline",
+            "propagation.client_b.baseline",
+            "propagation-live.client_a.baseline",
+            "propagation-live.client_b.baseline",
+            "propagation-live.client_b.observe_before",
+            "full.client_a.baseline",
+        ):
+            with self.subTest(capture_id=capture_id):
+                expectation = self.contract.capture_by_id(capture_id).expectation
+                self.assertIn("any valid default skin variant is acceptable", expectation)
+
     def test_comparisons_preserve_thresholds_regions_and_order(self) -> None:
         def values(scenario: str, role: str) -> list[tuple[object, ...]]:
             return [
