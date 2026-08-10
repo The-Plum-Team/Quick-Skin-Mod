@@ -187,7 +187,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   entry for cooldown and retry. The fixed concurrency group covers the complete protected drain,
   from oldest-entry selection through exact-id cleanup, so overlapping wakes cannot reserve the
   same capsule. Pending-run coalescing remains safe because queue state is durable and a settled
-  drain dispatches its own continuation.
+  drain dispatches its own continuation. The curator may suppress a replicated automation sync
+  only after authenticating one bot-owned associated PR and its complete server-side file list,
+  and only when every current and previous rename path belongs to the visual-review workflows,
+  protected CI tests, or documentation. Missing, oversized, multiple, or runtime-bearing diffs
+  remain eligible for the ordinary review path.
 - Optimized gallery images are derivatives, not the source proof. Publish separate source and
   derivative hashes/dimensions, and content-address each public image URL with the bytes actually
   served. Original PNGs may exist only in `pages-e2e-*` handoffs; all are one-day transients except

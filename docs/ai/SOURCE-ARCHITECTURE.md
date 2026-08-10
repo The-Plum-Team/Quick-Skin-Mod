@@ -140,6 +140,10 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   runs, so GitHub concurrency coalescing cannot lose a review. The fixed drain concurrency group
   covers selection through exact-id cleanup; overlapping wakes therefore cannot reserve the same
   oldest capsule before either reaches the model job.
+- `scripts/ci/visual_review_impact.py` is the narrow fail-open cost filter for replicated version
+  ports. Protected automation supplies a complete, bounded GitHub PR file inventory; only the two
+  visual-review workflows, the classifier itself, CI tests, and documentation may skip another
+  model review. Unknown paths, malformed inventories, and unsafe rename origins remain reviewable.
 - `scripts/ci/gradle_cache_policy.py` is the fail-closed writer policy for Gradle state. It permits
   writes only from protected `master`; release branches, packaged E2E, and release jobs remain
   read-only.
