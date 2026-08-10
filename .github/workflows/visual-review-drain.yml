@@ -1,8 +1,8 @@
 name: AI visual review drain
 
 # Curators enqueue immutable, source-bound capsules in visual-review.yml. This protected workflow
-# drains one oldest eligible capsule at a time. A fixed model concurrency group may coalesce wake
-# runs because the durable artifact queue, rather than a pending workflow run, owns the work.
+# drains one oldest eligible capsule at a time. A fixed workflow concurrency group may coalesce
+# wake runs because the durable artifact queue, rather than a pending workflow run, owns the work.
 on:
   schedule:
     - cron: "17,47 * * * *"
@@ -12,6 +12,14 @@ on:
   workflow_dispatch:
 
 permissions: {}
+
+# Serialize selection through cleanup, not just the credential-bearing model job. Otherwise two
+# wakes can select the same oldest artifact before either reaches the model lock. GitHub may replace
+# a pending member of this group; the durable queue and the running drain's continuation preserve
+# the work independently of that pending run.
+concurrency:
+  group: quick-skin-visual-review-model
+  cancel-in-progress: false
 
 jobs:
   select:
@@ -79,11 +87,6 @@ jobs:
     name: Review one queued capsule (advisory)
     needs: select
     if: needs.select.outputs.eligible == 'true'
-    # GitHub may replace an older pending member of this group. That is safe: every capsule remains
-    # in the artifact queue and the running drain dispatches the next wake after exact-id cleanup.
-    concurrency:
-      group: quick-skin-visual-review-model
-      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -97,7 +100,7 @@ jobs:
       review_complete: ${{ steps.check.outputs.review_complete }}
 
     steps:
-      - name: Revalidate the queue entry after acquiring global model capacity
+      - name: Revalidate the queue entry inside the global drain lock
         id: guard
         shell: bash
         env:
@@ -607,10 +610,16 @@ jobs:
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ ]]
           [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
-          metadata="$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" 2>/dev/null || true)"
-          if [[ -z "$metadata" ]]; then
-            exit 0
+          metadata_error="$(mktemp "$RUNNER_TEMP/visual-review-metadata.XXXXXX")"
+          metadata=""
+          if ! metadata="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" \
+              2>"$metadata_error")"; then
+            if grep -Fq '(HTTP 404)' "$metadata_error"; then
+              exit 0
+            fi
+            cat "$metadata_error" >&2
+            exit 1
           fi
           jq -e \
             --arg digest "sha256:$ARTIFACT_DIGEST" \
@@ -620,8 +629,20 @@ jobs:
             '.id == $artifact_id and .name == $name and .digest == $digest and
              .expired == false and .workflow_run.id == $run_id' \
             <<< "$metadata" > /dev/null
-          gh api --method DELETE \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
+          delete_error="$(mktemp "$RUNNER_TEMP/visual-review-delete.XXXXXX")"
+          if gh api --method DELETE \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" \
+              2>"$delete_error"; then
+            exit 0
+          fi
+          # Another authenticated cleanup may have settled the exact same immutable artifact after
+          # the metadata read. Missing is the desired postcondition; every other API failure stays
+          # visible and leaves the durable entry available for a later scheduled retry.
+          if grep -Fq '(HTTP 404)' "$delete_error"; then
+            exit 0
+          fi
+          cat "$delete_error" >&2
+          exit 1
 
   continue:
     name: Wake the next queued review

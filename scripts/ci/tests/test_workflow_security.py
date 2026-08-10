@@ -298,6 +298,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("permissions: {}", prepare_workflow)
         self.assertIn("workflows:\n      - Packaged E2E", prepare_workflow)
         prepare_jobs = prepare_workflow.split("\njobs:\n", 1)[1]
+        drain_header = drain_workflow.split("\njobs:\n", 1)[0]
         drain_jobs = drain_workflow.split("\njobs:\n", 1)[1]
         self.assertEqual(
             {"authenticate", "curate", "request-drain"},
@@ -310,8 +311,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-drain-requested", prepare_workflow)
         self.assertIn("visual-review-drain-requested", drain_workflow)
         self.assertIn('cron: "17,47 * * * *"', drain_workflow)
-        self.assertIn("quick-skin-visual-review-model", review)
-        self.assertIn("cancel-in-progress: false", review)
+        self.assertIn("quick-skin-visual-review-model", drain_header)
+        self.assertIn("cancel-in-progress: false", drain_header)
+        self.assertNotIn("concurrency:", review)
         self.assertIn("scripts/ci/visual_review_queue.py", select)
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
@@ -383,6 +385,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", cleanup)
         self.assertNotIn("actions/checkout@", cleanup)
         self.assertIn("gh api --method DELETE", cleanup)
+        self.assertIn("visual-review-metadata", cleanup)
+        self.assertIn("visual-review-delete", cleanup)
+        self.assertEqual(cleanup.count("(HTTP 404)"), 2)
         self.assertIn("contents: write", continuation)
 
         self.assertIn("lossless Minecraft 1.20.1", triage_prompt)
