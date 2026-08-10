@@ -37,6 +37,93 @@ class ReviewError(ValueError):
     pass
 
 
+def report_schema(
+    verdict_count: int, *, labels: list[str] | None = None
+) -> dict[str, Any]:
+    """Return the bounded draft-07 schema used for model structured output."""
+
+    if (
+        isinstance(verdict_count, bool)
+        or not isinstance(verdict_count, int)
+        or not 1 <= verdict_count <= MAX_REVIEW_FRAMES
+    ):
+        raise ReviewError(
+            f"structured review schema must contain between 1 and {MAX_REVIEW_FRAMES} verdicts"
+        )
+    if labels is not None:
+        if not isinstance(labels, list) or len(labels) != verdict_count:
+            raise ReviewError("structured review schema labels must be exact and unique")
+        if any(
+            not isinstance(label, str)
+            or not label.strip()
+            or len(label) > MAX_LABEL_LENGTH
+            or any(ord(character) < 32 or ord(character) == 127 for character in label)
+            for label in labels
+        ) or len(set(labels)) != verdict_count:
+            raise ReviewError("structured review schema labels must be exact and unique")
+    label_schema: dict[str, Any] = {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": MAX_LABEL_LENGTH,
+    }
+    if labels is not None:
+        label_schema["enum"] = labels
+    verdict = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": sorted(VERDICT_KEYS),
+        "properties": {
+            "label": label_schema,
+            "visible": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_VISIBLE_LENGTH,
+            },
+            "matches": {"type": "boolean"},
+            "anomalies": {
+                "type": "array",
+                "maxItems": MAX_ANOMALIES,
+                "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": MAX_ANOMALY_LENGTH,
+                },
+            },
+            "defect": {"type": "boolean"},
+        },
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["reviews"],
+        "properties": {
+            "reviews": {
+                "type": "array",
+                "minItems": verdict_count,
+                "maxItems": verdict_count,
+                "items": verdict,
+            }
+        },
+    }
+
+
+def extract_structured_report(envelope: Any) -> Any:
+    """Extract only a validated structured result from the Claude JSON envelope."""
+
+    if (
+        not isinstance(envelope, dict)
+        or envelope.get("type") != "result"
+        or envelope.get("subtype") != "success"
+    ):
+        raise ReviewError("model output is not a successful structured result envelope")
+    if "is_error" in envelope and envelope["is_error"] is not False:
+        raise ReviewError("model structured result envelope reports an error")
+    structured_output = envelope.get("structured_output")
+    if not isinstance(structured_output, dict) or set(structured_output) != {"reviews"}:
+        raise ReviewError("model result must contain only structured_output.reviews")
+    return structured_output["reviews"]
+
+
 def emit(summary: str) -> None:
     """Append to the Actions summary when available and always echo to stdout."""
     print(summary)
@@ -426,12 +513,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--report", default="visual-review-report.json")
     parser.add_argument("--manifest", default="visual-review-manifest.json")
     parser.add_argument("--input-root", default="review-input")
-    parser.add_argument("--validate-input-only", action="store_true")
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument("--validate-input-only", action="store_true")
+    actions.add_argument("--print-output-schema", action="store_true")
     parser.add_argument("--require-paired", action="store_true")
+    parser.add_argument("--structured-output-envelope", action="store_true")
     parser.add_argument("--normalized-report")
     args = parser.parse_args(argv)
     try:
         manifest = load(Path(args.manifest), "review manifest")
+        if args.print_output_schema:
+            entries, labels = validate_manifest(
+                manifest, require_paired=args.require_paired
+            )
+            print(
+                json.dumps(
+                    report_schema(len(entries), labels=labels),
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+            )
+            return 0
         if args.validate_input_only:
             count = validate_input(
                 manifest,
@@ -440,9 +543,12 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(f"Validated {count} curated visual review frames")
             return 0
+        report = load(Path(args.report), "review report")
+        if args.structured_output_envelope:
+            report = extract_structured_report(report)
         verdicts = validate(
             manifest,
-            load(Path(args.report), "review report"),
+            report,
             require_paired=args.require_paired,
         )
         if args.normalized_report is not None:
