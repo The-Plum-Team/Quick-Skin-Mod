@@ -139,7 +139,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
   the oldest eligible source. Queue state lives in Actions artifacts rather than pending workflow
-  runs, so GitHub concurrency coalescing cannot lose a review.
+  runs, so GitHub concurrency coalescing cannot lose a review. The fixed drain concurrency group
+  covers selection through exact-id cleanup; overlapping wakes therefore cannot reserve the same
+  oldest capsule before either reaches the model job.
 - `scripts/ci/gradle_cache_policy.py` is the fail-closed writer policy for Gradle state. It permits
   writes only from protected `master`; release branches, packaged E2E, and release jobs remain
   read-only.
