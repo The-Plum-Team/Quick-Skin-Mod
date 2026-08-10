@@ -402,6 +402,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("lossless Minecraft 1.20.1", triage_prompt)
         self.assertIn("becoming softer or blurred", triage_prompt)
         self.assertIn("independent second-pass", verify_prompt)
+        for prompt in (triage_prompt, verify_prompt):
+            self.assertIn("any intact Vanilla default", prompt)
+            self.assertIn("This exception never applies when the expectation names", prompt)
+            self.assertIn("a custom skin or cape", prompt)
         self.assertIn("DEFAULT_TRIAGE_CHUNK_SIZE = 8", runner)
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
         self.assertIn("path\"] == item[\"reference_path", runner)
