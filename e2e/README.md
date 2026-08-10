@@ -148,11 +148,12 @@ missing required skin-menu, cape-menu, cape-editor, or settings label, a visuall
 apply/animation pair, compatibility/error screen, crash report, or fatal
 mixin/access-widener/linkage/`@ExpectPlatform` log evidence. The background check measures
 luminance in a normalized outer region free of the menu and toast UI. Required-copy probes
-normalize to the gallery's 1600x900 reference size and require bright glyph pixels only in narrow,
-stable text regions. Other pixel checks use broad entropy/color and pairwise-change invariants
-rather than golden images, so GPU and Minecraft-version rendering differences are allowed. Every
-result records the literal fields `artifact_node`, `runtime_version`, `loader`, `scenario`,
-`jar_sha256`, and `port`.
+normalize to the gallery's 1600x900 reference size and require bright glyph pixels only in bounded,
+stable text regions. The skin drop-zone region covers its one-entry and two-entry catalog layouts;
+the glyph threshold remains unchanged, so an empty region still fails closed. Other pixel checks
+use broad entropy/color and pairwise-change invariants rather than golden images, so GPU and
+Minecraft-version rendering differences are allowed. Every result records the literal fields
+`artifact_node`, `runtime_version`, `loader`, `scenario`, `jar_sha256`, and `port`.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves
