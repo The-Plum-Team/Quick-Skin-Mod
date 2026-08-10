@@ -179,7 +179,7 @@ run and requires the final merge commit to have exactly the tested Git tree. Thi
 shown by each branch-specific Packaged E2E badge in the root README.
 
 Programmatic screenshot probes and comparisons are part of that required runtime gate. AI image
-judgment is a separate, authenticated `AI visual review` workflow and is advisory: it can annotate
+judgment is a separate authenticated prepare/queue/drain pipeline and is advisory: it can annotate
 evidence without delaying or weakening Build, Packaged E2E, or version-port completion.
 The stable cross-version anchor decision is recorded in
 [ADR 0004](../docs/architecture/decisions/0004-anchor-ai-visual-review-to-1-20-1.md).
@@ -190,22 +190,30 @@ Git objects—never as a checkout executed by the privileged workflow—then ful
 scenario product, requires one production JAR, and re-encodes every captured frame as a bounded
 metadata-free RGB PNG
 named by its served-byte SHA-256. For each semantic `capture_id`, it pairs the candidate with the
-authenticated current-head Fabric 1.20.1 frame selected from the protected Pages handoff/cache.
-Candidate and reference are normalized to the same dimensions without changing aspect ratio. The
-reference is a semantic visual anchor, not a strict whole-pixel golden image: legitimate Vanilla,
-loader, camera, lighting, and framing differences remain acceptable. A missing pair fails curation.
+authenticated current-head Fabric 1.20.1 frame selected only from the protected lossless Pages
+handoff; the compact WebP cache is never an AI oracle. Candidate and reference are normalized to
+the same dimensions without changing aspect ratio. The reference is a semantic visual anchor, not
+a strict whole-pixel golden image: legitimate Vanilla, loader, camera, lighting, and framing
+differences remain acceptable. A missing pair fails curation.
 
-The curator applies the protected review checker before upload and reserves
-32 MiB of the handoff envelope for the bounded manifest, proof, archive metadata, and structure. A
-source/run/implementation proof and bounded manifest cross into a fresh capsule. The model can read
-only the manifest/images; its stdout is captured as one raw result envelope without granting a
-write tool. The pinned CLI validates supported structural types, required keys, and manifest-bound
-label values. Protected code then extracts the verdict array and independently enforces the exact
-frame count, labels, text/list bounds, coherence, capsule, and semantic report contract before it
-uploads only a schema-normalized bounded report. An independent cleanup job deletes the one-use
-handoff immediately. Review concurrency is scoped to
-the authenticated source run, so a later version port cannot silently cancel an older pending
-review. The final small report remains for one day.
+The curator applies the protected review checker before upload and reserves 32 MiB of the handoff
+envelope for the bounded manifest, proof, archive metadata, and structure. A source/run/
+implementation proof and bounded manifest become a seven-day durable queue entry. A protected
+drainer authenticates the oldest eligible entry, then enters one repository-wide model concurrency
+group. The queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without
+losing reviews.
+
+The runner first marks content-addressed candidate/reference paths that are byte-identical as clean
+without a model call. Sonnet triages the rest in chunks of at most eight pairs. A concern or any
+confidence below high is independently rechecked by Opus in chunks of at most four. Each call is
+paced and retried within a bound. Both models can read only the bounded manifest/images; stdout is
+captured without granting a write or shell tool. Protected code validates exact label coverage,
+text/list bounds, decision coherence, capsule identity, and the final report contract. It uploads
+only a schema-normalized report; raw provider output stays private. Transient provider failures
+create only a sanitized one-day cooldown marker, leaving the queue entry for retry while other
+entries progress. Terminal validation/configuration failures are marked and retired. An independent
+cleanup job deletes a settled entry by exact artifact id. The final small report remains for one
+day.
 
 ## Public visual evidence
 
@@ -226,10 +234,12 @@ that adapter and the CI prompt/checker schema aligned.
 
 After a successful full run on a release branch—or after its exact-tree attestation—the advisory
 `prepare-pages-evidence` job downloads the original packaged artifacts and creates
-`pages-e2e-<branch>`. That one-day handoff contains only contract-selected source PNGs plus a
-validated manifest; logs, caches, crash reports, Minecraft directories, and AI-authored HTML are
-never copied. The producer then sends the explicit authenticated `pages-evidence-ready` event; it
-does not depend on recursive token-triggered workflow behavior.
+`pages-e2e-<branch>`. The handoff contains only contract-selected source PNGs plus a validated
+manifest; logs, caches, crash reports, Minecraft directories, and AI-authored HTML are never copied.
+Ordinary handoffs retain one day. The release matrix's Fabric 1.20.1 handoff retains 90 days as the
+current lossless visual anchor and is generation-rotated after replacement. The producer then sends
+the explicit authenticated `pages-evidence-ready` event; it does not depend on recursive
+token-triggered workflow behavior.
 
 The `Project site` controller executes only the protected generator from `master`. It authenticates
 each wake-up, coalesces concurrent events, discovers every release branch, and accepts evidence only
@@ -243,9 +253,11 @@ After a successful deployment, the controller explicitly self-dispatches `operat
 protected rotation authenticates its completed/successful owner and operates on exact artifact IDs,
 retaining one validated compact `pages-cache-*` bundle for each exact release head. This atomic,
 generation-safe rotation admits the replacement before deleting superseded exact IDs, and a delayed
-rotation cannot delete a newer cache. Original PNG bytes never enter that durable cache. Monthly
-validation can refresh compact caches without relaunching Minecraft. Pages and AI visual review
-remain advisory and are not protected release checks.
+rotation cannot delete a newer cache. For the matrix-derived 1.20.1 anchor it also retains the exact
+current raw handoff, revalidates it before every deletion, and deletes only older raw generations.
+Original PNG bytes never enter the durable compact cache. Monthly validation can refresh compact
+caches without relaunching Minecraft. Pages and AI visual review remain advisory and are not
+protected release checks.
 
 Run the focused contracts in the project Python environment (CI installs the Linux renderer from
 the hash-locked `scripts/pages/requirements.txt`):
