@@ -36,13 +36,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Never place raw visual artifacts in a credential-bearing job. Authenticate them, validate the
   protected lane graph, extract them with aggregate budgets, enforce exact matrix-row/scenario/JAR
   coverage, and canonicalize selected images in a prior secretless job. The fresh review capsule
-  may expose only its curated manifest and image directory through a read-only model tool surface;
-  the shell captures one raw JSON result envelope from model stdout. The pinned CLI must validate
-  supported structural types, required keys, and manifest-bound label values against a protected
-  schema derived from the exact manifest. Protected code must independently extract the verdicts
-  and enforce exact count, labels, bounds, and coherence before it emits the only normalized report
-  eligible for upload. A final
-  `actions: write` job reauthenticates and deletes the single-use handoff by exact id.
+  may expose only bounded manifest chunks and its curated image directory through a read-only model
+  tool surface; the shell captures one private raw JSON result envelope per bounded call from model
+  stdout. The pinned CLI must validate supported structural types, required keys, and
+  manifest-bound label values against a protected schema derived from the exact chunk. Protected
+  code must independently extract every result and enforce exact count, labels, bounds, and
+  coherence before it emits the only normalized report eligible for upload. Durable queue state
+  must not depend on a pending workflow run: a sanitized marker may cool a failed entry, raw
+  provider text must never be uploaded, and a final `actions: write` job may delete only a
+  completed handoff reauthenticated by exact id.
 - Version-port and repair validation must check out candidate code with credentials disabled.
   For a version port, the complete patch goes only into an alternate index; the protected merge
   controller reconstructs the original merge and copies only recomputed AI-conflict entries from

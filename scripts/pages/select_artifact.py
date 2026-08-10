@@ -66,6 +66,7 @@ def select_source(
     repository: str,
     branch: str,
     current_sha: str,
+    require_raw: bool = False,
 ) -> Artifact:
     handoff_name = f"pages-e2e-{branch}"
     cache_name = f"pages-cache-{branch}--{current_sha}"
@@ -88,6 +89,12 @@ def select_source(
         sha=current_sha,
         events=frozenset({"workflow_dispatch"}),
     )
+    if require_raw:
+        if handoff is None:
+            raise RotationError(
+                f"no authenticated lossless current-head evidence exists for {branch}"
+            )
+        return handoff
     cache = _newest_valid(
         api,
         [
@@ -139,6 +146,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="answer via exit status whether authenticated current-head evidence exists",
     )
+    parser.add_argument(
+        "--require-raw",
+        action="store_true",
+        help="select only a lossless pages-e2e handoff and never a compact cache",
+    )
     args = parser.parse_args(argv)
     if not args.probe and args.github_output is None:
         parser.error("--github-output is required unless --probe is used")
@@ -172,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
                     repository=repository,
                     branch=branch,
                     current_sha=current_sha,
+                    require_raw=args.require_raw,
                 )
             except RotationError as exc:
                 print(f"Pages evidence probe: {exc}", file=sys.stderr)
@@ -183,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
             repository=repository,
             branch=branch,
             current_sha=current_sha,
+            require_raw=args.require_raw,
         )
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write(f"artifact_id={selected.artifact_id}\n")
