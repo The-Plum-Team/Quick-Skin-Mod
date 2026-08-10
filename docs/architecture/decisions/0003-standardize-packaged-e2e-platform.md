@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-06
+- Amended by: ADR 0004 on 2026-08-10 for queued read-only visual review
 - Scope: shared packaged-runtime, visual-evidence, Pages, and version-port automation
 
 ## Context
@@ -91,12 +92,13 @@ to be byte-identical to protected `master` before publishing a required status. 
 bootstrap contract additionally binds each active loader's exact `src/e2e` tree and the complete
 release-branch loader build script; merely applying a convention last is not an authority boundary.
 
-Split visual judgment into authentication, secretless curation, fresh credential-bearing review,
-and exact-id cleanup. Curation proves the protected job graph and matrix-row/scenario/JAR product,
-fully decodes source images, and serves only bounded metadata-free RGB PNGs named by their new byte
-hash plus an auditable proof. The model can read only that manifest/image capsule and write one raw
-report. Protected code revalidates the capsule, bounds and normalizes the report, and never uploads
-the raw response or retains the single-use handoff. AI repair/conflict
+Split visual judgment into authentication, secretless curation, a durable capsule queue, fresh
+credential-bearing review, and exact-id cleanup. Curation proves the protected job graph and
+matrix-row/scenario/JAR product, fully decodes source images, and serves only bounded metadata-free
+RGB PNGs named by their new byte hash plus an auditable proof. The model can read only bounded
+manifest/image inputs; the shell privately captures its structured stdout. Protected code
+revalidates the capsule, bounds and normalizes the report, never uploads raw provider output, and
+retains a failed queue entry only for bounded retry. AI repair/conflict
 jobs install their pinned CLI only from protected package metadata and run in safe mode with an
 explicit shell-free tool set, scoped file permissions, no candidate configuration, and no persisted
 session/history. Failure logs and artifacts are identity-bound, size/count bounded, and extracted by
