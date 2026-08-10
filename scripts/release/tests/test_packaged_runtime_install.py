@@ -380,6 +380,11 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
             "faa5dca3c3d4354bae1bdde9e5a14b3b",
             packaged_runtime.offline_player_uuid("Bob"),
         )
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure,
+            "no locked offline UUID for E2E username 'Mallory'",
+        ):
+            packaged_runtime.offline_player_uuid("Mallory")
 
         package = types.ModuleType("minecraft_launcher_lib")
         package.__path__ = []  # type: ignore[attr-defined]

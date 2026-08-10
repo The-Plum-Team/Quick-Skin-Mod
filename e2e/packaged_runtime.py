@@ -22,7 +22,6 @@ import tempfile
 import time
 import urllib.parse
 import urllib.request
-import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
@@ -169,6 +168,12 @@ RUNTIME_STORE_ENV = "QUICKSKIN_E2E_RUNTIME_STORE"
 RUNTIME_STORE_MAX_AGE_ENV = "QUICKSKIN_E2E_RUNTIME_STORE_MAX_AGE_SECONDS"
 RUNTIME_STORE_MAX_BYTES_ENV = "QUICKSKIN_E2E_RUNTIME_STORE_MAX_BYTES"
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+OFFLINE_PLAYER_UUIDS = {
+    # Java UUID.nameUUIDFromBytes("OfflinePlayer:<name>".getBytes(UTF_8)).
+    # The E2E roles below are deliberately fixed; fail closed if that identity catalog drifts.
+    "Alice": "10920508d5d83eed93d292f193afe7d7",
+    "Bob": "faa5dca3c3d4354bae1bdde9e5a14b3b",
+}
 
 MAX_EVIDENCE_FILES = 512
 MAX_EVIDENCE_TOTAL_BYTES = 256 * 1024 * 1024
@@ -980,9 +985,10 @@ def write_e2e_client_config(game_dir: Path) -> Path:
 def offline_player_uuid(username: str) -> str:
     """Return Java's ``UUID.nameUUIDFromBytes`` identity for an offline player."""
 
-    payload = f"OfflinePlayer:{username}".encode("utf-8")
-    digest = hashlib.md5(payload, usedforsecurity=False).digest()
-    return uuid.UUID(bytes=digest, version=3).hex
+    try:
+        return OFFLINE_PLAYER_UUIDS[username]
+    except KeyError as exc:
+        raise RuntimeFailure(f"no locked offline UUID for E2E username {username!r}") from exc
 
 
 def client_command(
