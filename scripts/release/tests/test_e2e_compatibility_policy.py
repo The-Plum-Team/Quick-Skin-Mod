@@ -43,6 +43,31 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             "the splash type must be a class literal so the remapper rewrites it",
         )
 
+    def test_default_skin_baselines_wait_for_the_uuid_selected_texture(self) -> None:
+        shim = SHIM.read_text(encoding="utf-8")
+        self.assertIn("DefaultPlayerSkin.class", shim)
+        self.assertIn("expectedDefaultSkinTexture", shim)
+        self.assertIn("isExpectedDefaultSkinResolved", shim)
+
+        scenarios = (
+            E2E_JAVA / "scenario" / "Phase0Smoke.java",
+            E2E_JAVA / "scenario" / "PropagationScenario.java",
+            E2E_JAVA / "scenario" / "PropagationLiveScenario.java",
+            E2E_JAVA / "scenario" / "FullScenario.java",
+        )
+        for source in scenarios:
+            with self.subTest(source=source.name):
+                text = source.read_text(encoding="utf-8")
+                self.assertIn(
+                    ".ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))",
+                    text,
+                )
+                self.assertIn("default skin did not stabilize", text)
+
+        live = scenarios[2].read_text(encoding="utf-8")
+        self.assertIn("VanillaShim.isExpectedDefaultSkinResolved(a)", live)
+        self.assertIn("A's default skin did not stabilize BEFORE", live)
+
     def test_string_class_lookups_declare_an_intermediary_fallback(self) -> None:
         """Fabric serves intermediary names at runtime; a Mojang name alone resolves only on Forge."""
 

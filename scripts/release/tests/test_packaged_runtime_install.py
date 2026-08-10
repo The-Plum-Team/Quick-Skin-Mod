@@ -371,6 +371,68 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
             with self.assertRaisesRegex(packaged_runtime.RuntimeFailure, "exactly 8.0"):
                 packaged_runtime.client_runtime_recipe(self.matrix, self.row)
 
+    def test_client_uses_the_servers_standard_offline_uuid(self) -> None:
+        self.assertEqual(
+            "10920508d5d83eed93d292f193afe7d7",
+            packaged_runtime.offline_player_uuid("Alice"),
+        )
+        self.assertEqual(
+            "faa5dca3c3d4354bae1bdde9e5a14b3b",
+            packaged_runtime.offline_player_uuid("Bob"),
+        )
+
+        package = types.ModuleType("minecraft_launcher_lib")
+        package.__path__ = []  # type: ignore[attr-defined]
+        command = types.ModuleType("minecraft_launcher_lib.command")
+        utils = types.ModuleType("minecraft_launcher_lib.utils")
+        captured: dict[str, object] = {}
+
+        def get_minecraft_command(
+            version_id: str, install_dir: str, options: dict[str, object]
+        ) -> list[str]:
+            captured.update(
+                version_id=version_id,
+                install_dir=install_dir,
+                options=options,
+            )
+            return ["java", "minecraft"]
+
+        command.get_minecraft_command = get_minecraft_command  # type: ignore[attr-defined]
+        utils.generate_test_options = lambda: {}  # type: ignore[attr-defined]
+        package.command = command  # type: ignore[attr-defined]
+        package.utils = utils  # type: ignore[attr-defined]
+
+        with mock.patch.dict(
+            sys.modules,
+            {
+                "minecraft_launcher_lib": package,
+                "minecraft_launcher_lib.command": command,
+                "minecraft_launcher_lib.utils": utils,
+            },
+        ):
+            launched = packaged_runtime.client_command(
+                self.root / "install",
+                "fabric-loader-1.21.10",
+                self.root / "game",
+                {"runtime_version": "1.21.10"},
+                "propagation",
+                "client_a",
+                "Alice",
+                25565,
+                "/fake/java",
+            )
+
+        self.assertEqual(["java", "minecraft"], launched)
+        self.assertEqual("fabric-loader-1.21.10", captured["version_id"])
+        options = captured["options"]
+        self.assertIsInstance(options, dict)
+        assert isinstance(options, dict)
+        self.assertEqual("Alice", options["username"])
+        self.assertEqual(
+            "10920508d5d83eed93d292f193afe7d7",
+            options["uuid"],
+        )
+
 
 class PackagedRuntimeDependencyTest(unittest.TestCase):
     def setUp(self) -> None:

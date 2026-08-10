@@ -947,6 +947,14 @@ def write_server_files(server: Path, port: int, template_root: Path) -> None:
     shutil.copytree(template_root / "datapack", datapack, dirs_exist_ok=True)
 
 
+def offline_player_uuid(username: str) -> str:
+    """Return Java's ``UUID.nameUUIDFromBytes`` identity for an offline player."""
+
+    payload = f"OfflinePlayer:{username}".encode("utf-8")
+    digest = hashlib.md5(payload, usedforsecurity=False).digest()
+    return uuid.UUID(bytes=digest, version=3).hex
+
+
 def client_command(
     install_dir: Path,
     version_id: str,
@@ -965,7 +973,10 @@ def client_command(
     options.update(
         {
             "username": username,
-            "uuid": uuid.uuid5(uuid.NAMESPACE_DNS, f"quickskin-e2e-{username}").hex,
+            # The offline server derives this same UUID from the player name. Keeping the
+            # launch profile and server profile identical makes UUID-selected vanilla skins
+            # deterministic and prevents the client from briefly rendering a different fallback.
+            "uuid": offline_player_uuid(username),
             "token": "quickskin-e2e-offline",
             "executablePath": java,
             "defaultExecutablePath": java,

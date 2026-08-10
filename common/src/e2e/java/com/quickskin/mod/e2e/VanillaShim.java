@@ -5,6 +5,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.SplashRenderer;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
 
 import java.io.File;
@@ -12,17 +13,18 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
  * Isolates the handful of vanilla calls whose signature drifts across Minecraft versions, so the rest
  * of the harness stays a single version-agnostic source set. Everything here is reflection-based and
  * returns only version-stable types ({@link String}, {@link Screen}), importing no type that was
- * renamed/moved across versions. {@link SplashRenderer} is the one deliberate exception: its
- * package is identical on every supported version and only its constructor drifts, and it must be
- * referenced as a class literal so the harness jar's remapper rewrites it for Fabric's
- * intermediary runtime. Resolving a Minecraft name as a string only works on Mojang-mapped
- * loaders, so keep string lookups for classes that genuinely move.
+ * renamed/moved across versions. {@link SplashRenderer} and {@link DefaultPlayerSkin} are the two
+ * deliberate class-literal exceptions: their packages are identical on every supported version,
+ * and the harness jar's remapper must rewrite them for Fabric's intermediary runtime. Resolving a
+ * Minecraft name as a string only works on Mojang-mapped loaders, so keep string lookups for
+ * classes that genuinely move.
  *
  * <p>Drift absorbed (1.20.1 / 1.21.x / 26.x):</p>
  * <ul>
@@ -36,6 +38,9 @@ import java.util.function.Consumer;
  *       {@code getSkin().body()/cape()} returning a {@code ClientAsset.Texture} whose
  *       {@code texturePath()} is the Identifier (26.x). Returned as a String so no renamed type
  *       ({@code ResourceLocation}→{@code Identifier}) is imported.</li>
+ *   <li><b>UUID-selected default skin</b>: {@code DefaultPlayerSkin.getDefaultSkin(UUID)} returning
+ *       a ResourceLocation (1.20.1) vs {@code DefaultPlayerSkin.get(UUID)} returning the same
+ *       evolving player-skin record described above.</li>
  *   <li><b>player name</b>: {@code GameProfile.getName()} (authlib class) vs {@code name()} (authlib
  *       record, 26.x).</li>
  *   <li><b>main render target</b> (for screenshots): {@code Minecraft.getMainRenderTarget()} vs
@@ -143,6 +148,40 @@ public final class VanillaShim {
         return resolveLoc(p, "getSkinTextureLocation", new String[]{"texture", "body"});
     }
 
+    /**
+     * The vanilla default skin selected for this exact profile UUID, as a texture location string.
+     *
+     * <p>The method name and return shape drift across supported versions. Matching the static
+     * UUID signature avoids relying on an obfuscated name, while the class literal ensures Fabric's
+     * harness remapper rewrites the owner. String-returning model helpers in 1.20.1 are ignored
+     * because they are not resource locations.</p>
+     */
+    public static String expectedDefaultSkinTexture(AbstractClientPlayer p) {
+        if (p == null) return null;
+        UUID playerId = p.getUUID();
+        for (Method method : DefaultPlayerSkin.class.getDeclaredMethods()) {
+            if (!Modifier.isStatic(method.getModifiers())
+                    || method.getParameterCount() != 1
+                    || method.getParameterTypes()[0] != UUID.class) {
+                continue;
+            }
+            try {
+                method.setAccessible(true);
+                String location = unwrapDefaultSkinTexture(method.invoke(null, playerId));
+                if (location != null) return location;
+            } catch (Throwable ignored) {
+                // Another UUID helper may have a shape that is not a texture; try the next one.
+            }
+        }
+        return null;
+    }
+
+    /** True only when the renderer has converged on the UUID-selected vanilla default texture. */
+    public static boolean isExpectedDefaultSkinResolved(AbstractClientPlayer p) {
+        String expected = expectedDefaultSkinTexture(p);
+        return expected != null && expected.equals(skinTexture(p));
+    }
+
     /** As {@link #skinTexture} for the cape ({@code null} when no cape). */
     public static String cloakTexture(AbstractClientPlayer p) {
         return resolveLoc(p, "getCloakTextureLocation", new String[]{"capeTexture", "cape"});
@@ -201,6 +240,33 @@ public final class VanillaShim {
             E2ELog.warn("resolveLoc(" + directName + "): " + t);
         }
         return null;
+    }
+
+    private static String unwrapDefaultSkinTexture(Object candidate) throws ReflectiveOperationException {
+        if (candidate == null) return null;
+
+        // 1.21.x/26.x: PlayerSkin -> texture/body -> optional ClientAsset.Texture.texturePath().
+        for (String accessor : new String[]{"texture", "body"}) {
+            Method component = accessor.equals("texture")
+                    ? findNoArg(candidate.getClass(), accessor, "comp_1626")
+                    : findNoArg(candidate.getClass(), accessor);
+            if (component == null) continue;
+            Object texture = component.invoke(candidate);
+            if (texture == null) return null;
+            Method texturePath = findNoArg(texture.getClass(), "texturePath", "comp_3627");
+            Object location = texturePath == null ? texture : texturePath.invoke(texture);
+            String value = location == null ? null : location.toString();
+            return isResourceLocation(value) ? value : null;
+        }
+
+        // 1.20.1: getDefaultSkin(UUID) returns the ResourceLocation directly. The same class also
+        // exposes a UUID -> model-name helper, so accept only the lexical shape of a location.
+        String value = candidate.toString();
+        return isResourceLocation(value) ? value : null;
+    }
+
+    private static boolean isResourceLocation(String value) {
+        return value != null && value.matches("[a-z0-9_.-]+:[a-z0-9/._-]+");
     }
 
     /**

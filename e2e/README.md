@@ -23,7 +23,7 @@ This `master` integration baseline exercises the following exact packaged lanes:
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `4` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `4` |
 
-Scenario contract SHA-256: `fc9d7865191985220218ed2d0930a167042aba058ac89e7cb46c87d5b959bc8d`
+Scenario contract SHA-256: `67a552ac1a8e91da6c78533f61f6f4d681f2c85da8a816a2ff79c94ec491e135`
 Contract totals: `40` ordered steps, `36` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -87,6 +87,12 @@ python e2e/orchestrator.py \
 The two-client `propagation` and `propagation-live` scenarios and the Forge lane are exercised on
 Linux CI. Treat local macOS runs as development evidence only; release evidence comes from the CI
 Linux run.
+
+Packaged clients use the same standard `OfflinePlayer:<name>` UUID that the offline server derives.
+Before a default-skin screenshot, the harness waits for the renderer to hold the vanilla texture
+selected for that UUID instead of capturing Minecraft's earlier generic fallback frame. Visual
+review still accepts any intact vanilla default skin variant across versions; that tolerance does
+not apply to checkpoints whose expectation names a Quick Skin custom skin or cape.
 
 For a matrix Java major `<major>`, executable resolution checks
 `QUICKSKIN_JAVA_<major>`, the matching `JAVA_HOME_<major>_X64` variables, a matching `JAVA_HOME`,
