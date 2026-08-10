@@ -1,0 +1,654 @@
+name: AI visual review drain
+
+# Curators enqueue immutable, source-bound capsules in visual-review.yml. This protected workflow
+# drains one oldest eligible capsule at a time. A fixed model concurrency group may coalesce wake
+# runs because the durable artifact queue, rather than a pending workflow run, owns the work.
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+  repository_dispatch:
+    types:
+      - visual-review-drain-requested
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  select:
+    name: Select one durable review capsule
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      artifact_digest: ${{ steps.queue.outputs.artifact_digest }}
+      artifact_id: ${{ steps.queue.outputs.artifact_id }}
+      artifact_name: ${{ steps.queue.outputs.artifact_name }}
+      artifact_run_id: ${{ steps.queue.outputs.artifact_run_id }}
+      artifact_size: ${{ steps.queue.outputs.artifact_size }}
+      eligible: ${{ steps.queue.outputs.eligible }}
+      implementation_sha: ${{ steps.queue.outputs.implementation_sha }}
+      source_run_id: ${{ steps.queue.outputs.source_run_id }}
+
+    steps:
+      - name: Check out the protected queue selector
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Select the oldest authenticated non-cooling queue entry
+        id: queue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_ARTIFACT_ID: ${{ github.event.client_payload.artifact_id }}
+        run: |
+          set -euo pipefail
+          attempts=1
+          if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]] \
+              && [[ "$REQUESTED_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]; then
+            # The enqueue workflow dispatches from its final job, just before its own run settles.
+            # Poll only that authenticated wake long enough for completed-run provenance to exist.
+            attempts=12
+          fi
+          queue_output="$(mktemp "$RUNNER_TEMP/visual-review-queue.XXXXXX")"
+          for (( attempt = 1; attempt <= attempts; attempt++ )); do
+            : > "$queue_output"
+            python3 scripts/ci/visual_review_queue.py \
+              --repository "$GITHUB_REPOSITORY" \
+              --github-output "$queue_output" \
+              --cooldown-minutes 30
+            if grep -qx 'eligible=true' "$queue_output"; then
+              break
+            fi
+            if (( attempt < attempts )); then
+              sleep 5
+            fi
+          done
+          cat "$queue_output" >> "$GITHUB_OUTPUT"
+
+  review:
+    name: Review one queued capsule (advisory)
+    needs: select
+    if: needs.select.outputs.eligible == 'true'
+    # GitHub may replace an older pending member of this group. That is safe: every capsule remains
+    # in the artifact queue and the running drain dispatches the next wake after exact-id cleanup.
+    concurrency:
+      group: quick-skin-visual-review-model
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      already_reviewed: ${{ steps.guard.outputs.already_reviewed }}
+      cooling: ${{ steps.guard.outputs.cooling }}
+      failure_category: ${{ steps.classify.outputs.failure_category }}
+      failure_transient: ${{ steps.classify.outputs.failure_transient }}
+      review_complete: ${{ steps.check.outputs.review_complete }}
+
+    steps:
+      - name: Revalidate the queue entry after acquiring global model capacity
+        id: guard
+        shell: bash
+        env:
+          ARTIFACT_DIGEST: ${{ needs.select.outputs.artifact_digest }}
+          ARTIFACT_ID: ${{ needs.select.outputs.artifact_id }}
+          ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
+          ARTIFACT_RUN_ID: ${{ needs.select.outputs.artifact_run_id }}
+          ARTIFACT_SIZE: ${{ needs.select.outputs.artifact_size }}
+          GH_TOKEN: ${{ github.token }}
+          IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
+          SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          printf 'already_reviewed=false\n' >> "$GITHUB_OUTPUT"
+          printf 'cooling=false\n' >> "$GITHUB_OUTPUT"
+          printf 'reviewable=true\n' >> "$GITHUB_OUTPUT"
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$ARTIFACT_NAME" == "visual-review-input-$SOURCE_RUN_ID" ]]
+          [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
+          (( ARTIFACT_SIZE <= 536870912 ))
+          [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+
+          report_name="visual-review-$SOURCE_RUN_ID"
+          reports="$(gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$report_name&per_page=100")"
+          jq -e \
+            '(type == "array") and
+             ([.[] | (.artifacts | type == "array")] | all) and
+             ([.[].artifacts[]] | length <= 100)' \
+            <<< "$reports" > /dev/null
+          while IFS=$'\t' read -r report_run_id expired; do
+            [[ -n "$report_run_id" && "$expired" == false ]] || continue
+            report_run="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$report_run_id" 2>/dev/null || true)"
+            if [[ -n "$report_run" ]] && jq -e \
+                --arg repository "$GITHUB_REPOSITORY" \
+                '((.status == "completed" and
+                   (.conclusion == "success" or .conclusion == "failure")) or
+                  (.status == "in_progress" and .conclusion == null)) and
+                 (.event == "repository_dispatch" or .event == "schedule" or
+                  .event == "workflow_dispatch") and
+                 .head_branch == "master" and
+                 .path == ".github/workflows/visual-review-drain.yml" and
+                 .head_repository.full_name == $repository' \
+                <<< "$report_run" > /dev/null; then
+              printf 'already_reviewed=true\n' >> "$GITHUB_OUTPUT"
+              printf 'reviewable=false\n' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done < <(jq -r --arg name "$report_name" \
+            '.[].artifacts[] | select(.name == $name) |
+             [.workflow_run.id, .expired] | @tsv' <<< "$reports")
+
+          # A wake may have selected this capsule while an older run still held the model group.
+          # Re-check the exact source's fixed-name marker after entering that group so a recent
+          # provider failure cannot be retried by an already-pending duplicate drain.
+          attempt_name="visual-review-attempt-$SOURCE_RUN_ID"
+          attempts="$(gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$attempt_name&per_page=100")"
+          jq -e \
+            '(type == "array") and
+             ([.[] | (.artifacts | type == "array")] | all) and
+             ([.[].artifacts[]] | length <= 100)' \
+            <<< "$attempts" > /dev/null
+          while IFS=$'\t' read -r attempt_run_id expired created_at; do
+            [[ -n "$attempt_run_id" && "$expired" == false ]] || continue
+            if ! jq -ne --arg created_at "$created_at" \
+                '($created_at | fromdateiso8601) + 1800 > now'; then
+              continue
+            fi
+            attempt_run="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$attempt_run_id" 2>/dev/null || true)"
+            if [[ -n "$attempt_run" ]] && jq -e \
+                --arg repository "$GITHUB_REPOSITORY" \
+                '((.status == "completed" and .conclusion == "failure") or
+                  (.status == "in_progress" and .conclusion == null)) and
+                 (.event == "repository_dispatch" or .event == "schedule" or
+                  .event == "workflow_dispatch") and
+                 .head_branch == "master" and
+                 .path == ".github/workflows/visual-review-drain.yml" and
+                 .head_repository.full_name == $repository' \
+                <<< "$attempt_run" > /dev/null; then
+              printf 'cooling=true\n' >> "$GITHUB_OUTPUT"
+              printf 'reviewable=false\n' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done < <(jq -r --arg name "$attempt_name" \
+            '.[].artifacts[] | select(.name == $name) |
+             [.workflow_run.id, .expired, .created_at] | @tsv' <<< "$attempts")
+
+          metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
+          jq -e \
+            --arg digest "sha256:$ARTIFACT_DIGEST" \
+            --arg implementation_sha "$IMPLEMENTATION_SHA" \
+            --arg name "$ARTIFACT_NAME" \
+            --argjson artifact_id "$ARTIFACT_ID" \
+            --argjson artifact_run_id "$ARTIFACT_RUN_ID" \
+            --argjson size "$ARTIFACT_SIZE" \
+            '.id == $artifact_id and .name == $name and .digest == $digest and
+             .size_in_bytes == $size and .expired == false and
+             .workflow_run.id == $artifact_run_id and
+             .workflow_run.head_branch == "master" and
+             .workflow_run.head_sha == $implementation_sha' \
+            <<< "$metadata" > /dev/null
+          owner="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$ARTIFACT_RUN_ID")"
+          jq -e \
+            --arg implementation_sha "$IMPLEMENTATION_SHA" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --argjson run_id "$ARTIFACT_RUN_ID" \
+            '.id == $run_id and .status == "completed" and
+             (.conclusion == "success" or .conclusion == "failure") and
+             (.event == "repository_dispatch" or .event == "workflow_run") and
+             .head_branch == "master" and .head_sha == $implementation_sha and
+             .path == ".github/workflows/visual-review.yml" and
+             .head_repository.full_name == $repository' \
+            <<< "$owner" > /dev/null
+
+      - name: Check out the exact protected reviewer
+        if: steps.guard.outputs.reviewable == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.select.outputs.implementation_sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        if: steps.guard.outputs.reviewable == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Fetch and verify the exact curated capsule
+        if: steps.guard.outputs.reviewable == 'true'
+        shell: bash
+        env:
+          ARTIFACT_DIGEST: ${{ needs.select.outputs.artifact_digest }}
+          ARTIFACT_ID: ${{ needs.select.outputs.artifact_id }}
+          ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
+          ARTIFACT_RUN_ID: ${{ needs.select.outputs.artifact_run_id }}
+          ARTIFACT_SIZE: ${{ needs.select.outputs.artifact_size }}
+          GH_TOKEN: ${{ github.token }}
+          IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
+          SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/curated-review-input.zip"
+          gh api -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
+            > "$archive"
+          [[ "$(stat -c %s "$archive")" == "$ARTIFACT_SIZE" ]]
+          [[ "$(sha256sum "$archive" | cut -d ' ' -f 1)" == "$ARTIFACT_DIGEST" ]]
+          capsule="$RUNNER_TEMP/visual-review-capsule"
+          test ! -e "$capsule"
+          mkdir -p "$capsule"
+          python3 scripts/ci/bounded_zip.py \
+            "$archive" "$capsule/handoff" \
+            --max-archive-bytes 536870912 \
+            --max-entries 520 \
+            --max-total-bytes 536870912 \
+            --max-file-bytes 33554432 \
+            --max-compression-ratio 200 \
+            > "$RUNNER_TEMP/curated-extraction.json"
+          rm -f -- "$archive"
+          mv -- "$capsule/handoff/curation-proof.json" \
+            "$capsule/curation-proof.json"
+          mv -- "$capsule/handoff/review-input" "$capsule/review-input"
+          rmdir "$capsule/handoff"
+
+          mapfile -d '' top_level < <(
+            find "$capsule" -mindepth 1 -maxdepth 1 -print0
+          )
+          [[ "${#top_level[@]}" -eq 2 ]]
+          [[ -f "$capsule/curation-proof.json" && ! -L "$capsule/curation-proof.json" ]]
+          [[ -f "$capsule/review-input/visual-review-manifest.json" ]]
+          [[ -d "$capsule/review-input/images" ]]
+          [[ -z "$(find "$capsule/review-input/images" -mindepth 2 -print -quit)" ]]
+
+          image_count=0
+          image_bytes=0
+          while IFS= read -r -d '' frame; do
+            frame_name="$(basename "$frame")"
+            [[ -f "$frame" && ! -L "$frame" ]]
+            [[ "$frame_name" =~ ^[0-9a-f]{64}\.png$ ]]
+            [[ "$(sha256sum "$frame" | cut -d ' ' -f 1).png" == "$frame_name" ]]
+            image_count=$((image_count + 1))
+            image_bytes=$((image_bytes + $(stat -c %s "$frame")))
+          done < <(
+            find "$capsule/review-input/images" -mindepth 1 -maxdepth 1 -print0
+          )
+          (( image_count > 0 && image_count <= 512 ))
+
+          proof="$capsule/curation-proof.json"
+          manifest="$capsule/review-input/visual-review-manifest.json"
+          manifest_sha256="$(sha256sum "$manifest" | cut -d ' ' -f 1)"
+          frame_count="$(jq length "$manifest")"
+          source_sha="$(jq -er .source_sha "$proof")"
+          proof_source_run_id="$(jq -er .source_run_id "$proof")"
+          [[ "$proof_source_run_id" == "$SOURCE_RUN_ID" ]]
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
+          source_run="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sha "$source_sha" \
+            --argjson run_id "$SOURCE_RUN_ID" \
+            '.id == $run_id and .status == "completed" and .conclusion == "success" and
+             (.event == "pull_request" or .event == "schedule" or
+              .event == "workflow_dispatch") and .head_sha == $sha and
+             .path == ".github/workflows/on-demand-e2e.yml" and
+             .head_repository.full_name == $repository' \
+            <<< "$source_run" > /dev/null
+
+          reference_identity="$(python3 e2e/visual_review.py \
+            --matrix release/release-matrix.json --reference-identity)"
+          reference_branch="$(jq -er .release_branch <<< "$reference_identity")"
+          reference_artifact_node="$(jq -er .artifact_node <<< "$reference_identity")"
+          reference_version="$(jq -er .version <<< "$reference_identity")"
+          reference_loader="$(jq -er .loader <<< "$reference_identity")"
+          reference_id="$(jq -er .visual_reference.artifact_id "$proof")"
+          reference_name="$(jq -er .visual_reference.artifact_name "$proof")"
+          reference_run_id="$(jq -er .visual_reference.artifact_run_id "$proof")"
+          reference_sha="$(jq -er .visual_reference.sha "$proof")"
+          reference_digest="$(jq -er .visual_reference.artifact_digest "$proof")"
+          reference_size="$(jq -er .visual_reference.artifact_size_in_bytes "$proof")"
+          [[ "$reference_name" == "pages-e2e-$reference_branch" ]]
+          reference_metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$reference_id")"
+          jq -e \
+            --arg digest "$reference_digest" \
+            --arg name "$reference_name" \
+            --arg sha "$reference_sha" \
+            --argjson artifact_id "$reference_id" \
+            --argjson run_id "$reference_run_id" \
+            --argjson size "$reference_size" \
+            '.id == $artifact_id and .name == $name and .size_in_bytes == $size and
+             .digest == $digest and .expired == false and
+             .workflow_run.id == $run_id and .workflow_run.head_sha == $sha' \
+            <<< "$reference_metadata" > /dev/null
+          reference_run="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$reference_run_id")"
+          jq -e \
+            --arg branch "$reference_branch" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sha "$reference_sha" \
+            '.status == "completed" and .conclusion == "success" and
+             .event == "workflow_dispatch" and .head_branch == $branch and
+             .head_sha == $sha and .path == ".github/workflows/on-demand-e2e.yml" and
+             .head_repository.full_name == $repository' \
+            <<< "$reference_run" > /dev/null
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$reference_branch" \
+            --jq .commit.sha)" == "$reference_sha" ]]
+
+          scenario_contract_sha256="$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)"
+          jq -e \
+            --arg implementation_sha "$IMPLEMENTATION_SHA" \
+            --arg manifest_sha256 "$manifest_sha256" \
+            --arg reference_artifact_node "$reference_artifact_node" \
+            --arg reference_branch "$reference_branch" \
+            --arg reference_loader "$reference_loader" \
+            --arg reference_version "$reference_version" \
+            --arg scenario_contract_sha256 "$scenario_contract_sha256" \
+            --arg source_sha "$source_sha" \
+            --argjson frame_count "$frame_count" \
+            --argjson image_bytes "$image_bytes" \
+            --argjson image_count "$image_count" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            --argjson reference_id "$reference_id" \
+            --arg reference_name "$reference_name" \
+            --argjson reference_run_id "$reference_run_id" \
+            --argjson reference_size "$reference_size" \
+            --arg reference_digest "$reference_digest" \
+            --arg reference_sha "$reference_sha" \
+            '(keys | sort) == (["artifact_inventory", "frame_count",
+              "image_bytes", "image_count", "implementation_sha", "job_graph",
+              "manifest_sha256", "matrix_kind", "scenario_contract_sha256",
+              "schema_version", "source_run_id", "source_sha",
+              "visual_reference"] | sort) and
+             .schema_version == 3 and .source_run_id == $source_run_id and
+             .source_sha == $source_sha and .implementation_sha == $implementation_sha and
+             (.matrix_kind == "pr-anchors" or .matrix_kind == "native-anchors") and
+             .scenario_contract_sha256 == $scenario_contract_sha256 and
+             (.artifact_inventory | type == "array" and length > 0 and length <= 8) and
+             ([.artifact_inventory[].id] | length == (unique | length)) and
+             ([.artifact_inventory[].name] | length == (unique | length)) and
+             ([.artifact_inventory[] |
+               (.id | type == "number" and . > 0) and
+               (.name | type == "string" and
+                 test("^packaged-e2e-[A-Za-z0-9._-]+$")) and
+               (.size_in_bytes | type == "number" and . > 0 and . <= 67108864) and
+               (.digest | type == "string" and
+                 test("^sha256:[0-9a-f]{64}$")) and
+               (.expired == false) and
+               (.workflow_run | type == "object") and
+               (.workflow_run.id == $source_run_id)] | all) and
+             ([.artifact_inventory[].size_in_bytes] | add // 0) <= 268435456 and
+             (.job_graph | type == "object" and .runtime_policy == "full") and
+             (.visual_reference | (keys | sort) == (["artifact_digest", "artifact_id",
+               "artifact_name", "artifact_node", "artifact_run_id",
+               "artifact_size_in_bytes", "branch", "evidence_kind", "loader",
+               "manifest_sha256", "sha", "version"] | sort)) and
+             .visual_reference.artifact_id == $reference_id and
+             .visual_reference.artifact_name == $reference_name and
+             .visual_reference.artifact_run_id == $reference_run_id and
+             .visual_reference.artifact_size_in_bytes == $reference_size and
+             .visual_reference.artifact_digest == $reference_digest and
+             .visual_reference.branch == $reference_branch and
+             .visual_reference.sha == $reference_sha and
+             .visual_reference.artifact_node == $reference_artifact_node and
+             .visual_reference.version == $reference_version and
+             .visual_reference.loader == $reference_loader and
+             .visual_reference.evidence_kind == "raw-png" and
+             (.visual_reference.manifest_sha256 | type == "string" and
+               test("^[0-9a-f]{64}$")) and
+             .manifest_sha256 == $manifest_sha256 and .frame_count == $frame_count and
+             .image_count == $image_count and .image_bytes == $image_bytes' \
+            "$proof" > /dev/null
+
+          python3 e2e/check_visual_review.py \
+            --manifest "$manifest" \
+            --input-root "$capsule/review-input" \
+            --require-paired \
+            --validate-input-only
+          sha256sum "$manifest" > "$RUNNER_TEMP/visual-review-manifest.sha256"
+          mkdir -p "$RUNNER_TEMP/protected-reviewer"
+          cp e2e/check_visual_review.py "$RUNNER_TEMP/protected-reviewer/"
+          cp e2e/visual_review_runner.py "$RUNNER_TEMP/protected-reviewer/"
+          cp e2e/visual_review_prompt.md "$RUNNER_TEMP/protected-reviewer/"
+          cp e2e/visual_review_verify_prompt.md "$RUNNER_TEMP/protected-reviewer/"
+          sha256sum "$RUNNER_TEMP/protected-reviewer/"* \
+            > "$RUNNER_TEMP/protected-reviewer.sha256"
+
+      - name: Install Node for the locked Claude CLI
+        if: steps.guard.outputs.reviewable == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Install locked Claude Code outside the repository
+        if: steps.guard.outputs.reviewable == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/claude-cli"
+          cp .github/claude/package.json .github/claude/package-lock.json \
+            "$RUNNER_TEMP/claude-cli/"
+          (
+            cd "$RUNNER_TEMP/claude-cli"
+            npm ci --ignore-scripts
+            node node_modules/@anthropic-ai/claude-code/install.cjs
+            node_modules/.bin/claude --version
+          )
+
+      - name: Review bounded chunks with selective escalation
+        id: model
+        if: steps.guard.outputs.reviewable == 'true'
+        working-directory: ${{ runner.temp }}/visual-review-capsule
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_CODE_SKIP_PROMPT_HISTORY: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLAUDE_CODE_OAUTH_TOKEN"
+          unset GH_TOKEN GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN \
+            ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL \
+            ACTIONS_CACHE_URL ACTIONS_RESULTS_URL
+          sha256sum --check "$RUNNER_TEMP/protected-reviewer.sha256"
+          model_status=0
+          python3 "$RUNNER_TEMP/protected-reviewer/visual_review_runner.py" \
+            --capsule . \
+            --manifest review-input/visual-review-manifest.json \
+            --input-root review-input \
+            --claude "$RUNNER_TEMP/claude-cli/node_modules/.bin/claude" \
+            --triage-prompt \
+              "$RUNNER_TEMP/protected-reviewer/visual_review_prompt.md" \
+            --verify-prompt \
+              "$RUNNER_TEMP/protected-reviewer/visual_review_verify_prompt.md" \
+            --triage-model claude-sonnet-5 \
+            --verify-model claude-opus-5 \
+            --triage-chunk-size 8 \
+            --verify-chunk-size 4 \
+            --model-attempts 3 \
+            --call-spacing-seconds 10 \
+            --output visual-review-report.staged.json \
+            --failure-report visual-review-failure.json \
+            || model_status=$?
+          printf 'model_status=%s\n' "$model_status" >> "$GITHUB_OUTPUT"
+
+      - name: Independently validate the advisory result
+        id: check
+        if: steps.guard.outputs.reviewable == 'true'
+        working-directory: ${{ runner.temp }}/visual-review-capsule
+        shell: bash
+        env:
+          MODEL_STATUS: ${{ steps.model.outputs.model_status }}
+        run: |
+          set -euo pipefail
+          [[ "$MODEL_STATUS" =~ ^[0-9]{1,3}$ ]]
+          if (( MODEL_STATUS != 0 )); then
+            exit "$MODEL_STATUS"
+          fi
+          sha256sum --check "$RUNNER_TEMP/visual-review-manifest.sha256"
+          sha256sum --check "$RUNNER_TEMP/protected-reviewer.sha256"
+          python3 "$RUNNER_TEMP/protected-reviewer/check_visual_review.py" \
+            --manifest review-input/visual-review-manifest.json \
+            --input-root review-input \
+            --require-paired \
+            --validate-input-only
+          git -C "$GITHUB_WORKSPACE" diff --exit-code
+          review_status=0
+          python3 "$RUNNER_TEMP/protected-reviewer/check_visual_review.py" \
+            --report visual-review-report.staged.json \
+            --normalized-report visual-review-report.json \
+            --require-paired \
+            --manifest review-input/visual-review-manifest.json \
+            || review_status=$?
+          test -s visual-review-report.json
+          printf 'review_complete=true\n' >> "$GITHUB_OUTPUT"
+          exit "$review_status"
+
+      - name: Classify a failed attempt without provider text
+        id: classify
+        if: always() && steps.guard.outputs.reviewable == 'true'
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.check.outputs.review_complete }}" == true ]]; then
+            printf 'failure_category=\n' >> "$GITHUB_OUTPUT"
+            printf 'failure_transient=\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          capsule="$RUNNER_TEMP/visual-review-capsule"
+          mkdir -p "$capsule"
+          failure="$capsule/visual-review-failure.json"
+          if [[ ! -f "$failure" ]]; then
+            jq -n \
+              '{schema_version:1,category:"protected_validation",
+                stage:"drain",transient:false}' \
+              > "$failure"
+          fi
+          category="$(jq -er \
+            'select(.schema_version == 1 and
+              (.category | type == "string" and test("^[a-z0-9_-]{1,64}$")) and
+              (.stage | type == "string" and test("^[a-z0-9_-]{1,64}$")) and
+              (.transient | type == "boolean")) | .category' \
+            "$failure")"
+          transient="$(jq -er '.transient | if . then "true" else "false" end' \
+            "$failure")"
+          printf 'failure_category=%s\n' "$category" >> "$GITHUB_OUTPUT"
+          printf 'failure_transient=%s\n' "$transient" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the source-bound normalized report
+        if: always() && steps.check.outputs.review_complete == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visual-review-${{ needs.select.outputs.source_run_id }}
+          path: |
+            ${{ runner.temp }}/visual-review-capsule/curation-proof.json
+            ${{ runner.temp }}/visual-review-capsule/review-input/visual-review-manifest.json
+            ${{ runner.temp }}/visual-review-capsule/visual-review-report.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload only a sanitized attempt marker
+        if: >-
+          always() && steps.guard.outputs.reviewable == 'true' &&
+          steps.check.outputs.review_complete != 'true' &&
+          steps.classify.outputs.failure_category != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visual-review-attempt-${{ needs.select.outputs.source_run_id }}
+          path: ${{ runner.temp }}/visual-review-capsule/visual-review-failure.json
+          if-no-files-found: error
+          retention-days: 1
+
+  cleanup:
+    name: Delete one settled queue entry
+    needs:
+      - select
+      - review
+    if: >-
+      always() && needs.select.outputs.eligible == 'true' &&
+      (needs.review.outputs.review_complete == 'true' ||
+       needs.review.outputs.already_reviewed == 'true' ||
+       (needs.review.outputs.failure_category != '' &&
+        needs.review.outputs.failure_transient == 'false'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+
+    steps:
+      - name: Reauthenticate and delete only the selected queue artifact
+        shell: bash
+        env:
+          ARTIFACT_DIGEST: ${{ needs.select.outputs.artifact_digest }}
+          ARTIFACT_ID: ${{ needs.select.outputs.artifact_id }}
+          ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
+          ARTIFACT_RUN_ID: ${{ needs.select.outputs.artifact_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ ]]
+          [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" 2>/dev/null || true)"
+          if [[ -z "$metadata" ]]; then
+            exit 0
+          fi
+          jq -e \
+            --arg digest "sha256:$ARTIFACT_DIGEST" \
+            --arg name "$ARTIFACT_NAME" \
+            --argjson artifact_id "$ARTIFACT_ID" \
+            --argjson run_id "$ARTIFACT_RUN_ID" \
+            '.id == $artifact_id and .name == $name and .digest == $digest and
+             .expired == false and .workflow_run.id == $run_id' \
+            <<< "$metadata" > /dev/null
+          gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
+
+  continue:
+    name: Wake the next queued review
+    needs:
+      - select
+      - review
+      - cleanup
+    if: >-
+      always() && needs.select.outputs.eligible == 'true' &&
+      ((needs.cleanup.result == 'success' &&
+        (needs.review.outputs.review_complete == 'true' ||
+         needs.review.outputs.already_reviewed == 'true' ||
+         (needs.review.outputs.failure_category != '' &&
+          needs.review.outputs.failure_transient == 'false'))) ||
+       needs.review.outputs.failure_category != '' ||
+       needs.review.outputs.cooling == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Dispatch another independently selected drain
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          jq -n '{event_type:"visual-review-drain-requested",client_payload:{}}' \
+            | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
