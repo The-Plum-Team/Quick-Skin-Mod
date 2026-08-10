@@ -89,10 +89,12 @@ Linux CI. Treat local macOS runs as development evidence only; release evidence 
 Linux run.
 
 Packaged clients use the same standard `OfflinePlayer:<name>` UUID that the offline server derives.
-Before a default-skin screenshot, the harness waits for the renderer to hold the vanilla texture
-selected for that UUID instead of capturing Minecraft's earlier generic fallback frame. Visual
-review still accepts any intact vanilla default skin variant across versions; that tolerance does
-not apply to checkpoints whose expectation names a Quick Skin custom skin or cape.
+Each fresh client profile disables Quick Skin's asynchronous own-skin importer and clears persisted
+skin/cape selections before the mod starts. Before a default-skin screenshot, the harness then
+waits for the renderer to hold the vanilla texture selected for that UUID instead of capturing an
+account skin or Minecraft's earlier generic fallback frame. Visual review still accepts any intact
+vanilla default skin variant across versions; that tolerance does not apply to checkpoints whose
+expectation names a Quick Skin custom skin or cape.
 
 For a matrix Java major `<major>`, executable resolution checks
 `QUICKSKIN_JAVA_<major>`, the matching `JAVA_HOME_<major>_X64` variables, a matching `JAVA_HOME`,

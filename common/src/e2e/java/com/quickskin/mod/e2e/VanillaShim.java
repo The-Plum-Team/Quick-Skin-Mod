@@ -12,6 +12,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.RecordComponent;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -153,8 +154,10 @@ public final class VanillaShim {
      *
      * <p>The method name and return shape drift across supported versions. Matching the static
      * UUID signature avoids relying on an obfuscated name, while the class literal ensures Fabric's
-     * harness remapper rewrites the owner. String-returning model helpers in 1.20.1 are ignored
-     * because they are not resource locations.</p>
+     * harness remapper rewrites the owner. Newer return values are nested records whose accessor
+     * names are also remapped, so their runtime record components are traversed instead of guessing
+     * those names. String-returning model helpers in 1.20.1 are ignored because they are not default
+     * skin texture locations.</p>
      */
     public static String expectedDefaultSkinTexture(AbstractClientPlayer p) {
         if (p == null) return null;
@@ -243,30 +246,31 @@ public final class VanillaShim {
     }
 
     private static String unwrapDefaultSkinTexture(Object candidate) throws ReflectiveOperationException {
-        if (candidate == null) return null;
-
-        // 1.21.x/26.x: PlayerSkin -> texture/body -> optional ClientAsset.Texture.texturePath().
-        for (String accessor : new String[]{"texture", "body"}) {
-            Method component = accessor.equals("texture")
-                    ? findNoArg(candidate.getClass(), accessor, "comp_1626")
-                    : findNoArg(candidate.getClass(), accessor);
-            if (component == null) continue;
-            Object texture = component.invoke(candidate);
-            if (texture == null) return null;
-            Method texturePath = findNoArg(texture.getClass(), "texturePath", "comp_3627");
-            Object location = texturePath == null ? texture : texturePath.invoke(texture);
-            String value = location == null ? null : location.toString();
-            return isResourceLocation(value) ? value : null;
-        }
-
-        // 1.20.1: getDefaultSkin(UUID) returns the ResourceLocation directly. The same class also
-        // exposes a UUID -> model-name helper, so accept only the lexical shape of a location.
-        String value = candidate.toString();
-        return isResourceLocation(value) ? value : null;
+        return unwrapDefaultSkinTexture(candidate, 0);
     }
 
-    private static boolean isResourceLocation(String value) {
-        return value != null && value.matches("[a-z0-9_.-]+:[a-z0-9/._-]+");
+    private static String unwrapDefaultSkinTexture(
+            Object candidate, int depth) throws ReflectiveOperationException {
+        if (candidate == null || depth > 3) return null;
+
+        String direct = candidate.toString();
+        if (isDefaultSkinTextureLocation(direct)) return direct;
+
+        Class<?> type = candidate.getClass();
+        if (!type.isRecord()) return null;
+        for (RecordComponent component : type.getRecordComponents()) {
+            String nested = unwrapDefaultSkinTexture(
+                    component.getAccessor().invoke(candidate), depth + 1);
+            if (nested != null) return nested;
+        }
+        return null;
+    }
+
+    private static boolean isDefaultSkinTextureLocation(String value) {
+        return value != null
+                && value.matches("[a-z0-9_.-]+:[a-z0-9/._-]+")
+                && value.contains(":textures/entity/player/")
+                && value.endsWith(".png");
     }
 
     /**

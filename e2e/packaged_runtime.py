@@ -947,6 +947,36 @@ def write_server_files(server: Path, port: int, template_root: Path) -> None:
     shutil.copytree(template_root / "datapack", datapack, dirs_exist_ok=True)
 
 
+def write_e2e_client_config(game_dir: Path) -> Path:
+    """Seed a clean Quick Skin profile before client initialization.
+
+    Packaged runs exercise skin import explicitly in their scenario steps.  Letting the normal
+    Mojang own-skin importer race those steps would replace the UUID-selected vanilla baseline
+    with account data whose arrival time depends on the network.  Each E2E game directory is
+    disposable, so disable that importer and start with no persisted selection before Minecraft
+    loads the mod.
+    """
+
+    config_path = game_dir / "config" / "quickskin-client.json"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        json.dumps(
+            {
+                "enablePlayerOwnSkinSystem": False,
+                "activeSkinHash": "",
+                "activeCpmModelHash": "",
+                "activeCapeHash": "",
+                "playerOwnSkinHash": "",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return config_path
+
+
 def offline_player_uuid(username: str) -> str:
     """Return Java's ``UUID.nameUUIDFromBytes`` identity for an offline player."""
 
@@ -1798,8 +1828,8 @@ def run_packaged_row(
                 shutil.copy2(
                     repo / "e2e" / "options.txt.template", game_dir / "options.txt"
                 )
+                write_e2e_client_config(game_dir)
                 if row["loader"] == "neoforge":
-                    (game_dir / "config").mkdir(parents=True, exist_ok=True)
                     shutil.copy2(
                         repo / "e2e" / "fml.toml.neoforge",
                         game_dir / "config" / "fml.toml",

@@ -48,6 +48,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("DefaultPlayerSkin.class", shim)
         self.assertIn("expectedDefaultSkinTexture", shim)
         self.assertIn("isExpectedDefaultSkinResolved", shim)
+        self.assertIn("getRecordComponents()", shim)
 
         scenarios = (
             E2E_JAVA / "scenario" / "Phase0Smoke.java",

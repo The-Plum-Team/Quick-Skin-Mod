@@ -433,6 +433,26 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
             options["uuid"],
         )
 
+    def test_e2e_client_config_disables_ambient_own_skin_import(self) -> None:
+        game_dir = self.root / "game"
+
+        config_path = packaged_runtime.write_e2e_client_config(game_dir)
+
+        self.assertEqual(
+            game_dir / "config" / "quickskin-client.json",
+            config_path,
+        )
+        self.assertEqual(
+            {
+                "activeCapeHash": "",
+                "activeCpmModelHash": "",
+                "activeSkinHash": "",
+                "enablePlayerOwnSkinSystem": False,
+                "playerOwnSkinHash": "",
+            },
+            json.loads(config_path.read_text(encoding="utf-8")),
+        )
+
 
 class PackagedRuntimeDependencyTest(unittest.TestCase):
     def setUp(self) -> None:
