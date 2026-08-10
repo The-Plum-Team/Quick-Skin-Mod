@@ -42,6 +42,7 @@ from visual_review import (  # noqa: E402
     curate_manifest,
     load_reference_frames,
     reference_identity,
+    reference_retention_days,
     validate_expected_row,
 )
 
@@ -279,6 +280,77 @@ class VisualEvidenceTest(unittest.TestCase):
         )
         return self.root / "reference-evidence"
 
+    def write_raw_reference(
+        self,
+        capture_id: str,
+        *,
+        dimensions: tuple[int, int] = (800, 450),
+        color: tuple[int, int, int] = (80, 60, 40),
+    ) -> tuple[Path, str]:
+        catalog = load_catalog(self.catalog_path)
+        capture = catalog.by_id[capture_id]
+        branch = "forge-and-fabric-1.20.1"
+        artifact_node = "fabric-1.20.1"
+        bundle = self.root / "raw-reference-evidence" / branch
+        images = bundle / "images"
+        images.mkdir(parents=True)
+        encoded = io.BytesIO()
+        Image.new("RGB", dimensions, color).save(
+            encoded,
+            format="PNG",
+            optimize=False,
+            compress_level=9,
+        )
+        payload = encoded.getvalue()
+        file_sha256 = hashlib.sha256(payload).hexdigest()
+        pixel_sha256 = hashlib.sha256(bytes(color) * dimensions[0] * dimensions[1]).hexdigest()
+        (images / f"{file_sha256}.png").write_bytes(payload)
+        frame = {
+            "artifact_node": artifact_node,
+            "version": "1.20.1",
+            "loader": "fabric",
+            "scenario": capture["scenario"],
+            "role": capture["role"],
+            "step": capture["step"],
+            "frame_id": (
+                f"{artifact_node}/{capture['scenario']}/{capture['role']}/"
+                f"{capture['step']}"
+            ),
+            "capture_id": capture_id,
+            "title": capture["title"],
+            "expectation": capture["expectation"],
+            "review_tier": capture["review_tier"],
+            "asset": f"images/{file_sha256}.png",
+            "file_sha256": file_sha256,
+            "width": dimensions[0],
+            "height": dimensions[1],
+            "pixel_validation": {
+                "file_sha256": file_sha256,
+                "pixel_sha256": pixel_sha256,
+                "width": dimensions[0],
+                "height": dimensions[1],
+            },
+        }
+        manifest = {
+            "schema_version": 1,
+            "contract_sha256": self.contract_hash,
+            "release": {
+                "branch": branch,
+                "artifacts": [
+                    {
+                        "artifact_node": artifact_node,
+                        "version": "1.20.1",
+                        "loader": "fabric",
+                    }
+                ],
+            },
+            "frames": [frame],
+        }
+        (bundle / "manifest.json").write_text(
+            json.dumps(manifest) + "\n", encoding="utf-8"
+        )
+        return self.root / "raw-reference-evidence", pixel_sha256
+
     def test_catalog_exactly_covers_runtime_screenshot_contract(self) -> None:
         catalog = load_catalog()
         runtime = {
@@ -470,6 +542,31 @@ class VisualEvidenceTest(unittest.TestCase):
             len(list((self.root / "review-input" / "images").glob("*.png"))),
         )
 
+    def test_paired_manifest_preserves_lossless_raw_reference_pixels(self) -> None:
+        capture_id = "phase0-smoke.client_a.baseline"
+        self.write_catalog([("phase0-smoke", "client_a", "baseline")])
+        self.write_result("phase0-smoke")
+        reference_root, expected_pixels = self.write_raw_reference(capture_id)
+        references = load_reference_frames(
+            reference_root,
+            self.catalog_path,
+            branch="forge-and-fabric-1.20.1",
+            artifact_node="fabric-1.20.1",
+        )
+        manifest = build_manifest(
+            self.e2e_root,
+            self.catalog_path,
+            include_all=True,
+            combos=None,
+            reference_frames=references,
+        )
+
+        curated = curate_manifest(manifest, self.root / "lossless-review-input")
+
+        reference = self.root / curated[0]["reference_path"]
+        self.assertEqual(expected_pixels, validate_png_snapshot(reference)[2])
+        self.assertEqual("PNG", references[capture_id]["format"])
+
     def test_paired_manifest_fails_closed_on_a_missing_or_changed_reference(self) -> None:
         capture_id = "phase0-smoke.client_a.baseline"
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
@@ -555,6 +652,30 @@ class VisualEvidenceTest(unittest.TestCase):
             },
         ), self.assertRaisesRegex(VisualEvidenceError, "keep Minecraft 1.20.1"):
             reference_identity(self.root / "unused-matrix.json")
+
+    def test_only_the_visual_anchor_matrix_retains_lossless_evidence(self) -> None:
+        anchor = {
+            "unit_test_version": "1.20.1",
+            "project": {"release_branch": "forge-and-fabric-1.20.1"},
+            "artifacts": [
+                {
+                    "artifact_node": "fabric-1.20.1",
+                    "artifact_version": "1.20.1",
+                    "loader": "fabric",
+                }
+            ],
+        }
+        other = {
+            "unit_test_version": "1.21.1",
+            "project": {"release_branch": "fabric-and-neoforge-1.21.1"},
+            "artifacts": [],
+        }
+        matrix_path = self.root / "branch-matrix.json"
+
+        with mock.patch("visual_review.load_matrix", return_value=anchor):
+            self.assertEqual(90, reference_retention_days(matrix_path))
+        with mock.patch("visual_review.load_matrix", return_value=other):
+            self.assertEqual(1, reference_retention_days(matrix_path))
 
     def test_review_input_rejects_unreferenced_content(self) -> None:
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
