@@ -812,9 +812,16 @@ jobs:
         if: steps.owner.outputs.eligible == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          python scripts/pages/rotate_artifacts.py
-          --evidence-root "$RUNNER_TEMP/pages-cache"
-          --repository "$GITHUB_REPOSITORY"
-          --pages-run-id "${{ steps.owner.outputs.pages_run_id }}"
-          --pages-run-sha "${{ steps.owner.outputs.pages_run_sha }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          reference_identity="$(python3 e2e/visual_review.py \
+            --matrix release/release-matrix.json \
+            --reference-identity)"
+          reference_branch="$(jq -er .release_branch <<< "$reference_identity")"
+          python scripts/pages/rotate_artifacts.py \
+            --evidence-root "$RUNNER_TEMP/pages-cache" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pages-run-id "${{ steps.owner.outputs.pages_run_id }}" \
+            --pages-run-sha "${{ steps.owner.outputs.pages_run_sha }}" \
+            --preserve-raw-branch "$reference_branch"

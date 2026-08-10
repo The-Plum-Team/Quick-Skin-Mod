@@ -2,6 +2,7 @@
 
 - Status: Accepted — active
 - Date: 2026-08-02
+- Amended by: ADR 0004 on 2026-08-10 for the single lossless AI anchor
 - Scope: project landing page and cross-version packaged-E2E evidence
 
 ## Context
@@ -60,19 +61,22 @@ Publish one static project site through a custom GitHub Pages workflow:
 6. After a successful deployment, retain exactly one validated compact exact-head cache per release
    branch and refresh unchanged evidence monthly. Rotation runs only after the owning Pages workflow
    is `completed/success`: validate the replacement and current release head again, then delete caches
-   older than that replacement and the exact handoff it consumed. The same authenticated promotion
-   retires by immutable artifact ID the successful Pages run's fan-in and deploy artifacts. Raw
-   packaged-E2E proof instead expires after one day so a concurrent branch attestation can finish
-   consuming it. Preserve a concurrent newer handoff and preserve the previous cache whenever E2E,
-   deployment, validation, or rotation fails. Separately, a protected scheduled sweep discovers
+   older than that replacement and the ordinary exact handoff it consumed. For the matrix-derived
+   Fabric 1.20.1 AI anchor, retain the exact current raw handoff and retire only older validated raw
+   generations. The same authenticated promotion retires by immutable artifact ID the successful
+   Pages run's fan-in and deploy artifacts. Raw packaged-E2E proof instead expires after one day so
+   a concurrent branch attestation can finish consuming it. Preserve a concurrent newer handoff,
+   the current raw anchor, and the previous cache whenever E2E, deployment, validation, or rotation
+   fails. Separately, a protected scheduled sweep discovers
    live branches and deletes by exact cache ID only Actions caches scoped to branch refs that no
    longer exist. It does not treat non-branch refs or branches with active runs as orphans. A changed
    release branch still requires new exact-head evidence; Pages never relaunches Minecraft merely
    to refresh presentation.
-7. Keep original PNGs only in the one-day `pages-e2e-*` handoff. Publish bounded WebP derivatives
-   for browsing while recording and revalidating source-PNG and published-image hashes, dimensions,
-   and pixel contracts separately. `collected-pages-*` and the 90-day `pages-cache-*` contain no
-   original PNG bytes. Content-address public image URLs by the bytes actually served.
+7. Keep original PNGs only in `pages-e2e-*` handoffs. Ordinary handoffs expire after one day; the
+   current matrix-derived Fabric 1.20.1 handoff is a 90-day lossless AI anchor. Publish bounded WebP
+   derivatives for browsing while recording and revalidating source-PNG and published-image hashes,
+   dimensions, and pixel contracts separately. `collected-pages-*` and the 90-day `pages-cache-*`
+   contain no original PNG bytes. Content-address public image URLs by the bytes actually served.
 8. Provide a landing/link page and a gallery with an all-versions view, one accessible tab per
    discovered version, filters, and semantic cross-version/loader comparison. Unsupported loaders
    are explicit `not applicable` cells, not missing-test claims.
@@ -103,9 +107,10 @@ tests, and every affected release branch together.
 
 Publication fails closed when any release head lacks current evidence, while the previous atomic
 deployment remains available. The site does not create a second supported-version list. Artifact
-storage is bounded to one compact durable gallery generation per release branch; handoffs, fan-in,
-and deploy artifacts overlap only until their successful deployment has been promoted. Raw E2E
-proof may overlap for its one-day consumer-safety window. Ordinary Actions uploads expire after one day.
+storage is bounded to one compact durable gallery generation per release branch plus one lossless
+current AI anchor; ordinary handoffs, fan-in, and deploy artifacts overlap only until their
+successful deployment has been promoted. Raw E2E proof may overlap for its one-day consumer-safety
+window. Ordinary Actions uploads expire after one day.
 GitHub Pages limits and artifact retention must still be monitored as the number of versions or
 captures grows.
 
