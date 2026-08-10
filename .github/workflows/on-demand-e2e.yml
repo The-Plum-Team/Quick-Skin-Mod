@@ -541,6 +541,12 @@ jobs:
           printf 'source_created_at=%s\n' "$source_created_at" >> "$GITHUB_OUTPUT"
           printf 'target_sha=%s\n' "$target_sha" >> "$GITHUB_OUTPUT"
           printf 'target_created_at=%s\n' "$target_created_at" >> "$GITHUB_OUTPUT"
+          reference_retention_days="$(python3 e2e/visual_review.py \
+            --matrix release/release-matrix.json \
+            --reference-retention-days)"
+          [[ "$reference_retention_days" == 1 || "$reference_retention_days" == 90 ]]
+          printf 'reference_retention_days=%s\n' "$reference_retention_days" \
+            >> "$GITHUB_OUTPUT"
 
       - name: Fetch exact packaged behavior evidence
         if: steps.identity.outputs.publish == 'true'
@@ -579,9 +585,9 @@ jobs:
           path: public-evidence/
           if-no-files-found: error
           compression-level: 6
-          # This is an atomic handoff. A successful protected Pages run promotes it to the one
-          # rolling cache for this branch, then the rotation workflow deletes the consumed copy.
-          retention-days: 1
+          # Ordinary raw handoffs are deleted after Pages promotion. The matrix-derived 1.20.1
+          # visual anchor remains lossless for bounded AI comparison and is rotated on replacement.
+          retention-days: ${{ steps.identity.outputs.reference_retention_days }}
 
       - name: Confirm the exact handoff was published
         id: published
