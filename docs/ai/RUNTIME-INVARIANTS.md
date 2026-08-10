@@ -94,6 +94,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 ## Public E2E evidence
 
+- Packaged offline clients use the server's standard `OfflinePlayer:<name>` UUID. Their fresh,
+  disposable Quick Skin config disables the asynchronous own-skin importer and clears persisted
+  selections before mod initialization. A default-skin capture then waits until the renderer has
+  held the vanilla texture selected for that exact UUID; never accept an account import or the
+  earlier generic fallback frame as stable baseline evidence.
 - A public screenshot is valid only when a successful packaged `result.json` references it and its
   recorded SHA-256 and dimensions match the PNG. Do not infer scenario, role, or step from a
   filename, and do not let sets or duplicate labels collapse two frames into false coverage.
