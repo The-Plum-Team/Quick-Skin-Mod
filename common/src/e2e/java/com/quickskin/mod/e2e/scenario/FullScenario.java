@@ -147,11 +147,21 @@ public final class FullScenario implements Scenario {
                     enterWorldView(mc);
                 })
                 .minTicks(40) // ~2s render warmup so the first frame is real
+                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))
+                .settleTicks(20) // reject a one-frame generic fallback before the UUID skin lands
+                .timeoutTicks(400)
                 .screenshot(prefix + "full_01_baseline" + suffix)
                 .assertion(() -> {
                     if (mc.player == null) return Step.Result.fail("player is null");
+                    String expected = VanillaShim.expectedDefaultSkinTexture(mc.player);
+                    String actual = VanillaShim.skinTexture(mc.player);
+                    if (expected == null || !expected.equals(actual)) {
+                        return Step.Result.fail("default skin did not stabilize: expected="
+                                + expected + " actual=" + actual);
+                    }
                     return Step.Result.pass("player present: " + VanillaShim.playerName(mc.player)
-                            + " activeSkin=" + svc.hasActiveSkin(uuid) + " activeCape=" + svc.hasActiveCape(uuid));
+                            + " defaultSkin=" + actual + " activeSkin=" + svc.hasActiveSkin(uuid)
+                            + " activeCape=" + svc.hasActiveCape(uuid));
                 }));
 
         // 2. local skin upload --------------------------------------------------------------------
