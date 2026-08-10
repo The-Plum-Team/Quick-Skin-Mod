@@ -1050,7 +1050,11 @@ class PagesSiteTest(unittest.TestCase):
         )
 
         handoff = packaged.index("name: pages-e2e-${{ github.ref_name }}")
-        self.assertIn("retention-days: 1", packaged[handoff : handoff + 600])
+        self.assertIn(
+            "retention-days: ${{ steps.identity.outputs.reference_retention_days }}",
+            packaged[handoff : handoff + 900],
+        )
+        self.assertIn("--reference-retention-days", packaged)
         compact = pages.index("python3 scripts/pages/evidence.py compact")
         fan_in = pages.index("name: collected-pages-${{ matrix.branch }}", compact)
         self.assertLess(compact, fan_in)
