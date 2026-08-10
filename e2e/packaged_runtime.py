@@ -22,7 +22,6 @@ import tempfile
 import time
 import urllib.parse
 import urllib.request
-import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
@@ -169,6 +168,12 @@ RUNTIME_STORE_ENV = "QUICKSKIN_E2E_RUNTIME_STORE"
 RUNTIME_STORE_MAX_AGE_ENV = "QUICKSKIN_E2E_RUNTIME_STORE_MAX_AGE_SECONDS"
 RUNTIME_STORE_MAX_BYTES_ENV = "QUICKSKIN_E2E_RUNTIME_STORE_MAX_BYTES"
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+OFFLINE_PLAYER_UUIDS = {
+    # Java UUID.nameUUIDFromBytes("OfflinePlayer:<name>".getBytes(UTF_8)).
+    # The E2E roles below are deliberately fixed; fail closed if that identity catalog drifts.
+    "Alice": "10920508d5d83eed93d292f193afe7d7",
+    "Bob": "faa5dca3c3d4354bae1bdde9e5a14b3b",
+}
 
 MAX_EVIDENCE_FILES = 512
 MAX_EVIDENCE_TOTAL_BYTES = 256 * 1024 * 1024
@@ -947,6 +952,45 @@ def write_server_files(server: Path, port: int, template_root: Path) -> None:
     shutil.copytree(template_root / "datapack", datapack, dirs_exist_ok=True)
 
 
+def write_e2e_client_config(game_dir: Path) -> Path:
+    """Seed a clean Quick Skin profile before client initialization.
+
+    Packaged runs exercise skin import explicitly in their scenario steps.  Letting the normal
+    Mojang own-skin importer race those steps would replace the UUID-selected vanilla baseline
+    with account data whose arrival time depends on the network.  Each E2E game directory is
+    disposable, so disable that importer and start with no persisted selection before Minecraft
+    loads the mod.
+    """
+
+    config_path = game_dir / "config" / "quickskin-client.json"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        json.dumps(
+            {
+                "enablePlayerOwnSkinSystem": False,
+                "activeSkinHash": "",
+                "activeCpmModelHash": "",
+                "activeCapeHash": "",
+                "playerOwnSkinHash": "",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def offline_player_uuid(username: str) -> str:
+    """Return Java's ``UUID.nameUUIDFromBytes`` identity for an offline player."""
+
+    try:
+        return OFFLINE_PLAYER_UUIDS[username]
+    except KeyError as exc:
+        raise RuntimeFailure(f"no locked offline UUID for E2E username {username!r}") from exc
+
+
 def client_command(
     install_dir: Path,
     version_id: str,
@@ -965,7 +1009,10 @@ def client_command(
     options.update(
         {
             "username": username,
-            "uuid": uuid.uuid5(uuid.NAMESPACE_DNS, f"quickskin-e2e-{username}").hex,
+            # The offline server derives this same UUID from the player name. Keeping the
+            # launch profile and server profile identical makes UUID-selected vanilla skins
+            # deterministic and prevents the client from briefly rendering a different fallback.
+            "uuid": offline_player_uuid(username),
             "token": "quickskin-e2e-offline",
             "executablePath": java,
             "defaultExecutablePath": java,
@@ -1787,8 +1834,8 @@ def run_packaged_row(
                 shutil.copy2(
                     repo / "e2e" / "options.txt.template", game_dir / "options.txt"
                 )
+                write_e2e_client_config(game_dir)
                 if row["loader"] == "neoforge":
-                    (game_dir / "config").mkdir(parents=True, exist_ok=True)
                     shutil.copy2(
                         repo / "e2e" / "fml.toml.neoforge",
                         game_dir / "config" / "fml.toml",
