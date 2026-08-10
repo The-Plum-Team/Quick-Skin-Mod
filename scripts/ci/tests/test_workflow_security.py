@@ -105,6 +105,12 @@ class WorkflowSecurityTest(unittest.TestCase):
                         self.assertIn("> visual-review-report.raw.json", block)
                         self.assertIn("--output-format json", block)
                         self.assertIn('--json-schema "$output_schema"', block)
+                        self.assertIn("model_status=0", block)
+                        self.assertIn(
+                            "> visual-review-report.raw.json || model_status=$?",
+                            block,
+                        )
+                        self.assertIn("visual-review-model-status", block)
                         self.assertIn("unset GH_TOKEN GITHUB_TOKEN", block)
                         self.assertNotIn("Edit", block)
                         self.assertNotIn('"Write(', block)
@@ -379,11 +385,17 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('git -C "$GITHUB_WORKSPACE" diff --exit-code', visual)
         self.assertIn('python3 "$RUNNER_TEMP/visual-review-checker.py"', visual)
         self.assertIn("--normalized-report visual-review-report.json", visual)
+        self.assertIn(
+            'model_status="$(<"$RUNNER_TEMP/visual-review-model-status")"',
+            visual,
+        )
+        self.assertIn("(( model_status == 0 ))", visual)
         upload_report = visual[visual.index("- name: Upload the source-bound review report") :]
         for private_output in (
             "visual-review-report.raw.json",
             "visual-review-output-schema.json",
             "visual-review-output-schema.sha256",
+            "visual-review-model-status",
         ):
             self.assertNotIn(private_output, upload_report)
         self.assertIn("visual-review-report.json", upload_report)
