@@ -100,21 +100,26 @@ immutable workflow and governance activation contract.
 - Credential-bearing AI visual judgment runs in its own authenticated advisory workflow. The run
   pins the exact workflow `github.sha`, authenticates the complete protected job graph, and curates
   raw artifacts on a secretless runner. Every contracted candidate capture is paired by semantic
-  `capture_id` with authenticated current-head Fabric 1.20.1 Pages evidence; no review-tier filter
-  may omit a pair. Only canonical, same-sized, content-addressed RGB PNG pairs, a bounded manifest,
-  and provenance cross the handoff into a fresh model capsule; raw E2E ZIPs never share a runner
-  with the credential. The anchor guides semantic comparison and is not a whole-pixel equality
-  oracle. The handoff is revalidated before and after review and deleted by exact artifact id
-  immediately afterward. This advisory path must never delay, weaken, or become part of the
-  required Packaged E2E conclusion.
+  `capture_id` with authenticated current-head lossless Fabric 1.20.1 Pages handoff evidence; no
+  review-tier filter may omit a pair and the compact WebP cache is not an AI oracle. Only canonical,
+  same-sized, content-addressed RGB PNG pairs, a bounded manifest, and provenance enter a seven-day
+  durable queue; raw E2E ZIPs never share a runner with the credential. A globally serialized
+  protected drainer skips byte-identical pairs, triages bounded chunks with Sonnet, and sends only
+  suspicious or uncertain pairs to bounded Opus verification. It keeps provider output private,
+  uploads only the protected normalized report or a sanitized retry marker, and deletes a completed
+  queue entry by exact artifact id. This advisory path must never delay, weaken, or become part of
+  the required Packaged E2E conclusion.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
-  the only longer-lived uploads are the SHA-bound Pages cache and the immutable
-  `release-<release-id>` bundle, both retained for 90 days. The release bundle spans protected
-  environment approvals and provides bounded recovery for an interrupted publication. After a
-  successful Pages replacement, protected rotation deletes by exact artifact ID the superseded
-  cache, consumed `pages-e2e-<branch>` handoff, Pages fan-in artifacts, and deploy artifact. Raw
-  packaged-E2E proof retains its one-day window because a concurrent branch attestation may still
-  consume it; the single-use AI review handoff is deleted as soon as its review job settles. A
+  named exceptions are the seven-day queued visual-review capsule and three 90-day current-state
+  artifacts: the SHA-bound Pages cache, the matrix-derived lossless Fabric 1.20.1 anchor handoff,
+  and the immutable `release-<release-id>` bundle. The release bundle spans protected environment
+  approvals and provides bounded recovery for an interrupted publication. After a successful Pages
+  replacement, protected rotation deletes by exact artifact ID the superseded cache, ordinary
+  consumed `pages-e2e-<branch>` handoffs, older lossless anchor generations, Pages fan-in artifacts,
+  and the deploy artifact while preserving the current lossless anchor. Raw packaged-E2E proof
+  retains its one-day window because a concurrent branch attestation may still consume it; a
+  completed or terminally invalid AI queue entry is deleted immediately, while a transiently
+  failed entry remains bounded for retry. A
   protected schedule also deletes by exact cache ID Actions caches scoped to branch
   refs that no longer exist. On live branches it recognizes only SHA-bearing `setup-gradle` home
   keys, preserves the newest restorable generation per OS/job/cache-version family that has a

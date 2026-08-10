@@ -17,6 +17,9 @@ from typing import Any
 
 
 VERDICT_KEYS = {"label", "matches", "visible", "anomalies", "defect"}
+TRIAGE_KEYS = {"label", "decision", "confidence", "anomalies"}
+TRIAGE_DECISIONS = frozenset({"clean", "needs_review"})
+TRIAGE_CONFIDENCE = frozenset({"high", "medium", "low"})
 MANIFEST_KEYS = {"path", "label", "capture_id", "kind", "expectation"}
 PAIRED_MANIFEST_KEYS = MANIFEST_KEYS | {"reference_path", "reference_label"}
 SHA256_PNG = re.compile(r"^(?P<digest>[0-9a-f]{64})\.png$")
@@ -93,10 +96,54 @@ def report_schema(
     }
 
 
-def _model_error_category(envelope: dict[str, Any]) -> str:
+def triage_schema(labels: list[str]) -> dict[str, Any]:
+    """Return the compact provider-compatible schema used by the first pass."""
+
+    report_schema(len(labels), labels=labels)
+    verdict = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": sorted(TRIAGE_KEYS),
+        "properties": {
+            "label": {"type": "string", "enum": labels},
+            "decision": {
+                "type": "string",
+                "enum": sorted(TRIAGE_DECISIONS),
+            },
+            "confidence": {
+                "type": "string",
+                "enum": sorted(TRIAGE_CONFIDENCE),
+            },
+            "anomalies": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        },
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["reviews"],
+        "properties": {
+            "reviews": {
+                "type": "array",
+                "items": verdict,
+            }
+        },
+    }
+
+
+def model_error_category(envelope: dict[str, Any]) -> str:
+    """Classify a provider envelope without returning provider-authored text."""
+
     subtype = envelope.get("subtype")
     if subtype == "error_max_structured_output_retries":
         return "structured_output_retries_exhausted"
+    api_status = envelope.get("api_error_status")
+    if api_status == 429:
+        return "quota_or_rate_limit"
+    if api_status in {500, 502, 503, 504, 529}:
+        return "overloaded"
     result = envelope.get("result")
     if not isinstance(result, str) or len(result) > MAX_EXPECTATION_LENGTH:
         return "cli_or_api"
@@ -120,8 +167,10 @@ def _model_error_category(envelope: dict[str, Any]) -> str:
     return "cli_or_api"
 
 
-def _safe_model_error_details(envelope: dict[str, Any]) -> str:
-    details = [f"category={_model_error_category(envelope)}"]
+def safe_model_error_details(envelope: dict[str, Any]) -> str:
+    """Return bounded diagnostics that never echo an untrusted provider response."""
+
+    details = [f"category={model_error_category(envelope)}"]
     terminal_reason = envelope.get("terminal_reason")
     if isinstance(terminal_reason, str) and SAFE_MODEL_DETAIL.fullmatch(
         terminal_reason
@@ -145,7 +194,7 @@ def extract_structured_report(envelope: Any) -> Any:
     if envelope.get("subtype") != "success" or envelope.get("is_error") is not False:
         raise ReviewError(
             "model structured result failed "
-            f"({_safe_model_error_details(envelope)})"
+            f"({safe_model_error_details(envelope)})"
         )
     structured_output = envelope.get("structured_output")
     if not isinstance(structured_output, dict) or set(structured_output) != {"reviews"}:
@@ -470,6 +519,76 @@ def validate(
     extra = sorted(reviewed - expected)
     if missing or extra:
         raise ReviewError(f"review label mismatch: missing={missing}, extra={extra}")
+    return [verdicts[label] for label in labels]
+
+
+def validate_triage(
+    manifest: Any, report: Any, *, require_paired: bool = False
+) -> list[dict[str, Any]]:
+    """Validate compact first-pass decisions and restore manifest ordering."""
+
+    _entries, labels = validate_manifest(manifest, require_paired=require_paired)
+    if (
+        not isinstance(report, list)
+        or not report
+        or len(report) > MAX_REVIEW_FRAMES
+    ):
+        raise ReviewError(
+            f"review triage must contain between 1 and {MAX_REVIEW_FRAMES} verdicts"
+        )
+    verdicts: dict[str, dict[str, Any]] = {}
+    for index, verdict in enumerate(report):
+        if not isinstance(verdict, dict) or set(verdict) != TRIAGE_KEYS:
+            raise ReviewError(
+                f"triage verdict {index} must contain exactly {sorted(TRIAGE_KEYS)}"
+            )
+        label = _text(
+            verdict["label"],
+            f"triage verdict {index}.label",
+            maximum=MAX_LABEL_LENGTH,
+        )
+        decision = verdict["decision"]
+        confidence = verdict["confidence"]
+        if decision not in TRIAGE_DECISIONS:
+            raise ReviewError(f"triage verdict {index}.decision is invalid")
+        if confidence not in TRIAGE_CONFIDENCE:
+            raise ReviewError(f"triage verdict {index}.confidence is invalid")
+        anomalies = verdict["anomalies"]
+        if not isinstance(anomalies, list) or len(anomalies) > MAX_ANOMALIES:
+            raise ReviewError(
+                f"triage verdict {index}.anomalies must be an array of strings"
+            )
+        normalized_anomalies = [
+            _text(
+                item,
+                f"triage verdict {index}.anomalies[{anomaly_index}]",
+                maximum=MAX_ANOMALY_LENGTH,
+            )
+            for anomaly_index, item in enumerate(anomalies)
+        ]
+        if decision == "clean" and normalized_anomalies:
+            raise ReviewError(
+                f"clean triage verdict {index} cannot describe an anomaly"
+            )
+        if decision == "needs_review" and not normalized_anomalies:
+            raise ReviewError(
+                f"needs_review triage verdict {index} must describe its concern"
+            )
+        if label in verdicts:
+            raise ReviewError(f"review triage contains duplicate label {label!r}")
+        verdicts[label] = {
+            "label": label,
+            "decision": decision,
+            "confidence": confidence,
+            "anomalies": normalized_anomalies,
+        }
+
+    expected = set(labels)
+    reviewed = set(verdicts)
+    missing = sorted(expected - reviewed)
+    extra = sorted(reviewed - expected)
+    if missing or extra:
+        raise ReviewError(f"triage label mismatch: missing={missing}, extra={extra}")
     return [verdicts[label] for label in labels]
 
 
