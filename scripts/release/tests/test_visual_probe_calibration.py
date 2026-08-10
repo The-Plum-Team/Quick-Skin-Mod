@@ -20,7 +20,9 @@ import packaged_runtime  # noqa: E402
 TEXT_CANARY = {
     ("full", "client_a", "skin_menu_screen"): (
         ("skin catalog labels", (480, 195, 850, 300), 175, 500),
-        ("skin drop-zone instructions", (560, 478, 745, 523), 175, 300),
+        # The E2E import guarantees one entry; the offline Alice skin may add a second. The
+        # drop-zone centers in the remaining list area, so its copy has two legitimate Y offsets.
+        ("skin drop-zone instructions", (560, 440, 745, 523), 175, 300),
     ),
     ("full", "client_a", "cape_menu_screen"): (
         ("cape menu title", (590, 100, 735, 140), 159, 174),
