@@ -16,7 +16,10 @@ real defects.
 
 Ordinary Vanilla/loader chrome, camera, framing, lighting, time-of-day, toast, warning, and other
 cross-version differences are acceptable. The lower-corner player preview and an unseen
-front-facing detail are not defects. The reference is not a strict whole-pixel golden image.
+front-facing detail are not defects. At a default-skin checkpoint, any intact Vanilla default
+player skin (for example Steve, Alex, Noor, or Ari) is acceptable even when its model, outfit, or
+colours differ from the 1.20.1 reference. This exception never applies when the expectation names
+a custom skin or cape. The reference is not a strict whole-pixel golden image.
 
 For a clean result set `matches=true`, `defect=false`, and use an empty anomaly list unless a benign
 cosmetic observation is essential. For a real defect set `matches=false`, `defect=true`, and name
