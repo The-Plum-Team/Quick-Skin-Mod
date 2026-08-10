@@ -23,7 +23,7 @@ This `fabric-and-neoforge-26.1` release branch exercises the following exact pac
 | `fabric-26.1` | `26.1` | Fabric | `25` | `4` |
 | `neoforge-26.1` | `26.1` | NeoForge | `25` | `4` |
 
-Scenario contract SHA-256: `dfe7e8643aa71f61b7006d18ec97ec16ba1925b0e929f60a2e20583aabdb6fa4`
+Scenario contract SHA-256: `67a552ac1a8e91da6c78533f61f6f4d681f2c85da8a816a2ff79c94ec491e135`
 Contract totals: `40` ordered steps, `36` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -87,6 +87,14 @@ python e2e/orchestrator.py \
 The two-client `propagation` and `propagation-live` scenarios and the NeoForge lane are exercised on
 Linux CI. Treat local macOS runs as development evidence only; release evidence comes from the CI
 Linux run.
+
+Packaged clients use the same standard `OfflinePlayer:<name>` UUID that the offline server derives.
+Each fresh client profile disables Quick Skin's asynchronous own-skin importer and clears persisted
+skin/cape selections before the mod starts. Before a default-skin screenshot, the harness then
+waits for the renderer to hold the vanilla texture selected for that UUID instead of capturing an
+account skin or Minecraft's earlier generic fallback frame. Visual review still accepts any intact
+vanilla default skin variant across versions; that tolerance does not apply to checkpoints whose
+expectation names a Quick Skin custom skin or cape.
 
 For a matrix Java major `<major>`, executable resolution checks
 `QUICKSKIN_JAVA_<major>`, the matching `JAVA_HOME_<major>_X64` variables, a matching `JAVA_HOME`,
