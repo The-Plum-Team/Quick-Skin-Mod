@@ -905,25 +905,35 @@ class VisualReviewContractTest(unittest.TestCase):
         self.assertFalse(has_defects)
         self.assertIn("advisory", summary.lower())
 
-    def test_structured_output_schema_matches_the_checker_bounds(self) -> None:
+    def test_structured_output_schema_uses_only_provider_supported_constraints(self) -> None:
         labels = [f"lane/scenario/client/step-{index}" for index in range(7)]
         schema = report_schema(7, labels=labels)
         self.assertEqual(["reviews"], schema["required"])
         self.assertFalse(schema["additionalProperties"])
         reviews = schema["properties"]["reviews"]
-        self.assertEqual(7, reviews["minItems"])
-        self.assertEqual(7, reviews["maxItems"])
         verdict = reviews["items"]
         self.assertEqual(sorted(self.clean[0]), verdict["required"])
         self.assertFalse(verdict["additionalProperties"])
         self.assertEqual(labels, verdict["properties"]["label"]["enum"])
-        self.assertEqual(512, verdict["properties"]["label"]["maxLength"])
-        self.assertEqual(2048, verdict["properties"]["visible"]["maxLength"])
-        self.assertEqual(16, verdict["properties"]["anomalies"]["maxItems"])
-        self.assertEqual(
-            1024,
-            verdict["properties"]["anomalies"]["items"]["maxLength"],
-        )
+        unsupported = {
+            "minimum",
+            "maximum",
+            "minLength",
+            "maxLength",
+            "minItems",
+            "maxItems",
+        }
+
+        def assert_supported(value: object) -> None:
+            if isinstance(value, dict):
+                self.assertTrue(unsupported.isdisjoint(value))
+                for child in value.values():
+                    assert_supported(child)
+            elif isinstance(value, list):
+                for child in value:
+                    assert_supported(child)
+
+        assert_supported(schema)
         for count in (0, 513, True):
             with self.subTest(count=count), self.assertRaises(ReviewError):
                 report_schema(count)
@@ -953,6 +963,49 @@ class VisualReviewContractTest(unittest.TestCase):
             with self.subTest(candidate=candidate), self.assertRaises(ReviewError):
                 extract_structured_report(candidate)
 
+    def test_model_error_envelope_is_classified_without_echoing_its_result(self) -> None:
+        cases = (
+            (
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": True,
+                    "terminal_reason": "api_error",
+                    "result": "Not logged in; private provider response",
+                },
+                "authentication",
+            ),
+            (
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": True,
+                    "terminal_reason": "api_error",
+                    "api_error_status": 400,
+                    "result": "Invalid JSON schema: unsupported keyword; private detail",
+                },
+                "schema_rejected",
+            ),
+            (
+                {
+                    "type": "result",
+                    "subtype": "error_max_structured_output_retries",
+                    "is_error": True,
+                    "terminal_reason": "unsafe detail\n# injected",
+                    "result": "private retry transcript",
+                },
+                "structured_output_retries_exhausted",
+            ),
+        )
+        for envelope, category in cases:
+            with self.subTest(category=category):
+                with self.assertRaises(ReviewError) as raised:
+                    extract_structured_report(envelope)
+                message = str(raised.exception)
+                self.assertIn(f"category={category}", message)
+                self.assertNotIn(str(envelope["result"]), message)
+                self.assertNotIn("injected", message)
+
     def test_cli_prints_schema_for_the_manifest_frame_count(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             manifest = Path(temporary) / "manifest.json"
@@ -965,8 +1018,8 @@ class VisualReviewContractTest(unittest.TestCase):
 
             self.assertEqual(0, result)
             reviews = json.loads(output.getvalue())["properties"]["reviews"]
-            self.assertEqual(1, reviews["minItems"])
-            self.assertEqual(1, reviews["maxItems"])
+            self.assertNotIn("minItems", reviews)
+            self.assertNotIn("maxItems", reviews)
             self.assertEqual(
                 [self.manifest[0]["label"]],
                 reviews["items"]["properties"]["label"]["enum"],
