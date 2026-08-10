@@ -107,7 +107,11 @@ immutable workflow and governance activation contract.
   protected drainer skips byte-identical pairs, triages bounded chunks with Sonnet, and sends only
   suspicious or uncertain pairs to bounded Opus verification. It keeps provider output private,
   uploads only the protected normalized report or a sanitized retry marker, and deletes a completed
-  queue entry by exact artifact id. This advisory path must never delay, weaken, or become part of
+  queue entry by exact artifact id. A bot-owned version-port PR whose authenticated complete diff
+  contains only the visual-review workflows, protected CI contracts, and documentation is skipped:
+  the source change exercises that infrastructure once, while repeating unchanged product images
+  across every port would add cost rather than visual signal. Any ambiguous, renamed, or runtime
+  path fails open to normal review. This advisory path must never delay, weaken, or become part of
   the required Packaged E2E conclusion.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
   named exceptions are the seven-day queued visual-review capsule and three 90-day current-state
