@@ -31,18 +31,21 @@ small player-preview thumbnail in a lower corner; a front-facing detail you cann
 camera usually sits behind the player. The 1.20.1 frame is a visual anchor, not an instruction to
 reject legitimate Vanilla-version differences.
 
-Return a JSON array with one object per manifest entry. Output the JSON array and nothing else:
+Return a JSON object whose `reviews` array has one object per manifest entry. Output that object
+and nothing else:
 
 ```json
-[
-  {
-    "label": "<the label, copied verbatim from the manifest>",
-    "visible": "<what you actually see, 1-2 sentences>",
-    "matches": true,
-    "anomalies": ["<each real visual problem, empty if none>"],
-    "defect": false
-  }
-]
+{
+  "reviews": [
+    {
+      "label": "<the label, copied verbatim from the manifest>",
+      "visible": "<what you actually see, 1-2 sentences>",
+      "matches": true,
+      "anomalies": ["<each real visual problem, empty if none>"],
+      "defect": false
+    }
+  ]
+}
 ```
 
 Set `"defect": false` when the frame is acceptable, even if you noted a cosmetic
