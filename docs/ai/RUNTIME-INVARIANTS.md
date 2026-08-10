@@ -148,14 +148,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   release-branch head; a later protected Pages run may only roll that already validated bundle
   into cache.
 - Retention is current-state, not longitudinal history. Keep exactly one durable Pages cache per
-  release branch. Treat raw packaged-E2E uploads, `pages-e2e-<branch>`, Pages fan-in, and the deploy
-  artifact as short-lived handoffs. Rotation happens in a separate protected workflow after the
-  owning Pages run is `completed/success`; it must recheck run provenance, the release head,
-  replacement artifact identity, and every deletion ID before retiring the exact consumed handoff,
-  Pages-run intermediates, and caches older than the successful replacement. Raw packaged-E2E
-  proof expires after one day; do not delete it during promotion because a concurrent branch
-  attestation may still consume it. A failed E2E, deployment, validation, or rotation must preserve
-  the previous usable cache, and a delayed rotation must never delete a concurrent newer generation.
+  release branch and exactly one lossless raw handoff for the matrix-derived Fabric 1.20.1 visual
+  anchor. Treat raw packaged-E2E uploads, every other `pages-e2e-<branch>`, Pages fan-in, and the
+  deploy artifact as short-lived handoffs. Rotation happens in a separate protected workflow after
+  the owning Pages run is `completed/success`; it must recheck run provenance, the release head,
+  replacement artifact identity, and every deletion ID before retiring the exact ordinary consumed
+  handoff, older lossless-anchor generations, Pages-run intermediates, and caches older than the
+  successful replacement. It must revalidate the retained raw anchor before every deletion. Raw
+  packaged-E2E proof expires after one day; do not delete it during promotion because a concurrent
+  branch attestation may still consume it. A failed E2E, deployment, validation, or rotation must
+  preserve the previous usable cache and raw anchor, and a delayed rotation must never delete a
+  concurrent newer generation.
 - Discovery records one protected `master` SHA for the Pages run. Every collection and render job
   checks out that exact implementation revision; an advancing `master` may affect only a later run.
 - Treat downloaded artifacts and their JSON as untrusted. Require the exact curated tree, exact
@@ -165,23 +168,32 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   size-limit violations. Protected rendering must decode and recompute screenshot/comparison pixel
   metrics before publishing. Presentation code must use escaped/text DOM APIs and local assets.
 - Secret-bearing visual review has the fixed boundary `authenticate -> curate without secrets ->
-  review in a fresh capsule -> exact-id cleanup`. Curating must authenticate every source artifact
-  by numeric id, size, digest, run, protected matrix row, complete scenario product, and one JAR;
+  durable queue -> globally serialized review in a fresh capsule -> exact-id cleanup`. Curating
+  must authenticate every source artifact by numeric id, size, digest, run, protected matrix row,
+  complete scenario product, and one JAR;
   it must import the authenticated source commit only as inert Git objects and never check out or
   execute source-head files in the privileged default-branch workflow;
-  authenticate the exact current-head 1.20.1 Pages source and its run provenance; fully decode,
-  dimension-normalize, and canonically re-encode bounded RGB PNG pairs without source metadata; and
-  emit a source/implementation/candidate/reference-artifact-bound proof. The review runner accepts
-  only that immutable handoff, exposes only its manifest/images to the model with a read-only tool
-  surface, captures the verdict from stdout, revalidates the capsule after the model exits,
-  publishes only a bounded normalized report, and immediately deletes the intermediate artifact.
-  Concurrency must not let one authenticated source run cancel another pending review.
+  authenticate the exact current-head lossless 1.20.1 Pages source and its run provenance; fully
+  decode, dimension-normalize, and canonically re-encode bounded RGB PNG pairs without source
+  metadata; and emit a source/implementation/candidate/reference-artifact-bound proof. Queue
+  selection must authenticate protected owners, survive pending-run replacement, accept a curated
+  capsule whose later wake step failed, and cool recent failed attempts without blocking other
+  sources. The review runner accepts only that immutable handoff, skips byte-identical paths,
+  exposes only bounded manifests/images to Sonnet triage and selective Opus verification with a
+  read-only tool surface, captures each verdict from stdout, and validates exact labels and semantic
+  coherence after every call. It revalidates the capsule after the model exits, publishes only a
+  bounded normalized report or sanitized attempt marker, never uploads raw provider text, and
+  deletes only a completed or terminally invalid queue artifact. A transient failure retains the
+  entry for cooldown and retry. Concurrency must not discard or immediately duplicate a pending
+  authenticated review.
 - Optimized gallery images are derivatives, not the source proof. Publish separate source and
   derivative hashes/dimensions, and content-address each public image URL with the bytes actually
-  served. Original PNGs may exist only in the one-day `pages-e2e-*` handoff. Protected conversion
-  must revalidate source bytes and metrics before atomically producing the WebP-only fan-in/cache;
-  every later cache/render read must revalidate the retained source record, derivative bytes,
-  derivative metrics, and derivative comparisons.
+  served. Original PNGs may exist only in `pages-e2e-*` handoffs; all are one-day transients except
+  the current matrix-derived Fabric 1.20.1 visual anchor, which is retained for 90 days and rotated
+  only after a validated replacement. Protected conversion must revalidate source bytes and metrics
+  before atomically producing the WebP-only fan-in/cache; every later cache/render read must
+  revalidate the retained source record, derivative bytes, derivative metrics, and derivative
+  comparisons. AI comparison must never use the lossy derivative as its baseline.
 - Pages is an advisory, atomic publication surface. Failure must preserve the previous site and
   must not weaken or replace the required Build and Packaged E2E gates.
 - A version port must classify the complete original unmerged path set before AI runs. Exact
