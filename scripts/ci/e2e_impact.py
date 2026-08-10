@@ -56,6 +56,7 @@ EXACT_NON_RUNTIME_WORKFLOWS = frozenset(
         ".github/workflows/release.yml",
         ".github/workflows/sync-version-branches.yml",
         ".github/workflows/visual-review.yml",
+        ".github/workflows/visual-review-drain.yml",
     }
 )
 

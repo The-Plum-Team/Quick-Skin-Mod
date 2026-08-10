@@ -187,6 +187,26 @@ def select_consumed_handoffs(
     )
 
 
+def select_old_handoffs(
+    artifacts: list[Artifact], *, branch: str, keep: Artifact
+) -> list[Artifact]:
+    """Select only older raw generations after a validated raw replacement exists."""
+
+    expected_name = f"pages-e2e-{branch}"
+    return sorted(
+        (
+            artifact
+            for artifact in artifacts
+            if artifact.name == expected_name
+            and not artifact.expired
+            and artifact.artifact_id != keep.artifact_id
+            and artifact.head_branch == branch
+            and artifact.order < keep.order
+        ),
+        key=lambda artifact: artifact.order,
+    )
+
+
 def select_pages_run_transients(
     artifacts: list[Artifact],
     *,
@@ -391,6 +411,7 @@ def rotate_branch(
     pages_run_id: int,
     pages_run_sha: str,
     delete_delay_seconds: float,
+    preserve_handoff_branch: str | None = None,
 ) -> list[int]:
     if api.get_branch_sha(generation.branch) != generation.target_sha:
         print(f"head changed; rotation skipped for {generation.branch}")
@@ -412,13 +433,37 @@ def rotate_branch(
         {artifact.artifact_id: artifact for artifact in old_caches}.values(),
         key=lambda artifact: artifact.order,
     )
-    handoffs = select_consumed_handoffs(
-        api.list_artifacts(handoff_name),
+    handoff_inventory = api.list_artifacts(handoff_name)
+    consumed_handoffs = select_consumed_handoffs(
+        handoff_inventory,
         branch=generation.branch,
         target_run_id=generation.target_run_id,
         target_sha=generation.target_sha,
         keep=generation.keep,
     )
+    if generation.branch == preserve_handoff_branch:
+        if len(consumed_handoffs) != 1:
+            raise RotationError(
+                f"lossless visual reference requires exactly one current handoff for "
+                f"{generation.branch}"
+            )
+        retained_handoff = consumed_handoffs[0]
+        handoffs = select_old_handoffs(
+            handoff_inventory,
+            branch=generation.branch,
+            keep=retained_handoff,
+        )
+        _validate_run(
+            api.get_run(retained_handoff.run_id),
+            repository=repository,
+            workflow=E2E_WORKFLOW,
+            branch=generation.branch,
+            sha=generation.target_sha,
+            events=frozenset({"workflow_dispatch"}),
+            require_success=True,
+        )
+    else:
+        handoffs = consumed_handoffs
     for artifact in old_caches:
         _validate_run(
             api.get_run(artifact.run_id),
@@ -435,7 +480,7 @@ def rotate_branch(
             repository=repository,
             workflow=E2E_WORKFLOW,
             branch=generation.branch,
-            sha=generation.target_sha,
+            sha=artifact.head_sha,
             events=frozenset({"workflow_dispatch"}),
             require_success=True,
         )
@@ -448,6 +493,12 @@ def rotate_branch(
             pages_run_id=pages_run_id,
             pages_run_sha=pages_run_sha,
         )
+        if generation.branch == preserve_handoff_branch:
+            current_handoff = api.get_artifact(retained_handoff.artifact_id)
+            if current_handoff != retained_handoff or current_handoff.expired:
+                raise RotationError(
+                    f"lossless visual reference changed while rotating {generation.branch}"
+                )
         if _delete_exact_artifact(api, artifact):
             deleted.append(artifact.artifact_id)
         if delete_delay_seconds:
@@ -463,6 +514,7 @@ def rotate_generations(
     pages_run_id: int,
     pages_run_sha: str,
     delete_delay_seconds: float,
+    preserve_handoff_branch: str | None = None,
 ) -> tuple[dict[str, list[int]], list[str]]:
     """Rotate each branch independently so one moved head cannot strand the rest."""
 
@@ -477,6 +529,7 @@ def rotate_generations(
                 pages_run_id=pages_run_id,
                 pages_run_sha=pages_run_sha,
                 delete_delay_seconds=delete_delay_seconds,
+                preserve_handoff_branch=preserve_handoff_branch,
             )
         except RotationError as exc:
             # Every deletion is individually revalidated inside rotate_branch, so a
@@ -606,6 +659,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--pages-run-id", required=True)
     parser.add_argument("--pages-run-sha", required=True)
     parser.add_argument("--delete-delay-seconds", type=float, default=1.0)
+    parser.add_argument(
+        "--preserve-raw-branch",
+        help="retain the newest validated raw handoff for this visual-reference branch",
+    )
     return parser.parse_args(argv)
 
 
@@ -619,6 +676,12 @@ def main(argv: list[str] | None = None) -> int:
         pages_run_sha = _commit(args.pages_run_sha, "pages_run_sha")
         if args.delete_delay_seconds < 0 or args.delete_delay_seconds > 10:
             raise RotationError("delete delay must be between 0 and 10 seconds")
+        preserve_raw_branch = args.preserve_raw_branch
+        if (
+            preserve_raw_branch is not None
+            and parse_version_branch(preserve_raw_branch) is None
+        ):
+            raise RotationError("preserved raw branch must be a release branch")
         token = os.environ.get("GH_TOKEN", "")
         if not token:
             raise RotationError("GH_TOKEN is required")
@@ -652,6 +715,7 @@ def main(argv: list[str] | None = None) -> int:
             pages_run_id=pages_run_id,
             pages_run_sha=pages_run_sha,
             delete_delay_seconds=args.delete_delay_seconds,
+            preserve_handoff_branch=preserve_raw_branch,
         )
         try:
             pages_run_deleted = retire_pages_run_transients(

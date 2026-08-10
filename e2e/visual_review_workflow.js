@@ -7,7 +7,8 @@
 // Expectations come from the canonical scenario-contract.json and are passed through per item —
 // this script does not duplicate them.
 //
-// One vision agent per screenshot pair opens the candidate and its authenticated 1.20.1 reference
+// One vision agent per screenshot pair opens the candidate and its authenticated lossless 1.20.1
+// reference
 // and checks both against the expectation; any frame it flags (mismatch or anomaly) is re-examined
 // by an independent skeptic before it is reported, to suppress false positives. Returns the same
 // exact verdict array accepted by
