@@ -33,6 +33,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      pull-requests: read
     outputs:
       artifact_inventory: ${{ steps.source.outputs.artifact_inventory }}
       eligible: ${{ steps.source.outputs.eligible }}
@@ -41,7 +42,13 @@ jobs:
       source_run_id: ${{ steps.source.outputs.source_run_id }}
 
     steps:
-      # Authenticate scalar payloads and the required gate before any repository code is executed.
+      - name: Check out the exact protected impact policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      # Authenticate scalar payloads and the required gate before invoking protected policy code.
       - name: Resolve the exact trusted source run
         id: source
         shell: bash
@@ -113,6 +120,71 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
             [[ "$(jq -r .event <<< "$source_run")" == workflow_dispatch ]]
             [[ "$source_branch" == automation/sync/* ]]
+
+            # A shared visual-review infrastructure change is exercised once on its source PR.
+            # Its generated version ports still need Build and Packaged E2E, but reviewing the
+            # same unaffected screenshots for every release branch would spend model capacity
+            # without adding product signal. Skip only an exact, bot-owned sync PR whose complete
+            # server-side file inventory is confined to this orchestration, its contracts, and
+            # documentation. Any ambiguity or any renamed runtime path falls through to review.
+            associated_pulls="$(gh api -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20" \
+              2>/dev/null || true)"
+            source_pr_number=""
+            if [[ -n "$associated_pulls" ]]; then
+              source_pr_number="$(jq -er \
+                --arg branch "$source_branch" \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg sha "$source_sha" \
+                'select(type == "array" and length <= 20) |
+                 [.[] | select(
+                   .head.ref == $branch and .head.sha == $sha and
+                   .head.repo.full_name == $repository and
+                   .base.repo.full_name == $repository and
+                   .user.login == "github-actions[bot]")] |
+                 if length == 1 then .[0].number else empty end' \
+                <<< "$associated_pulls" 2>/dev/null || true)"
+            fi
+            if [[ "$source_pr_number" =~ ^[1-9][0-9]*$ ]]; then
+              source_pr="$(gh api \
+                "repos/$GITHUB_REPOSITORY/pulls/$source_pr_number" \
+                2>/dev/null || true)"
+              changed_files=""
+              if [[ -n "$source_pr" ]] && jq -e \
+                  --arg branch "$source_branch" \
+                  --arg repository "$GITHUB_REPOSITORY" \
+                  --arg sha "$source_sha" \
+                  --argjson number "$source_pr_number" \
+                  '.number == $number and
+                   (.state == "open" or .state == "closed") and
+                   .head.ref == $branch and .head.sha == $sha and
+                   .head.repo.full_name == $repository and
+                   .base.repo.full_name == $repository and
+                   .user.login == "github-actions[bot]" and
+                   (.changed_files | type == "number" and . > 0 and . <= 100)' \
+                  <<< "$source_pr" > /dev/null; then
+                changed_files="$(jq -r .changed_files <<< "$source_pr")"
+              fi
+              if [[ "$changed_files" =~ ^[1-9][0-9]*$ ]]; then
+                source_pr_files="$(gh api \
+                  "repos/$GITHUB_REPOSITORY/pulls/$source_pr_number/files?per_page=100" \
+                  2>/dev/null || true)"
+                if [[ -n "$source_pr_files" ]]; then
+                  source_pr_files_path="$(mktemp \
+                    "$RUNNER_TEMP/visual-review-impact.XXXXXX.json")"
+                  printf '%s' "$source_pr_files" > "$source_pr_files_path"
+                  impact="$(python3 scripts/ci/visual_review_impact.py \
+                    --files "$source_pr_files_path" \
+                    --changed-files "$changed_files")"
+                  [[ "$impact" == review || "$impact" == skip ]]
+                  if [[ "$impact" == skip ]]; then
+                    printf 'Ignoring infrastructure-only visual review sync PR %s (%s files)\n' \
+                      "$source_pr_number" "$changed_files"
+                    exit 0
+                  fi
+                fi
+              fi
+            fi
           fi
 
           # Duplicate workflow_run and repository_dispatch twins for the same source run exit
