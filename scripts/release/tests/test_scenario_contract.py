@@ -370,7 +370,7 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "skin_menu_screen",
                     "skin drop-zone instructions",
-                    (560, 478, 745, 523),
+                    (560, 440, 745, 523),
                     175,
                     300,
                 ),
