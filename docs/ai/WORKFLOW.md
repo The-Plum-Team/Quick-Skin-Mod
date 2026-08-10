@@ -37,8 +37,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   protected lane graph, extract them with aggregate budgets, enforce exact matrix-row/scenario/JAR
   coverage, and canonicalize selected images in a prior secretless job. The fresh review capsule
   may expose only its curated manifest and image directory through a read-only model tool surface;
-  the shell captures one raw report from model stdout. Protected code revalidates the capsule and
-  emits the only normalized report eligible for upload. A final
+  the shell captures one raw JSON result envelope from model stdout. The pinned CLI must validate
+  structured output against a protected schema derived from the exact manifest, and protected code
+  must independently extract and revalidate the verdicts before it emits the only normalized report
+  eligible for upload. A final
   `actions: write` job reauthenticates and deletes the single-use handoff by exact id.
 - Version-port and repair validation must check out candidate code with credentials disabled.
   For a version port, the complete patch goes only into an alternate index; the protected merge
