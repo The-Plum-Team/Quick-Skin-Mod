@@ -196,10 +196,21 @@ public final class PropagationScenario implements Scenario {
     private Step baseline(Minecraft mc, String v, String role) {
         return Step.of("baseline")
                 .minTicks(40) // ~2s render warmup so the first frame is real
+                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))
+                .settleTicks(20) // reject a one-frame generic fallback before the UUID skin lands
+                .timeoutTicks(400)
                 .screenshot(v + "_01_baseline_" + role + ".png")
-                .assertion(() -> mc.player != null
-                        ? Step.Result.pass("player present: " + VanillaShim.playerName(mc.player))
-                        : Step.Result.fail("player is null"));
+                .assertion(() -> {
+                    if (mc.player == null) return Step.Result.fail("player is null");
+                    String expected = VanillaShim.expectedDefaultSkinTexture(mc.player);
+                    String actual = VanillaShim.skinTexture(mc.player);
+                    if (expected == null || !expected.equals(actual)) {
+                        return Step.Result.fail("default skin did not stabilize: expected="
+                                + expected + " actual=" + actual);
+                    }
+                    return Step.Result.pass("player present: " + VanillaShim.playerName(mc.player)
+                            + " defaultSkin=" + actual);
+                });
     }
 
     /**
