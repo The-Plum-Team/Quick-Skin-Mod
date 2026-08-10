@@ -23,6 +23,7 @@ from rotate_artifacts import (  # noqa: E402
     rotate_branch,
     rotate_generations,
     select_consumed_handoffs,
+    select_old_handoffs,
     select_old_caches,
     select_pages_run_transients,
 )
@@ -305,6 +306,41 @@ class PagesArtifactRotationTest(unittest.TestCase):
         )
         self.assertEqual(selected, [consumed])
 
+    def test_old_handoff_selector_keeps_the_current_lossless_generation(self) -> None:
+        expected_name = f"pages-e2e-{BRANCH}"
+        old = artifact(
+            100,
+            expected_name,
+            "2026-08-03T10:30:00Z",
+            run_id=700,
+            head_branch=BRANCH,
+            head_sha=OLD_PAGES_SHA,
+        )
+        current = artifact(
+            110,
+            expected_name,
+            "2026-08-03T11:30:00Z",
+            run_id=800,
+            head_branch=BRANCH,
+            head_sha=TARGET_SHA,
+        )
+        newer = artifact(
+            120,
+            expected_name,
+            "2026-08-03T12:30:00Z",
+            run_id=801,
+            head_branch=BRANCH,
+            head_sha=TARGET_SHA,
+        )
+
+        selected = select_old_handoffs(
+            [newer, current, old],
+            branch=BRANCH,
+            keep=current,
+        )
+
+        self.assertEqual([old], selected)
+
     def test_pages_selector_is_bounded_to_current_run_and_release_inventory(self) -> None:
         expected = [
             artifact(
@@ -408,6 +444,16 @@ class PagesArtifactRotationTest(unittest.TestCase):
         )
         self.assertEqual(selected, self.keep)
         self.assertNotIn(700, api.runs)
+        self.assertEqual(
+            handoff,
+            select_source(
+                api,
+                repository=REPOSITORY,
+                branch=BRANCH,
+                current_sha=TARGET_SHA,
+                require_raw=True,
+            ),
+        )
 
     def test_source_selection_prefers_a_newer_same_sha_handoff(self) -> None:
         handoff = artifact(
@@ -600,6 +646,83 @@ class PagesArtifactRotationTest(unittest.TestCase):
         self.assertEqual(deleted, [100, 110])
         self.assertEqual(api.deleted, [100, 110])
         self.assertNotIn(raw_source.artifact_id, api.deleted)
+
+    def test_rotation_replaces_but_never_compacts_the_lossless_reference(self) -> None:
+        old_cache = artifact(
+            100,
+            f"pages-cache-{BRANCH}",
+            "2026-08-03T10:00:00Z",
+            run_id=700,
+            head_branch="master",
+            head_sha=OLD_PAGES_SHA,
+        )
+        old_handoff = artifact(
+            109,
+            f"pages-e2e-{BRANCH}",
+            "2026-08-03T10:30:00Z",
+            run_id=790,
+            head_branch=BRANCH,
+            head_sha=OLD_PAGES_SHA,
+        )
+        current_handoff = artifact(
+            110,
+            f"pages-e2e-{BRANCH}",
+            "2026-08-03T11:30:00Z",
+            run_id=800,
+            head_branch=BRANCH,
+            head_sha=TARGET_SHA,
+        )
+        api = FakeApi(
+            keep=self.keep,
+            inventories={
+                old_cache.name: [old_cache, self.keep],
+                current_handoff.name: [old_handoff, current_handoff],
+            },
+            runs={
+                700: run(
+                    700,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_run",
+                    branch="master",
+                    sha=OLD_PAGES_SHA,
+                ),
+                790: run(
+                    790,
+                    workflow=".github/workflows/on-demand-e2e.yml",
+                    event="workflow_dispatch",
+                    branch=BRANCH,
+                    sha=OLD_PAGES_SHA,
+                ),
+                800: run(
+                    800,
+                    workflow=".github/workflows/on-demand-e2e.yml",
+                    event="workflow_dispatch",
+                    branch=BRANCH,
+                    sha=TARGET_SHA,
+                ),
+                900: run(
+                    900,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_dispatch",
+                    branch="master",
+                    sha=PAGES_SHA,
+                ),
+            },
+        )
+
+        deleted = rotate_branch(
+            api,
+            self.generation,
+            repository=REPOSITORY,
+            pages_run_id=900,
+            pages_run_sha=PAGES_SHA,
+            delete_delay_seconds=0,
+            preserve_handoff_branch=BRANCH,
+        )
+
+        self.assertEqual([100, 109], deleted)
+        self.assertEqual([100, 109], api.deleted)
+        self.assertNotIn(current_handoff.artifact_id, api.deleted)
 
     def test_rotation_is_a_noop_if_the_release_head_changed(self) -> None:
         api = FakeApi(
@@ -951,6 +1074,9 @@ class SelectArtifactProbeTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             select_artifact.parse_args(["--repository", REPOSITORY, "--branch", BRANCH])
         self.assertTrue(select_artifact.parse_args(self.probe_argv()).probe)
+        self.assertTrue(
+            select_artifact.parse_args([*self.probe_argv(), "--require-raw"]).require_raw
+        )
 
     def test_selection_outputs_the_exact_numeric_artifact_identity(self) -> None:
         keep = artifact(
