@@ -184,8 +184,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   coherence after every call. It revalidates the capsule after the model exits, publishes only a
   bounded normalized report or sanitized attempt marker, never uploads raw provider text, and
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
-  entry for cooldown and retry. Concurrency must not discard or immediately duplicate a pending
-  authenticated review.
+  entry for cooldown and retry. The fixed concurrency group covers the complete protected drain,
+  from oldest-entry selection through exact-id cleanup, so overlapping wakes cannot reserve the
+  same capsule. Pending-run coalescing remains safe because queue state is durable and a settled
+  drain dispatches its own continuation.
 - Optimized gallery images are derivatives, not the source proof. Publish separate source and
   derivative hashes/dimensions, and content-address each public image URL with the bytes actually
   served. Original PNGs may exist only in `pages-e2e-*` handoffs; all are one-day transients except
