@@ -205,9 +205,11 @@ loader, camera, lighting, and framing differences remain acceptable. A missing p
 The curator applies the protected review checker before upload and reserves
 32 MiB of the handoff envelope for the bounded manifest, proof, archive metadata, and structure. A
 source/run/implementation proof and bounded manifest cross into a fresh capsule. The model can read
-only the manifest/images; its stdout is captured as one raw verdict file without granting a write
-tool. Protected code revalidates the capsule, uploads only a schema-normalized bounded report, and
-an independent cleanup job deletes the one-use handoff immediately. Review concurrency is scoped to
+only the manifest/images; its stdout is captured as one raw result envelope without granting a
+write tool. The pinned CLI must first validate its structured output against the exact frame count;
+protected code then extracts the verdict array, revalidates the capsule and semantic report
+contract, and uploads only a schema-normalized bounded report. An independent cleanup job deletes
+the one-use handoff immediately. Review concurrency is scoped to
 the authenticated source run, so a later version port cannot silently cancel an older pending
 review. The final small report remains for one day.
 
@@ -224,8 +226,9 @@ SHA-256, dimensions, and before/after pixel metrics. The canonical contract and 
 must have exact test-enforced coverage.
 
 `visual_review_workflow.js` is an optional manual Workflow adapter, not the GitHub Actions entry
-point. It consumes the generated manifest and emits the same exact verdict-array contract as
-`check_visual_review.py`; keep that adapter and the CI prompt/checker schema aligned.
+point. It consumes the generated manifest and emits the same exact verdict-array contract that CI
+extracts from its structured `reviews` result before passing it to `check_visual_review.py`; keep
+that adapter and the CI prompt/checker schema aligned.
 
 After a successful full run on a release branch—or after its exact-tree attestation—the advisory
 `prepare-pages-evidence` job downloads the original packaged artifacts and creates
