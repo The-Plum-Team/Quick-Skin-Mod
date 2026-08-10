@@ -31,6 +31,7 @@ MAX_EXPECTATION_LENGTH = 4096
 MAX_VISIBLE_LENGTH = 2048
 MAX_ANOMALY_LENGTH = 1024
 MAX_ANOMALIES = 16
+SAFE_MODEL_DETAIL = re.compile(r"^[a-z0-9_-]{1,64}$")
 
 
 class ReviewError(ValueError):
@@ -40,7 +41,7 @@ class ReviewError(ValueError):
 def report_schema(
     verdict_count: int, *, labels: list[str] | None = None
 ) -> dict[str, Any]:
-    """Return the bounded draft-07 schema used for model structured output."""
+    """Return the provider-compatible structure used for model output."""
 
     if (
         isinstance(verdict_count, bool)
@@ -61,11 +62,7 @@ def report_schema(
             for label in labels
         ) or len(set(labels)) != verdict_count:
             raise ReviewError("structured review schema labels must be exact and unique")
-    label_schema: dict[str, Any] = {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": MAX_LABEL_LENGTH,
-    }
+    label_schema: dict[str, Any] = {"type": "string"}
     if labels is not None:
         label_schema["enum"] = labels
     verdict = {
@@ -74,20 +71,11 @@ def report_schema(
         "required": sorted(VERDICT_KEYS),
         "properties": {
             "label": label_schema,
-            "visible": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": MAX_VISIBLE_LENGTH,
-            },
+            "visible": {"type": "string"},
             "matches": {"type": "boolean"},
             "anomalies": {
                 "type": "array",
-                "maxItems": MAX_ANOMALIES,
-                "items": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": MAX_ANOMALY_LENGTH,
-                },
+                "items": {"type": "string"},
             },
             "defect": {"type": "boolean"},
         },
@@ -99,25 +87,66 @@ def report_schema(
         "properties": {
             "reviews": {
                 "type": "array",
-                "minItems": verdict_count,
-                "maxItems": verdict_count,
                 "items": verdict,
             }
         },
     }
 
 
+def _model_error_category(envelope: dict[str, Any]) -> str:
+    subtype = envelope.get("subtype")
+    if subtype == "error_max_structured_output_retries":
+        return "structured_output_retries_exhausted"
+    result = envelope.get("result")
+    if not isinstance(result, str) or len(result) > MAX_EXPECTATION_LENGTH:
+        return "cli_or_api"
+    message = result.casefold()
+    if any(
+        marker in message
+        for marker in ("not logged in", "authentication", "oauth", "unauthorized")
+    ):
+        return "authentication"
+    if any(
+        marker in message
+        for marker in ("rate limit", "usage limit", "limit reached", "quota")
+    ):
+        return "quota_or_rate_limit"
+    if "schema" in message and any(
+        marker in message for marker in ("invalid", "unsupported", "complex")
+    ):
+        return "schema_rejected"
+    if "overloaded" in message:
+        return "overloaded"
+    return "cli_or_api"
+
+
+def _safe_model_error_details(envelope: dict[str, Any]) -> str:
+    details = [f"category={_model_error_category(envelope)}"]
+    terminal_reason = envelope.get("terminal_reason")
+    if isinstance(terminal_reason, str) and SAFE_MODEL_DETAIL.fullmatch(
+        terminal_reason
+    ):
+        details.append(f"terminal_reason={terminal_reason}")
+    api_status = envelope.get("api_error_status")
+    if (
+        isinstance(api_status, int)
+        and not isinstance(api_status, bool)
+        and 100 <= api_status <= 599
+    ):
+        details.append(f"api_status={api_status}")
+    return ", ".join(details)
+
+
 def extract_structured_report(envelope: Any) -> Any:
     """Extract only a validated structured result from the Claude JSON envelope."""
 
-    if (
-        not isinstance(envelope, dict)
-        or envelope.get("type") != "result"
-        or envelope.get("subtype") != "success"
-    ):
+    if not isinstance(envelope, dict) or envelope.get("type") != "result":
         raise ReviewError("model output is not a successful structured result envelope")
-    if "is_error" in envelope and envelope["is_error"] is not False:
-        raise ReviewError("model structured result envelope reports an error")
+    if envelope.get("subtype") != "success" or envelope.get("is_error") is not False:
+        raise ReviewError(
+            "model structured result failed "
+            f"({_safe_model_error_details(envelope)})"
+        )
     structured_output = envelope.get("structured_output")
     if not isinstance(structured_output, dict) or set(structured_output) != {"reviews"}:
         raise ReviewError("model result must contain only structured_output.reviews")
