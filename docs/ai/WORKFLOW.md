@@ -38,8 +38,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   coverage, and canonicalize selected images in a prior secretless job. The fresh review capsule
   may expose only its curated manifest and image directory through a read-only model tool surface;
   the shell captures one raw JSON result envelope from model stdout. The pinned CLI must validate
-  structured output against a protected schema derived from the exact manifest, and protected code
-  must independently extract and revalidate the verdicts before it emits the only normalized report
+  supported structural types, required keys, and manifest-bound label values against a protected
+  schema derived from the exact manifest. Protected code must independently extract the verdicts
+  and enforce exact count, labels, bounds, and coherence before it emits the only normalized report
   eligible for upload. A final
   `actions: write` job reauthenticates and deletes the single-use handoff by exact id.
 - Version-port and repair validation must check out candidate code with credentials disabled.
