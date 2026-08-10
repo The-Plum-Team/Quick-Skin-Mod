@@ -161,13 +161,7 @@ def public_manifest(manifest: list[dict[str, object]]) -> list[dict[str, str]]:
     return public
 
 
-def reference_identity(matrix_path: Path) -> dict[str, str]:
-    """Derive the one protected visual anchor without introducing a version list."""
-
-    try:
-        matrix = load_matrix(matrix_path)
-    except MatrixError as exc:
-        raise VisualEvidenceError(str(exc)) from exc
+def _reference_identity_from_matrix(matrix: dict[str, object]) -> dict[str, str]:
     version = matrix.get("unit_test_version")
     project = matrix.get("project")
     branch = project.get("release_branch") if isinstance(project, dict) else None
@@ -207,6 +201,29 @@ def reference_identity(matrix_path: Path) -> dict[str, str]:
     }
 
 
+def reference_identity(matrix_path: Path) -> dict[str, str]:
+    """Derive the one protected visual anchor without introducing a version list."""
+
+    try:
+        matrix = load_matrix(matrix_path)
+    except MatrixError as exc:
+        raise VisualEvidenceError(str(exc)) from exc
+    return _reference_identity_from_matrix(matrix)
+
+
+def reference_retention_days(matrix_path: Path) -> int:
+    """Retain raw evidence only on the branch that owns the protected visual anchor."""
+
+    try:
+        matrix = load_matrix(matrix_path)
+    except MatrixError as exc:
+        raise VisualEvidenceError(str(exc)) from exc
+    if matrix.get("unit_test_version") != VISUAL_REFERENCE_VERSION:
+        return 1
+    _reference_identity_from_matrix(matrix)
+    return 90
+
+
 def _read_reference_manifest(path: Path) -> dict[str, object]:
     try:
         metadata = path.lstat()
@@ -227,9 +244,9 @@ def _read_reference_manifest(path: Path) -> dict[str, object]:
             parse_float=_parse_finite_reference_float,
         )
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
-        raise VisualEvidenceError(f"cannot read compact visual reference manifest: {exc}") from exc
+        raise VisualEvidenceError(f"cannot read visual reference manifest: {exc}") from exc
     if not isinstance(parsed, dict):
-        raise VisualEvidenceError("compact visual reference manifest must be an object")
+        raise VisualEvidenceError("visual reference manifest must be an object")
     return parsed
 
 
@@ -240,7 +257,7 @@ def load_reference_frames(
     branch: str,
     artifact_node: str,
 ) -> dict[str, dict[str, object]]:
-    """Load one already validated compact Pages lane as the cross-version anchor."""
+    """Load one already validated raw or compact Pages lane as the visual anchor."""
 
     try:
         root = evidence_root.resolve(strict=True)
@@ -249,13 +266,14 @@ def load_reference_frames(
             raise OSError("reference bundle is a symbolic link")
         bundle = unresolved_bundle.resolve(strict=True)
     except OSError as exc:
-        raise VisualEvidenceError(f"cannot resolve compact visual reference: {exc}") from exc
+        raise VisualEvidenceError(f"cannot resolve visual reference: {exc}") from exc
     if bundle.parent != root or not bundle.is_dir() or bundle.is_symlink():
-        raise VisualEvidenceError("compact visual reference bundle escapes its evidence root")
+        raise VisualEvidenceError("visual reference bundle escapes its evidence root")
     manifest = _read_reference_manifest(bundle / "manifest.json")
     catalog = load_catalog(catalog_path)
-    if manifest.get("schema_version") != 2:
-        raise VisualEvidenceError("visual reference must be compact Pages evidence")
+    schema_version = manifest.get("schema_version")
+    if schema_version not in {1, 2}:
+        raise VisualEvidenceError("visual reference must be raw or compact Pages evidence")
     if manifest.get("contract_sha256") != catalog.contract_sha256:
         raise VisualEvidenceError("visual reference uses a different scenario contract")
     release = manifest.get("release")
@@ -318,19 +336,32 @@ def load_reference_frames(
             raise VisualEvidenceError(
                 f"visual reference frame {index} has invalid or duplicate identity"
             )
-        derivative = frame.get("derivative")
-        if not isinstance(derivative, dict) or derivative.get("format") != "webp":
-            raise VisualEvidenceError(f"visual reference frame {index} has no WebP derivative")
-        asset = derivative.get("asset")
-        file_sha256 = derivative.get("file_sha256")
-        metrics = derivative.get("pixel_validation")
-        width = derivative.get("width")
-        height = derivative.get("height")
+        if schema_version == 1:
+            asset = frame.get("asset")
+            file_sha256 = frame.get("file_sha256")
+            metrics = frame.get("pixel_validation")
+            width = frame.get("width")
+            height = frame.get("height")
+            expected_asset = f"images/{file_sha256}.png"
+            expected_format = "PNG"
+        else:
+            derivative = frame.get("derivative")
+            if not isinstance(derivative, dict) or derivative.get("format") != "webp":
+                raise VisualEvidenceError(
+                    f"visual reference frame {index} has no WebP derivative"
+                )
+            asset = derivative.get("asset")
+            file_sha256 = derivative.get("file_sha256")
+            metrics = derivative.get("pixel_validation")
+            width = derivative.get("width")
+            height = derivative.get("height")
+            expected_asset = f"images/{file_sha256}.webp"
+            expected_format = "WEBP"
         if (
             not isinstance(asset, str)
             or not isinstance(file_sha256, str)
             or not SHA256.fullmatch(file_sha256)
-            or asset != f"images/{file_sha256}.webp"
+            or asset != expected_asset
             or not isinstance(metrics, dict)
             or metrics.get("file_sha256") != file_sha256
             or not isinstance(metrics.get("pixel_sha256"), str)
@@ -364,7 +395,7 @@ def load_reference_frames(
             "pixel_sha256": metrics["pixel_sha256"],
             "width": width,
             "height": height,
-            "format": "WEBP",
+            "format": expected_format,
             "version": reference_version,
             "loader": reference_loader,
         }
@@ -381,10 +412,10 @@ def _canonicalize_verified_reference(
     expected_pixel_sha256: object,
     expected_dimensions: tuple[object, object],
 ) -> tuple[tuple[int, int], str, bytes]:
-    """Revalidate one compact derivative and return a metadata-free RGB PNG."""
+    """Revalidate one Pages image and return a metadata-free RGB PNG."""
 
     if (
-        expected_format != "WEBP"
+        expected_format not in {"PNG", "WEBP"}
         or not isinstance(expected_file_sha256, str)
         or not SHA256.fullmatch(expected_file_sha256)
         or not isinstance(expected_pixel_sha256, str)
@@ -716,9 +747,14 @@ def main(argv: list[str] | None = None) -> int:
         help="print the visual anchor derived from the protected release matrix",
     )
     parser.add_argument(
+        "--reference-retention-days",
+        action="store_true",
+        help="print the raw-evidence retention for this branch matrix",
+    )
+    parser.add_argument(
         "--reference-evidence-root",
         type=Path,
-        help="already validated compact Pages evidence containing the 1.20.1 anchor",
+        help="already validated raw or compact Pages evidence containing the 1.20.1 anchor",
     )
     parser.add_argument("--reference-branch")
     parser.add_argument("--reference-artifact-node")
@@ -750,7 +786,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.reference_identity:
             if (
-                args.validate_row_json is not None
+                args.reference_retention_days
+                or args.validate_row_json is not None
                 or args.curate_output is not None
                 or args.all
                 or args.combos is not None
@@ -766,6 +803,19 @@ def main(argv: list[str] | None = None) -> int:
                     separators=(",", ":"),
                 )
             )
+            return 0
+        if args.reference_retention_days:
+            if (
+                args.validate_row_json is not None
+                or args.curate_output is not None
+                or args.all
+                or args.combos is not None
+                or has_reference
+            ):
+                raise VisualEvidenceError(
+                    "--reference-retention-days cannot be combined with evidence selection"
+                )
+            print(reference_retention_days(args.matrix))
             return 0
         if args.validate_row_json is not None:
             if (
