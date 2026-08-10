@@ -215,7 +215,7 @@ public final class PropagationLiveScenario implements Scenario {
                     boolean atVantage = Math.hypot(mc.player.getX() - tgtX, mc.player.getZ() - tgtZ) < 0.4;
                     String skin = VanillaShim.skinTexture(a);
                     String cloak = VanillaShim.cloakTexture(a);
-                    boolean clean = (skin == null || !skin.startsWith("quickskin:network/"))
+                    boolean clean = VanillaShim.isExpectedDefaultSkinResolved(a)
                             && (cloak == null || !cloak.startsWith("quickskin:network/"));
                     if (atVantage && clean) {
                         settleTicks++;
@@ -231,11 +231,16 @@ public final class PropagationLiveScenario implements Scenario {
                     if (a == null) return Step.Result.fail("A's entity not present yet");
                     String skin = VanillaShim.skinTexture(a);
                     String cloak = VanillaShim.cloakTexture(a);
+                    String expected = VanillaShim.expectedDefaultSkinTexture(a);
                     boolean customSkin = skin != null && skin.startsWith("quickskin:network/");
                     boolean customCape = cloak != null && cloak.startsWith("quickskin:network/");
                     if (customSkin || customCape)
                         return Step.Result.fail("A already custom BEFORE the live change (skin=" + skin
                                 + " cape=" + cloak + ") — ordering race");
+                    if (expected == null || !expected.equals(skin)) {
+                        return Step.Result.fail("A's default skin did not stabilize BEFORE: expected="
+                                + expected + " actual=" + skin);
+                    }
                     try {
                         NetworkSyncService.getInstance().syncAppearance(me, "", "", "slim");
                         E2ELog.info("B acknowledged clean BEFORE via slim-model appearance");
@@ -281,10 +286,21 @@ public final class PropagationLiveScenario implements Scenario {
     private Step baseline(Minecraft mc, String v, String role) {
         return Step.of("baseline")
                 .minTicks(40) // ~2s render warmup so the first frame is real
+                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))
+                .settleTicks(20) // reject a one-frame generic fallback before the UUID skin lands
+                .timeoutTicks(400)
                 .screenshot(v + "_live_00_baseline_" + role + ".png")
-                .assertion(() -> mc.player != null
-                        ? Step.Result.pass("player present: " + VanillaShim.playerName(mc.player))
-                        : Step.Result.fail("player is null"));
+                .assertion(() -> {
+                    if (mc.player == null) return Step.Result.fail("player is null");
+                    String expected = VanillaShim.expectedDefaultSkinTexture(mc.player);
+                    String actual = VanillaShim.skinTexture(mc.player);
+                    if (expected == null || !expected.equals(actual)) {
+                        return Step.Result.fail("default skin did not stabilize: expected="
+                                + expected + " actual=" + actual);
+                    }
+                    return Step.Result.pass("player present: " + VanillaShim.playerName(mc.player)
+                            + " defaultSkin=" + actual);
+                });
     }
 
     /**
