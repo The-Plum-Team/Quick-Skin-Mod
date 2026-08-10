@@ -29,6 +29,9 @@ Escalate these concerns:
 Do not escalate ordinary cross-version Minecraft or loader chrome, camera, framing, lighting,
 time-of-day, HUD toast, or warning differences. Ignore the small player-preview thumbnail in a
 lower corner. The camera usually sits behind the player, so an unseen front-only detail is not a
-defect. The reference is a semantic visual anchor, not a strict whole-image golden screenshot.
+defect. At a default-skin checkpoint, any intact Vanilla default player skin (for example Steve,
+Alex, Noor, or Ari) is acceptable even when its model, outfit, or colours differ from the 1.20.1
+reference. This exception never applies when the expectation names a custom skin or cape. The
+reference is a semantic visual anchor, not a strict whole-image golden screenshot.
 
 Return only the structured result requested by the runner. Do not edit files or attempt a fix.
