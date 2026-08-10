@@ -60,6 +60,7 @@ class E2EImpactTest(unittest.TestCase):
             ".github/workflows/release.yml",
             ".github/workflows/sync-version-branches.yml",
             ".github/workflows/visual-review.yml",
+            ".github/workflows/visual-review-drain.yml",
         )
         for path in non_gate_workflows:
             with self.subTest(path=path):
