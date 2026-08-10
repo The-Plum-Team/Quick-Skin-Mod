@@ -103,6 +103,8 @@ class WorkflowSecurityTest(unittest.TestCase):
                         )
                         self.assertIn('"Read(./review-input/images/**)"', block)
                         self.assertIn("> visual-review-report.raw.json", block)
+                        self.assertIn("--output-format json", block)
+                        self.assertIn('--json-schema "$output_schema"', block)
                         self.assertIn("unset GH_TOKEN GITHUB_TOKEN", block)
                         self.assertNotIn("Edit", block)
                         self.assertNotIn('"Write(', block)
@@ -357,7 +359,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("scripts/ci/bounded_zip.py", visual)
         self.assertIn("--max-entries 520", visual)
         self.assertEqual(2, visual.count("--validate-input-only"))
-        self.assertEqual(3, visual.count("--require-paired"))
+        self.assertEqual(4, visual.count("--require-paired"))
         self.assertIn("visual-review-capsule", visual)
         self.assertNotIn("actions/download-artifact@", visual_workflow)
         self.assertNotIn("merge-multiple", visual)
@@ -367,6 +369,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", notify)
         self.assertIn("visual-review-manifest.sha256", visual)
         self.assertIn("visual-review-checker.py", visual)
+        self.assertIn("visual-review-output-schema.json", visual)
+        self.assertIn("--print-output-schema", visual)
+        self.assertIn("--structured-output-envelope", visual)
         self.assertIn("visual_reference", visual)
         self.assertIn("visual-review-model-${{ needs.authenticate.outputs.source_run_id }}", visual)
         self.assertNotIn("group: visual-review-model\n", visual)
@@ -375,7 +380,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('python3 "$RUNNER_TEMP/visual-review-checker.py"', visual)
         self.assertIn("--normalized-report visual-review-report.json", visual)
         upload_report = visual[visual.index("- name: Upload the source-bound review report") :]
-        self.assertNotIn("visual-review-report.raw.json", upload_report)
+        for private_output in (
+            "visual-review-report.raw.json",
+            "visual-review-output-schema.json",
+            "visual-review-output-schema.sha256",
+        ):
+            self.assertNotIn(private_output, upload_report)
         self.assertIn("visual-review-report.json", upload_report)
         self.assertIn("actions: write", cleanup)
         self.assertNotIn("contents:", cleanup)

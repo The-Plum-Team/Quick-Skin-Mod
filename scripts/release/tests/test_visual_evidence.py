@@ -19,7 +19,10 @@ import packaged_runtime  # noqa: E402
 from check_visual_review import (  # noqa: E402
     MAX_JSON_BYTES,
     ReviewError,
+    extract_structured_report,
     load,
+    main as check_visual_review_main,
+    report_schema,
     render,
     validate,
     validate_input,
@@ -901,6 +904,73 @@ class VisualReviewContractTest(unittest.TestCase):
         summary, has_defects = render(verdicts)
         self.assertFalse(has_defects)
         self.assertIn("advisory", summary.lower())
+
+    def test_structured_output_schema_matches_the_checker_bounds(self) -> None:
+        labels = [f"lane/scenario/client/step-{index}" for index in range(7)]
+        schema = report_schema(7, labels=labels)
+        self.assertEqual(["reviews"], schema["required"])
+        self.assertFalse(schema["additionalProperties"])
+        reviews = schema["properties"]["reviews"]
+        self.assertEqual(7, reviews["minItems"])
+        self.assertEqual(7, reviews["maxItems"])
+        verdict = reviews["items"]
+        self.assertEqual(sorted(self.clean[0]), verdict["required"])
+        self.assertFalse(verdict["additionalProperties"])
+        self.assertEqual(labels, verdict["properties"]["label"]["enum"])
+        self.assertEqual(512, verdict["properties"]["label"]["maxLength"])
+        self.assertEqual(2048, verdict["properties"]["visible"]["maxLength"])
+        self.assertEqual(16, verdict["properties"]["anomalies"]["maxItems"])
+        self.assertEqual(
+            1024,
+            verdict["properties"]["anomalies"]["items"]["maxLength"],
+        )
+        for count in (0, 513, True):
+            with self.subTest(count=count), self.assertRaises(ReviewError):
+                report_schema(count)
+        with self.assertRaises(ReviewError):
+            report_schema(2, labels=["duplicate", "duplicate"])
+
+    def test_extracts_only_a_successful_structured_result(self) -> None:
+        envelope = {
+            "type": "result",
+            "subtype": "success",
+            "is_error": False,
+            "result": "ignored free-form text",
+            "structured_output": {"reviews": self.clean},
+        }
+        self.assertEqual(self.clean, extract_structured_report(envelope))
+
+        invalid = (
+            {**envelope, "subtype": "error_max_structured_output_retries"},
+            {**envelope, "is_error": True},
+            {**envelope, "structured_output": self.clean},
+            {
+                **envelope,
+                "structured_output": {"reviews": self.clean, "extra": True},
+            },
+        )
+        for candidate in invalid:
+            with self.subTest(candidate=candidate), self.assertRaises(ReviewError):
+                extract_structured_report(candidate)
+
+    def test_cli_prints_schema_for_the_manifest_frame_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = Path(temporary) / "manifest.json"
+            manifest.write_text(json.dumps(self.manifest), encoding="utf-8")
+            output = io.StringIO()
+            with mock.patch("sys.stdout", output):
+                result = check_visual_review_main(
+                    ["--manifest", str(manifest), "--print-output-schema"]
+                )
+
+            self.assertEqual(0, result)
+            reviews = json.loads(output.getvalue())["properties"]["reviews"]
+            self.assertEqual(1, reviews["minItems"])
+            self.assertEqual(1, reviews["maxItems"])
+            self.assertEqual(
+                [self.manifest[0]["label"]],
+                reviews["items"]["properties"]["label"]["enum"],
+            )
 
     def test_rejects_empty_duplicate_extra_and_incoherent_verdicts(self) -> None:
         cases = (
