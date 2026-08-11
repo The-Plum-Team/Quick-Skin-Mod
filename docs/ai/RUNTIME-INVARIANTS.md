@@ -110,11 +110,13 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - The current contract is deliberately a cross-version parity contract: every supported loader and
   version publishes every checkpoint. Do not add a version-only capture without first extending
   the contract schema and protected validator with explicit applicability rules.
-- Advisory AI review must pair every candidate checkpoint with the identical semantic `capture_id`
-  from authenticated current-head Fabric 1.20.1 evidence. It must not fall back to filenames,
-  ordinals, review tiers, a latest-version baseline, or strict whole-pixel equality. Reject a
-  missing pair, contract skew, aspect-ratio drift, stale reference head, or mixed paired/unpaired
-  capsule before the credential-bearing job starts.
+- Advisory AI review must pair every later-version candidate checkpoint with the identical semantic
+  `capture_id` from authenticated current-head Fabric 1.20.1 evidence. A 1.20.1 review must instead
+  cross-pair Fabric with Forge and Forge with Fabric from the authenticated source run, and those
+  anchor pairs must reach semantic review even when their content-addressed image path is shared.
+  It must not fall back to filenames, ordinals, review tiers, a latest-version baseline, or strict
+  whole-pixel equality. Reject a missing pair or 1.20.1 peer, contract skew, aspect-ratio drift,
+  stale reference head, or mixed paired/unpaired capsule before the credential-bearing job starts.
 - Java harness reports, packaged results, raw handoffs, compact caches, and public manifests must
   carry the exact validated contract SHA-256. Reject missing, extra, reordered, hash-mismatched, or
   assertion-free steps and reject a screenshot both when a capture is missing and when a
