@@ -142,18 +142,27 @@ class VisualEvidenceTest(unittest.TestCase):
         filename: str = "same.png",
         digest: str | None = None,
         status: str = "pass",
+        artifact_node: str = "fabric-1.20.1",
+        runtime_version: str = "1.20.1",
+        loader: str = "fabric",
+        image_payload: bytes = PNG,
     ) -> Path:
-        artifact = "fabric-1.20.1"
-        profile_relative = Path("profiles") / f"{artifact}--1.20.1--{scenario}"
+        profile_relative = (
+            Path("profiles") / f"{artifact_node}--{runtime_version}--{scenario}"
+        )
         profile = self.e2e_root / profile_relative
         screenshot = profile / "client_a" / "screenshots" / filename
         screenshot.parent.mkdir(parents=True, exist_ok=True)
-        screenshot.write_bytes(PNG)
-        file_sha256 = hashlib.sha256(PNG).hexdigest() if digest is None else digest
+        screenshot.write_bytes(image_payload)
+        file_sha256 = (
+            hashlib.sha256(image_payload).hexdigest() if digest is None else digest
+        )
+        with Image.open(io.BytesIO(image_payload)) as image:
+            pixel_sha256 = hashlib.sha256(image.convert("RGB").tobytes()).hexdigest()
         result = {
-            "artifact_node": artifact,
-            "runtime_version": "1.20.1",
-            "loader": "fabric",
+            "artifact_node": artifact_node,
+            "runtime_version": runtime_version,
+            "loader": loader,
             "scenario": scenario,
             "contract_sha256": self.contract_hash,
             "jar_sha256": "a" * 64,
@@ -167,7 +176,7 @@ class VisualEvidenceTest(unittest.TestCase):
             "elapsed_s": 1.0,
             "reports": {
                 "client_a": {
-                    "version": "1.20.1",
+                    "version": runtime_version,
                     "role": "client_a",
                     "scenario": scenario,
                     "contract_sha256": self.contract_hash,
@@ -186,7 +195,7 @@ class VisualEvidenceTest(unittest.TestCase):
                                 "width": PNG_WIDTH,
                                 "height": PNG_HEIGHT,
                                 "file_sha256": file_sha256,
-                                "pixel_sha256": PNG_PIXEL_SHA256,
+                                "pixel_sha256": pixel_sha256,
                                 "luma_entropy": 1.0,
                                 "meaningful_colors": 1,
                                 "dark_fraction": 0.0,
@@ -504,10 +513,15 @@ class VisualEvidenceTest(unittest.TestCase):
         with self.assertRaisesRegex(VisualEvidenceError, "must not already exist"):
             curate_manifest(manifest, output)
 
-    def test_paired_manifest_matches_every_capture_to_the_1_20_1_anchor(self) -> None:
+    def test_1_20_1_anchor_cross_pairs_fabric_and_forge(self) -> None:
         capture_id = "phase0-smoke.client_a.baseline"
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
         self.write_result("phase0-smoke")
+        self.write_result(
+            "phase0-smoke",
+            artifact_node="forge-1.20.1",
+            loader="forge",
+        )
         reference_root = self.write_compact_reference(capture_id)
         references = load_reference_frames(
             reference_root,
@@ -525,27 +539,59 @@ class VisualEvidenceTest(unittest.TestCase):
 
         curated = curate_manifest(manifest, self.root / "review-input")
 
-        self.assertEqual(1, len(curated))
-        self.assertEqual(capture_id, curated[0]["capture_id"])
+        self.assertEqual(2, len(curated))
+        by_label = {item["label"]: item for item in curated}
+        self.assertEqual(
+            "forge-1.20.1/phase0-smoke/client_a/baseline",
+            by_label["fabric-1.20.1/phase0-smoke/client_a/baseline"]["reference_label"],
+        )
         self.assertEqual(
             "fabric-1.20.1/phase0-smoke/client_a/baseline",
-            curated[0]["reference_label"],
+            by_label["forge-1.20.1/phase0-smoke/client_a/baseline"]["reference_label"],
         )
-        self.assertNotEqual(curated[0]["path"], curated[0]["reference_path"])
-        with Image.open(self.root / curated[0]["path"]) as candidate:
-            self.assertEqual((800, 450), candidate.size)
-        with Image.open(self.root / curated[0]["reference_path"]) as reference:
-            self.assertEqual((800, 450), reference.size)
-        self.assertEqual(1, validate_input(curated, self.root / "review-input"))
+        for item in curated:
+            self.assertEqual(capture_id, item["capture_id"])
+            self.assertEqual(item["path"], item["reference_path"])
+            with Image.open(self.root / item["path"]) as candidate:
+                self.assertEqual((PNG_WIDTH, PNG_HEIGHT), candidate.size)
+        self.assertEqual(2, validate_input(curated, self.root / "review-input"))
         self.assertEqual(
-            2,
+            1,
             len(list((self.root / "review-input" / "images").glob("*.png"))),
         )
+
+    def test_1_20_1_anchor_fails_closed_without_the_other_loader(self) -> None:
+        capture_id = "phase0-smoke.client_a.baseline"
+        self.write_catalog([("phase0-smoke", "client_a", "baseline")])
+        self.write_result("phase0-smoke")
+        reference_root = self.write_compact_reference(capture_id)
+        references = load_reference_frames(
+            reference_root,
+            self.catalog_path,
+            branch="forge-and-fabric-1.20.1",
+            artifact_node="fabric-1.20.1",
+        )
+
+        with self.assertRaisesRegex(
+            VisualEvidenceError,
+            "requires matching Fabric and Forge captures; missing forge",
+        ):
+            build_manifest(
+                self.e2e_root,
+                self.catalog_path,
+                include_all=True,
+                combos=None,
+                reference_frames=references,
+            )
 
     def test_paired_manifest_preserves_lossless_raw_reference_pixels(self) -> None:
         capture_id = "phase0-smoke.client_a.baseline"
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
-        self.write_result("phase0-smoke")
+        self.write_result(
+            "phase0-smoke",
+            artifact_node="fabric-1.21.1",
+            runtime_version="1.21.1",
+        )
         reference_root, expected_pixels = self.write_raw_reference(capture_id)
         references = load_reference_frames(
             reference_root,
@@ -570,7 +616,11 @@ class VisualEvidenceTest(unittest.TestCase):
     def test_paired_manifest_fails_closed_on_a_missing_or_changed_reference(self) -> None:
         capture_id = "phase0-smoke.client_a.baseline"
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
-        self.write_result("phase0-smoke")
+        self.write_result(
+            "phase0-smoke",
+            artifact_node="fabric-1.21.1",
+            runtime_version="1.21.1",
+        )
         reference_root = self.write_compact_reference(capture_id)
         references = load_reference_frames(
             reference_root,

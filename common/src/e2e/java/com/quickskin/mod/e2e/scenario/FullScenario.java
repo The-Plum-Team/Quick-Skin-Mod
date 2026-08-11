@@ -934,6 +934,10 @@ public final class FullScenario implements Scenario {
         steps.add(Step.of("animated_cape_apply")
                 .action(() -> {
                     enterWorldView(mc);
+                    // The preceding BMO parity probe deliberately equips an elytra. Every cape
+                    // checkpoint owns its equipment state so a previous step cannot silently turn
+                    // the cape texture into an elytra render.
+                    setChestSlot(mc, ItemStack.EMPTY);
                     try {
                         // Prefer a bundled real animated GIF cape (dropped into e2e resources); the mod
                         // decodes it (StbGifLoader) into an animated local cape. Fall back to the bundled
@@ -952,10 +956,20 @@ public final class FullScenario implements Scenario {
                     }
                 })
                 .minTicks(20)
-                .ready(() -> soleAnimatedState() != null)
+                .ready(() -> {
+                    setChestSlot(mc, ItemStack.EMPTY);
+                    String expectedCapeId = expectedAnimatedCapeId();
+                    return soleAnimatedState() != null
+                            && hasExpectedCape(svc, uuid, expectedCapeId)
+                            && hasEmptyChest(mc)
+                            && VanillaShim.cloakTexture(mc.player) != null;
+                })
                 .timeoutTicks(200)
                 .screenshot(prefix + "full_06a_animated_cape_frameA" + suffix)
                 .assertion(() -> {
+                    if (!hasEmptyChest(mc)) {
+                        return Step.Result.fail("animated cape rendered with a non-empty CHEST slot");
+                    }
                     Object st = soleAnimatedState();
                     if (st == null) return Step.Result.fail("no animated AnimationState registered");
                     AnimationMetadata meta = metaOf(st);
@@ -966,21 +980,38 @@ public final class FullScenario implements Scenario {
                         return Step.Result.fail("currentFrame out of range: " + animStartFrame + "/" + fc);
                     PlayerAppearance app = svc.getAppearance(uuid);
                     String capeId = app == null ? null : app.getCapeId();
+                    String expectedCapeId = expectedAnimatedCapeId();
+                    if (!hasExpectedCape(svc, uuid, expectedCapeId)) {
+                        return Step.Result.fail("animated cape route is not active: " + capeId);
+                    }
                     String src = (gifCapeHash != null) ? "local GIF cape" : "known:rickroll";
                     return Step.Result.pass(src + " registered capeId=" + capeId
                             + " frameCount=" + fc + " startFrame=" + animStartFrame);
                 }));
 
         steps.add(Step.of("animated_cape_advance")
+                .action(() -> setChestSlot(mc, ItemStack.EMPTY))
                 .minTicks(5)
                 // Poll until the wall-clock-driven currentFrame moves off the snapshot taken above.
                 .ready(() -> {
+                    setChestSlot(mc, ItemStack.EMPTY);
                     Object st = soleAnimatedState();
-                    return st != null && animStartFrame != Integer.MIN_VALUE && frameOf(st) != animStartFrame;
+                    return hasEmptyChest(mc)
+                            && hasExpectedCape(svc, uuid, expectedAnimatedCapeId())
+                            && VanillaShim.cloakTexture(mc.player) != null
+                            && st != null
+                            && animStartFrame != Integer.MIN_VALUE
+                            && frameOf(st) != animStartFrame;
                 })
                 .timeoutTicks(400) // up to 20s; rickroll cycles 17 frames @ 50ms
                 .screenshot(prefix + "full_06b_animated_cape_frameB" + suffix)
                 .assertion(() -> {
+                    if (!hasEmptyChest(mc)) {
+                        return Step.Result.fail("advanced cape frame rendered with a non-empty CHEST slot");
+                    }
+                    if (!hasExpectedCape(svc, uuid, expectedAnimatedCapeId())) {
+                        return Step.Result.fail("animated cape route disappeared before frame B");
+                    }
                     Object st = soleAnimatedState();
                     if (st == null) return Step.Result.fail("animation disappeared");
                     AnimationMetadata meta = metaOf(st);
@@ -1007,6 +1038,7 @@ public final class FullScenario implements Scenario {
         steps.add(Step.of("hd_cape_no_downscale")
                 .action(() -> {
                     enterWorldView(mc);
+                    setChestSlot(mc, ItemStack.EMPTY);
                     try {
                         Path hd = TestAssets.makeHdCape(); // 256x128 == CAPE_256, kept verbatim on import
                         hdCapeHash = TestAssets.registerLocalCapeAs(hd, "qs_e2e_cape_hd.png");
@@ -1017,11 +1049,24 @@ public final class FullScenario implements Scenario {
                     }
                 })
                 .minTicks(30)
-                .ready(() -> hdCapeHash != null && LocalAssetManager.getInstance().getMetadata(hdCapeHash) != null)
+                .ready(() -> {
+                    setChestSlot(mc, ItemStack.EMPTY);
+                    return hdCapeHash != null
+                            && LocalAssetManager.getInstance().getMetadata(hdCapeHash) != null
+                            && hasExpectedCape(svc, uuid, "local_cape:" + hdCapeHash)
+                            && hasEmptyChest(mc)
+                            && VanillaShim.cloakTexture(mc.player) != null;
+                })
                 .timeoutTicks(200)
                 .screenshot(prefix + "full_07_hd_cape_body" + suffix)
                 .assertion(() -> {
                     if (hdCapeHash == null) return Step.Result.fail("HD cape registration failed");
+                    if (!hasEmptyChest(mc)) {
+                        return Step.Result.fail("HD cape rendered with a non-empty CHEST slot");
+                    }
+                    if (!hasExpectedCape(svc, uuid, "local_cape:" + hdCapeHash)) {
+                        return Step.Result.fail("HD cape route is not active");
+                    }
                     AssetMetadata meta = LocalAssetManager.getInstance().getMetadata(hdCapeHash);
                     if (meta == null) return Step.Result.fail("no metadata for HD cape");
                     int w = meta.resolution().getWidth(), h = meta.resolution().getHeight();
@@ -2428,6 +2473,15 @@ public final class FullScenario implements Scenario {
 
     private void equipElytra(Minecraft mc) {
         setChestSlot(mc, new ItemStack(Items.ELYTRA));
+    }
+
+    private static boolean hasEmptyChest(Minecraft mc) {
+        return mc.player != null
+                && mc.player.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
+    }
+
+    private String expectedAnimatedCapeId() {
+        return gifCapeHash != null ? "local_cape:" + gifCapeHash : "known:rickroll";
     }
 
     /**
