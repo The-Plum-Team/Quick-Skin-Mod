@@ -494,6 +494,60 @@
               }
             },
             {
+              "id": "bundled_bmo_cape",
+              "assertion_required": true,
+              "capture": {
+                "title": "Bundled BMO cape",
+                "review_tier": "key",
+                "expectation": "The player is seen from behind wearing the bundled BMO cape; this is the unedited visual reference for the adjusted BMO cape capture.",
+                "probes": []
+              }
+            },
+            {
+              "id": "bundled_bmo_elytra",
+              "assertion_required": true,
+              "capture": {
+                "title": "Bundled BMO elytra",
+                "review_tier": "key",
+                "expectation": "The player wears elytra textured directly by the bundled BMO atlas; this is the unedited visual reference for the adjusted BMO elytra capture.",
+                "probes": []
+              }
+            },
+            {
+              "id": "bmo_adjust_screen",
+              "assertion_required": true,
+              "capture": {
+                "title": "Black-padded BMO aligned",
+                "review_tier": "key",
+                "expectation": "The cape editor shows the BMO atlas aligned at the correct crop from a double-sized 128x64 source whose surrounding unused area is opaque black; the cape and elytra previews are intact.",
+                "probes": []
+              }
+            },
+            {
+              "id": "adjusted_bmo_cape",
+              "assertion_required": true,
+              "capture": {
+                "title": "Adjusted BMO cape",
+                "review_tier": "key",
+                "expectation": "The player wears the BMO cape saved through the editor, and it looks the same as the bundled BMO cape reference without black padding leaking into the visible surface.",
+                "probes": []
+              }
+            },
+            {
+              "id": "adjusted_bmo_elytra",
+              "assertion_required": true,
+              "capture": {
+                "title": "Adjusted BMO elytra",
+                "review_tier": "key",
+                "expectation": "The player wears elytra from the BMO cape saved through the editor, and both wings look the same as the bundled BMO elytra reference without broken UV placement.",
+                "probes": []
+              }
+            },
+            {
+              "id": "bmo_render_parity",
+              "assertion_required": true
+            },
+            {
               "id": "animated_cape_apply",
               "assertion_required": true,
               "capture": {
