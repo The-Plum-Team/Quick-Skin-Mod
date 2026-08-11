@@ -52,6 +52,12 @@ EXPECTED_STEPS = {
         "cape_adjust_opaque_on",
         "cape_adjust_zoom_out",
         "cape_adjust_zoom_in",
+        "bundled_bmo_cape",
+        "bundled_bmo_elytra",
+        "bmo_adjust_screen",
+        "adjusted_bmo_cape",
+        "adjusted_bmo_elytra",
+        "bmo_render_parity",
         "animated_cape_apply",
         "animated_cape_advance",
         "hd_cape_no_downscale",
@@ -75,7 +81,11 @@ EXPECTED_CAPTURES = {
         "observe_before",
         "await_live_change",
     ),
-    ("full", "client_a"): EXPECTED_STEPS[("full", "client_a")],
+    ("full", "client_a"): tuple(
+        step
+        for step in EXPECTED_STEPS[("full", "client_a")]
+        if step != "bmo_render_parity"
+    ),
 }
 
 
@@ -223,7 +233,7 @@ class ScenarioContractTest(unittest.TestCase):
             for role in scenario["roles"]
             for step in role["steps"]
         )
-        self.assertEqual(36, authored_capture_count)
+        self.assertEqual(41, authored_capture_count)
         self.assertEqual(authored_capture_count, len(self.contract.captures))
 
     def test_capture_metadata_and_ids_are_derived_from_steps(self) -> None:
@@ -233,7 +243,7 @@ class ScenarioContractTest(unittest.TestCase):
             for step in steps
         }
         self.assertEqual(expected_ids, set(self.contract.capture_ids))
-        self.assertEqual(36, len(expected_ids))
+        self.assertEqual(41, len(expected_ids))
         first = self.contract.capture_by_id("full.client_a.baseline")
         self.assertIs(
             first,
