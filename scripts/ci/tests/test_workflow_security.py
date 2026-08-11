@@ -330,7 +330,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-input-$source_run_id", authenticate)
         self.assertIn("visual-review-$source_run_id", authenticate)
         self.assertIn("visual-review-drain.yml", authenticate)
-        self.assertIn("implementation_sha=\"$GITHUB_SHA\"", authenticate)
+        self.assertNotIn("implementation_sha", authenticate)
         self.assertNotIn("branches/master", authenticate)
         self.assertIn("actions/runs/$source_run_id/artifacts", authenticate)
         self.assertIn("artifact_inventory", authenticate)
@@ -367,9 +367,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("retention-days: 7", curate)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", curate)
         self.assertNotIn("claude-code", curate)
-        self.assertIn(
-            "ref: ${{ needs.authenticate.outputs.implementation_sha }}", curate
-        )
+        self.assertIn("ref: ${{ github.sha }}", curate)
+        self.assertIn("IMPLEMENTATION_SHA: ${{ github.sha }}", curate)
+        self.assertIn('[[ "$IMPLEMENTATION_SHA" == "$GITHUB_SHA" ]]', curate)
+        self.assertNotIn("needs.authenticate.outputs.implementation_sha", prepare_workflow)
         self.assertIn("persist-credentials: false", curate)
         self.assertIn("contents: write", request)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", request)
