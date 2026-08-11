@@ -913,8 +913,8 @@ public class CapeAdjustScreen extends Screen {
 
         int drawX = (int) imgOffsetX;
         int drawY = (int) imgOffsetY;
-        int drawW = (int) (srcW * imgScale);
-        int drawH = (int) (srcFrameHeight * imgScale);
+        int drawW = scaledSourcePixels(srcW);
+        int drawH = scaledSourcePixels(srcFrameHeight);
 
         BufferedImage cape = new BufferedImage(capeW, capeH, BufferedImage.TYPE_INT_ARGB);
         java.awt.Graphics2D g = cape.createGraphics();
@@ -996,6 +996,19 @@ public class CapeAdjustScreen extends Screen {
                 }
             }
         }
+    }
+
+    /**
+     * Convert the continuous zoom into the raster span used by both composers.
+     *
+     * <p>The slider mapping is logarithmic, so an exact-looking scale can return from its
+     * position round trip one ULP below the requested value (for example {@code 1.0} becomes
+     * {@code 0.9999999999999999}). Truncating that product turned a centred 128x64 source into a
+     * 127x63 draw and resampled every UV edge. Nearest-pixel rounding preserves the intended
+     * integer span while retaining smooth fractional zoom everywhere else.</p>
+     */
+    private int scaledSourcePixels(int sourcePixels) {
+        return (int) Math.round(sourcePixels * imgScale);
     }
 
     /**
@@ -1517,8 +1530,8 @@ public class CapeAdjustScreen extends Screen {
 
         int drawX = (int) imgOffsetX;
         int drawY = (int) imgOffsetY;
-        int drawW = (int) (srcW * imgScale);
-        int drawH = (int) (srcFrameHeight * imgScale);
+        int drawW = scaledSourcePixels(srcW);
+        int drawH = scaledSourcePixels(srcFrameHeight);
 
         BufferedImage cape = new BufferedImage(capeW, capeH * frameCount, BufferedImage.TYPE_INT_ARGB);
         java.awt.Graphics2D g = cape.createGraphics();
