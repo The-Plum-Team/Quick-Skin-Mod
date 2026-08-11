@@ -93,3 +93,8 @@ When a shared contract change is fanned out, `master` can become authoritative s
 for a bounded period until both the authenticated current-head artifact and the release branch's
 scenario contract match protected `master`. It still fails closed if parity never arrives, while
 normal version-port fan-out no longer drops candidates during that expected rotation window.
+
+The curator checkout and its recorded implementation identity come directly from the workflow
+run's protected `github.sha`. Candidate metadata never supplies or transits the executable checkout
+ref between jobs; candidate commits remain inert Git objects read only through bounded `git show`
+operations.
