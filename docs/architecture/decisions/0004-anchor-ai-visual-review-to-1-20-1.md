@@ -87,3 +87,9 @@ never weakens or delays the required Build and Packaged E2E gates.
 The 1.20.1 branch must continue publishing evidence for every checkpoint in the parity contract.
 If the project ever retires that branch or intentionally changes the visual design, this decision
 must be revisited explicitly rather than allowing the baseline to drift automatically.
+
+When a shared contract change is fanned out, `master` can become authoritative shortly before the
+1.20.1 release branch and its raw handoff finish rotating. The protected curator therefore polls
+for a bounded period until both the authenticated current-head artifact and the release branch's
+scenario contract match protected `master`. It still fails closed if parity never arrives, while
+normal version-port fan-out no longer drops candidates during that expected rotation window.
