@@ -6,6 +6,7 @@ import com.quickskin.mod.client.gui.screen.PlayerCapeMenuScreen;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.client.gui.screen.RenameScreen;
 import com.quickskin.mod.client.gui.screen.SettingsScreen;
+import com.quickskin.mod.client.gui.util.CapeImportProcessor;
 import com.quickskin.mod.client.gui.util.GuiScaleManager;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
@@ -71,6 +72,8 @@ import javax.imageio.ImageIO;
  *   <li>model slim/classic &mdash; {@code applySkin(...,"slim"/"classic")}; {@code getModel()} flips.</li>
  *   <li>known cape &mdash; cape menu shot; {@code applyCape("known:test")}; cape id + location.</li>
  *   <li>CapeAdjustScreen &mdash; opened with a test image + harness-owned {@code onApply} consumer.</li>
+ *   <li>BMO editor parity &mdash; crop a black-padded 128&times;64 import and compare its cape and
+ *       elytra atlas/render paths with the bundled 64&times;32 original.</li>
  *   <li>animated cape &mdash; {@code applyCape("known:rickroll")}; reflect {@code AnimationState
  *       .currentFrame} advancing, cross-checked with {@code AnimationMetadata.getFrameAtTime}.</li>
  *   <li>HD cape no-downscale &mdash; import a 256&times;128 cape; metadata resolution == source dims.</li>
@@ -122,6 +125,23 @@ public final class FullScenario implements Scenario {
     private final AtomicInteger zoomHoldIn = new AtomicInteger();
     private final AtomicReference<BufferedImage> zoomedOutAtlas = new AtomicReference<>();
 
+    /** The non-standard BMO import and the exact production atlas it must reproduce. */
+    private final AtomicReference<CapeImportProcessor.PreparedCape> bmoPreparedCape =
+            new AtomicReference<>();
+    private final AtomicReference<BufferedImage> bundledBmoAtlas = new AtomicReference<>();
+    private final AtomicReference<BufferedImage> adjustedBmoAtlas = new AtomicReference<>();
+    private final AtomicInteger bmoAdjustHold = new AtomicInteger();
+    private volatile String adjustedBmoCapeHash;
+
+    /** Screen-space tolerance for the redundant renderer-level BMO parity check. */
+    private static final double BMO_RENDER_REGION_LEFT = 0.44;
+    private static final double BMO_RENDER_REGION_TOP = 0.40;
+    private static final double BMO_RENDER_REGION_RIGHT = 0.56;
+    private static final double BMO_RENDER_REGION_BOTTOM = 0.84;
+    private static final int BMO_RENDER_MAX_ALIGNMENT = 3;
+    private static final int BMO_RENDER_CHANNEL_TOLERANCE = 12;
+    private static final double BMO_RENDER_MAX_CHANGED_FRACTION = 0.10;
+
     private final AtomicReference<BufferedImage> capeAdjustResult = new AtomicReference<>();
     private volatile String renameResult;
     private volatile Boolean deleteResult;
@@ -137,6 +157,10 @@ public final class FullScenario implements Scenario {
         final PlayerAppearanceService svc = PlayerAppearanceService.getInstance();
         final String prefix = v + "_";
         final String suffix = "_" + role + ".png";
+        final String bundledBmoCapeShot = prefix + "full_05h_bmo_bundled_cape" + suffix;
+        final String bundledBmoElytraShot = prefix + "full_05i_bmo_bundled_elytra" + suffix;
+        final String adjustedBmoCapeShot = prefix + "full_05k_bmo_adjusted_cape" + suffix;
+        final String adjustedBmoElytraShot = prefix + "full_05l_bmo_adjusted_elytra" + suffix;
 
         List<Step> steps = new ArrayList<>();
 
@@ -697,6 +721,214 @@ public final class FullScenario implements Scenario {
                             + "-step drag matched the jump exactly; a wheel notch moved the slider "
                             + "by " + expectedStep + "; applied == previewed");
                 }));
+
+        // 5h-5m. bundled BMO versus the same atlas recovered through the editor ------------------
+        // The imported source is a 128x64 black canvas with the production 64x32 BMO atlas centred
+        // inside it. Reset shows the whole padded source at 50%; moving the real zoom slider to
+        // scale 1.0 must re-anchor it to (-32,-16), crop away only the black padding and reproduce
+        // every BMO cape + elytra UV pixel exactly. The paired world captures then redundantly check
+        // that the bundled and adjusted ids render the same surface with and without worn elytra.
+        final AtomicReference<String> bmoSetupFailure = new AtomicReference<>();
+        steps.add(Step.of("bundled_bmo_cape")
+                .action(() -> {
+                    enterWorldView(mc);
+                    setChestSlot(mc, ItemStack.EMPTY);
+                    svc.applyCape(uuid, "known:bmo");
+                })
+                .minTicks(30)
+                .ready(() -> hasExpectedCape(svc, uuid, "known:bmo")
+                        && mc.player != null
+                        && mc.player.getItemBySlot(EquipmentSlot.CHEST).isEmpty()
+                        && VanillaShim.cloakTexture(mc.player) != null)
+                .timeoutTicks(300)
+                .screenshot(bundledBmoCapeShot)
+                .assertion(() -> assertCapeRoute(mc, svc, uuid, "known:bmo", false)));
+
+        steps.add(Step.of("bundled_bmo_elytra")
+                .action(() -> {
+                    enterWorldView(mc);
+                    equipElytra(mc);
+                })
+                .minTicks(25)
+                .ready(() -> {
+                    equipElytra(mc);
+                    return hasExpectedCape(svc, uuid, "known:bmo")
+                            && mc.player != null
+                            && mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)
+                            && VanillaShim.cloakTexture(mc.player) != null;
+                })
+                .timeoutTicks(300)
+                .screenshot(bundledBmoElytraShot)
+                .assertion(() -> assertCapeRoute(mc, svc, uuid, "known:bmo", true)));
+
+        steps.add(Step.of("bmo_adjust_screen")
+                .action(() -> {
+                    enterWorldView(mc);
+                    setChestSlot(mc, ItemStack.EMPTY);
+                    capeAdjustResult.set(null);
+                    bmoPreparedCape.set(null);
+                    bundledBmoAtlas.set(null);
+                    adjustedBmoAtlas.set(null);
+                    adjustedBmoCapeHash = null;
+                    bmoAdjustHold.set(0);
+                    bmoSetupFailure.set(null);
+                    try {
+                        Path source = TestAssets.makePaddedBmoCapeSource();
+                        CapeImportProcessor.PreparedCape prepared =
+                                CapeImportProcessor.prepare(source);
+                        bmoPreparedCape.set(prepared);
+                        bundledBmoAtlas.set(TestAssets.makeBundledBmoCapeImage());
+                        Consumer<BufferedImage> onApply = capeAdjustResult::set;
+                        VanillaShim.setScreen(mc, new CapeAdjustScreen(
+                                null, prepared.atlas(), prepared.frameCount(), onApply));
+                    } catch (Throwable t) {
+                        bmoSetupFailure.set("could not prepare padded BMO source: " + t);
+                        E2ELog.error("bmo_adjust_screen setup failed", t);
+                    }
+                })
+                .minTicks(25)
+                .ready(() -> {
+                    if (bmoSetupFailure.get() != null) return true;
+                    double target = bmoTargetZoomPosition();
+                    return setZoomOnAdjustScreen(mc, target)
+                            && bmoAdjustHold.incrementAndGet() >= PREVIEW_HOLD_TICKS;
+                })
+                .timeoutTicks(400)
+                .screenshot(prefix + "full_05j_bmo_adjusted_editor" + suffix)
+                .assertion(() -> {
+                    String setupFailure = bmoSetupFailure.get();
+                    if (setupFailure != null) return Step.Result.fail(setupFailure);
+                    if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen screen))
+                        return Step.Result.fail("BMO cape adjust not open: " + screenName(mc));
+                    CapeImportProcessor.PreparedCape prepared = bmoPreparedCape.get();
+                    BufferedImage expected = bundledBmoAtlas.get();
+                    if (prepared == null || expected == null)
+                        return Step.Result.fail("BMO source or expected atlas was not retained");
+                    if (prepared.standardFormat())
+                        return Step.Result.fail("128x64 padded BMO source bypassed the editor");
+
+                    String padding = validatePaddedBmoSource(prepared.atlas(), expected);
+                    if (padding != null) return Step.Result.fail(padding);
+                    double target = bmoTargetZoomPosition();
+                    String desync = checkZoomSliderAgrees(mc, target);
+                    if (desync != null) return Step.Result.fail(desync);
+                    double scale;
+                    double offsetX;
+                    double offsetY;
+                    try {
+                        scale = adjustScreenDouble(screen, "imgScale");
+                        offsetX = adjustScreenDouble(screen, "imgOffsetX");
+                        offsetY = adjustScreenDouble(screen, "imgOffsetY");
+                    } catch (Exception e) {
+                        return Step.Result.fail("could not read BMO transform: " + e);
+                    }
+                    if (Math.abs(scale - 1.0) > 1.0e-9
+                            || Math.abs(offsetX + TestAssets.BMO_PADDED_X) > 1.0e-9
+                            || Math.abs(offsetY + TestAssets.BMO_PADDED_Y) > 1.0e-9) {
+                        return Step.Result.fail("BMO transform is scale=" + scale + " offset=("
+                                + offsetX + "," + offsetY + "), expected 1.0 offset=(-"
+                                + TestAssets.BMO_PADDED_X + ",-" + TestAssets.BMO_PADDED_Y + ")");
+                    }
+
+                    BufferedImage composed = composeCapeNow(mc);
+                    BufferedImage previewed = composePreviewFrameNow(mc);
+                    if (composed == null || previewed == null)
+                        return Step.Result.fail("BMO composed or preview atlas unavailable");
+                    long composedDrift = countDifferingPixels(expected, composed);
+                    long previewDrift = countDifferingPixels(expected, previewed);
+                    if (composedDrift != 0 || previewDrift != 0)
+                        return Step.Result.fail("BMO atlas drift before apply: composed="
+                                + composedDrift + " preview=" + previewDrift + " pixels");
+                    if (CapeImportProcessor.isElytraAreaTransparent(composed))
+                        return Step.Result.fail("adjusted BMO atlas lost the bundled elytra UVs");
+
+                    try {
+                        Method apply = CapeAdjustScreen.class.getDeclaredMethod("applyAndClose");
+                        apply.setAccessible(true);
+                        apply.invoke(screen);
+                    } catch (Throwable t) {
+                        return Step.Result.fail("BMO applyAndClose failed: " + t);
+                    }
+                    BufferedImage applied = capeAdjustResult.get();
+                    if (applied == null) return Step.Result.fail("BMO onApply returned no atlas");
+                    long appliedDrift = countDifferingPixels(expected, applied);
+                    if (appliedDrift != 0)
+                        return Step.Result.fail("applied BMO differs from bundled atlas in "
+                                + appliedDrift + " pixels");
+                    adjustedBmoAtlas.set(applied);
+                    adjustedBmoCapeHash = TestAssets.registerAdjustedCape(prepared, applied);
+                    if (adjustedBmoCapeHash == null)
+                        return Step.Result.fail("adjusted BMO was not catalogued as a local cape");
+                    AssetMetadata metadata = LocalAssetManager.getInstance()
+                            .getMetadata(adjustedBmoCapeHash);
+                    if (metadata == null || !metadata.isCape()
+                            || metadata.resolution().getWidth() != TestAssets.BMO_CAPE_WIDTH
+                            || metadata.resolution().getHeight() != TestAssets.BMO_CAPE_HEIGHT) {
+                        return Step.Result.fail("adjusted BMO metadata is missing or not 64x32: "
+                                + metadata);
+                    }
+                    return Step.Result.pass("128x64 black-padded BMO aligned at scale 1.0 / offset "
+                            + "(-32,-16); preview, applied and bundled 64x32 atlases are identical");
+                }));
+
+        steps.add(Step.of("adjusted_bmo_cape")
+                .action(() -> {
+                    enterWorldView(mc);
+                    setChestSlot(mc, ItemStack.EMPTY);
+                    if (adjustedBmoCapeHash != null) {
+                        svc.applyCape(uuid, "local_cape:" + adjustedBmoCapeHash);
+                    }
+                })
+                .minTicks(30)
+                .ready(() -> bmoSetupFailure.get() != null
+                        || (adjustedBmoCapeHash != null
+                        && hasExpectedCape(svc, uuid, "local_cape:" + adjustedBmoCapeHash)
+                        && mc.player != null
+                        && mc.player.getItemBySlot(EquipmentSlot.CHEST).isEmpty()
+                        && VanillaShim.cloakTexture(mc.player) != null))
+                .timeoutTicks(300)
+                .screenshot(adjustedBmoCapeShot)
+                .assertion(() -> bmoSetupFailure.get() == null
+                        ? assertAdjustedBmoRoute(mc, svc, uuid, false)
+                        : Step.Result.fail("BMO setup failed before adjusted cape: "
+                                + bmoSetupFailure.get())));
+
+        steps.add(Step.of("adjusted_bmo_elytra")
+                .action(() -> {
+                    enterWorldView(mc);
+                    equipElytra(mc);
+                })
+                .minTicks(25)
+                .ready(() -> {
+                    equipElytra(mc);
+                    return bmoSetupFailure.get() != null
+                            || (adjustedBmoCapeHash != null
+                            && hasExpectedCape(svc, uuid, "local_cape:" + adjustedBmoCapeHash)
+                            && mc.player != null
+                            && mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)
+                            && VanillaShim.cloakTexture(mc.player) != null);
+                })
+                .timeoutTicks(300)
+                .screenshot(adjustedBmoElytraShot)
+                .assertion(() -> bmoSetupFailure.get() == null
+                        ? assertAdjustedBmoRoute(mc, svc, uuid, true)
+                        : Step.Result.fail("BMO setup failed before adjusted elytra: "
+                                + bmoSetupFailure.get())));
+
+        steps.add(Step.of("bmo_render_parity")
+                .minTicks(15)
+                .ready(() -> bmoSetupFailure.get() != null
+                        || (readShot(bundledBmoCapeShot) != null
+                        && readShot(bundledBmoElytraShot) != null
+                        && readShot(adjustedBmoCapeShot) != null
+                        && readShot(adjustedBmoElytraShot) != null))
+                .timeoutTicks(400)
+                .assertion(() -> bmoSetupFailure.get() == null
+                        ? compareBmoRenderPairs(
+                                bundledBmoCapeShot, adjustedBmoCapeShot,
+                                bundledBmoElytraShot, adjustedBmoElytraShot)
+                        : Step.Result.fail("BMO setup failed before render comparison: "
+                                + bmoSetupFailure.get())));
 
         // 6. animated cape ------------------------------------------------------------------------
         steps.add(Step.of("animated_cape_apply")
@@ -1931,6 +2163,204 @@ public final class FullScenario implements Scenario {
             }
         }
         return false;
+    }
+
+    private static boolean hasExpectedCape(
+            PlayerAppearanceService service, UUID uuid, String capeId) {
+        PlayerAppearance appearance = service.getAppearance(uuid);
+        return appearance != null
+                && capeId.equals(appearance.getCapeId())
+                && service.hasActiveCape(uuid)
+                && service.getCapeLocation(uuid) != null;
+    }
+
+    /** Assert the shared render inputs for either a bundled or adjusted BMO cape route. */
+    private static Step.Result assertCapeRoute(
+            Minecraft mc,
+            PlayerAppearanceService service,
+            UUID uuid,
+            String capeId,
+            boolean expectElytra
+    ) {
+        if (!hasExpectedCape(service, uuid, capeId)) {
+            PlayerAppearance appearance = service.getAppearance(uuid);
+            return Step.Result.fail("active cape="
+                    + (appearance == null ? null : appearance.getCapeId())
+                    + " expected " + capeId);
+        }
+        if (mc.player == null) return Step.Result.fail("player null");
+        boolean hasElytra = mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA);
+        if (hasElytra != expectElytra) {
+            return Step.Result.fail("elytra equipped=" + hasElytra + " expected " + expectElytra);
+        }
+        Object expected = CapeService.getInstance().getCapeLocation(null, capeId);
+        Object resolved = service.getCapeLocation(uuid);
+        if (expected == null || !expected.equals(resolved)) {
+            return Step.Result.fail("cape location=" + resolved + " expected " + expected);
+        }
+        String cloak = VanillaShim.cloakTexture(mc.player);
+        if (cloak == null) return Step.Result.fail("cloak texture is null for " + capeId);
+        return Step.Result.pass(capeId + " resolved to " + resolved
+                + (expectElytra ? " with elytra equipped" : " with an empty chest slot"));
+    }
+
+    private Step.Result assertAdjustedBmoRoute(
+            Minecraft mc, PlayerAppearanceService service, UUID uuid, boolean expectElytra) {
+        if (adjustedBmoCapeHash == null) {
+            return Step.Result.fail("adjusted BMO cape was not catalogued");
+        }
+        String capeId = "local_cape:" + adjustedBmoCapeHash;
+        Step.Result route = assertCapeRoute(mc, service, uuid, capeId, expectElytra);
+        if (!route.pass()) return route;
+        BufferedImage expected = bundledBmoAtlas.get();
+        BufferedImage adjusted = adjustedBmoAtlas.get();
+        if (expected == null || adjusted == null) {
+            return Step.Result.fail("bundled or adjusted BMO atlas was not retained");
+        }
+        long drift = countDifferingPixels(expected, adjusted);
+        if (drift != 0) {
+            return Step.Result.fail("render route uses an adjusted BMO atlas with " + drift
+                    + " pixels of drift");
+        }
+        return Step.Result.pass(route.message() + "; local atlas remains pixel-identical to bundled BMO");
+    }
+
+    /** Slider position that turns the centred 128x64 source into a 1:1 64x32 crop. */
+    private static double bmoTargetZoomPosition() {
+        return CapeZoomRange.position(1.0, TestAssets.BMO_CAPE_WIDTH,
+                TestAssets.BMO_PADDED_WIDTH, TestAssets.BMO_PADDED_HEIGHT);
+    }
+
+    /**
+     * Prove that the fixture really is BMO unchanged inside opaque-black padding. A generated or
+     * stale lookalike would make the downstream equality assertion meaningless, so this checks all
+     * 8192 source pixels rather than a few landmarks.
+     */
+    private static String validatePaddedBmoSource(
+            BufferedImage padded, BufferedImage expected) {
+        if (padded.getWidth() != TestAssets.BMO_PADDED_WIDTH
+                || padded.getHeight() != TestAssets.BMO_PADDED_HEIGHT) {
+            return "padded BMO source is " + padded.getWidth() + "x" + padded.getHeight()
+                    + ", expected " + TestAssets.BMO_PADDED_WIDTH + "x"
+                    + TestAssets.BMO_PADDED_HEIGHT;
+        }
+        if (expected.getWidth() != TestAssets.BMO_CAPE_WIDTH
+                || expected.getHeight() != TestAssets.BMO_CAPE_HEIGHT) {
+            return "bundled BMO atlas has unexpected dimensions";
+        }
+        for (int y = 0; y < padded.getHeight(); y++) {
+            for (int x = 0; x < padded.getWidth(); x++) {
+                boolean inside = x >= TestAssets.BMO_PADDED_X
+                        && x < TestAssets.BMO_PADDED_X + TestAssets.BMO_CAPE_WIDTH
+                        && y >= TestAssets.BMO_PADDED_Y
+                        && y < TestAssets.BMO_PADDED_Y + TestAssets.BMO_CAPE_HEIGHT;
+                int wanted = inside
+                        ? expected.getRGB(x - TestAssets.BMO_PADDED_X,
+                                y - TestAssets.BMO_PADDED_Y)
+                        : 0xFF000000;
+                int actual = padded.getRGB(x, y);
+                if (actual != wanted) {
+                    return "padded BMO pixel (" + x + "," + y + ")="
+                            + Integer.toHexString(actual) + " expected "
+                            + Integer.toHexString(wanted)
+                            + (inside ? " from bundled BMO" : " opaque black padding");
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Result of aligning and comparing the fixed central player region in two world captures. */
+    private record RenderedDifference(
+            double changedFraction, double rmsDifference, int shiftX, int shiftY) {
+    }
+
+    private static Step.Result compareBmoRenderPairs(
+            String bundledCape,
+            String adjustedCape,
+            String bundledElytra,
+            String adjustedElytra
+    ) {
+        try {
+            RenderedDifference cape = measureRenderedDifference(
+                    readShot(bundledCape), readShot(adjustedCape));
+            RenderedDifference elytra = measureRenderedDifference(
+                    readShot(bundledElytra), readShot(adjustedElytra));
+            if (cape == null || elytra == null) {
+                return Step.Result.fail("one or more BMO parity screenshots are unavailable");
+            }
+            if (cape.changedFraction() > BMO_RENDER_MAX_CHANGED_FRACTION) {
+                return Step.Result.fail("edited BMO cape render drifted from bundled BMO: changed="
+                        + cape.changedFraction() + " rms=" + cape.rmsDifference()
+                        + " shift=(" + cape.shiftX() + "," + cape.shiftY() + ")");
+            }
+            if (elytra.changedFraction() > BMO_RENDER_MAX_CHANGED_FRACTION) {
+                return Step.Result.fail("edited BMO elytra render drifted from bundled BMO: changed="
+                        + elytra.changedFraction() + " rms=" + elytra.rmsDifference()
+                        + " shift=(" + elytra.shiftX() + "," + elytra.shiftY() + ")");
+            }
+            return Step.Result.pass("bundled vs adjusted BMO render parity: cape changed="
+                    + cape.changedFraction() + " rms=" + cape.rmsDifference()
+                    + ", elytra changed=" + elytra.changedFraction()
+                    + " rms=" + elytra.rmsDifference());
+        } catch (RuntimeException error) {
+            return Step.Result.fail("could not compare BMO render pairs: " + error);
+        }
+    }
+
+    /**
+     * Compare only the fixed third-person player area and absorb at most three pixels of ordinary
+     * entity/cape interpolation drift. A channel delta up to 12 is ignored for lighting noise; a
+     * broken UV crop changes the BMO surface by far more and over far more than the allowed tenth
+     * of this tightly bounded region. Exact atlas equality remains the primary, non-flaky oracle.
+     */
+    private static RenderedDifference measureRenderedDifference(
+            BufferedImage first, BufferedImage second) {
+        if (first == null || second == null
+                || first.getWidth() != second.getWidth()
+                || first.getHeight() != second.getHeight()) {
+            return null;
+        }
+        int left = (int) Math.floor(first.getWidth() * BMO_RENDER_REGION_LEFT);
+        int top = (int) Math.floor(first.getHeight() * BMO_RENDER_REGION_TOP);
+        int right = (int) Math.ceil(first.getWidth() * BMO_RENDER_REGION_RIGHT);
+        int bottom = (int) Math.ceil(first.getHeight() * BMO_RENDER_REGION_BOTTOM);
+        RenderedDifference best = null;
+        for (int shiftY = -BMO_RENDER_MAX_ALIGNMENT;
+             shiftY <= BMO_RENDER_MAX_ALIGNMENT; shiftY++) {
+            for (int shiftX = -BMO_RENDER_MAX_ALIGNMENT;
+                 shiftX <= BMO_RENDER_MAX_ALIGNMENT; shiftX++) {
+                long changed = 0;
+                long squared = 0;
+                long pixels = 0;
+                for (int y = top + BMO_RENDER_MAX_ALIGNMENT;
+                     y < bottom - BMO_RENDER_MAX_ALIGNMENT; y++) {
+                    for (int x = left + BMO_RENDER_MAX_ALIGNMENT;
+                         x < right - BMO_RENDER_MAX_ALIGNMENT; x++) {
+                        int a = first.getRGB(x, y);
+                        int b = second.getRGB(x + shiftX, y + shiftY);
+                        int dr = Math.abs(((a >>> 16) & 0xFF) - ((b >>> 16) & 0xFF));
+                        int dg = Math.abs(((a >>> 8) & 0xFF) - ((b >>> 8) & 0xFF));
+                        int db = Math.abs((a & 0xFF) - (b & 0xFF));
+                        int maximum = Math.max(dr, Math.max(dg, db));
+                        if (maximum > BMO_RENDER_CHANNEL_TOLERANCE) changed++;
+                        squared += (long) dr * dr + (long) dg * dg + (long) db * db;
+                        pixels++;
+                    }
+                }
+                double fraction = pixels == 0 ? 1.0 : (double) changed / pixels;
+                double rms = pixels == 0 ? 255.0 : Math.sqrt((double) squared / (pixels * 3));
+                RenderedDifference candidate = new RenderedDifference(
+                        fraction, rms, shiftX, shiftY);
+                if (best == null
+                        || candidate.changedFraction() < best.changedFraction()
+                        || (candidate.changedFraction() == best.changedFraction()
+                        && candidate.rmsDifference() < best.rmsDifference())) {
+                    best = candidate;
+                }
+            }
+        }
+        return best;
     }
 
     /** @return how many pixels differ, or -1 when the two atlases are not the same size */
