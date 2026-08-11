@@ -212,12 +212,15 @@ authenticates every artifact and exact matrix row. It imports the exact source c
 Git objects—never as a checkout executed by the privileged workflow—then fully decodes the complete
 scenario product, requires one production JAR, and re-encodes every captured frame as a bounded
 metadata-free RGB PNG
-named by its served-byte SHA-256. For each semantic `capture_id`, it pairs the candidate with the
-authenticated current-head Fabric 1.20.1 frame selected only from the protected lossless Pages
-handoff; the compact WebP cache is never an AI oracle. Candidate and reference are normalized to
-the same dimensions without changing aspect ratio. The reference is a semantic visual anchor, not
-a strict whole-pixel golden image: legitimate Vanilla, loader, camera, lighting, and framing
-differences remain acceptable. A missing pair fails curation.
+named by its served-byte SHA-256. For each semantic `capture_id`, later-version candidates are
+paired with the authenticated current-head Fabric 1.20.1 frame selected only from the protected
+lossless Pages handoff; the compact WebP cache is never an AI oracle. The 1.20.1 source run instead
+establishes the anchor across its two authenticated lanes: Fabric is paired with Forge and Forge
+with Fabric. Those anchor pairs receive semantic review even when both loaders produced identical
+pixels. Candidate and reference are normalized to the same dimensions without changing aspect
+ratio. The reference is a semantic visual anchor, not a strict whole-pixel golden image: legitimate
+Vanilla, loader, camera, lighting, and framing differences remain acceptable. A missing reference
+or 1.20.1 peer fails curation.
 
 The curator applies the protected review checker before upload and reserves 32 MiB of the handoff
 envelope for the bounded manifest, proof, archive metadata, and structure. A source/run/
