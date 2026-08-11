@@ -344,7 +344,8 @@ jobs:
 
       # This job has no secrets. It reauthenticates the full protected job graph, downloads each
       # immutable artifact by numeric ID, then passes only decoded, content-addressed PNG pairs
-      # onward. The reference is the current authenticated Fabric 1.20.1 Pages evidence.
+      # onward. Later versions use current authenticated Fabric 1.20.1 Pages evidence; the 1.20.1
+      # source itself is cross-paired between its authenticated Fabric and Forge lanes.
       - name: Validate and curate exact packaged evidence
         id: evidence
         shell: bash
