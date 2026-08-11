@@ -37,7 +37,6 @@ jobs:
     outputs:
       artifact_inventory: ${{ steps.source.outputs.artifact_inventory }}
       eligible: ${{ steps.source.outputs.eligible }}
-      implementation_sha: ${{ steps.source.outputs.implementation_sha }}
       source_sha: ${{ steps.source.outputs.source_sha }}
       source_run_id: ${{ steps.source.outputs.source_run_id }}
 
@@ -307,11 +306,8 @@ jobs:
           ' <<< "$artifact_inventory" > /dev/null
 
           [[ "$GITHUB_REF" == refs/heads/master ]]
-          implementation_sha="$GITHUB_SHA"
-          [[ "$implementation_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'artifact_inventory=%s\n' "$artifact_inventory" >> "$GITHUB_OUTPUT"
           printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
-          printf 'implementation_sha=%s\n' "$implementation_sha" >> "$GITHUB_OUTPUT"
           printf 'source_sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
           printf 'source_run_id=%s\n' "$source_run_id" >> "$GITHUB_OUTPUT"
 
@@ -332,7 +328,7 @@ jobs:
       - name: Check out the exact protected curator
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.authenticate.outputs.implementation_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Install Python for protected evidence validation
@@ -355,11 +351,13 @@ jobs:
         env:
           ARTIFACT_INVENTORY: ${{ needs.authenticate.outputs.artifact_inventory }}
           GH_TOKEN: ${{ github.token }}
-          IMPLEMENTATION_SHA: ${{ needs.authenticate.outputs.implementation_sha }}
+          IMPLEMENTATION_SHA: ${{ github.sha }}
           SOURCE_RUN_ID: ${{ needs.authenticate.outputs.source_run_id }}
           SOURCE_SHA: ${{ needs.authenticate.outputs.source_sha }}
         run: |
           set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/master ]]
+          [[ "$IMPLEMENTATION_SHA" == "$GITHUB_SHA" ]]
           [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
