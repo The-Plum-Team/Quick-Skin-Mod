@@ -23,15 +23,15 @@ This `fabric-and-neoforge-26.1` release branch exercises the following exact pac
 | `fabric-26.1` | `26.1` | Fabric | `25` | `4` |
 | `neoforge-26.1` | `26.1` | NeoForge | `25` | `4` |
 
-Scenario contract SHA-256: `67a552ac1a8e91da6c78533f61f6f4d681f2c85da8a816a2ff79c94ec491e135`
-Contract totals: `40` ordered steps, `36` captures.
+Scenario contract SHA-256: `f327a0abcb141330ae9c78d0feed45cb601b23273eeedb622abc3528a5e228a6`
+Contract totals: `46` ordered steps, `41` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `7` | `5` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `25` | `25` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `31` | `30` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->
@@ -169,6 +169,13 @@ the glyph threshold remains unchanged, so an empty region still fails closed. Ot
 use broad entropy/color and pairwise-change invariants rather than golden images, so GPU and
 Minecraft-version rendering differences are allowed. Every result records the literal fields
 `artifact_node`, `runtime_version`, `loader`, `scenario`, `jar_sha256`, and `port`.
+
+The `full` scenario also exercises adjusted-cape parity against the production BMO asset. It
+centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import, drives the real zoom
+control to a 1:1 crop, saves through the adjusted-import boundary, and requires the preview,
+applied, and persisted atlases to remain pixel-identical to the bundled original. Separate direct
+and adjusted world captures cover both the cape and elytra render routes; their tightly cropped
+comparison allows only small entity-animation and lighting drift.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves
