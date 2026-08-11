@@ -1,9 +1,12 @@
 package com.quickskin.mod.e2e;
 
+import com.quickskin.mod.client.gui.util.CapeImportProcessor;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AssetMetadata;
+import com.quickskin.mod.common.data.KnownCapes;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.common.util.HashUtil;
+import net.minecraft.client.Minecraft;
 
 import javax.imageio.ImageIO;
 import java.awt.AlphaComposite;
@@ -29,6 +32,17 @@ public final class TestAssets {
 
     /** Classpath location of an optional real skin bundled into the e2e resources (see makeClassicSkin). */
     private static final String BUNDLED_SKIN = "/qs_e2e_test_skin.png";
+
+    /** The production BMO atlas used to prove that the editor preserves bundled cape UVs. */
+    private static final String BUNDLED_BMO_CAPE =
+            "/assets/quickskin/textures/capes/bmo.png";
+
+    public static final int BMO_CAPE_WIDTH = 64;
+    public static final int BMO_CAPE_HEIGHT = 32;
+    public static final int BMO_PADDED_WIDTH = BMO_CAPE_WIDTH * 2;
+    public static final int BMO_PADDED_HEIGHT = BMO_CAPE_HEIGHT * 2;
+    public static final int BMO_PADDED_X = (BMO_PADDED_WIDTH - BMO_CAPE_WIDTH) / 2;
+    public static final int BMO_PADDED_Y = (BMO_PADDED_HEIGHT - BMO_CAPE_HEIGHT) / 2;
 
     /** Read cap for hashing an installed cape; comfortably above any cape this harness writes. */
     private static final int MAX_CAPE_BYTES = 8 * 1024 * 1024;
@@ -139,6 +153,67 @@ public final class TestAssets {
     public static Path makeClassicCape() throws Exception {
         Path tmp = Files.createTempFile("qs_e2e_cape_", ".png");
         ImageIO.write(makeClassicCapeImage(), "png", tmp.toFile());
+        return tmp;
+    }
+
+    /**
+     * The exact production BMO cape atlas, loaded from the production mod resource rather than a
+     * copied E2E fixture. A changed or missing bundled asset therefore fails the parity scenario
+     * instead of silently comparing the editor with a stale duplicate.
+     */
+    public static BufferedImage makeBundledBmoCapeImage() throws Exception {
+        // Forge isolates the E2E automation mod from the production mod's classpath resources.
+        // Minecraft's resource manager is the loader-independent source of the texture that the
+        // real renderer sees, so this also catches a missing or shadowed shipped asset.
+        var texture = KnownCapes.BMO.getTextureLocation();
+        var resource = Minecraft.getInstance().getResourceManager().getResource(texture)
+                .orElseThrow(() -> new IllegalStateException(
+                        "missing bundled BMO cape " + BUNDLED_BMO_CAPE));
+        try (InputStream in = resource.open()) {
+            BufferedImage image = ImageIO.read(in);
+            if (image == null
+                    || image.getWidth() != BMO_CAPE_WIDTH
+                    || image.getHeight() != BMO_CAPE_HEIGHT) {
+                String dimensions = image == null
+                        ? "undecodable"
+                        : image.getWidth() + "x" + image.getHeight();
+                throw new IllegalStateException("bundled BMO cape is " + dimensions
+                        + ", expected " + BMO_CAPE_WIDTH + "x" + BMO_CAPE_HEIGHT);
+            }
+            return toArgb(image);
+        }
+    }
+
+    /**
+     * A deliberately awkward import source: a 128x64 opaque-black canvas with the unchanged BMO
+     * 64x32 atlas centred inside it. Pixels inside the BMO rectangle are copied with setRGB so its
+     * transparent elytra silhouette remains transparent; only the surrounding padding is black.
+     * Zooming this source from its reset 50% fit to 100% about the cape centre must land exactly on
+     * the embedded atlas at offset (-32,-16).
+     */
+    public static BufferedImage makePaddedBmoCapeSourceImage() throws Exception {
+        BufferedImage bmo = makeBundledBmoCapeImage();
+        BufferedImage padded = new BufferedImage(
+                BMO_PADDED_WIDTH, BMO_PADDED_HEIGHT, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = padded.createGraphics();
+        graphics.setComposite(AlphaComposite.Src);
+        graphics.setColor(Color.BLACK);
+        graphics.fillRect(0, 0, padded.getWidth(), padded.getHeight());
+        graphics.dispose();
+        for (int y = 0; y < BMO_CAPE_HEIGHT; y++) {
+            for (int x = 0; x < BMO_CAPE_WIDTH; x++) {
+                padded.setRGB(BMO_PADDED_X + x, BMO_PADDED_Y + y, bmo.getRGB(x, y));
+            }
+        }
+        return padded;
+    }
+
+    /** {@link #makePaddedBmoCapeSourceImage()} written as the non-standard PNG import source. */
+    public static Path makePaddedBmoCapeSource() throws Exception {
+        Path tmp = Files.createTempFile("qs_e2e_bmo_padded_", ".png");
+        if (!ImageIO.write(makePaddedBmoCapeSourceImage(), "png", tmp.toFile())) {
+            throw new IllegalStateException("no PNG writer for padded BMO cape source");
+        }
         return tmp;
     }
 
@@ -366,6 +441,53 @@ public final class TestAssets {
             return null;
         }
         return registerLocalCapeAs(gif, "qs_e2e_cape.gif");
+    }
+
+    /**
+     * Persist an atlas produced by {@code CapeAdjustScreen} through the same adjusted-import
+     * boundary used by {@code CapeImportWorkflow}, then return its catalogued local-cape id.
+     *
+     * <p>The parity source carries BMO's non-empty elytra UVs, so production's optional vanilla
+     * elytra fallback is provably inapplicable. Passing {@code null} here keeps this shared harness
+     * independent of version-specific Minecraft resource identifiers without changing the bytes
+     * that the real workflow would save.</p>
+     */
+    public static String registerAdjustedCape(
+            CapeImportProcessor.PreparedCape prepared,
+            BufferedImage adjusted
+    ) throws Exception {
+        LocalAssetManager mgr = LocalAssetManager.getInstance();
+        Path capesDir = mgr.getCapesDirectory();
+        Path metadataDir = mgr.getCacheDirectory();
+        if (capesDir == null || metadataDir == null) {
+            E2ELog.warn("local cape/cache directories are not initialized");
+            return null;
+        }
+        if (CapeImportProcessor.isElytraAreaTransparent(adjusted)) {
+            throw new IllegalStateException(
+                    "adjusted BMO atlas lost its elytra UVs before persistence");
+        }
+
+        Set<String> before = new HashSet<>();
+        for (AssetMetadata meta : mgr.getAssetsByType("cape")) {
+            before.add(meta.hash());
+        }
+
+        Path target = CapeImportProcessor.saveAdjusted(
+                prepared, adjusted, capesDir, metadataDir, null);
+        mgr.reload();
+        String hash = HashUtil.computeAssetHash(
+                BoundedFileReader.readBytes(target, MAX_CAPE_BYTES), "cape");
+        if (hash != null && mgr.getMetadata(hash) != null) {
+            return hash;
+        }
+        for (AssetMetadata meta : mgr.getAssetsByType("cape")) {
+            if (!before.contains(meta.hash())) {
+                return meta.hash();
+            }
+        }
+        E2ELog.warn("adjusted cape was not catalogued after save: " + target);
+        return null;
     }
 
     /**
