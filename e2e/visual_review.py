@@ -50,6 +50,7 @@ MAX_REFERENCE_MANIFEST_BYTES = 10 * 1024 * 1024
 MAX_SINGLE_IMAGE_BYTES = 32 * 1024 * 1024
 VISUAL_REFERENCE_VERSION = "1.20.1"
 VISUAL_REFERENCE_LOADER = "fabric"
+VISUAL_REFERENCE_PEER_LOADER = "forge"
 
 
 def _reject_duplicate_reference_keys(
@@ -100,6 +101,20 @@ def build_manifest(
 ) -> list[dict[str, object]]:
     catalog = load_catalog(catalog_path)
     _, frames, _ = collect_evidence(e2e_root, catalog)
+    anchor_frames: dict[tuple[str, str], dict[str, object]] = {}
+    for frame in frames:
+        if (
+            frame["version"] == VISUAL_REFERENCE_VERSION
+            and frame["loader"]
+            in {VISUAL_REFERENCE_LOADER, VISUAL_REFERENCE_PEER_LOADER}
+        ):
+            key = (frame["loader"], frame["capture_id"])
+            if key in anchor_frames:
+                raise VisualEvidenceError(
+                    "visual reference source contains duplicate 1.20.1 loader captures: "
+                    f"{frame['loader']}/{frame['capture_id']}"
+                )
+            anchor_frames[key] = frame
     available = {(frame["version"], frame["loader"]) for frame in frames}
     if combos is not None:
         unknown = combos - available
@@ -124,11 +139,37 @@ def build_manifest(
             "_verified_height": frame["height"],
         }
         if reference_frames is not None:
-            reference = reference_frames.get(frame["capture_id"])
-            if reference is None:
+            published_reference = reference_frames.get(frame["capture_id"])
+            if published_reference is None:
                 raise VisualEvidenceError(
                     f"visual reference is missing capture {frame['capture_id']!r}"
                 )
+            reference = published_reference
+            if (
+                frame["version"] == VISUAL_REFERENCE_VERSION
+                and frame["loader"]
+                in {VISUAL_REFERENCE_LOADER, VISUAL_REFERENCE_PEER_LOADER}
+            ):
+                peer_loader = (
+                    VISUAL_REFERENCE_PEER_LOADER
+                    if frame["loader"] == VISUAL_REFERENCE_LOADER
+                    else VISUAL_REFERENCE_LOADER
+                )
+                peer = anchor_frames.get((peer_loader, frame["capture_id"]))
+                if peer is None:
+                    raise VisualEvidenceError(
+                        "Minecraft 1.20.1 visual review requires matching Fabric and "
+                        f"Forge captures; missing {peer_loader}/{frame['capture_id']}"
+                    )
+                reference = {
+                    "path": peer["source_path"],
+                    "label": peer["frame_id"],
+                    "file_sha256": peer["file_sha256"],
+                    "pixel_sha256": peer["pixel_validation"]["pixel_sha256"],
+                    "width": peer["width"],
+                    "height": peer["height"],
+                    "format": "PNG",
+                }
             item.update(
                 {
                     "reference_path": reference["path"],
