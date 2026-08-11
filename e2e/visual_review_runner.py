@@ -73,14 +73,33 @@ def _chunks(items: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]
     return [items[index : index + size] for index in range(0, len(items), size)]
 
 
+def _is_cross_loader_1_20_1_anchor(item: dict[str, Any]) -> bool:
+    candidate = item["label"].split("/", 1)[0]
+    reference = item["reference_label"].split("/", 1)[0]
+    return {candidate, reference} == {"fabric-1.20.1", "forge-1.20.1"}
+
+
 def build_review_plan(
     manifest: Any, *, triage_chunk_size: int = DEFAULT_TRIAGE_CHUNK_SIZE
 ) -> dict[str, Any]:
     """Split byte-identical pairs from bounded semantic-review chunks."""
 
     entries, _labels = validate_manifest(manifest, require_paired=True)
-    identical = [item for item in entries if item["path"] == item["reference_path"]]
-    semantic = [item for item in entries if item["path"] != item["reference_path"]]
+    # The 1.20.1 anchor is established by inspecting Fabric against Forge and vice versa.
+    # Shared pixels are useful evidence of loader parity, but never evidence that the shared image
+    # satisfies its semantic checkpoint, so those pairs must still reach the model.
+    identical = [
+        item
+        for item in entries
+        if item["path"] == item["reference_path"]
+        and not _is_cross_loader_1_20_1_anchor(item)
+    ]
+    semantic = [
+        item
+        for item in entries
+        if item["path"] != item["reference_path"]
+        or _is_cross_loader_1_20_1_anchor(item)
+    ]
     return {
         "identical": identical,
         "semantic": semantic,
