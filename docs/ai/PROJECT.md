@@ -99,13 +99,16 @@ immutable workflow and governance activation contract.
   publish logs/crash reports, or make Pages a protected release check.
 - Credential-bearing AI visual judgment runs in its own authenticated advisory workflow. The run
   pins the exact workflow `github.sha`, authenticates the complete protected job graph, and curates
-  raw artifacts on a secretless runner. Every contracted candidate capture is paired by semantic
-  `capture_id` with authenticated current-head lossless Fabric 1.20.1 Pages handoff evidence; no
-  review-tier filter may omit a pair and the compact WebP cache is not an AI oracle. Only canonical,
-  same-sized, content-addressed RGB PNG pairs, a bounded manifest, and provenance enter a seven-day
+  raw artifacts on a secretless runner. Every later-version candidate capture is paired by semantic
+  `capture_id` with authenticated current-head lossless Fabric 1.20.1 Pages handoff evidence.
+  Within 1.20.1, Fabric and Forge are paired in both directions and remain subject to semantic
+  review even when their pixels match; no review-tier filter may omit a pair and the compact WebP
+  cache is not an AI oracle. Only canonical, same-sized, content-addressed RGB PNG pairs, a bounded
+  manifest, and provenance enter a seven-day
   durable queue; raw E2E ZIPs never share a runner with the credential. A globally serialized
-  protected drainer skips byte-identical pairs, triages bounded chunks with Sonnet, and sends only
-  suspicious or uncertain pairs to bounded Opus verification. It keeps provider output private,
+  protected drainer skips byte-identical non-anchor pairs, triages bounded chunks with Sonnet, and
+  sends only suspicious or uncertain pairs to bounded Opus verification. It keeps provider output
+  private,
   uploads only the protected normalized report or a sanitized retry marker, and deletes a completed
   queue entry by exact artifact id. A bot-owned version-port PR whose authenticated complete diff
   contains only the visual-review workflows, protected CI contracts, and documentation is skipped:
