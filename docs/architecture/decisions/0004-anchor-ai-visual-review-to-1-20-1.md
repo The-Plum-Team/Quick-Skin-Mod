@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-09
-- Updated: 2026-08-10
+- Updated: 2026-08-11
 - Scope: advisory packaged-E2E image review across release branches
 
 ## Context
@@ -24,7 +24,9 @@ contract gives each checkpoint a stable identity independent of filenames.
 
 ## Decision
 
-Use Fabric 1.20.1 as the stable semantic visual anchor for advisory AI review.
+Use Minecraft 1.20.1 as the stable semantic visual anchor for advisory AI review. Establish that
+anchor by reviewing Fabric and Forge against each other; use its Fabric lane as the stable
+cross-version reference.
 
 The protected reviewer derives the anchor artifact and release branch from the protected `master`
 release matrix and additionally requires the resolved version to be exactly `1.20.1` and the loader
@@ -36,11 +38,13 @@ oracle. Protected retention preserves the current raw anchor for 90 days and rep
 a new current-head raw handoff and compact Pages cache have both been authenticated.
 
 For every candidate capture in every packaged lane, the curator requires exactly one reference
-frame with the same contract-derived `capture_id`. It selects all captures, including those whose
-review tier is `all`. Both images are fully decoded, their hashes and pixel identities are
-recomputed, and the candidate is normalized to the reference dimensions only when the aspect ratio
-matches. The model receives only content-addressed metadata-free RGB PNG pairs and must inspect both
-sides of every manifest entry.
+frame with the same contract-derived `capture_id`. Later versions use the authenticated lossless
+Fabric 1.20.1 Pages frame. A 1.20.1 source run is paired across loaders in both directions: Fabric's
+reference is Forge and Forge's reference is Fabric from that same authenticated run. Missing either
+loader fails curation. It selects all captures, including those whose review tier is `all`. Both
+images are fully decoded, their hashes and pixel identities are recomputed, and the candidate is
+normalized to the reference dimensions only when the aspect ratio matches. The model receives only
+content-addressed metadata-free RGB PNG pairs and must inspect both sides of every manifest entry.
 
 The comparison is semantic, not strict pixel equality. Minecraft-version or loader chrome, camera
 position, lighting, framing, and other expected Vanilla differences may vary. Quick Skin-owned
@@ -53,8 +57,10 @@ the oldest authenticated entry and a repository-wide concurrency group serialize
 Replacing a pending GitHub run cannot discard the capsule, and a sanitized failure marker applies
 a cooldown before retry while allowing other entries to progress.
 
-Before any model call, content-addressed paths eliminate byte-identical candidate/reference pairs.
-The remaining pairs are triaged in chunks of at most eight by Sonnet. Only a reported concern or a
+Before any model call, content-addressed paths eliminate byte-identical candidate/reference pairs
+except the Fabric/Forge 1.20.1 anchor pairs. Anchor parity is not proof of semantic correctness, so
+those pairs always reach the model and are checked against the contract expectation. The remaining
+pairs are triaged in chunks of at most eight by Sonnet. Only a reported concern or a
 non-high-confidence decision is escalated to an independent Opus pass in chunks of at most four.
 Each call has bounded retries and pacing. Capture the model's JSON from stdout with a read-only tool
 surface, validate label coverage and semantic coherence after every call, normalize the final
@@ -77,9 +83,10 @@ write tool; the rest of ADR 0003 remains active.
 
 ## Consequences
 
-Every capture is paired, but identical pixels consume no model capacity and the expensive verifier
-sees only ambiguous or suspicious pairs. Bounded chunks reduce context dilution and make retry cost
-proportional to one small chunk instead of the complete matrix. In return, subtle cross-version
+Every capture is paired. Identical pixels consume no model capacity outside the 1.20.1 cross-loader
+anchor, and the expensive verifier sees only ambiguous or suspicious pairs. Bounded chunks reduce
+context dilution and make retry cost proportional to one small chunk instead of the complete
+matrix. In return, subtle cross-version
 regressions have a stable lossless comparison point and omitted review tiers can no longer create
 silent holes. A missing or stale 1.20.1 reference prevents the advisory review from starting but
 never weakens or delays the required Build and Packaged E2E gates.
