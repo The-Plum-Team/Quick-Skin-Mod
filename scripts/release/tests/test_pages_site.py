@@ -390,7 +390,7 @@ class PagesSiteTest(unittest.TestCase):
             expected_target_sha="2" * 40,
         )
 
-        self.assertEqual(72, len(manifest["frames"]))
+        self.assertEqual(82, len(manifest["frames"]))
         self.assertEqual(8, len(manifest["lanes"]))
         self.assertEqual(
             self.catalog.contract_sha256,
@@ -771,7 +771,7 @@ class PagesSiteTest(unittest.TestCase):
         )
 
         self.assertEqual(2, summary["versions"])
-        self.assertEqual(144, summary["frames"])
+        self.assertEqual(164, summary["frames"])
         self.assertTrue((output / ".nojekyll").is_file())
         self.assertTrue((output / "index.html").is_file())
         self.assertTrue((output / "e2e" / "index.html").is_file())
@@ -781,8 +781,8 @@ class PagesSiteTest(unittest.TestCase):
             (output / "e2e" / "gallery-data.json").read_text(encoding="utf-8")
         )
         self.assertEqual(["1.21.1", "1.20.1"], [row["version"] for row in site_data["releases"]])
-        self.assertEqual(144, len(gallery["frames"]))
-        self.assertEqual(144, len({frame["frame_id"] for frame in gallery["frames"]}))
+        self.assertEqual(164, len(gallery["frames"]))
+        self.assertEqual(164, len({frame["frame_id"] for frame in gallery["frames"]}))
         sample = gallery["frames"][0]
         published = output / "e2e" / sample["image"]
         self.assertEqual(sample["published_file_sha256"], published.stem)
