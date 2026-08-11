@@ -346,6 +346,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--reference-identity", curate)
         self.assertIn("scripts/pages/select_artifact.py", curate)
         self.assertIn("--require-raw", curate)
+        self.assertIn("for attempt in {1..90}", curate)
+        self.assertIn(
+            'git show "${candidate_reference_sha}:e2e/scenario-contract.json"',
+            curate,
+        )
+        self.assertIn(
+            'reference_contract_sha256" == "$master_contract_sha256', curate
+        )
+        self.assertIn("visual reference did not reach protected", curate)
+        self.assertIn("sleep 5", curate)
         self.assertIn("--kind raw", curate)
         self.assertNotIn("scripts/pages/evidence.py compact", curate)
         self.assertIn("--reference-evidence-root \"$reference_selected\"", curate)
