@@ -18,12 +18,18 @@ from visual_review_runner import (  # noqa: E402
 )
 
 
-def paired(label: str, candidate: str, reference: str) -> dict[str, str]:
+def paired(
+    label: str,
+    candidate: str,
+    reference: str,
+    *,
+    reference_artifact: str = "fabric-1.20.1",
+) -> dict[str, str]:
     _artifact, scenario, role, step = label.split("/")
     return {
         "path": candidate,
         "reference_path": reference,
-        "reference_label": f"fabric-1.20.1/{scenario}/{role}/{step}",
+        "reference_label": f"{reference_artifact}/{scenario}/{role}/{step}",
         "label": label,
         "capture_id": f"{scenario}.{role}.{step}",
         "kind": f"{scenario}.{role}.{step}",
@@ -59,6 +65,42 @@ class VisualReviewRunnerTest(unittest.TestCase):
         self.assertEqual([[self.manifest[1]], [self.manifest[2]]], plan["triage_chunks"])
         with self.assertRaises(ReviewError):
             build_review_plan(self.manifest, triage_chunk_size=9)
+
+    def test_plan_semantically_reviews_identical_1_20_1_cross_loader_pair(self) -> None:
+        anchor = paired(
+            "fabric-1.20.1/full/client_a/anchor",
+            "review-input/images/a.png",
+            "review-input/images/a.png",
+            reference_artifact="forge-1.20.1",
+        )
+        calls: list[list[str]] = []
+
+        def provider(
+            stage: str,
+            _chunk_index: int,
+            chunk: list[dict[str, Any]],
+            _schema: dict[str, Any],
+        ) -> list[dict[str, Any]]:
+            self.assertEqual("triage", stage)
+            calls.append([item["label"] for item in chunk])
+            return [
+                {
+                    "label": anchor["label"],
+                    "decision": "clean",
+                    "confidence": "high",
+                    "anomalies": [],
+                }
+            ]
+
+        plan = build_review_plan([anchor])
+        verdicts, stats = execute_review([anchor], provider)
+
+        self.assertEqual([], plan["identical"])
+        self.assertEqual([anchor], plan["semantic"])
+        self.assertEqual([[anchor["label"]]], calls)
+        self.assertEqual(SYNTHETIC_CLEAN_VISIBLE, verdicts[0]["visible"])
+        self.assertEqual(0, stats["identical"])
+        self.assertEqual(1, stats["triaged"])
 
     def test_two_stage_review_escalates_only_non_high_clean_results(self) -> None:
         calls: list[tuple[str, list[str]]] = []
