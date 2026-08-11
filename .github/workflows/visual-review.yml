@@ -442,6 +442,9 @@ jobs:
 
           # Resolve the reference only after the candidate run, source commit, controller parity,
           # job graph, and artifact inventory have all been authenticated by protected code.
+          # A shared contract rollout can update master a few minutes before the 1.20.1 release
+          # head and its lossless handoff rotate. Wait through that bounded, authenticated window
+          # instead of losing an otherwise valid review request to the old reference generation.
           reference_identity="$(python3 e2e/visual_review.py \
             --matrix release/release-matrix.json \
             --reference-identity)"
@@ -450,18 +453,60 @@ jobs:
           REFERENCE_VERSION="$(jq -er .version <<< "$reference_identity")"
           REFERENCE_LOADER="$(jq -er .loader <<< "$reference_identity")"
           reference_output="$(mktemp "$RUNNER_TEMP/reference-selection.XXXXXX")"
-          python3 scripts/pages/select_artifact.py \
-            --repository "$GITHUB_REPOSITORY" \
-            --branch "$REFERENCE_BRANCH" \
-            --require-raw \
-            --github-output "$reference_output"
+          reference_contract="$(mktemp "$RUNNER_TEMP/reference-contract.XXXXXX.json")"
+          reference_error="$(mktemp "$RUNNER_TEMP/reference-selection.XXXXXX.err")"
+          reference_ready=false
+          reference_state=''
+          for attempt in {1..90}; do
+            : > "$reference_output"
+            : > "$reference_error"
+            next_state=evidence-pending
+            next_message='authenticated current-head reference evidence is not ready'
+            if python3 scripts/pages/select_artifact.py \
+                --repository "$GITHUB_REPOSITORY" \
+                --branch "$REFERENCE_BRANCH" \
+                --require-raw \
+                --github-output "$reference_output" 2> "$reference_error"; then
+              [[ "$(wc -l < "$reference_output" | tr -d ' ')" == 5 ]]
+              candidate_reference_sha="$(sed -n 's/^sha=//p' "$reference_output")"
+              [[ "$candidate_reference_sha" =~ ^[0-9a-f]{40}$ ]]
+              if ! git cat-file -e "${candidate_reference_sha}^{commit}" 2> /dev/null; then
+                git fetch --no-tags origin "$candidate_reference_sha"
+                [[ "$(git rev-parse FETCH_HEAD)" == "$candidate_reference_sha" ]]
+              fi
+              git show "${candidate_reference_sha}:e2e/scenario-contract.json" \
+                > "$reference_contract"
+              reference_contract_sha256="$(sha256sum "$reference_contract" | cut -d ' ' -f 1)"
+              if [[ "$reference_contract_sha256" == "$master_contract_sha256" ]]; then
+                reference_ready=true
+                break
+              fi
+              next_state="contract:$reference_contract_sha256"
+              next_message='reference branch still carries the previous scenario contract'
+            elif [[ -s "$reference_error" ]]; then
+              next_message="$(tail -n 1 "$reference_error")"
+            fi
+            if [[ "$next_state" != "$reference_state" ]]; then
+              printf 'Visual reference pending (%s/90): %s\n' "$attempt" "$next_message"
+              reference_state="$next_state"
+            fi
+            if (( attempt < 90 )); then
+              sleep 5
+            fi
+          done
+          if [[ "$reference_ready" != true ]]; then
+            cat "$reference_error" >&2
+            printf 'visual reference did not reach protected scenario-contract parity in time\n' \
+              >&2
+            exit 1
+          fi
           [[ "$(wc -l < "$reference_output" | tr -d ' ')" == 5 ]]
           REFERENCE_ARTIFACT_ID="$(sed -n 's/^artifact_id=//p' "$reference_output")"
           REFERENCE_ARTIFACT_NAME="$(sed -n 's/^name=//p' "$reference_output")"
           REFERENCE_ARTIFACT_RUN_ID="$(sed -n 's/^run_id=//p' "$reference_output")"
           REFERENCE_SHA="$(sed -n 's/^sha=//p' "$reference_output")"
           REFERENCE_ARTIFACT_SIZE="$(sed -n 's/^size_in_bytes=//p' "$reference_output")"
-          rm -f -- "$reference_output"
+          rm -f -- "$reference_output" "$reference_contract" "$reference_error"
 
           [[ "$REFERENCE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$REFERENCE_ARTIFACT_NAME" =~ ^pages-e2e-[A-Za-z0-9._/-]+$ ]]
