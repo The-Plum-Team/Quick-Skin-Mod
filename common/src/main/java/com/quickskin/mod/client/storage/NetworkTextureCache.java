@@ -5,6 +5,8 @@ import com.quickskin.mod.QuickSkin;
 import com.quickskin.mod.common.data.ContentId;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.common.util.SafeImageReader;
+import com.quickskin.mod.common.util.CapeElytraSilhouette;
+import com.quickskin.mod.common.util.PngAnimationIdentity;
 import com.quickskin.mod.networking.NetworkSecurity;
 import com.quickskin.mod.networking.TextureRequestCoordinator;
 import com.quickskin.mod.networking.TextureTransferLimits;
@@ -51,7 +53,7 @@ public class NetworkTextureCache {
     // Store raw texture bytes in memory (ORIGINAL unprocessed data)
     private final Map<TextureKey, byte[]> originalTextureData = new ConcurrentHashMap<>();
 
-    // Store processed texture bytes (with transparency removed if needed)
+    // Store presentation bytes (skin transparency policy and the structural cape/Elytra cutout).
     private final Map<TextureKey, byte[]> textureDataCache = new ConcurrentHashMap<>();
 
     // Fully decoded on a bounded worker; ownership transfers to DynamicTexture on first use.
@@ -111,21 +113,38 @@ public class NetworkTextureCache {
         }
 
         BufferedImage originalDecoded = decoded;
+        BufferedImage earsSource = "skin".equals(textureType) ? decoded : null;
         boolean shouldRemoveTransparency = "skin".equals(textureType)
                 && com.quickskin.mod.config.ClientConfig.getInstance()
                         .shouldDisableSkinTransparency();
         byte[] processedData = originalCopy;
-        if (shouldRemoveTransparency) {
+        if (shouldRemoveTransparency || "cape".equals(textureType)) {
             try {
-                decoded = com.quickskin.mod.common.util.HDTextureProcessor
-                        .removeTransparency(decoded);
-                processedData = com.quickskin.mod.common.util.HDTextureProcessor.imageToPng(decoded);
+                if (shouldRemoveTransparency) {
+                    decoded = com.quickskin.mod.common.util.HDTextureProcessor
+                            .removeTransparency(decoded);
+                } else {
+                    int frameHeight = decoded.getWidth() / 2;
+                    int frameCount = frameHeight > 0 && decoded.getHeight() % frameHeight == 0
+                            ? decoded.getHeight() / frameHeight : 0;
+                    decoded = CapeElytraSilhouette.maskedCopy(decoded, frameCount);
+                }
+                if (decoded != originalDecoded) {
+                    processedData = com.quickskin.mod.common.util.HDTextureProcessor.imageToPng(decoded);
+                    if (processedData != null && "cape".equals(textureType)) {
+                        String animationIdentity = PngAnimationIdentity.extract(originalCopy);
+                        if (animationIdentity != null) {
+                            processedData = PngAnimationIdentity.attach(
+                                    processedData, animationIdentity);
+                        }
+                    }
+                }
                 if (processedData == null) {
-                    LOGGER.warn("Transparency processing produced invalid PNG data for network texture {}", hash);
+                    LOGGER.warn("Presentation processing produced invalid PNG data for network texture {}", hash);
                     return null;
                 }
-            } catch (RuntimeException e) {
-                LOGGER.warn("Unable to process transparency for network texture {}", hash, e);
+            } catch (IOException | RuntimeException e) {
+                LOGGER.warn("Unable to process network texture presentation for {}", hash, e);
                 return null;
             }
         }
@@ -142,7 +161,7 @@ public class NetworkTextureCache {
         }
         BufferedImage earsImage = "skin".equals(textureType)
                 && com.quickskin.mod.client.compat.EarsCompatIntegration.isAvailable()
-                ? originalDecoded : null;
+                ? earsSource : null;
         boolean hasTransparency =
                 com.quickskin.mod.common.util.TextureAlphaDetector.hasTransparentPixels(decoded);
         return new PreparedTexture(
