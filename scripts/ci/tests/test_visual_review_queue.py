@@ -14,6 +14,7 @@ from visual_review_queue import (  # noqa: E402
     DRAIN_WORKFLOW,
     PREPARE_WORKFLOW,
     Artifact,
+    blocked_generations,
     select_pending,
 )
 
@@ -110,6 +111,172 @@ class VisualReviewQueueTest(unittest.TestCase):
             (anchor, 200),
             select_pending(FakeApi([advisory, anchor], runs), repository=REPOSITORY),
         )
+
+    def test_requested_artifact_selects_its_exact_authenticated_entry(self) -> None:
+        oldest = artifact(1, "visual-review-input-100", run_id=10, minutes_ago=90)
+        requested = artifact(
+            2, "visual-review-input-200", run_id=20, minutes_ago=10
+        )
+        api = FakeApi(
+            [oldest, requested],
+            {
+                10: owner(10, PREPARE_WORKFLOW),
+                20: owner(20, PREPARE_WORKFLOW),
+            },
+        )
+
+        self.assertEqual(
+            (requested, 200),
+            select_pending(
+                api,
+                repository=REPOSITORY,
+                requested_artifact_id=requested.artifact_id,
+            ),
+        )
+
+    def test_requested_artifact_must_still_be_eligible(self) -> None:
+        pending = artifact(1, "visual-review-input-100", run_id=10, minutes_ago=90)
+        report = artifact(2, "visual-review-100", run_id=20, minutes_ago=5)
+        api = FakeApi(
+            [pending, report],
+            {
+                10: owner(10, PREPARE_WORKFLOW),
+                20: owner(20, DRAIN_WORKFLOW, conclusion="failure"),
+            },
+        )
+
+        self.assertIsNone(
+            select_pending(
+                api,
+                repository=REPOSITORY,
+                requested_artifact_id=pending.artifact_id,
+            )
+        )
+        self.assertIsNone(
+            select_pending(
+                FakeApi(
+                    [pending],
+                    {10: owner(10, PREPARE_WORKFLOW)},
+                ),
+                repository=REPOSITORY,
+                requested_artifact_id=999,
+            )
+        )
+
+    def test_confirmed_defect_marker_stops_only_its_exact_generation(self) -> None:
+        blocked_input = artifact(
+            1, "visual-review-input-100", run_id=10, minutes_ago=90
+        )
+        next_input = Artifact(
+            **{
+                **artifact(
+                    2, "visual-review-input-200", run_id=20, minutes_ago=80
+                ).__dict__,
+                "head_sha": "c" * 40,
+            }
+        )
+        block = artifact(
+            3,
+            f"visual-review-wave-block-{SHA}",
+            run_id=30,
+            minutes_ago=5,
+        )
+        runs = {
+            10: owner(10, PREPARE_WORKFLOW),
+            20: {**owner(20, PREPARE_WORKFLOW), "head_sha": "c" * 40},
+            30: owner(
+                30,
+                DRAIN_WORKFLOW,
+                conclusion=None,
+                status="in_progress",
+            ),
+        }
+        api = FakeApi([blocked_input, next_input, block], runs)
+
+        self.assertEqual(
+            {SHA},
+            blocked_generations(api, api.artifacts, repository=REPOSITORY),
+        )
+        self.assertEqual(
+            (next_input, 200),
+            select_pending(api, repository=REPOSITORY, now=NOW),
+        )
+        self.assertIsNone(
+            select_pending(
+                api,
+                repository=REPOSITORY,
+                now=NOW,
+                requested_artifact_id=blocked_input.artifact_id,
+            )
+        )
+
+    def test_rejects_wave_block_from_another_owner_or_generation(self) -> None:
+        pending = artifact(1, "visual-review-input-100", run_id=10, minutes_ago=90)
+        wrong_owner = artifact(
+            2,
+            f"visual-review-wave-block-{SHA}",
+            run_id=20,
+            minutes_ago=5,
+        )
+        wrong_generation = artifact(
+            3,
+            f"visual-review-wave-block-{'c' * 40}",
+            run_id=30,
+            minutes_ago=4,
+        )
+        wrong_generation = Artifact(
+            **{**wrong_generation.__dict__, "head_sha": "c" * 40}
+        )
+        api = FakeApi(
+            [pending, wrong_owner, wrong_generation],
+            {
+                10: owner(10, PREPARE_WORKFLOW),
+                20: owner(20, PREPARE_WORKFLOW),
+                30: {
+                    **owner(30, DRAIN_WORKFLOW, conclusion="failure"),
+                    "head_sha": "c" * 40,
+                },
+            },
+        )
+
+        self.assertEqual(
+            {"c" * 40},
+            blocked_generations(api, api.artifacts, repository=REPOSITORY),
+        )
+        self.assertEqual((pending, 100), select_pending(api, repository=REPOSITORY))
+
+    def test_generation_suffix_separates_generation_from_reviewer_sha(self) -> None:
+        generation = "d" * 40
+        blocked_input = artifact(
+            1,
+            f"visual-review-input-100-{generation}",
+            run_id=10,
+            minutes_ago=90,
+        )
+        block = artifact(
+            2,
+            f"visual-review-wave-block-{generation}",
+            run_id=20,
+            minutes_ago=5,
+        )
+        api = FakeApi(
+            [blocked_input, block],
+            {
+                10: owner(10, PREPARE_WORKFLOW),
+                20: owner(
+                    20,
+                    DRAIN_WORKFLOW,
+                    conclusion=None,
+                    status="in_progress",
+                ),
+            },
+        )
+
+        self.assertEqual(
+            {generation},
+            blocked_generations(api, api.artifacts, repository=REPOSITORY),
+        )
+        self.assertIsNone(select_pending(api, repository=REPOSITORY))
 
     def test_selects_oldest_unreviewed_input_after_attempt_cooldown(self) -> None:
         reviewed = artifact(1, "visual-review-input-100", run_id=10, minutes_ago=90)
