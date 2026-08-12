@@ -121,8 +121,13 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   RGB PNGs. `e2e/check_visual_review.py` validates the all-single or all-paired bounded capsule,
   keeps `semantic_valid` independent from nullable `matches_reference`, and normalizes bounded model
   output. `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Sonnet
-  triage, selectively escalates bounded Opus verification chunks, skips only byte-identical
-  certified comparison pairs, and keeps raw provider output private.
+  triage, runs independent loader-grouped chunks concurrently, pipelines suspicious or uncertain
+  results into concurrent bounded Opus verification, cancels outstanding calls after the first
+  confirmed defect, skips byte-identical certified comparison pairs, and keeps raw provider output
+  private. `e2e/visual_review_cache.py` validates the rolling paired-only verdict cache: a hit binds
+  candidate/reference pixels, expectation, capture and loader identity, scenario contract, release
+  matrix, reviewer code, prompts, models, mode, and chunk policy; unpaired semantic anchors never
+  consume it.
 - `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
   an unpaired, loader-complete, completely clean 1.20.1 report and binds its source/proof/manifest/
   report digests to exact Git identities supplied by protected workflow checks. The version
@@ -145,7 +150,8 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   for concurrent attestations and are outside rotation ownership.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
-  the oldest eligible source. Queue state lives in Actions artifacts rather than pending workflow
+  the oldest eligible source except that a completed certifiable automatic 1.20.1 anchor preempts
+  advisory work. Queue state lives in Actions artifacts rather than pending workflow
   runs, so GitHub concurrency coalescing cannot lose a review. The fixed drain concurrency group
   covers selection through exact-id cleanup; overlapping wakes therefore cannot reserve the same
   oldest capsule before either reaches the model job.

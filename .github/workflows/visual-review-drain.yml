@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
-      actions: read
+      actions: write
       contents: read
     outputs:
       already_reviewed: ${{ steps.guard.outputs.already_reviewed }}
@@ -454,6 +454,7 @@ jobs:
           sha256sum "$manifest" > "$RUNNER_TEMP/visual-review-manifest.sha256"
           mkdir -p "$RUNNER_TEMP/protected-reviewer"
           cp e2e/check_visual_review.py "$RUNNER_TEMP/protected-reviewer/"
+          cp e2e/visual_review_cache.py "$RUNNER_TEMP/protected-reviewer/"
           cp e2e/visual_review_runner.py "$RUNNER_TEMP/protected-reviewer/"
           cp e2e/visual_review_prompt.md "$RUNNER_TEMP/protected-reviewer/"
           cp e2e/visual_review_verify_prompt.md "$RUNNER_TEMP/protected-reviewer/"
@@ -462,6 +463,135 @@ jobs:
             "$RUNNER_TEMP/protected-reviewer/"
           sha256sum "$RUNNER_TEMP/protected-reviewer/"* \
             > "$RUNNER_TEMP/protected-reviewer.sha256"
+
+      - name: Restore only the authenticated exact-policy verdict cache
+        id: verdict-cache
+        if: steps.guard.outputs.reviewable == 'true'
+        continue-on-error: true
+        working-directory: ${{ runner.temp }}/visual-review-capsule
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf 'restored=false\n' >> "$GITHUB_OUTPUT"
+          printf 'artifact_id=\n' >> "$GITHUB_OUTPUT"
+          printf 'policy_sha256=\n' >> "$GITHUB_OUTPUT"
+          review_mode="$(jq -er \
+            '.review_mode | select(. == "anchor-semantic" or
+              . == "reference-comparison")' curation-proof.json)"
+          if [[ "$review_mode" != reference-comparison ]]; then
+            exit 0
+          fi
+          triage_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_prompt.md"
+          verify_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_verify_prompt.md"
+          policy_sha256="$(python3 \
+            "$RUNNER_TEMP/protected-reviewer/visual_review_cache.py" policy \
+            --runner "$RUNNER_TEMP/protected-reviewer/visual_review_runner.py" \
+            --checker "$RUNNER_TEMP/protected-reviewer/check_visual_review.py" \
+            --cache-codec "$RUNNER_TEMP/protected-reviewer/visual_review_cache.py" \
+            --scenario-contract "$GITHUB_WORKSPACE/e2e/scenario-contract.json" \
+            --release-matrix "$GITHUB_WORKSPACE/release/release-matrix.json" \
+            --provider-lock "$GITHUB_WORKSPACE/.github/claude/package-lock.json" \
+            --triage-prompt "$triage_prompt" \
+            --verify-prompt "$verify_prompt" \
+            --triage-model claude-sonnet-5 \
+            --verify-model claude-opus-5 \
+            --review-mode "$review_mode" \
+            --triage-chunk-size 8 \
+            --verify-chunk-size 4)"
+          [[ "$policy_sha256" =~ ^[0-9a-f]{64}$ ]]
+          printf 'policy_sha256=%s\n' "$policy_sha256" >> "$GITHUB_OUTPUT"
+          cache_name="visual-review-verdict-cache-$policy_sha256"
+          if ! artifacts="$(gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$cache_name&per_page=100")"; then
+            exit 0
+          fi
+          if ! jq -e \
+            '(type == "array") and
+             ([.[] | (.artifacts | type == "array")] | all) and
+             ([.[].artifacts[]] | length <= 100)' \
+              <<< "$artifacts" > /dev/null; then
+            exit 0
+          fi
+          cache_metadata=''
+          while IFS=$'\t' read -r candidate_id candidate_run_id; do
+            [[ "$candidate_id" =~ ^[1-9][0-9]*$ ]]
+            [[ "$candidate_run_id" =~ ^[1-9][0-9]*$ ]]
+            candidate_run="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_run_id" \
+              2>/dev/null || true)"
+            if [[ -n "$candidate_run" ]] && jq -e \
+                --arg workflow_sha "$GITHUB_SHA" \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --argjson run_id "$candidate_run_id" \
+                '.id == $run_id and .status == "completed" and
+                 (.conclusion == "success" or .conclusion == "failure") and
+                 (.event == "repository_dispatch" or .event == "schedule" or
+                  .event == "workflow_dispatch") and
+                 .head_branch == "master" and .head_sha == $workflow_sha and
+                 .path == ".github/workflows/visual-review-drain.yml" and
+                 .head_repository.full_name == $repository' \
+                <<< "$candidate_run" > /dev/null; then
+              cache_metadata="$(jq -c --argjson id "$candidate_id" \
+                '[.[].artifacts[] | select(.id == $id)] |
+                 if length == 1 then .[0] else empty end' <<< "$artifacts")"
+              break
+            fi
+          done < <(jq -r --arg name "$cache_name" \
+            '[.[].artifacts[] |
+              select(.name == $name and .expired == false and
+                (.size_in_bytes | type == "number" and . > 0 and . <= 4194304) and
+                (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
+                (.id | type == "number" and . > 0) and
+                (.workflow_run.id | type == "number" and . > 0))] |
+             sort_by(.created_at, .id) | reverse | .[] |
+             [.id, .workflow_run.id] | @tsv' <<< "$artifacts" || true)
+          if [[ -z "$cache_metadata" ]]; then
+            exit 0
+          fi
+          if ! cache_id="$(jq -er .id <<< "$cache_metadata")" || \
+              ! cache_run_id="$(jq -er .workflow_run.id <<< "$cache_metadata")" || \
+              ! cache_size="$(jq -er .size_in_bytes <<< "$cache_metadata")" || \
+              ! cache_digest="$(jq -er \
+                '.digest | select(type == "string" and
+                  test("^sha256:[0-9a-f]{64}$"))' <<< "$cache_metadata")"; then
+            exit 0
+          fi
+          cache_archive="$RUNNER_TEMP/visual-review-verdict-cache.zip"
+          if ! gh api -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$cache_id/zip" \
+              > "$cache_archive"; then
+            exit 0
+          fi
+          if [[ "$(stat -c %s "$cache_archive")" != "$cache_size" ]] || \
+              [[ "sha256:$(sha256sum "$cache_archive" | cut -d ' ' -f 1)" != \
+                "$cache_digest" ]]; then
+            exit 0
+          fi
+          if ! python3 "$GITHUB_WORKSPACE/scripts/ci/bounded_zip.py" \
+            "$cache_archive" "$RUNNER_TEMP/restored-verdict-cache" \
+            --max-archive-bytes 4194304 \
+            --max-entries 1 \
+            --max-total-bytes 4194304 \
+            --max-file-bytes 4194304 \
+            --max-compression-ratio 200 \
+              > "$RUNNER_TEMP/verdict-cache-extraction.json"; then
+            exit 0
+          fi
+          rm -f -- "$cache_archive"
+          restored="$RUNNER_TEMP/restored-verdict-cache/visual-review-verdict-cache.json"
+          if [[ ! -f "$restored" || -L "$restored" ]]; then
+            exit 0
+          fi
+          if ! python3 "$RUNNER_TEMP/protected-reviewer/visual_review_cache.py" validate \
+            --cache "$restored" \
+            --policy-sha256 "$policy_sha256" \
+              --normalized-output visual-review-verdict-cache.input.json; then
+            exit 0
+          fi
+          printf 'artifact_id=%s\n' "$cache_id" >> "$GITHUB_OUTPUT"
+          printf 'restored=true\n' >> "$GITHUB_OUTPUT"
 
       - name: Install Node for the locked Claude CLI
         if: steps.guard.outputs.reviewable == 'true'
@@ -508,6 +638,14 @@ jobs:
             triage_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_prompt.md"
             verify_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_verify_prompt.md"
           fi
+          cache_arguments=()
+          if [[ "${{ steps.verdict-cache.outputs.restored }}" == true ]]; then
+            cache_arguments=(
+              --cache visual-review-verdict-cache.input.json
+              --cache-policy-sha256 \
+                "${{ steps.verdict-cache.outputs.policy_sha256 }}"
+            )
+          fi
           model_status=0
           python3 "$RUNNER_TEMP/protected-reviewer/visual_review_runner.py" \
             --capsule . \
@@ -521,9 +659,12 @@ jobs:
             --verify-model claude-opus-5 \
             --triage-chunk-size 8 \
             --verify-chunk-size 4 \
+            --max-parallel-calls 32 \
             --model-attempts 3 \
-            --call-spacing-seconds 10 \
+            --call-spacing-seconds 0 \
+            "${cache_arguments[@]}" \
             --output visual-review-report.staged.json \
+            --completion-state visual-review-completion.json \
             --failure-report visual-review-failure.json \
             || model_status=$?
           printf 'model_status=%s\n' "$model_status" >> "$GITHUB_OUTPUT"
@@ -556,6 +697,27 @@ jobs:
             --normalized-report visual-review-report.json
             --manifest review-input/visual-review-manifest.json
           )
+          jq -e \
+            --argjson manifest_frames "$(jq length review-input/visual-review-manifest.json)" \
+            --argjson report_verdicts "$(jq length visual-review-report.staged.json)" \
+            '(keys | sort) == (["manifest_frames", "report_verdicts",
+              "schema_version", "state"] | sort) and
+             (.schema_version == 1) and
+             (.manifest_frames | type == "number") and
+             (.report_verdicts | type == "number") and
+             (.state == "complete" or .state == "blocking-partial") and
+             .manifest_frames == $manifest_frames and
+             .report_verdicts == $report_verdicts and
+             (if .state == "complete" then
+                .report_verdicts == .manifest_frames
+              else
+                .report_verdicts > 0 and .report_verdicts <= .manifest_frames
+              end)' visual-review-completion.json > /dev/null
+          if [[ "$(jq -er .state visual-review-completion.json)" == blocking-partial ]]; then
+            jq -e 'length > 0 and all(.[]; .defect == true)' \
+              visual-review-report.staged.json > /dev/null
+            report_arguments+=(--allow-blocking-partial)
+          fi
           if [[ "$review_mode" == reference-comparison ]]; then
             validation_arguments+=(--require-paired)
             report_arguments+=(--require-paired)
@@ -570,6 +732,117 @@ jobs:
           test -s visual-review-report.json
           printf 'review_complete=true\n' >> "$GITHUB_OUTPUT"
           exit "$review_status"
+
+      - name: Publish the protected exact-policy verdict cache
+        id: publish-verdict-cache
+        if: >-
+          always() && steps.guard.outputs.reviewable == 'true' &&
+          steps.check.outputs.review_complete == 'true' &&
+          steps.verdict-cache.outputs.policy_sha256 != '' &&
+          steps.model.outputs.model_status == '0'
+        working-directory: ${{ runner.temp }}/visual-review-capsule
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(jq -er .review_mode curation-proof.json)" == reference-comparison ]]
+          update_arguments=()
+          if [[ -f visual-review-verdict-cache.input.json ]]; then
+            update_arguments=(--existing-cache visual-review-verdict-cache.input.json)
+          fi
+          python3 "$RUNNER_TEMP/protected-reviewer/visual_review_cache.py" update \
+            "${update_arguments[@]}" \
+            --manifest review-input/visual-review-manifest.json \
+            --report visual-review-report.json \
+            --policy-sha256 "${{ steps.verdict-cache.outputs.policy_sha256 }}" \
+            --output visual-review-verdict-cache.json
+          printf 'artifact_name=visual-review-verdict-cache-%s\n' \
+            "${{ steps.verdict-cache.outputs.policy_sha256 }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the protected exact-policy verdict cache
+        id: verdict-cache-artifact
+        if: always() && steps.publish-verdict-cache.outputs.artifact_name != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.publish-verdict-cache.outputs.artifact_name }}
+          path: ${{ runner.temp }}/visual-review-capsule/visual-review-verdict-cache.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retire the superseded exact-policy verdict cache
+        if: >-
+          always() && steps.verdict-cache.outputs.restored == 'true' &&
+          steps.verdict-cache-artifact.outputs.artifact-id != ''
+        shell: bash
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          old_id="${{ steps.verdict-cache.outputs.artifact_id }}"
+          new_id="${{ steps.verdict-cache-artifact.outputs.artifact-id }}"
+          [[ "$old_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$new_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$old_id" != "$new_id" ]]
+          metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$old_id")"
+          jq -e \
+            --arg name "visual-review-verdict-cache-${{ steps.verdict-cache.outputs.policy_sha256 }}" \
+            --argjson artifact_id "$old_id" \
+            '.id == $artifact_id and .name == $name and .expired == false' \
+            <<< "$metadata" > /dev/null
+          gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$old_id"
+
+      - name: Retire superseded caches for obsolete review policies
+        if: >-
+          always() && steps.verdict-cache-artifact.outputs.artifact-id != ''
+        shell: bash
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current_id="${{ steps.verdict-cache-artifact.outputs.artifact-id }}"
+          current_name="${{ steps.publish-verdict-cache.outputs.artifact_name }}"
+          [[ "$current_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$current_name" =~ ^visual-review-verdict-cache-[0-9a-f]{64}$ ]]
+          inventory="$(gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100")"
+          jq -e \
+            '(type == "array") and
+             ([.[] | (.artifacts | type == "array")] | all) and
+             ([.[].artifacts[]] | length <= 10000)' \
+            <<< "$inventory" > /dev/null
+          while IFS=$'\t' read -r stale_id stale_name stale_run_id; do
+            [[ "$stale_id" =~ ^[1-9][0-9]*$ ]]
+            [[ "$stale_name" =~ ^visual-review-verdict-cache-[0-9a-f]{64}$ ]]
+            [[ "$stale_run_id" =~ ^[1-9][0-9]*$ ]]
+            [[ "$stale_id" != "$current_id" ]]
+            stale_run="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$stale_run_id" \
+              2>/dev/null || true)"
+            if [[ -z "$stale_run" ]] || ! jq -e \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --argjson run_id "$stale_run_id" \
+                '.id == $run_id and .status == "completed" and
+                 (.conclusion == "success" or .conclusion == "failure") and
+                 (.event == "repository_dispatch" or .event == "schedule" or
+                  .event == "workflow_dispatch") and
+                 .head_branch == "master" and
+                 .path == ".github/workflows/visual-review-drain.yml" and
+                 .head_repository.full_name == $repository' \
+                <<< "$stale_run" > /dev/null; then
+              continue
+            fi
+            gh api --method DELETE \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$stale_id"
+          done < <(jq -r --arg current_name "$current_name" \
+            '.[].artifacts[] |
+             select(.expired == false and .name != $current_name and
+               (.name | test("^visual-review-verdict-cache-[0-9a-f]{64}$"))) |
+             [.id, .name, .workflow_run.id] | @tsv' <<< "$inventory")
 
       - name: Certify a clean synchronized 1.20.1 anchor
         id: certify
@@ -733,6 +1006,7 @@ jobs:
             ${{ runner.temp }}/visual-review-capsule/curation-proof.json
             ${{ runner.temp }}/visual-review-capsule/review-input/visual-review-manifest.json
             ${{ runner.temp }}/visual-review-capsule/visual-review-report.json
+            ${{ runner.temp }}/visual-review-capsule/visual-review-completion.json
           if-no-files-found: error
           retention-days: 1
 

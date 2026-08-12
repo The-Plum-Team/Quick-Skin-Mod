@@ -203,6 +203,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "Upload the exact semantic anchor certificate",
                 "${{ steps.certify.outputs.artifact_name }}",
             ): "7",
+            (
+                "visual-review-drain.yml",
+                "Upload the protected exact-policy verdict cache",
+                "${{ steps.publish-verdict-cache.outputs.artifact_name }}",
+            ): "7",
         }
         observed_overrides: set[tuple[str, str, str]] = set()
         for workflow, step_name, block in uploads:
@@ -395,6 +400,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", request)
 
         self.assertIn("actions/artifacts/$ARTIFACT_ID", review)
+        self.assertIn("actions: write", review)
         self.assertIn("scripts/ci/bounded_zip.py", review)
         self.assertIn("--max-entries 520", review)
         self.assertIn("visual-review-capsule", review)
@@ -417,7 +423,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--verify-model claude-opus-5", review)
         self.assertIn("--triage-chunk-size 8", review)
         self.assertIn("--verify-chunk-size 4", review)
+        self.assertIn("--max-parallel-calls 32", review)
+        self.assertIn("--call-spacing-seconds 0", review)
         self.assertIn("--model-attempts 3", review)
+        self.assertIn("visual_review_cache.py", review)
+        self.assertIn("--completion-state visual-review-completion.json", review)
+        self.assertIn("--allow-blocking-partial", review)
+        self.assertIn("visual-review-verdict-cache-$policy_sha256", review)
+        self.assertIn("--max-entries 1", review)
+        self.assertIn("steps.verdict-cache-artifact.outputs.artifact-id", review)
+        self.assertIn("Retire superseded caches for obsolete review policies", review)
         self.assertIn("visual-review-failure.json", review)
         self.assertIn("visual-review-attempt-${{ needs.select.outputs.source_run_id }}", review)
         self.assertIn("cooling=true", review)
@@ -461,6 +476,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("matches_reference=null", semantic_verify_prompt)
         self.assertIn("DEFAULT_TRIAGE_CHUNK_SIZE = 8", runner)
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
+        self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
+        self.assertIn("ThreadPoolExecutor", runner)
         self.assertIn("path\"] == item[\"reference_path", runner)
         self.assertIn("TRIAGE_CONFIDENCE", (
             ROOT / "e2e" / "check_visual_review.py"
