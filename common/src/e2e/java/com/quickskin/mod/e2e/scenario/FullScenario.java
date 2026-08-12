@@ -163,8 +163,8 @@ public final class FullScenario implements Scenario {
         final String suffix = "_" + role + ".png";
         final String bundledBmoCapeShot = prefix + "full_05h_bmo_bundled_cape" + suffix;
         final String bundledBmoElytraShot = prefix + "full_05i_bmo_bundled_elytra" + suffix;
-        final String adjustedBmoCapeShot = prefix + "full_05k_bmo_adjusted_cape" + suffix;
-        final String adjustedBmoElytraShot = prefix + "full_05l_bmo_adjusted_elytra" + suffix;
+        final String adjustedBmoCapeShot = prefix + "full_05l_bmo_adjusted_cape" + suffix;
+        final String adjustedBmoElytraShot = prefix + "full_05m_bmo_adjusted_elytra" + suffix;
 
         List<Step> steps = new ArrayList<>();
 
@@ -730,7 +730,7 @@ public final class FullScenario implements Scenario {
                             + "by " + expectedStep + "; applied == previewed");
                 }));
 
-        // 5h-5m. bundled BMO versus the same atlas recovered through the editor ------------------
+        // 5h-5n. bundled BMO versus the same atlas recovered through the editor ------------------
         // The imported source is a 128x64 black canvas with the production 64x32 BMO atlas centred
         // inside it. Reset shows the whole padded source at 50%; moving the real zoom slider to
         // scale 1.0 must re-anchor it to (-32,-16), crop away only the black padding and reproduce
@@ -771,7 +771,7 @@ public final class FullScenario implements Scenario {
                 .screenshot(bundledBmoElytraShot)
                 .assertion(() -> assertCapeRoute(mc, svc, uuid, "known:bmo", true)));
 
-        steps.add(Step.of("bmo_adjust_screen")
+        steps.add(Step.of("bmo_padded_source_screen")
                 .action(() -> {
                     enterWorldView(mc);
                     setChestSlot(mc, ItemStack.EMPTY);
@@ -793,10 +793,61 @@ public final class FullScenario implements Scenario {
                                 null, prepared.atlas(), prepared.frameCount(), onApply));
                     } catch (Throwable t) {
                         bmoSetupFailure.set("could not prepare padded BMO source: " + t);
-                        E2ELog.error("bmo_adjust_screen setup failed", t);
+                        E2ELog.error("bmo_padded_source_screen setup failed", t);
                     }
                 })
                 .minTicks(25)
+                .ready(() -> {
+                    if (bmoSetupFailure.get() != null) return true;
+                    return VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen
+                            && bmoAdjustHold.incrementAndGet() >= PREVIEW_HOLD_TICKS;
+                })
+                .timeoutTicks(400)
+                .screenshot(prefix + "full_05j_bmo_padded_source" + suffix)
+                .assertion(() -> {
+                    String setupFailure = bmoSetupFailure.get();
+                    if (setupFailure != null) return Step.Result.fail(setupFailure);
+                    if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen screen))
+                        return Step.Result.fail("BMO padded source screen not open: " + screenName(mc));
+                    CapeImportProcessor.PreparedCape prepared = bmoPreparedCape.get();
+                    BufferedImage expected = bundledBmoAtlas.get();
+                    if (prepared == null || expected == null)
+                        return Step.Result.fail("BMO source or expected atlas was not retained");
+                    if (prepared.standardFormat())
+                        return Step.Result.fail("128x64 padded BMO source bypassed the editor");
+
+                    String padding = validatePaddedBmoSource(prepared.atlas(), expected);
+                    if (padding != null) return Step.Result.fail(padding);
+                    double target = bmoPaddedZoomPosition();
+                    String desync = checkZoomSliderAgrees(mc, target);
+                    if (desync != null) return Step.Result.fail(desync);
+                    double scale;
+                    double offsetX;
+                    double offsetY;
+                    try {
+                        scale = adjustScreenDouble(screen, "imgScale");
+                        offsetX = adjustScreenDouble(screen, "imgOffsetX");
+                        offsetY = adjustScreenDouble(screen, "imgOffsetY");
+                    } catch (Exception e) {
+                        return Step.Result.fail("could not read BMO transform: " + e);
+                    }
+                    double expectedScale = (double) TestAssets.BMO_CAPE_WIDTH
+                            / TestAssets.BMO_PADDED_WIDTH;
+                    if (Math.abs(scale - expectedScale) > 1.0e-9
+                            || Math.abs(offsetX) > 1.0e-9
+                            || Math.abs(offsetY) > 1.0e-9) {
+                        return Step.Result.fail("BMO transform is scale=" + scale + " offset=("
+                                + offsetX + "," + offsetY + "), expected " + expectedScale
+                                + " offset=(0,0)");
+                    }
+
+                    return Step.Result.pass("complete 64x32 BMO atlas is centred inside exact "
+                            + "opaque-black 128x64 padding at reset scale " + expectedScale);
+                }));
+
+        steps.add(Step.of("bmo_adjust_screen")
+                .action(() -> bmoAdjustHold.set(0))
+                .minTicks(5)
                 .ready(() -> {
                     if (bmoSetupFailure.get() != null) return true;
                     double target = bmoTargetZoomPosition();
@@ -804,7 +855,7 @@ public final class FullScenario implements Scenario {
                             && bmoAdjustHold.incrementAndGet() >= PREVIEW_HOLD_TICKS;
                 })
                 .timeoutTicks(400)
-                .screenshot(prefix + "full_05j_bmo_adjusted_editor" + suffix)
+                .screenshot(prefix + "full_05k_bmo_adjusted_editor" + suffix)
                 .assertion(() -> {
                     String setupFailure = bmoSetupFailure.get();
                     if (setupFailure != null) return Step.Result.fail(setupFailure);
@@ -2351,6 +2402,13 @@ public final class FullScenario implements Scenario {
     /** Slider position that turns the centred 128x64 source into a 1:1 64x32 crop. */
     private static double bmoTargetZoomPosition() {
         return CapeZoomRange.position(1.0, TestAssets.BMO_CAPE_WIDTH,
+                TestAssets.BMO_PADDED_WIDTH, TestAssets.BMO_PADDED_HEIGHT);
+    }
+
+    /** Slider position at reset, where the complete padded source fits inside the 64x32 grid. */
+    private static double bmoPaddedZoomPosition() {
+        double resetScale = (double) TestAssets.BMO_CAPE_WIDTH / TestAssets.BMO_PADDED_WIDTH;
+        return CapeZoomRange.position(resetScale, TestAssets.BMO_CAPE_WIDTH,
                 TestAssets.BMO_PADDED_WIDTH, TestAssets.BMO_PADDED_HEIGHT);
     }
 
