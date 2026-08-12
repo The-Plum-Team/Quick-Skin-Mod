@@ -11,8 +11,9 @@ sys.path.insert(0, str(ROOT / "e2e"))
 
 from check_visual_review import ReviewError, triage_schema, validate_triage  # noqa: E402
 from visual_review_runner import (  # noqa: E402
-    SYNTHETIC_CLEAN_VISIBLE,
+    SYNTHETIC_COMPARISON_CLEAN_VISIBLE,
     SYNTHETIC_IDENTICAL_VISIBLE,
+    SYNTHETIC_SEMANTIC_CLEAN_VISIBLE,
     build_review_plan,
     execute_review,
 )
@@ -30,6 +31,17 @@ def paired(
         "path": candidate,
         "reference_path": reference,
         "reference_label": f"{reference_artifact}/{scenario}/{role}/{step}",
+        "label": label,
+        "capture_id": f"{scenario}.{role}.{step}",
+        "kind": f"{scenario}.{role}.{step}",
+        "expectation": f"Expected {step}",
+    }
+
+
+def unpaired(label: str, candidate: str) -> dict[str, str]:
+    _artifact, scenario, role, step = label.split("/")
+    return {
+        "path": candidate,
         "label": label,
         "capture_id": f"{scenario}.{role}.{step}",
         "kind": f"{scenario}.{role}.{step}",
@@ -66,12 +78,10 @@ class VisualReviewRunnerTest(unittest.TestCase):
         with self.assertRaises(ReviewError):
             build_review_plan(self.manifest, triage_chunk_size=9)
 
-    def test_plan_semantically_reviews_identical_1_20_1_cross_loader_pair(self) -> None:
-        anchor = paired(
+    def test_unpaired_anchor_always_receives_semantic_review(self) -> None:
+        anchor = unpaired(
             "fabric-1.20.1/full/client_a/anchor",
             "review-input/images/a.png",
-            "review-input/images/a.png",
-            reference_artifact="forge-1.20.1",
         )
         calls: list[list[str]] = []
 
@@ -98,7 +108,9 @@ class VisualReviewRunnerTest(unittest.TestCase):
         self.assertEqual([], plan["identical"])
         self.assertEqual([anchor], plan["semantic"])
         self.assertEqual([[anchor["label"]]], calls)
-        self.assertEqual(SYNTHETIC_CLEAN_VISIBLE, verdicts[0]["visible"])
+        self.assertEqual(SYNTHETIC_SEMANTIC_CLEAN_VISIBLE, verdicts[0]["visible"])
+        self.assertTrue(verdicts[0]["semantic_valid"])
+        self.assertIsNone(verdicts[0]["matches_reference"])
         self.assertEqual(0, stats["identical"])
         self.assertEqual(1, stats["triaged"])
 
@@ -133,7 +145,8 @@ class VisualReviewRunnerTest(unittest.TestCase):
                 {
                     "label": labels[0],
                     "visible": "The candidate panel is visibly blurred.",
-                    "matches": False,
+                    "semantic_valid": False,
+                    "matches_reference": False,
                     "anomalies": ["Custom panel is softer than the reference."],
                     "defect": True,
                 }
@@ -146,7 +159,7 @@ class VisualReviewRunnerTest(unittest.TestCase):
             [item["label"] for item in verdicts],
         )
         self.assertEqual(SYNTHETIC_IDENTICAL_VISIBLE, verdicts[0]["visible"])
-        self.assertEqual(SYNTHETIC_CLEAN_VISIBLE, verdicts[1]["visible"])
+        self.assertEqual(SYNTHETIC_COMPARISON_CLEAN_VISIBLE, verdicts[1]["visible"])
         self.assertTrue(verdicts[2]["defect"])
         self.assertEqual(
             [
@@ -157,7 +170,8 @@ class VisualReviewRunnerTest(unittest.TestCase):
         )
         self.assertEqual(
             {
-                "pairs": 3,
+                "frames": 3,
+                "paired": 1,
                 "identical": 1,
                 "triaged": 2,
                 "triage_chunks": 1,

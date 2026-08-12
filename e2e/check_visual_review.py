@@ -16,7 +16,14 @@ from pathlib import PurePosixPath
 from typing import Any
 
 
-VERDICT_KEYS = {"label", "matches", "visible", "anomalies", "defect"}
+VERDICT_KEYS = {
+    "label",
+    "semantic_valid",
+    "matches_reference",
+    "visible",
+    "anomalies",
+    "defect",
+}
 TRIAGE_KEYS = {"label", "decision", "confidence", "anomalies"}
 TRIAGE_DECISIONS = frozenset({"clean", "needs_review"})
 TRIAGE_CONFIDENCE = frozenset({"high", "medium", "low"})
@@ -42,7 +49,10 @@ class ReviewError(ValueError):
 
 
 def report_schema(
-    verdict_count: int, *, labels: list[str] | None = None
+    verdict_count: int,
+    *,
+    labels: list[str] | None = None,
+    paired: bool | None = None,
 ) -> dict[str, Any]:
     """Return the provider-compatible structure used for model output."""
 
@@ -68,6 +78,13 @@ def report_schema(
     label_schema: dict[str, Any] = {"type": "string"}
     if labels is not None:
         label_schema["enum"] = labels
+    reference_schema: dict[str, Any]
+    if paired is True:
+        reference_schema = {"type": "boolean"}
+    elif paired is False:
+        reference_schema = {"type": "null"}
+    else:
+        reference_schema = {"type": ["boolean", "null"]}
     verdict = {
         "type": "object",
         "additionalProperties": False,
@@ -75,7 +92,8 @@ def report_schema(
         "properties": {
             "label": label_schema,
             "visible": {"type": "string"},
-            "matches": {"type": "boolean"},
+            "semantic_valid": {"type": "boolean"},
+            "matches_reference": reference_schema,
             "anomalies": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -458,7 +476,8 @@ def validate_input(
 def validate(
     manifest: Any, report: Any, *, require_paired: bool = False
 ) -> list[dict[str, Any]]:
-    _entries, labels = validate_manifest(manifest, require_paired=require_paired)
+    entries, labels = validate_manifest(manifest, require_paired=require_paired)
+    paired = "reference_path" in entries[0]
 
     if (
         not isinstance(report, list)
@@ -484,8 +503,23 @@ def validate(
             f"report verdict {index}.visible",
             maximum=MAX_VISIBLE_LENGTH,
         )
-        if not isinstance(verdict["matches"], bool) or not isinstance(verdict["defect"], bool):
-            raise ReviewError(f"report verdict {index} matches/defect must be booleans")
+        if (
+            not isinstance(verdict["semantic_valid"], bool)
+            or not isinstance(verdict["defect"], bool)
+        ):
+            raise ReviewError(
+                f"report verdict {index} semantic_valid/defect must be booleans"
+            )
+        matches_reference = verdict["matches_reference"]
+        if paired:
+            if not isinstance(matches_reference, bool):
+                raise ReviewError(
+                    f"paired report verdict {index} must judge matches_reference"
+                )
+        elif matches_reference is not None:
+            raise ReviewError(
+                f"semantic-only report verdict {index} cannot judge a reference"
+            )
         anomalies = verdict["anomalies"]
         if not isinstance(anomalies, list) or len(anomalies) > MAX_ANOMALIES:
             raise ReviewError(f"report verdict {index}.anomalies must be an array of strings")
@@ -497,9 +531,12 @@ def validate(
             )
             for anomaly_index, item in enumerate(anomalies)
         ]
-        if verdict["matches"] == verdict["defect"]:
+        expected_defect = (not verdict["semantic_valid"]) or (
+            paired and matches_reference is False
+        )
+        if verdict["defect"] != expected_defect:
             raise ReviewError(
-                f"report verdict {index} must set exactly one of matches or defect"
+                f"report verdict {index} defect disagrees with its semantic/reference result"
             )
         if verdict["defect"] and not normalized_anomalies:
             raise ReviewError(f"defect verdict {index} must describe at least one anomaly")
@@ -508,7 +545,8 @@ def validate(
         verdicts[label] = {
             "label": label,
             "visible": visible,
-            "matches": verdict["matches"],
+            "semantic_valid": verdict["semantic_valid"],
+            "matches_reference": matches_reference,
             "anomalies": normalized_anomalies,
             "defect": verdict["defect"],
         }
@@ -623,7 +661,8 @@ def render(verdicts: list[dict[str, Any]]) -> tuple[str, bool]:
     lines.extend(
         (
             "",
-            "This AI review is advisory. The packaged runtime and pixel invariants remain the required gate.",
+            "Semantic validity is independent from reference similarity; a reference match can "
+            "never hide a semantic defect.",
         )
     )
     return "\n".join(lines), bool(defects)
@@ -676,7 +715,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 json.dumps(
-                    report_schema(len(entries), labels=labels),
+                    report_schema(
+                        len(entries),
+                        labels=labels,
+                        paired="reference_path" in entries[0],
+                    ),
                     ensure_ascii=True,
                     separators=(",", ":"),
                     sort_keys=True,

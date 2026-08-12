@@ -198,6 +198,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "Upload only the curated review input",
                 "${{ steps.identity.outputs.artifact_name }}",
             ): "7",
+            (
+                "visual-review-drain.yml",
+                "Upload the exact semantic anchor certificate",
+                "${{ steps.certify.outputs.artifact_name }}",
+            ): "7",
         }
         observed_overrides: set[tuple[str, str, str]] = set()
         for workflow, step_name, block in uploads:
@@ -261,7 +266,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("or not ref_protected", policy)
         self.assertIn('return ref_name != "master"', policy)
 
-    def test_visual_review_is_advisory_queued_and_model_bounded(self) -> None:
+    def test_visual_review_is_queued_bounded_and_certifies_the_anchor(self) -> None:
         e2e = (WORKFLOWS / "on-demand-e2e.yml").read_text(encoding="utf-8")
         prepare_workflow = (WORKFLOWS / "visual-review.yml").read_text(
             encoding="utf-8"
@@ -275,6 +280,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         verify_prompt = (
             ROOT / "e2e" / "visual_review_verify_prompt.md"
         ).read_text(encoding="utf-8")
+        semantic_prompt = (
+            ROOT / "e2e" / "visual_review_semantic_prompt.md"
+        ).read_text(encoding="utf-8")
+        semantic_verify_prompt = (
+            ROOT / "e2e" / "visual_review_semantic_verify_prompt.md"
+        ).read_text(encoding="utf-8")
         runner = (ROOT / "e2e" / "visual_review_runner.py").read_text(
             encoding="utf-8"
         )
@@ -284,6 +295,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         select = job_block("visual-review-drain.yml", "select")
         review = job_block("visual-review-drain.yml", "review")
         cleanup = job_block("visual-review-drain.yml", "cleanup")
+        release_anchor = job_block("visual-review-drain.yml", "release-anchor")
         continuation = job_block("visual-review-drain.yml", "continue")
         pages = job_block("on-demand-e2e.yml", "prepare-pages-evidence")
         notify = job_block("on-demand-e2e.yml", "notify-version-port")
@@ -305,7 +317,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             set(re.findall(r"(?m)^  ([a-z0-9-]+):\n", prepare_jobs)),
         )
         self.assertEqual(
-            {"select", "review", "cleanup", "continue"},
+            {"select", "review", "cleanup", "release-anchor", "continue"},
             set(re.findall(r"(?m)^  ([a-z0-9-]+):\n", drain_jobs)),
         )
         self.assertIn("visual-review-drain-requested", prepare_workflow)
@@ -324,6 +336,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('.user.login == "github-actions[bot]"', authenticate)
         self.assertIn('.changed_files', authenticate)
         self.assertIn('scripts/ci/visual_review_impact.py', authenticate)
+        self.assertIn('source_pr_base="$(jq -er .base.ref', authenticate)
+        self.assertIn('source_pr_merged="$(jq -er', authenticate)
+        self.assertIn('Deferring semantic anchor review until PR', authenticate)
+        self.assertIn('&& "$source_pr_base" != "$anchor_branch"', authenticate)
         self.assertIn('ref: ${{ github.sha }}', authenticate)
         self.assertIn('persist-credentials: false', authenticate)
         self.assertIn('Ignoring infrastructure-only visual review sync PR', authenticate)
@@ -359,11 +375,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--kind raw", curate)
         self.assertNotIn("scripts/pages/evidence.py compact", curate)
         self.assertIn("--reference-evidence-root \"$reference_selected\"", curate)
+        self.assertIn("--semantic-anchor", curate)
+        self.assertIn("review_mode=anchor-semantic", curate)
+        self.assertIn("visual_reference=null", curate)
         self.assertIn("--all", curate)
         self.assertIn("--validate-row-json", curate)
         self.assertIn("--curate-output", curate)
         self.assertIn("evidence_kind:\"raw-png\"", curate)
-        self.assertIn("schema_version:3", curate)
+        self.assertIn("schema_version:4", curate)
         self.assertIn("retention-days: 7", curate)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", curate)
         self.assertNotIn("claude-code", curate)
@@ -382,10 +401,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("ref: ${{ needs.select.outputs.implementation_sha }}", review)
         self.assertIn("persist-credentials: false", review)
         self.assertNotIn("actions/download-artifact@", review)
-        self.assertIn("schema_version == 3", review)
+        self.assertIn("schema_version == 4", review)
         self.assertIn('evidence_kind == "raw-png"', review)
         self.assertIn("CLAUDE_CODE_OAUTH_TOKEN", review)
         self.assertIn("visual_review_runner.py", review)
+        self.assertIn("--review-mode \"$review_mode\"", review)
+        self.assertIn("visual_review_semantic_prompt.md", review)
+        self.assertIn("visual_review_semantic_verify_prompt.md", review)
         self.assertIn("--triage-model claude-sonnet-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
         self.assertIn("--triage-chunk-size 8", review)
@@ -399,6 +421,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("git -C \"$GITHUB_WORKSPACE\" diff --exit-code", review)
         self.assertIn("--normalized-report visual-review-report.json", review)
         self.assertIn("visual-review-report.json", review)
+        self.assertIn("scripts/ci/visual_anchor_certification.py", review)
+        self.assertIn("visual-anchor-certification-$master_source_sha", review)
+        self.assertIn('commits/$anchor_source_sha/pulls', review)
+        self.assertIn('.user.login == "github-actions[bot]"', review)
+        self.assertIn('[[ "${source_commit[2]}" == "$master_source_sha" ]]', review)
+        self.assertIn("steps.check.outcome == 'success'", review)
         self.assertNotIn("review-work", review[review.index("Upload the source-bound"):])
         self.assertIn("actions: write", cleanup)
         self.assertNotIn("contents:", cleanup)
@@ -408,6 +436,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-metadata", cleanup)
         self.assertIn("visual-review-delete", cleanup)
         self.assertEqual(cleanup.count("(HTTP 404)"), 2)
+        self.assertIn("contents: write", release_anchor)
+        self.assertIn("actions: read", release_anchor)
+        self.assertIn("visual-anchor-certified", release_anchor)
+        self.assertIn("actions/artifacts/$ARTIFACT_ID", release_anchor)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_anchor)
+        self.assertNotIn("actions/checkout@", release_anchor)
         self.assertIn("contents: write", continuation)
 
         self.assertIn("lossless Minecraft 1.20.1", triage_prompt)
@@ -417,6 +451,9 @@ class WorkflowSecurityTest(unittest.TestCase):
             self.assertIn("any intact Vanilla default", prompt)
             self.assertIn("This exception never applies when the expectation names", prompt)
             self.assertIn("a custom skin or cape", prompt)
+        self.assertIn("deliberately no reference image", semantic_prompt)
+        self.assertIn("Do not compare loaders", semantic_prompt)
+        self.assertIn("matches_reference=null", semantic_verify_prompt)
         self.assertIn("DEFAULT_TRIAGE_CHUNK_SIZE = 8", runner)
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
         self.assertIn("path\"] == item[\"reference_path", runner)
@@ -700,7 +737,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn('--base "$TARGET_HEAD_SHA"', propose)
         self.assertIn('--head "$candidate_commit"', propose)
-        self.assertIn('if [[ "$runtime_required" == false ]]; then', propose)
+        self.assertIn('&& "$TARGET_BRANCH" != "$anchor_branch"', propose)
         self.assertIn("runtime_policy:$runtime_policy", propose)
         self.assertIn("runtime_manifest:$runtime_manifest", propose)
         self.assertIn("--arg tree \"$tree\"", propose)
@@ -715,7 +752,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("../controller/scripts/ci/e2e_impact.py", publish)
         self.assertIn('--base "$TARGET_HEAD_SHA"', publish)
         self.assertIn('--head "$commit"', publish)
-        self.assertIn('if [[ "$runtime_required" == false ]]; then', publish)
+        self.assertIn('&& "$TARGET_BRANCH" != "$anchor_branch"', publish)
         self.assertIn('[[ "$runtime_policy" == "$EXPECTED_RUNTIME_POLICY" ]]', publish)
         self.assertIn('-f runtime_policy="$RUNTIME_POLICY"', publish)
 
@@ -738,6 +775,7 @@ class WorkflowSecurityTest(unittest.TestCase):
 
         self.assertIn("branches/master", merge)
         self.assertIn('git show "$protected_sha:scripts/ci/e2e_impact.py"', merge)
+        self.assertIn('git show "$protected_sha:release/release-matrix.json"', merge)
         self.assertIn('--base "$base_sha"', merge)
         self.assertIn('--head "$head_sha"', merge)
         self.assertIn("NOTIFYING_RUNTIME_POLICY", merge)
@@ -758,6 +796,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("Packaged E2E not applicable (non-runtime port)", merge)
         self.assertIn("Verified exact-head Packaged E2E", merge)
         self.assertIn('-f runtime_policy="$runtime_policy"', merge)
+        self.assertIn('&& "$target_branch" != "$anchor_branch"', merge)
+        self.assertIn('merged-anchor-visual-review.json', merge)
+        self.assertIn('event_type:"visual-review-requested"', merge)
+        self.assertIn('for attempt in {1..5}', merge)
+        anchor_wake = merge.index('merged-anchor-visual-review.json')
+        self.assertLess(merge.index('gh pr merge "$pr_number"'), anchor_wake)
+        self.assertLess(merge.index('gh workflow run on-demand-e2e.yml'), anchor_wake)
         revalidate = merge.index('python3 "$controller/scripts/ci/e2e_job_graph.py"')
         publish = merge.index("publish_required_status()")
         self.assertLess(revalidate, publish)
@@ -1058,7 +1103,34 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_version_sync_accepts_only_master_as_its_source(self) -> None:
         discover = job_block("sync-version-branches.yml", "discover")
+        workflow = (WORKFLOWS / "sync-version-branches.yml").read_text(
+            encoding="utf-8"
+        )
         self.assertIn('[[ "$SOURCE_REF" == refs/heads/master ]]', discover)
+        self.assertIn("visual-anchor-certified", workflow)
+        self.assertNotIn("PUSH_BEFORE", discover)
+        self.assertNotIn("scripts/ci/e2e_impact.py", discover)
+        self.assertGreaterEqual(discover.count('--target "$anchor_branch"'), 3)
+        self.assertIn('--exclude "$anchor_branch"', discover)
+        self.assertIn("scripts/ci/visual_anchor_certification.py verify", discover)
+        self.assertIn("actions/artifacts/$PAYLOAD_ARTIFACT_ID", discover)
+        self.assertIn('.path == ".github/workflows/visual-review-drain.yml"', discover)
+        self.assertIn('[[ "${source_commit[2]}" == "$GITHUB_SHA" ]]', discover)
+        self.assertIn('branches/$anchor_branch', discover)
+
+    def test_automatic_generation_forces_full_anchor_before_fanout(self) -> None:
+        propose = job_block("sync-version-branches.yml", "propose")
+        validate = job_block("sync-version-branches.yml", "validate")
+        publish = job_block("sync-version-branches.yml", "publish")
+        merge = job_block("handle-version-port-result.yml", "merge")
+
+        for block in (propose, validate, publish):
+            with self.subTest(boundary=block.splitlines()[0]):
+                self.assertIn('["fabric", "forge"]', block)
+                self.assertIn('&& "$TARGET_BRANCH" != "$anchor_branch"', block)
+                self.assertIn("runtime_policy=full", block)
+        self.assertIn('["fabric", "forge"]', merge)
+        self.assertIn('&& "$target_branch" != "$anchor_branch"', merge)
 
     def test_version_port_merge_revalidates_the_exact_pr(self) -> None:
         merge = job_block("handle-version-port-result.yml", "merge")

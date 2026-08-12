@@ -110,13 +110,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - The current contract is deliberately a cross-version parity contract: every supported loader and
   version publishes every checkpoint. Do not add a version-only capture without first extending
   the contract schema and protected validator with explicit applicability rules.
-- Advisory AI review must pair every later-version candidate checkpoint with the identical semantic
+- AI review must pair every later-version candidate checkpoint with the identical semantic
   `capture_id` from authenticated current-head Fabric 1.20.1 evidence. A 1.20.1 review must instead
-  cross-pair Fabric with Forge and Forge with Fabric from the authenticated source run, and those
-  anchor pairs must reach semantic review even when their content-addressed image path is shared.
-  It must not fall back to filenames, ordinals, review tiers, a latest-version baseline, or strict
-  whole-pixel equality. Reject a missing pair or 1.20.1 peer, contract skew, aspect-ratio drift,
-  stale reference head, or mixed paired/unpaired capsule before the credential-bearing job starts.
+  contain no reference, require identical complete Fabric/Forge capture sets, and send both loaders'
+  frames through independent semantic review even when their content-addressed path is shared. It
+  must not fall back to filenames, ordinals, review tiers, a latest-version baseline, cross-loader
+  agreement, or strict whole-pixel equality. Reject missing anchor coverage, a missing later-version
+  pair, contract skew, aspect-ratio drift, stale reference head, or a mixed paired/unpaired capsule
+  before the credential-bearing job starts.
 - Java harness reports, packaged results, raw handoffs, compact caches, and public manifests must
   carry the exact validated contract SHA-256. Reject missing, extra, reordered, hash-mismatched, or
   assertion-free steps and reject a screenshot both when a capture is missing and when a
@@ -180,12 +181,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   complete scenario product, and one JAR;
   it must import the authenticated source commit only as inert Git objects and never check out or
   execute source-head files in the privileged default-branch workflow;
-  authenticate the exact current-head lossless 1.20.1 Pages source and its run provenance; fully
-  decode, dimension-normalize, and canonically re-encode bounded RGB PNG pairs without source
-  metadata; and emit a source/implementation/candidate/reference-artifact-bound proof. Queue
+  for the 1.20.1 anchor, require complete Fabric/Forge coverage and emit only unpaired frames; for
+  later versions, authenticate the exact current-head lossless 1.20.1 Pages source and its run
+  provenance; fully decode, dimension-normalize, and canonically re-encode bounded RGB PNGs without
+  source metadata; and emit a source/implementation/candidate/reference-artifact-bound proof. Queue
   selection must authenticate protected owners, survive pending-run replacement, accept a curated
   capsule whose later wake step failed, and cool recent failed attempts without blocking other
-  sources. The review runner accepts only that immutable handoff, skips byte-identical paths,
+  sources. The review runner accepts only that immutable handoff, never skips an unpaired anchor
+  frame, skips byte-identical paths only in paired comparison mode,
   exposes only bounded manifests/images to Sonnet triage and selective Opus verification with a
   read-only tool surface, captures each verdict from stdout, and validates exact labels and semantic
   coherence after every call. It revalidates the capsule after the model exits, publishes only a
@@ -194,11 +197,24 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   entry for cooldown and retry. The fixed concurrency group covers the complete protected drain,
   from oldest-entry selection through exact-id cleanup, so overlapping wakes cannot reserve the
   same capsule. Pending-run coalescing remains safe because queue state is durable and a settled
-  drain dispatches its own continuation. The curator may suppress a replicated automation sync
-  only after authenticating one bot-owned associated PR and its complete server-side file list,
+  drain dispatches its own continuation. The curator may suppress a replicated non-anchor
+  automation sync only after authenticating one bot-owned associated PR and its complete
+  server-side file list,
   and only when every current and previous rename path belongs to the visual-review workflows,
   protected CI tests, or documentation. Missing, oversized, multiple, or runtime-bearing diffs
-  remain eligible for the ordinary review path.
+  remain eligible for the ordinary review path. The automatic matrix-derived 1.20.1 anchor must
+  never use this suppression, irrespective of its immediate file inventory.
+- Every automatic `master` synchronization releases non-anchor version branches only after the
+  protected drainer produces a semantic 1.20.1 certificate. The certificate must cover identical
+  non-empty Fabric and Forge capture sets, contain no reference, report every frame semantically
+  valid with no defect, belong to the exact synchronization merge parent, and bind the current
+  exact-tree anchor merge head. The consuming synchronizer must reauthenticate the artifact id,
+  digest, size, successful protected owner run, source E2E run, contract hash, Git parents, equal
+  source/target trees, current `master`, and current anchor head. Stale or invalid dispatches are
+  no-ops. Immediate-diff classification must never bypass the anchor: a non-runtime tip can include
+  an older uncertified runtime change. The anchor's Packaged E2E policy is therefore always `full`.
+  This scheduling gate must never replace or weaken either individual port's required Build or
+  Packaged E2E checks.
 - Optimized gallery images are derivatives, not the source proof. Publish separate source and
   derivative hashes/dimensions, and content-address each public image URL with the bytes actually
   served. Original PNGs may exist only in `pages-e2e-*` handoffs; all are one-day transients except
