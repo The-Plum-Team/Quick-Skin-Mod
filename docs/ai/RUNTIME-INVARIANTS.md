@@ -181,7 +181,7 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   size-limit violations. Protected rendering must decode and recompute screenshot/comparison pixel
   metrics before publishing. Presentation code must use escaped/text DOM APIs and local assets.
 - Secret-bearing visual review has the fixed boundary `authenticate -> curate without secrets ->
-  durable queue -> globally serialized review in a fresh capsule -> exact-id cleanup`. Curating
+  durable queue -> artifact-scoped review in a fresh capsule -> exact-id cleanup`. Curating
   must authenticate every source artifact by numeric id, size, digest, run, protected matrix row,
   complete scenario product, and one JAR;
   it must import the authenticated source commit only as inert Git objects and never check out or
@@ -197,17 +197,22 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   exposes only bounded manifests/images to concurrent loader-grouped Sonnet triage and selective
   concurrent Opus verification with a read-only tool surface, captures each verdict from stdout,
   and validates exact labels and semantic coherence after every call. A first Opus-confirmed defect
-  cancels outstanding work and emits only an explicit fail-closed partial report, which can never
-  certify an anchor. A paired cache hit must bind exact candidate/reference pixels, expectation,
+  cancels outstanding work, emits only an explicit fail-closed partial report, publishes a sanitized
+  marker bound to the exact protected automatic generation and reauthenticated reviewer
+  implementation, and best-effort cancels its sibling
+  drains; authenticated queue selection must skip every remaining capsule for that generation. A
+  blocked report can never certify an anchor. A paired cache hit must bind exact candidate/reference pixels, expectation,
   capture and loader identity, scenario contract, release matrix, protected code, prompts, models,
   mode, and chunk policy; never cache or reuse unpaired anchor semantics. It revalidates the
   capsule after the model exits, publishes only a bounded normalized report or sanitized attempt
   marker, never uploads raw provider text, and
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
-  entry for cooldown and retry. The fixed concurrency group covers the complete protected drain,
-  from oldest-entry selection through exact-id cleanup, so overlapping wakes cannot reserve the
-  same capsule. Pending-run coalescing remains safe because queue state is durable and a settled
-  drain dispatches its own continuation. The curator may suppress a replicated non-anchor
+  entry for cooldown and retry. Each exact artifact ID locks its complete protected drain, from
+  exact selection through cleanup, so duplicate wakes cannot overlap while unrelated capsules run
+  concurrently. A separately locked scheduled/manual sweep never reviews directly: it converts
+  one authenticated oldest-entry selection into an exact wake. Pending-run coalescing remains safe
+  because queue state is durable and a settled drain dispatches its own continuation. The curator
+  may suppress a replicated non-anchor
   automation sync only after authenticating one bot-owned associated PR and its complete
   server-side file list,
   and only when every current and previous rename path belongs to the visual-review workflows,

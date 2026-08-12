@@ -45,6 +45,8 @@ OPAQUE_STARS_CANARY = (
     0.10,
 )
 
+TITLE_SPLASH_SCAN_CANARY = (0.50, 0.0, 1.0, 0.50)
+
 
 class VisualProbeCalibrationTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -117,6 +119,53 @@ class VisualProbeCalibrationTest(unittest.TestCase):
             packaged_runtime.validate_opaque_stars_background(
                 bright_path, packaged_runtime.OPAQUE_STARS_PROBES[key]
             )
+
+    def test_title_splash_probe_excludes_denser_yellow_panorama_content(self) -> None:
+        """Regression canary for the real 1.21.10 flower-field false positive."""
+
+        source = (
+            ROOT
+            / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn("int scanBottom = Math.max(1, height / 2);", source)
+        self.assertIn("int scanLeft = width / 2;", source)
+        self.assertIn("for (int y = scanTop; y < scanBottom; y++)", source)
+        self.assertIn("for (int x = scanLeft; x < scanRight; x++)", source)
+
+        width, height = 1920, 1080
+        image = Image.new("RGB", (width, height), (18, 28, 42))
+        draw = ImageDraw.Draw(image)
+        # The false target is intentionally much denser than the title text, just as the 1.21.10
+        # panorama was. A whole-frame densest-cluster strategy would pick this lower-left field.
+        draw.rectangle((100, 680, 280, 750), fill=(255, 240, 20))
+        # The only eligible title-chrome cluster is the upper-right splash.
+        draw.rectangle((1125, 202, 1280, 273), fill=(255, 255, 0))
+
+        left = int(TITLE_SPLASH_SCAN_CANARY[0] * width)
+        top = int(TITLE_SPLASH_SCAN_CANARY[1] * height)
+        right = int(TITLE_SPLASH_SCAN_CANARY[2] * width)
+        bottom = int(TITLE_SPLASH_SCAN_CANARY[3] * height)
+        eligible = [
+            (x, y)
+            for y in range(top, bottom)
+            for x in range(left, right)
+            if image.getpixel((x, y))[0] >= 200
+            and image.getpixel((x, y))[1] >= 200
+            and image.getpixel((x, y))[2] <= 90
+        ]
+
+        self.assertTrue(eligible)
+        self.assertGreaterEqual(min(x for x, _y in eligible), width // 2)
+        self.assertLess(max(y for _x, y in eligible), height // 2)
+        self.assertEqual(
+            (1125, 202, 1280, 273),
+            (
+                min(x for x, _y in eligible),
+                min(y for _x, y in eligible),
+                max(x for x, _y in eligible),
+                max(y for _x, y in eligible),
+            ),
+        )
 
 
 if __name__ == "__main__":
