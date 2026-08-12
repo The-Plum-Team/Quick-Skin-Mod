@@ -59,10 +59,17 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         for source in scenarios:
             with self.subTest(source=source.name):
                 text = source.read_text(encoding="utf-8")
-                self.assertIn(
-                    ".ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))",
-                    text,
-                )
+                if source.name == "PropagationScenario.java":
+                    self.assertIn(
+                        ".ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player)",
+                        text,
+                    )
+                    self.assertIn("&& (!observer || holdObserverBaseline(mc))", text)
+                else:
+                    self.assertIn(
+                        ".ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))",
+                        text,
+                    )
                 self.assertIn("default skin did not stabilize", text)
 
         live = scenarios[2].read_text(encoding="utf-8")
@@ -87,6 +94,20 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn('.ready(() -> holdModelEvidenceView(mc, "classic"))', scenario)
         self.assertIn("expectedModel.equals(VanillaShim.playerModel(mc.player))", scenario)
         self.assertIn("restoreModelEvidenceView(mc);", scenario)
+
+    def test_propagation_observer_baseline_hides_the_already_custom_subject(self) -> None:
+        scenario = (
+            E2E_JAVA / "scenario" / "PropagationScenario.java"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("holdObserverBaseline(mc)", scenario)
+        self.assertIn("CameraType.FIRST_PERSON", scenario)
+        self.assertIn("AbstractClientPlayer subject = findOther(mc);", scenario)
+        self.assertIn("if (distance < 3.0)", scenario)
+        self.assertIn("lookX * subjectX + lookZ * subjectZ <= -0.95", scenario)
+        self.assertIn(
+            "remote subject present behind first-person camera", scenario
+        )
 
     def test_string_class_lookups_declare_an_intermediary_fallback(self) -> None:
         """Fabric serves intermediary names at runtime; a Mojang name alone resolves only on Forge."""

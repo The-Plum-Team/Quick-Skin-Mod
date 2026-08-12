@@ -105,7 +105,7 @@
               "capture": {
                 "title": "Propagation observer baseline",
                 "review_tier": "all",
-                "expectation": "The observer starts in a normal first-person world view with an intact vanilla default appearance before inspecting the subject; any valid default skin variant is acceptable.",
+                "expectation": "A stable first-person world view whose lower-right hand and arm show the observer's intact vanilla default skin; any valid default skin variant is acceptable. The remote subject is deliberately held behind the camera and must not be visible before the later inspection checkpoint.",
                 "probes": []
               }
             },

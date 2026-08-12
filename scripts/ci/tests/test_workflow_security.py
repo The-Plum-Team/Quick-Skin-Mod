@@ -200,6 +200,11 @@ class WorkflowSecurityTest(unittest.TestCase):
             ): "7",
             (
                 "visual-review-drain.yml",
+                "Upload the source-bound normalized report",
+                "visual-review-${{ needs.select.outputs.source_run_id }}",
+            ): "7",
+            (
+                "visual-review-drain.yml",
                 "Upload the exact semantic anchor certificate",
                 "${{ steps.certify.outputs.artifact_name }}",
             ): "7",
@@ -497,6 +502,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-metadata", cleanup)
         self.assertIn("visual-review-delete", cleanup)
         self.assertEqual(cleanup.count("(HTTP 404)"), 2)
+        self.assertIn("API rate limit exceeded", cleanup)
+        self.assertIn("queue cleanup deferred", cleanup)
+        self.assertIn("authenticated marker must outlive", drain_workflow)
         self.assertIn("contents: write", release_anchor)
         self.assertIn("actions: read", release_anchor)
         self.assertIn("visual-anchor-certified", release_anchor)
@@ -505,6 +513,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("actions/checkout@", release_anchor)
         self.assertIn("contents: write", continuation)
         self.assertIn("needs.review.outputs.wave_blocked != 'true'", continuation)
+        self.assertIn("API rate limit exceeded", continuation)
+        self.assertIn("queue continuation deferred", continuation)
+        self.assertIn("visual-review-continuation", continuation)
 
         self.assertIn("lossless Minecraft 1.20.1", triage_prompt)
         self.assertIn("becoming softer or blurred", triage_prompt)

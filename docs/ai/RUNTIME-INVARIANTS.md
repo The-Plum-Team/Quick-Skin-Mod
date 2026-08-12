@@ -137,6 +137,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   and 4-pixel Steve arm widths are independently inspectable, restore the prior FOV afterwards, and
   compare the bounded player region by a material threshold. Stored intent or an ambiguous distant
   silhouette alone cannot certify model geometry.
+- In the sequential propagation scenario, the observer baseline must wait for the remote subject
+  and hold it decisively behind a first-person camera while proving the observer's own UUID-selected
+  vanilla texture. The subject is allowed to have completed its custom apply before the observer
+  launches; startup speed must never decide whether that custom subject leaks into a checkpoint
+  whose contract says it is still outside the later inspection frame.
 - Adjusted-cape parity evidence must show a non-standard padded source before cropping and the final
   aligned atlas as separate semantic checkpoints. The source checkpoint must expose all four
   padding bands; the aligned checkpoint must identify coloured pixels in auxiliary cape/elytra UV
@@ -224,7 +229,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
   entry for cooldown and retry. Each exact artifact ID locks its complete protected drain, from
   exact selection through cleanup, so duplicate wakes cannot overlap while unrelated capsules run
-  concurrently. A separately locked scheduled/manual sweep never reviews directly: it converts
+  concurrently. Once a normalized report or durable block makes a source ineligible, an explicit
+  GitHub installation-rate-limit response may defer input cleanup or the redundant continuation
+  wake without turning the completed review red. The normalized report or block must outlive its
+  durable input so deferred cleanup can never make reviewed work eligible again; artifact retention
+  and the scheduled sweep own eventual housekeeping/recovery, while every other API error remains visible. A separately locked
+  scheduled/manual sweep never reviews directly: it converts
   one authenticated oldest-entry selection into an exact wake. Pending-run coalescing remains safe
   because queue state is durable and a settled drain dispatches its own continuation. The curator
   may suppress a replicated non-anchor
