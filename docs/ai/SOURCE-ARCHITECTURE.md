@@ -116,14 +116,24 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every later-version candidate with the same semantic
-  capture from authenticated lossless raw Pages handoff evidence. For the 1.20.1 source itself it
-  cross-pairs Fabric and Forge in both directions and rejects incomplete loader coverage. It
-  atomically re-encodes both sides as same-sized, metadata-free RGB PNGs.
-  `e2e/check_visual_review.py` validates the all-single or
-  all-paired bounded capsule and normalizes bounded model output. `e2e/visual_review_runner.py`
-  removes byte-identical non-anchor pairs, always semantically reviews the cross-loader 1.20.1
-  anchor, runs bounded Sonnet triage chunks, selectively escalates bounded Opus verification
-  chunks, and keeps raw provider output private.
+  capture from authenticated lossless raw Pages handoff evidence. For a 1.20.1 source it instead
+  requires complete, identical Fabric/Forge capture-id sets and exposes each frame without any
+  reference. It atomically re-encodes candidates and any later-version references as metadata-free
+  RGB PNGs. `e2e/check_visual_review.py` validates the all-single or all-paired bounded capsule,
+  keeps `semantic_valid` independent from nullable `matches_reference`, and normalizes bounded model
+  output. `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Sonnet
+  triage, runs independent loader-grouped chunks concurrently, pipelines suspicious or uncertain
+  results into concurrent bounded Opus verification, cancels outstanding calls after the first
+  confirmed defect, skips byte-identical certified comparison pairs, and keeps raw provider output
+  private. `e2e/visual_review_cache.py` validates the rolling paired-only verdict cache: a hit binds
+  candidate/reference pixels, expectation, capture and loader identity, scenario contract, release
+  matrix, reviewer code, prompts, models, mode, and chunk policy; unpaired semantic anchors never
+  consume it.
+- `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
+  an unpaired, loader-complete, completely clean 1.20.1 report and binds its source/proof/manifest/
+  report digests to exact Git identities supplied by protected workflow checks. The version
+  synchronizer accepts the resulting artifact only from a successful protected drain run, for the
+  exact current `master` SHA and exact current merged anchor head.
 - `scripts/pages/evidence.py` creates and validates a small branch-scoped raw handoff, then
   atomically compacts a validated bundle to protected WebP derivatives. It may copy only contracted
   screenshots and structured provenance—never runtime logs or arbitrary HTML. The compact schema
@@ -141,14 +151,17 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   for concurrent attestations and are outside rotation ownership.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
-  the oldest eligible source. Queue state lives in Actions artifacts rather than pending workflow
+  the oldest eligible source except that a completed certifiable automatic 1.20.1 anchor preempts
+  advisory work. Queue state lives in Actions artifacts rather than pending workflow
   runs, so GitHub concurrency coalescing cannot lose a review. The fixed drain concurrency group
   covers selection through exact-id cleanup; overlapping wakes therefore cannot reserve the same
   oldest capsule before either reaches the model job.
 - `scripts/ci/visual_review_impact.py` is the narrow fail-open cost filter for replicated version
   ports. Protected automation supplies a complete, bounded GitHub PR file inventory; only the two
   visual-review workflows, the classifier itself, CI tests, and documentation may skip another
-  model review. Unknown paths, malformed inventories, and unsafe rename origins remain reviewable.
+  model review on a non-anchor port. The matrix-derived 1.20.1 port can never use this skip because
+  its semantic review certifies the cumulative current `master` generation. Unknown paths,
+  malformed inventories, and unsafe rename origins remain reviewable.
 - `scripts/ci/gradle_cache_policy.py` is the fail-closed writer policy for Gradle state. It permits
   writes only from protected `master`; release branches, packaged E2E, and release jobs remain
   read-only.
