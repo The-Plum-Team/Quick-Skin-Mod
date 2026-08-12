@@ -14,6 +14,7 @@ from visual_review_cache import (  # noqa: E402
     cache_identity,
     cache_key,
     cached_verdicts,
+    combine_caches,
     merge_cache,
     review_policy_sha256,
     validate_cache,
@@ -57,6 +58,33 @@ def verdict(label: str, *, defect: bool = False) -> dict[str, object]:
 
 
 class VisualReviewCacheTest(unittest.TestCase):
+    def test_immutable_shards_combine_newest_first(self) -> None:
+        shared = paired("fabric-1.21.1/full/client_a/cape")
+        older_only = paired("forge-1.21.1/full/client_a/cape")
+        older = merge_cache(
+            None,
+            [shared, older_only],
+            [verdict(shared["label"]), verdict(older_only["label"])],
+            policy_sha256=POLICY,
+            review_mode="reference-comparison",
+        )
+        newer = merge_cache(
+            None,
+            [shared],
+            [verdict(shared["label"], defect=True)],
+            policy_sha256=POLICY,
+            review_mode="reference-comparison",
+        )
+
+        combined = combine_caches([newer, older], policy_sha256=POLICY)
+        hits = cached_verdicts(
+            [shared, older_only], combined, review_mode="reference-comparison"
+        )
+
+        self.assertTrue(hits[shared["label"]]["defect"])
+        self.assertFalse(hits[older_only["label"]]["defect"])
+        self.assertEqual(2, len(combined["entries"]))
+
     def test_policy_changes_when_any_protected_input_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

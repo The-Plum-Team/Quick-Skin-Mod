@@ -208,6 +208,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "Upload the protected exact-policy verdict cache",
                 "${{ steps.publish-verdict-cache.outputs.artifact_name }}",
             ): "7",
+            (
+                "visual-review-drain.yml",
+                "Upload the sanitized generation block marker",
+                "${{ steps.wave-block.outputs.artifact_name }}",
+            ): "7",
         }
         observed_overrides: set[tuple[str, str, str]] = set()
         for workflow, step_name, block in uploads:
@@ -298,6 +303,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         curate = job_block("visual-review.yml", "curate")
         request = job_block("visual-review.yml", "request-drain")
         select = job_block("visual-review-drain.yml", "select")
+        dispatch_selected = job_block(
+            "visual-review-drain.yml", "dispatch-selected"
+        )
         review = job_block("visual-review-drain.yml", "review")
         cleanup = job_block("visual-review-drain.yml", "cleanup")
         release_anchor = job_block("visual-review-drain.yml", "release-anchor")
@@ -322,16 +330,38 @@ class WorkflowSecurityTest(unittest.TestCase):
             set(re.findall(r"(?m)^  ([a-z0-9-]+):\n", prepare_jobs)),
         )
         self.assertEqual(
-            {"select", "review", "cleanup", "release-anchor", "continue"},
+            {
+                "select",
+                "dispatch-selected",
+                "review",
+                "cleanup",
+                "release-anchor",
+                "continue",
+            },
             set(re.findall(r"(?m)^  ([a-z0-9-]+):\n", drain_jobs)),
         )
         self.assertIn("visual-review-drain-requested", prepare_workflow)
         self.assertIn("visual-review-drain-requested", drain_workflow)
         self.assertIn('cron: "17,47 * * * *"', drain_workflow)
-        self.assertIn("quick-skin-visual-review-model", drain_header)
+        self.assertIn("quick-skin-visual-review-${{", drain_header)
+        self.assertIn("github.event.client_payload.artifact_id", drain_header)
+        self.assertIn("'queue-sweep'", drain_header)
         self.assertIn("cancel-in-progress: false", drain_header)
         self.assertNotIn("concurrency:", review)
         self.assertIn("scripts/ci/visual_review_queue.py", select)
+        self.assertIn("--requested-artifact-id", select)
+        self.assertIn("artifact_id=$REQUESTED_ARTIFACT_ID", select)
+        self.assertIn("artifact_name=$REQUESTED_ARTIFACT_NAME", select)
+        self.assertIn("generation_sha=$REQUESTED_GENERATION_SHA", select)
+        self.assertIn("needs.select.outputs.direct == 'false'", dispatch_selected)
+        self.assertIn("visual-review-drain-requested", dispatch_selected)
+        self.assertIn("artifact_id:$artifact_id", dispatch_selected)
+        self.assertIn("artifact_name:$artifact_name", dispatch_selected)
+        self.assertIn("generation_sha:$generation_sha", dispatch_selected)
+        self.assertIn("contents: write", dispatch_selected)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", dispatch_selected)
+        self.assertNotIn("actions/checkout@", dispatch_selected)
+        self.assertIn("needs.select.outputs.direct == 'true'", review)
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
         self.assertIn('endswith(" - contract scenarios")', authenticate)
@@ -349,6 +379,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('persist-credentials: false', authenticate)
         self.assertIn('Ignoring infrastructure-only visual review sync PR', authenticate)
         self.assertIn("visual-review-input-$source_run_id", authenticate)
+        self.assertIn('startswith($input_name + "-")', authenticate)
         self.assertIn("visual-review-$source_run_id", authenticate)
         self.assertIn("visual-review-drain.yml", authenticate)
         self.assertNotIn("implementation_sha", authenticate)
@@ -430,9 +461,19 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--completion-state visual-review-completion.json", review)
         self.assertIn("--allow-blocking-partial", review)
         self.assertIn("visual-review-verdict-cache-$policy_sha256", review)
+        self.assertIn("visual_review_cache.py\" combine", review)
+        self.assertIn("artifact_ids=", review)
+        self.assertIn("Retire the consumed exact-policy verdict cache shards", review)
         self.assertIn("--max-entries 1", review)
         self.assertIn("steps.verdict-cache-artifact.outputs.artifact-id", review)
         self.assertIn("Retire superseded caches for obsolete review policies", review)
+        self.assertIn(
+            "visual-review-wave-block-$GENERATION_SHA", review
+        )
+        self.assertIn("Upload the sanitized generation block marker", review)
+        self.assertIn("Cancel sibling drains after the durable block exists", review)
+        self.assertIn("actions/runs/$sibling_id/cancel", review)
+        self.assertIn("steps.wave-block-artifact.outputs.artifact-id", review)
         self.assertIn("visual-review-failure.json", review)
         self.assertIn("visual-review-attempt-${{ needs.select.outputs.source_run_id }}", review)
         self.assertIn("cooling=true", review)
@@ -463,6 +504,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_anchor)
         self.assertNotIn("actions/checkout@", release_anchor)
         self.assertIn("contents: write", continuation)
+        self.assertIn("needs.review.outputs.wave_blocked != 'true'", continuation)
 
         self.assertIn("lossless Minecraft 1.20.1", triage_prompt)
         self.assertIn("becoming softer or blurred", triage_prompt)
