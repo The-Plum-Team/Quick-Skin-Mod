@@ -1,16 +1,19 @@
 name: Sync version branches
 
-# Shared changes land on master. Each release branch is discovered from GitHub and keeps its own
-# matrix authoritative. The planning job has read-only GitHub access; if Claude is needed it can
-# only produce a bounded patch artifact. A separate deterministic writer validates and publishes it.
+# Shared changes land on master. Every automatic generation first ports only the matrix-derived
+# Minecraft 1.20.1 anchor. A protected semantic certificate releases the remaining discovered
+# branches. Each target keeps its own matrix authoritative; no workflow stores a version list.
 on:
   push:
     branches:
       - master
+  repository_dispatch:
+    types:
+      - visual-anchor-certified
   workflow_dispatch:
     inputs:
       target:
-        description: Optional exact version branch; empty means every discovered branch
+        description: Optional exact recovery target; empty starts the certified anchor wave
         required: false
         type: string
 
@@ -27,6 +30,7 @@ jobs:
     name: Discover release branches
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       issues: write
     outputs:
@@ -50,20 +54,177 @@ jobs:
         id: targets
         shell: bash
         env:
+          EVENT_ACTION: ${{ github.event.action }}
           GH_TOKEN: ${{ github.token }}
+          PAYLOAD_ANCHOR_SOURCE_SHA: ${{ github.event.client_payload.anchor_source_sha }}
+          PAYLOAD_ANCHOR_TARGET_SHA: ${{ github.event.client_payload.anchor_target_sha }}
+          PAYLOAD_ARTIFACT_DIGEST: ${{ github.event.client_payload.artifact_digest }}
+          PAYLOAD_ARTIFACT_ID: ${{ github.event.client_payload.artifact_id }}
+          PAYLOAD_ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
+          PAYLOAD_ARTIFACT_RUN_ID: ${{ github.event.client_payload.artifact_run_id }}
+          PAYLOAD_ARTIFACT_SIZE: ${{ github.event.client_payload.artifact_size }}
+          PAYLOAD_MASTER_SOURCE_SHA: ${{ github.event.client_payload.master_source_sha }}
           REQUESTED_TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
+          reference_identity="$(python3 e2e/visual_review.py \
+            --matrix release/release-matrix.json --reference-identity)"
+          anchor_branch="$(jq -er .release_branch <<< "$reference_identity")"
+          [[ "$(jq -er .version <<< "$reference_identity")" == 1.20.1 ]]
+          branches="$RUNNER_TEMP/release-branches.txt"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/branches?per_page=100" \
+            --jq '.[].name' > "$branches"
+          grep -Fxq "$anchor_branch" "$branches"
+          python3 scripts/release/version_branches.py \
+            --exclude master --target "$anchor_branch" < "$branches" > /dev/null
+
           if [[ -n "$REQUESTED_TARGET" ]]; then
+            [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]
             value="$(python3 scripts/release/version_branches.py \
               --exclude master --target "$REQUESTED_TARGET")"
+          elif [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
+            [[ "$EVENT_ACTION" == visual-anchor-certified ]]
+            [[ "$PAYLOAD_MASTER_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+            # A certificate for an older master generation is expected during rapid updates. It
+            # cannot release any work for the new generation and is safely ignored.
+            if [[ "$PAYLOAD_MASTER_SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+              printf 'Ignoring stale anchor certificate for %s; current master is %s\n' \
+                "$PAYLOAD_MASTER_SOURCE_SHA" "$GITHUB_SHA"
+              printf 'value=[]\n' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/master" \
+              --jq .commit.sha)" == "$GITHUB_SHA" ]]
+            [[ "$PAYLOAD_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+            [[ "$PAYLOAD_ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+            [[ "$PAYLOAD_ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
+            (( PAYLOAD_ARTIFACT_SIZE <= 1048576 ))
+            [[ "$PAYLOAD_ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+            [[ "$PAYLOAD_ANCHOR_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+            [[ "$PAYLOAD_ANCHOR_TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+            [[ "$PAYLOAD_ARTIFACT_NAME" == \
+              "visual-anchor-certification-$GITHUB_SHA" ]]
+
+            metadata="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$PAYLOAD_ARTIFACT_ID")"
+            jq -e \
+              --arg digest "$PAYLOAD_ARTIFACT_DIGEST" \
+              --arg name "$PAYLOAD_ARTIFACT_NAME" \
+              --arg sha "$GITHUB_SHA" \
+              --argjson artifact_id "$PAYLOAD_ARTIFACT_ID" \
+              --argjson run_id "$PAYLOAD_ARTIFACT_RUN_ID" \
+              --argjson size "$PAYLOAD_ARTIFACT_SIZE" \
+              '.id == $artifact_id and .name == $name and .digest == $digest and
+               .size_in_bytes == $size and .expired == false and
+               .workflow_run.id == $run_id and .workflow_run.head_branch == "master" and
+               .workflow_run.head_sha == $sha' <<< "$metadata" > /dev/null
+            owner=''
+            for attempt in {1..60}; do
+              owner="$(gh api \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$PAYLOAD_ARTIFACT_RUN_ID")"
+              if [[ "$(jq -r .status <<< "$owner")" == completed ]]; then
+                break
+              fi
+              sleep 2
+            done
+            jq -e \
+              --arg repository "$GITHUB_REPOSITORY" \
+              --arg sha "$GITHUB_SHA" \
+              --argjson run_id "$PAYLOAD_ARTIFACT_RUN_ID" \
+              '.id == $run_id and .status == "completed" and .conclusion == "success" and
+               (.event == "repository_dispatch" or .event == "schedule" or
+                .event == "workflow_dispatch") and .head_branch == "master" and
+               .head_sha == $sha and
+               .path == ".github/workflows/visual-review-drain.yml" and
+               .head_repository.full_name == $repository' <<< "$owner" > /dev/null
+
+            archive="$RUNNER_TEMP/visual-anchor-certification.zip"
+            gh api -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$PAYLOAD_ARTIFACT_ID/zip" \
+              > "$archive"
+            [[ "$(stat -c %s "$archive")" == "$PAYLOAD_ARTIFACT_SIZE" ]]
+            [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
+              "$PAYLOAD_ARTIFACT_DIGEST" ]]
+            extracted="$RUNNER_TEMP/visual-anchor-certification"
+            python3 scripts/ci/bounded_zip.py \
+              "$archive" "$extracted" \
+              --max-archive-bytes 1048576 \
+              --max-entries 1 \
+              --max-total-bytes 1048576 \
+              --max-file-bytes 1048576 \
+              --max-compression-ratio 20 \
+              > "$RUNNER_TEMP/visual-anchor-certification-extraction.json"
+            rm -f -- "$archive"
+            mapfile -d '' certificate_files < <(
+              find "$extracted" -mindepth 1 -maxdepth 1 -print0
+            )
+            [[ "${#certificate_files[@]}" -eq 1 ]]
+            certificate="${certificate_files[0]}"
+            [[ -f "$certificate" && ! -L "$certificate" ]]
+            [[ "$(basename "$certificate")" == visual-anchor-certification.json ]]
+            python3 scripts/ci/visual_anchor_certification.py verify \
+              --certificate "$certificate" \
+              --expected-master-sha "$GITHUB_SHA" \
+              --expected-anchor-branch "$anchor_branch" \
+              > "$RUNNER_TEMP/verified-anchor-certificate.json"
+            jq -e \
+              --arg anchor_source_sha "$PAYLOAD_ANCHOR_SOURCE_SHA" \
+              --arg anchor_target_sha "$PAYLOAD_ANCHOR_TARGET_SHA" \
+              --arg implementation_sha "$(jq -r .head_sha <<< "$owner")" \
+              --arg scenario_contract_sha256 \
+                "$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)" \
+              '.anchor_source_sha == $anchor_source_sha and
+               .anchor_target_sha == $anchor_target_sha and
+               .implementation_sha == $implementation_sha and
+               .scenario_contract_sha256 == $scenario_contract_sha256' \
+              "$certificate" > /dev/null
+
+            [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$anchor_branch" \
+              --jq .commit.sha)" == "$PAYLOAD_ANCHOR_TARGET_SHA" ]]
+            git fetch --no-tags origin \
+              "$PAYLOAD_ANCHOR_SOURCE_SHA" "$PAYLOAD_ANCHOR_TARGET_SHA"
+            read -r -a source_commit <<< "$(git rev-list --parents -n 1 \
+              "$PAYLOAD_ANCHOR_SOURCE_SHA")"
+            [[ "${#source_commit[@]}" -eq 3 ]]
+            [[ "${source_commit[2]}" == "$GITHUB_SHA" ]]
+            read -r -a target_commit <<< "$(git rev-list --parents -n 1 \
+              "$PAYLOAD_ANCHOR_TARGET_SHA")"
+            [[ "${#target_commit[@]}" -eq 3 ]]
+            [[ "${target_commit[1]}" == "$PAYLOAD_ANCHOR_SOURCE_SHA" \
+              || "${target_commit[2]}" == "$PAYLOAD_ANCHOR_SOURCE_SHA" ]]
+            [[ "$(git rev-parse "$PAYLOAD_ANCHOR_SOURCE_SHA^{tree}")" == \
+              "$(git rev-parse "$PAYLOAD_ANCHOR_TARGET_SHA^{tree}")" ]]
+
+            source_run_id="$(jq -er .source_run_id "$certificate")"
+            source_branch="$(jq -er .source_branch "$certificate")"
+            source_run="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id")"
+            jq -e \
+              --arg branch "$source_branch" \
+              --arg repository "$GITHUB_REPOSITORY" \
+              --arg sha "$PAYLOAD_ANCHOR_SOURCE_SHA" \
+              --argjson run_id "$source_run_id" \
+              '.id == $run_id and .status == "completed" and .conclusion == "success" and
+               .event == "workflow_dispatch" and .head_branch == $branch and
+               .head_sha == $sha and .path == ".github/workflows/on-demand-e2e.yml" and
+               .head_repository.full_name == $repository' <<< "$source_run" > /dev/null
+            value="$(python3 scripts/release/version_branches.py \
+              --exclude master --exclude "$anchor_branch" < "$branches")"
+          elif [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            # Always certify the complete current master generation. Classifying only the latest
+            # push range is unsafe: a documentation-only tip can still contain an older runtime
+            # change whose anchor review is pending or failed.
+            value="$(python3 scripts/release/version_branches.py \
+              --exclude master --target "$anchor_branch")"
           else
-            value="$(gh api --paginate "repos/$GITHUB_REPOSITORY/branches?per_page=100" \
-              --jq '.[].name' | python3 scripts/release/version_branches.py --exclude master)"
+            [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]
+            value="$(python3 scripts/release/version_branches.py \
+              --exclude master --target "$anchor_branch")"
           fi
           printf 'value=%s\n' "$value" >> "$GITHUB_OUTPUT"
 
       - name: Ensure the automation PR label exists
+        if: steps.targets.outputs.value != '[]'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -385,8 +546,18 @@ jobs:
             jq -e \
               '.schema_version == 1 and (.runtime_required | type == "boolean") and (.paths | type == "array" and length > 0) and (.runtime_paths | type == "array")' \
               <<< "$runtime_manifest" > /dev/null
+            anchor_branch="$(jq -er '
+              .unit_test_version as $version |
+              select($version == "1.20.1") |
+              select(([.artifacts[] |
+                select(.artifact_version == $version) | .loader] |
+                sort | unique) == ["fabric", "forge"]) |
+              .project.release_branch |
+              select(type == "string" and length > 0)
+            ' "$RUNNER_TEMP/version-port-controller/release/release-matrix.json")"
             runtime_policy=full
-            if [[ "$runtime_required" == false ]]; then
+            if [[ "$runtime_required" == false \
+                && "$TARGET_BRANCH" != "$anchor_branch" ]]; then
               runtime_policy=not-applicable
             fi
           else
@@ -705,8 +876,18 @@ jobs:
           runtime_manifest="$(sed -n 's/^manifest=//p' "$impact_output")"
           [[ "$(jq -S -c . <<< "$runtime_manifest")" \
             == "$(jq -S -c . <<< "$EXPECTED_RUNTIME_MANIFEST")" ]]
+          anchor_branch="$(jq -er '
+            .unit_test_version as $version |
+            select($version == "1.20.1") |
+            select(([.artifacts[] |
+              select(.artifact_version == $version) | .loader] |
+              sort | unique) == ["fabric", "forge"]) |
+            .project.release_branch |
+            select(type == "string" and length > 0)
+          ' ../controller/release/release-matrix.json)"
           runtime_policy=full
-          if [[ "$runtime_required" == false ]]; then
+          if [[ "$runtime_required" == false \
+              && "$TARGET_BRANCH" != "$anchor_branch" ]]; then
             runtime_policy=not-applicable
           fi
           [[ "$runtime_policy" == "$EXPECTED_RUNTIME_POLICY" ]]
@@ -1001,8 +1182,18 @@ jobs:
           runtime_manifest="$(sed -n 's/^manifest=//p' "$impact_output")"
           [[ "$(jq -S -c . <<< "$runtime_manifest")" \
             == "$(jq -S -c . <<< "$EXPECTED_RUNTIME_MANIFEST")" ]]
+          anchor_branch="$(jq -er '
+            .unit_test_version as $version |
+            select($version == "1.20.1") |
+            select(([.artifacts[] |
+              select(.artifact_version == $version) | .loader] |
+              sort | unique) == ["fabric", "forge"]) |
+            .project.release_branch |
+            select(type == "string" and length > 0)
+          ' ../controller/release/release-matrix.json)"
           runtime_policy=full
-          if [[ "$runtime_required" == false ]]; then
+          if [[ "$runtime_required" == false \
+              && "$TARGET_BRANCH" != "$anchor_branch" ]]; then
             runtime_policy=not-applicable
           fi
           [[ "$runtime_policy" == "$EXPECTED_RUNTIME_POLICY" ]]
