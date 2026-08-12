@@ -20,9 +20,15 @@ from typing import Any, Protocol
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
-INPUT_NAME = re.compile(r"^visual-review-input-(?P<source>[1-9][0-9]*)$")
+INPUT_NAME = re.compile(
+    r"^visual-review-input-(?P<source>[1-9][0-9]*)"
+    r"(?:-(?P<generation>[0-9a-f]{40}))?$"
+)
 REPORT_NAME = re.compile(r"^visual-review-(?P<source>[1-9][0-9]*)$")
 ATTEMPT_NAME = re.compile(r"^visual-review-attempt-(?P<source>[1-9][0-9]*)$")
+WAVE_BLOCK_NAME = re.compile(
+    r"^visual-review-wave-block-(?P<generation>[0-9a-f]{40})$"
+)
 ANCHOR_SOURCE_BRANCH = re.compile(
     r"^automation/sync/forge-and-fabric-1\.20\.1/[A-Za-z0-9._/-]+$"
 )
@@ -200,17 +206,64 @@ def reviewed_sources(
     )
 
 
+def blocked_generations(
+    api: QueueApi, artifacts: list[Artifact], *, repository: str
+) -> set[str]:
+    """Return exact master generations stopped by a protected confirmed-defect marker."""
+
+    blocks: set[str] = set()
+    run_cache: dict[int, dict[str, Any]] = {}
+    for artifact in artifacts:
+        match = WAVE_BLOCK_NAME.fullmatch(artifact.name)
+        if match is None or artifact.expired:
+            continue
+        generation = match.group("generation")
+        # The owner run still binds the marker to its exact protected reviewer implementation; the
+        # name binds its verdict to the product generation, which must remain stopped even when
+        # master advances and a newer protected drainer encounters an older queued sibling.
+        if artifact.size_in_bytes > 1_048_576:
+            continue
+        run = run_cache.get(artifact.run_id)
+        if run is None:
+            run = api.get_run(artifact.run_id)
+            run_cache[artifact.run_id] = run
+        if valid_owner(
+            run,
+            repository=repository,
+            artifact=artifact,
+            workflow=DRAIN_WORKFLOW,
+            events=DRAIN_EVENTS,
+            conclusions=frozenset({"failure"}),
+            allow_in_progress=True,
+        ):
+            blocks.add(generation)
+    return blocks
+
+
+def input_generation(artifact: Artifact) -> str:
+    """Generation encoded by a current input, with a legacy implementation-SHA fallback."""
+
+    match = INPUT_NAME.fullmatch(artifact.name)
+    if match is None:
+        raise QueueError("visual review input name is invalid")
+    return match.group("generation") or artifact.head_sha
+
+
 def select_pending(
     api: QueueApi,
     *,
     repository: str,
     now: datetime | None = None,
     cooldown: timedelta = timedelta(minutes=DEFAULT_COOLDOWN_MINUTES),
+    requested_artifact_id: int | None = None,
 ) -> tuple[Artifact, int] | None:
+    if requested_artifact_id is not None and requested_artifact_id <= 0:
+        raise QueueError("requested artifact id must be a positive integer")
     artifacts = api.list_artifacts()
     if len(artifacts) > MAX_ARTIFACTS:
         raise QueueError(f"visual review artifact inventory exceeds {MAX_ARTIFACTS}")
     reviewed = reviewed_sources(api, artifacts, repository=repository)
+    blocked = blocked_generations(api, artifacts, repository=repository)
     attempts = _valid_sources(
         api,
         artifacts,
@@ -242,9 +295,19 @@ def select_pending(
         if source_run_id not in reviewed and source_run_id not in cooling
         for artifact in values
         if artifact.size_in_bytes <= MAX_INPUT_BYTES
+        and input_generation(artifact) not in blocked
     ]
     if not candidates:
         return None
+    if requested_artifact_id is not None:
+        requested = [
+            candidate
+            for candidate in candidates
+            if candidate[0].artifact_id == requested_artifact_id
+        ]
+        if len(requested) > 1:
+            raise QueueError("requested artifact id is ambiguous")
+        return requested[0] if requested else None
     source_run_cache: dict[int, dict[str, Any]] = {}
 
     def priority(candidate: tuple[Artifact, int]) -> tuple[int, datetime, int]:
@@ -340,6 +403,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=DEFAULT_COOLDOWN_MINUTES,
     )
+    parser.add_argument("--requested-artifact-id", type=int)
     return parser.parse_args(argv)
 
 
@@ -362,6 +426,7 @@ def main(argv: list[str] | None = None) -> int:
             ),
             repository=repository,
             cooldown=timedelta(minutes=args.cooldown_minutes),
+            requested_artifact_id=args.requested_artifact_id,
         )
         with args.github_output.open("a", encoding="utf-8") as output:
             if selected is None:
@@ -375,6 +440,7 @@ def main(argv: list[str] | None = None) -> int:
             output.write(f"artifact_size={artifact.size_in_bytes}\n")
             output.write(f"artifact_run_id={artifact.run_id}\n")
             output.write(f"implementation_sha={artifact.head_sha}\n")
+            output.write(f"generation_sha={input_generation(artifact)}\n")
             output.write(f"source_run_id={source_run_id}\n")
         return 0
     except (OSError, QueueError) as exc:

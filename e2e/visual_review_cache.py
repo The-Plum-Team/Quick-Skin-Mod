@@ -343,6 +343,31 @@ def cached_verdicts(
     return hits
 
 
+def combine_caches(
+    caches: list[dict[str, Any]], *, policy_sha256: str
+) -> dict[str, Any]:
+    """Combine newest-first immutable shards without weakening exact-policy validation."""
+
+    ordered: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    for cache in reversed(caches):
+        normalized = validate_cache(cache, policy_sha256)
+        for entry in normalized["entries"]:
+            # Callers supply newest shards first. Iterate the other way so moving a duplicate to
+            # the end retains the newest verdict and preserves oldest-first eviction semantics.
+            ordered.pop(entry["key"], None)
+            ordered[entry["key"]] = entry
+    while len(ordered) > MAX_CACHE_ENTRIES:
+        ordered.popitem(last=False)
+    return validate_cache(
+        {
+            "schema_version": CACHE_SCHEMA_VERSION,
+            "policy_sha256": policy_sha256,
+            "entries": list(ordered.values()),
+        },
+        policy_sha256,
+    )
+
+
 def merge_cache(
     existing: dict[str, Any] | None,
     manifest: Any,
@@ -448,6 +473,12 @@ def main(argv: list[str] | None = None) -> int:
     validate_parser.add_argument("--cache", type=Path, required=True)
     validate_parser.add_argument("--policy-sha256", required=True)
     validate_parser.add_argument("--normalized-output", type=Path)
+    combine_parser = commands.add_parser("combine")
+    combine_parser.add_argument(
+        "--cache", type=Path, action="append", required=True
+    )
+    combine_parser.add_argument("--policy-sha256", required=True)
+    combine_parser.add_argument("--output", type=Path, required=True)
     update_parser = commands.add_parser("update")
     update_parser.add_argument("--existing-cache", type=Path)
     update_parser.add_argument("--manifest", type=Path, required=True)
@@ -480,6 +511,14 @@ def main(argv: list[str] | None = None) -> int:
             if args.normalized_output is not None:
                 write_cache(args.normalized_output, cache)
             print(f"Validated {len(cache['entries'])} exact-policy visual verdicts")
+            return 0
+        if args.command == "combine":
+            combined = combine_caches(
+                [load_cache(path, args.policy_sha256) for path in args.cache],
+                policy_sha256=args.policy_sha256,
+            )
+            write_cache(args.output, combined)
+            print(f"Combined {len(combined['entries'])} exact-policy visual verdicts")
             return 0
         existing = (
             load_cache(args.existing_cache, args.policy_sha256)

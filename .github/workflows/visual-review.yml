@@ -2,9 +2,10 @@ name: AI visual review
 
 # This workflow authenticates and curates immutable review capsules from protected code. Ordinary
 # trusted runs arrive through workflow_run; GITHUB_TOKEN-driven version ports use the explicit
-# authenticated dispatch because recursive workflow events are suppressed. A separate globally
-# serialized drainer owns the Claude credential. Reports are not required gate conclusions; only a
-# clean synchronized 1.20.1 report can mint the certificate that releases the later-version wave.
+# authenticated dispatch because recursive workflow events are suppressed. Separate protected,
+# artifact-scoped drainers own the Claude credential. Reports are not required gate conclusions;
+# only a clean synchronized 1.20.1 report can mint the certificate that releases the later-version
+# wave.
 on:
   repository_dispatch:
     types:
@@ -220,46 +221,50 @@ jobs:
           # here for one API call, before the heavier jobs and artifact validation below.
           report_name="visual-review-$source_run_id"
           input_name="visual-review-input-$source_run_id"
-          for artifact_name in "$report_name" "$input_name"; do
-            artifacts="$(gh api --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$artifact_name&per_page=100")"
-            jq -e \
-              '(type == "array") and
-               ([.[] | (.artifacts | type == "array")] | all) and
-               ([.[].artifacts[]] | length <= 100)' \
-              <<< "$artifacts" > /dev/null
-            while IFS=$'\t' read -r artifact_run_id artifact_expired; do
-              [[ -n "$artifact_run_id" ]] || continue
-              [[ "$artifact_expired" == false ]] || continue
-              owner_run="$(gh api \
-                "repos/$GITHUB_REPOSITORY/actions/runs/$artifact_run_id" 2>/dev/null || true)"
-              expected_workflow=".github/workflows/visual-review.yml"
-              expected_events='["repository_dispatch","workflow_run"]'
-              expected_conclusions='["success","failure"]'
-              if [[ "$artifact_name" == "$report_name" ]]; then
-                expected_workflow=".github/workflows/visual-review-drain.yml"
-                expected_events='["repository_dispatch","schedule","workflow_dispatch"]'
-                expected_conclusions='["success","failure"]'
-              fi
-              if [[ -n "$owner_run" ]] && jq -e \
-                  --arg repository "$GITHUB_REPOSITORY" \
-                  --arg workflow "$expected_workflow" \
-                  --argjson conclusions "$expected_conclusions" \
-                  --argjson events "$expected_events" \
-                  '.status == "completed" and
-                   (.conclusion as $conclusion | $conclusions | index($conclusion)) != null and
-                   (.event as $event | $events | index($event)) != null and
-                   .head_branch == "master" and .path == $workflow and
-                   .head_repository.full_name == $repository' \
-                  <<< "$owner_run" > /dev/null; then
-                printf 'Visual review is already queued or complete for source run %s\n' \
-                  "$source_run_id"
-                exit 0
-              fi
-            done < <(jq -r --arg name "$artifact_name" \
-              '.[].artifacts[] | select(.name == $name) |
-               [.workflow_run.id, .expired] | @tsv' <<< "$artifacts")
-          done
+          artifacts="$(gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100")"
+          jq -e \
+            '(type == "array") and
+             ([.[] | (.artifacts | type == "array")] | all) and
+             ([.[].artifacts[]] | length <= 10000)' \
+            <<< "$artifacts" > /dev/null
+          while IFS=$'\t' read -r artifact_name artifact_run_id artifact_expired; do
+            [[ -n "$artifact_run_id" ]] || continue
+            [[ "$artifact_expired" == false ]] || continue
+            expected_workflow=".github/workflows/visual-review.yml"
+            expected_events='["repository_dispatch","workflow_run"]'
+            expected_conclusions='["success","failure"]'
+            if [[ "$artifact_name" == "$report_name" ]]; then
+              expected_workflow=".github/workflows/visual-review-drain.yml"
+              expected_events='["repository_dispatch","schedule","workflow_dispatch"]'
+            else
+              [[ "$artifact_name" == "$input_name" \
+                || "$artifact_name" =~ ^visual-review-input-$source_run_id-[0-9a-f]{40}$ ]]
+            fi
+            owner_run="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$artifact_run_id" 2>/dev/null || true)"
+            if [[ -n "$owner_run" ]] && jq -e \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg workflow "$expected_workflow" \
+                --argjson conclusions "$expected_conclusions" \
+                --argjson events "$expected_events" \
+                '.status == "completed" and
+                 (.conclusion as $conclusion | $conclusions | index($conclusion)) != null and
+                 (.event as $event | $events | index($event)) != null and
+                 .head_branch == "master" and .path == $workflow and
+                 .head_repository.full_name == $repository' \
+                <<< "$owner_run" > /dev/null; then
+              printf 'Visual review is already queued or complete for source run %s\n' \
+                "$source_run_id"
+              exit 0
+            fi
+          done < <(jq -r \
+            --arg input_name "$input_name" \
+            --arg report_name "$report_name" \
+            '.[].artifacts[] |
+             select(.name == $report_name or .name == $input_name or
+               (.name | startswith($input_name + "-"))) |
+             [.name, .workflow_run.id, .expired] | @tsv' <<< "$artifacts")
 
           # List endpoints are read as --paginate --slurp page arrays, the same shape every other
           # trusted workflow consumes, then flattened before any count or identity assertion.
@@ -353,6 +358,7 @@ jobs:
     outputs:
       artifact_id: ${{ steps.handoff.outputs.artifact-id }}
       artifact_name: ${{ steps.identity.outputs.artifact_name }}
+      generation_sha: ${{ steps.evidence.outputs.generation_sha }}
 
     steps:
       - name: Check out the exact protected curator
@@ -485,6 +491,19 @@ jobs:
           source_release_branch="$(jq -er .project.release_branch "$source_matrix")"
           review_mode=reference-comparison
           master_source_sha=''
+          # Every controller-owned version port is a two-parent merge whose second parent is the
+          # exact master generation being propagated. Preserve that identity for the whole wave,
+          # not only for its 1.20.1 anchor, so a confirmed later-version defect can stop sibling
+          # reviews without affecting an unrelated generation or advisory PR.
+          if [[ "$(jq -r .event <<< "$source_run")" == workflow_dispatch \
+              && "$source_branch" == automation/sync/* ]]; then
+            read -r -a source_commit <<< "$(git rev-list --parents -n 1 "$SOURCE_SHA")"
+            if [[ "${#source_commit[@]}" -eq 3 ]] \
+                && git merge-base --is-ancestor \
+                  "${source_commit[2]}" "$IMPLEMENTATION_SHA"; then
+              master_source_sha="${source_commit[2]}"
+            fi
+          fi
           if jq -e \
               --arg reference_version "$REFERENCE_VERSION" \
               '(.include | length == 2) and
@@ -493,14 +512,14 @@ jobs:
               "$RUNNER_TEMP/expected-e2e-matrix.json" > /dev/null; then
             [[ "$source_release_branch" == "$REFERENCE_BRANCH" ]]
             review_mode=anchor-semantic
-            read -r -a source_commit <<< "$(git rev-list --parents -n 1 "$SOURCE_SHA")"
-            if [[ "${#source_commit[@]}" -eq 3 ]] \
-                && git merge-base --is-ancestor \
-                  "${source_commit[2]}" "$IMPLEMENTATION_SHA"; then
-              master_source_sha="${source_commit[2]}"
-            fi
           fi
           printf 'review_mode=%s\n' "$review_mode" >> "$GITHUB_OUTPUT"
+          generation_sha="$IMPLEMENTATION_SHA"
+          if [[ -n "$master_source_sha" ]]; then
+            generation_sha="$master_source_sha"
+          fi
+          [[ "$generation_sha" =~ ^[0-9a-f]{40}$ ]]
+          printf 'generation_sha=%s\n' "$generation_sha" >> "$GITHUB_OUTPUT"
 
           if [[ "$review_mode" == reference-comparison ]]; then
           reference_output="$(mktemp "$RUNNER_TEMP/reference-selection.XXXXXX")"
@@ -842,11 +861,14 @@ jobs:
         if: steps.evidence.outputs.contract_skew == 'false'
         shell: bash
         env:
+          GENERATION_SHA: ${{ steps.evidence.outputs.generation_sha }}
           SOURCE_RUN_ID: ${{ needs.authenticate.outputs.source_run_id }}
         run: |
           set -euo pipefail
+          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          printf 'artifact_name=visual-review-input-%s\n' "$SOURCE_RUN_ID" \
+          printf 'artifact_name=visual-review-input-%s-%s\n' \
+            "$SOURCE_RUN_ID" "$GENERATION_SHA" \
             >> "$GITHUB_OUTPUT"
 
       - name: Upload only the curated review input
@@ -884,14 +906,18 @@ jobs:
         env:
           ARTIFACT_ID: ${{ needs.curate.outputs.artifact_id }}
           ARTIFACT_NAME: ${{ needs.curate.outputs.artifact_name }}
+          GENERATION_SHA: ${{ needs.curate.outputs.generation_sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ ]]
+          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA$ ]]
           jq -n \
             --arg artifact_id "$ARTIFACT_ID" \
             --arg artifact_name "$ARTIFACT_NAME" \
+            --arg generation_sha "$GENERATION_SHA" \
             '{event_type:"visual-review-drain-requested",
-              client_payload:{artifact_id:$artifact_id,artifact_name:$artifact_name}}' \
+              client_payload:{artifact_id:$artifact_id,artifact_name:$artifact_name,
+                generation_sha:$generation_sha}}' \
             | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
