@@ -25,7 +25,17 @@ objects as `master`. Only changed blobs, trees, and commits add repository stora
 ## Automated propagation
 
 `Sync version branches` runs after a trusted push to `master` and can also be dispatched for one
-exact target. It discovers remote release branches from the naming contract, then for each target:
+exact recovery target. It discovers remote release branches from the naming contract; it never
+stores a version list. Every automatic generation runs in two waves: first only the matrix-derived
+Minecraft 1.20.1 branch, then every remaining branch after the protected visual drainer semantically
+certifies all Fabric and Forge anchor captures without a reference. The certificate is bound to the
+exact `master` source, tested synchronization head, current exact-tree anchor merge, source run,
+scenario contract, manifest, and normalized report. The anchor port always executes full Packaged
+E2E and semantic review, including for an immediate documentation/site/administration-only diff:
+the current generation can cumulatively contain an older runtime change whose certificate is still
+pending or failed. A manual exact target remains available for recovery.
+
+For each selected target the workflow:
 
 1. creates an isolated `automation/sync/...` branch from the target, or updates its existing open
    synchronization PR in place;
@@ -44,6 +54,13 @@ exact target. It discovers remote release branches from the naming contract, the
 7. receives a trusted `repository_dispatch` when each gate settles;
 8. merges and deletes the automation branch only after both exact-head gates pass;
 9. dispatches lightweight Build and Packaged E2E attestations on the final release branch.
+
+The anchor port's required gates and merge remain ordinary deterministic port operations; AI is
+not a required status on that PR. The trusted merge handler wakes semantic review only after that
+merge exists. A clean semantic certificate gates only creation of the second wave. If the model is
+unavailable, finds a defect, receives incomplete loader coverage, or produces a certificate for a
+stale `master` or stale anchor head, no other version tests are launched for that generation. A
+newer `master` push starts a fresh anchor generation instead of accepting an older certificate.
 
 The source-preferred policy in step 3 is a three-way file merge, not a whole-file checkout from
 `master`: non-conflicting target-only hunks survive. The credentialless validator and the narrow

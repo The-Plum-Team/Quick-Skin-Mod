@@ -44,7 +44,9 @@ class E2EImpactTest(unittest.TestCase):
             ".github/actions/run-packaged-e2e/action.yml",
             "ORACLE-RETIREMENT.md",
             "e2e/visual_review_prompt.md",
+            "e2e/visual_review_semantic_prompt.md",
             "scripts/ci/e2e_impact.py",
+            "scripts/ci/visual_anchor_certification.py",
         ):
             with self.subTest(path=path):
                 result = impact.classify([path])
