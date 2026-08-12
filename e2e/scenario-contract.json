@@ -35,7 +35,7 @@
               "capture": {
                 "title": "Smoke local skin",
                 "review_tier": "all",
-                "expectation": "A normal first-person world view whose small HUD preview shows the brown-haired, navy-plaid custom skin.",
+                "expectation": "A normal first-person world view whose lower-right player arm wears the custom skin's dark charcoal-and-gray plaid sleeve with a brown hand.",
                 "probes": []
               }
             }
@@ -83,7 +83,7 @@
               "capture": {
                 "title": "Propagation subject applied",
                 "review_tier": "all",
-                "expectation": "The subject remains in first person while the lower-corner HUD preview shows the custom navy-plaid appearance.",
+                "expectation": "The subject remains in first person while the lower-right player arm wears the custom skin's dark charcoal-and-gray plaid sleeve with a brown hand.",
                 "probes": []
               }
             }
@@ -123,7 +123,7 @@
               "capture": {
                 "title": "Propagation observed remotely",
                 "review_tier": "key",
-                "expectation": "The observer sees Alice wearing the custom navy-plaid skin and the orange or green face of a deep-blue cape.",
+                "expectation": "The observer sees Alice wearing the custom skin with brown hair, a dark charcoal-and-gray plaid jacket and blue trousers, plus the orange or green face of a deep-blue cape.",
                 "probes": []
               }
             }
@@ -176,7 +176,7 @@
               "capture": {
                 "title": "Live subject applied",
                 "review_tier": "all",
-                "expectation": "The subject's first-person view includes a lower-corner preview of the newly applied custom navy-plaid appearance.",
+                "expectation": "The subject's first-person view includes the newly applied custom skin on the lower-right player arm: a dark charcoal-and-gray plaid sleeve with a brown hand.",
                 "probes": []
               }
             }
@@ -222,7 +222,7 @@
               "capture": {
                 "title": "Live observer after",
                 "review_tier": "key",
-                "expectation": "The observer sees the same Alice changed to the brown-haired navy-plaid skin with a custom orange or green cape.",
+                "expectation": "The observer sees the same Alice changed to the custom skin with brown hair, a dark charcoal-and-gray plaid jacket and blue trousers, plus a custom orange or green cape.",
                 "probes": []
               }
             }
@@ -272,7 +272,7 @@
               "capture": {
                 "title": "Local skin applied",
                 "review_tier": "key",
-                "expectation": "The centered third-person player wears the custom skin: brown hair, a dark navy plaid jacket and blue trousers.",
+                "expectation": "The centered third-person player wears the custom skin: brown hair, a dark charcoal-and-gray plaid jacket and blue trousers.",
                 "probes": []
               }
             },
@@ -339,7 +339,7 @@
               "capture": {
                 "title": "Slim model",
                 "review_tier": "key",
-                "expectation": "The custom navy-plaid skin is rendered on the slim Alex-style arm model.",
+                "expectation": "The custom skin with a dark charcoal-and-gray plaid jacket and blue trousers is rendered on the slim Alex-style arm model.",
                 "probes": []
               }
             },
@@ -349,7 +349,7 @@
               "capture": {
                 "title": "Classic model",
                 "review_tier": "key",
-                "expectation": "The custom navy-plaid skin is rendered on the wider classic Steve-style arm model.",
+                "expectation": "The custom skin with a dark charcoal-and-gray plaid jacket and blue trousers is rendered on the wider classic Steve-style arm model.",
                 "probes": []
               }
             },
@@ -509,7 +509,7 @@
               "capture": {
                 "title": "Bundled BMO elytra",
                 "review_tier": "key",
-                "expectation": "The player wears elytra textured directly by the bundled BMO atlas; this is the unedited visual reference for the adjusted BMO elytra capture.",
+                "expectation": "The crouching player wears elytra textured directly by the bundled BMO atlas; the pose must visibly separate both wings, and this is the unedited visual reference for the adjusted BMO elytra capture.",
                 "probes": []
               }
             },
@@ -539,7 +539,7 @@
               "capture": {
                 "title": "Adjusted BMO elytra",
                 "review_tier": "key",
-                "expectation": "The player wears elytra from the BMO cape saved through the editor, and both wings look the same as the bundled BMO elytra reference without broken UV placement.",
+                "expectation": "The crouching player wears elytra from the BMO cape saved through the editor; the pose must visibly separate both wings, which look the same as the bundled BMO elytra reference without broken UV placement.",
                 "probes": []
               }
             },

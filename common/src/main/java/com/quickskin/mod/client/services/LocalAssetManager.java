@@ -11,6 +11,7 @@ import com.quickskin.mod.common.data.SkinSortMode;
 import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.common.util.HashUtil;
 import com.quickskin.mod.common.util.BoundedFileReader;
+import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.HDTextureProcessor;
 import com.quickskin.mod.common.util.SkinModelDetector;
 import com.quickskin.mod.common.util.SafeImageReader;
@@ -1238,13 +1239,14 @@ public class LocalAssetManager {
 //?}
             AssetMetadata metadata = snapshot.metadata().get(primary);
             boolean isSkin = metadata != null && "skin".equals(metadata.type());
+            boolean isCape = metadata != null && metadata.isCape();
             boolean shouldRemoveTransparency = isSkin &&
                     com.quickskin.mod.config.ClientConfig.getInstance().shouldDisableSkinTransparency();
 //? if <1.21.11 {
 //?} else {
 
             // Canonical full-quality bytes need no decode/re-encode when presentation policy is off.
-            if (quality == TextureQuality.FULL && !shouldRemoveTransparency
+            if (quality == TextureQuality.FULL && !shouldRemoveTransparency && !isCape
                     && primary.equals(HashUtil.computeAssetContentId(
                             sourceBytes, metadata != null ? metadata.type() : null))) {
                 return sourceBytes;
@@ -1260,13 +1262,20 @@ public class LocalAssetManager {
             if (shouldRemoveTransparency) {
                 image = HDTextureProcessor.removeTransparency(image);
             }
+            boolean capePresentationChanged = false;
+            if (isCape) {
+                BufferedImage masked = CapeElytraSilhouette.maskedCopy(
+                        image, Math.max(1, metadata.frameCount()));
+                capePresentationChanged = masked != image;
+                image = masked;
+            }
 
             // Process based on quality
             return switch (quality) {
                 case FULL -> {
                     // For FULL quality, we need to convert the image back to bytes
-                    // since we may have modified it (transparency removal)
-                    if (shouldRemoveTransparency) {
+                    // since presentation policy may have modified it.
+                    if (shouldRemoveTransparency || capePresentationChanged) {
                         yield HDTextureProcessor.imageToPng(image);
                     } else {
                         yield sourceBytes;
@@ -2031,9 +2040,8 @@ public class LocalAssetManager {
     }
 
     /**
-     * Check if the elytra area of a cape atlas is transparent, and if so,
-     * composite the vanilla elytra texture onto the cached atlas.
-     * This keeps the source GIF untouched while ensuring elytra renders correctly.
+     * Apply the shared Elytra import policy to a cached GIF atlas while keeping the source GIF
+     * untouched: composite the vanilla fallback where required, then restore the tapered cutout.
      */
     private void compositeElytraOnAtlasIfNeeded(Path atlasPath, int frameCount) {
         try {
@@ -2042,66 +2050,61 @@ public class LocalAssetManager {
 
             int capeW = atlas.getWidth();
             int frameH = (frameCount > 0) ? atlas.getHeight() / frameCount : atlas.getHeight();
+            if (frameCount < 1 || frameH * frameCount != atlas.getHeight()) return;
 
-            // Sample the elytra area (top-right of the cape) for transparency
-            double scale = capeW / 64.0;
-            int elytraX = (int) (22 * scale);
-            int elytraW = (int) (32 * scale);
-            int elytraH = (int) (16 * scale);
-            boolean allTransparent = true;
-            int samplePoints = 5;
-            for (int i = 0; i < samplePoints && allTransparent; i++) {
-                for (int j = 0; j < samplePoints && allTransparent; j++) {
-                    int x = Math.min(elytraX + (i * elytraW / (samplePoints - 1)), capeW - 1);
-                    int y = Math.min(j * elytraH / (samplePoints - 1), frameH - 1);
-                    int alpha = (atlas.getRGB(x, y) >> 24) & 0xFF;
-                    if (alpha > 10) allTransparent = false;
-                }
+            boolean needsFallback = false;
+            for (int frame = 0; frame < frameCount; frame++) {
+                needsFallback |= CapeElytraSilhouette.isElytraAreaTransparent(
+                        atlas.getSubimage(0, frame * frameH, capeW, frameH));
             }
 
-//? if <1.21 {
-            if (!allTransparent) return; // Elytra area has content, no compositing needed
-//?} else {
-            if (!allTransparent) return;
-//?}
+            BufferedImage composited = atlas;
+            if (needsFallback) {
 
-            // Load vanilla elytra texture
-            var resourceOpt = Minecraft.getInstance().getResourceManager()
+                // Load vanilla elytra texture
+                var resourceOpt = Minecraft.getInstance().getResourceManager()
 //? if <1.21 {
-                    .getResource(new ResourceLocation("minecraft", "textures/entity/elytra.png"));
+                        .getResource(new ResourceLocation("minecraft", "textures/entity/elytra.png"));
 //?} else if <1.21.11 {
-                    .getResource(ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"));
+                        .getResource(ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"));
 //?} else {
-                    .getResource(Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"));
+                        .getResource(Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"));
 //?}
-            if (resourceOpt.isEmpty()) return;
-            BufferedImage elytra;
-            try (var stream = resourceOpt.get().open()) {
+                if (resourceOpt.isEmpty()) return;
+                BufferedImage elytra;
+                try (var stream = resourceOpt.get().open()) {
 //? if <1.21.11 {
-                elytra = SafeImageReader.readPng(stream);
+                    elytra = SafeImageReader.readPng(stream);
 //?} else {
-                byte[] encoded = com.quickskin.mod.common.util.BoundedFileReader.readBytes(
-                        stream,
-                        (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
-                elytra = com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
+                    byte[] encoded = com.quickskin.mod.common.util.BoundedFileReader.readBytes(
+                            stream,
+                            (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
+                    elytra = com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
 //?}
-            }
-            if (elytra == null) return;
+                }
+                if (elytra == null) return;
 
-            // Composite elytra under each frame
-            BufferedImage composited = new BufferedImage(capeW, atlas.getHeight(), BufferedImage.TYPE_INT_ARGB);
-            java.awt.Graphics2D g = composited.createGraphics();
-            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
-                    java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            for (int i = 0; i < frameCount; i++) {
-                int yOff = i * frameH;
-                g.drawImage(elytra, 0, yOff, capeW, yOff + frameH,
-                        0, 0, elytra.getWidth(), elytra.getHeight(), null);
-                g.drawImage(atlas.getSubimage(0, yOff, capeW, frameH), 0, yOff, null);
+                composited = new BufferedImage(
+                        capeW, atlas.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                java.awt.Graphics2D g = composited.createGraphics();
+                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                        java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+                for (int i = 0; i < frameCount; i++) {
+                    int yOff = i * frameH;
+                    BufferedImage frame = atlas.getSubimage(0, yOff, capeW, frameH);
+                    if (CapeElytraSilhouette.isElytraAreaTransparent(frame)) {
+                        g.drawImage(elytra, 0, yOff, capeW, yOff + frameH,
+                                0, 0, elytra.getWidth(), elytra.getHeight(), null);
+                    }
+                    g.drawImage(frame, 0, yOff, null);
+                }
+                g.dispose();
             }
-            g.dispose();
 
-            ImageIO.write(composited, "PNG", atlasPath.toFile());
+            BufferedImage masked = CapeElytraSilhouette.maskedCopy(composited, frameCount);
+            if (composited != atlas || masked != atlas) {
+                ImageIO.write(masked, "PNG", atlasPath.toFile());
+            }
         } catch (Exception e) {
             // Non-critical — elytra just won't have the vanilla fallback
         }
