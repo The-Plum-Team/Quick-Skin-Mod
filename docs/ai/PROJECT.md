@@ -119,16 +119,22 @@ immutable workflow and governance activation contract.
   current-head lossless Fabric 1.20.1 Pages evidence; the compact WebP cache is never an AI oracle.
   Only canonical content-addressed RGB PNGs, a bounded manifest, and provenance enter the durable
   queue; raw E2E ZIPs never share a runner with the credential. A globally serialized protected
-  drainer triages bounded chunks with Sonnet, sends suspicious or uncertain frames to bounded Opus
-  verification, keeps provider output private, uploads only the protected normalized report or a
-  sanitized retry marker, and deletes a settled queue entry by exact artifact id. Build and
+  drainer prioritizes a certifiable anchor, triages all independent loader-grouped chunks
+  concurrently with Sonnet, sends suspicious or uncertain frames to concurrent bounded Opus
+  verification, cancels outstanding work after the first Opus-confirmed defect, and reuses paired
+  verdicts only under an exact content/expectation/loader/contract/matrix/reviewer/prompt/model
+  policy key;
+  unpaired anchor semantics are never cached. It keeps provider output private and uploads only the
+  protected normalized report or a sanitized retry marker, and deletes a settled queue entry by
+  exact artifact id. Build and
   Packaged E2E remain the required exact-head checks for every individual port, and their
   conclusions never depend on model output. The semantic certificate gates only scheduling of the
   cross-version wave: provider failure or a semantic defect deliberately delays that wave instead
   of blessing an unverified baseline.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
-  named exceptions are the seven-day queued visual-review capsules and semantic certificates plus
-  three 90-day current-state artifacts: the SHA-bound Pages cache, the matrix-derived lossless
+  named exceptions are the seven-day queued visual-review capsules, semantic certificates, and
+  rolling exact-policy visual verdict caches, plus three 90-day current-state artifacts: the
+  SHA-bound Pages cache, the matrix-derived lossless
   Fabric 1.20.1 anchor handoff, and the immutable `release-<release-id>` bundle. The release bundle
   spans protected environment
   approvals and provides bounded recovery for an interrupted publication. After a successful Pages

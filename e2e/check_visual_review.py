@@ -560,6 +560,32 @@ def validate(
     return [verdicts[label] for label in labels]
 
 
+def validate_blocking_partial(
+    manifest: Any, report: Any, *, require_paired: bool = False
+) -> list[dict[str, Any]]:
+    """Validate a fail-closed partial report containing only confirmed defects."""
+
+    entries, labels = validate_manifest(manifest, require_paired=require_paired)
+    paired = "reference_path" in entries[0]
+    if not isinstance(report, list) or not report or len(report) > len(entries):
+        raise ReviewError("blocking partial report must contain confirmed defects")
+    allowed = set(labels)
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, verdict in enumerate(report):
+        label = verdict.get("label") if isinstance(verdict, dict) else None
+        if not isinstance(label, str) or label not in allowed or label in seen:
+            raise ReviewError(f"blocking partial verdict {index} has an invalid label")
+        item = entries[labels.index(label)]
+        checked = validate([item], [verdict], require_paired=paired)[0]
+        if not checked["defect"]:
+            raise ReviewError("blocking partial report cannot contain a clean verdict")
+        seen.add(label)
+        normalized.append(checked)
+    order = {label: index for index, label in enumerate(labels)}
+    return sorted(normalized, key=lambda verdict: order[verdict["label"]])
+
+
 def validate_triage(
     manifest: Any, report: Any, *, require_paired: bool = False
 ) -> list[dict[str, Any]]:
@@ -637,14 +663,26 @@ def markdown_text(value: Any) -> str:
     return text
 
 
-def render(verdicts: list[dict[str, Any]]) -> tuple[str, bool]:
+def render(
+    verdicts: list[dict[str, Any]], *, total_frames: int | None = None
+) -> tuple[str, bool]:
     defects = [verdict for verdict in verdicts if verdict["defect"]]
+    total = len(verdicts) if total_frames is None else total_frames
+    partial = total != len(verdicts)
     lines = [
         "## Advisory visual review: defects reported" if defects else "## Advisory visual review: passed",
         "",
-        f"Reviewed {len(verdicts)} of {len(verdicts)} frames · "
+        f"Reviewed {len(verdicts)} of {total} frames · "
         f"{len(verdicts) - len(defects)} clean · {len(defects)} defect(s)",
     ]
+    if partial:
+        lines.extend(
+            (
+                "",
+                "Opus confirmed a blocking defect, so outstanding parallel reviews were "
+                "cancelled and this partial report cannot certify or release anything.",
+            )
+        )
     if defects:
         lines.extend(("", "### Reported defects"))
         for verdict in defects:
@@ -706,6 +744,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-paired", action="store_true")
     parser.add_argument("--structured-output-envelope", action="store_true")
     parser.add_argument("--normalized-report")
+    parser.add_argument("--allow-blocking-partial", action="store_true")
     args = parser.parse_args(argv)
     try:
         manifest = load(Path(args.manifest), "review manifest")
@@ -737,17 +776,25 @@ def main(argv: list[str] | None = None) -> int:
         report = load(Path(args.report), "review report")
         if args.structured_output_envelope:
             report = extract_structured_report(report)
-        verdicts = validate(
-            manifest,
-            report,
-            require_paired=args.require_paired,
-        )
+        if args.allow_blocking_partial:
+            verdicts = validate_blocking_partial(
+                manifest, report, require_paired=args.require_paired
+            )
+        else:
+            verdicts = validate(
+                manifest,
+                report,
+                require_paired=args.require_paired,
+            )
         if args.normalized_report is not None:
             write_normalized_report(Path(args.normalized_report), verdicts)
     except ReviewError as exc:
         emit(f"## Advisory visual review: invalid\n\n{markdown_text(exc)}")
         return 1
-    summary, has_defects = render(verdicts)
+    summary, has_defects = render(
+        verdicts,
+        total_frames=len(manifest) if args.allow_blocking_partial else None,
+    )
     emit(summary)
     return 1 if has_defects else 0
 
