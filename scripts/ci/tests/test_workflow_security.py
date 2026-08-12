@@ -408,6 +408,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--review-mode \"$review_mode\"", review)
         self.assertIn("visual_review_semantic_prompt.md", review)
         self.assertIn("visual_review_semantic_verify_prompt.md", review)
+        self.assertNotRegex(
+            drain_workflow,
+            r"(?m)^\s*'[^'\n]*\\$",
+            "a backslash inside a multiline single-quoted jq filter is literal",
+        )
         self.assertIn("--triage-model claude-sonnet-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
         self.assertIn("--triage-chunk-size 8", review)
