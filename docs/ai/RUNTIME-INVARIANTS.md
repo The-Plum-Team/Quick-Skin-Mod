@@ -128,6 +128,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   assertion-free steps and reject a screenshot both when a capture is missing and when a
   non-capture step emits one. Keep independent fixed probe canaries; do not generate calibration
   fixtures from the oracle values under test.
+- Animated-cape evidence must use a valid cape-frame atlas, hold explicitly selected distinct
+  frames through screenshot settlement, and compare the rendered cape region by a material pixel
+  threshold. A changing logical frame counter alone does not prove that Minecraft sampled the
+  intended UVs or that the visible cape changed.
 - Every orchestrator invocation writes into a fresh owned workspace and promotes only its bounded
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's

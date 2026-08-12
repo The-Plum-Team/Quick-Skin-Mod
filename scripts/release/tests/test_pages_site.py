@@ -309,21 +309,12 @@ class PagesSiteTest(unittest.TestCase):
                     for comparison_contract in pairs:
                         first_step = comparison_contract.first_step
                         second_step = comparison_contract.second_step
-                        comparison = {
-                            "changed_fraction": 1.0,
-                            "rms_difference": (
-                                71.573
-                                if comparison_contract.region is not None
-                                else 98.694
-                            ),
-                            "required_changed_fraction": (
-                                comparison_contract.minimum_changed_fraction
-                            ),
-                        }
-                        if comparison_contract.region is not None:
-                            comparison["region"] = list(
-                                comparison_contract.region
-                            )
+                        comparison = packaged_runtime.compare_screenshots(
+                            screenshots / f"{first_step}.png",
+                            screenshots / f"{second_step}.png",
+                            comparison_contract.minimum_changed_fraction,
+                            comparison_contract.region,
+                        )
                         comparison_metrics[f"{first_step}->{second_step}"] = comparison
                     reports[role] = {
                         "version": version,
