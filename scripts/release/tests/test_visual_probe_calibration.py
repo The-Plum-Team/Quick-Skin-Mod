@@ -167,6 +167,28 @@ class VisualProbeCalibrationTest(unittest.TestCase):
             ),
         )
 
+    def test_bmo_elytra_evidence_pins_the_interpolated_rear_pose(self) -> None:
+        """A logical crouch alone once left one rendered wing edge-on to the camera."""
+
+        source = (
+            ROOT
+            / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(2, source.count(".settleTicks(12)"))
+        # Each of the two captures reapplies the pose in both action() and ready(), so it cannot
+        # drift during the wait for textures/equipment to settle.
+        self.assertEqual(4, source.count("poseElytraForEvidence(mc);"))
+        self.assertIn("mc.player.setYRot(yaw);", source)
+        self.assertIn("mc.player.yRotO = yaw;", source)
+        self.assertIn("mc.player.setYHeadRot(yaw);", source)
+        self.assertIn("mc.player.yHeadRotO = yaw;", source)
+        self.assertIn("mc.player.setYBodyRot(yaw);", source)
+        self.assertIn("mc.player.yBodyRotO = yaw;", source)
+        self.assertIn(
+            'return Step.Result.fail("elytra evidence camera/body yaw is not stably aligned")',
+            source,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
