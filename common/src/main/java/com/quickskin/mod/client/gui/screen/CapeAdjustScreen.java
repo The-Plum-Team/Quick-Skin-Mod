@@ -11,6 +11,7 @@ import com.quickskin.mod.client.gui.widget.PlayerWidget;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.TextureQuality;
+import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.CapeOpaqueFill;
 import com.quickskin.mod.common.util.CapeZoomRange;
 import com.quickskin.mod.config.ClientConfig;
@@ -938,7 +939,8 @@ public class CapeAdjustScreen extends Screen {
 
     /**
      * Finish one composed frame: clear the pixels outside the cape body and elytra UV face regions,
-     * and — when the opaque toggle is on — flatten every remaining pixel onto the chosen fill.
+     * flatten every pixel onto the chosen fill when requested, then restore the transparent
+     * cutout that gives the outer Elytra face its tapered silhouette.
      *
      * <p>This is the only pass either composer makes over individual pixels, and it is the last
      * step of both {@link #composeFrame(int)} (which feeds the 2D thumbnails and, through
@@ -947,14 +949,15 @@ public class CapeAdjustScreen extends Screen {
      * the fill here is what makes the preview and the applied cape structurally unable to diverge:
      * there is one rule, invoked from one loop, and both callers run that loop over every frame.
      *
-     * <p>With the toggle off the cleared value is {@code 0x00000000} and in-region pixels are never
-     * read or written, so the output is byte-for-byte what it was before the toggle existed.
+     * <p>With the toggle off the cleared value is {@code 0x00000000}; visible in-region pixels are
+     * unchanged, while invalid pixels outside the tapered outer-wing silhouette are normalized to
+     * transparent.
      *
      * At 1x (64x32):
      *   Cape body:                (0,0)-(22,17)
      *   Elytra top/bottom faces:  (24,0)-(44,2)
      *   Elytra side/front/back:   (22,2)-(46,22)
-     * Everything else (corners, right margin, bottom margin) is cleared.
+     * Everything else (including the outer-wing silhouette cutout) is cleared.
      */
     private void finalizeCapeFrame(BufferedImage image, int yOffset, int frameH) {
         int capeW = image.getWidth();
@@ -975,8 +978,8 @@ public class CapeAdjustScreen extends Screen {
         // slider moves mid-compose.
         boolean fill = opaqueFill;
         int fillRgb = opaqueFillRgb;
-        // Unused margins are transparent today; under the toggle they become the fill, which is
-        // what leaves the composed atlas with no pixel below alpha 255 anywhere.
+        // Unused margins become the fill too so the toggle changes no cape-facing semantics. The
+        // one intentional exception is the Elytra silhouette cutout restored after this pass.
         int clearedValue = fill ? CapeOpaqueFill.opaque(fillRgb) : 0x00000000;
 
         for (int y = yOffset; y < yOffset + frameH; y++) {
@@ -996,6 +999,7 @@ public class CapeAdjustScreen extends Screen {
                 }
             }
         }
+        CapeElytraSilhouette.applyToFrame(image, yOffset, frameH);
     }
 
     /**
@@ -1270,22 +1274,14 @@ public class CapeAdjustScreen extends Screen {
         // Wing shape from elytra default texture (MinecraftCapes convention)
         // Each row: {startCol, endColExclusive} in 10-wide face space
         // Top-right = shoulder cutoff, bottom-left = wing tip taper
-        int[][] wingRows = {
-                {0, 6}, {0, 7}, {0, 8}, {0, 8}, {0, 8},     // rows 0-4
-                {0, 9}, {0, 9}, {0, 9}, {0, 9},              // rows 5-8
-                {0, 10}, {0, 10}, {0, 10}, {0, 10}, {0, 10}, // rows 9-13
-                {1, 10}, {1, 10}, {1, 10},                    // rows 14-16
-                {2, 10}, {2, 10},                              // rows 17-18
-                {3, 10}                                        // row 19
-        };
         int eBackFaceY = eLY; // same Y as other elytra body faces
         double colW = eBackW / 10.0;
         double rowH = eLH / 20.0;
         int wingColor = 0xFFFFAA00;
 
         for (int row = 0; row < 20; row++) {
-            int left = wingRows[row][0];
-            int right = wingRows[row][1];
+            int left = CapeElytraSilhouette.wingStartColumn(row);
+            int right = CapeElytraSilhouette.wingEndColumn(row);
             int sLeft = eBackX + (int) (left * colW);
             int sRight = eBackX + (int) (right * colW);
             int sTop = eBackFaceY + (int) (row * rowH);
@@ -1314,8 +1310,8 @@ public class CapeAdjustScreen extends Screen {
 
             // Horizontal staircase connectors where boundary changes
             if (row > 0) {
-                int prevLeft = wingRows[row - 1][0];
-                int prevRight = wingRows[row - 1][1];
+                int prevLeft = CapeElytraSilhouette.wingStartColumn(row - 1);
+                int prevRight = CapeElytraSilhouette.wingEndColumn(row - 1);
                 if (left != prevLeft) {
                     int sPrevLeft = eBackX + (int) (Math.min(left, prevLeft) * colW);
                     int sMaxLeft = eBackX + (int) (Math.max(left, prevLeft) * colW);
@@ -1472,19 +1468,11 @@ public class CapeAdjustScreen extends Screen {
                     36 * scale, 2 * scale, 10 * scale, 20 * scale, capeW, capeW / 2);
 
             // Mask the preview corners to match the wing silhouette
-            int[][] wingRows = {
-                    {0, 6}, {0, 7}, {0, 8}, {0, 8}, {0, 8},
-                    {0, 9}, {0, 9}, {0, 9}, {0, 9},
-                    {0, 10}, {0, 10}, {0, 10}, {0, 10}, {0, 10},
-                    {1, 10}, {1, 10}, {1, 10},
-                    {2, 10}, {2, 10},
-                    {3, 10}
-            };
             double pColW = elytraPreviewW / 10.0;
             double pRowH = elytraPreviewH / 20.0;
             for (int row = 0; row < 20; row++) {
-                int left = wingRows[row][0];
-                int right = wingRows[row][1];
+                int left = CapeElytraSilhouette.wingStartColumn(row);
+                int right = CapeElytraSilhouette.wingEndColumn(row);
                 int rTop = elytraY + (int) (row * pRowH);
                 int rBot = elytraY + (int) ((row + 1) * pRowH);
                 if (left > 0) {
