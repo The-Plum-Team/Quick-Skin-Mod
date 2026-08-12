@@ -928,12 +928,31 @@ jobs:
           # Matrix needs-edges settle per stage, not per target, so a broken sibling target no
           # longer skips this leg. The writer must still never publish a tree whose own exact
           # validation leg did not succeed in this run.
-          jobs_json="$(gh api --paginate --slurp \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100")"
-          validate_result="$(jq -r \
-            --arg name "Validate port to $TARGET_BRANCH without credentials" \
-            '[.[].jobs[] | select(.name == $name)] | if length == 1 then .[0].conclusion else "invalid" end' \
-            <<< "$jobs_json")"
+          validate_result=invalid
+          for attempt in {1..12}; do
+            jobs_json=""
+            if jobs_json="$(gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100")"; then
+              validate_result="$(jq -r \
+                --arg name "Validate port to $TARGET_BRANCH without credentials" \
+                '[.[].jobs[] | select(.name == $name)] | if length == 1 then .[0].conclusion else "invalid" end' \
+                <<< "$jobs_json")"
+            else
+              validate_result=api-error
+            fi
+            if [[ "$validate_result" == success ]]; then
+              break
+            fi
+            if [[ "$validate_result" != invalid && "$validate_result" != null \
+              && "$validate_result" != api-error ]]; then
+              echo "::error::Validation for $TARGET_BRANCH concluded $validate_result"
+              exit 1
+            fi
+            if (( attempt < 12 )); then
+              echo "::notice::Validation job for $TARGET_BRANCH has not settled (attempt $attempt/12)"
+              sleep 5
+            fi
+          done
           [[ "$validate_result" == success ]]
 
       - name: Download the immutable validated proposal
