@@ -499,7 +499,7 @@ jobs:
             ACTIONS_CACHE_URL ACTIONS_RESULTS_URL
           sha256sum --check "$RUNNER_TEMP/protected-reviewer.sha256"
           review_mode="$(jq -er \
-            '.review_mode | select(. == "anchor-semantic" or \
+            '.review_mode | select(. == "anchor-semantic" or
               . == "reference-comparison")' curation-proof.json)"
           if [[ "$review_mode" == anchor-semantic ]]; then
             triage_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_semantic_prompt.md"
@@ -544,7 +544,7 @@ jobs:
           sha256sum --check "$RUNNER_TEMP/visual-review-manifest.sha256"
           sha256sum --check "$RUNNER_TEMP/protected-reviewer.sha256"
           review_mode="$(jq -er \
-            '.review_mode | select(. == "anchor-semantic" or \
+            '.review_mode | select(. == "anchor-semantic" or
               . == "reference-comparison")' curation-proof.json)"
           validation_arguments=(
             --manifest review-input/visual-review-manifest.json
@@ -586,7 +586,7 @@ jobs:
             exit 0
           fi
           if ! jq -e \
-              '(.master_source_sha | type == "string" and \
+              '(.master_source_sha | type == "string" and
                 test("^[0-9a-f]{40}$")) and
                (.source_branch | type == "string" and
                 test("^automation/sync/[A-Za-z0-9._/-]+$"))' \
@@ -596,7 +596,7 @@ jobs:
             exit 0
           fi
           master_source_sha="$(jq -er \
-            '.master_source_sha | select(type == "string" and \
+            '.master_source_sha | select(type == "string" and
               test("^[0-9a-f]{40}$"))' "$proof")"
           anchor_source_sha="$(jq -er .source_sha "$proof")"
           source_branch="$(jq -er .source_branch "$proof")"
@@ -846,7 +846,7 @@ jobs:
           metadata="$(gh api \
             "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
           digest="$(jq -er \
-            '.digest | select(type == "string" and \
+            '.digest | select(type == "string" and
               test("^sha256:[0-9a-f]{64}$"))' <<< "$metadata")"
           size="$(jq -er .size_in_bytes <<< "$metadata")"
           jq -e \
