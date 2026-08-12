@@ -84,6 +84,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   over-budget appearance gracefully instead of weakening the cap.
 - Server cache deletion belongs on the bounded cache-I/O executor. Remove a cache entry from the
   live namespace before scheduling deletion so a concurrent replacement cannot be deleted.
+- Cape atlases produced by the editor or custom import paths must keep the vanilla tapered alpha
+  cutout in the outer Elytra face at every supported scale and in every animation frame.
+  Opaque-fill, import fallback, local/network presentation, and animation processing must share
+  the same structural mask; content-addressed source bytes remain immutable when only presentation
+  requires normalization.
 
 ## Optional integrations
 
