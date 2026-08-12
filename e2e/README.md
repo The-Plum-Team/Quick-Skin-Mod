@@ -23,15 +23,15 @@ This `fabric-and-neoforge-1.21.10` release branch exercises the following exact 
 | `fabric-1.21.10` | `1.21.10` | Fabric | `21` | `4` |
 | `neoforge-1.21.10` | `1.21.10` | NeoForge | `21` | `4` |
 
-Scenario contract SHA-256: `f1000aeced803919fd8c3e5797b496eec7d8b49bf731711a5b25c58656ed24c9`
-Contract totals: `46` ordered steps, `41` captures.
+Scenario contract SHA-256: `c552f8e8eec462185766f3ecb43cd82d6e0098140fb70222c569e7f66ff12f71`
+Contract totals: `47` ordered steps, `42` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `7` | `5` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `31` | `30` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `32` | `31` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->
@@ -164,18 +164,23 @@ Minecraft-version rendering differences are allowed. Every result records the li
 `artifact_node`, `runtime_version`, `loader`, `scenario`, `jar_sha256`, and `port`.
 
 The `full` scenario also exercises adjusted-cape parity against the production BMO asset. It
-centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import, drives the real zoom
-control to a 1:1 crop, saves through the adjusted-import boundary, and requires the preview,
-applied, and persisted atlases to remain pixel-identical to the bundled original. Separate direct
-and adjusted world captures cover both the cape and elytra render routes; their tightly cropped
-comparison allows only small entity-animation and lighting drift. The elytra captures hold the
-player in a deterministic crouching pose, opening the two wings far enough for semantic review to
-distinguish elytra geometry from a draped cape.
+centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import. One editor capture keeps
+the reset fit so the complete source, centred atlas, and four black padding bands are independently
+visible; the next drives the real zoom control to a 1:1 crop. In that crop, narrow coloured regions
+outside the three highlighted front/back/outer-wing faces are legitimate auxiliary cape and elytra
+UV faces, not padding leakage. The harness saves through the adjusted-import boundary and requires
+the preview, applied, and persisted atlases to remain pixel-identical to the bundled original.
+Separate direct and adjusted world captures cover both the cape and elytra render routes; their
+tightly cropped comparison allows only small entity-animation and lighting drift. The elytra
+captures hold the player in a deterministic crouching pose, opening the two wings far enough for
+semantic review to distinguish elytra geometry from a draped cape.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves
 that the production preview covers those exact pixels; formatted or seasonal splash selection is
-not part of the mod behavior being tested.
+not part of the mod behavior being tested. Detection is restricted to the broad upper-right title
+chrome area, so denser yellow bees or flower fields in a version-specific panorama cannot be
+mistaken for the splash.
 
 Pull requests and releases run their contract-selected `pr` and `release` profiles on both loader
 lanes against manifest-bound bytes from the exact commit. The same packaged workflow can also be
@@ -225,9 +230,11 @@ missing later-version reference fails curation.
 The curator applies the protected review checker before upload and reserves 32 MiB of the handoff
 envelope for the bounded manifest, proof, archive metadata, and structure. A source/run/
 implementation proof and bounded manifest become a seven-day durable queue entry. A protected
-drainer authenticates the oldest eligible entry, then enters one repository-wide model concurrency
-group. The queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without
-losing reviews.
+exact wake may authenticate only its requested artifact and locks the complete drain by that ID;
+distinct capsules therefore run concurrently while duplicate wakes coalesce. Scheduled/manual
+recovery sweeps share a separate lock and only redispatch one authenticated exact identity. The
+queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without losing
+reviews.
 
 The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
 over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
@@ -240,7 +247,10 @@ chunks of at most eight. All independent chunks run concurrently, and each conce
 below high is independently rechecked by Opus in concurrent chunks of at most four as soon as its
 Sonnet result is available. Provider throttling is handled by bounded retries rather than serial
 launch pacing. Once any Opus chunk confirms a defect, outstanding calls are cancelled and the
-explicit blocking-partial result cannot certify or release anything. Both models can read only the
+explicit blocking-partial result cannot certify or release anything. For an automatic version
+wave, the protected drain then publishes a sanitized marker bound to that exact master generation,
+best-effort cancels sibling drains, and makes later authenticated queue selection skip its remaining
+capsules. Both models can read only the
 bounded manifest/images; stdout is captured without granting a write or shell tool. Protected code
 validates exact label coverage, text/list bounds, decision coherence, capsule identity, and two
 independent final fields: `semantic_valid` and nullable `matches_reference`. A reference match can
@@ -248,8 +258,9 @@ never hide a semantic failure. It uploads only a schema-normalized report; raw p
 private. Transient provider failures create only a sanitized one-day cooldown marker, leaving the
 queue entry for retry while other entries progress. Terminal validation/configuration failures are
 marked and retired. An independent cleanup job deletes a settled entry by exact artifact id. The
-final small report remains for one day; the single rolling exact-policy verdict cache remains for
-seven days and is replaced only after a protected successor upload.
+final small report remains for one day. Exact-policy verdict cache shards remain for seven days;
+parallel drains may briefly publish siblings, and a later protected successor combines and retires
+every authenticated shard it consumed without dropping concurrent verdicts.
 
 A completely clean synchronized 1.20.1 report creates a seven-day certificate only after the
 bot-owned anchor PR is merged and that exact-tree merge is still the current anchor head. The

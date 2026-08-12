@@ -72,13 +72,14 @@ import javax.imageio.ImageIO;
  * <ol>
  *   <li>baseline &mdash; clean state, player present (singletons reset, 3rd-person view).</li>
  *   <li>local skin upload &mdash; {@code SkinImporter.importSkin} &rarr; {@code applySkin}; menu shot.</li>
- *   <li>model slim/classic &mdash; {@code applySkin(...,"slim"/"classic")}; {@code getModel()} flips.</li>
+ *   <li>model slim/classic &mdash; {@code applySkin(...,"slim"/"classic")}; both the requested
+ *       appearance and Minecraft's renderer-facing model flip in a close, stable rear view.</li>
  *   <li>known cape &mdash; cape menu shot; {@code applyCape("known:test")}; cape id + location.</li>
  *   <li>CapeAdjustScreen &mdash; opened with a test image + harness-owned {@code onApply} consumer.</li>
  *   <li>BMO editor parity &mdash; crop a black-padded 128&times;64 import and compare its cape and
  *       elytra atlas/render paths with the bundled 64&times;32 original.</li>
- *   <li>animated cape &mdash; {@code applyCape("known:rickroll")}; reflect {@code AnimationState
- *       .currentFrame} advancing, cross-checked with {@code AnimationMetadata.getFrameAtTime}.</li>
+ *   <li>animated cape &mdash; apply a valid bundled GIF cape atlas, pin two distinct frames, and
+ *       prove both the active animation state and the rendered cape change.</li>
  *   <li>HD cape no-downscale &mdash; import a 256&times;128 cape; metadata resolution == source dims.</li>
  *   <li>elytra hides cape &mdash; equip {@code Items.ELYTRA} in CHEST; assert the inputs that make
  *       {@code CapeLayerMixin} cancel and the alpha cutout that tapers the rendered wings.</li>
@@ -91,21 +92,24 @@ import javax.imageio.ImageIO;
  *
  * <p>Screens are opened via {@link VanillaShim#setScreen} on the client/tick thread; one or more
  * render frames are pumped (via {@code minTicks}) so {@code init()} builds widgets before a screenshot
- * or a reflective button press. Private playback/widget state is read by reflection so no shipped code
- * is touched.</p>
+ * or a reflective button press. Private playback/widget state is read by reflection.</p>
  */
 public final class FullScenario implements Scenario {
 
-    /** Animation id CapeService registers a known animated cape under ({@code "cape_known_"+id}). */
-    private static final String RICKROLL_ANIM_ID = "cape_known_rickroll";
+    /** A close but unclipped view makes the one-texture-pixel arm-width delta inspectable. */
+    private static final int MODEL_EVIDENCE_FOV = 50;
+    private volatile Integer modelEvidenceOriginalFov;
 
     private volatile String skinHash;        // set by step 2, reused by model + HUD steps
     private volatile String externalSkinHash; // set by the external-drop step (no import call)
     private volatile String hdCapeHash;      // set by step "hd_cape"
     private final AtomicReference<BufferedImage> hdCapeSource = new AtomicReference<>();
     private final AtomicReference<BufferedImage> hdCapePresentation = new AtomicReference<>();
-    private volatile String gifCapeHash;     // set by the animated-cape step (bundled GIF), null -> rickroll
+    private volatile String gifCapeHash;     // set by the mandatory bundled-GIF checkpoint
     private volatile int animStartFrame = Integer.MIN_VALUE; // snapshot for the frame-advance check
+    /** Frame held still for screenshot A, then advanced deterministically to screenshot B. */
+    private static final int ANIMATED_EVIDENCE_FRAME_A = 0;
+    private static final int ANIMATED_EVIDENCE_FRAME_B = 1;
     /** Previous-poll layout stamp of the open skin menu; {@code Long.MIN_VALUE} = not held yet. */
     private long skinMenuLayoutStamp = Long.MIN_VALUE;
     private volatile String previewCapeHashA;  // set by the cape-preview steps (never applied)
@@ -164,8 +168,8 @@ public final class FullScenario implements Scenario {
         final String suffix = "_" + role + ".png";
         final String bundledBmoCapeShot = prefix + "full_05h_bmo_bundled_cape" + suffix;
         final String bundledBmoElytraShot = prefix + "full_05i_bmo_bundled_elytra" + suffix;
-        final String adjustedBmoCapeShot = prefix + "full_05k_bmo_adjusted_cape" + suffix;
-        final String adjustedBmoElytraShot = prefix + "full_05l_bmo_adjusted_elytra" + suffix;
+        final String adjustedBmoCapeShot = prefix + "full_05l_bmo_adjusted_cape" + suffix;
+        final String adjustedBmoElytraShot = prefix + "full_05m_bmo_adjusted_elytra" + suffix;
 
         List<Step> steps = new ArrayList<>();
 
@@ -310,37 +314,40 @@ public final class FullScenario implements Scenario {
         // 3. model slim / classic -----------------------------------------------------------------
         steps.add(Step.of("model_slim")
                 .action(() -> {
-                    enterWorldView(mc);
+                    prepareModelEvidenceView(mc);
                     if (skinHash != null) svc.applySkin(uuid, "local_skin:" + skinHash, "slim");
                 })
                 .minTicks(30)
+                .ready(() -> holdModelEvidenceView(mc, "slim"))
+                .settleTicks(12)
+                .timeoutTicks(240)
                 .screenshot(prefix + "full_03a_model_slim" + suffix)
-                .assertion(() -> {
-                    PlayerAppearance app = svc.getAppearance(uuid);
-                    if (app == null) return Step.Result.fail("no appearance");
-                    return "slim".equals(app.getModel())
-                            ? Step.Result.pass("model=slim")
-                            : Step.Result.fail("model=" + app.getModel() + " expected slim");
-                }));
+                .assertion(() -> assertModelEvidence(mc, svc, uuid, "slim")));
 
         steps.add(Step.of("model_classic")
                 .action(() -> {
-                    enterWorldView(mc);
+                    prepareModelEvidenceView(mc);
                     if (skinHash != null) svc.applySkin(uuid, "local_skin:" + skinHash, "classic");
                 })
                 .minTicks(30)
+                .ready(() -> holdModelEvidenceView(mc, "classic"))
+                .settleTicks(12)
+                .timeoutTicks(240)
                 .screenshot(prefix + "full_03b_model_classic" + suffix)
                 .assertion(() -> {
-                    PlayerAppearance app = svc.getAppearance(uuid);
-                    if (app == null) return Step.Result.fail("no appearance");
-                    return "classic".equals(app.getModel())
-                            ? Step.Result.pass("model=classic")
-                            : Step.Result.fail("model=" + app.getModel() + " expected classic");
+                    try {
+                        return assertModelEvidence(mc, svc, uuid, "classic");
+                    } finally {
+                        restoreModelEvidenceView(mc);
+                    }
                 }));
 
         // 4. known cape ---------------------------------------------------------------------------
         steps.add(Step.of("cape_menu_screen")
-                .action(() -> VanillaShim.setScreen(mc, new PlayerCapeMenuScreen(null)))
+                .action(() -> {
+                    restoreModelEvidenceView(mc);
+                    VanillaShim.setScreen(mc, new PlayerCapeMenuScreen(null));
+                })
                 .minTicks(20)
                 .ready(() -> VanillaShim.currentScreen(mc) instanceof PlayerCapeMenuScreen)
                 .timeoutTicks(200)
@@ -731,7 +738,7 @@ public final class FullScenario implements Scenario {
                             + "by " + expectedStep + "; applied == previewed");
                 }));
 
-        // 5h-5m. bundled BMO versus the same atlas recovered through the editor ------------------
+        // 5h-5n. bundled BMO versus the same atlas recovered through the editor ------------------
         // The imported source is a 128x64 black canvas with the production 64x32 BMO atlas centred
         // inside it. Reset shows the whole padded source at 50%; moving the real zoom slider to
         // scale 1.0 must re-anchor it to (-32,-16), crop away only the black padding and reproduce
@@ -767,11 +774,12 @@ public final class FullScenario implements Scenario {
                             && mc.player.isCrouching()
                             && VanillaShim.cloakTexture(mc.player) != null;
                 })
+                .settleTicks(12)
                 .timeoutTicks(300)
                 .screenshot(bundledBmoElytraShot)
                 .assertion(() -> assertCapeRoute(mc, svc, uuid, "known:bmo", true)));
 
-        steps.add(Step.of("bmo_adjust_screen")
+        steps.add(Step.of("bmo_padded_source_screen")
                 .action(() -> {
                     enterWorldView(mc);
                     setChestSlot(mc, ItemStack.EMPTY);
@@ -793,10 +801,61 @@ public final class FullScenario implements Scenario {
                                 null, prepared.atlas(), prepared.frameCount(), onApply));
                     } catch (Throwable t) {
                         bmoSetupFailure.set("could not prepare padded BMO source: " + t);
-                        E2ELog.error("bmo_adjust_screen setup failed", t);
+                        E2ELog.error("bmo_padded_source_screen setup failed", t);
                     }
                 })
                 .minTicks(25)
+                .ready(() -> {
+                    if (bmoSetupFailure.get() != null) return true;
+                    return VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen
+                            && bmoAdjustHold.incrementAndGet() >= PREVIEW_HOLD_TICKS;
+                })
+                .timeoutTicks(400)
+                .screenshot(prefix + "full_05j_bmo_padded_source" + suffix)
+                .assertion(() -> {
+                    String setupFailure = bmoSetupFailure.get();
+                    if (setupFailure != null) return Step.Result.fail(setupFailure);
+                    if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen screen))
+                        return Step.Result.fail("BMO padded source screen not open: " + screenName(mc));
+                    CapeImportProcessor.PreparedCape prepared = bmoPreparedCape.get();
+                    BufferedImage expected = bundledBmoAtlas.get();
+                    if (prepared == null || expected == null)
+                        return Step.Result.fail("BMO source or expected atlas was not retained");
+                    if (prepared.standardFormat())
+                        return Step.Result.fail("128x64 padded BMO source bypassed the editor");
+
+                    String padding = validatePaddedBmoSource(prepared.atlas(), expected);
+                    if (padding != null) return Step.Result.fail(padding);
+                    double target = bmoPaddedZoomPosition();
+                    String desync = checkZoomSliderAgrees(mc, target);
+                    if (desync != null) return Step.Result.fail(desync);
+                    double scale;
+                    double offsetX;
+                    double offsetY;
+                    try {
+                        scale = adjustScreenDouble(screen, "imgScale");
+                        offsetX = adjustScreenDouble(screen, "imgOffsetX");
+                        offsetY = adjustScreenDouble(screen, "imgOffsetY");
+                    } catch (Exception e) {
+                        return Step.Result.fail("could not read BMO transform: " + e);
+                    }
+                    double expectedScale = (double) TestAssets.BMO_CAPE_WIDTH
+                            / TestAssets.BMO_PADDED_WIDTH;
+                    if (Math.abs(scale - expectedScale) > 1.0e-9
+                            || Math.abs(offsetX) > 1.0e-9
+                            || Math.abs(offsetY) > 1.0e-9) {
+                        return Step.Result.fail("BMO transform is scale=" + scale + " offset=("
+                                + offsetX + "," + offsetY + "), expected " + expectedScale
+                                + " offset=(0,0)");
+                    }
+
+                    return Step.Result.pass("complete 64x32 BMO atlas is centred inside exact "
+                            + "opaque-black 128x64 padding at reset scale " + expectedScale);
+                }));
+
+        steps.add(Step.of("bmo_adjust_screen")
+                .action(() -> bmoAdjustHold.set(0))
+                .minTicks(5)
                 .ready(() -> {
                     if (bmoSetupFailure.get() != null) return true;
                     double target = bmoTargetZoomPosition();
@@ -804,7 +863,7 @@ public final class FullScenario implements Scenario {
                             && bmoAdjustHold.incrementAndGet() >= PREVIEW_HOLD_TICKS;
                 })
                 .timeoutTicks(400)
-                .screenshot(prefix + "full_05j_bmo_adjusted_editor" + suffix)
+                .screenshot(prefix + "full_05k_bmo_adjusted_editor" + suffix)
                 .assertion(() -> {
                     String setupFailure = bmoSetupFailure.get();
                     if (setupFailure != null) return Step.Result.fail(setupFailure);
@@ -919,6 +978,7 @@ public final class FullScenario implements Scenario {
                             && mc.player.isCrouching()
                             && VanillaShim.cloakTexture(mc.player) != null);
                 })
+                .settleTicks(12)
                 .timeoutTicks(300)
                 .screenshot(adjustedBmoElytraShot)
                 .assertion(() -> bmoSetupFailure.get() == null
@@ -950,18 +1010,19 @@ public final class FullScenario implements Scenario {
                     // the cape texture into an elytra render.
                     setChestSlot(mc, ItemStack.EMPTY);
                     try {
-                        // Prefer a bundled real animated GIF cape (dropped into e2e resources); the mod
-                        // decodes it (StbGifLoader) into an animated local cape. Fall back to the bundled
-                        // known animated cape (rickroll) if no GIF is present.
+                        // The mod decodes the valid bundled GIF cape into an animated local cape.
+                        // Missing evidence is fatal: a different fallback could satisfy the logical
+                        // animation checks without proving the contracted red/blue render change.
                         gifCapeHash = TestAssets.registerBundledGifCape();
-                        if (gifCapeHash != null) {
-                            svc.applyCape(uuid, "local_cape:" + gifCapeHash);
-                            AnimatedTextureManager.getInstance().setAnimationSpeed("cape_" + gifCapeHash, 1.0f);
-                            E2ELog.info("applied local animated GIF cape local_cape:" + gifCapeHash);
-                        } else {
-                            svc.applyCape(uuid, "known:rickroll");
-                            AnimatedTextureManager.getInstance().setAnimationSpeed(RICKROLL_ANIM_ID, 1.0f);
+                        if (gifCapeHash == null) {
+                            throw new IllegalStateException("bundled animated cape is missing");
                         }
+                        svc.applyCape(uuid, "local_cape:" + gifCapeHash);
+                        // Hold the initial frame while its screenshot settles. The follow-up
+                        // step advances to an exact different frame, then freezes it as well.
+                        AnimatedTextureManager.getInstance().setAnimationSpeed(
+                                "cape_" + gifCapeHash, 0.0f);
+                        E2ELog.info("applied local animated GIF cape local_cape:" + gifCapeHash);
                     } catch (Exception e) {
                         E2ELog.error("animated_cape_apply failed", e);
                     }
@@ -970,18 +1031,27 @@ public final class FullScenario implements Scenario {
                 .ready(() -> {
                     setChestSlot(mc, ItemStack.EMPTY);
                     String expectedCapeId = expectedAnimatedCapeId();
-                    return soleAnimatedState() != null
+                    Object state = expectedAnimatedState();
+                    if (state != null) {
+                        AnimatedTextureManager.getInstance().setAnimationSpeed(
+                                expectedAnimationId(), 0.0f);
+                        AnimatedTextureManager.getInstance().setAnimationFrame(
+                                expectedAnimationId(), ANIMATED_EVIDENCE_FRAME_A);
+                    }
+                    return state != null
                             && hasExpectedCape(svc, uuid, expectedCapeId)
                             && hasEmptyChest(mc)
-                            && VanillaShim.cloakTexture(mc.player) != null;
+                            && VanillaShim.cloakTexture(mc.player) != null
+                            && frameOf(state) == ANIMATED_EVIDENCE_FRAME_A;
                 })
+                .settleTicks(12)
                 .timeoutTicks(200)
                 .screenshot(prefix + "full_06a_animated_cape_frameA" + suffix)
                 .assertion(() -> {
                     if (!hasEmptyChest(mc)) {
                         return Step.Result.fail("animated cape rendered with a non-empty CHEST slot");
                     }
-                    Object st = soleAnimatedState();
+                    Object st = expectedAnimatedState();
                     if (st == null) return Step.Result.fail("no animated AnimationState registered");
                     AnimationMetadata meta = metaOf(st);
                     int fc = (meta == null) ? -1 : meta.frameCount();
@@ -989,32 +1059,48 @@ public final class FullScenario implements Scenario {
                     if (fc < 2) return Step.Result.fail("animation frameCount=" + fc + " (not animated)");
                     if (animStartFrame < 0 || animStartFrame >= fc)
                         return Step.Result.fail("currentFrame out of range: " + animStartFrame + "/" + fc);
+                    if (animStartFrame != ANIMATED_EVIDENCE_FRAME_A) {
+                        return Step.Result.fail("animated evidence frame A drifted to "
+                                + animStartFrame);
+                    }
                     PlayerAppearance app = svc.getAppearance(uuid);
                     String capeId = app == null ? null : app.getCapeId();
                     String expectedCapeId = expectedAnimatedCapeId();
                     if (!hasExpectedCape(svc, uuid, expectedCapeId)) {
                         return Step.Result.fail("animated cape route is not active: " + capeId);
                     }
-                    String src = (gifCapeHash != null) ? "local GIF cape" : "known:rickroll";
-                    return Step.Result.pass(src + " registered capeId=" + capeId
+                    return Step.Result.pass("local GIF cape registered capeId=" + capeId
                             + " frameCount=" + fc + " startFrame=" + animStartFrame);
                 }));
 
         steps.add(Step.of("animated_cape_advance")
-                .action(() -> setChestSlot(mc, ItemStack.EMPTY))
+                .action(() -> {
+                    setChestSlot(mc, ItemStack.EMPTY);
+                    if (gifCapeHash != null) {
+                        AnimatedTextureManager.getInstance().setAnimationFrame(
+                                expectedAnimationId(), ANIMATED_EVIDENCE_FRAME_B);
+                    }
+                })
                 .minTicks(5)
-                // Poll until the wall-clock-driven currentFrame moves off the snapshot taken above.
+                // Reassert the exact target frame while the rendered image settles. This proves a
+                // real frame change without racing a fast wall-clock animation past the screenshot.
                 .ready(() -> {
                     setChestSlot(mc, ItemStack.EMPTY);
-                    Object st = soleAnimatedState();
+                    Object st = expectedAnimatedState();
+                    if (st != null) {
+                        AnimatedTextureManager.getInstance().setAnimationFrame(
+                                expectedAnimationId(), ANIMATED_EVIDENCE_FRAME_B);
+                    }
                     return hasEmptyChest(mc)
                             && hasExpectedCape(svc, uuid, expectedAnimatedCapeId())
                             && VanillaShim.cloakTexture(mc.player) != null
                             && st != null
                             && animStartFrame != Integer.MIN_VALUE
-                            && frameOf(st) != animStartFrame;
+                            && frameOf(st) != animStartFrame
+                            && frameOf(st) == ANIMATED_EVIDENCE_FRAME_B;
                 })
-                .timeoutTicks(400) // up to 20s; rickroll cycles 17 frames @ 50ms
+                .settleTicks(12)
+                .timeoutTicks(200)
                 .screenshot(prefix + "full_06b_animated_cape_frameB" + suffix)
                 .assertion(() -> {
                     if (!hasEmptyChest(mc)) {
@@ -1023,7 +1109,7 @@ public final class FullScenario implements Scenario {
                     if (!hasExpectedCape(svc, uuid, expectedAnimatedCapeId())) {
                         return Step.Result.fail("animated cape route disappeared before frame B");
                     }
-                    Object st = soleAnimatedState();
+                    Object st = expectedAnimatedState();
                     if (st == null) return Step.Result.fail("animation disappeared");
                     AnimationMetadata meta = metaOf(st);
                     if (meta == null) return Step.Result.fail("no metadata");
@@ -1031,18 +1117,13 @@ public final class FullScenario implements Scenario {
                     int now = frameOf(st);
                     if (now == animStartFrame)
                         return Step.Result.fail("currentFrame did not advance (stuck at " + now + ")");
+                    if (now != ANIMATED_EVIDENCE_FRAME_B) {
+                        return Step.Result.fail("animated evidence frame B drifted to " + now);
+                    }
                     if (now < 0 || now >= fc)
                         return Step.Result.fail("currentFrame out of range: " + now + "/" + fc);
-                    // Cross-check against the same formula tick() uses (best-effort; ±tick timing).
-                    Long startTime = startTimeOf(st);
-                    Float speed = speedOf(st);
-                    String cross = "n/a";
-                    if (startTime != null && speed != null) {
-                        long elapsed = (long) ((System.currentTimeMillis() - startTime) * speed);
-                        cross = String.valueOf(meta.getFrameAtTime(elapsed));
-                    }
                     return Step.Result.pass("frame advanced " + animStartFrame + "->" + now
-                            + "/" + fc + " (getFrameAtTime=" + cross + ")");
+                            + "/" + fc + " and remained pinned through capture settlement");
                 }));
 
         // 7. HD cape import (no downscale) --------------------------------------------------------
@@ -1534,19 +1615,23 @@ public final class FullScenario implements Scenario {
      * internals that have already been renamed once across the supported eras. The harness pins
      * the string and colour, but deliberately keeps measuring vanilla's placement and pulse.
      *
-     * <p>The splash is not the only saturated yellow on a title screen, though - the 26.x panorama
-     * flies <em>bees</em> through its cherry grove, and a bee halfway down the screen would stretch
-     * a naive bounding box until its middle landed on empty panorama. So the pixels are clustered
-     * into bands first, by row and then by column, and the densest cluster wins: a splash string is
-     * hundreds of pixels of contiguous text, a bee is a few dozen somewhere else entirely.
+     * <p>The splash is not the only saturated yellow on a title screen, though. The panorama can
+     * contain bees and thousands of yellow flower pixels - 1.21.10 exposed exactly that false
+     * positive. Vanilla's splash is title chrome in the upper-right quadrant on every supported
+     * lane, so only that deliberately broad area is eligible. Its pixels are then clustered into
+     * bands, by row and then by column, and the densest eligible cluster wins.
      */
     private int[] locateSplash(Minecraft mc, BufferedImage shot) {
         int height = shot.getHeight();
         int width = shot.getWidth();
+        int scanTop = 0;
+        int scanBottom = Math.max(1, height / 2);
+        int scanLeft = width / 2;
+        int scanRight = width;
         int[] perRow = new int[height];
         int total = 0;
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+        for (int y = scanTop; y < scanBottom; y++) {
+            for (int x = scanLeft; x < scanRight; x++) {
                 if (isSplashYellow(shot.getRGB(x, y))) {
                     perRow[y]++;
                     total++;
@@ -1559,7 +1644,7 @@ public final class FullScenario implements Scenario {
 
         int[] perColumn = new int[width];
         for (int y = rows[0]; y <= rows[1]; y++) {
-            for (int x = 0; x < width; x++) {
+            for (int x = scanLeft; x < scanRight; x++) {
                 if (isSplashYellow(shot.getRGB(x, y))) perColumn[x]++;
             }
         }
@@ -2283,6 +2368,13 @@ public final class FullScenario implements Scenario {
         if (expectElytra && !mc.player.isCrouching()) {
             return Step.Result.fail("elytra evidence pose is not crouching");
         }
+        if (expectElytra && (!sameRotation(mc.player.getYRot(), mc.player.yRotO)
+                || !sameRotation(mc.player.getYRot(), mc.player.yHeadRot)
+                || !sameRotation(mc.player.getYRot(), mc.player.yHeadRotO)
+                || !sameRotation(mc.player.getYRot(), mc.player.yBodyRot)
+                || !sameRotation(mc.player.getYRot(), mc.player.yBodyRotO))) {
+            return Step.Result.fail("elytra evidence camera/body yaw is not stably aligned");
+        }
         Object expected = CapeService.getInstance().getCapeLocation(null, capeId);
         Object resolved = service.getCapeLocation(uuid);
         if (expected == null || !expected.equals(resolved)) {
@@ -2318,6 +2410,13 @@ public final class FullScenario implements Scenario {
     /** Slider position that turns the centred 128x64 source into a 1:1 64x32 crop. */
     private static double bmoTargetZoomPosition() {
         return CapeZoomRange.position(1.0, TestAssets.BMO_CAPE_WIDTH,
+                TestAssets.BMO_PADDED_WIDTH, TestAssets.BMO_PADDED_HEIGHT);
+    }
+
+    /** Slider position at reset, where the complete padded source fits inside the 64x32 grid. */
+    private static double bmoPaddedZoomPosition() {
+        double resetScale = (double) TestAssets.BMO_CAPE_WIDTH / TestAssets.BMO_PADDED_WIDTH;
+        return CapeZoomRange.position(resetScale, TestAssets.BMO_CAPE_WIDTH,
                 TestAssets.BMO_PADDED_WIDTH, TestAssets.BMO_PADDED_HEIGHT);
     }
 
@@ -2510,13 +2609,68 @@ public final class FullScenario implements Scenario {
             }
             if (mc.player != null) {
                 mc.player.setShiftKeyDown(false);
-                mc.player.setDeltaMovement(0, 0, 0);
-                mc.player.setYRot(180f);
-                mc.player.setYHeadRot(180f);
-                mc.player.setXRot(0f);
+                pinRearEvidenceView(mc);
             }
         } catch (Throwable t) {
             E2ELog.warn("enterWorldView: " + t);
+        }
+    }
+
+    /**
+     * Zoom only the two model checkpoints so the 3-pixel Alex and 4-pixel Steve arms are visible.
+     * The original FOV is captured once and restored before any later scenario evidence.
+     */
+    private void prepareModelEvidenceView(Minecraft mc) {
+        enterWorldView(mc);
+        Integer current = VanillaShim.fieldOfView(mc);
+        if (modelEvidenceOriginalFov == null && current != null) {
+            modelEvidenceOriginalFov = current;
+        }
+        VanillaShim.setFieldOfView(mc, MODEL_EVIDENCE_FOV);
+        pinRearEvidenceView(mc);
+    }
+
+    /** Hold camera, pose, and renderer-facing geometry through the screenshot settle window. */
+    private boolean holdModelEvidenceView(Minecraft mc, String expectedModel) {
+        if (mc.player == null || mc.options == null) return false;
+        VanillaShim.setScreen(mc, null);
+        mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+        mc.options.keyShift.setDown(false);
+        mc.player.setShiftKeyDown(false);
+        pinRearEvidenceView(mc);
+        return VanillaShim.setFieldOfView(mc, MODEL_EVIDENCE_FOV)
+                && Integer.valueOf(MODEL_EVIDENCE_FOV).equals(VanillaShim.fieldOfView(mc))
+                && expectedModel.equals(VanillaShim.playerModel(mc.player));
+    }
+
+    private Step.Result assertModelEvidence(
+            Minecraft mc, PlayerAppearanceService svc, UUID uuid, String expectedModel) {
+        PlayerAppearance app = svc.getAppearance(uuid);
+        if (app == null) return Step.Result.fail("no appearance");
+        if (!expectedModel.equals(app.getModel())) {
+            return Step.Result.fail(
+                    "stored model=" + app.getModel() + " expected " + expectedModel);
+        }
+        String renderedModel = VanillaShim.playerModel(mc.player);
+        if (!expectedModel.equals(renderedModel)) {
+            return Step.Result.fail(
+                    "renderer model=" + renderedModel + " expected " + expectedModel);
+        }
+        if (!Integer.valueOf(MODEL_EVIDENCE_FOV).equals(VanillaShim.fieldOfView(mc))) {
+            return Step.Result.fail(
+                    "model evidence FOV=" + VanillaShim.fieldOfView(mc)
+                            + " expected " + MODEL_EVIDENCE_FOV);
+        }
+        return Step.Result.pass(
+                "stored model=" + expectedModel + ", renderer model=" + renderedModel
+                        + ", close rear FOV=" + MODEL_EVIDENCE_FOV);
+    }
+
+    private void restoreModelEvidenceView(Minecraft mc) {
+        Integer original = modelEvidenceOriginalFov;
+        if (original != null) {
+            VanillaShim.setFieldOfView(mc, original);
+            modelEvidenceOriginalFov = null;
         }
     }
 
@@ -2528,7 +2682,37 @@ public final class FullScenario implements Scenario {
     private void poseElytraForEvidence(Minecraft mc) {
         equipElytra(mc);
         if (mc.options != null) mc.options.keyShift.setDown(true);
-        if (mc.player != null) mc.player.setShiftKeyDown(true);
+        if (mc.player != null) {
+            mc.player.setShiftKeyDown(true);
+            pinRearEvidenceView(mc);
+        }
+    }
+
+    /**
+     * Align the camera, head and rendered body to the same rear-facing yaw.
+     *
+     * <p>Changing only {@code setYRot} leaves {@code yBodyRot} free to retain its previous
+     * interpolated direction. That made the player look almost sideways in the BMO elytra evidence:
+     * one wing was broad while the other was edge-on even though the logical crouch assertion
+     * passed. Pin both current and previous rotations during the settle window so the captured
+     * frame is a stable rear view rather than a transition between poses.
+     */
+    private void pinRearEvidenceView(Minecraft mc) {
+        if (mc.player == null) return;
+        float yaw = 180f;
+        mc.player.setDeltaMovement(0, 0, 0);
+        mc.player.setYRot(yaw);
+        mc.player.yRotO = yaw;
+        mc.player.setYHeadRot(yaw);
+        mc.player.yHeadRotO = yaw;
+        mc.player.setYBodyRot(yaw);
+        mc.player.yBodyRotO = yaw;
+        mc.player.setXRot(0f);
+        mc.player.xRotO = 0f;
+    }
+
+    private static boolean sameRotation(float left, float right) {
+        return Math.abs(left - right) < 0.01f;
     }
 
     private static boolean hasEmptyChest(Minecraft mc) {
@@ -2537,7 +2721,11 @@ public final class FullScenario implements Scenario {
     }
 
     private String expectedAnimatedCapeId() {
-        return gifCapeHash != null ? "local_cape:" + gifCapeHash : "known:rickroll";
+        return gifCapeHash == null ? null : "local_cape:" + gifCapeHash;
+    }
+
+    private String expectedAnimationId() {
+        return gifCapeHash == null ? null : "cape_" + gifCapeHash;
     }
 
     /**
@@ -2572,19 +2760,18 @@ public final class FullScenario implements Scenario {
 
     // ===== animation reflection ================================================================
 
-    /** The single registered {@code AnimationState} whose metadata has &gt;1 frame, or null. */
-    private Object soleAnimatedState() {
+    /** The registered state for the cape actually worn by this checkpoint, or {@code null}. */
+    private Object expectedAnimatedState() {
         try {
             AnimatedTextureManager mgr = AnimatedTextureManager.getInstance();
             Field f = AnimatedTextureManager.class.getDeclaredField("animations");
             f.setAccessible(true);
             Map<?, ?> map = (Map<?, ?>) f.get(mgr);
-            for (Object st : map.values()) {
-                AnimationMetadata m = metaOf(st);
-                if (m != null && m.frameCount() > 1) return st;
-            }
+            Object state = map.get(expectedAnimationId());
+            AnimationMetadata metadata = metaOf(state);
+            return metadata != null && metadata.frameCount() > 1 ? state : null;
         } catch (Throwable t) {
-            E2ELog.warn("soleAnimatedState: " + t);
+            E2ELog.warn("expectedAnimatedState: " + t);
         }
         return null;
     }
@@ -2597,16 +2784,6 @@ public final class FullScenario implements Scenario {
     private AnimationMetadata metaOf(Object state) {
         Object v2 = stateField(state, "metadata");
         return (v2 instanceof AnimationMetadata m) ? m : null;
-    }
-
-    private Long startTimeOf(Object state) {
-        Object v2 = stateField(state, "startTime");
-        return (v2 instanceof Long l) ? l : null;
-    }
-
-    private Float speedOf(Object state) {
-        Object v2 = stateField(state, "speedMultiplier");
-        return (v2 instanceof Float fl) ? fl : null;
     }
 
     private static Object stateField(Object state, String name) {
