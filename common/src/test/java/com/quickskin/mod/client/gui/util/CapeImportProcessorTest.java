@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.util;
 
+import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -84,11 +85,62 @@ class CapeImportProcessorTest {
                 transparentCape, 1, vanillaElytra);
         assertEquals(0xffcc3300, composite.getRGB(0, 0));
 
-        transparentCape.setRGB(22, 0, 0xff00aa00);
+        transparentCape.setRGB(22, 2, 0xff00aa00);
         assertFalse(CapeImportProcessor.isElytraAreaTransparent(transparentCape));
         assertSame(
                 transparentCape,
                 CapeImportProcessor.compositeElytraIfNeeded(
                         transparentCape, 1, vanillaElytra));
+    }
+
+    @Test
+    void opaqueCapeImportsReceiveATaperedElytraCutout() throws IOException {
+        BufferedImage opaqueCape = opaqueAtlas(256, 128, 1);
+
+        BufferedImage masked = CapeImportProcessor.compositeElytraIfNeeded(
+                opaqueCape, 1, null);
+
+        assertFalse(masked == opaqueCape, "an invalid opaque atlas needs a presentation copy");
+        assertTrue(CapeElytraSilhouette.hasRequiredCutout(masked, 1));
+        assertEquals(0x00000000, masked.getRGB(45 * 4, 2 * 4));
+        assertEquals(0xff117788, masked.getRGB(36 * 4, 2 * 4));
+        assertEquals(0xff117788, masked.getRGB(1, 1), "cape pixels must stay untouched");
+        assertFalse(CapeElytraSilhouette.hasRequiredCutout(opaqueCape, 1),
+                "the caller-owned source must not be mutated");
+    }
+
+    @Test
+    void everyAnimatedFrameReceivesTheSameCutout() throws IOException {
+        BufferedImage atlas = opaqueAtlas(128, 128, 2);
+
+        BufferedImage masked = CapeImportProcessor.compositeElytraIfNeeded(atlas, 2, null);
+
+        assertTrue(CapeElytraSilhouette.hasRequiredCutout(masked, 2));
+        assertEquals(0x00000000, masked.getRGB(45 * 2, 2 * 2));
+        assertEquals(0x00000000, masked.getRGB(45 * 2, 64 + 2 * 2));
+        assertEquals(0xff117788, masked.getRGB(36 * 2, 64 + 2 * 2));
+    }
+
+    @Test
+    void exactElytraFaceScanIgnoresPaddingButFindsRealContent() {
+        BufferedImage cape = new BufferedImage(64, 32, BufferedImage.TYPE_INT_ARGB);
+        cape.setRGB(63, 31, 0xffffffff);
+        assertTrue(CapeImportProcessor.isElytraAreaTransparent(cape));
+
+        cape.setRGB(36, 2, 0xffffffff);
+        assertFalse(CapeImportProcessor.isElytraAreaTransparent(cape));
+    }
+
+    private static BufferedImage opaqueAtlas(int width, int height, int frameCount) {
+        BufferedImage atlas = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = atlas.createGraphics();
+        try {
+            graphics.setColor(new java.awt.Color(0xff117788, true));
+            graphics.fillRect(0, 0, width, height);
+        } finally {
+            graphics.dispose();
+        }
+        assertEquals(height, width / 2 * frameCount);
+        return atlas;
     }
 }
