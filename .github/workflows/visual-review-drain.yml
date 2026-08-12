@@ -1,8 +1,9 @@
 name: AI visual review drain
 
 # Curators enqueue immutable, source-bound capsules in visual-review.yml. This protected workflow
-# drains one oldest eligible capsule at a time. A fixed workflow concurrency group may coalesce
-# wake runs because the durable artifact queue, rather than a pending workflow run, owns the work.
+# drains one oldest eligible capsule at a time and may certify a clean synchronized 1.20.1 anchor.
+# A fixed workflow concurrency group may coalesce wake runs because the durable artifact queue,
+# rather than a pending workflow run, owns the work.
 on:
   schedule:
     - cron: "17,47 * * * *"
@@ -84,7 +85,7 @@ jobs:
           cat "$queue_output" >> "$GITHUB_OUTPUT"
 
   review:
-    name: Review one queued capsule (advisory)
+    name: Review one queued capsule
     needs: select
     if: needs.select.outputs.eligible == 'true'
     runs-on: ubuntu-24.04
@@ -94,6 +95,11 @@ jobs:
       contents: read
     outputs:
       already_reviewed: ${{ steps.guard.outputs.already_reviewed }}
+      certificate_artifact_id: ${{ steps.anchor-certificate.outputs.artifact-id }}
+      certificate_artifact_name: ${{ steps.certify.outputs.artifact_name }}
+      certificate_anchor_source_sha: ${{ steps.certify.outputs.anchor_source_sha }}
+      certificate_anchor_target_sha: ${{ steps.certify.outputs.anchor_target_sha }}
+      certificate_master_sha: ${{ steps.certify.outputs.master_source_sha }}
       cooling: ${{ steps.guard.outputs.cooling }}
       failure_category: ${{ steps.classify.outputs.failure_category }}
       failure_transient: ${{ steps.classify.outputs.failure_transient }}
@@ -317,73 +323,33 @@ jobs:
              .head_repository.full_name == $repository' \
             <<< "$source_run" > /dev/null
 
-          reference_identity="$(python3 e2e/visual_review.py \
-            --matrix release/release-matrix.json --reference-identity)"
-          reference_branch="$(jq -er .release_branch <<< "$reference_identity")"
-          reference_artifact_node="$(jq -er .artifact_node <<< "$reference_identity")"
-          reference_version="$(jq -er .version <<< "$reference_identity")"
-          reference_loader="$(jq -er .loader <<< "$reference_identity")"
-          reference_id="$(jq -er .visual_reference.artifact_id "$proof")"
-          reference_name="$(jq -er .visual_reference.artifact_name "$proof")"
-          reference_run_id="$(jq -er .visual_reference.artifact_run_id "$proof")"
-          reference_sha="$(jq -er .visual_reference.sha "$proof")"
-          reference_digest="$(jq -er .visual_reference.artifact_digest "$proof")"
-          reference_size="$(jq -er .visual_reference.artifact_size_in_bytes "$proof")"
-          [[ "$reference_name" == "pages-e2e-$reference_branch" ]]
-          reference_metadata="$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$reference_id")"
-          jq -e \
-            --arg digest "$reference_digest" \
-            --arg name "$reference_name" \
-            --arg sha "$reference_sha" \
-            --argjson artifact_id "$reference_id" \
-            --argjson run_id "$reference_run_id" \
-            --argjson size "$reference_size" \
-            '.id == $artifact_id and .name == $name and .size_in_bytes == $size and
-             .digest == $digest and .expired == false and
-             .workflow_run.id == $run_id and .workflow_run.head_sha == $sha' \
-            <<< "$reference_metadata" > /dev/null
-          reference_run="$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$reference_run_id")"
-          jq -e \
-            --arg branch "$reference_branch" \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg sha "$reference_sha" \
-            '.status == "completed" and .conclusion == "success" and
-             .event == "workflow_dispatch" and .head_branch == $branch and
-             .head_sha == $sha and .path == ".github/workflows/on-demand-e2e.yml" and
-             .head_repository.full_name == $repository' \
-            <<< "$reference_run" > /dev/null
-          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$reference_branch" \
-            --jq .commit.sha)" == "$reference_sha" ]]
-
+          review_mode="$(jq -er \
+            '.review_mode | select(. == "anchor-semantic" or
+              . == "reference-comparison")' "$proof")"
+          source_branch="$(jq -er .source_branch "$proof")"
+          [[ "$(jq -r .head_branch <<< "$source_run")" == "$source_branch" ]]
           scenario_contract_sha256="$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)"
           jq -e \
             --arg implementation_sha "$IMPLEMENTATION_SHA" \
             --arg manifest_sha256 "$manifest_sha256" \
-            --arg reference_artifact_node "$reference_artifact_node" \
-            --arg reference_branch "$reference_branch" \
-            --arg reference_loader "$reference_loader" \
-            --arg reference_version "$reference_version" \
+            --arg review_mode "$review_mode" \
             --arg scenario_contract_sha256 "$scenario_contract_sha256" \
+            --arg source_branch "$source_branch" \
             --arg source_sha "$source_sha" \
             --argjson frame_count "$frame_count" \
             --argjson image_bytes "$image_bytes" \
             --argjson image_count "$image_count" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
-            --argjson reference_id "$reference_id" \
-            --arg reference_name "$reference_name" \
-            --argjson reference_run_id "$reference_run_id" \
-            --argjson reference_size "$reference_size" \
-            --arg reference_digest "$reference_digest" \
-            --arg reference_sha "$reference_sha" \
-            '(keys | sort) == (["artifact_inventory", "frame_count",
-              "image_bytes", "image_count", "implementation_sha", "job_graph",
-              "manifest_sha256", "matrix_kind", "scenario_contract_sha256",
-              "schema_version", "source_run_id", "source_sha",
-              "visual_reference"] | sort) and
-             .schema_version == 3 and .source_run_id == $source_run_id and
-             .source_sha == $source_sha and .implementation_sha == $implementation_sha and
+            '(keys | sort) == (["artifact_inventory", "frame_count", "image_bytes",
+              "image_count", "implementation_sha", "job_graph", "manifest_sha256",
+              "master_source_sha", "matrix_kind", "review_mode",
+              "scenario_contract_sha256", "schema_version", "source_branch",
+              "source_run_id", "source_sha", "visual_reference"] | sort) and
+             .schema_version == 4 and .source_run_id == $source_run_id and
+             .source_branch == $source_branch and .source_sha == $source_sha and
+             (.master_source_sha == null or
+               (.master_source_sha | type == "string" and test("^[0-9a-f]{40}$"))) and
+             .implementation_sha == $implementation_sha and .review_mode == $review_mode and
              (.matrix_kind == "pr-anchors" or .matrix_kind == "native-anchors") and
              .scenario_contract_sha256 == $scenario_contract_sha256 and
              (.artifact_inventory | type == "array" and length > 0 and length <= 8) and
@@ -394,45 +360,106 @@ jobs:
                (.name | type == "string" and
                  test("^packaged-e2e-[A-Za-z0-9._-]+$")) and
                (.size_in_bytes | type == "number" and . > 0 and . <= 67108864) and
-               (.digest | type == "string" and
-                 test("^sha256:[0-9a-f]{64}$")) and
-               (.expired == false) and
-               (.workflow_run | type == "object") and
+               (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
+               (.expired == false) and (.workflow_run | type == "object") and
                (.workflow_run.id == $source_run_id)] | all) and
              ([.artifact_inventory[].size_in_bytes] | add // 0) <= 268435456 and
              (.job_graph | type == "object" and .runtime_policy == "full") and
-             (.visual_reference | (keys | sort) == (["artifact_digest", "artifact_id",
-               "artifact_name", "artifact_node", "artifact_run_id",
-               "artifact_size_in_bytes", "branch", "evidence_kind", "loader",
-               "manifest_sha256", "sha", "version"] | sort)) and
-             .visual_reference.artifact_id == $reference_id and
-             .visual_reference.artifact_name == $reference_name and
-             .visual_reference.artifact_run_id == $reference_run_id and
-             .visual_reference.artifact_size_in_bytes == $reference_size and
-             .visual_reference.artifact_digest == $reference_digest and
-             .visual_reference.branch == $reference_branch and
-             .visual_reference.sha == $reference_sha and
-             .visual_reference.artifact_node == $reference_artifact_node and
-             .visual_reference.version == $reference_version and
-             .visual_reference.loader == $reference_loader and
-             .visual_reference.evidence_kind == "raw-png" and
-             (.visual_reference.manifest_sha256 | type == "string" and
-               test("^[0-9a-f]{64}$")) and
              .manifest_sha256 == $manifest_sha256 and .frame_count == $frame_count and
-             .image_count == $image_count and .image_bytes == $image_bytes' \
+             .image_count == $image_count and .image_bytes == $image_bytes and
+             (if $review_mode == "anchor-semantic" then
+                .visual_reference == null
+              else
+                (.visual_reference | type == "object")
+              end)' \
             "$proof" > /dev/null
 
-          python3 e2e/check_visual_review.py \
-            --manifest "$manifest" \
-            --input-root "$capsule/review-input" \
-            --require-paired \
+          validation_arguments=(
+            --manifest "$manifest"
+            --input-root "$capsule/review-input"
             --validate-input-only
+          )
+          if [[ "$review_mode" == reference-comparison ]]; then
+            reference_identity="$(python3 e2e/visual_review.py \
+              --matrix release/release-matrix.json --reference-identity)"
+            reference_branch="$(jq -er .release_branch <<< "$reference_identity")"
+            reference_artifact_node="$(jq -er .artifact_node <<< "$reference_identity")"
+            reference_version="$(jq -er .version <<< "$reference_identity")"
+            reference_loader="$(jq -er .loader <<< "$reference_identity")"
+            reference_id="$(jq -er .visual_reference.artifact_id "$proof")"
+            reference_name="$(jq -er .visual_reference.artifact_name "$proof")"
+            reference_run_id="$(jq -er .visual_reference.artifact_run_id "$proof")"
+            reference_sha="$(jq -er .visual_reference.sha "$proof")"
+            reference_digest="$(jq -er .visual_reference.artifact_digest "$proof")"
+            reference_size="$(jq -er .visual_reference.artifact_size_in_bytes "$proof")"
+            [[ "$reference_name" == "pages-e2e-$reference_branch" ]]
+            reference_metadata="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$reference_id")"
+            jq -e \
+              --arg digest "$reference_digest" \
+              --arg name "$reference_name" \
+              --arg sha "$reference_sha" \
+              --argjson artifact_id "$reference_id" \
+              --argjson run_id "$reference_run_id" \
+              --argjson size "$reference_size" \
+              '.id == $artifact_id and .name == $name and .size_in_bytes == $size and
+               .digest == $digest and .expired == false and
+               .workflow_run.id == $run_id and .workflow_run.head_sha == $sha' \
+              <<< "$reference_metadata" > /dev/null
+            reference_run="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$reference_run_id")"
+            jq -e \
+              --arg branch "$reference_branch" \
+              --arg repository "$GITHUB_REPOSITORY" \
+              --arg sha "$reference_sha" \
+              '.status == "completed" and .conclusion == "success" and
+               .event == "workflow_dispatch" and .head_branch == $branch and
+               .head_sha == $sha and .path == ".github/workflows/on-demand-e2e.yml" and
+               .head_repository.full_name == $repository' \
+              <<< "$reference_run" > /dev/null
+            [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$reference_branch" \
+              --jq .commit.sha)" == "$reference_sha" ]]
+            jq -e \
+              --arg reference_artifact_node "$reference_artifact_node" \
+              --arg reference_branch "$reference_branch" \
+              --arg reference_digest "$reference_digest" \
+              --arg reference_loader "$reference_loader" \
+              --arg reference_name "$reference_name" \
+              --arg reference_sha "$reference_sha" \
+              --arg reference_version "$reference_version" \
+              --argjson reference_id "$reference_id" \
+              --argjson reference_run_id "$reference_run_id" \
+              --argjson reference_size "$reference_size" \
+              '(.visual_reference | (keys | sort) == (["artifact_digest", "artifact_id",
+                "artifact_name", "artifact_node", "artifact_run_id",
+                "artifact_size_in_bytes", "branch", "evidence_kind", "loader",
+                "manifest_sha256", "sha", "version"] | sort)) and
+               .visual_reference.artifact_id == $reference_id and
+               .visual_reference.artifact_name == $reference_name and
+               .visual_reference.artifact_run_id == $reference_run_id and
+               .visual_reference.artifact_size_in_bytes == $reference_size and
+               .visual_reference.artifact_digest == $reference_digest and
+               .visual_reference.branch == $reference_branch and
+               .visual_reference.sha == $reference_sha and
+               .visual_reference.artifact_node == $reference_artifact_node and
+               .visual_reference.version == $reference_version and
+               .visual_reference.loader == $reference_loader and
+               .visual_reference.evidence_kind == "raw-png" and
+               (.visual_reference.manifest_sha256 | type == "string" and
+                 test("^[0-9a-f]{64}$"))' \
+              "$proof" > /dev/null
+            validation_arguments+=(--require-paired)
+          fi
+          python3 e2e/check_visual_review.py "${validation_arguments[@]}"
           sha256sum "$manifest" > "$RUNNER_TEMP/visual-review-manifest.sha256"
           mkdir -p "$RUNNER_TEMP/protected-reviewer"
           cp e2e/check_visual_review.py "$RUNNER_TEMP/protected-reviewer/"
           cp e2e/visual_review_runner.py "$RUNNER_TEMP/protected-reviewer/"
           cp e2e/visual_review_prompt.md "$RUNNER_TEMP/protected-reviewer/"
           cp e2e/visual_review_verify_prompt.md "$RUNNER_TEMP/protected-reviewer/"
+          cp e2e/visual_review_semantic_prompt.md "$RUNNER_TEMP/protected-reviewer/"
+          cp e2e/visual_review_semantic_verify_prompt.md \
+            "$RUNNER_TEMP/protected-reviewer/"
           sha256sum "$RUNNER_TEMP/protected-reviewer/"* \
             > "$RUNNER_TEMP/protected-reviewer.sha256"
 
@@ -471,16 +498,25 @@ jobs:
             ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL \
             ACTIONS_CACHE_URL ACTIONS_RESULTS_URL
           sha256sum --check "$RUNNER_TEMP/protected-reviewer.sha256"
+          review_mode="$(jq -er \
+            '.review_mode | select(. == "anchor-semantic" or \
+              . == "reference-comparison")' curation-proof.json)"
+          if [[ "$review_mode" == anchor-semantic ]]; then
+            triage_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_semantic_prompt.md"
+            verify_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_semantic_verify_prompt.md"
+          else
+            triage_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_prompt.md"
+            verify_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_verify_prompt.md"
+          fi
           model_status=0
           python3 "$RUNNER_TEMP/protected-reviewer/visual_review_runner.py" \
             --capsule . \
             --manifest review-input/visual-review-manifest.json \
             --input-root review-input \
+            --review-mode "$review_mode" \
             --claude "$RUNNER_TEMP/claude-cli/node_modules/.bin/claude" \
-            --triage-prompt \
-              "$RUNNER_TEMP/protected-reviewer/visual_review_prompt.md" \
-            --verify-prompt \
-              "$RUNNER_TEMP/protected-reviewer/visual_review_verify_prompt.md" \
+            --triage-prompt "$triage_prompt" \
+            --verify-prompt "$verify_prompt" \
             --triage-model claude-sonnet-5 \
             --verify-model claude-opus-5 \
             --triage-chunk-size 8 \
@@ -492,7 +528,7 @@ jobs:
             || model_status=$?
           printf 'model_status=%s\n' "$model_status" >> "$GITHUB_OUTPUT"
 
-      - name: Independently validate the advisory result
+      - name: Independently validate the normalized result
         id: check
         if: steps.guard.outputs.reviewable == 'true'
         working-directory: ${{ runner.temp }}/visual-review-capsule
@@ -507,22 +543,154 @@ jobs:
           fi
           sha256sum --check "$RUNNER_TEMP/visual-review-manifest.sha256"
           sha256sum --check "$RUNNER_TEMP/protected-reviewer.sha256"
-          python3 "$RUNNER_TEMP/protected-reviewer/check_visual_review.py" \
-            --manifest review-input/visual-review-manifest.json \
-            --input-root review-input \
-            --require-paired \
+          review_mode="$(jq -er \
+            '.review_mode | select(. == "anchor-semantic" or \
+              . == "reference-comparison")' curation-proof.json)"
+          validation_arguments=(
+            --manifest review-input/visual-review-manifest.json
+            --input-root review-input
             --validate-input-only
+          )
+          report_arguments=(
+            --report visual-review-report.staged.json
+            --normalized-report visual-review-report.json
+            --manifest review-input/visual-review-manifest.json
+          )
+          if [[ "$review_mode" == reference-comparison ]]; then
+            validation_arguments+=(--require-paired)
+            report_arguments+=(--require-paired)
+          fi
+          python3 "$RUNNER_TEMP/protected-reviewer/check_visual_review.py" \
+            "${validation_arguments[@]}"
           git -C "$GITHUB_WORKSPACE" diff --exit-code
           review_status=0
           python3 "$RUNNER_TEMP/protected-reviewer/check_visual_review.py" \
-            --report visual-review-report.staged.json \
-            --normalized-report visual-review-report.json \
-            --require-paired \
-            --manifest review-input/visual-review-manifest.json \
+            "${report_arguments[@]}" \
             || review_status=$?
           test -s visual-review-report.json
           printf 'review_complete=true\n' >> "$GITHUB_OUTPUT"
           exit "$review_status"
+
+      - name: Certify a clean synchronized 1.20.1 anchor
+        id: certify
+        if: steps.check.outcome == 'success'
+        working-directory: ${{ runner.temp }}/visual-review-capsule
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf 'certified=false\n' >> "$GITHUB_OUTPUT"
+          proof=curation-proof.json
+          if [[ "$(jq -er .review_mode "$proof")" != anchor-semantic ]]; then
+            exit 0
+          fi
+          if ! jq -e \
+              '(.master_source_sha | type == "string" and \
+                test("^[0-9a-f]{40}$")) and
+               (.source_branch | type == "string" and
+                test("^automation/sync/[A-Za-z0-9._/-]+$"))' \
+              "$proof" > /dev/null; then
+            # Pull-request and scheduled 1.20.1 reviews are semantic too, but only an exact
+            # workflow-owned version port can release a cross-version synchronization wave.
+            exit 0
+          fi
+          master_source_sha="$(jq -er \
+            '.master_source_sha | select(type == "string" and \
+              test("^[0-9a-f]{40}$"))' "$proof")"
+          anchor_source_sha="$(jq -er .source_sha "$proof")"
+          source_branch="$(jq -er .source_branch "$proof")"
+          source_run_id="$(jq -er .source_run_id "$proof")"
+          implementation_sha="$(jq -er .implementation_sha "$proof")"
+          [[ "$anchor_source_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$source_branch" =~ ^automation/sync/[A-Za-z0-9._/-]+$ ]]
+          [[ "$source_run_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$implementation_sha" =~ ^[0-9a-f]{40}$ ]]
+
+          reference_identity="$(python3 "$GITHUB_WORKSPACE/e2e/visual_review.py" \
+            --matrix "$GITHUB_WORKSPACE/release/release-matrix.json" \
+            --reference-identity)"
+          anchor_branch="$(jq -er .release_branch <<< "$reference_identity")"
+
+          # The ordinary gate handler may still be completing the merge when model review ends.
+          # Admit only the unique bot-owned anchor PR after GitHub records its merge commit.
+          merged_pr=''
+          for attempt in {1..60}; do
+            associated="$(gh api -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/commits/$anchor_source_sha/pulls?per_page=20")"
+            merged_pr="$(jq -c \
+              --arg anchor_branch "$anchor_branch" \
+              --arg repository "$GITHUB_REPOSITORY" \
+              --arg source_branch "$source_branch" \
+              --arg source_sha "$anchor_source_sha" \
+              '[.[] | select(
+                .base.ref == $anchor_branch and
+                .base.repo.full_name == $repository and
+                .head.ref == $source_branch and .head.sha == $source_sha and
+                .head.repo.full_name == $repository and
+                .user.login == "github-actions[bot]" and
+                ([.labels[].name] | index("automated-version-sync")) != null and
+                .merged_at != null and
+                (.merge_commit_sha | type == "string" and
+                  test("^[0-9a-f]{40}$")))] |
+               if length == 1 then .[0] else empty end' <<< "$associated")"
+            if [[ -n "$merged_pr" ]]; then
+              break
+            fi
+            sleep 5
+          done
+          test -n "$merged_pr"
+          anchor_target_sha="$(jq -er .merge_commit_sha <<< "$merged_pr")"
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$anchor_branch" \
+            --jq .commit.sha)" == "$anchor_target_sha" ]]
+
+          git -C "$GITHUB_WORKSPACE" fetch --no-tags origin \
+            "$master_source_sha" "$anchor_source_sha" "$anchor_target_sha"
+          read -r -a source_commit <<< "$(git -C "$GITHUB_WORKSPACE" \
+            rev-list --parents -n 1 "$anchor_source_sha")"
+          [[ "${#source_commit[@]}" -eq 3 ]]
+          [[ "${source_commit[2]}" == "$master_source_sha" ]]
+          git -C "$GITHUB_WORKSPACE" merge-base --is-ancestor \
+            "$master_source_sha" "$implementation_sha"
+          read -r -a target_commit <<< "$(git -C "$GITHUB_WORKSPACE" \
+            rev-list --parents -n 1 "$anchor_target_sha")"
+          [[ "${#target_commit[@]}" -eq 3 ]]
+          [[ "${target_commit[1]}" == "$anchor_source_sha" \
+            || "${target_commit[2]}" == "$anchor_source_sha" ]]
+          [[ "$(git -C "$GITHUB_WORKSPACE" rev-parse \
+            "$anchor_source_sha^{tree}")" == \
+            "$(git -C "$GITHUB_WORKSPACE" rev-parse "$anchor_target_sha^{tree}")" ]]
+
+          certificate=visual-anchor-certification.json
+          python3 "$GITHUB_WORKSPACE/scripts/ci/visual_anchor_certification.py" create \
+            --proof "$proof" \
+            --manifest review-input/visual-review-manifest.json \
+            --report visual-review-report.json \
+            --anchor-branch "$anchor_branch" \
+            --anchor-target-sha "$anchor_target_sha" \
+            --output "$certificate" \
+            > "$RUNNER_TEMP/visual-anchor-certificate-summary.json"
+          python3 "$GITHUB_WORKSPACE/scripts/ci/visual_anchor_certification.py" verify \
+            --certificate "$certificate" \
+            --expected-master-sha "$master_source_sha" \
+            --expected-anchor-branch "$anchor_branch" \
+            > /dev/null
+          artifact_name="visual-anchor-certification-$master_source_sha"
+          printf 'anchor_source_sha=%s\n' "$anchor_source_sha" >> "$GITHUB_OUTPUT"
+          printf 'anchor_target_sha=%s\n' "$anchor_target_sha" >> "$GITHUB_OUTPUT"
+          printf 'artifact_name=%s\n' "$artifact_name" >> "$GITHUB_OUTPUT"
+          printf 'master_source_sha=%s\n' "$master_source_sha" >> "$GITHUB_OUTPUT"
+          printf 'certified=true\n' >> "$GITHUB_OUTPUT"
+
+      - name: Upload the exact semantic anchor certificate
+        id: anchor-certificate
+        if: steps.certify.outputs.certified == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.certify.outputs.artifact_name }}
+          path: ${{ runner.temp }}/visual-review-capsule/visual-anchor-certification.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Classify a failed attempt without provider text
         id: classify
@@ -643,6 +811,71 @@ jobs:
           fi
           cat "$delete_error" >&2
           exit 1
+
+  release-anchor:
+    name: Release the certified cross-version wave
+    needs:
+      - review
+      - cleanup
+    if: >-
+      always() && needs.cleanup.result == 'success' &&
+      needs.review.outputs.certificate_artifact_id != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Authenticate and publish the semantic certificate identity
+        shell: bash
+        env:
+          ANCHOR_SOURCE_SHA: ${{ needs.review.outputs.certificate_anchor_source_sha }}
+          ANCHOR_TARGET_SHA: ${{ needs.review.outputs.certificate_anchor_target_sha }}
+          ARTIFACT_ID: ${{ needs.review.outputs.certificate_artifact_id }}
+          ARTIFACT_NAME: ${{ needs.review.outputs.certificate_artifact_name }}
+          GH_TOKEN: ${{ github.token }}
+          MASTER_SOURCE_SHA: ${{ needs.review.outputs.certificate_master_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$MASTER_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ANCHOR_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ANCHOR_TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ARTIFACT_NAME" == "visual-anchor-certification-$MASTER_SOURCE_SHA" ]]
+          metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
+          digest="$(jq -er \
+            '.digest | select(type == "string" and \
+              test("^sha256:[0-9a-f]{64}$"))' <<< "$metadata")"
+          size="$(jq -er .size_in_bytes <<< "$metadata")"
+          jq -e \
+            --arg name "$ARTIFACT_NAME" \
+            --arg sha "$GITHUB_SHA" \
+            --argjson artifact_id "$ARTIFACT_ID" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            '.id == $artifact_id and .name == $name and .expired == false and
+             (.size_in_bytes | type == "number" and . > 0 and . <= 1048576) and
+             .workflow_run.id == $run_id and .workflow_run.head_branch == "master" and
+             .workflow_run.head_sha == $sha' \
+            <<< "$metadata" > /dev/null
+          jq -n \
+            --arg anchor_source_sha "$ANCHOR_SOURCE_SHA" \
+            --arg anchor_target_sha "$ANCHOR_TARGET_SHA" \
+            --arg artifact_digest "$digest" \
+            --arg artifact_id "$ARTIFACT_ID" \
+            --arg artifact_name "$ARTIFACT_NAME" \
+            --arg artifact_run_id "$GITHUB_RUN_ID" \
+            --arg artifact_size "$size" \
+            --arg master_source_sha "$MASTER_SOURCE_SHA" \
+            '{event_type:"visual-anchor-certified",client_payload:{
+              master_source_sha:$master_source_sha,
+              anchor_source_sha:$anchor_source_sha,
+              anchor_target_sha:$anchor_target_sha,
+              artifact_id:$artifact_id,artifact_name:$artifact_name,
+              artifact_run_id:$artifact_run_id,
+              artifact_size:$artifact_size,artifact_digest:$artifact_digest}}' \
+            | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
 
   continue:
     name: Wake the next queued review
