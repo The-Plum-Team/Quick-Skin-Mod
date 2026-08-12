@@ -169,7 +169,7 @@ public class AnimatedTextureManager {
          * to the GPU texture and uploads.
          */
         long tick(long availablePixels) {
-            if (metadata.frameCount() <= 1) {
+            if (metadata.frameCount() <= 1 || speedMultiplier == 0.0f) {
                 return 0L;
             }
 
@@ -850,10 +850,35 @@ public class AnimatedTextureManager {
      * Update the animation speed for a registered animation
      */
     public void setAnimationSpeed(String animationId, float speed) {
+        if (!Float.isFinite(speed) || speed < 0.0f) {
+            return;
+        }
         AnimationState state = animations.get(animationId);
         if (state != null) {
             state.setSpeedMultiplier(speed);
         }
+    }
+
+    /**
+     * Pin one exact active frame and upload it immediately.
+     *
+     * <p>This is used by deterministic visual evidence and is also useful to render a paused
+     * animation without waiting for wall-clock playback. It deliberately does not alter the atlas,
+     * metadata, or configured speed; callers that need the frame to stay pinned set speed to zero.</p>
+     *
+     * @return true only when the requested frame was installed on the active GPU texture
+     */
+    public synchronized boolean setAnimationFrame(String animationId, int frame) {
+        if (animationId == null) return false;
+        AnimationState state = animations.get(animationId);
+        if (state == null || frame < 0 || frame >= state.metadata.frameCount()) return false;
+        if (state.currentFrame == frame) return true;
+        NativeImage pixels = state.frameTexture.getPixels();
+        if (pixels == null) return false;
+        state.copyFrameTo(pixels, frame);
+        state.currentFrame = frame;
+        state.frameTexture.upload();
+        return true;
     }
 
     /**
