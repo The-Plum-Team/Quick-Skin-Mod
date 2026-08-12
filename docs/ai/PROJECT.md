@@ -118,10 +118,14 @@ immutable workflow and governance activation contract.
   is certified, every later-version candidate is paired by semantic `capture_id` with authenticated
   current-head lossless Fabric 1.20.1 Pages evidence; the compact WebP cache is never an AI oracle.
   Only canonical content-addressed RGB PNGs, a bounded manifest, and provenance enter the durable
-  queue; raw E2E ZIPs never share a runner with the credential. A globally serialized protected
-  drainer prioritizes a certifiable anchor, triages all independent loader-grouped chunks
-  concurrently with Sonnet, sends suspicious or uncertain frames to concurrent bounded Opus
-  verification, cancels outstanding work after the first Opus-confirmed defect, and reuses paired
+  queue; raw E2E ZIPs never share a runner with the credential. Protected drains are locked by
+  exact queue artifact, so different capsules run concurrently while duplicate wakes coalesce;
+  generic recovery sweeps only redispatch an authenticated exact wake. A certifiable anchor is
+  prioritized before the cross-version wave. Each drain triages independent loader-grouped chunks
+  concurrently with Sonnet and sends suspicious or uncertain frames to concurrent bounded Opus
+  verification. The first Opus-confirmed defect publishes a protected generation-bound marker,
+  cancels sibling drains and keeps later queue selection from spending more model calls on that
+  automatic wave. Each drain also cancels its own outstanding calls on confirmation and reuses paired
   verdicts only under an exact content/expectation/loader/contract/matrix/reviewer/prompt/model
   policy key;
   unpaired anchor semantics are never cached. It keeps provider output private and uploads only the
