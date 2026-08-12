@@ -23,7 +23,7 @@ This `fabric-and-neoforge-1.21.2` release branch exercises the following exact p
 | `fabric-1.21.2` | `1.21.2` | Fabric | `21` | `4` |
 | `neoforge-1.21.2` | `1.21.2` | NeoForge | `21` | `4` |
 
-Scenario contract SHA-256: `f327a0abcb141330ae9c78d0feed45cb601b23273eeedb622abc3528a5e228a6`
+Scenario contract SHA-256: `f1000aeced803919fd8c3e5797b496eec7d8b49bf731711a5b25c58656ed24c9`
 Contract totals: `46` ordered steps, `41` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -168,7 +168,9 @@ centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import, driv
 control to a 1:1 crop, saves through the adjusted-import boundary, and requires the preview,
 applied, and persisted atlases to remain pixel-identical to the bundled original. Separate direct
 and adjusted world captures cover both the cape and elytra render routes; their tightly cropped
-comparison allows only small entity-animation and lighting drift.
+comparison allows only small entity-animation and lighting drift. The elytra captures hold the
+player in a deterministic crouching pose, opening the two wings far enough for semantic review to
+distinguish elytra geometry from a draped cape.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves
@@ -187,33 +189,38 @@ static-site presentation, or isolated administration changes. Build, unit, and s
 still run, while the stable Packaged E2E gate reports an explicit N/A and launches no Minecraft.
 Unknown, mixed, production, loader/overlay, matrix, Gradle, workflow, harness, contract, oracle, or
 classifier changes always resolve to `full`. A `not-applicable` exact-tree attestation deliberately
-does not mint screenshots or Pages evidence.
+does not mint screenshots or Pages evidence. The matrix-derived 1.20.1 anchor port is the exception:
+automatic propagation always forces it to `full` so it can certify the complete current `master`
+generation, even when the port's immediate file list would otherwise qualify for N/A.
 
 After that tested port merges, the controller dispatches a lightweight run of the same workflow on
 the final release branch. That run does not launch Minecraft: it verifies the successful source
 run and requires the final merge commit to have exactly the tested Git tree. This is the evidence
 shown by each branch-specific Packaged E2E badge in the root README.
 
-Programmatic screenshot probes and comparisons are part of that required runtime gate. AI image
-judgment is a separate authenticated prepare/queue/drain pipeline and is advisory: it can annotate
-evidence without delaying or weakening Build, Packaged E2E, or version-port completion.
-The stable cross-version anchor decision is recorded in
-[ADR 0004](../docs/architecture/decisions/0004-anchor-ai-visual-review-to-1-20-1.md).
+Programmatic screenshot probes and comparisons are part of that required runtime gate. AI visual review
+is a separate authenticated prepare/queue/drain pipeline and never changes the conclusion
+of Build, Packaged E2E, or an individual version-port gate. For every automatic `master` generation,
+however, its semantic 1.20.1 certificate is deliberately a scheduling prerequisite for starting
+the remaining version ports. The anchor and two-wave decisions are recorded in
+[ADR 0004](../docs/architecture/decisions/0004-anchor-ai-visual-review-to-1-20-1.md) and
+[ADR 0005](../docs/architecture/decisions/0005-certify-1-20-1-before-version-fanout.md).
 
 That workflow never exposes raw packaged artifacts to the model credential. A secretless curator
 authenticates every artifact and exact matrix row. It imports the exact source commit only as inert
 Git objects—never as a checkout executed by the privileged workflow—then fully decodes the complete
 scenario product, requires one production JAR, and re-encodes every captured frame as a bounded
 metadata-free RGB PNG
-named by its served-byte SHA-256. For each semantic `capture_id`, later-version candidates are
-paired with the authenticated current-head Fabric 1.20.1 frame selected only from the protected
-lossless Pages handoff; the compact WebP cache is never an AI oracle. The 1.20.1 source run instead
-establishes the anchor across its two authenticated lanes: Fabric is paired with Forge and Forge
-with Fabric. Those anchor pairs receive semantic review even when both loaders produced identical
-pixels. Candidate and reference are normalized to the same dimensions without changing aspect
-ratio. The reference is a semantic visual anchor, not a strict whole-pixel golden image: legitimate
-Vanilla, loader, camera, lighting, and framing differences remain acceptable. A missing reference
-or 1.20.1 peer fails curation.
+named by its served-byte SHA-256. A 1.20.1 run exposes every Fabric and Forge frame without any
+reference image. Both loaders must have the same complete `capture_id` set, and each screenshot is
+judged independently against its expectation. This prevents a shared renderer, state, or equipment
+bug from becoming correct merely because both loaders agree. For each semantic `capture_id`, a
+later-version candidate is paired with the authenticated current-head Fabric 1.20.1 frame selected
+only from the protected lossless Pages handoff; the compact WebP cache is never an AI oracle.
+Candidate and reference are normalized to the same dimensions without changing aspect ratio. The
+reference is semantic rather than a strict whole-pixel golden image: legitimate Vanilla, loader,
+camera, lighting, and framing differences remain acceptable. Missing anchor-loader coverage or a
+missing later-version reference fails curation.
 
 The curator applies the protected review checker before upload and reserves 32 MiB of the handoff
 envelope for the bounded manifest, proof, archive metadata, and structure. A source/run/
@@ -222,17 +229,38 @@ drainer authenticates the oldest eligible entry, then enters one repository-wide
 group. The queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without
 losing reviews.
 
-The runner first marks content-addressed candidate/reference paths that are byte-identical as clean
-without a model call. Sonnet triages the rest in chunks of at most eight pairs. A concern or any
-confidence below high is independently rechecked by Opus in chunks of at most four. Each call is
-paced and retried within a bound. Both models can read only the bounded manifest/images; stdout is
-captured without granting a write or shell tool. Protected code validates exact label coverage,
-text/list bounds, decision coherence, capsule identity, and the final report contract. It uploads
-only a schema-normalized report; raw provider output stays private. Transient provider failures
-create only a sanitized one-day cooldown marker, leaving the queue entry for retry while other
-entries progress. Terminal validation/configuration failures are marked and retired. An independent
-cleanup job deletes a settled entry by exact artifact id. The final small report remains for one
-day.
+The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
+over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
+candidate/reference pair clean without a model call. It may also reuse a protected verdict only
+when candidate and reference PNG digests, expectation, capture identity, loader artifact, scenario
+contract, release matrix, prompts, reviewer/checker/cache code, models, mode, and chunk policy all
+match exactly;
+unpaired anchor semantics are never cached. Sonnet triages the remaining frames in loader-sibling
+chunks of at most eight. All independent chunks run concurrently, and each concern or confidence
+below high is independently rechecked by Opus in concurrent chunks of at most four as soon as its
+Sonnet result is available. Provider throttling is handled by bounded retries rather than serial
+launch pacing. Once any Opus chunk confirms a defect, outstanding calls are cancelled and the
+explicit blocking-partial result cannot certify or release anything. Both models can read only the
+bounded manifest/images; stdout is captured without granting a write or shell tool. Protected code
+validates exact label coverage, text/list bounds, decision coherence, capsule identity, and two
+independent final fields: `semantic_valid` and nullable `matches_reference`. A reference match can
+never hide a semantic failure. It uploads only a schema-normalized report; raw provider output stays
+private. Transient provider failures create only a sanitized one-day cooldown marker, leaving the
+queue entry for retry while other entries progress. Terminal validation/configuration failures are
+marked and retired. An independent cleanup job deletes a settled entry by exact artifact id. The
+final small report remains for one day; the single rolling exact-policy verdict cache remains for
+seven days and is replaced only after a protected successor upload.
+
+A completely clean synchronized 1.20.1 report creates a seven-day certificate only after the
+bot-owned anchor PR is merged and that exact-tree merge is still the current anchor head. The
+certificate binds the `master` source SHA, tested and merged anchor SHAs, source run, protected
+review implementation, scenario contract, curation proof, manifest, and normalized report. The
+drainer dispatches its exact artifact identity; `Sync version branches` reauthenticates its owner,
+digest, size, JSON contract, Actions run, Git parents, equal tested/merged trees, current `master`,
+and current anchor head before discovering every non-anchor branch. A stale certificate is a safe
+no-op. There is no direct automatic fan-out for a documentation/site/administration-only tip,
+because that tip may include an older uncertified runtime change. Manual exact-target dispatch
+remains available for recovery.
 
 ## Public visual evidence
 
@@ -275,8 +303,9 @@ generation-safe rotation admits the replacement before deleting superseded exact
 rotation cannot delete a newer cache. For the matrix-derived 1.20.1 anchor it also retains the exact
 current raw handoff, revalidates it before every deletion, and deletes only older raw generations.
 Original PNG bytes never enter the durable compact cache. Monthly validation can refresh compact
-caches without relaunching Minecraft. Pages and AI visual review remain advisory and are not
-protected release checks.
+caches without relaunching Minecraft. Pages and per-port AI reports are not protected release
+checks; the clean semantic anchor certificate is instead a fail-closed prerequisite for scheduling
+the second synchronization wave.
 
 Run the focused contracts in the project Python environment (CI installs the Linux renderer from
 the hash-locked `scripts/pages/requirements.txt`):
