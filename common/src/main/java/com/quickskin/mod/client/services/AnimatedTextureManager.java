@@ -6,6 +6,7 @@ import com.quickskin.mod.client.storage.NetworkTextureCache;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.quickskin.mod.QuickSkin;
 import com.quickskin.mod.common.data.AnimationMetadata;
+import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.networking.NetworkSecurity;
 import com.quickskin.mod.networking.TextureTransferLimits;
@@ -611,6 +612,8 @@ public class AnimatedTextureManager {
         int effectiveFrameCount = Math.min(metadata.frameCount(), MAX_ANIM_FRAMES);
         int srcFrameWidth = atlasImage.getWidth();
         int srcFrameHeight = atlasImage.getHeight() / metadata.frameCount();
+
+        atlasImage = CapeElytraSilhouette.maskedCopy(atlasImage, metadata.frameCount());
 
         boolean needsDownscale = srcFrameWidth > MAX_ANIM_FRAME_WIDTH || srcFrameHeight > MAX_ANIM_FRAME_HEIGHT;
         boolean needsTruncate = effectiveFrameCount < metadata.frameCount();
