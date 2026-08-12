@@ -23,7 +23,7 @@ This `forge-and-fabric-1.20.1` release branch exercises the following exact pack
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `4` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `4` |
 
-Scenario contract SHA-256: `1273e54b409c10a937d84ae099f88d82f33785e25dcb0453e507f076a6fba9f4`
+Scenario contract SHA-256: `f1000aeced803919fd8c3e5797b496eec7d8b49bf731711a5b25c58656ed24c9`
 Contract totals: `46` ordered steps, `41` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -168,7 +168,9 @@ centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import, driv
 control to a 1:1 crop, saves through the adjusted-import boundary, and requires the preview,
 applied, and persisted atlases to remain pixel-identical to the bundled original. Separate direct
 and adjusted world captures cover both the cape and elytra render routes; their tightly cropped
-comparison allows only small entity-animation and lighting drift.
+comparison allows only small entity-animation and lighting drift. The elytra captures hold the
+player in a deterministic crouching pose, opening the two wings far enough for semantic review to
+distinguish elytra geometry from a draped cape.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves

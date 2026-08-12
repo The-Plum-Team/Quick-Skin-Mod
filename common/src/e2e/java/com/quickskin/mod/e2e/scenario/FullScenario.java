@@ -756,14 +756,15 @@ public final class FullScenario implements Scenario {
         steps.add(Step.of("bundled_bmo_elytra")
                 .action(() -> {
                     enterWorldView(mc);
-                    equipElytra(mc);
+                    poseElytraForEvidence(mc);
                 })
                 .minTicks(25)
                 .ready(() -> {
-                    equipElytra(mc);
+                    poseElytraForEvidence(mc);
                     return hasExpectedCape(svc, uuid, "known:bmo")
                             && mc.player != null
                             && mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)
+                            && mc.player.isCrouching()
                             && VanillaShim.cloakTexture(mc.player) != null;
                 })
                 .timeoutTicks(300)
@@ -905,16 +906,17 @@ public final class FullScenario implements Scenario {
         steps.add(Step.of("adjusted_bmo_elytra")
                 .action(() -> {
                     enterWorldView(mc);
-                    equipElytra(mc);
+                    poseElytraForEvidence(mc);
                 })
                 .minTicks(25)
                 .ready(() -> {
-                    equipElytra(mc);
+                    poseElytraForEvidence(mc);
                     return bmoSetupFailure.get() != null
                             || (adjustedBmoCapeHash != null
                             && hasExpectedCape(svc, uuid, "local_cape:" + adjustedBmoCapeHash)
                             && mc.player != null
                             && mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)
+                            && mc.player.isCrouching()
                             && VanillaShim.cloakTexture(mc.player) != null);
                 })
                 .timeoutTicks(300)
@@ -2278,6 +2280,9 @@ public final class FullScenario implements Scenario {
         if (hasElytra != expectElytra) {
             return Step.Result.fail("elytra equipped=" + hasElytra + " expected " + expectElytra);
         }
+        if (expectElytra && !mc.player.isCrouching()) {
+            return Step.Result.fail("elytra evidence pose is not crouching");
+        }
         Object expected = CapeService.getInstance().getCapeLocation(null, capeId);
         Object resolved = service.getCapeLocation(uuid);
         if (expected == null || !expected.equals(resolved)) {
@@ -2499,8 +2504,12 @@ public final class FullScenario implements Scenario {
     private void enterWorldView(Minecraft mc) {
         try {
             VanillaShim.setScreen(mc, null);
-            if (mc.options != null) mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            if (mc.options != null) {
+                mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+                mc.options.keyShift.setDown(false);
+            }
             if (mc.player != null) {
+                mc.player.setShiftKeyDown(false);
                 mc.player.setDeltaMovement(0, 0, 0);
                 mc.player.setYRot(180f);
                 mc.player.setYHeadRot(180f);
@@ -2513,6 +2522,13 @@ public final class FullScenario implements Scenario {
 
     private void equipElytra(Minecraft mc) {
         setChestSlot(mc, new ItemStack(Items.ELYTRA));
+    }
+
+    /** Keep both elytra wings visually separated so semantic review cannot mistake them for a cape. */
+    private void poseElytraForEvidence(Minecraft mc) {
+        equipElytra(mc);
+        if (mc.options != null) mc.options.keyShift.setDown(true);
+        if (mc.player != null) mc.player.setShiftKeyDown(true);
     }
 
     private static boolean hasEmptyChest(Minecraft mc) {
