@@ -202,6 +202,46 @@ def public_manifest(manifest: list[dict[str, object]]) -> list[dict[str, str]]:
     return public
 
 
+def validate_semantic_anchor_manifest(
+    manifest: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Require complete, unpaired Fabric and Forge 1.20.1 semantic coverage."""
+
+    expected_artifacts = {
+        f"{VISUAL_REFERENCE_LOADER}-{VISUAL_REFERENCE_VERSION}",
+        f"{VISUAL_REFERENCE_PEER_LOADER}-{VISUAL_REFERENCE_VERSION}",
+    }
+    captures: dict[str, set[str]] = {artifact: set() for artifact in expected_artifacts}
+    for index, item in enumerate(manifest):
+        if any(field in item for field in PUBLIC_REFERENCE_FIELDS):
+            raise VisualEvidenceError(
+                "semantic anchor certification cannot contain reference images"
+            )
+        label = item.get("label")
+        capture_id = item.get("capture_id")
+        if not isinstance(label, str) or not isinstance(capture_id, str):
+            raise VisualEvidenceError(
+                f"semantic anchor frame {index} has no canonical identity"
+            )
+        artifact = label.split("/", 1)[0]
+        if artifact not in expected_artifacts:
+            raise VisualEvidenceError(
+                f"semantic anchor contains a non-anchor artifact: {artifact!r}"
+            )
+        if capture_id in captures[artifact]:
+            raise VisualEvidenceError(
+                f"semantic anchor duplicates {artifact}/{capture_id}"
+            )
+        captures[artifact].add(capture_id)
+    if not all(captures.values()) or len(
+        {frozenset(capture_ids) for capture_ids in captures.values()}
+    ) != 1:
+        raise VisualEvidenceError(
+            "semantic anchor requires identical complete Fabric and Forge capture sets"
+        )
+    return manifest
+
+
 def _reference_identity_from_matrix(matrix: dict[str, object]) -> dict[str, str]:
     version = matrix.get("unit_test_version")
     project = matrix.get("project")
@@ -772,6 +812,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--all", action="store_true", help="include every catalogued capture")
     parser.add_argument(
+        "--semantic-anchor",
+        action="store_true",
+        help="require unpaired complete Fabric/Forge 1.20.1 semantic coverage",
+    )
+    parser.add_argument(
         "--combos",
         help="comma-separated <version>/<loader> filter (for example 1.20.1/fabric)",
     )
@@ -825,6 +870,12 @@ def main(argv: list[str] | None = None) -> int:
             raise VisualEvidenceError(
                 "paired cross-version review must use --all to cover every capture"
             )
+        if args.semantic_anchor and (
+            not args.all or has_reference or args.combos is not None
+        ):
+            raise VisualEvidenceError(
+                "--semantic-anchor requires --all and cannot use a combo or reference"
+            )
         if args.reference_identity:
             if (
                 args.reference_retention_days
@@ -832,6 +883,7 @@ def main(argv: list[str] | None = None) -> int:
                 or args.curate_output is not None
                 or args.all
                 or args.combos is not None
+                or args.semantic_anchor
                 or has_reference
             ):
                 raise VisualEvidenceError(
@@ -851,6 +903,7 @@ def main(argv: list[str] | None = None) -> int:
                 or args.curate_output is not None
                 or args.all
                 or args.combos is not None
+                or args.semantic_anchor
                 or has_reference
             ):
                 raise VisualEvidenceError(
@@ -863,6 +916,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.curate_output is not None
                 or args.all
                 or args.combos is not None
+                or args.semantic_anchor
                 or has_reference
             ):
                 raise VisualEvidenceError(
@@ -898,6 +952,8 @@ def main(argv: list[str] | None = None) -> int:
             combos=parse_combos(args.combos),
             reference_frames=reference_frames,
         )
+        if args.semantic_anchor:
+            manifest = validate_semantic_anchor_manifest(manifest)
         if args.curate_output is not None:
             manifest = curate_manifest(manifest, args.curate_output)
         else:
