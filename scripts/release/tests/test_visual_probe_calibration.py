@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from itertools import pairwise
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -10,8 +11,10 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "e2e"))
+sys.path.insert(0, str(ROOT / "scripts" / "release"))
 
 import packaged_runtime  # noqa: E402
+from generate_e2e_cape_fixture import generate as generate_cape_fixture  # noqa: E402
 
 
 # This is deliberately not generated from scenario-contract.json. It is the fixed calibration
@@ -174,7 +177,9 @@ class VisualProbeCalibrationTest(unittest.TestCase):
             ROOT
             / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
         ).read_text(encoding="utf-8")
-        self.assertEqual(2, source.count(".settleTicks(12)"))
+        bmo_section = source[source.index('Step.of("bundled_bmo_elytra")'):
+                             source.index("// 6. animated cape")]
+        self.assertEqual(2, bmo_section.count(".settleTicks(12)"))
         # Each of the two captures reapplies the pose in both action() and ready(), so it cannot
         # drift during the wait for textures/equipment to settle.
         self.assertEqual(4, source.count("poseElytraForEvidence(mc);"))
@@ -188,6 +193,55 @@ class VisualProbeCalibrationTest(unittest.TestCase):
             'return Step.Result.fail("elytra evidence camera/body yaw is not stably aligned")',
             source,
         )
+
+    def test_animated_cape_fixture_is_valid_and_visibly_changes_in_its_uv_face(self) -> None:
+        """The former square GIF exposed only a clipped corner when sampled as a cape atlas."""
+
+        gif = ROOT / "common/src/e2e/resources/qs_e2e_test_cape.gif"
+        generated = self.root / "cape.gif"
+        generate_cape_fixture(generated)
+        self.assertEqual(gif.read_bytes(), generated.read_bytes())
+        with Image.open(gif) as image:
+            self.assertEqual((64, 32), image.size)
+            self.assertEqual(2, image.n_frames)
+            face_frames = []
+            for frame in range(image.n_frames):
+                image.seek(frame)
+                rgb = image.convert("RGB")
+                # Minecraft's visible rear cape face is x=1..10, y=1..16 in a 64x32 atlas.
+                face_frames.append(rgb.crop((1, 1, 11, 17)))
+
+                colored = [
+                    (x, y)
+                    for y in range(rgb.height)
+                    for x in range(rgb.width)
+                    if max(rgb.getpixel((x, y))) - min(rgb.getpixel((x, y))) > 80
+                ]
+                self.assertTrue(colored)
+                self.assertTrue(all(1 <= x < 11 and 1 <= y < 17 for x, y in colored))
+
+            self.assertTrue(
+                any(left.tobytes() != right.tobytes() for left, right in pairwise(face_frames))
+            )
+
+        source = (
+            ROOT
+            / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn(".setAnimationFrame(", source)
+        self.assertIn("map.get(expectedAnimationId())", source)
+        self.assertIn("ANIMATED_EVIDENCE_FRAME_A = 0", source)
+        self.assertIn("ANIMATED_EVIDENCE_FRAME_B = 1", source)
+        animated_section = source[source.index('Step.of("animated_cape_apply")'):
+                                  source.index("// 7. HD cape import")]
+        self.assertEqual(2, animated_section.count(".settleTicks(12)"))
+
+        manager_source = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/client/services/AnimatedTextureManager.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn("speedMultiplier == 0.0f", manager_source)
+        self.assertIn("boolean setAnimationFrame(String animationId, int frame)", manager_source)
 
 
 if __name__ == "__main__":

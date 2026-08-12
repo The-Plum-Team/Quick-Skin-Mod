@@ -77,8 +77,8 @@ import javax.imageio.ImageIO;
  *   <li>CapeAdjustScreen &mdash; opened with a test image + harness-owned {@code onApply} consumer.</li>
  *   <li>BMO editor parity &mdash; crop a black-padded 128&times;64 import and compare its cape and
  *       elytra atlas/render paths with the bundled 64&times;32 original.</li>
- *   <li>animated cape &mdash; {@code applyCape("known:rickroll")}; reflect {@code AnimationState
- *       .currentFrame} advancing, cross-checked with {@code AnimationMetadata.getFrameAtTime}.</li>
+ *   <li>animated cape &mdash; apply a valid bundled GIF cape atlas, pin two distinct frames, and
+ *       prove both the active animation state and the rendered cape change.</li>
  *   <li>HD cape no-downscale &mdash; import a 256&times;128 cape; metadata resolution == source dims.</li>
  *   <li>elytra hides cape &mdash; equip {@code Items.ELYTRA} in CHEST; assert the inputs that make
  *       {@code CapeLayerMixin} cancel and the alpha cutout that tapers the rendered wings.</li>
@@ -91,21 +91,20 @@ import javax.imageio.ImageIO;
  *
  * <p>Screens are opened via {@link VanillaShim#setScreen} on the client/tick thread; one or more
  * render frames are pumped (via {@code minTicks}) so {@code init()} builds widgets before a screenshot
- * or a reflective button press. Private playback/widget state is read by reflection so no shipped code
- * is touched.</p>
+ * or a reflective button press. Private playback/widget state is read by reflection.</p>
  */
 public final class FullScenario implements Scenario {
-
-    /** Animation id CapeService registers a known animated cape under ({@code "cape_known_"+id}). */
-    private static final String RICKROLL_ANIM_ID = "cape_known_rickroll";
 
     private volatile String skinHash;        // set by step 2, reused by model + HUD steps
     private volatile String externalSkinHash; // set by the external-drop step (no import call)
     private volatile String hdCapeHash;      // set by step "hd_cape"
     private final AtomicReference<BufferedImage> hdCapeSource = new AtomicReference<>();
     private final AtomicReference<BufferedImage> hdCapePresentation = new AtomicReference<>();
-    private volatile String gifCapeHash;     // set by the animated-cape step (bundled GIF), null -> rickroll
+    private volatile String gifCapeHash;     // set by the mandatory bundled-GIF checkpoint
     private volatile int animStartFrame = Integer.MIN_VALUE; // snapshot for the frame-advance check
+    /** Frame held still for screenshot A, then advanced deterministically to screenshot B. */
+    private static final int ANIMATED_EVIDENCE_FRAME_A = 0;
+    private static final int ANIMATED_EVIDENCE_FRAME_B = 1;
     /** Previous-poll layout stamp of the open skin menu; {@code Long.MIN_VALUE} = not held yet. */
     private long skinMenuLayoutStamp = Long.MIN_VALUE;
     private volatile String previewCapeHashA;  // set by the cape-preview steps (never applied)
@@ -952,18 +951,19 @@ public final class FullScenario implements Scenario {
                     // the cape texture into an elytra render.
                     setChestSlot(mc, ItemStack.EMPTY);
                     try {
-                        // Prefer a bundled real animated GIF cape (dropped into e2e resources); the mod
-                        // decodes it (StbGifLoader) into an animated local cape. Fall back to the bundled
-                        // known animated cape (rickroll) if no GIF is present.
+                        // The mod decodes the valid bundled GIF cape into an animated local cape.
+                        // Missing evidence is fatal: a different fallback could satisfy the logical
+                        // animation checks without proving the contracted red/blue render change.
                         gifCapeHash = TestAssets.registerBundledGifCape();
-                        if (gifCapeHash != null) {
-                            svc.applyCape(uuid, "local_cape:" + gifCapeHash);
-                            AnimatedTextureManager.getInstance().setAnimationSpeed("cape_" + gifCapeHash, 1.0f);
-                            E2ELog.info("applied local animated GIF cape local_cape:" + gifCapeHash);
-                        } else {
-                            svc.applyCape(uuid, "known:rickroll");
-                            AnimatedTextureManager.getInstance().setAnimationSpeed(RICKROLL_ANIM_ID, 1.0f);
+                        if (gifCapeHash == null) {
+                            throw new IllegalStateException("bundled animated cape is missing");
                         }
+                        svc.applyCape(uuid, "local_cape:" + gifCapeHash);
+                        // Hold the initial frame while its screenshot settles. The follow-up
+                        // step advances to an exact different frame, then freezes it as well.
+                        AnimatedTextureManager.getInstance().setAnimationSpeed(
+                                "cape_" + gifCapeHash, 0.0f);
+                        E2ELog.info("applied local animated GIF cape local_cape:" + gifCapeHash);
                     } catch (Exception e) {
                         E2ELog.error("animated_cape_apply failed", e);
                     }
@@ -972,18 +972,27 @@ public final class FullScenario implements Scenario {
                 .ready(() -> {
                     setChestSlot(mc, ItemStack.EMPTY);
                     String expectedCapeId = expectedAnimatedCapeId();
-                    return soleAnimatedState() != null
+                    Object state = expectedAnimatedState();
+                    if (state != null) {
+                        AnimatedTextureManager.getInstance().setAnimationSpeed(
+                                expectedAnimationId(), 0.0f);
+                        AnimatedTextureManager.getInstance().setAnimationFrame(
+                                expectedAnimationId(), ANIMATED_EVIDENCE_FRAME_A);
+                    }
+                    return state != null
                             && hasExpectedCape(svc, uuid, expectedCapeId)
                             && hasEmptyChest(mc)
-                            && VanillaShim.cloakTexture(mc.player) != null;
+                            && VanillaShim.cloakTexture(mc.player) != null
+                            && frameOf(state) == ANIMATED_EVIDENCE_FRAME_A;
                 })
+                .settleTicks(12)
                 .timeoutTicks(200)
                 .screenshot(prefix + "full_06a_animated_cape_frameA" + suffix)
                 .assertion(() -> {
                     if (!hasEmptyChest(mc)) {
                         return Step.Result.fail("animated cape rendered with a non-empty CHEST slot");
                     }
-                    Object st = soleAnimatedState();
+                    Object st = expectedAnimatedState();
                     if (st == null) return Step.Result.fail("no animated AnimationState registered");
                     AnimationMetadata meta = metaOf(st);
                     int fc = (meta == null) ? -1 : meta.frameCount();
@@ -991,32 +1000,48 @@ public final class FullScenario implements Scenario {
                     if (fc < 2) return Step.Result.fail("animation frameCount=" + fc + " (not animated)");
                     if (animStartFrame < 0 || animStartFrame >= fc)
                         return Step.Result.fail("currentFrame out of range: " + animStartFrame + "/" + fc);
+                    if (animStartFrame != ANIMATED_EVIDENCE_FRAME_A) {
+                        return Step.Result.fail("animated evidence frame A drifted to "
+                                + animStartFrame);
+                    }
                     PlayerAppearance app = svc.getAppearance(uuid);
                     String capeId = app == null ? null : app.getCapeId();
                     String expectedCapeId = expectedAnimatedCapeId();
                     if (!hasExpectedCape(svc, uuid, expectedCapeId)) {
                         return Step.Result.fail("animated cape route is not active: " + capeId);
                     }
-                    String src = (gifCapeHash != null) ? "local GIF cape" : "known:rickroll";
-                    return Step.Result.pass(src + " registered capeId=" + capeId
+                    return Step.Result.pass("local GIF cape registered capeId=" + capeId
                             + " frameCount=" + fc + " startFrame=" + animStartFrame);
                 }));
 
         steps.add(Step.of("animated_cape_advance")
-                .action(() -> setChestSlot(mc, ItemStack.EMPTY))
+                .action(() -> {
+                    setChestSlot(mc, ItemStack.EMPTY);
+                    if (gifCapeHash != null) {
+                        AnimatedTextureManager.getInstance().setAnimationFrame(
+                                expectedAnimationId(), ANIMATED_EVIDENCE_FRAME_B);
+                    }
+                })
                 .minTicks(5)
-                // Poll until the wall-clock-driven currentFrame moves off the snapshot taken above.
+                // Reassert the exact target frame while the rendered image settles. This proves a
+                // real frame change without racing a fast wall-clock animation past the screenshot.
                 .ready(() -> {
                     setChestSlot(mc, ItemStack.EMPTY);
-                    Object st = soleAnimatedState();
+                    Object st = expectedAnimatedState();
+                    if (st != null) {
+                        AnimatedTextureManager.getInstance().setAnimationFrame(
+                                expectedAnimationId(), ANIMATED_EVIDENCE_FRAME_B);
+                    }
                     return hasEmptyChest(mc)
                             && hasExpectedCape(svc, uuid, expectedAnimatedCapeId())
                             && VanillaShim.cloakTexture(mc.player) != null
                             && st != null
                             && animStartFrame != Integer.MIN_VALUE
-                            && frameOf(st) != animStartFrame;
+                            && frameOf(st) != animStartFrame
+                            && frameOf(st) == ANIMATED_EVIDENCE_FRAME_B;
                 })
-                .timeoutTicks(400) // up to 20s; rickroll cycles 17 frames @ 50ms
+                .settleTicks(12)
+                .timeoutTicks(200)
                 .screenshot(prefix + "full_06b_animated_cape_frameB" + suffix)
                 .assertion(() -> {
                     if (!hasEmptyChest(mc)) {
@@ -1025,7 +1050,7 @@ public final class FullScenario implements Scenario {
                     if (!hasExpectedCape(svc, uuid, expectedAnimatedCapeId())) {
                         return Step.Result.fail("animated cape route disappeared before frame B");
                     }
-                    Object st = soleAnimatedState();
+                    Object st = expectedAnimatedState();
                     if (st == null) return Step.Result.fail("animation disappeared");
                     AnimationMetadata meta = metaOf(st);
                     if (meta == null) return Step.Result.fail("no metadata");
@@ -1033,18 +1058,13 @@ public final class FullScenario implements Scenario {
                     int now = frameOf(st);
                     if (now == animStartFrame)
                         return Step.Result.fail("currentFrame did not advance (stuck at " + now + ")");
+                    if (now != ANIMATED_EVIDENCE_FRAME_B) {
+                        return Step.Result.fail("animated evidence frame B drifted to " + now);
+                    }
                     if (now < 0 || now >= fc)
                         return Step.Result.fail("currentFrame out of range: " + now + "/" + fc);
-                    // Cross-check against the same formula tick() uses (best-effort; ±tick timing).
-                    Long startTime = startTimeOf(st);
-                    Float speed = speedOf(st);
-                    String cross = "n/a";
-                    if (startTime != null && speed != null) {
-                        long elapsed = (long) ((System.currentTimeMillis() - startTime) * speed);
-                        cross = String.valueOf(meta.getFrameAtTime(elapsed));
-                    }
                     return Step.Result.pass("frame advanced " + animStartFrame + "->" + now
-                            + "/" + fc + " (getFrameAtTime=" + cross + ")");
+                            + "/" + fc + " and remained pinned through capture settlement");
                 }));
 
         // 7. HD cape import (no downscale) --------------------------------------------------------
@@ -2577,7 +2597,11 @@ public final class FullScenario implements Scenario {
     }
 
     private String expectedAnimatedCapeId() {
-        return gifCapeHash != null ? "local_cape:" + gifCapeHash : "known:rickroll";
+        return gifCapeHash == null ? null : "local_cape:" + gifCapeHash;
+    }
+
+    private String expectedAnimationId() {
+        return gifCapeHash == null ? null : "cape_" + gifCapeHash;
     }
 
     /**
@@ -2612,19 +2636,18 @@ public final class FullScenario implements Scenario {
 
     // ===== animation reflection ================================================================
 
-    /** The single registered {@code AnimationState} whose metadata has &gt;1 frame, or null. */
-    private Object soleAnimatedState() {
+    /** The registered state for the cape actually worn by this checkpoint, or {@code null}. */
+    private Object expectedAnimatedState() {
         try {
             AnimatedTextureManager mgr = AnimatedTextureManager.getInstance();
             Field f = AnimatedTextureManager.class.getDeclaredField("animations");
             f.setAccessible(true);
             Map<?, ?> map = (Map<?, ?>) f.get(mgr);
-            for (Object st : map.values()) {
-                AnimationMetadata m = metaOf(st);
-                if (m != null && m.frameCount() > 1) return st;
-            }
+            Object state = map.get(expectedAnimationId());
+            AnimationMetadata metadata = metaOf(state);
+            return metadata != null && metadata.frameCount() > 1 ? state : null;
         } catch (Throwable t) {
-            E2ELog.warn("soleAnimatedState: " + t);
+            E2ELog.warn("expectedAnimatedState: " + t);
         }
         return null;
     }
@@ -2637,16 +2660,6 @@ public final class FullScenario implements Scenario {
     private AnimationMetadata metaOf(Object state) {
         Object v2 = stateField(state, "metadata");
         return (v2 instanceof AnimationMetadata m) ? m : null;
-    }
-
-    private Long startTimeOf(Object state) {
-        Object v2 = stateField(state, "startTime");
-        return (v2 instanceof Long l) ? l : null;
-    }
-
-    private Float speedOf(Object state) {
-        Object v2 = stateField(state, "speedMultiplier");
-        return (v2 instanceof Float fl) ? fl : null;
     }
 
     private static Object stateField(Object state, String name) {

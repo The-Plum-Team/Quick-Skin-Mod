@@ -316,7 +316,12 @@ class ScenarioContractTest(unittest.TestCase):
             [
                 ("baseline", "local_skin_apply", 0.00001, None),
                 ("model_slim", "model_classic", 0.00001, None),
-                ("animated_cape_apply", "animated_cape_advance", 0.00001, None),
+                (
+                    "animated_cape_apply",
+                    "animated_cape_advance",
+                    0.01,
+                    (0.44, 0.45, 0.56, 0.78),
+                ),
                 ("known_cape_apply", "hd_cape_no_downscale", 0.00001, None),
                 (
                     "cape_preview_selected_a",
