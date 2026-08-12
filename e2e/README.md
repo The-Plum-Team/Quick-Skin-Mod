@@ -168,7 +168,9 @@ centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import, driv
 control to a 1:1 crop, saves through the adjusted-import boundary, and requires the preview,
 applied, and persisted atlases to remain pixel-identical to the bundled original. Separate direct
 and adjusted world captures cover both the cape and elytra render routes; their tightly cropped
-comparison allows only small entity-animation and lighting drift.
+comparison allows only small entity-animation and lighting drift. The elytra captures hold the
+player in a deterministic crouching pose, opening the two wings far enough for semantic review to
+distinguish elytra geometry from a draped cape.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves

@@ -509,7 +509,7 @@
               "capture": {
                 "title": "Bundled BMO elytra",
                 "review_tier": "key",
-                "expectation": "The player wears elytra textured directly by the bundled BMO atlas; this is the unedited visual reference for the adjusted BMO elytra capture.",
+                "expectation": "The crouching player wears elytra textured directly by the bundled BMO atlas; the pose must visibly separate both wings, and this is the unedited visual reference for the adjusted BMO elytra capture.",
                 "probes": []
               }
             },
@@ -539,7 +539,7 @@
               "capture": {
                 "title": "Adjusted BMO elytra",
                 "review_tier": "key",
-                "expectation": "The player wears elytra from the BMO cape saved through the editor, and both wings look the same as the bundled BMO elytra reference without broken UV placement.",
+                "expectation": "The crouching player wears elytra from the BMO cape saved through the editor; the pose must visibly separate both wings, which look the same as the bundled BMO elytra reference without broken UV placement.",
                 "probes": []
               }
             },
