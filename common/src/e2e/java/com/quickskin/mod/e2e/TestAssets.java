@@ -306,7 +306,8 @@ public final class TestAssets {
     }
 
     /**
-     * A valid <b>256x128</b> opaque cape PNG. 256x128 is exactly {@code SkinResolution.CAPE_256}
+     * A deliberately fully opaque <b>256x128</b> cape PNG. 256x128 is exactly
+     * {@code SkinResolution.CAPE_256}
      * (and {@code height % (width/2) == 128 % 128 == 0}, a single static frame), so
      * {@code LocalAssetManager.processPngAsset} keeps it verbatim instead of resizing — letting the
      * "HD cape import preserves source resolution (no downscale)" property be asserted on the metadata.
@@ -315,7 +316,9 @@ public final class TestAssets {
         final int w = 256, h = 128;
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
-        // Deep teal base over the whole HD atlas so no elytra compositing kicks in on import.
+        // Deep teal over the whole atlas, including the Elytra cutout. This deliberately malformed
+        // input proves that local presentation restores the tapered silhouette without rewriting
+        // the content-addressed source.
         g.setColor(new Color(0x11, 0x77, 0x88));
         g.fillRect(0, 0, w, h);
         // The visible cape front scales 4x from the 64x32 layout: (4,4)-(40,64). Bright magenta landmark.
