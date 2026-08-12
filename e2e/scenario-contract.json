@@ -514,12 +514,22 @@
               }
             },
             {
+              "id": "bmo_padded_source_screen",
+              "assertion_required": true,
+              "capture": {
+                "title": "Black-padded BMO source",
+                "review_tier": "key",
+                "expectation": "At the editor's 100% reset zoom, the complete BMO atlas is visibly centred at half size inside the double-sized 128x64 source, with broad opaque-black padding on all four sides; at this before-crop checkpoint it is intentionally not aligned to the coloured UV guides yet.",
+                "probes": []
+              }
+            },
+            {
               "id": "bmo_adjust_screen",
               "assertion_required": true,
               "capture": {
                 "title": "Black-padded BMO aligned",
                 "review_tier": "key",
-                "expectation": "The cape editor shows the BMO atlas aligned at the correct crop from a double-sized 128x64 source whose surrounding unused area is opaque black; the cape and elytra previews are intact.",
+                "expectation": "At 200% zoom, the complete 64x32 BMO atlas fills the crop: the Front, Cape Back and tapered Elytra art align with their coloured guides and the previews are intact. Narrow teal strips between or beside those three highlighted faces are expected auxiliary side, top and bottom UV faces from the same BMO atlas, not leaked padding.",
                 "probes": []
               }
             },

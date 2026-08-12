@@ -23,15 +23,15 @@ This `master` integration baseline exercises the following exact packaged lanes:
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `4` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `4` |
 
-Scenario contract SHA-256: `3181474fb11a12d0f7791c58c5521bd743b431666028493a23061c1cd173d07d`
-Contract totals: `46` ordered steps, `41` captures.
+Scenario contract SHA-256: `5a592e2e19a157c6cefbf174f86c5b72e05799b61a3a376aa8e9221676c2c7c4`
+Contract totals: `47` ordered steps, `42` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `7` | `5` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `31` | `30` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `32` | `31` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->
@@ -164,13 +164,16 @@ Minecraft-version rendering differences are allowed. Every result records the li
 `artifact_node`, `runtime_version`, `loader`, `scenario`, `jar_sha256`, and `port`.
 
 The `full` scenario also exercises adjusted-cape parity against the production BMO asset. It
-centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import, drives the real zoom
-control to a 1:1 crop, saves through the adjusted-import boundary, and requires the preview,
-applied, and persisted atlases to remain pixel-identical to the bundled original. Separate direct
-and adjusted world captures cover both the cape and elytra render routes; their tightly cropped
-comparison allows only small entity-animation and lighting drift. The elytra captures hold the
-player in a deterministic crouching pose, opening the two wings far enough for semantic review to
-distinguish elytra geometry from a draped cape.
+centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import. One editor capture keeps
+the reset fit so the complete source, centred atlas, and four black padding bands are independently
+visible; the next drives the real zoom control to a 1:1 crop. In that crop, narrow coloured regions
+outside the three highlighted front/back/outer-wing faces are legitimate auxiliary cape and elytra
+UV faces, not padding leakage. The harness saves through the adjusted-import boundary and requires
+the preview, applied, and persisted atlases to remain pixel-identical to the bundled original.
+Separate direct and adjusted world captures cover both the cape and elytra render routes; their
+tightly cropped comparison allows only small entity-animation and lighting drift. The elytra
+captures hold the player in a deterministic crouching pose, opening the two wings far enough for
+semantic review to distinguish elytra geometry from a draped cape.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves

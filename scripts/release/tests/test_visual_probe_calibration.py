@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -192,6 +193,53 @@ class VisualProbeCalibrationTest(unittest.TestCase):
         self.assertIn(
             'return Step.Result.fail("elytra evidence camera/body yaw is not stably aligned")',
             source,
+        )
+
+    def test_bmo_padding_and_aligned_uv_semantics_are_separate_checkpoints(self) -> None:
+        """Padding and auxiliary UV faces must never share one ambiguous model expectation."""
+
+        contract = json.loads(
+            (ROOT / "e2e/scenario-contract.json").read_text(encoding="utf-8")
+        )
+        full = next(item for item in contract["scenarios"] if item["scenario"] == "full")
+        role = next(item for item in full["roles"] if item["role"] == "client_a")
+        steps = {item["id"]: item for item in role["steps"]}
+
+        padded = steps["bmo_padded_source_screen"]["capture"]["expectation"]
+        aligned = steps["bmo_adjust_screen"]["capture"]["expectation"]
+        self.assertIn("padding on all four sides", padded)
+        self.assertIn("before-crop checkpoint", padded)
+        self.assertNotIn("auxiliary", padded)
+        self.assertIn("auxiliary side, top and bottom UV faces", aligned)
+        self.assertIn("not leaked padding", aligned)
+
+        source = (
+            ROOT
+            / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
+        ).read_text(encoding="utf-8")
+        padded_start = source.index('Step.of("bmo_padded_source_screen")')
+        aligned_start = source.index('Step.of("bmo_adjust_screen")')
+        adjusted_start = source.index('Step.of("adjusted_bmo_cape")')
+        self.assertLess(padded_start, aligned_start)
+        self.assertEqual(
+            1,
+            source[padded_start:aligned_start].count(
+                'screenshot(prefix + "full_05j_bmo_padded_source"'
+            ),
+        )
+        self.assertEqual(
+            1,
+            source[aligned_start:adjusted_start].count(
+                'screenshot(prefix + "full_05k_bmo_adjusted_editor"'
+            ),
+        )
+        self.assertIn(
+            'return Step.Result.fail("BMO transform is scale="',
+            source[padded_start:aligned_start],
+        )
+        self.assertIn(
+            "long composedDrift = countDifferingPixels(expected, composed);",
+            source[aligned_start:adjusted_start],
         )
 
     def test_animated_cape_fixture_is_valid_and_visibly_changes_in_its_uv_face(self) -> None:
