@@ -12,7 +12,8 @@
 // and checks both against the expectation; any frame it flags (mismatch or anomaly) is re-examined
 // by an independent skeptic before it is reported, to suppress false positives. Returns the same
 // exact verdict array accepted by
-// check_visual_review.py: {label, matches, visible, anomalies, defect} for every input frame.
+// check_visual_review.py:
+// {label, semantic_valid, matches_reference, visible, anomalies, defect} for every input frame.
 
 export const meta = {
   name: 'e2e-visual-review',
@@ -27,20 +28,22 @@ const REVIEW_SCHEMA = {
   type: 'object',
   properties: {
     visible: { type: 'string', description: 'What you actually see in the image, 1-2 sentences.' },
-    matches: { type: 'boolean', description: 'Does the image match the expectation?' },
+    semanticValid: { type: 'boolean', description: 'Does the candidate satisfy the expectation on its own?' },
+    matchesReference: { type: 'boolean', description: 'Does the candidate semantically match the 1.20.1 reference?' },
     anomalies: { type: 'array', items: { type: 'string' }, description: 'Real visual problems (wrong/garbled texture, cape clipping through elytra, transparency or background-compositing artifacts, missing element, black/empty frame). Empty if none.' },
     confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
   },
-  required: ['visible', 'matches', 'anomalies', 'confidence'],
+  required: ['visible', 'semanticValid', 'matchesReference', 'anomalies', 'confidence'],
 }
 
 const VERIFY_SCHEMA = {
   type: 'object',
   properties: {
-    realProblem: { type: 'boolean', description: 'Is this a genuine rendering bug (true) or acceptable/benign (false)?' },
+    semanticValid: { type: 'boolean', description: 'Does the candidate satisfy the expectation on its own?' },
+    matchesReference: { type: 'boolean', description: 'Does it semantically match the 1.20.1 reference?' },
     note: { type: 'string' },
   },
-  required: ['realProblem', 'note'],
+  required: ['semanticValid', 'matchesReference', 'note'],
 }
 
 let items = args
@@ -58,7 +61,8 @@ const results = await pipeline(
     `Use the Read tool to OPEN and LOOK AT BOTH images at these exact paths:\n` +
     `Candidate: ${it.path}\nReference (${it.reference_label || 'Minecraft 1.20.1'}): ${it.reference_path}\n\n` +
     `It SHOULD show: ${it.expectation || '(describe what is shown)'}\n\n` +
-    `Report what you actually see, whether it matches, and any visual anomalies (garbled/wrong textures, ` +
+    `Report what you actually see, whether the candidate satisfies the expectation independently, ` +
+    `whether it semantically matches the reference, and any visual anomalies (garbled/wrong textures, ` +
     `a cape clipping through an elytra, transparency or background-compositing artifacts, missing elements, ` +
     `or a black/empty/crashed frame). Custom panels, outlines, grids, labels, textures and controls ` +
     `must remain as crisp as the reference; only the world behind an overlay may be intentionally blurred. ` +
@@ -68,13 +72,15 @@ const results = await pipeline(
   ).then(v => ({ it, v })),
   (r) => {
     if (!r || !r.v) return r
-    const flagged = r.v.matches === false || (r.v.anomalies && r.v.anomalies.length > 0)
+    const flagged = r.v.semanticValid === false || r.v.matchesReference === false ||
+      (r.v.anomalies && r.v.anomalies.length > 0)
     if (!flagged) return r
     return agent(
       `Independently re-examine a Minecraft screenshot a first reviewer flagged.\n` +
       `Use the Read tool to open the candidate ${r.it.path} and reference ${r.it.reference_path}.\n\n` +
       `It SHOULD show: ${r.it.expectation || ''}\n` +
-      `First reviewer said: matches=${r.v.matches}; anomalies=${JSON.stringify(r.v.anomalies)}.\n\n` +
+      `First reviewer said: semanticValid=${r.v.semanticValid}; ` +
+      `matchesReference=${r.v.matchesReference}; anomalies=${JSON.stringify(r.v.anomalies)}.\n\n` +
       `Decide if this is a GENUINE rendering bug or acceptable. Default to NOT a real problem unless the ` +
       `rendering is clearly wrong against the expectation. If useful, inspect the full-resolution pixels of ` +
       `both curated images before deciding.`,
@@ -86,15 +92,17 @@ const results = await pipeline(
 const verdicts = []
 for (const r of results) {
   if (!r || !r.v) throw new Error(`no review returned for ${r && r.it ? r.it.label : '?'}`)
-  const isFlagged = r.v.matches === false || (r.v.anomalies && r.v.anomalies.length > 0)
-  const defect = isFlagged && (!r.verify || r.verify.realProblem)
+  const semanticValid = r.verify ? r.verify.semanticValid : r.v.semanticValid
+  const matchesReference = r.verify ? r.verify.matchesReference : r.v.matchesReference
+  const defect = semanticValid === false || matchesReference === false
   const anomalies = defect ? [...r.v.anomalies] : []
   if (defect && anomalies.length === 0) {
     anomalies.push(r.verify && r.verify.note ? r.verify.note : 'The frame did not match its expectation.')
   }
   verdicts.push({
     label: r.it.label,
-    matches: !defect,
+    semantic_valid: semanticValid,
+    matches_reference: matchesReference,
     visible: r.v.visible,
     anomalies,
     defect,
