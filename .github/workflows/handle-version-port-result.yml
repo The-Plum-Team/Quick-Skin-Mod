@@ -751,8 +751,19 @@ jobs:
             > "$policy_dir/e2e_impact.py"
           git show "$protected_sha:scripts/release/version_branches.py" \
             > "$policy_dir/version_branches.py"
+          git show "$protected_sha:release/release-matrix.json" \
+            > "$policy_dir/release-matrix.json"
           python3 "$policy_dir/version_branches.py" \
             --target "$target_branch" > /dev/null
+          anchor_branch="$(jq -er '
+            .unit_test_version as $version |
+            select($version == "1.20.1") |
+            select(([.artifacts[] |
+              select(.artifact_version == $version) | .loader] |
+              sort | unique) == ["fabric", "forge"]) |
+            .project.release_branch |
+            select(type == "string" and length > 0)
+          ' "$policy_dir/release-matrix.json")"
           impact_output="$RUNNER_TEMP/e2e-impact-output"
           : > "$impact_output"
           python3 "$policy_dir/e2e_impact.py" \
@@ -783,7 +794,8 @@ jobs:
               break
             fi
           done
-          if [[ "$runtime_required" == false && "$chain_complete" == true ]]; then
+          if [[ "$runtime_required" == false && "$chain_complete" == true \
+              && "$target_branch" != "$anchor_branch" ]]; then
             runtime_policy=not-applicable
           fi
           # An executed and passed full suite is strictly stronger evidence than a derived
@@ -897,6 +909,35 @@ jobs:
             -f attest_sha="$head_sha" \
             -f attest_target_sha="$target_sha" \
             -f runtime_policy="$runtime_policy"
+
+          # The first E2E completion request deliberately defers a synchronization anchor until
+          # this independently gated merge exists. Wake semantic review now with the already
+          # authenticated exact source run; bounded retries make the post-merge handoff resilient
+          # to a transient repository-dispatch failure.
+          if [[ "$target_branch" == "$anchor_branch" ]]; then
+            review_payload="$RUNNER_TEMP/merged-anchor-visual-review.json"
+            jq -n \
+              --arg source_branch "$HEAD_BRANCH" \
+              --arg source_repository "$GITHUB_REPOSITORY" \
+              --arg source_run_id "$e2e_run_id" \
+              --arg source_sha "$head_sha" \
+              '{event_type:"visual-review-requested",client_payload:{
+                source_branch:$source_branch,
+                source_repository:$source_repository,
+                source_run_id:$source_run_id,source_sha:$source_sha}}' \
+              > "$review_payload"
+            review_dispatched=false
+            for attempt in {1..5}; do
+              if timeout 20s gh api --method POST \
+                  "repos/$GITHUB_REPOSITORY/dispatches" \
+                  --input "$review_payload"; then
+                review_dispatched=true
+                break
+              fi
+              sleep 2
+            done
+            [[ "$review_dispatched" == true ]]
+          fi
 
           # The merge commit must be reachable from the current release tip with a tree
           # identical to the merged head; a legitimate later commit on top of it must not
