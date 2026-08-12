@@ -339,7 +339,7 @@
               "capture": {
                 "title": "Slim model",
                 "review_tier": "key",
-                "expectation": "The custom skin with a dark charcoal-and-gray plaid jacket and blue trousers is rendered on the slim Alex-style arm model.",
+                "expectation": "A close, stable rear view clearly shows the custom dark charcoal-and-gray plaid jacket and blue trousers on slim Alex geometry, with visibly narrow 3-pixel-wide arms.",
                 "probes": []
               }
             },
@@ -349,7 +349,7 @@
               "capture": {
                 "title": "Classic model",
                 "review_tier": "key",
-                "expectation": "The custom skin with a dark charcoal-and-gray plaid jacket and blue trousers is rendered on the wider classic Steve-style arm model.",
+                "expectation": "A close, stable rear view clearly shows the custom dark charcoal-and-gray plaid jacket and blue trousers on classic Steve geometry, with visibly wider 4-pixel-wide arms.",
                 "probes": []
               }
             },
@@ -680,7 +680,13 @@
             {
               "first_step": "model_slim",
               "second_step": "model_classic",
-              "minimum_changed_fraction": 1e-05
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.38,
+                0.18,
+                0.62,
+                0.96
+              ]
             },
             {
               "first_step": "animated_cape_apply",

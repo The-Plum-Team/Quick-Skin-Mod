@@ -195,6 +195,28 @@ class VisualProbeCalibrationTest(unittest.TestCase):
             source,
         )
 
+    def test_model_geometry_evidence_is_close_stable_and_semantically_explicit(self) -> None:
+        source = (
+            ROOT
+            / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
+        ).read_text(encoding="utf-8")
+        contract = json.loads(
+            (ROOT / "e2e/scenario-contract.json").read_text(encoding="utf-8")
+        )
+        full = next(item for item in contract["scenarios"] if item["scenario"] == "full")
+        role = next(item for item in full["roles"] if item["role"] == "client_a")
+        steps = {item["id"]: item for item in role["steps"]}
+
+        model_section = source[source.index('Step.of("model_slim")'):
+                               source.index("// 4. known cape")]
+        self.assertEqual(2, model_section.count("prepareModelEvidenceView(mc);"))
+        self.assertEqual(2, model_section.count(".settleTicks(12)"))
+        self.assertIn("MODEL_EVIDENCE_FOV = 50", source)
+        self.assertIn("pinRearEvidenceView(mc);", source)
+        self.assertIn("renderer model=", source)
+        self.assertIn("3-pixel-wide arms", steps["model_slim"]["capture"]["expectation"])
+        self.assertIn("4-pixel-wide arms", steps["model_classic"]["capture"]["expectation"])
+
     def test_bmo_padding_and_aligned_uv_semantics_are_separate_checkpoints(self) -> None:
         """Padding and auxiliary UV faces must never share one ambiguous model expectation."""
 
