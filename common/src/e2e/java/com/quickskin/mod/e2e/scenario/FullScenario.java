@@ -767,6 +767,7 @@ public final class FullScenario implements Scenario {
                             && mc.player.isCrouching()
                             && VanillaShim.cloakTexture(mc.player) != null;
                 })
+                .settleTicks(12)
                 .timeoutTicks(300)
                 .screenshot(bundledBmoElytraShot)
                 .assertion(() -> assertCapeRoute(mc, svc, uuid, "known:bmo", true)));
@@ -919,6 +920,7 @@ public final class FullScenario implements Scenario {
                             && mc.player.isCrouching()
                             && VanillaShim.cloakTexture(mc.player) != null);
                 })
+                .settleTicks(12)
                 .timeoutTicks(300)
                 .screenshot(adjustedBmoElytraShot)
                 .assertion(() -> bmoSetupFailure.get() == null
@@ -2287,6 +2289,13 @@ public final class FullScenario implements Scenario {
         if (expectElytra && !mc.player.isCrouching()) {
             return Step.Result.fail("elytra evidence pose is not crouching");
         }
+        if (expectElytra && (!sameRotation(mc.player.getYRot(), mc.player.yRotO)
+                || !sameRotation(mc.player.getYRot(), mc.player.yHeadRot)
+                || !sameRotation(mc.player.getYRot(), mc.player.yHeadRotO)
+                || !sameRotation(mc.player.getYRot(), mc.player.yBodyRot)
+                || !sameRotation(mc.player.getYRot(), mc.player.yBodyRotO))) {
+            return Step.Result.fail("elytra evidence camera/body yaw is not stably aligned");
+        }
         Object expected = CapeService.getInstance().getCapeLocation(null, capeId);
         Object resolved = service.getCapeLocation(uuid);
         if (expected == null || !expected.equals(resolved)) {
@@ -2514,10 +2523,7 @@ public final class FullScenario implements Scenario {
             }
             if (mc.player != null) {
                 mc.player.setShiftKeyDown(false);
-                mc.player.setDeltaMovement(0, 0, 0);
-                mc.player.setYRot(180f);
-                mc.player.setYHeadRot(180f);
-                mc.player.setXRot(0f);
+                pinRearEvidenceView(mc);
             }
         } catch (Throwable t) {
             E2ELog.warn("enterWorldView: " + t);
@@ -2532,7 +2538,37 @@ public final class FullScenario implements Scenario {
     private void poseElytraForEvidence(Minecraft mc) {
         equipElytra(mc);
         if (mc.options != null) mc.options.keyShift.setDown(true);
-        if (mc.player != null) mc.player.setShiftKeyDown(true);
+        if (mc.player != null) {
+            mc.player.setShiftKeyDown(true);
+            pinRearEvidenceView(mc);
+        }
+    }
+
+    /**
+     * Align the camera, head and rendered body to the same rear-facing yaw.
+     *
+     * <p>Changing only {@code setYRot} leaves {@code yBodyRot} free to retain its previous
+     * interpolated direction. That made the player look almost sideways in the BMO elytra evidence:
+     * one wing was broad while the other was edge-on even though the logical crouch assertion
+     * passed. Pin both current and previous rotations during the settle window so the captured
+     * frame is a stable rear view rather than a transition between poses.
+     */
+    private void pinRearEvidenceView(Minecraft mc) {
+        if (mc.player == null) return;
+        float yaw = 180f;
+        mc.player.setDeltaMovement(0, 0, 0);
+        mc.player.setYRot(yaw);
+        mc.player.yRotO = yaw;
+        mc.player.setYHeadRot(yaw);
+        mc.player.yHeadRotO = yaw;
+        mc.player.setYBodyRot(yaw);
+        mc.player.yBodyRotO = yaw;
+        mc.player.setXRot(0f);
+        mc.player.xRotO = 0f;
+    }
+
+    private static boolean sameRotation(float left, float right) {
+        return Math.abs(left - right) < 0.01f;
     }
 
     private static boolean hasEmptyChest(Minecraft mc) {
