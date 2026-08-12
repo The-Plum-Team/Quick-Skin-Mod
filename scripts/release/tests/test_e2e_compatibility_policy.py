@@ -69,6 +69,25 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("VanillaShim.isExpectedDefaultSkinResolved(a)", live)
         self.assertIn("A's default skin did not stabilize BEFORE", live)
 
+    def test_model_evidence_reads_the_renderer_facing_geometry(self) -> None:
+        shim = SHIM.read_text(encoding="utf-8")
+        scenario = (E2E_JAVA / "scenario" / "FullScenario.java").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("public static String playerModel", shim)
+        self.assertIn('"getModelName", "method_3121", "m_108564_"', shim)
+        self.assertIn('"getSkin", "method_52814", "method_52810"', shim)
+        self.assertIn('findNoArg(skin.getClass(), "model", "comp_1629")', shim)
+        self.assertIn("skin.getClass().getRecordComponents()", shim)
+        self.assertIn("enumValue.ordinal() == 0", shim)
+        self.assertIn("enumValue.ordinal() == 1", shim)
+        self.assertIn("prepareModelEvidenceView(mc);", scenario)
+        self.assertIn('.ready(() -> holdModelEvidenceView(mc, "slim"))', scenario)
+        self.assertIn('.ready(() -> holdModelEvidenceView(mc, "classic"))', scenario)
+        self.assertIn("expectedModel.equals(VanillaShim.playerModel(mc.player))", scenario)
+        self.assertIn("restoreModelEvidenceView(mc);", scenario)
+
     def test_string_class_lookups_declare_an_intermediary_fallback(self) -> None:
         """Fabric serves intermediary names at runtime; a Mojang name alone resolves only on Forge."""
 

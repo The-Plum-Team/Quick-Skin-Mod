@@ -39,6 +39,9 @@ import java.util.function.Consumer;
  *       {@code getSkin().body()/cape()} returning a {@code ClientAsset.Texture} whose
  *       {@code texturePath()} is the Identifier (26.x). Returned as a String so no renamed type
  *       ({@code ResourceLocation}→{@code Identifier}) is imported.</li>
+ *   <li><b>player model geometry</b>: {@code getModelName()} (1.20.1) vs the model component of
+ *       {@code getSkin()} (1.21.x/26.x). The normalized result describes the value consumed by the
+ *       renderer, rather than Quick Skin's requested appearance state.</li>
  *   <li><b>UUID-selected default skin</b>: {@code DefaultPlayerSkin.getDefaultSkin(UUID)} returning
  *       a ResourceLocation (1.20.1) vs {@code DefaultPlayerSkin.get(UUID)} returning the same
  *       evolving player-skin record described above.</li>
@@ -147,6 +150,93 @@ public final class VanillaShim {
      */
     public static String skinTexture(AbstractClientPlayer p) {
         return resolveLoc(p, "getSkinTextureLocation", new String[]{"texture", "body"});
+    }
+
+    /**
+     * The normalized model geometry selected by the renderer ({@code slim} or {@code classic}).
+     *
+     * <p>Quick Skin's appearance repository records the requested model, but that alone cannot
+     * prove that a loader's player-skin adapter exposed the same value to Minecraft. This reads the
+     * final vanilla-facing accessor used to choose the slim or wide player renderer.</p>
+     */
+    public static String playerModel(AbstractClientPlayer p) {
+        if (p == null) return null;
+        try {
+            // 1.20.1: PlayerRenderer selects between its models through this string getter.
+            Method direct = findNoArg(
+                    p.getClass(), "getModelName", "method_3121", "m_108564_"
+            );
+            if (direct != null) {
+                return normalizePlayerModel(direct.invoke(p));
+            }
+
+            // 1.21.x/26.x: the renderer consumes the model component of PlayerSkin.
+            Method getSkin = findNoArg(p.getClass(), "getSkin", "method_52814", "method_52810");
+            Object skin = getSkin == null ? null : getSkin.invoke(p);
+            Method model = skin == null
+                    ? null
+                    : findNoArg(skin.getClass(), "model", "comp_1629");
+            if (model != null) {
+                return normalizePlayerModel(model.invoke(skin));
+            }
+            // Production loaders may expose the record's official obfuscated accessor. Select the
+            // unique enum component structurally instead of guessing a one-letter method name that
+            // could collide with an unrelated accessor.
+            if (skin != null && skin.getClass().isRecord()) {
+                String resolved = null;
+                for (RecordComponent component : skin.getClass().getRecordComponents()) {
+                    if (!component.getType().isEnum()) continue;
+                    String candidate = normalizePlayerModel(component.getAccessor().invoke(skin));
+                    if (candidate == null) continue;
+                    if (resolved != null) return null;
+                    resolved = candidate;
+                }
+                return resolved;
+            }
+            return null;
+        } catch (Throwable t) {
+            E2ELog.warn("playerModel: " + t);
+            return null;
+        }
+    }
+
+    private static String normalizePlayerModel(Object value) {
+        if (value == null) return null;
+        Enum<?> enumValue = value instanceof Enum<?> candidate ? candidate : null;
+        String model = enumValue == null ? String.valueOf(value) : enumValue.name();
+        model = model.toLowerCase(Locale.ROOT);
+        if (model.equals("slim") || model.endsWith(".slim")) return "slim";
+        if (model.equals("classic") || model.equals("default") || model.equals("wide")
+                || model.endsWith(".wide")) {
+            return "classic";
+        }
+        // Fabric's intermediary runtime renames the enum constants themselves. Their declared
+        // order is the stable vanilla contract in every supported PlayerSkin era: SLIM, then WIDE.
+        if (enumValue != null && enumValue.ordinal() == 0) return "slim";
+        if (enumValue != null && enumValue.ordinal() == 1) return "classic";
+        return null;
+    }
+
+    /** The current camera FOV option, or {@code null} when it cannot be read. */
+    public static Integer fieldOfView(Minecraft mc) {
+        try {
+            return mc == null || mc.options == null ? null : mc.options.fov().get();
+        } catch (Throwable t) {
+            E2ELog.warn("fieldOfView: " + t);
+            return null;
+        }
+    }
+
+    /** Set the camera FOV without persisting it; the scenario restores the previous value. */
+    public static boolean setFieldOfView(Minecraft mc, int value) {
+        try {
+            if (mc == null || mc.options == null) return false;
+            mc.options.fov().set(value);
+            return value == mc.options.fov().get();
+        } catch (Throwable t) {
+            E2ELog.warn("setFieldOfView: " + t);
+            return false;
+        }
     }
 
     /**
