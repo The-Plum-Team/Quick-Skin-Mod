@@ -418,6 +418,37 @@ public final class TestAssets {
     /** Classpath location of an optional real animated GIF cape bundled into the e2e resources. */
     private static final String BUNDLED_CAPE_GIF = "/qs_e2e_test_cape.gif";
 
+    /** Exact geometry of every frame in {@link #BUNDLED_CAPE_GIF}. */
+    public static final int ANIMATED_CAPE_FRAME_WIDTH = 64;
+    public static final int ANIMATED_CAPE_FRAME_HEIGHT = 32;
+
+    /**
+     * Validate that the E2E GIF itself is a cape atlas rather than merely an arbitrary animation.
+     *
+     * <p>The previous fixture used 640x640 square frames. The local-catalog shortcut accepted those
+     * bytes without opening the adjustment UI, so Minecraft sampled only a tiny UV corner: the
+     * nominal circle became a clipped sliver at the bottom of the rendered cape. Keep this check at
+     * the fixture boundary so a visually unsuitable replacement cannot produce convincing logical
+     * animation assertions again.</p>
+     */
+    public static CapeImportProcessor.PreparedCape prepareBundledGifCape() throws Exception {
+        Path gif = makeGifCape();
+        if (gif == null) return null;
+        CapeImportProcessor.PreparedCape prepared = CapeImportProcessor.prepare(gif);
+        if (!prepared.gif()
+                || !prepared.standardFormat()
+                || prepared.atlas().getWidth() != ANIMATED_CAPE_FRAME_WIDTH
+                || prepared.atlas().getHeight()
+                        != ANIMATED_CAPE_FRAME_HEIGHT * prepared.frameCount()
+                || prepared.frameCount() < 2
+                || prepared.animationMetadata() == null
+                || prepared.animationMetadata().frameCount() != prepared.frameCount()) {
+            throw new IllegalStateException(
+                    "bundled animated cape must contain at least two 64x32 GIF frames");
+        }
+        return prepared;
+    }
+
     /**
      * Extract the optional bundled animated GIF cape (dropped into {@code common/src/e2e/resources/})
      * to a temp {@code .gif} file, or {@code null} if none is bundled.
@@ -438,12 +469,12 @@ public final class TestAssets {
      * rest of the harness uses. Returns {@code null} if no GIF is bundled or registration failed.
      */
     public static String registerBundledGifCape() throws Exception {
-        Path gif = makeGifCape();
-        if (gif == null) {
+        CapeImportProcessor.PreparedCape prepared = prepareBundledGifCape();
+        if (prepared == null) {
             E2ELog.warn("no bundled GIF cape at " + BUNDLED_CAPE_GIF);
             return null;
         }
-        return registerLocalCapeAs(gif, "qs_e2e_cape.gif");
+        return registerLocalCapeAs(prepared.source(), "qs_e2e_cape.gif");
     }
 
     /**

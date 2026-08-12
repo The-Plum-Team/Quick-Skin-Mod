@@ -1,9 +1,8 @@
 name: AI visual review drain
 
-# Curators enqueue immutable, source-bound capsules in visual-review.yml. This protected workflow
-# drains one oldest eligible capsule at a time and may certify a clean synchronized 1.20.1 anchor.
-# A fixed workflow concurrency group may coalesce wake runs because the durable artifact queue,
-# rather than a pending workflow run, owns the work.
+# Curators enqueue immutable, source-bound capsules in visual-review.yml. Exact artifact wakes run
+# independently, while a scheduled/manual sweep only redispatches one authenticated exact wake.
+# The protected workflow may also certify a clean synchronized 1.20.1 anchor.
 on:
   schedule:
     - cron: "17,47 * * * *"
@@ -14,12 +13,12 @@ on:
 
 permissions: {}
 
-# Serialize selection through cleanup, not just the credential-bearing model job. Otherwise two
-# wakes can select the same oldest artifact before either reaches the model lock. GitHub may replace
-# a pending member of this group; the durable queue and the running drain's continuation preserve
-# the work independently of that pending run.
+# Deduplicate wakes for one immutable artifact without serializing unrelated capsules. Generic
+# sweeps share their own lock and never review directly, so they cannot race an exact wake after
+# selecting the oldest fallback entry. GitHub may coalesce duplicate wakes because queue state is
+# durable and exact-id cleanup, rather than any pending workflow run, owns completion.
 concurrency:
-  group: quick-skin-visual-review-model
+  group: quick-skin-visual-review-${{ github.event.client_payload.artifact_id || 'queue-sweep' }}
   cancel-in-progress: false
 
 jobs:
@@ -37,7 +36,9 @@ jobs:
       artifact_name: ${{ steps.queue.outputs.artifact_name }}
       artifact_run_id: ${{ steps.queue.outputs.artifact_run_id }}
       artifact_size: ${{ steps.queue.outputs.artifact_size }}
+      direct: ${{ steps.queue.outputs.direct }}
       eligible: ${{ steps.queue.outputs.eligible }}
+      generation_sha: ${{ steps.queue.outputs.generation_sha }}
       implementation_sha: ${{ steps.queue.outputs.implementation_sha }}
       source_run_id: ${{ steps.queue.outputs.source_run_id }}
 
@@ -59,14 +60,32 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REQUESTED_ARTIFACT_ID: ${{ github.event.client_payload.artifact_id }}
+          REQUESTED_ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
+          REQUESTED_GENERATION_SHA: ${{ github.event.client_payload.generation_sha }}
         run: |
           set -euo pipefail
           attempts=1
-          if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]] \
-              && [[ "$REQUESTED_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]; then
+          direct=false
+          requested_arguments=()
+          if [[ -n "$REQUESTED_ARTIFACT_ID" ]]; then
+            [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]
+            [[ "$REQUESTED_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+            if [[ -n "$REQUESTED_GENERATION_SHA" ]]; then
+              [[ "$REQUESTED_GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+              [[ "$REQUESTED_ARTIFACT_NAME" =~ \
+                ^visual-review-input-[1-9][0-9]*-$REQUESTED_GENERATION_SHA$ ]]
+            else
+              # Migration compatibility for a durable capsule queued by the immediately previous
+              # protected workflow. Its authenticated owner SHA becomes the generation fallback.
+              [[ "$REQUESTED_ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ ]]
+            fi
             # The enqueue workflow dispatches from its final job, just before its own run settles.
             # Poll only that authenticated wake long enough for completed-run provenance to exist.
             attempts=12
+            direct=true
+            requested_arguments=(--requested-artifact-id "$REQUESTED_ARTIFACT_ID")
+          else
+            [[ -z "$REQUESTED_ARTIFACT_NAME" ]]
           fi
           queue_output="$(mktemp "$RUNNER_TEMP/visual-review-queue.XXXXXX")"
           for (( attempt = 1; attempt <= attempts; attempt++ )); do
@@ -74,7 +93,8 @@ jobs:
             python3 scripts/ci/visual_review_queue.py \
               --repository "$GITHUB_REPOSITORY" \
               --github-output "$queue_output" \
-              --cooldown-minutes 30
+              --cooldown-minutes 30 \
+              "${requested_arguments[@]}"
             if grep -qx 'eligible=true' "$queue_output"; then
               break
             fi
@@ -82,12 +102,57 @@ jobs:
               sleep 5
             fi
           done
+          if [[ "$direct" == true ]] && grep -qx 'eligible=true' "$queue_output"; then
+            grep -qx "artifact_id=$REQUESTED_ARTIFACT_ID" "$queue_output"
+            grep -qx "artifact_name=$REQUESTED_ARTIFACT_NAME" "$queue_output"
+            if [[ -n "$REQUESTED_GENERATION_SHA" ]]; then
+              grep -qx "generation_sha=$REQUESTED_GENERATION_SHA" "$queue_output"
+            fi
+          fi
           cat "$queue_output" >> "$GITHUB_OUTPUT"
+          printf 'direct=%s\n' "$direct" >> "$GITHUB_OUTPUT"
+
+  dispatch-selected:
+    name: Convert one fallback selection into an exact wake
+    needs: select
+    if: >-
+      needs.select.outputs.eligible == 'true' &&
+      needs.select.outputs.direct == 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Dispatch the authenticated exact artifact identity
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ needs.select.outputs.artifact_id }}
+          ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
+          GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ \
+            || "$ARTIFACT_NAME" =~ \
+              ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA$ ]]
+          jq -n \
+            --arg artifact_id "$ARTIFACT_ID" \
+            --arg artifact_name "$ARTIFACT_NAME" \
+            --arg generation_sha "$GENERATION_SHA" \
+            '{event_type:"visual-review-drain-requested",
+              client_payload:{artifact_id:$artifact_id,artifact_name:$artifact_name,
+                generation_sha:$generation_sha}}' \
+            | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
 
   review:
     name: Review one queued capsule
     needs: select
-    if: needs.select.outputs.eligible == 'true'
+    if: >-
+      needs.select.outputs.eligible == 'true' &&
+      needs.select.outputs.direct == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -104,9 +169,10 @@ jobs:
       failure_category: ${{ steps.classify.outputs.failure_category }}
       failure_transient: ${{ steps.classify.outputs.failure_transient }}
       review_complete: ${{ steps.check.outputs.review_complete }}
+      wave_blocked: ${{ (steps.wave-block.outputs.blocked == 'true' || steps.guard.outputs.wave_blocked == 'true') && 'true' || 'false' }}
 
     steps:
-      - name: Revalidate the queue entry inside the global drain lock
+      - name: Revalidate the artifact-scoped queue entry
         id: guard
         shell: bash
         env:
@@ -115,6 +181,7 @@ jobs:
           ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
           ARTIFACT_RUN_ID: ${{ needs.select.outputs.artifact_run_id }}
           ARTIFACT_SIZE: ${{ needs.select.outputs.artifact_size }}
+          GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
           GH_TOKEN: ${{ github.token }}
           IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
           SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
@@ -123,14 +190,89 @@ jobs:
           printf 'already_reviewed=false\n' >> "$GITHUB_OUTPUT"
           printf 'cooling=false\n' >> "$GITHUB_OUTPUT"
           printf 'reviewable=true\n' >> "$GITHUB_OUTPUT"
+          printf 'wave_blocked=false\n' >> "$GITHUB_OUTPUT"
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$ARTIFACT_NAME" == "visual-review-input-$SOURCE_RUN_ID" ]]
+          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ARTIFACT_NAME" == "visual-review-input-$SOURCE_RUN_ID" \
+            || "$ARTIFACT_NAME" == \
+              "visual-review-input-$SOURCE_RUN_ID-$GENERATION_SHA" ]]
           [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
           [[ "$ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
           (( ARTIFACT_SIZE <= 536870912 ))
           [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+
+          # An Opus-confirmed defect in one automatic port stops every sibling review from the same
+          # exact propagated generation. The marker's protected implementation is reauthenticated
+          # from its owner; a name alone, or an artifact from another workflow, cannot suppress work.
+          block_name="visual-review-wave-block-$GENERATION_SHA"
+          blocks="$(gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$block_name&per_page=100")"
+          jq -e \
+            '(type == "array") and
+             ([.[] | (.artifacts | type == "array")] | all) and
+             ([.[].artifacts[]] | length <= 100)' \
+            <<< "$blocks" > /dev/null
+          while IFS=$'\t' read -r block_run_id expired size head_sha; do
+            [[ -n "$block_run_id" && "$expired" == false ]] || continue
+            [[ "$size" =~ ^[1-9][0-9]*$ ]] || continue
+            (( size <= 1048576 )) || continue
+            [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || continue
+            block_run="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$block_run_id" 2>/dev/null || true)"
+            if [[ -n "$block_run" ]] && jq -e \
+                --arg implementation_sha "$head_sha" \
+                --arg repository "$GITHUB_REPOSITORY" \
+                '((.status == "completed" and .conclusion == "failure") or
+                  (.status == "in_progress" and .conclusion == null)) and
+                 (.event == "repository_dispatch" or .event == "schedule" or
+                  .event == "workflow_dispatch") and
+                 .head_branch == "master" and .head_sha == $implementation_sha and
+                 .path == ".github/workflows/visual-review-drain.yml" and
+                 .head_repository.full_name == $repository' \
+                <<< "$block_run" > /dev/null; then
+              block_id="$(jq -er --argjson run_id "$block_run_id" \
+                --arg name "$block_name" \
+                '[.[].artifacts[] | select(.name == $name and
+                  .workflow_run.id == $run_id and .expired == false)] |
+                 if length == 1 then .[0].id else empty end' <<< "$blocks")"
+              [[ "$block_id" =~ ^[1-9][0-9]*$ ]]
+              block_archive="$RUNNER_TEMP/visual-review-wave-block-$block_id.zip"
+              gh api -H 'Accept: application/vnd.github+json' \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts/$block_id/zip" \
+                > "$block_archive"
+              block_root="$RUNNER_TEMP/visual-review-wave-block-$block_id"
+              python3 scripts/ci/bounded_zip.py "$block_archive" "$block_root" \
+                --max-archive-bytes 1048576 \
+                --max-entries 1 \
+                --max-total-bytes 1048576 \
+                --max-file-bytes 1048576 \
+                --max-compression-ratio 100 \
+                > "$RUNNER_TEMP/visual-review-wave-block-extraction-$block_id.json"
+              block_file="$block_root/visual-review-wave-block.json"
+              [[ -f "$block_file" && ! -L "$block_file" ]]
+              jq -e \
+                --arg generation_sha "$GENERATION_SHA" \
+                --arg implementation_sha "$head_sha" \
+                '(keys | sort) == (["generation_sha", "implementation_sha", "kind",
+                  "report_sha256", "schema_version", "source_run_id", "source_sha"] |
+                  sort) and .schema_version == 1 and
+                 .kind == "quick-skin-visual-review-wave-block" and
+                 .generation_sha == $generation_sha and
+                 .implementation_sha == $implementation_sha and
+                 (.source_run_id | type == "number" and . > 0) and
+                 (.source_sha | type == "string" and test("^[0-9a-f]{40}$")) and
+                 (.report_sha256 | type == "string" and test("^[0-9a-f]{64}$"))' \
+                "$block_file" > /dev/null
+              printf 'wave_blocked=true\n' >> "$GITHUB_OUTPUT"
+              printf 'reviewable=false\n' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done < <(jq -r --arg name "$block_name" \
+            '.[].artifacts[] | select(.name == $name) |
+             [.workflow_run.id, .expired, .size_in_bytes,
+              .workflow_run.head_sha] | @tsv' <<< "$blocks")
 
           report_name="visual-review-$SOURCE_RUN_ID"
           reports="$(gh api --paginate --slurp \
@@ -475,7 +617,7 @@ jobs:
         run: |
           set -euo pipefail
           printf 'restored=false\n' >> "$GITHUB_OUTPUT"
-          printf 'artifact_id=\n' >> "$GITHUB_OUTPUT"
+          printf 'artifact_ids=\n' >> "$GITHUB_OUTPUT"
           printf 'policy_sha256=\n' >> "$GITHUB_OUTPUT"
           review_mode="$(jq -er \
             '.review_mode | select(. == "anchor-semantic" or
@@ -514,7 +656,9 @@ jobs:
               <<< "$artifacts" > /dev/null; then
             exit 0
           fi
-          cache_metadata=''
+          cache_arguments=()
+          cache_ids=()
+          cache_paths=()
           while IFS=$'\t' read -r candidate_id candidate_run_id; do
             [[ "$candidate_id" =~ ^[1-9][0-9]*$ ]]
             [[ "$candidate_run_id" =~ ^[1-9][0-9]*$ ]]
@@ -536,7 +680,56 @@ jobs:
               cache_metadata="$(jq -c --argjson id "$candidate_id" \
                 '[.[].artifacts[] | select(.id == $id)] |
                  if length == 1 then .[0] else empty end' <<< "$artifacts")"
-              break
+              if [[ -z "$cache_metadata" ]]; then
+                continue
+              fi
+              if ! cache_size="$(jq -er .size_in_bytes <<< "$cache_metadata")" || \
+                  ! cache_digest="$(jq -er \
+                    '.digest | select(type == "string" and
+                      test("^sha256:[0-9a-f]{64}$"))' <<< "$cache_metadata")"; then
+                continue
+              fi
+              cache_archive="$RUNNER_TEMP/visual-review-verdict-cache-$candidate_id.zip"
+              if ! gh api -H 'Accept: application/vnd.github+json' \
+                  "repos/$GITHUB_REPOSITORY/actions/artifacts/$candidate_id/zip" \
+                    > "$cache_archive"; then
+                continue
+              fi
+              if [[ "$(stat -c %s "$cache_archive")" != "$cache_size" ]] || \
+                  [[ "sha256:$(sha256sum "$cache_archive" | cut -d ' ' -f 1)" != \
+                    "$cache_digest" ]]; then
+                rm -f -- "$cache_archive"
+                continue
+              fi
+              cache_root="$RUNNER_TEMP/restored-verdict-cache-$candidate_id"
+              if ! python3 "$GITHUB_WORKSPACE/scripts/ci/bounded_zip.py" \
+                  "$cache_archive" "$cache_root" \
+                  --max-archive-bytes 4194304 \
+                  --max-entries 1 \
+                  --max-total-bytes 4194304 \
+                  --max-file-bytes 4194304 \
+                  --max-compression-ratio 200 \
+                    > "$RUNNER_TEMP/verdict-cache-extraction-$candidate_id.json"; then
+                rm -f -- "$cache_archive"
+                continue
+              fi
+              rm -f -- "$cache_archive"
+              restored="$cache_root/visual-review-verdict-cache.json"
+              normalized="$RUNNER_TEMP/visual-review-verdict-cache-$candidate_id.json"
+              if [[ ! -f "$restored" || -L "$restored" ]] || \
+                  ! python3 \
+                    "$RUNNER_TEMP/protected-reviewer/visual_review_cache.py" validate \
+                    --cache "$restored" \
+                    --policy-sha256 "$policy_sha256" \
+                    --normalized-output "$normalized"; then
+                continue
+              fi
+              cache_arguments+=(--cache "$normalized")
+              cache_ids+=("$candidate_id")
+              cache_paths+=("$normalized")
+              if (( ${#cache_ids[@]} == 32 )); then
+                break
+              fi
             fi
           done < <(jq -r --arg name "$cache_name" \
             '[.[].artifacts[] |
@@ -547,50 +740,24 @@ jobs:
                 (.workflow_run.id | type == "number" and . > 0))] |
              sort_by(.created_at, .id) | reverse | .[] |
              [.id, .workflow_run.id] | @tsv' <<< "$artifacts" || true)
-          if [[ -z "$cache_metadata" ]]; then
+          if (( ${#cache_ids[@]} == 0 )); then
             exit 0
           fi
-          if ! cache_id="$(jq -er .id <<< "$cache_metadata")" || \
-              ! cache_run_id="$(jq -er .workflow_run.id <<< "$cache_metadata")" || \
-              ! cache_size="$(jq -er .size_in_bytes <<< "$cache_metadata")" || \
-              ! cache_digest="$(jq -er \
-                '.digest | select(type == "string" and
-                  test("^sha256:[0-9a-f]{64}$"))' <<< "$cache_metadata")"; then
-            exit 0
+          if python3 "$RUNNER_TEMP/protected-reviewer/visual_review_cache.py" \
+              combine --help > /dev/null 2>&1; then
+            python3 "$RUNNER_TEMP/protected-reviewer/visual_review_cache.py" combine \
+              "${cache_arguments[@]}" \
+              --policy-sha256 "$policy_sha256" \
+              --output visual-review-verdict-cache.input.json
+          else
+            # Capsules queued by the immediately preceding implementation have no combine command.
+            # Preserve its original newest-cache behavior and retire only the shard actually used.
+            cp -- "${cache_paths[0]}" visual-review-verdict-cache.input.json
+            cache_ids=("${cache_ids[0]}")
           fi
-          cache_archive="$RUNNER_TEMP/visual-review-verdict-cache.zip"
-          if ! gh api -H 'Accept: application/vnd.github+json' \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$cache_id/zip" \
-              > "$cache_archive"; then
-            exit 0
-          fi
-          if [[ "$(stat -c %s "$cache_archive")" != "$cache_size" ]] || \
-              [[ "sha256:$(sha256sum "$cache_archive" | cut -d ' ' -f 1)" != \
-                "$cache_digest" ]]; then
-            exit 0
-          fi
-          if ! python3 "$GITHUB_WORKSPACE/scripts/ci/bounded_zip.py" \
-            "$cache_archive" "$RUNNER_TEMP/restored-verdict-cache" \
-            --max-archive-bytes 4194304 \
-            --max-entries 1 \
-            --max-total-bytes 4194304 \
-            --max-file-bytes 4194304 \
-            --max-compression-ratio 200 \
-              > "$RUNNER_TEMP/verdict-cache-extraction.json"; then
-            exit 0
-          fi
-          rm -f -- "$cache_archive"
-          restored="$RUNNER_TEMP/restored-verdict-cache/visual-review-verdict-cache.json"
-          if [[ ! -f "$restored" || -L "$restored" ]]; then
-            exit 0
-          fi
-          if ! python3 "$RUNNER_TEMP/protected-reviewer/visual_review_cache.py" validate \
-            --cache "$restored" \
-            --policy-sha256 "$policy_sha256" \
-              --normalized-output visual-review-verdict-cache.input.json; then
-            exit 0
-          fi
-          printf 'artifact_id=%s\n' "$cache_id" >> "$GITHUB_OUTPUT"
+          cache_id_list="$(IFS=,; printf '%s' "${cache_ids[*]}")"
+          [[ "$cache_id_list" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]]
+          printf 'artifact_ids=%s\n' "$cache_id_list" >> "$GITHUB_OUTPUT"
           printf 'restored=true\n' >> "$GITHUB_OUTPUT"
 
       - name: Install Node for the locked Claude CLI
@@ -733,6 +900,124 @@ jobs:
           printf 'review_complete=true\n' >> "$GITHUB_OUTPUT"
           exit "$review_status"
 
+      - name: Create a sanitized generation block after a confirmed defect
+        id: wave-block
+        if: >-
+          always() && steps.guard.outputs.reviewable == 'true' &&
+          steps.check.outputs.review_complete == 'true'
+        working-directory: ${{ runner.temp }}/visual-review-capsule
+        shell: bash
+        env:
+          GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
+          IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
+          SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          printf 'blocked=false\n' >> "$GITHUB_OUTPUT"
+          if [[ "$(jq -er .state visual-review-completion.json)" != blocking-partial ]]; then
+            exit 0
+          fi
+          source_branch="$(jq -er .source_branch curation-proof.json)"
+          # Advisory PRs must never suppress reviews for the protected automatic version wave.
+          if [[ "$source_branch" != automation/sync/* ]]; then
+            exit 0
+          fi
+          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          proof_generation="$(jq -er \
+            '.master_source_sha // .implementation_sha |
+             select(type == "string" and test("^[0-9a-f]{40}$"))' \
+            curation-proof.json)"
+          [[ "$proof_generation" == "$GENERATION_SHA" ]]
+          jq -e \
+            --arg implementation_sha "$IMPLEMENTATION_SHA" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '.implementation_sha == $implementation_sha and
+             .source_run_id == $source_run_id and
+             (.source_branch | startswith("automation/sync/"))' \
+            curation-proof.json > /dev/null
+          jq -e 'length > 0 and all(.[]; .defect == true)' \
+            visual-review-report.json > /dev/null
+          report_sha256="$(sha256sum visual-review-report.json | cut -d ' ' -f 1)"
+          source_sha="$(jq -er \
+            '.source_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
+            curation-proof.json)"
+          jq -n \
+            --arg implementation_sha "$IMPLEMENTATION_SHA" \
+            --arg generation_sha "$GENERATION_SHA" \
+            --arg report_sha256 "$report_sha256" \
+            --arg source_sha "$source_sha" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '{schema_version:1,kind:"quick-skin-visual-review-wave-block",
+              generation_sha:$generation_sha,implementation_sha:$implementation_sha,
+              source_run_id:$source_run_id,
+              source_sha:$source_sha,report_sha256:$report_sha256}' \
+            > visual-review-wave-block.json
+          printf 'artifact_name=visual-review-wave-block-%s\n' "$GENERATION_SHA" \
+            >> "$GITHUB_OUTPUT"
+          printf 'blocked=true\n' >> "$GITHUB_OUTPUT"
+
+      - name: Upload the sanitized generation block marker
+        id: wave-block-artifact
+        if: always() && steps.wave-block.outputs.blocked == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.wave-block.outputs.artifact_name }}
+          path: ${{ runner.temp }}/visual-review-capsule/visual-review-wave-block.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Cancel sibling drains after the durable block exists
+        if: >-
+          always() && steps.wave-block-artifact.outputs.artifact-id != ''
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          workflow_id="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/visual-review-drain.yml" --jq .id)"
+          [[ "$workflow_id" =~ ^[1-9][0-9]*$ ]]
+          for status in queued in_progress; do
+            runs="$(gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id/runs?branch=master&status=$status&per_page=100")"
+            jq -e \
+              '(type == "array") and ([.[] | (.workflow_runs | type == "array")] | all) and
+               ([.[].workflow_runs[]] | length <= 1000)' <<< "$runs" > /dev/null
+            while IFS= read -r sibling_id; do
+              [[ "$sibling_id" =~ ^[1-9][0-9]*$ ]]
+              [[ "$sibling_id" != "$GITHUB_RUN_ID" ]]
+              sibling="$(gh api \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$sibling_id" 2>/dev/null || true)"
+              if [[ -z "$sibling" ]] || ! jq -e \
+                  --arg implementation_sha "$IMPLEMENTATION_SHA" \
+                  --arg repository "$GITHUB_REPOSITORY" \
+                  --argjson run_id "$sibling_id" \
+                  '.id == $run_id and
+                   (.status == "queued" or .status == "in_progress") and
+                   (.event == "repository_dispatch" or .event == "schedule" or
+                    .event == "workflow_dispatch") and
+                   .head_branch == "master" and .head_sha == $implementation_sha and
+                   .path == ".github/workflows/visual-review-drain.yml" and
+                   .head_repository.full_name == $repository' \
+                  <<< "$sibling" > /dev/null; then
+                continue
+              fi
+              gh api --method POST \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$sibling_id/cancel" \
+                2>/dev/null || true
+            done < <(jq -r \
+              --arg implementation_sha "$IMPLEMENTATION_SHA" \
+              --argjson current_run_id "$GITHUB_RUN_ID" \
+              '.[].workflow_runs[] |
+               select(.id != $current_run_id and .head_sha == $implementation_sha) |
+               .id' <<< "$runs")
+          done
+
       - name: Publish the protected exact-policy verdict cache
         id: publish-verdict-cache
         if: >-
@@ -770,7 +1055,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Retire the superseded exact-policy verdict cache
+      - name: Retire the consumed exact-policy verdict cache shards
         if: >-
           always() && steps.verdict-cache.outputs.restored == 'true' &&
           steps.verdict-cache-artifact.outputs.artifact-id != ''
@@ -780,20 +1065,40 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          old_id="${{ steps.verdict-cache.outputs.artifact_id }}"
+          old_id_list="${{ steps.verdict-cache.outputs.artifact_ids }}"
           new_id="${{ steps.verdict-cache-artifact.outputs.artifact-id }}"
-          [[ "$old_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$old_id_list" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]]
           [[ "$new_id" =~ ^[1-9][0-9]*$ ]]
-          [[ "$old_id" != "$new_id" ]]
-          metadata="$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$old_id")"
-          jq -e \
-            --arg name "visual-review-verdict-cache-${{ steps.verdict-cache.outputs.policy_sha256 }}" \
-            --argjson artifact_id "$old_id" \
-            '.id == $artifact_id and .name == $name and .expired == false' \
-            <<< "$metadata" > /dev/null
-          gh api --method DELETE \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$old_id"
+          IFS=, read -r -a old_ids <<< "$old_id_list"
+          for old_id in "${old_ids[@]}"; do
+            [[ "$old_id" =~ ^[1-9][0-9]*$ ]]
+            [[ "$old_id" != "$new_id" ]]
+            metadata_error="$(mktemp "$RUNNER_TEMP/verdict-cache-metadata.XXXXXX")"
+            if ! metadata="$(gh api \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts/$old_id" \
+                2>"$metadata_error")"; then
+              if grep -Fq '(HTTP 404)' "$metadata_error"; then
+                continue
+              fi
+              cat "$metadata_error" >&2
+              exit 1
+            fi
+            jq -e \
+              --arg name "visual-review-verdict-cache-${{ steps.verdict-cache.outputs.policy_sha256 }}" \
+              --argjson artifact_id "$old_id" \
+              '.id == $artifact_id and .name == $name and .expired == false' \
+              <<< "$metadata" > /dev/null
+            delete_error="$(mktemp "$RUNNER_TEMP/verdict-cache-delete.XXXXXX")"
+            if ! gh api --method DELETE \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts/$old_id" \
+                2>"$delete_error"; then
+              if grep -Fq '(HTTP 404)' "$delete_error"; then
+                continue
+              fi
+              cat "$delete_error" >&2
+              exit 1
+            fi
+          done
 
       - name: Retire superseded caches for obsolete review policies
         if: >-
@@ -1050,7 +1355,8 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ ]]
+          [[ "$ARTIFACT_NAME" =~ \
+            ^visual-review-input-[1-9][0-9]*(-[0-9a-f]{40})?$ ]]
           [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
           metadata_error="$(mktemp "$RUNNER_TEMP/visual-review-metadata.XXXXXX")"
           metadata=""
@@ -1165,18 +1471,33 @@ jobs:
          (needs.review.outputs.failure_category != '' &&
           needs.review.outputs.failure_transient == 'false'))) ||
        needs.review.outputs.failure_category != '' ||
-       needs.review.outputs.cooling == 'true')
+       needs.review.outputs.cooling == 'true') &&
+      needs.review.outputs.wave_blocked != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
 
     steps:
-      - name: Dispatch another independently selected drain
+      - name: Dispatch another independently selected drain unless this wave is blocked
         shell: bash
         env:
+          ARTIFACT_ID: ${{ needs.select.outputs.artifact_id }}
+          ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
+          GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          jq -n '{event_type:"visual-review-drain-requested",client_payload:{}}' \
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ \
+            || "$ARTIFACT_NAME" =~ \
+              ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA$ ]]
+          jq -n \
+            --arg artifact_id "$ARTIFACT_ID" \
+            --arg artifact_name "$ARTIFACT_NAME" \
+            --arg generation_sha "$GENERATION_SHA" \
+            '{event_type:"visual-review-drain-requested",client_payload:{
+              artifact_id:$artifact_id,artifact_name:$artifact_name,
+              generation_sha:$generation_sha}}' \
             | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
