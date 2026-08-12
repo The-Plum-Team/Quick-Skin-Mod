@@ -47,10 +47,13 @@ TRANSIENT_MODEL_CATEGORIES = frozenset(
     }
 )
 SYNTHETIC_IDENTICAL_VISIBLE = (
-    "Candidate pixels are identical to the authenticated 1.20.1 reference."
+    "Candidate pixels are identical to the certified 1.20.1 reference."
 )
-SYNTHETIC_CLEAN_VISIBLE = (
-    "Candidate matches the authenticated 1.20.1 reference and checkpoint expectation."
+SYNTHETIC_COMPARISON_CLEAN_VISIBLE = (
+    "Candidate is semantically valid and matches the certified 1.20.1 reference."
+)
+SYNTHETIC_SEMANTIC_CLEAN_VISIBLE = (
+    "Candidate independently satisfies its checkpoint expectation."
 )
 
 
@@ -73,34 +76,27 @@ def _chunks(items: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]
     return [items[index : index + size] for index in range(0, len(items), size)]
 
 
-def _is_cross_loader_1_20_1_anchor(item: dict[str, Any]) -> bool:
-    candidate = item["label"].split("/", 1)[0]
-    reference = item["reference_label"].split("/", 1)[0]
-    return {candidate, reference} == {"fabric-1.20.1", "forge-1.20.1"}
-
-
 def build_review_plan(
     manifest: Any, *, triage_chunk_size: int = DEFAULT_TRIAGE_CHUNK_SIZE
 ) -> dict[str, Any]:
     """Split byte-identical pairs from bounded semantic-review chunks."""
 
-    entries, _labels = validate_manifest(manifest, require_paired=True)
-    # The 1.20.1 anchor is established by inspecting Fabric against Forge and vice versa.
-    # Shared pixels are useful evidence of loader parity, but never evidence that the shared image
-    # satisfies its semantic checkpoint, so those pairs must still reach the model.
+    entries, _labels = validate_manifest(manifest)
+    paired = "reference_path" in entries[0]
+    # A semantic-only anchor has no reference and every frame reaches the model. Once that anchor
+    # is certified, byte-identical later-version pairs can inherit both its semantics and pixels.
     identical = [
         item
         for item in entries
-        if item["path"] == item["reference_path"]
-        and not _is_cross_loader_1_20_1_anchor(item)
+        if paired and item["path"] == item["reference_path"]
     ]
     semantic = [
         item
         for item in entries
-        if item["path"] != item["reference_path"]
-        or _is_cross_loader_1_20_1_anchor(item)
+        if not paired or item["path"] != item["reference_path"]
     ]
     return {
+        "paired": paired,
         "identical": identical,
         "semantic": semantic,
         "triage_chunks": _chunks(semantic, triage_chunk_size) if semantic else [],
@@ -116,14 +112,16 @@ def execute_review(
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Run compact triage, escalate uncertain findings, and restore exact order."""
 
-    entries, labels = validate_manifest(manifest, require_paired=True)
+    entries, labels = validate_manifest(manifest)
+    paired = "reference_path" in entries[0]
     plan = build_review_plan(entries, triage_chunk_size=triage_chunk_size)
     final_by_label: dict[str, dict[str, Any]] = {}
     for item in plan["identical"]:
         final_by_label[item["label"]] = {
             "label": item["label"],
             "visible": SYNTHETIC_IDENTICAL_VISIBLE,
-            "matches": True,
+            "semantic_valid": True,
+            "matches_reference": True,
             "anomalies": [],
             "defect": False,
         }
@@ -137,7 +135,7 @@ def execute_review(
             chunk,
             triage_schema(chunk_labels),
         )
-        for verdict in validate_triage(chunk, raw_triage, require_paired=True):
+        for verdict in validate_triage(chunk, raw_triage, require_paired=paired):
             triage_by_label[verdict["label"]] = verdict
 
     escalated: list[dict[str, Any]] = []
@@ -146,8 +144,13 @@ def execute_review(
         if triage["decision"] == "clean" and triage["confidence"] == "high":
             final_by_label[item["label"]] = {
                 "label": item["label"],
-                "visible": SYNTHETIC_CLEAN_VISIBLE,
-                "matches": True,
+                "visible": (
+                    SYNTHETIC_COMPARISON_CLEAN_VISIBLE
+                    if paired
+                    else SYNTHETIC_SEMANTIC_CLEAN_VISIBLE
+                ),
+                "semantic_valid": True,
+                "matches_reference": True if paired else None,
                 "anomalies": [],
                 "defect": False,
             }
@@ -166,10 +169,11 @@ def execute_review(
             report_schema(
                 len(validation_chunk),
                 labels=[item["label"] for item in validation_chunk],
+                paired=paired,
             ),
         )
         for verdict in validate(
-            validation_chunk, raw_verdicts, require_paired=True
+            validation_chunk, raw_verdicts, require_paired=paired
         ):
             final_by_label[verdict["label"]] = verdict
 
@@ -179,10 +183,11 @@ def execute_review(
     final = validate(
         entries,
         [final_by_label[label] for label in labels],
-        require_paired=True,
+        require_paired=paired,
     )
     return final, {
-        "pairs": len(entries),
+        "frames": len(entries),
+        "paired": int(paired),
         "identical": len(plan["identical"]),
         "triaged": len(plan["semantic"]),
         "triage_chunks": len(plan["triage_chunks"]),
@@ -228,6 +233,7 @@ class ClaudeProvider:
         verify_prompt: str,
         triage_model: str,
         verify_model: str,
+        paired: bool,
         attempts: int,
         call_spacing_seconds: float,
     ) -> None:
@@ -236,6 +242,7 @@ class ClaudeProvider:
         self.claude = claude
         self.prompts = {"triage": triage_prompt, "verify": verify_prompt}
         self.models = {"triage": triage_model, "verify": verify_model}
+        self.paired = paired
         self.attempts = attempts
         self.call_spacing_seconds = call_spacing_seconds
         self.last_call_started: float | None = None
@@ -262,11 +269,18 @@ class ClaudeProvider:
         manifest_path = self.work_root / "chunks" / f"{chunk_name}.json"
         _write_json_new(manifest_path, manifest)
         manifest_relative = manifest_path.relative_to(self.capsule).as_posix()
+        image_instruction = (
+            "open the candidate and reference images for every entry"
+            if self.paired
+            else "open the candidate image for every entry"
+        )
         prompt = (
             self.prompts[stage]
             + "\n\nThe exact manifest for this bounded pass is `./"
             + manifest_relative
-            + "`. Read that manifest first, then open both labelled images for every entry."
+            + "`. Read that manifest first, then "
+            + image_instruction
+            + "."
         )
         schema_json = json.dumps(
             schema,
@@ -350,7 +364,7 @@ class ClaudeProvider:
                                 normalized = validate_triage(
                                     manifest,
                                     structured,
-                                    require_paired=True,
+                                    require_paired=self.paired,
                                 )
                             else:
                                 validation_manifest = [
@@ -364,7 +378,7 @@ class ClaudeProvider:
                                 normalized = validate(
                                     validation_manifest,
                                     structured,
-                                    require_paired=True,
+                                    require_paired=self.paired,
                                 )
                         except ReviewError:
                             # Schema-valid output can still violate semantic invariants such as
@@ -414,6 +428,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--verify-model", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--failure-report", type=Path)
+    parser.add_argument(
+        "--review-mode",
+        required=True,
+        choices=("anchor-semantic", "reference-comparison"),
+    )
     parser.add_argument("--triage-chunk-size", type=int, default=DEFAULT_TRIAGE_CHUNK_SIZE)
     parser.add_argument("--verify-chunk-size", type=int, default=DEFAULT_VERIFY_CHUNK_SIZE)
     parser.add_argument("--model-attempts", type=int, default=DEFAULT_MODEL_ATTEMPTS)
@@ -441,7 +460,11 @@ def main(argv: list[str] | None = None) -> int:
         if manifest_path.parent != input_root or input_root.parent != capsule:
             raise RunnerError("invalid_capsule", "input", transient=False)
         manifest = load(manifest_path, "review manifest")
-        validate_input(manifest, input_root, require_paired=True)
+        entries, _labels = validate_manifest(manifest)
+        paired = "reference_path" in entries[0]
+        if paired != (args.review_mode == "reference-comparison"):
+            raise RunnerError("invalid_capsule", "review_mode", transient=False)
+        validate_input(manifest, input_root, require_paired=paired)
         work_root = capsule / "review-work"
         if work_root.exists() or work_root.is_symlink():
             raise RunnerError("invalid_capsule", "work", transient=False)
@@ -454,6 +477,7 @@ def main(argv: list[str] | None = None) -> int:
             verify_prompt=_bounded_prompt(args.verify_prompt, "verify_prompt"),
             triage_model=args.triage_model,
             verify_model=args.verify_model,
+            paired=paired,
             attempts=args.model_attempts,
             call_spacing_seconds=args.call_spacing_seconds,
         )
