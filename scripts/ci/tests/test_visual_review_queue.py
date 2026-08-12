@@ -74,8 +74,43 @@ class FakeApi:
     def get_run(self, run_id: int) -> dict[str, Any]:
         return self.runs[run_id]
 
+    def get_source_run(self, run_id: int) -> dict[str, Any]:
+        return self.runs.get(
+            run_id,
+            {
+                "status": "completed",
+                "conclusion": "success",
+                "head_branch": "feature/example",
+            },
+        )
+
 
 class VisualReviewQueueTest(unittest.TestCase):
+    def test_certifiable_anchor_preempts_an_older_advisory_review(self) -> None:
+        advisory = artifact(1, "visual-review-input-100", run_id=10, minutes_ago=90)
+        anchor = artifact(2, "visual-review-input-200", run_id=20, minutes_ago=10)
+        runs = {
+            10: owner(10, PREPARE_WORKFLOW),
+            20: owner(20, PREPARE_WORKFLOW),
+            100: {
+                "status": "completed",
+                "conclusion": "success",
+                "head_branch": "feature/example",
+            },
+            200: {
+                "status": "completed",
+                "conclusion": "success",
+                "head_branch": (
+                    "automation/sync/forge-and-fabric-1.20.1/123-1"
+                ),
+            },
+        }
+
+        self.assertEqual(
+            (anchor, 200),
+            select_pending(FakeApi([advisory, anchor], runs), repository=REPOSITORY),
+        )
+
     def test_selects_oldest_unreviewed_input_after_attempt_cooldown(self) -> None:
         reviewed = artifact(1, "visual-review-input-100", run_id=10, minutes_ago=90)
         cooling = artifact(2, "visual-review-input-200", run_id=20, minutes_ago=80)

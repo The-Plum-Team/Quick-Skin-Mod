@@ -52,6 +52,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "build.gradle.kts",
     "common/src/e2e",
     "e2e/check_visual_review.py",
+    "e2e/visual_review_cache.py",
     "e2e/ci_summary.py",
     "e2e/dependency_integrity.py",
     "e2e/generate_contract_java.py",
@@ -67,6 +68,10 @@ PROTECTED_CONTROLLER_PATHS = (
     "e2e/visual_evidence.py",
     "e2e/visual_review.py",
     "e2e/visual_review_prompt.md",
+    "e2e/visual_review_runner.py",
+    "e2e/visual_review_semantic_prompt.md",
+    "e2e/visual_review_semantic_verify_prompt.md",
+    "e2e/visual_review_verify_prompt.md",
     "e2e/visual_review_workflow.js",
     "gradle/archive-conventions.gradle.kts",
     "gradle/e2e-harness-conventions.gradle.kts",
@@ -77,6 +82,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "gradlew",
     "scripts/ci/e2e_impact.py",
     "scripts/ci/e2e_job_graph.py",
+    "scripts/ci/visual_anchor_certification.py",
     "scripts/ci/version_port_conflicts.py",
     "scripts/ci/version_port_merge.py",
     "scripts/release/artifact_manifest.py",
@@ -120,6 +126,20 @@ def _git(repository: Path, *arguments: str) -> bytes:
         detail = completed.stderr.decode("utf-8", errors="replace").strip()
         raise JobGraphError(detail or f"git {' '.join(arguments)} failed")
     return completed.stdout
+
+
+def _git_object_exists(repository: Path, object_name: str) -> bool:
+    try:
+        completed = subprocess.run(
+            ("git", "cat-file", "-e", object_name),
+            cwd=repository,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError as exc:
+        raise JobGraphError(f"cannot execute git: {exc}") from exc
+    return completed.returncode == 0
 
 
 def validate_controller_parity(
@@ -167,8 +187,12 @@ def validate_controller_parity(
             or ".." in Path(path).parts
         ):
             raise JobGraphError(f"invalid protected controller path {path!r}")
-        _git(repository, "cat-file", "-e", f"{protected_sha}:{path}")
-        _git(repository, "cat-file", "-e", f"{head_sha}:{path}")
+        protected_exists = _git_object_exists(repository, f"{protected_sha}:{path}")
+        head_exists = _git_object_exists(repository, f"{head_sha}:{path}")
+        if protected_exists != head_exists:
+            raise JobGraphError(
+                f"port E2E controller presence differs from protected master: {path}"
+            )
     outside_roots = [
         path
         for path in version_specific_paths
