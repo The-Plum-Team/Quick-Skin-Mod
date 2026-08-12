@@ -44,6 +44,7 @@ from visual_review import (  # noqa: E402
     reference_identity,
     reference_retention_days,
     validate_expected_row,
+    validate_semantic_anchor_manifest,
 )
 
 
@@ -584,6 +585,32 @@ class VisualEvidenceTest(unittest.TestCase):
                 reference_frames=references,
             )
 
+    def test_semantic_anchor_requires_unpaired_loader_complete_coverage(self) -> None:
+        base = {
+            "path": "review-input/images/" + "a" * 64 + ".png",
+            "capture_id": "phase0-smoke.client_a.baseline",
+            "kind": "phase0-smoke.client_a.baseline",
+            "expectation": "Expected baseline",
+        }
+        manifest = [
+            {
+                **base,
+                "label": "fabric-1.20.1/phase0-smoke/client_a/baseline",
+            },
+            {
+                **base,
+                "label": "forge-1.20.1/phase0-smoke/client_a/baseline",
+            },
+        ]
+        self.assertEqual(manifest, validate_semantic_anchor_manifest(manifest))
+
+        with self.assertRaisesRegex(VisualEvidenceError, "identical complete"):
+            validate_semantic_anchor_manifest(manifest[:1])
+        with self.assertRaisesRegex(VisualEvidenceError, "cannot contain reference"):
+            validate_semantic_anchor_manifest(
+                [{**manifest[0], "reference_path": manifest[0]["path"]}, manifest[1]]
+            )
+
     def test_paired_manifest_preserves_lossless_raw_reference_pixels(self) -> None:
         capture_id = "phase0-smoke.client_a.baseline"
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
@@ -1063,7 +1090,8 @@ class VisualReviewContractTest(unittest.TestCase):
         self.clean = [
             {
                 "label": "lane/scenario/client/step",
-                "matches": True,
+                "semantic_valid": True,
+                "matches_reference": None,
                 "visible": "Expected player",
                 "anomalies": [],
                 "defect": False,
@@ -1202,7 +1230,10 @@ class VisualReviewContractTest(unittest.TestCase):
             (self.manifest, []),
             (self.manifest, self.clean + self.clean),
             (self.manifest, [{**self.clean[0], "extra": True}]),
-            (self.manifest, [{**self.clean[0], "matches": False, "defect": False}]),
+            (
+                self.manifest,
+                [{**self.clean[0], "semantic_valid": False, "defect": False}],
+            ),
             (self.manifest, [{**self.clean[0], "label": "unexpected"}]),
         )
         for manifest, report in cases:
