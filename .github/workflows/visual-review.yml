@@ -1,9 +1,10 @@
 name: AI visual review
 
-# This advisory workflow authenticates and curates immutable review capsules from protected code.
-# Ordinary trusted runs arrive through workflow_run; GITHUB_TOKEN-driven version ports use the
-# explicit authenticated dispatch because recursive workflow events are suppressed. A separate
-# globally serialized drainer owns the Claude credential. Neither path is a required conclusion.
+# This workflow authenticates and curates immutable review capsules from protected code. Ordinary
+# trusted runs arrive through workflow_run; GITHUB_TOKEN-driven version ports use the explicit
+# authenticated dispatch because recursive workflow events are suppressed. A separate globally
+# serialized drainer owns the Claude credential. Reports are not required gate conclusions; only a
+# clean synchronized 1.20.1 report can mint the certificate that releases the later-version wave.
 on:
   repository_dispatch:
     types:
@@ -119,13 +120,22 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
             [[ "$(jq -r .event <<< "$source_run")" == workflow_dispatch ]]
             [[ "$source_branch" == automation/sync/* ]]
+            anchor_branch="$(jq -er '
+              .unit_test_version as $version |
+              select($version == "1.20.1") |
+              select(([.artifacts[] |
+                select(.artifact_version == $version) | .loader] |
+                sort | unique) == ["fabric", "forge"]) |
+              .project.release_branch |
+              select(type == "string" and length > 0)
+            ' release/release-matrix.json)"
 
             # A shared visual-review infrastructure change is exercised once on its source PR.
-            # Its generated version ports still need Build and Packaged E2E, but reviewing the
-            # same unaffected screenshots for every release branch would spend model capacity
-            # without adding product signal. Skip only an exact, bot-owned sync PR whose complete
-            # server-side file inventory is confined to this orchestration, its contracts, and
-            # documentation. Any ambiguity or any renamed runtime path falls through to review.
+            # Its generated non-anchor ports still need Build and Packaged E2E, but reviewing the
+            # same unaffected screenshots for every later release branch would spend model
+            # capacity without adding product signal. Skip only an exact, bot-owned non-anchor PR
+            # whose complete server-side file inventory is confined to this orchestration, its
+            # contracts, and documentation. Any ambiguity or renamed runtime path falls through.
             associated_pulls="$(gh api -H 'Accept: application/vnd.github+json' \
               "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20" \
               2>/dev/null || true)"
@@ -149,6 +159,8 @@ jobs:
                 "repos/$GITHUB_REPOSITORY/pulls/$source_pr_number" \
                 2>/dev/null || true)"
               changed_files=""
+              source_pr_base=""
+              source_pr_merged=""
               if [[ -n "$source_pr" ]] && jq -e \
                   --arg branch "$source_branch" \
                   --arg repository "$GITHUB_REPOSITORY" \
@@ -159,10 +171,24 @@ jobs:
                    .head.ref == $branch and .head.sha == $sha and
                    .head.repo.full_name == $repository and
                    .base.repo.full_name == $repository and
+                   (.base.ref | type == "string" and length > 0) and
+                   (.merged | type == "boolean") and
                    .user.login == "github-actions[bot]" and
                    (.changed_files | type == "number" and . > 0 and . <= 100)' \
                   <<< "$source_pr" > /dev/null; then
                 changed_files="$(jq -r .changed_files <<< "$source_pr")"
+                source_pr_base="$(jq -er .base.ref <<< "$source_pr")"
+                source_pr_merged="$(jq -er \
+                  '.merged | if . then "true" else "false" end' <<< "$source_pr")"
+              fi
+              if [[ "$source_pr_base" == "$anchor_branch" \
+                  && "$source_pr_merged" != true ]]; then
+                # The exact merge handler sends another authenticated request after the anchor
+                # merge is known. Do not spend model capacity or risk consuming a clean report
+                # while the independent Build gate is still pending.
+                printf 'Deferring semantic anchor review until PR %s is merged\n' \
+                  "$source_pr_number"
+                exit 0
               fi
               if [[ "$changed_files" =~ ^[1-9][0-9]*$ ]]; then
                 source_pr_files="$(gh api \
@@ -176,7 +202,11 @@ jobs:
                     --files "$source_pr_files_path" \
                     --changed-files "$changed_files")"
                   [[ "$impact" == review || "$impact" == skip ]]
-                  if [[ "$impact" == skip ]]; then
+                  # Even an infrastructure-only anchor port must run the full semantic review.
+                  # It certifies the complete current master generation, which may contain a
+                  # previously pending runtime change outside this PR's immediate file list.
+                  if [[ "$impact" == skip \
+                      && "$source_pr_base" != "$anchor_branch" ]]; then
                     printf 'Ignoring infrastructure-only visual review sync PR %s (%s files)\n' \
                       "$source_pr_number" "$changed_files"
                     exit 0
@@ -343,9 +373,9 @@ jobs:
           -r scripts/pages/requirements.txt
 
       # This job has no secrets. It reauthenticates the full protected job graph, downloads each
-      # immutable artifact by numeric ID, then passes only decoded, content-addressed PNG pairs
-      # onward. Later versions use current authenticated Fabric 1.20.1 Pages evidence; the 1.20.1
-      # source itself is cross-paired between its authenticated Fabric and Forge lanes.
+      # immutable artifact by numeric ID, then passes only decoded, content-addressed PNGs onward.
+      # Later versions use current authenticated Fabric 1.20.1 Pages evidence; the 1.20.1 source
+      # itself is curated without a reference and requires complete Fabric/Forge capture parity.
       - name: Validate and curate exact packaged evidence
         id: evidence
         shell: bash
@@ -451,6 +481,28 @@ jobs:
           REFERENCE_ARTIFACT_NODE="$(jq -er .artifact_node <<< "$reference_identity")"
           REFERENCE_VERSION="$(jq -er .version <<< "$reference_identity")"
           REFERENCE_LOADER="$(jq -er .loader <<< "$reference_identity")"
+          source_branch="$(jq -er .head_branch <<< "$source_run")"
+          source_release_branch="$(jq -er .project.release_branch "$source_matrix")"
+          review_mode=reference-comparison
+          master_source_sha=''
+          if jq -e \
+              --arg reference_version "$REFERENCE_VERSION" \
+              '(.include | length == 2) and
+               ([.include[].runtime_version] | unique) == [$reference_version] and
+               ([.include[].loader] | sort) == ["fabric", "forge"]' \
+              "$RUNNER_TEMP/expected-e2e-matrix.json" > /dev/null; then
+            [[ "$source_release_branch" == "$REFERENCE_BRANCH" ]]
+            review_mode=anchor-semantic
+            read -r -a source_commit <<< "$(git rev-list --parents -n 1 "$SOURCE_SHA")"
+            if [[ "${#source_commit[@]}" -eq 3 ]] \
+                && git merge-base --is-ancestor \
+                  "${source_commit[2]}" "$IMPLEMENTATION_SHA"; then
+              master_source_sha="${source_commit[2]}"
+            fi
+          fi
+          printf 'review_mode=%s\n' "$review_mode" >> "$GITHUB_OUTPUT"
+
+          if [[ "$review_mode" == reference-comparison ]]; then
           reference_output="$(mktemp "$RUNNER_TEMP/reference-selection.XXXXXX")"
           reference_contract="$(mktemp "$RUNNER_TEMP/reference-contract.XXXXXX.json")"
           reference_error="$(mktemp "$RUNNER_TEMP/reference-selection.XXXXXX.err")"
@@ -600,6 +652,15 @@ jobs:
             <<< "$reference_target_run" > /dev/null
           [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$REFERENCE_BRANCH" \
             --jq .commit.sha)" == "$REFERENCE_SHA" ]]
+          else
+            REFERENCE_ARTIFACT_ID=0
+            REFERENCE_ARTIFACT_NAME=''
+            REFERENCE_ARTIFACT_RUN_ID=0
+            REFERENCE_ARTIFACT_SIZE=0
+            REFERENCE_SHA=''
+            reference_artifact_digest=''
+            reference_manifest_sha256=''
+          fi
 
           raw_root="$RUNNER_TEMP/raw-review-evidence"
           mkdir -p "$raw_root/artifacts" "$raw_root/e2e-out/profiles"
@@ -687,23 +748,34 @@ jobs:
               <<< "$ARTIFACT_INVENTORY"
           )
 
-          python3 e2e/visual_review.py \
-            --all \
-            --e2e-root "$raw_root/e2e-out" \
-            --reference-evidence-root "$reference_selected" \
-            --reference-branch "$REFERENCE_BRANCH" \
-            --reference-artifact-node "$REFERENCE_ARTIFACT_NODE" \
-            --curate-output "$RUNNER_TEMP/review-input" \
+          review_arguments=(
+            --all
+            --e2e-root "$raw_root/e2e-out"
+            --curate-output "$RUNNER_TEMP/review-input"
+          )
+          if [[ "$review_mode" == anchor-semantic ]]; then
+            review_arguments+=(--semantic-anchor)
+          else
+            review_arguments+=(
+              --reference-evidence-root "$reference_selected"
+              --reference-branch "$REFERENCE_BRANCH"
+              --reference-artifact-node "$REFERENCE_ARTIFACT_NODE"
+            )
+          fi
+          python3 e2e/visual_review.py "${review_arguments[@]}" \
             > "$RUNNER_TEMP/manifest.stdout.json"
           cmp --silent \
             "$RUNNER_TEMP/manifest.stdout.json" \
             "$RUNNER_TEMP/review-input/visual-review-manifest.json"
-          python3 e2e/check_visual_review.py \
-            --validate-input-only \
-            --require-paired \
-            --manifest \
-              "$RUNNER_TEMP/review-input/visual-review-manifest.json" \
+          validation_arguments=(
+            --validate-input-only
+            --manifest "$RUNNER_TEMP/review-input/visual-review-manifest.json"
             --input-root "$RUNNER_TEMP/review-input"
+          )
+          if [[ "$review_mode" == reference-comparison ]]; then
+            validation_arguments+=(--require-paired)
+          fi
+          python3 e2e/check_visual_review.py "${validation_arguments[@]}"
 
           manifest_sha256="$(sha256sum \
             "$RUNNER_TEMP/review-input/visual-review-manifest.json" | cut -d ' ' -f 1)"
@@ -714,45 +786,53 @@ jobs:
             -printf '%s\n' | awk '{ total += $1 } END { print total + 0 }')"
           frame_count="$(jq length \
             "$RUNNER_TEMP/review-input/visual-review-manifest.json")"
+          visual_reference=null
+          if [[ "$review_mode" == reference-comparison ]]; then
+            visual_reference="$(jq -n \
+              --arg artifact_digest "$reference_artifact_digest" \
+              --arg artifact_name "$REFERENCE_ARTIFACT_NAME" \
+              --arg artifact_node "$REFERENCE_ARTIFACT_NODE" \
+              --arg branch "$REFERENCE_BRANCH" \
+              --arg loader "$REFERENCE_LOADER" \
+              --arg manifest_sha256 "$reference_manifest_sha256" \
+              --arg sha "$REFERENCE_SHA" \
+              --arg version "$REFERENCE_VERSION" \
+              --argjson artifact_id "$REFERENCE_ARTIFACT_ID" \
+              --argjson artifact_run_id "$REFERENCE_ARTIFACT_RUN_ID" \
+              --argjson artifact_size "$REFERENCE_ARTIFACT_SIZE" \
+              '{artifact_id:$artifact_id, artifact_name:$artifact_name,
+                artifact_run_id:$artifact_run_id,
+                artifact_size_in_bytes:$artifact_size,
+                artifact_digest:$artifact_digest, branch:$branch, sha:$sha,
+                artifact_node:$artifact_node, version:$version, loader:$loader,
+                evidence_kind:"raw-png", manifest_sha256:$manifest_sha256}')"
+          fi
           jq -n \
             --arg implementation_sha "$IMPLEMENTATION_SHA" \
             --arg manifest_sha256 "$manifest_sha256" \
+            --arg master_source_sha "$master_source_sha" \
             --arg matrix_kind "$matrix_kind" \
-            --arg reference_artifact_digest "$reference_artifact_digest" \
-            --arg reference_artifact_name "$REFERENCE_ARTIFACT_NAME" \
-            --arg reference_artifact_node "$REFERENCE_ARTIFACT_NODE" \
-            --arg reference_branch "$REFERENCE_BRANCH" \
-            --arg reference_loader "$REFERENCE_LOADER" \
-            --arg reference_manifest_sha256 "$reference_manifest_sha256" \
-            --arg reference_sha "$REFERENCE_SHA" \
-            --arg reference_version "$REFERENCE_VERSION" \
+            --arg review_mode "$review_mode" \
             --arg scenario_contract_sha256 \
               "$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)" \
+            --arg source_branch "$source_branch" \
             --arg source_sha "$SOURCE_SHA" \
             --argjson artifact_inventory "$ARTIFACT_INVENTORY" \
             --argjson frame_count "$frame_count" \
             --argjson image_bytes "$image_bytes" \
             --argjson image_count "$image_count" \
             --argjson job_graph "$(cat "$RUNNER_TEMP/e2e-job-graph.json")" \
-            --argjson reference_artifact_id "$REFERENCE_ARTIFACT_ID" \
-            --argjson reference_artifact_run_id "$REFERENCE_ARTIFACT_RUN_ID" \
-            --argjson reference_artifact_size "$REFERENCE_ARTIFACT_SIZE" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
-            '{schema_version:3, source_run_id:$source_run_id,
-              source_sha:$source_sha, implementation_sha:$implementation_sha,
-              matrix_kind:$matrix_kind,
+            --argjson visual_reference "$visual_reference" \
+            '{schema_version:4, source_run_id:$source_run_id,
+              source_branch:$source_branch, source_sha:$source_sha,
+              master_source_sha:($master_source_sha |
+                if length == 40 then . else null end),
+              implementation_sha:$implementation_sha, matrix_kind:$matrix_kind,
+              review_mode:$review_mode,
               scenario_contract_sha256:$scenario_contract_sha256,
               artifact_inventory:$artifact_inventory, job_graph:$job_graph,
-              visual_reference:{artifact_id:$reference_artifact_id,
-                artifact_name:$reference_artifact_name,
-                artifact_run_id:$reference_artifact_run_id,
-                artifact_size_in_bytes:$reference_artifact_size,
-                artifact_digest:$reference_artifact_digest,
-                branch:$reference_branch, sha:$reference_sha,
-                artifact_node:$reference_artifact_node,
-                version:$reference_version, loader:$reference_loader,
-                evidence_kind:"raw-png",
-                manifest_sha256:$reference_manifest_sha256},
+              visual_reference:$visual_reference,
               manifest_sha256:$manifest_sha256, frame_count:$frame_count,
               image_count:$image_count, image_bytes:$image_bytes}' \
             > "$RUNNER_TEMP/curation-proof.json"
