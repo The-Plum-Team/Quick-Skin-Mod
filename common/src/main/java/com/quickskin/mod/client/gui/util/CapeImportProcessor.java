@@ -2,6 +2,7 @@ package com.quickskin.mod.client.gui.util;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.quickskin.mod.common.data.AnimationMetadata;
+import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.HashUtil;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.common.util.SafeImageReader;
@@ -173,7 +174,7 @@ public final class CapeImportProcessor {
             int frameCount,
             BufferedImage vanillaElytra
     ) throws IOException {
-        if (atlas == null || vanillaElytra == null) {
+        if (atlas == null) {
             return atlas;
         }
 
@@ -191,54 +192,35 @@ public final class CapeImportProcessor {
                     atlas.getSubimage(0, y, atlas.getWidth(), frameHeight));
             anyFrameNeedsElytra |= needsElytra[frameIndex];
         }
-        if (!anyFrameNeedsElytra) {
-            return atlas;
-        }
-
-        BufferedImage composite = new BufferedImage(
-                atlas.getWidth(), atlas.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        Graphics2D graphics = composite.createGraphics();
-        try {
-            graphics.setRenderingHint(
-                    RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            graphics.setComposite(AlphaComposite.Clear);
-            graphics.fillRect(0, 0, composite.getWidth(), composite.getHeight());
-            graphics.setComposite(AlphaComposite.SrcOver);
-            for (int frameIndex = 0; frameIndex < frameCount; frameIndex++) {
-                int y = frameIndex * frameHeight;
-                if (needsElytra[frameIndex]) {
-                    graphics.drawImage(vanillaElytra, 0, y, atlas.getWidth(), y + frameHeight,
-                            0, 0, vanillaElytra.getWidth(), vanillaElytra.getHeight(), null);
+        BufferedImage composite = atlas;
+        if (anyFrameNeedsElytra && vanillaElytra != null) {
+            composite = new BufferedImage(
+                    atlas.getWidth(), atlas.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = composite.createGraphics();
+            try {
+                graphics.setRenderingHint(
+                        RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+                graphics.setComposite(AlphaComposite.Clear);
+                graphics.fillRect(0, 0, composite.getWidth(), composite.getHeight());
+                graphics.setComposite(AlphaComposite.SrcOver);
+                for (int frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                    int y = frameIndex * frameHeight;
+                    if (needsElytra[frameIndex]) {
+                        graphics.drawImage(vanillaElytra, 0, y, atlas.getWidth(), y + frameHeight,
+                                0, 0, vanillaElytra.getWidth(), vanillaElytra.getHeight(), null);
+                    }
+                    graphics.drawImage(
+                            atlas.getSubimage(0, y, atlas.getWidth(), frameHeight), 0, y, null);
                 }
-                graphics.drawImage(atlas.getSubimage(0, y, atlas.getWidth(), frameHeight), 0, y, null);
+            } finally {
+                graphics.dispose();
             }
-        } finally {
-            graphics.dispose();
         }
-        return composite;
+        return CapeElytraSilhouette.maskedCopy(composite, frameCount);
     }
 
     public static boolean isElytraAreaTransparent(BufferedImage image) {
-        if (image == null || image.getWidth() < 2 || image.getHeight() < 1) {
-            return true;
-        }
-        double scale = image.getWidth() / 64.0;
-        int startX = (int) (22 * scale);
-        int width = Math.max(1, (int) (32 * scale));
-        int height = Math.max(1, (int) (16 * scale));
-
-        for (int xSample = 0; xSample < 5; xSample++) {
-            for (int ySample = 0; ySample < 5; ySample++) {
-                int x = startX + (xSample * Math.max(0, width - 1) / 4);
-                int y = ySample * Math.max(0, height - 1) / 4;
-                x = Math.min(Math.max(0, x), image.getWidth() - 1);
-                y = Math.min(Math.max(0, y), image.getHeight() - 1);
-                if (((image.getRGB(x, y) >>> 24) & 0xFF) > 10) {
-                    return false;
-                }
-            }
-        }
-        return true;
+        return CapeElytraSilhouette.isElytraAreaTransparent(image);
     }
 
     public static Path uniqueTarget(Path source, Path targetDirectory, String extension)
