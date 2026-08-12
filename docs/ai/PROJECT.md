@@ -81,7 +81,9 @@ immutable workflow and governance activation contract.
   an exact documentation/site/administration-only diff. Production, loader, overlay, harness,
   contract, visual oracle, matrix, Gradle, workflow, classifier, mixed, malformed, or unknown
   changes always execute the complete contract-selected suite. The dispatched workflow and result
-  handler independently revalidate that decision before publishing the stable status context.
+  handler independently revalidate that decision before publishing the stable status context. The
+  automatic 1.20.1 anchor port is always `full`, even when its immediate diff would otherwise be
+  eligible for N/A, because it certifies the cumulative current `master` generation.
 - The marked README release-status table is generated from discovered release branches and each
   branch's matrix. Its workflow updates one idempotent automation PR and never pushes directly to
   `master`. Do not edit its rows manually or add a branch/version list to its workflow.
@@ -97,29 +99,38 @@ immutable workflow and governance activation contract.
   retire older caches plus the consumed handoff.
   Never delete the fallback before its replacement succeeds, introduce a second version list,
   publish logs/crash reports, or make Pages a protected release check.
-- Credential-bearing AI visual judgment runs in its own authenticated advisory workflow. The run
-  pins the exact workflow `github.sha`, authenticates the complete protected job graph, and curates
-  raw artifacts on a secretless runner. Every later-version candidate capture is paired by semantic
-  `capture_id` with authenticated current-head lossless Fabric 1.20.1 Pages handoff evidence.
-  Within 1.20.1, Fabric and Forge are paired in both directions and remain subject to semantic
-  review even when their pixels match; no review-tier filter may omit a pair and the compact WebP
-  cache is not an AI oracle. Only canonical, same-sized, content-addressed RGB PNG pairs, a bounded
-  manifest, and provenance enter a seven-day
-  durable queue; raw E2E ZIPs never share a runner with the credential. A globally serialized
-  protected drainer skips byte-identical non-anchor pairs, triages bounded chunks with Sonnet, and
-  sends only suspicious or uncertain pairs to bounded Opus verification. It keeps provider output
-  private,
-  uploads only the protected normalized report or a sanitized retry marker, and deletes a completed
-  queue entry by exact artifact id. A bot-owned version-port PR whose authenticated complete diff
-  contains only the visual-review workflows, protected CI contracts, and documentation is skipped:
-  the source change exercises that infrastructure once, while repeating unchanged product images
-  across every port would add cost rather than visual signal. Any ambiguous, renamed, or runtime
-  path fails open to normal review. This advisory path must never delay, weaken, or become part of
-  the required Packaged E2E conclusion.
+- Every automatic push to `master` propagates in two waves. The synchronizer first targets only
+  the matrix-derived Minecraft 1.20.1 release branch. Its Fabric and Forge screenshots are curated
+  without any reference image and reviewed independently against every contract expectation, so a
+  defect shared by both loaders cannot certify itself. The protected report records semantic
+  validity separately from reference similarity. Only a completely clean, loader-complete report
+  for the exact bot-owned synchronization commit may produce a seven-day semantic certificate,
+  and only after its exact-tree merge is the current 1.20.1 branch head. The certificate binds the
+  `master` source SHA, tested and merged anchor SHAs, source run, protected implementation,
+  scenario contract, manifest, and normalized report. A protected `repository_dispatch`
+  reauthenticates that artifact and releases every other discovered version branch. A stale,
+  malformed, incomplete, defective, unavailable, or superseded certificate releases nothing.
+  No immediate-diff exception may fan out directly: a documentation-only tip can contain an older
+  runtime change whose certification is still pending or failed. An explicit manual exact target
+  remains an operator recovery path.
+- Credential-bearing AI visual judgment pins the exact workflow `github.sha`, authenticates the
+  complete protected job graph, and curates raw artifacts on a secretless runner. After the anchor
+  is certified, every later-version candidate is paired by semantic `capture_id` with authenticated
+  current-head lossless Fabric 1.20.1 Pages evidence; the compact WebP cache is never an AI oracle.
+  Only canonical content-addressed RGB PNGs, a bounded manifest, and provenance enter the durable
+  queue; raw E2E ZIPs never share a runner with the credential. A globally serialized protected
+  drainer triages bounded chunks with Sonnet, sends suspicious or uncertain frames to bounded Opus
+  verification, keeps provider output private, uploads only the protected normalized report or a
+  sanitized retry marker, and deletes a settled queue entry by exact artifact id. Build and
+  Packaged E2E remain the required exact-head checks for every individual port, and their
+  conclusions never depend on model output. The semantic certificate gates only scheduling of the
+  cross-version wave: provider failure or a semantic defect deliberately delays that wave instead
+  of blessing an unverified baseline.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
-  named exceptions are the seven-day queued visual-review capsule and three 90-day current-state
-  artifacts: the SHA-bound Pages cache, the matrix-derived lossless Fabric 1.20.1 anchor handoff,
-  and the immutable `release-<release-id>` bundle. The release bundle spans protected environment
+  named exceptions are the seven-day queued visual-review capsules and semantic certificates plus
+  three 90-day current-state artifacts: the SHA-bound Pages cache, the matrix-derived lossless
+  Fabric 1.20.1 anchor handoff, and the immutable `release-<release-id>` bundle. The release bundle
+  spans protected environment
   approvals and provides bounded recovery for an interrupted publication. After a successful Pages
   replacement, protected rotation deletes by exact artifact ID the superseded cache, ordinary
   consumed `pages-e2e-<branch>` handoffs, older lossless anchor generations, Pages fan-in artifacts,
