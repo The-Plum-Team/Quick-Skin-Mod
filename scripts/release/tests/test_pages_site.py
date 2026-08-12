@@ -309,21 +309,12 @@ class PagesSiteTest(unittest.TestCase):
                     for comparison_contract in pairs:
                         first_step = comparison_contract.first_step
                         second_step = comparison_contract.second_step
-                        comparison = {
-                            "changed_fraction": 1.0,
-                            "rms_difference": (
-                                71.573
-                                if comparison_contract.region is not None
-                                else 98.694
-                            ),
-                            "required_changed_fraction": (
-                                comparison_contract.minimum_changed_fraction
-                            ),
-                        }
-                        if comparison_contract.region is not None:
-                            comparison["region"] = list(
-                                comparison_contract.region
-                            )
+                        comparison = packaged_runtime.compare_screenshots(
+                            screenshots / f"{first_step}.png",
+                            screenshots / f"{second_step}.png",
+                            comparison_contract.minimum_changed_fraction,
+                            comparison_contract.region,
+                        )
                         comparison_metrics[f"{first_step}->{second_step}"] = comparison
                     reports[role] = {
                         "version": version,
@@ -390,7 +381,7 @@ class PagesSiteTest(unittest.TestCase):
             expected_target_sha="2" * 40,
         )
 
-        self.assertEqual(82, len(manifest["frames"]))
+        self.assertEqual(84, len(manifest["frames"]))
         self.assertEqual(8, len(manifest["lanes"]))
         self.assertEqual(
             self.catalog.contract_sha256,
@@ -771,7 +762,7 @@ class PagesSiteTest(unittest.TestCase):
         )
 
         self.assertEqual(2, summary["versions"])
-        self.assertEqual(164, summary["frames"])
+        self.assertEqual(168, summary["frames"])
         self.assertTrue((output / ".nojekyll").is_file())
         self.assertTrue((output / "index.html").is_file())
         self.assertTrue((output / "e2e" / "index.html").is_file())
@@ -781,8 +772,8 @@ class PagesSiteTest(unittest.TestCase):
             (output / "e2e" / "gallery-data.json").read_text(encoding="utf-8")
         )
         self.assertEqual(["1.21.1", "1.20.1"], [row["version"] for row in site_data["releases"]])
-        self.assertEqual(164, len(gallery["frames"]))
-        self.assertEqual(164, len({frame["frame_id"] for frame in gallery["frames"]}))
+        self.assertEqual(168, len(gallery["frames"]))
+        self.assertEqual(168, len({frame["frame_id"] for frame in gallery["frames"]}))
         sample = gallery["frames"][0]
         published = output / "e2e" / sample["image"]
         self.assertEqual(sample["published_file_sha256"], published.stem)

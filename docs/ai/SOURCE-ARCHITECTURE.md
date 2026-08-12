@@ -121,11 +121,13 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   output. `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Sonnet
   triage, runs independent loader-grouped chunks concurrently, pipelines suspicious or uncertain
   results into concurrent bounded Opus verification, cancels outstanding calls after the first
-  confirmed defect, skips byte-identical certified comparison pairs, and keeps raw provider output
-  private. `e2e/visual_review_cache.py` validates the rolling paired-only verdict cache: a hit binds
-  candidate/reference pixels, expectation, capture and loader identity, scenario contract, release
-  matrix, reviewer code, prompts, models, mode, and chunk policy; unpaired semantic anchors never
-  consume it.
+  confirmed defect, publishes a protected exact-generation block and cancels sibling drains, skips
+  byte-identical certified comparison pairs, and keeps raw provider output private.
+  `e2e/visual_review_cache.py` validates and combines bounded immutable paired-only verdict
+  cache shards: a hit binds candidate/reference pixels, expectation, capture and loader identity,
+  scenario contract, release matrix, reviewer code, prompts, models, mode, and chunk policy;
+  unpaired semantic anchors never consume it. Parallel drains may briefly publish sibling shards;
+  a later protected successor combines and retires every authenticated shard it consumed.
 - `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
   an unpaired, loader-complete, completely clean 1.20.1 report and binds its source/proof/manifest/
   report digests to exact Git identities supplied by protected workflow checks. The version
@@ -149,10 +151,14 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
   the oldest eligible source except that a completed certifiable automatic 1.20.1 anchor preempts
-  advisory work. Queue state lives in Actions artifacts rather than pending workflow
-  runs, so GitHub concurrency coalescing cannot lose a review. The fixed drain concurrency group
-  covers selection through exact-id cleanup; overlapping wakes therefore cannot reserve the same
-  oldest capsule before either reaches the model job.
+  advisory work. An exact wake may select only its requested authenticated artifact. Queue state
+  lives in Actions artifacts rather than pending workflow runs, so GitHub concurrency coalescing
+  cannot lose a review. Exact artifact IDs define drain concurrency groups: duplicate wakes cannot
+  overlap, while distinct capsules run in parallel. Scheduled/manual recovery sweeps share a
+  separate lock and only redispatch the selected exact identity, so they never review a capsule
+  concurrently with its direct wake. Queue selection also authenticates generation-block artifacts
+  from failed/in-progress protected drains and skips only inputs carrying the exact blocked master
+  generation; the marker's owner still binds it to its exact protected reviewer implementation.
 - `scripts/ci/visual_review_impact.py` is the narrow fail-open cost filter for replicated version
   ports. Protected automation supplies a complete, bounded GitHub PR file inventory; only the two
   visual-review workflows, the classifier itself, CI tests, and documentation may skip another
