@@ -227,18 +227,27 @@ drainer authenticates the oldest eligible entry, then enters one repository-wide
 group. The queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without
 losing reviews.
 
-The runner sends every unpaired 1.20.1 frame to Sonnet. In later paired reviews it may mark a
-content-addressed byte-identical candidate/reference pair clean without a model call. Sonnet
-triages the remaining frames in chunks of at most eight; a concern or confidence below high is
-independently rechecked by Opus in chunks of at most four. Each call is paced and retried within a
-bound. Both models can read only the bounded manifest/images; stdout is captured without granting a
-write or shell tool. Protected code validates exact label coverage, text/list bounds, decision
-coherence, capsule identity, and two independent final fields: `semantic_valid` and nullable
-`matches_reference`. A reference match can never hide a semantic failure. It uploads only a
-schema-normalized report; raw provider output stays private. Transient provider failures create
-only a sanitized one-day cooldown marker, leaving the queue entry for retry while other entries
-progress. Terminal validation/configuration failures are marked and retired. An independent cleanup
-job deletes a settled entry by exact artifact id. The final small report remains for one day.
+The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
+over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
+candidate/reference pair clean without a model call. It may also reuse a protected verdict only
+when candidate and reference PNG digests, expectation, capture identity, loader artifact, scenario
+contract, release matrix, prompts, reviewer/checker/cache code, models, mode, and chunk policy all
+match exactly;
+unpaired anchor semantics are never cached. Sonnet triages the remaining frames in loader-sibling
+chunks of at most eight. All independent chunks run concurrently, and each concern or confidence
+below high is independently rechecked by Opus in concurrent chunks of at most four as soon as its
+Sonnet result is available. Provider throttling is handled by bounded retries rather than serial
+launch pacing. Once any Opus chunk confirms a defect, outstanding calls are cancelled and the
+explicit blocking-partial result cannot certify or release anything. Both models can read only the
+bounded manifest/images; stdout is captured without granting a write or shell tool. Protected code
+validates exact label coverage, text/list bounds, decision coherence, capsule identity, and two
+independent final fields: `semantic_valid` and nullable `matches_reference`. A reference match can
+never hide a semantic failure. It uploads only a schema-normalized report; raw provider output stays
+private. Transient provider failures create only a sanitized one-day cooldown marker, leaving the
+queue entry for retry while other entries progress. Terminal validation/configuration failures are
+marked and retired. An independent cleanup job deletes a settled entry by exact artifact id. The
+final small report remains for one day; the single rolling exact-policy verdict cache remains for
+seven days and is replaced only after a protected successor upload.
 
 A completely clean synchronized 1.20.1 report creates a seven-day certificate only after the
 bot-owned anchor PR is merged and that exact-tree merge is still the current anchor head. The

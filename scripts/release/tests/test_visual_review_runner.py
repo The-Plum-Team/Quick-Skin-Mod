@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import threading
 import unittest
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,13 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "e2e"))
 
-from check_visual_review import ReviewError, triage_schema, validate_triage  # noqa: E402
+from check_visual_review import (  # noqa: E402
+    ReviewError,
+    render,
+    triage_schema,
+    validate_blocking_partial,
+    validate_triage,
+)
 from visual_review_runner import (  # noqa: E402
     SYNTHETIC_COMPARISON_CLEAN_VISIBLE,
     SYNTHETIC_IDENTICAL_VISIBLE,
@@ -78,6 +85,24 @@ class VisualReviewRunnerTest(unittest.TestCase):
         with self.assertRaises(ReviewError):
             build_review_plan(self.manifest, triage_chunk_size=9)
 
+    def test_plan_keeps_loader_siblings_in_the_same_chunk(self) -> None:
+        interleaved = [
+            unpaired("fabric-1.20.1/full/client_a/first", "review-input/images/a.png"),
+            unpaired("fabric-1.20.1/full/client_a/second", "review-input/images/b.png"),
+            unpaired("forge-1.20.1/full/client_a/first", "review-input/images/c.png"),
+            unpaired("forge-1.20.1/full/client_a/second", "review-input/images/d.png"),
+        ]
+
+        chunks = build_review_plan(interleaved, triage_chunk_size=2)["triage_chunks"]
+
+        self.assertEqual(
+            [
+                [interleaved[0]["label"], interleaved[2]["label"]],
+                [interleaved[1]["label"], interleaved[3]["label"]],
+            ],
+            [[item["label"] for item in chunk] for chunk in chunks],
+        )
+
     def test_unpaired_anchor_always_receives_semantic_review(self) -> None:
         anchor = unpaired(
             "fabric-1.20.1/full/client_a/anchor",
@@ -113,6 +138,51 @@ class VisualReviewRunnerTest(unittest.TestCase):
         self.assertIsNone(verdicts[0]["matches_reference"])
         self.assertEqual(0, stats["identical"])
         self.assertEqual(1, stats["triaged"])
+        self.assertEqual(0, stats["cached"])
+
+    def test_independent_triage_chunks_run_concurrently(self) -> None:
+        manifest = [
+            unpaired(
+                f"fabric-1.20.1/full/client_a/frame_{index}",
+                f"review-input/images/{index}.png",
+            )
+            for index in range(2)
+        ]
+        rendezvous = threading.Barrier(2, timeout=2)
+        active = 0
+        maximum_active = 0
+        lock = threading.Lock()
+
+        def provider(
+            stage: str,
+            _chunk_index: int,
+            chunk: list[dict[str, Any]],
+            _schema: dict[str, Any],
+        ) -> list[dict[str, Any]]:
+            nonlocal active, maximum_active
+            self.assertEqual("triage", stage)
+            with lock:
+                active += 1
+                maximum_active = max(maximum_active, active)
+            rendezvous.wait()
+            with lock:
+                active -= 1
+            return [
+                {
+                    "label": chunk[0]["label"],
+                    "decision": "clean",
+                    "confidence": "high",
+                    "anomalies": [],
+                }
+            ]
+
+        verdicts, stats = execute_review(
+            manifest, provider, triage_chunk_size=1, max_parallel_calls=2
+        )
+
+        self.assertEqual(2, maximum_active)
+        self.assertEqual(2, len(verdicts))
+        self.assertEqual(0, stats["stopped_early"])
 
     def test_two_stage_review_escalates_only_non_high_clean_results(self) -> None:
         calls: list[tuple[str, list[str]]] = []
@@ -154,13 +224,8 @@ class VisualReviewRunnerTest(unittest.TestCase):
 
         verdicts, stats = execute_review(self.manifest, provider)
 
-        self.assertEqual(
-            [item["label"] for item in self.manifest],
-            [item["label"] for item in verdicts],
-        )
-        self.assertEqual(SYNTHETIC_IDENTICAL_VISIBLE, verdicts[0]["visible"])
-        self.assertEqual(SYNTHETIC_COMPARISON_CLEAN_VISIBLE, verdicts[1]["visible"])
-        self.assertTrue(verdicts[2]["defect"])
+        self.assertEqual([self.manifest[2]["label"]], [item["label"] for item in verdicts])
+        self.assertTrue(verdicts[0]["defect"])
         self.assertEqual(
             [
                 ("triage", [self.manifest[1]["label"], self.manifest[2]["label"]]),
@@ -173,13 +238,67 @@ class VisualReviewRunnerTest(unittest.TestCase):
                 "frames": 3,
                 "paired": 1,
                 "identical": 1,
+                "cached": 0,
                 "triaged": 2,
                 "triage_chunks": 1,
                 "escalated": 1,
                 "verify_chunks": 1,
+                "reviewed": 1,
+                "stopped_early": 1,
             },
             stats,
         )
+
+    def test_cached_defect_blocks_without_calling_a_model(self) -> None:
+        cached = {
+            self.manifest[2]["label"]: {
+                "label": self.manifest[2]["label"],
+                "visible": "The cape is visibly square.",
+                "semantic_valid": False,
+                "matches_reference": False,
+                "anomalies": ["The expected elytra shape is missing."],
+                "defect": True,
+            }
+        }
+
+        def provider(*_args: Any, **_kwargs: Any) -> list[dict[str, Any]]:
+            self.fail("a cached blocking defect must stop before provider calls")
+
+        verdicts, stats = execute_review(
+            self.manifest, provider, cache_hits=cached
+        )
+
+        self.assertEqual([self.manifest[2]["label"]], [item["label"] for item in verdicts])
+        self.assertEqual(1, stats["cached"])
+        self.assertEqual(1, stats["stopped_early"])
+
+    def test_partial_reports_accept_only_confirmed_defects_and_summarize_scope(self) -> None:
+        defect = {
+            "label": self.manifest[2]["label"],
+            "visible": "The candidate is visibly blurred.",
+            "semantic_valid": False,
+            "matches_reference": False,
+            "anomalies": ["The custom panel is blurred."],
+            "defect": True,
+        }
+
+        normalized = validate_blocking_partial(
+            self.manifest, [defect], require_paired=True
+        )
+        summary, has_defects = render(normalized, total_frames=len(self.manifest))
+
+        self.assertTrue(has_defects)
+        self.assertIn("Reviewed 1 of 3 frames", summary)
+        self.assertIn("cannot certify or release anything", summary)
+        clean = {
+            **defect,
+            "semantic_valid": True,
+            "matches_reference": True,
+            "anomalies": [],
+            "defect": False,
+        }
+        with self.assertRaisesRegex(ReviewError, "cannot contain a clean verdict"):
+            validate_blocking_partial(self.manifest, [clean], require_paired=True)
 
     def test_triage_schema_and_validator_keep_provider_constraints_small(self) -> None:
         labels = [self.manifest[1]["label"], self.manifest[2]["label"]]

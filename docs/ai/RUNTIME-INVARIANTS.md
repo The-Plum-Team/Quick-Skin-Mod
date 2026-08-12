@@ -189,10 +189,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   capsule whose later wake step failed, and cool recent failed attempts without blocking other
   sources. The review runner accepts only that immutable handoff, never skips an unpaired anchor
   frame, skips byte-identical paths only in paired comparison mode,
-  exposes only bounded manifests/images to Sonnet triage and selective Opus verification with a
-  read-only tool surface, captures each verdict from stdout, and validates exact labels and semantic
-  coherence after every call. It revalidates the capsule after the model exits, publishes only a
-  bounded normalized report or sanitized attempt marker, never uploads raw provider text, and
+  exposes only bounded manifests/images to concurrent loader-grouped Sonnet triage and selective
+  concurrent Opus verification with a read-only tool surface, captures each verdict from stdout,
+  and validates exact labels and semantic coherence after every call. A first Opus-confirmed defect
+  cancels outstanding work and emits only an explicit fail-closed partial report, which can never
+  certify an anchor. A paired cache hit must bind exact candidate/reference pixels, expectation,
+  capture and loader identity, scenario contract, release matrix, protected code, prompts, models,
+  mode, and chunk policy; never cache or reuse unpaired anchor semantics. It revalidates the
+  capsule after the model exits, publishes only a bounded normalized report or sanitized attempt
+  marker, never uploads raw provider text, and
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
   entry for cooldown and retry. The fixed concurrency group covers the complete protected drain,
   from oldest-entry selection through exact-id cleanup, so overlapping wakes cannot reserve the
