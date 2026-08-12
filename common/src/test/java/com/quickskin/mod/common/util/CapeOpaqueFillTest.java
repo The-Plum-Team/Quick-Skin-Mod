@@ -183,9 +183,9 @@ class CapeOpaqueFillTest {
     }
 
     /**
-     * The packaged E2E asserts {@code TextureAlphaDetector.hasTransparentPixels(composed) == false}
-     * once the toggle is on. That detector needs a client, and it samples rather than scanning, so
-     * pin its predicate — {@code alpha < 255} — here exhaustively instead.
+     * The screen applies this rule only to non-structural pixels; its final pass then restores the
+     * Elytra cutout. Pin the fill rule itself exhaustively here so every pixel it receives becomes
+     * opaque before that separate structural mask is applied.
      */
     @Test
     void flatteningClearsEveryTransparentPixelTheDetectorWouldFind() {
