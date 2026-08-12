@@ -553,7 +553,7 @@
               "capture": {
                 "title": "Animated cape frame A",
                 "review_tier": "key",
-                "expectation": "The player wears a real light animated cape with a red circular motif; the surface is not blank, black or garbled.",
+                "expectation": "The player wears a real dark animated cape whose light face contains a complete red vertical motif fully inside the cape surface; it is not clipped, blank, black or garbled.",
                 "probes": []
               }
             },
@@ -563,7 +563,7 @@
               "capture": {
                 "title": "Animated cape frame B",
                 "review_tier": "key",
-                "expectation": "A later frame of the same light cape is visible and the red motif has moved or changed from frame A.",
+                "expectation": "A later frozen frame of the same dark cape is visible; the complete motif has changed from red to blue and moved horizontally while remaining fully inside the cape surface.",
                 "probes": []
               }
             },
@@ -675,7 +675,13 @@
             {
               "first_step": "animated_cape_apply",
               "second_step": "animated_cape_advance",
-              "minimum_changed_fraction": 1e-05
+              "minimum_changed_fraction": 0.01,
+              "region": [
+                0.44,
+                0.45,
+                0.56,
+                0.78
+              ]
             },
             {
               "first_step": "known_cape_apply",
