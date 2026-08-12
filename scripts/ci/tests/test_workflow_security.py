@@ -1162,6 +1162,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("needs.propose.result != 'cancelled'", publish)
         self.assertIn("needs.validate.result != 'cancelled'", publish)
         self.assertIn("Require this target's own validate leg", publish)
+        self.assertIn("jobs?filter=latest&per_page=100", publish)
+        self.assertIn("for attempt in {1..12}", publish)
+        self.assertIn("sleep 5", publish)
+        self.assertIn("validate_result=api-error", publish)
         self.assertIn('[[ "$validate_result" == success ]]', publish)
         self.assertIn("Download the immutable validated proposal", publish)
 

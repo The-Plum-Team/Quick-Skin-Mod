@@ -132,6 +132,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   frames through screenshot settlement, and compare the rendered cape region by a material pixel
   threshold. A changing logical frame counter alone does not prove that Minecraft sampled the
   intended UVs or that the visible cape changed.
+- Slim/classic model evidence must assert both Quick Skin's requested appearance and Minecraft's
+  renderer-facing model selection. Capture it in a close, pinned rear view where the 3-pixel Alex
+  and 4-pixel Steve arm widths are independently inspectable, restore the prior FOV afterwards, and
+  compare the bounded player region by a material threshold. Stored intent or an ambiguous distant
+  silhouette alone cannot certify model geometry.
 - Adjusted-cape parity evidence must show a non-standard padded source before cropping and the final
   aligned atlas as separate semantic checkpoints. The source checkpoint must expose all four
   padding bands; the aligned checkpoint must identify coloured pixels in auxiliary cape/elytra UV

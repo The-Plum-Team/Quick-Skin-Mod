@@ -72,7 +72,8 @@ import javax.imageio.ImageIO;
  * <ol>
  *   <li>baseline &mdash; clean state, player present (singletons reset, 3rd-person view).</li>
  *   <li>local skin upload &mdash; {@code SkinImporter.importSkin} &rarr; {@code applySkin}; menu shot.</li>
- *   <li>model slim/classic &mdash; {@code applySkin(...,"slim"/"classic")}; {@code getModel()} flips.</li>
+ *   <li>model slim/classic &mdash; {@code applySkin(...,"slim"/"classic")}; both the requested
+ *       appearance and Minecraft's renderer-facing model flip in a close, stable rear view.</li>
  *   <li>known cape &mdash; cape menu shot; {@code applyCape("known:test")}; cape id + location.</li>
  *   <li>CapeAdjustScreen &mdash; opened with a test image + harness-owned {@code onApply} consumer.</li>
  *   <li>BMO editor parity &mdash; crop a black-padded 128&times;64 import and compare its cape and
@@ -94,6 +95,10 @@ import javax.imageio.ImageIO;
  * or a reflective button press. Private playback/widget state is read by reflection.</p>
  */
 public final class FullScenario implements Scenario {
+
+    /** A close but unclipped view makes the one-texture-pixel arm-width delta inspectable. */
+    private static final int MODEL_EVIDENCE_FOV = 50;
+    private volatile Integer modelEvidenceOriginalFov;
 
     private volatile String skinHash;        // set by step 2, reused by model + HUD steps
     private volatile String externalSkinHash; // set by the external-drop step (no import call)
@@ -309,37 +314,40 @@ public final class FullScenario implements Scenario {
         // 3. model slim / classic -----------------------------------------------------------------
         steps.add(Step.of("model_slim")
                 .action(() -> {
-                    enterWorldView(mc);
+                    prepareModelEvidenceView(mc);
                     if (skinHash != null) svc.applySkin(uuid, "local_skin:" + skinHash, "slim");
                 })
                 .minTicks(30)
+                .ready(() -> holdModelEvidenceView(mc, "slim"))
+                .settleTicks(12)
+                .timeoutTicks(240)
                 .screenshot(prefix + "full_03a_model_slim" + suffix)
-                .assertion(() -> {
-                    PlayerAppearance app = svc.getAppearance(uuid);
-                    if (app == null) return Step.Result.fail("no appearance");
-                    return "slim".equals(app.getModel())
-                            ? Step.Result.pass("model=slim")
-                            : Step.Result.fail("model=" + app.getModel() + " expected slim");
-                }));
+                .assertion(() -> assertModelEvidence(mc, svc, uuid, "slim")));
 
         steps.add(Step.of("model_classic")
                 .action(() -> {
-                    enterWorldView(mc);
+                    prepareModelEvidenceView(mc);
                     if (skinHash != null) svc.applySkin(uuid, "local_skin:" + skinHash, "classic");
                 })
                 .minTicks(30)
+                .ready(() -> holdModelEvidenceView(mc, "classic"))
+                .settleTicks(12)
+                .timeoutTicks(240)
                 .screenshot(prefix + "full_03b_model_classic" + suffix)
                 .assertion(() -> {
-                    PlayerAppearance app = svc.getAppearance(uuid);
-                    if (app == null) return Step.Result.fail("no appearance");
-                    return "classic".equals(app.getModel())
-                            ? Step.Result.pass("model=classic")
-                            : Step.Result.fail("model=" + app.getModel() + " expected classic");
+                    try {
+                        return assertModelEvidence(mc, svc, uuid, "classic");
+                    } finally {
+                        restoreModelEvidenceView(mc);
+                    }
                 }));
 
         // 4. known cape ---------------------------------------------------------------------------
         steps.add(Step.of("cape_menu_screen")
-                .action(() -> VanillaShim.setScreen(mc, new PlayerCapeMenuScreen(null)))
+                .action(() -> {
+                    restoreModelEvidenceView(mc);
+                    VanillaShim.setScreen(mc, new PlayerCapeMenuScreen(null));
+                })
                 .minTicks(20)
                 .ready(() -> VanillaShim.currentScreen(mc) instanceof PlayerCapeMenuScreen)
                 .timeoutTicks(200)
@@ -2605,6 +2613,64 @@ public final class FullScenario implements Scenario {
             }
         } catch (Throwable t) {
             E2ELog.warn("enterWorldView: " + t);
+        }
+    }
+
+    /**
+     * Zoom only the two model checkpoints so the 3-pixel Alex and 4-pixel Steve arms are visible.
+     * The original FOV is captured once and restored before any later scenario evidence.
+     */
+    private void prepareModelEvidenceView(Minecraft mc) {
+        enterWorldView(mc);
+        Integer current = VanillaShim.fieldOfView(mc);
+        if (modelEvidenceOriginalFov == null && current != null) {
+            modelEvidenceOriginalFov = current;
+        }
+        VanillaShim.setFieldOfView(mc, MODEL_EVIDENCE_FOV);
+        pinRearEvidenceView(mc);
+    }
+
+    /** Hold camera, pose, and renderer-facing geometry through the screenshot settle window. */
+    private boolean holdModelEvidenceView(Minecraft mc, String expectedModel) {
+        if (mc.player == null || mc.options == null) return false;
+        VanillaShim.setScreen(mc, null);
+        mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+        mc.options.keyShift.setDown(false);
+        mc.player.setShiftKeyDown(false);
+        pinRearEvidenceView(mc);
+        return VanillaShim.setFieldOfView(mc, MODEL_EVIDENCE_FOV)
+                && Integer.valueOf(MODEL_EVIDENCE_FOV).equals(VanillaShim.fieldOfView(mc))
+                && expectedModel.equals(VanillaShim.playerModel(mc.player));
+    }
+
+    private Step.Result assertModelEvidence(
+            Minecraft mc, PlayerAppearanceService svc, UUID uuid, String expectedModel) {
+        PlayerAppearance app = svc.getAppearance(uuid);
+        if (app == null) return Step.Result.fail("no appearance");
+        if (!expectedModel.equals(app.getModel())) {
+            return Step.Result.fail(
+                    "stored model=" + app.getModel() + " expected " + expectedModel);
+        }
+        String renderedModel = VanillaShim.playerModel(mc.player);
+        if (!expectedModel.equals(renderedModel)) {
+            return Step.Result.fail(
+                    "renderer model=" + renderedModel + " expected " + expectedModel);
+        }
+        if (!Integer.valueOf(MODEL_EVIDENCE_FOV).equals(VanillaShim.fieldOfView(mc))) {
+            return Step.Result.fail(
+                    "model evidence FOV=" + VanillaShim.fieldOfView(mc)
+                            + " expected " + MODEL_EVIDENCE_FOV);
+        }
+        return Step.Result.pass(
+                "stored model=" + expectedModel + ", renderer model=" + renderedModel
+                        + ", close rear FOV=" + MODEL_EVIDENCE_FOV);
+    }
+
+    private void restoreModelEvidenceView(Minecraft mc) {
+        Integer original = modelEvidenceOriginalFov;
+        if (original != null) {
+            VanillaShim.setFieldOfView(mc, original);
+            modelEvidenceOriginalFov = null;
         }
     }
 

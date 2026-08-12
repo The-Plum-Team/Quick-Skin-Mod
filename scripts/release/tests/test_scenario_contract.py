@@ -325,7 +325,12 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual(
             [
                 ("baseline", "local_skin_apply", 0.00001, None),
-                ("model_slim", "model_classic", 0.00001, None),
+                (
+                    "model_slim",
+                    "model_classic",
+                    0.001,
+                    (0.38, 0.18, 0.62, 0.96),
+                ),
                 (
                     "animated_cape_apply",
                     "animated_cape_advance",
