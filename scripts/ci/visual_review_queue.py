@@ -23,6 +23,9 @@ DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 INPUT_NAME = re.compile(r"^visual-review-input-(?P<source>[1-9][0-9]*)$")
 REPORT_NAME = re.compile(r"^visual-review-(?P<source>[1-9][0-9]*)$")
 ATTEMPT_NAME = re.compile(r"^visual-review-attempt-(?P<source>[1-9][0-9]*)$")
+ANCHOR_SOURCE_BRANCH = re.compile(
+    r"^automation/sync/forge-and-fabric-1\.20\.1/[A-Za-z0-9._/-]+$"
+)
 PREPARE_WORKFLOW = ".github/workflows/visual-review.yml"
 DRAIN_WORKFLOW = ".github/workflows/visual-review-drain.yml"
 PREPARE_EVENTS = frozenset({"repository_dispatch", "workflow_run"})
@@ -57,6 +60,8 @@ class QueueApi(Protocol):
     def list_artifacts(self) -> list[Artifact]: ...
 
     def get_run(self, run_id: int) -> dict[str, Any]: ...
+
+    def get_source_run(self, run_id: int) -> dict[str, Any]: ...
 
 
 def _positive_int(value: Any, label: str) -> int:
@@ -240,7 +245,24 @@ def select_pending(
     ]
     if not candidates:
         return None
-    return min(candidates, key=lambda item: item[0].order)
+    source_run_cache: dict[int, dict[str, Any]] = {}
+
+    def priority(candidate: tuple[Artifact, int]) -> tuple[int, datetime, int]:
+        artifact, source_run_id = candidate
+        source_run = source_run_cache.get(source_run_id)
+        if source_run is None:
+            source_run = api.get_source_run(source_run_id)
+            source_run_cache[source_run_id] = source_run
+        branch = source_run.get("head_branch") if isinstance(source_run, dict) else None
+        certifiable_anchor = bool(
+            source_run.get("status") == "completed"
+            and source_run.get("conclusion") == "success"
+            and isinstance(branch, str)
+            and ANCHOR_SOURCE_BRANCH.fullmatch(branch)
+        )
+        return (0 if certifiable_anchor else 1, artifact.created_at, artifact.artifact_id)
+
+    return min(candidates, key=priority)
 
 
 class GitHubApi:
@@ -304,6 +326,9 @@ class GitHubApi:
             raise QueueError("workflow run response is invalid")
         self._runs[run_id] = payload
         return payload
+
+    def get_source_run(self, run_id: int) -> dict[str, Any]:
+        return self.get_run(run_id)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

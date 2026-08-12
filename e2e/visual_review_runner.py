@@ -4,11 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import os
+import signal
 import subprocess
 import sys
+import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
 
@@ -26,6 +30,7 @@ from check_visual_review import (
     validate_triage,
     write_normalized_report,
 )
+from visual_review_cache import cached_verdicts, load_cache
 
 
 DEFAULT_TRIAGE_CHUNK_SIZE = 8
@@ -33,9 +38,11 @@ DEFAULT_VERIFY_CHUNK_SIZE = 4
 MAX_CHUNK_SIZE = 8
 DEFAULT_MODEL_ATTEMPTS = 3
 MAX_MODEL_ATTEMPTS = 4
-DEFAULT_CALL_SPACING_SECONDS = 10.0
+DEFAULT_CALL_SPACING_SECONDS = 0.0
 DEFAULT_RETRY_DELAYS = (30.0, 60.0, 120.0)
 MAX_MODEL_SECONDS = 15 * 60
+DEFAULT_MAX_PARALLEL_CALLS = 16
+MAX_PARALLEL_CALLS = 32
 TRANSIENT_MODEL_CATEGORIES = frozenset(
     {
         "cli_or_api",
@@ -47,10 +54,13 @@ TRANSIENT_MODEL_CATEGORIES = frozenset(
     }
 )
 SYNTHETIC_IDENTICAL_VISIBLE = (
-    "Candidate pixels are identical to the authenticated 1.20.1 reference."
+    "Candidate pixels are identical to the certified 1.20.1 reference."
 )
-SYNTHETIC_CLEAN_VISIBLE = (
-    "Candidate matches the authenticated 1.20.1 reference and checkpoint expectation."
+SYNTHETIC_COMPARISON_CLEAN_VISIBLE = (
+    "Candidate is semantically valid and matches the certified 1.20.1 reference."
+)
+SYNTHETIC_SEMANTIC_CLEAN_VISIBLE = (
+    "Candidate independently satisfies its checkpoint expectation."
 )
 
 
@@ -60,6 +70,10 @@ class RunnerError(RuntimeError):
         self.category = category
         self.stage = stage
         self.transient = transient
+
+
+class ReviewCancelled(RuntimeError):
+    """Raised inside workers after another Opus chunk confirms a defect."""
 
 
 ReviewProvider = Callable[
@@ -73,37 +87,59 @@ def _chunks(items: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]
     return [items[index : index + size] for index in range(0, len(items), size)]
 
 
-def _is_cross_loader_1_20_1_anchor(item: dict[str, Any]) -> bool:
-    candidate = item["label"].split("/", 1)[0]
-    reference = item["reference_label"].split("/", 1)[0]
-    return {candidate, reference} == {"fabric-1.20.1", "forge-1.20.1"}
+def _checkpoint_chunks(
+    items: list[dict[str, Any]], size: int
+) -> list[list[dict[str, Any]]]:
+    """Pack loader siblings together without exceeding the provider chunk bound."""
+
+    _chunks([], size)
+    grouped: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
+    for item in items:
+        grouped.setdefault(item["capture_id"], []).append(item)
+    chunks: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    for siblings in grouped.values():
+        for offset in range(0, len(siblings), size):
+            bounded = siblings[offset : offset + size]
+            if current and len(current) + len(bounded) > size:
+                chunks.append(current)
+                current = []
+            current.extend(bounded)
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def build_review_plan(
-    manifest: Any, *, triage_chunk_size: int = DEFAULT_TRIAGE_CHUNK_SIZE
+    manifest: Any,
+    *,
+    triage_chunk_size: int = DEFAULT_TRIAGE_CHUNK_SIZE,
+    cached_labels: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """Split byte-identical pairs from bounded semantic-review chunks."""
 
-    entries, _labels = validate_manifest(manifest, require_paired=True)
-    # The 1.20.1 anchor is established by inspecting Fabric against Forge and vice versa.
-    # Shared pixels are useful evidence of loader parity, but never evidence that the shared image
-    # satisfies its semantic checkpoint, so those pairs must still reach the model.
+    entries, _labels = validate_manifest(manifest)
+    paired = "reference_path" in entries[0]
+    # A semantic-only anchor has no reference and every frame reaches the model. Once that anchor
+    # is certified, byte-identical later-version pairs can inherit both its semantics and pixels.
     identical = [
         item
         for item in entries
-        if item["path"] == item["reference_path"]
-        and not _is_cross_loader_1_20_1_anchor(item)
+        if paired and item["path"] == item["reference_path"]
     ]
     semantic = [
         item
         for item in entries
-        if item["path"] != item["reference_path"]
-        or _is_cross_loader_1_20_1_anchor(item)
+        if (not paired or item["path"] != item["reference_path"])
+        and item["label"] not in cached_labels
     ]
     return {
+        "paired": paired,
         "identical": identical,
         "semantic": semantic,
-        "triage_chunks": _chunks(semantic, triage_chunk_size) if semantic else [],
+        "triage_chunks": (
+            _checkpoint_chunks(semantic, triage_chunk_size) if semantic else []
+        ),
     }
 
 
@@ -113,65 +149,214 @@ def execute_review(
     *,
     triage_chunk_size: int = DEFAULT_TRIAGE_CHUNK_SIZE,
     verify_chunk_size: int = DEFAULT_VERIFY_CHUNK_SIZE,
+    max_parallel_calls: int = DEFAULT_MAX_PARALLEL_CALLS,
+    cache_hits: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Run compact triage, escalate uncertain findings, and restore exact order."""
+    """Pipeline concurrent triage and verification, stopping on one confirmed defect.
 
-    entries, labels = validate_manifest(manifest, require_paired=True)
-    plan = build_review_plan(entries, triage_chunk_size=triage_chunk_size)
-    final_by_label: dict[str, dict[str, Any]] = {}
+    The provider must be safe for concurrent calls when ``max_parallel_calls`` is above one.
+    """
+
+    entries, labels = validate_manifest(manifest)
+    paired = "reference_path" in entries[0]
+    if (
+        isinstance(max_parallel_calls, bool)
+        or not isinstance(max_parallel_calls, int)
+        or not 1 <= max_parallel_calls <= MAX_PARALLEL_CALLS
+    ):
+        raise ReviewError(
+            f"parallel model calls must be between 1 and {MAX_PARALLEL_CALLS}"
+        )
+    normalized_cache_hits: dict[str, dict[str, Any]] = {}
+    if cache_hits:
+        for label, verdict in cache_hits.items():
+            if label not in labels:
+                raise ReviewError(f"cache contains unknown manifest label {label!r}")
+            item = entries[labels.index(label)]
+            normalized_cache_hits[label] = validate(
+                [item], [verdict], require_paired=paired
+            )[0]
+    plan = build_review_plan(
+        entries,
+        triage_chunk_size=triage_chunk_size,
+        cached_labels=frozenset(normalized_cache_hits),
+    )
+    final_by_label: dict[str, dict[str, Any]] = dict(normalized_cache_hits)
     for item in plan["identical"]:
         final_by_label[item["label"]] = {
             "label": item["label"],
             "visible": SYNTHETIC_IDENTICAL_VISIBLE,
-            "matches": True,
+            "semantic_valid": True,
+            "matches_reference": True,
             "anomalies": [],
             "defect": False,
         }
 
+    cached_defects = [
+        normalized_cache_hits[label]
+        for label in labels
+        if label in normalized_cache_hits
+        and normalized_cache_hits[label]["defect"]
+    ]
+    if cached_defects:
+        return cached_defects, {
+            "frames": len(entries),
+            "paired": int(paired),
+            "identical": len(plan["identical"]),
+            "cached": len(normalized_cache_hits),
+            "triaged": 0,
+            "triage_chunks": 0,
+            "escalated": 0,
+            "verify_chunks": 0,
+            "reviewed": len(cached_defects),
+            "stopped_early": 1,
+        }
+
     triage_by_label: dict[str, dict[str, Any]] = {}
-    for chunk_index, chunk in enumerate(plan["triage_chunks"]):
-        chunk_labels = [item["label"] for item in chunk]
-        raw_triage = provider(
+    escalated_count = 0
+    verify_chunks_count = 0
+    confirmed_defects: list[dict[str, Any]] = []
+    executor: concurrent.futures.ThreadPoolExecutor | None = None
+    pending: dict[
+        concurrent.futures.Future[list[dict[str, Any]]],
+        tuple[str, list[dict[str, Any]]],
+    ] = {}
+    verify_index = 0
+
+    def submit_triage(index: int, chunk: list[dict[str, Any]]) -> None:
+        labels_for_chunk = [item["label"] for item in chunk]
+        if executor is None:
+            raise ReviewError("review executor is unavailable")
+        future = executor.submit(
+            provider,
             "triage",
-            chunk_index,
+            index,
             chunk,
-            triage_schema(chunk_labels),
+            triage_schema(labels_for_chunk),
         )
-        for verdict in validate_triage(chunk, raw_triage, require_paired=True):
-            triage_by_label[verdict["label"]] = verdict
+        pending[future] = ("triage", chunk)
 
-    escalated: list[dict[str, Any]] = []
-    for item in plan["semantic"]:
-        triage = triage_by_label[item["label"]]
-        if triage["decision"] == "clean" and triage["confidence"] == "high":
-            final_by_label[item["label"]] = {
-                "label": item["label"],
-                "visible": SYNTHETIC_CLEAN_VISIBLE,
-                "matches": True,
-                "anomalies": [],
-                "defect": False,
-            }
-            continue
-        escalated.append({**item, "first_review": triage})
-
-    for chunk_index, enriched_chunk in enumerate(_chunks(escalated, verify_chunk_size) if escalated else []):
+    def submit_verify(chunk: list[dict[str, Any]]) -> None:
+        nonlocal verify_index, verify_chunks_count
         validation_chunk = [
             {key: value for key, value in item.items() if key != "first_review"}
-            for item in enriched_chunk
+            for item in chunk
         ]
-        raw_verdicts = provider(
+        if executor is None:
+            raise ReviewError("review executor is unavailable")
+        future = executor.submit(
+            provider,
             "verify",
-            chunk_index,
-            enriched_chunk,
+            verify_index,
+            chunk,
             report_schema(
                 len(validation_chunk),
                 labels=[item["label"] for item in validation_chunk],
+                paired=paired,
             ),
         )
-        for verdict in validate(
-            validation_chunk, raw_verdicts, require_paired=True
-        ):
-            final_by_label[verdict["label"]] = verdict
+        verify_index += 1
+        verify_chunks_count += 1
+        pending[future] = ("verify", chunk)
+
+    stopped_early = False
+    try:
+        if plan["triage_chunks"]:
+            executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=max_parallel_calls,
+                thread_name_prefix="visual-review",
+            )
+        for chunk_index, chunk in enumerate(plan["triage_chunks"]):
+            submit_triage(chunk_index, chunk)
+        while pending and not stopped_early:
+            completed, _waiting = concurrent.futures.wait(
+                tuple(pending),
+                return_when=concurrent.futures.FIRST_COMPLETED,
+            )
+            for future in completed:
+                stage, chunk = pending.pop(future)
+                raw = future.result()
+                if stage == "triage":
+                    normalized_triage = validate_triage(
+                        chunk, raw, require_paired=paired
+                    )
+                    escalated: list[dict[str, Any]] = []
+                    for item, triage in zip(chunk, normalized_triage, strict=True):
+                        triage_by_label[item["label"]] = triage
+                        if (
+                            triage["decision"] == "clean"
+                            and triage["confidence"] == "high"
+                        ):
+                            final_by_label[item["label"]] = {
+                                "label": item["label"],
+                                "visible": (
+                                    SYNTHETIC_COMPARISON_CLEAN_VISIBLE
+                                    if paired
+                                    else SYNTHETIC_SEMANTIC_CLEAN_VISIBLE
+                                ),
+                                "semantic_valid": True,
+                                "matches_reference": True if paired else None,
+                                "anomalies": [],
+                                "defect": False,
+                            }
+                        else:
+                            escalated.append({**item, "first_review": triage})
+                    escalated_count += len(escalated)
+                    for verify_chunk in _checkpoint_chunks(
+                        escalated, verify_chunk_size
+                    ):
+                        submit_verify(verify_chunk)
+                    continue
+
+                validation_chunk = [
+                    {key: value for key, value in item.items() if key != "first_review"}
+                    for item in chunk
+                ]
+                verdicts = validate(
+                    validation_chunk, raw, require_paired=paired
+                )
+                defects = [verdict for verdict in verdicts if verdict["defect"]]
+                if defects:
+                    confirmed_defects.extend(defects)
+                    stopped_early = True
+                    cancel = getattr(provider, "cancel", None)
+                    if callable(cancel):
+                        cancel()
+                    for queued in pending:
+                        queued.cancel()
+                    break
+                for verdict in verdicts:
+                    final_by_label[verdict["label"]] = verdict
+    except BaseException:
+        cancel = getattr(provider, "cancel", None)
+        if callable(cancel):
+            cancel()
+        for queued in pending:
+            queued.cancel()
+        raise
+    finally:
+        if executor is not None:
+            executor.shutdown(wait=True, cancel_futures=True)
+
+    if stopped_early:
+        ordered_defects = [
+            verdict
+            for label in labels
+            for verdict in confirmed_defects
+            if verdict["label"] == label
+        ]
+        return ordered_defects, {
+            "frames": len(entries),
+            "paired": int(paired),
+            "identical": len(plan["identical"]),
+            "cached": len(normalized_cache_hits),
+            "triaged": len(triage_by_label),
+            "triage_chunks": len(plan["triage_chunks"]),
+            "escalated": escalated_count,
+            "verify_chunks": verify_chunks_count,
+            "reviewed": len(ordered_defects),
+            "stopped_early": 1,
+        }
 
     missing = [label for label in labels if label not in final_by_label]
     if missing:
@@ -179,15 +364,19 @@ def execute_review(
     final = validate(
         entries,
         [final_by_label[label] for label in labels],
-        require_paired=True,
+        require_paired=paired,
     )
     return final, {
-        "pairs": len(entries),
+        "frames": len(entries),
+        "paired": int(paired),
         "identical": len(plan["identical"]),
+        "cached": len(normalized_cache_hits),
         "triaged": len(plan["semantic"]),
         "triage_chunks": len(plan["triage_chunks"]),
-        "escalated": len(escalated),
-        "verify_chunks": len(_chunks(escalated, verify_chunk_size)) if escalated else 0,
+        "escalated": escalated_count,
+        "verify_chunks": verify_chunks_count,
+        "reviewed": len(final),
+        "stopped_early": 0,
     }
 
 
@@ -228,6 +417,7 @@ class ClaudeProvider:
         verify_prompt: str,
         triage_model: str,
         verify_model: str,
+        paired: bool,
         attempts: int,
         call_spacing_seconds: float,
     ) -> None:
@@ -236,18 +426,44 @@ class ClaudeProvider:
         self.claude = claude
         self.prompts = {"triage": triage_prompt, "verify": verify_prompt}
         self.models = {"triage": triage_model, "verify": verify_model}
+        self.paired = paired
         self.attempts = attempts
         self.call_spacing_seconds = call_spacing_seconds
         self.last_call_started: float | None = None
+        self._pace_lock = threading.Lock()
+        self._artifact_lock = threading.Lock()
+        self._process_lock = threading.Lock()
+        self._processes: set[subprocess.Popen[bytes]] = set()
+        self._cancelled = threading.Event()
+
+    def cancel(self) -> None:
+        self._cancelled.set()
+        with self._process_lock:
+            processes = tuple(self._processes)
+        for process in processes:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (OSError, ProcessLookupError):
+                continue
 
     def _pace(self) -> None:
-        if self.last_call_started is not None:
-            remaining = self.call_spacing_seconds - (
-                time.monotonic() - self.last_call_started
-            )
-            if remaining > 0:
-                time.sleep(remaining)
-        self.last_call_started = time.monotonic()
+        if self.call_spacing_seconds <= 0:
+            return
+        while True:
+            if self._cancelled.is_set():
+                raise ReviewCancelled()
+            with self._pace_lock:
+                now = time.monotonic()
+                remaining = (
+                    0.0
+                    if self.last_call_started is None
+                    else self.call_spacing_seconds - (now - self.last_call_started)
+                )
+                if remaining <= 0:
+                    self.last_call_started = now
+                    return
+            if self._cancelled.wait(min(remaining, 1.0)):
+                raise ReviewCancelled()
 
     def __call__(
         self,
@@ -256,17 +472,27 @@ class ClaudeProvider:
         manifest: list[dict[str, Any]],
         schema: dict[str, Any],
     ) -> list[dict[str, Any]]:
+        if self._cancelled.is_set():
+            raise ReviewCancelled()
         if stage not in self.prompts:
             raise RunnerError("internal", "provider", transient=False)
         chunk_name = f"{stage}-{chunk_index:03d}"
         manifest_path = self.work_root / "chunks" / f"{chunk_name}.json"
-        _write_json_new(manifest_path, manifest)
+        with self._artifact_lock:
+            _write_json_new(manifest_path, manifest)
         manifest_relative = manifest_path.relative_to(self.capsule).as_posix()
+        image_instruction = (
+            "open the candidate and reference images for every entry"
+            if self.paired
+            else "open the candidate image for every entry"
+        )
         prompt = (
             self.prompts[stage]
             + "\n\nThe exact manifest for this bounded pass is `./"
             + manifest_relative
-            + "`. Read that manifest first, then open both labelled images for every entry."
+            + "`. Read that manifest first, then "
+            + image_instruction
+            + "."
         )
         schema_json = json.dumps(
             schema,
@@ -276,10 +502,13 @@ class ClaudeProvider:
         )
         last_error = RunnerError("cli_or_api", stage, transient=True)
         for attempt in range(1, self.attempts + 1):
+            if self._cancelled.is_set():
+                raise ReviewCancelled()
             self._pace()
             output_path = self.work_root / "private" / f"{chunk_name}-{attempt}.json"
             stderr_path = self.work_root / "private" / f"{chunk_name}-{attempt}.stderr"
-            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._artifact_lock:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
             command = [
                 str(self.claude),
                 "--print",
@@ -304,20 +533,39 @@ class ClaudeProvider:
             ]
             try:
                 with output_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
-                    completed = subprocess.run(
+                    process = subprocess.Popen(
                         command,
                         cwd=self.capsule,
                         stdin=subprocess.DEVNULL,
                         stdout=stdout,
                         stderr=stderr,
-                        check=False,
-                        timeout=MAX_MODEL_SECONDS,
+                        start_new_session=True,
                     )
+                    with self._process_lock:
+                        if self._cancelled.is_set():
+                            try:
+                                os.killpg(process.pid, signal.SIGKILL)
+                            except (OSError, ProcessLookupError):
+                                pass
+                        else:
+                            self._processes.add(process)
+                    try:
+                        returncode = process.wait(timeout=MAX_MODEL_SECONDS)
+                    finally:
+                        with self._process_lock:
+                            self._processes.discard(process)
             except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait(timeout=30)
+                except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
+                    pass
                 last_error = RunnerError("timeout", stage, transient=True)
             except OSError as exc:
                 raise RunnerError("cli_unavailable", stage, transient=False) from exc
             else:
+                if self._cancelled.is_set():
+                    raise ReviewCancelled()
                 try:
                     envelope = load(
                         output_path,
@@ -331,7 +579,7 @@ class ClaudeProvider:
                     if isinstance(envelope, dict)
                     else "cli_or_api"
                 )
-                if completed.returncode == 0 and isinstance(envelope, dict):
+                if returncode == 0 and isinstance(envelope, dict):
                     try:
                         structured = extract_structured_report(envelope)
                     except ReviewError:
@@ -350,7 +598,7 @@ class ClaudeProvider:
                                 normalized = validate_triage(
                                     manifest,
                                     structured,
-                                    require_paired=True,
+                                    require_paired=self.paired,
                                 )
                             else:
                                 validation_manifest = [
@@ -364,7 +612,7 @@ class ClaudeProvider:
                                 normalized = validate(
                                     validation_manifest,
                                     structured,
-                                    require_paired=True,
+                                    require_paired=self.paired,
                                 )
                         except ReviewError:
                             # Schema-valid output can still violate semantic invariants such as
@@ -385,7 +633,10 @@ class ClaudeProvider:
                     )
             if not last_error.transient or attempt == self.attempts:
                 raise last_error
-            time.sleep(DEFAULT_RETRY_DELAYS[min(attempt - 1, len(DEFAULT_RETRY_DELAYS) - 1)])
+            if self._cancelled.wait(
+                DEFAULT_RETRY_DELAYS[min(attempt - 1, len(DEFAULT_RETRY_DELAYS) - 1)]
+            ):
+                raise ReviewCancelled()
         raise last_error
 
 
@@ -414,8 +665,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--verify-model", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--failure-report", type=Path)
+    parser.add_argument("--cache", type=Path)
+    parser.add_argument("--cache-policy-sha256")
+    parser.add_argument("--completion-state", type=Path, required=True)
+    parser.add_argument(
+        "--review-mode",
+        required=True,
+        choices=("anchor-semantic", "reference-comparison"),
+    )
     parser.add_argument("--triage-chunk-size", type=int, default=DEFAULT_TRIAGE_CHUNK_SIZE)
     parser.add_argument("--verify-chunk-size", type=int, default=DEFAULT_VERIFY_CHUNK_SIZE)
+    parser.add_argument(
+        "--max-parallel-calls",
+        type=int,
+        default=DEFAULT_MAX_PARALLEL_CALLS,
+    )
     parser.add_argument("--model-attempts", type=int, default=DEFAULT_MODEL_ATTEMPTS)
     parser.add_argument(
         "--call-spacing-seconds",
@@ -433,6 +697,10 @@ def main(argv: list[str] | None = None) -> int:
             raise RunnerError("configuration", "arguments", transient=False)
         if not 0 <= args.call_spacing_seconds <= 120:
             raise RunnerError("configuration", "arguments", transient=False)
+        if not 1 <= args.max_parallel_calls <= MAX_PARALLEL_CALLS:
+            raise RunnerError("configuration", "arguments", transient=False)
+        if (args.cache is None) != (args.cache_policy_sha256 is None):
+            raise RunnerError("configuration", "cache", transient=False)
         capsule = args.capsule.resolve(strict=True)
         if not capsule.is_dir() or capsule.is_symlink():
             raise RunnerError("invalid_capsule", "input", transient=False)
@@ -441,7 +709,19 @@ def main(argv: list[str] | None = None) -> int:
         if manifest_path.parent != input_root or input_root.parent != capsule:
             raise RunnerError("invalid_capsule", "input", transient=False)
         manifest = load(manifest_path, "review manifest")
-        validate_input(manifest, input_root, require_paired=True)
+        entries, _labels = validate_manifest(manifest)
+        paired = "reference_path" in entries[0]
+        if paired != (args.review_mode == "reference-comparison"):
+            raise RunnerError("invalid_capsule", "review_mode", transient=False)
+        validate_input(manifest, input_root, require_paired=paired)
+        cache_hits: dict[str, dict[str, Any]] = {}
+        if args.cache is not None:
+            cache = load_cache(
+                args.cache.resolve(strict=True), args.cache_policy_sha256
+            )
+            cache_hits = cached_verdicts(
+                manifest, cache, review_mode=args.review_mode
+            )
         work_root = capsule / "review-work"
         if work_root.exists() or work_root.is_symlink():
             raise RunnerError("invalid_capsule", "work", transient=False)
@@ -454,6 +734,7 @@ def main(argv: list[str] | None = None) -> int:
             verify_prompt=_bounded_prompt(args.verify_prompt, "verify_prompt"),
             triage_model=args.triage_model,
             verify_model=args.verify_model,
+            paired=paired,
             attempts=args.model_attempts,
             call_spacing_seconds=args.call_spacing_seconds,
         )
@@ -462,8 +743,19 @@ def main(argv: list[str] | None = None) -> int:
             provider,
             triage_chunk_size=args.triage_chunk_size,
             verify_chunk_size=args.verify_chunk_size,
+            max_parallel_calls=args.max_parallel_calls,
+            cache_hits=cache_hits,
         )
         write_normalized_report(args.output, verdicts)
+        _write_json_new(
+            args.completion_state.absolute(),
+            {
+                "schema_version": 1,
+                "state": "blocking-partial" if stats["stopped_early"] else "complete",
+                "manifest_frames": stats["frames"],
+                "report_verdicts": len(verdicts),
+            },
+        )
         print(
             "Visual review plan: "
             + ", ".join(f"{key}={value}" for key, value in stats.items())

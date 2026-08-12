@@ -1,9 +1,13 @@
 # ADR 0004: Anchor AI visual review to Minecraft 1.20.1
 
-- Status: Accepted
+- Status: Superseded in part by ADR 0005
 - Date: 2026-08-09
 - Updated: 2026-08-11
 - Scope: advisory packaged-E2E image review across release branches
+
+ADR 0005 supersedes this record's cross-loader anchor-establishment and all-at-once propagation
+rules. Its lossless semantic `capture_id` comparison, bounded queue, and selective-review mechanics
+remain active for versions reviewed after the anchor is independently certified.
 
 ## Context
 
