@@ -1534,19 +1534,23 @@ public final class FullScenario implements Scenario {
      * internals that have already been renamed once across the supported eras. The harness pins
      * the string and colour, but deliberately keeps measuring vanilla's placement and pulse.
      *
-     * <p>The splash is not the only saturated yellow on a title screen, though - the 26.x panorama
-     * flies <em>bees</em> through its cherry grove, and a bee halfway down the screen would stretch
-     * a naive bounding box until its middle landed on empty panorama. So the pixels are clustered
-     * into bands first, by row and then by column, and the densest cluster wins: a splash string is
-     * hundreds of pixels of contiguous text, a bee is a few dozen somewhere else entirely.
+     * <p>The splash is not the only saturated yellow on a title screen, though. The panorama can
+     * contain bees and thousands of yellow flower pixels - 1.21.10 exposed exactly that false
+     * positive. Vanilla's splash is title chrome in the upper-right quadrant on every supported
+     * lane, so only that deliberately broad area is eligible. Its pixels are then clustered into
+     * bands, by row and then by column, and the densest eligible cluster wins.
      */
     private int[] locateSplash(Minecraft mc, BufferedImage shot) {
         int height = shot.getHeight();
         int width = shot.getWidth();
+        int scanTop = 0;
+        int scanBottom = Math.max(1, height / 2);
+        int scanLeft = width / 2;
+        int scanRight = width;
         int[] perRow = new int[height];
         int total = 0;
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+        for (int y = scanTop; y < scanBottom; y++) {
+            for (int x = scanLeft; x < scanRight; x++) {
                 if (isSplashYellow(shot.getRGB(x, y))) {
                     perRow[y]++;
                     total++;
@@ -1559,7 +1563,7 @@ public final class FullScenario implements Scenario {
 
         int[] perColumn = new int[width];
         for (int y = rows[0]; y <= rows[1]; y++) {
-            for (int x = 0; x < width; x++) {
+            for (int x = scanLeft; x < scanRight; x++) {
                 if (isSplashYellow(shot.getRGB(x, y))) perColumn[x]++;
             }
         }

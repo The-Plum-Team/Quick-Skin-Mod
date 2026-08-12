@@ -23,7 +23,7 @@ This `master` integration baseline exercises the following exact packaged lanes:
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `4` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `4` |
 
-Scenario contract SHA-256: `1273e54b409c10a937d84ae099f88d82f33785e25dcb0453e507f076a6fba9f4`
+Scenario contract SHA-256: `f1000aeced803919fd8c3e5797b496eec7d8b49bf731711a5b25c58656ed24c9`
 Contract totals: `46` ordered steps, `41` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -175,7 +175,9 @@ distinguish elytra geometry from a draped cape.
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves
 that the production preview covers those exact pixels; formatted or seasonal splash selection is
-not part of the mod behavior being tested.
+not part of the mod behavior being tested. Detection is restricted to the broad upper-right title
+chrome area, so denser yellow bees or flower fields in a version-specific panorama cannot be
+mistaken for the splash.
 
 Pull requests and releases run their contract-selected `pr` and `release` profiles on both loader
 lanes against manifest-bound bytes from the exact commit. The same packaged workflow can also be
@@ -225,9 +227,11 @@ missing later-version reference fails curation.
 The curator applies the protected review checker before upload and reserves 32 MiB of the handoff
 envelope for the bounded manifest, proof, archive metadata, and structure. A source/run/
 implementation proof and bounded manifest become a seven-day durable queue entry. A protected
-drainer authenticates the oldest eligible entry, then enters one repository-wide model concurrency
-group. The queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without
-losing reviews.
+exact wake may authenticate only its requested artifact and locks the complete drain by that ID;
+distinct capsules therefore run concurrently while duplicate wakes coalesce. Scheduled/manual
+recovery sweeps share a separate lock and only redispatch one authenticated exact identity. The
+queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without losing
+reviews.
 
 The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
 over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
@@ -240,7 +244,10 @@ chunks of at most eight. All independent chunks run concurrently, and each conce
 below high is independently rechecked by Opus in concurrent chunks of at most four as soon as its
 Sonnet result is available. Provider throttling is handled by bounded retries rather than serial
 launch pacing. Once any Opus chunk confirms a defect, outstanding calls are cancelled and the
-explicit blocking-partial result cannot certify or release anything. Both models can read only the
+explicit blocking-partial result cannot certify or release anything. For an automatic version
+wave, the protected drain then publishes a sanitized marker bound to that exact master generation,
+best-effort cancels sibling drains, and makes later authenticated queue selection skip its remaining
+capsules. Both models can read only the
 bounded manifest/images; stdout is captured without granting a write or shell tool. Protected code
 validates exact label coverage, text/list bounds, decision coherence, capsule identity, and two
 independent final fields: `semantic_valid` and nullable `matches_reference`. A reference match can
@@ -248,8 +255,9 @@ never hide a semantic failure. It uploads only a schema-normalized report; raw p
 private. Transient provider failures create only a sanitized one-day cooldown marker, leaving the
 queue entry for retry while other entries progress. Terminal validation/configuration failures are
 marked and retired. An independent cleanup job deletes a settled entry by exact artifact id. The
-final small report remains for one day; the single rolling exact-policy verdict cache remains for
-seven days and is replaced only after a protected successor upload.
+final small report remains for one day. Exact-policy verdict cache shards remain for seven days;
+parallel drains may briefly publish siblings, and a later protected successor combines and retires
+every authenticated shard it consumed without dropping concurrent verdicts.
 
 A completely clean synchronized 1.20.1 report creates a seven-day certificate only after the
 bot-owned anchor PR is merged and that exact-tree merge is still the current anchor head. The
