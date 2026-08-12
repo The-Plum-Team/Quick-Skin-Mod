@@ -54,6 +54,7 @@ EXPECTED_STEPS = {
         "cape_adjust_zoom_in",
         "bundled_bmo_cape",
         "bundled_bmo_elytra",
+        "bmo_padded_source_screen",
         "bmo_adjust_screen",
         "adjusted_bmo_cape",
         "adjusted_bmo_elytra",
@@ -233,7 +234,7 @@ class ScenarioContractTest(unittest.TestCase):
             for role in scenario["roles"]
             for step in role["steps"]
         )
-        self.assertEqual(41, authored_capture_count)
+        self.assertEqual(42, authored_capture_count)
         self.assertEqual(authored_capture_count, len(self.contract.captures))
 
     def test_capture_metadata_and_ids_are_derived_from_steps(self) -> None:
@@ -243,7 +244,7 @@ class ScenarioContractTest(unittest.TestCase):
             for step in steps
         }
         self.assertEqual(expected_ids, set(self.contract.capture_ids))
-        self.assertEqual(41, len(expected_ids))
+        self.assertEqual(42, len(expected_ids))
         first = self.contract.capture_by_id("full.client_a.baseline")
         self.assertIs(
             first,
@@ -258,6 +259,15 @@ class ScenarioContractTest(unittest.TestCase):
         )
         self.assertEqual("Skin menu", skin_menu.title)
         self.assertEqual("key", skin_menu.review_tier)
+
+        padded_bmo = self.contract.capture_by_id(
+            "full.client_a.bmo_padded_source_screen"
+        )
+        self.assertIn("opaque-black padding on all four sides", padded_bmo.expectation)
+        aligned_bmo = self.contract.capture_by_id(
+            "full.client_a.bmo_adjust_screen"
+        )
+        self.assertIn("auxiliary side, top and bottom UV faces", aligned_bmo.expectation)
         self.assertIn("dark, subtly starred background", skin_menu.expectation)
 
         for capture_id in (
