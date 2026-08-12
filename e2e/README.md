@@ -23,7 +23,7 @@ This `forge-and-fabric-1.20.1` release branch exercises the following exact pack
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `4` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `4` |
 
-Scenario contract SHA-256: `f327a0abcb141330ae9c78d0feed45cb601b23273eeedb622abc3528a5e228a6`
+Scenario contract SHA-256: `1273e54b409c10a937d84ae099f88d82f33785e25dcb0453e507f076a6fba9f4`
 Contract totals: `46` ordered steps, `41` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
