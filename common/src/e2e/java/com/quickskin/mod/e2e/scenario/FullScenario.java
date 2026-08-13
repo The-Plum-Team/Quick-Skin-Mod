@@ -84,7 +84,8 @@ import javax.imageio.ImageIO;
  *       prove both the active animation state and the rendered cape change.</li>
  *   <li>HD cape no-downscale &mdash; import a 256&times;128 cape; metadata resolution == source dims.</li>
  *   <li>elytra hides cape &mdash; equip {@code Items.ELYTRA} in CHEST; assert the inputs that make
- *       {@code CapeLayerMixin} cancel and the alpha cutout that tapers the rendered wings.</li>
+ *       {@code CapeLayerMixin} cancel and the complete vanilla alpha envelope that prevents the
+ *       custom atlas from rendering as rectangular wings.</li>
  *   <li><i>(propagation A&rarr;B &mdash; separate scenario, not here)</i></li>
  *   <li>settings / rename / delete &mdash; {@code SettingsScreen} round-trips a flag through
  *       {@code onClose}&rarr;{@code ClientConfig}; Rename/Delete dialogs feed a harness-owned callback.</li>
@@ -516,7 +517,7 @@ public final class FullScenario implements Scenario {
                         return Step.Result.fail("cape adjust not open: " + screenName(mc));
                     BufferedImage composed = composeCapeNow(mc);
                     if (composed == null) return Step.Result.fail("composeCapeImage unavailable");
-                    if (!CapeElytraSilhouette.isOpaqueExceptWingCutout(composed, 1))
+                    if (!CapeElytraSilhouette.isOpaqueExceptElytraEnvelope(composed, 1))
                         return Step.Result.fail(
                                 "toggle on must fill the atlas except the Elytra silhouette cutout");
                     int pixel = composed.getRGB(TestAssets.TRANSPARENT_WINDOW_X + 1,
@@ -528,7 +529,7 @@ public final class FullScenario implements Scenario {
                     // what the 2D thumbnails blit and what PlayerWidget.setCape is handed.
                     BufferedImage preview = composePreviewFrameNow(mc);
                     if (preview == null) return Step.Result.fail("composeFrame unavailable");
-                    if (!CapeElytraSilhouette.isOpaqueExceptWingCutout(preview, 1))
+                    if (!CapeElytraSilhouette.isOpaqueExceptElytraEnvelope(preview, 1))
                         return Step.Result.fail(
                                 "preview must keep only the Elytra silhouette transparent");
                     if (preview.getRGB(TestAssets.TRANSPARENT_WINDOW_X + 1,
@@ -545,7 +546,7 @@ public final class FullScenario implements Scenario {
                     }
                     BufferedImage applied = capeAdjustResult.get();
                     if (applied == null) return Step.Result.fail("onApply did not receive an image");
-                    if (!CapeElytraSilhouette.isOpaqueExceptWingCutout(applied, 1))
+                    if (!CapeElytraSilhouette.isOpaqueExceptElytraEnvelope(applied, 1))
                         return Step.Result.fail(
                                 "applied cape must keep only the Elytra silhouette transparent");
                     if (applied.getRGB(TestAssets.TRANSPARENT_WINDOW_X + 1,
@@ -1267,7 +1268,7 @@ public final class FullScenario implements Scenario {
                     BufferedImage hdAtlas = hdCapePresentation.get();
                     if (!CapeElytraSilhouette.hasRequiredCutout(hdAtlas, 1)) {
                         return Step.Result.fail(
-                                "HD cape presentation did not restore the tapered Elytra cutout");
+                                "HD cape presentation did not restore the complete Elytra envelope");
                     }
                     if (!CapeElytraSilhouette.isExactMaskedPresentation(
                             hdCapeSource.get(), hdAtlas, 1)) {
@@ -1275,38 +1276,38 @@ public final class FullScenario implements Scenario {
                                 "HD cape presentation changed pixels outside the Elytra cutout");
                     }
                     return Step.Result.pass("HD cape preserved at " + w + "x" + h
-                            + " with tapered Elytra cutout (no downscale)");
+                            + " with the complete vanilla Elytra envelope (no downscale)");
                 }));
 
         // 8. elytra hides cape --------------------------------------------------------------------
         steps.add(Step.of("elytra_hides_cape")
                 .action(() -> {
                     enterWorldView(mc);
-                    equipElytra(mc);
+                    poseElytraForEvidence(mc);
                 })
                 .minTicks(15)
                 .ready(() -> {
-                    equipElytra(mc); // re-assert each tick in case creative inventory sync clears it
+                    // Re-assert equipment, crouch and rear yaw through the complete settle window.
+                    // Standing wings overlap and can hide a rectangular inner-face regression.
+                    poseElytraForEvidence(mc);
                     return mc.player != null
                             && mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)
+                            && mc.player.isCrouching()
                             && svc.hasActiveCape(uuid)
                             && VanillaShim.cloakTexture(mc.player) != null;
                 })
+                .settleTicks(12)
                 .timeoutTicks(200)
                 .screenshot(prefix + "full_08_elytra_hides_cape" + suffix)
                 .assertion(() -> {
                     if (mc.player == null) return Step.Result.fail("player null");
-                    equipElytra(mc);
-                    boolean elytra = mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA);
-                    boolean activeCape = svc.hasActiveCape(uuid);
-                    String cloak = VanillaShim.cloakTexture(mc.player);
-                    if (!elytra) return Step.Result.fail("CHEST slot is not an elytra");
-                    if (!activeCape) return Step.Result.fail("hasActiveCape(uuid) is false");
-                    if (cloak == null) return Step.Result.fail("cloak location null (cancel via hide branch, not elytra)");
+                    Step.Result route = assertCapeRoute(
+                            mc, svc, uuid, "local_cape:" + hdCapeHash, true);
+                    if (!route.pass()) return route;
                     BufferedImage hdAtlas = hdCapePresentation.get();
                     if (!CapeElytraSilhouette.hasRequiredCutout(hdAtlas, 1)) {
                         return Step.Result.fail(
-                                "active HD cape atlas has no tapered Elytra alpha cutout");
+                                "active HD cape atlas has no complete vanilla Elytra envelope");
                     }
                     if (!CapeElytraSilhouette.isExactMaskedPresentation(
                             hdCapeSource.get(), hdAtlas, 1)) {
@@ -1316,7 +1317,8 @@ public final class FullScenario implements Scenario {
                     // CapeLayerMixin cancels the flat cape iff these inputs hold. Minecraft then
                     // renders the custom atlas on the worn Elytra, whose outline is alpha-driven.
                     return Step.Result.pass("cape-cancel inputs satisfied and active HD atlas has "
-                            + "a tapered Elytra cutout: elytra in CHEST + activeCape + cloak=" + cloak);
+                            + "the complete vanilla Elytra envelope: elytra in CHEST + activeCape + cloak="
+                            + VanillaShim.cloakTexture(mc.player));
                 }));
 
         // 8b. the cape editor previews the cape, never the worn elytra -----------------------------
@@ -2259,7 +2261,7 @@ public final class FullScenario implements Scenario {
                 return "animated atlas geometry changed: "
                         + atlas.getWidth() + "x" + atlas.getHeight() + " expected 64x64";
             }
-            if (!CapeElytraSilhouette.isOpaqueExceptWingCutout(atlas, 2)) {
+            if (!CapeElytraSilhouette.isOpaqueExceptElytraEnvelope(atlas, 2)) {
                 return "animated atlas does not preserve its Elytra cutout as the only transparency";
             }
             for (int frame = 0; frame < 2; frame++) {

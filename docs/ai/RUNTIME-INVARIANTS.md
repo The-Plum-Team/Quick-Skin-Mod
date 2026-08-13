@@ -84,8 +84,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   over-budget appearance gracefully instead of weakening the cap.
 - Server cache deletion belongs on the bounded cache-I/O executor. Remove a cache entry from the
   live namespace before scheduling deletion so a concurrent replacement cannot be deleted.
-- Cape atlases produced by the editor or custom import paths must keep the vanilla tapered alpha
-  cutout in the outer Elytra face at every supported scale and in every animation frame.
+- Cape atlases produced by the editor or custom import paths must keep the complete vanilla Elytra
+  alpha envelope at every supported scale and in every animation frame. That envelope includes
+  the transparent inner 10x20 face as well as the tapered outer face; otherwise an opaque source
+  canvas renders as a rectangular wing panel even though the editor preview looks tapered.
   Opaque-fill, import fallback, local/network presentation, and animation processing must share
   the same structural mask; content-addressed source bytes remain immutable when only presentation
   requires normalization.
@@ -161,10 +163,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's
   device/inode identity through every rename and rollback. An interrupted swap must roll back or
-  recover without touching a replacement or sibling path. Reap every launched Minecraft process,
-  including after forced termination, before closing its log handle or freezing evidence; a kill
-  request alone does not prove that an in-flight log write has quiesced. Runtime installation, game
-  directories, and dependency caches never enter the promoted evidence tree.
+  recover without touching a replacement or sibling path. Reap every launched Minecraft process
+  group, including descendants left after a shell launcher exits and after forced termination,
+  before closing its log handle or freezing evidence; a kill request or an exited group leader alone
+  does not prove that an in-flight log write has quiesced. Runtime installation, game directories,
+  and dependency caches never enter the promoted evidence tree.
 - Reusable Minecraft installations and downloads belong to `RuntimeStore/v1`, not an evidence
   directory. Recipe identity includes schema, host OS/architecture, Java major, Minecraft and
   loader versions, exact installer hash, launcher-library revision, and normalizer revision.
