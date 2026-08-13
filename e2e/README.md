@@ -23,7 +23,7 @@ This `fabric-and-neoforge-26.1.2` release branch exercises the following exact p
 | `fabric-26.1.2` | `26.1.2` | Fabric | `25` | `4` |
 | `neoforge-26.1.2` | `26.1.2` | NeoForge | `25` | `4` |
 
-Scenario contract SHA-256: `c552f8e8eec462185766f3ecb43cd82d6e0098140fb70222c569e7f66ff12f71`
+Scenario contract SHA-256: `39fa84a1cf271168c440b6fa5d2c26a69943a72257adbe09357e578208025783`
 Contract totals: `47` ordered steps, `42` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |

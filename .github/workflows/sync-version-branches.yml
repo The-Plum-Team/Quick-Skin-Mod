@@ -892,8 +892,8 @@ jobs:
           fi
           [[ "$runtime_policy" == "$EXPECTED_RUNTIME_POLICY" ]]
 
-  publish:
-    name: Publish validated port to ${{ matrix.target }}
+  authorize:
+    name: Authorize settled version-port validations
     needs:
       - discover
       - propose
@@ -903,6 +903,109 @@ jobs:
       needs.discover.result == 'success' &&
       needs.propose.result != 'cancelled' &&
       needs.validate.result != 'cancelled' &&
+      needs.discover.outputs.targets != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      validation_index: ${{ steps.validation-index.outputs.value }}
+
+    steps:
+      - name: Build one immutable settled validation index
+        id: validation-index
+        shell: bash
+        env:
+          EXPECTED_TARGETS: ${{ needs.discover.outputs.targets }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          jq -e '
+            type == "array" and length > 0 and
+            all(.[]; type == "string" and length > 0 and length <= 240 and
+              test("^[A-Za-z0-9._-]+-and-[A-Za-z0-9._-]+-[0-9]+(\\.[0-9]+)+$")) and
+            . == (sort | unique)
+          ' <<< "$EXPECTED_TARGETS" > /dev/null
+          jobs_file="$(mktemp "$RUNNER_TEMP/version-port-jobs.XXXXXX")"
+          # One settled inventory read replaces up to twelve polls in every parallel writer.
+          if ! gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100" \
+              > "$jobs_file"; then
+            # A settled matrix remains safe to retry: no writer can start without this index.
+            # Retry only the single centralized inventory read, never once per target.
+            sleep 5
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100" \
+              > "$jobs_file"
+          fi
+          index_dir="$(mktemp -d \
+            "$RUNNER_TEMP/version-port-validation-index.XXXXXX")"
+          index="$index_dir/index.json"
+          jq -n \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg source_sha "$GITHUB_SHA" \
+            --argjson expected_targets "$EXPECTED_TARGETS" \
+            --slurpfile pages "$jobs_file" '
+              def job_name($target):
+                "Validate port to " + $target + " without credentials";
+              ($expected_targets | map(job_name(.))) as $expected_names |
+              ([$pages[0][]?.jobs[]? |
+                select(.name as $name | $expected_names | index($name))]) as $jobs |
+              if ($jobs | length) != ($expected_targets | length) or
+                 ($jobs | map(.name) | sort | unique) != ($expected_names | sort) or
+                 (all($jobs[];
+                   .status == "completed" and
+                   (.conclusion | type == "string" and length > 0) and
+                   .run_id == ($run_id | tonumber) and
+                   .head_sha == $source_sha and
+                   (.run_attempt | type == "number" and . > 0 and floor == . and
+                     . <= ($run_attempt | tonumber))) | not)
+              then error("settled validate matrix does not match discovered targets")
+              else
+                ([$expected_targets[] as $target |
+                  select(any($jobs[];
+                    .name == job_name($target) and .conclusion == "success")) |
+                  $target]) as $successful_targets |
+                {schema_version:1,run_id:$run_id,
+                 authorization_attempt:$run_attempt,
+                 source_sha:$source_sha,expected_targets:$expected_targets,
+                 successful_targets:$successful_targets}
+              end
+            ' > "$index"
+          jq -e \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg source_sha "$GITHUB_SHA" \
+            --argjson expected_targets "$EXPECTED_TARGETS" '
+              (keys | sort) == (["authorization_attempt", "expected_targets",
+                "run_id", "schema_version", "source_sha",
+                "successful_targets"] | sort) and
+              .schema_version == 1 and .run_id == $run_id and
+              .authorization_attempt == $run_attempt and
+              .source_sha == $source_sha and
+              .expected_targets == $expected_targets and
+              (.successful_targets | type == "array" and
+                . == (sort | unique) and
+                all(.[]; . as $target |
+                  $expected_targets | index($target) != null))
+            ' "$index" > /dev/null
+          printf 'value=%s\n' "$(jq -c . "$index")" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish validated port to ${{ matrix.target }}
+    needs:
+      - discover
+      - propose
+      - validate
+      - authorize
+    if: >-
+      always() &&
+      needs.discover.result == 'success' &&
+      needs.propose.result != 'cancelled' &&
+      needs.validate.result != 'cancelled' &&
+      needs.authorize.result == 'success' &&
       needs.discover.outputs.targets != '[]'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -918,42 +1021,34 @@ jobs:
         target: ${{ fromJSON(needs.discover.outputs.targets) }}
 
     steps:
-      - name: Require this target's own validate leg
+      - name: Require this target's centrally authorized validation
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          EXPECTED_TARGETS: ${{ needs.discover.outputs.targets }}
           TARGET_BRANCH: ${{ matrix.target }}
+          VALIDATION_INDEX: ${{ needs.authorize.outputs.validation_index }}
         run: |
           set -euo pipefail
-          # Matrix needs-edges settle per stage, not per target, so a broken sibling target no
-          # longer skips this leg. The writer must still never publish a tree whose own exact
-          # validation leg did not succeed in this run.
-          validate_result=invalid
-          for attempt in {1..12}; do
-            jobs_json=""
-            if jobs_json="$(gh api --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100")"; then
-              validate_result="$(jq -r \
-                --arg name "Validate port to $TARGET_BRANCH without credentials" \
-                '[.[].jobs[] | select(.name == $name)] | if length == 1 then .[0].conclusion else "invalid" end' \
-                <<< "$jobs_json")"
-            else
-              validate_result=api-error
-            fi
-            if [[ "$validate_result" == success ]]; then
-              break
-            fi
-            if [[ "$validate_result" != invalid && "$validate_result" != null \
-              && "$validate_result" != api-error ]]; then
-              echo "::error::Validation for $TARGET_BRANCH concluded $validate_result"
-              exit 1
-            fi
-            if (( attempt < 12 )); then
-              echo "::notice::Validation job for $TARGET_BRANCH has not settled (attempt $attempt/12)"
-              sleep 5
-            fi
-          done
-          [[ "$validate_result" == success ]]
+          [[ "${#VALIDATION_INDEX}" -le 8192 ]]
+          jq -e \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg max_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg source_sha "$GITHUB_SHA" \
+            --arg target "$TARGET_BRANCH" \
+            --argjson expected_targets "$EXPECTED_TARGETS" \
+            '(keys | sort) == (["authorization_attempt", "expected_targets",
+              "run_id", "schema_version", "source_sha",
+              "successful_targets"] | sort) and
+             .schema_version == 1 and .run_id == $run_id and
+             (.authorization_attempt | test("^[1-9][0-9]*$") and
+               (tonumber <= ($max_attempt | tonumber))) and
+             .source_sha == $source_sha and
+             .expected_targets == $expected_targets and
+             (.successful_targets | type == "array" and
+               . == (sort | unique) and index($target) != null and
+               all(.[]; . as $entry_target |
+                 $expected_targets | index($entry_target) != null))' \
+            <<< "$VALIDATION_INDEX" > /dev/null
 
       - name: Download the immutable validated proposal
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
