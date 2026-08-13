@@ -112,6 +112,21 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `e2e/visual_evidence.py` reads successful `result.json` reports, verifies the scenario-contract
   hash and exact graph, PNG containment, full decode, dimensions, SHA-256, probes, and comparisons,
   and exposes the shared evidence model used by the AI review and public site.
+- `e2e/mod-compatibility-contract.json` is the reviewed optional-mod artifact lock. It owns the
+  supported integration ids, applicability rules, Modrinth project identities, and every immutable
+  external JAR URL/filename/size/SHA-256/SHA-512 tuple. `e2e/mod_compatibility.py` is its fail-closed
+  runtime reader, planner, and materializer. `e2e/update_mod_compatibility_lock.py` is the only code
+  allowed to query Modrinth or select a newest upstream release; it is an explicit maintainer tool,
+  never part of an E2E run.
+- `e2e/mod_compatibility_visual.py` authenticates one complete modded result and its clean
+  same-version/loader packaged baseline, pairs every capture by semantic identity, and emits only
+  content-addressed metadata-free images plus an exact source/implementation/contract/artifact
+  proof. `.github/workflows/mod-compatibility-e2e.yml` owns admission, the fully parallel
+  artifact-by-mod runtime matrix, and secretless curation.
+  `.github/workflows/mod-compatibility-review.yml` is the separate credential-bearing consumer; it
+  downloads only curated capsules, sends every pair to Sonnet even when pixels are identical,
+  escalates every non-high-clean result to Opus, and publishes a durable source-wave block before
+  cancelling siblings after a confirmed defect.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every later-version candidate with the same semantic

@@ -772,6 +772,55 @@
           ]
         }
       ]
+    },
+    {
+      "scenario": "mod-compatibility",
+      "execution_profiles": [
+        "compatibility"
+      ],
+      "orchestration": {
+        "mode": "single-client"
+      },
+      "roles": [
+        {
+          "role": "client_a",
+          "steps": [
+            {
+              "id": "integration_active",
+              "assertion_required": true
+            },
+            {
+              "id": "baseline_with_mod",
+              "assertion_required": true,
+              "capture": {
+                "title": "Compatibility baseline",
+                "review_tier": "all",
+                "expectation": "With the named compatibility mod loaded, a stable third-person flat-world view shows the complete local player with an intact UUID-selected vanilla default skin and no rendering corruption.",
+                "compatibility_reference_capture_id": "phase0-smoke.client_a.baseline",
+                "probes": []
+              }
+            },
+            {
+              "id": "apply_local_skin_with_mod",
+              "assertion_required": true,
+              "capture": {
+                "title": "Compatibility local skin",
+                "review_tier": "all",
+                "expectation": "With the named compatibility mod loaded, a normal first-person world view shows the custom skin's dark charcoal-and-gray plaid sleeve and brown hand without missing geometry, texture corruption, or interference from the other mod.",
+                "compatibility_reference_capture_id": "phase0-smoke.client_a.apply_local_skin",
+                "probes": []
+              }
+            }
+          ],
+          "comparisons": [
+            {
+              "first_step": "baseline_with_mod",
+              "second_step": "apply_local_skin_with_mod",
+              "minimum_changed_fraction": 1e-05
+            }
+          ]
+        }
+      ]
     }
   ]
 }
