@@ -23,7 +23,7 @@ This `master` integration baseline exercises the following exact packaged lanes:
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `5` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `5` |
 
-Scenario contract SHA-256: `dd97d3ea81cdde7d4fd870b1637fcb53c04b80973108bdadb6406179ce37b982`
+Scenario contract SHA-256: `824ab573c1ccfbfd7b0a6cc8815d665fb195d195f5ccb4e0f9bf9bf74a7ac673`
 Contract totals: `52` ordered steps, `45` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -166,6 +166,13 @@ the glyph threshold remains unchanged, so an empty region still fails closed. Ot
 use broad entropy/color and pairwise-change invariants rather than golden images, so GPU and
 Minecraft-version rendering differences are allowed. Every result records the literal fields
 `artifact_node`, `runtime_version`, `loader`, `scenario`, `jar_sha256`, and `port`.
+
+The remote propagation captures pin the disposable subject's current and interpolated head/body
+rotations and hold the observer at a numerically asserted rear vantage. Their passed runtime
+evidence records all three rotations and the observer/forward-vector cosine. This makes cape
+placement inspectable without treating a transient head turn as proof that a correctly rear-mounted
+cape crossed the player's chest; a front-facing subject or misplaced observer fails before AI
+review.
 
 The `full` scenario also exercises adjusted-cape parity against the production BMO asset. It
 centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import. One editor capture keeps
