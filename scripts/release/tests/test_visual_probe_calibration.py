@@ -211,8 +211,8 @@ class VisualProbeCalibrationTest(unittest.TestCase):
             ),
         )
 
-    def test_bmo_elytra_evidence_pins_the_interpolated_rear_pose(self) -> None:
-        """A logical crouch alone once left one rendered wing edge-on to the camera."""
+    def test_custom_elytra_evidence_pins_the_interpolated_rear_pose(self) -> None:
+        """A logical crouch alone can hide one wing or an opaque inner-face rectangle."""
 
         source = (
             ROOT
@@ -220,11 +220,19 @@ class VisualProbeCalibrationTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         bmo_section = source[source.index('Step.of("bundled_bmo_elytra")'):
                              source.index("// 6. animated cape")]
+        hd_section = source[source.index('Step.of("elytra_hides_cape")'):
+                            source.index("// 8b. the cape editor")]
         self.assertEqual(3, bmo_section.count(".settleTicks(12)"))
         # Both custom captures and the post-removal vanilla capture reapply the pose in action()
         # and ready(); the removal transition also restores it after opening the menu releases
         # movement keys, so no checkpoint can drift while textures/equipment settle.
-        self.assertEqual(7, source.count("poseElytraForEvidence(mc);"))
+        self.assertEqual(7, bmo_section.count("poseElytraForEvidence(mc);"))
+        # The fully opaque HD fixture owns the same two-call hold and settle window. Without it,
+        # overlapping standing wings can make the inner-face canvas regression look like a cape.
+        self.assertEqual(2, hd_section.count("poseElytraForEvidence(mc);"))
+        self.assertEqual(1, hd_section.count(".settleTicks(12)"))
+        self.assertIn("assertCapeRoute(", hd_section)
+        self.assertEqual(9, source.count("poseElytraForEvidence(mc);"))
         self.assertIn('Step.of("remove_cape_with_elytra")', bmo_section)
         self.assertIn('Step.of("vanilla_elytra_after_cape_removal")', bmo_section)
         self.assertIn('"quickskin.button.remove_cape"', bmo_section)
