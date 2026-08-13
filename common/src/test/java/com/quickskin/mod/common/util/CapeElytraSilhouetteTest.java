@@ -3,6 +3,8 @@ package com.quickskin.mod.common.util;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CapeElytraSilhouetteTest {
 
     @Test
-    void oneXMaskMatchesTheVanillaOuterWingRows() {
+    void oneXMaskMatchesTheCompleteVanillaElytraEnvelope() throws Exception {
         BufferedImage frame = opaque(64, 32);
 
         assertTrue(CapeElytraSilhouette.applyToFrame(frame, 0, 32));
@@ -27,7 +29,21 @@ class CapeElytraSilhouetteTest {
                         pixel, "outer wing row=" + row + " column=" + column);
             }
         }
-        assertEquals(0xff117788, frame.getRGB(35, 2), "adjacent right side changed");
+        assertEquals(0x00000000, frame.getRGB(24, 2),
+                "the unused inner face must not expose the source canvas");
+        assertEquals(0x00000000, frame.getRGB(22, 2),
+                "the upper left-side pixel lies outside vanilla's alpha envelope");
+        assertEquals(0xff117788, frame.getRGB(34, 2),
+                "a visible right-side pixel changed");
+        assertEquals(0x00000000, frame.getRGB(24, 0),
+                "unused top-face pixels must be transparent");
+        assertEquals(0xff117788, frame.getRGB(31, 0),
+                "a visible top-face pixel changed");
+        assertEquals(206, countOpaque(frame, 22, 0, 24, 22),
+                "the 1x mask must match vanilla's complete binary alpha envelope");
+        assertEquals("30a122a9da95ac4c31188e5c91c7d4be4809988292830d032115988cf63496de",
+                alphaEnvelopeSha256(frame),
+                "the complete 24x22 alpha map must match the fixed vanilla canary");
         assertEquals(0xff117788, frame.getRGB(1, 1), "cape body changed");
         assertTrue(CapeElytraSilhouette.hasRequiredCutout(frame, 1));
     }
@@ -46,6 +62,10 @@ class CapeElytraSilhouetteTest {
                 assertEquals(0xff117788, frame.getRGB(x, y));
             }
         }
+        assertEquals(0x00000000, frame.getRGB(24 * 4, 2 * 4),
+                "the inner face must be masked at HD scales too");
+        assertEquals(0xff117788, frame.getRGB(31 * 4, 0),
+                "visible top-face pixels must survive block scaling");
         assertTrue(CapeElytraSilhouette.hasRequiredCutout(frame, 1));
     }
 
@@ -74,10 +94,10 @@ class CapeElytraSilhouetteTest {
         CapeElytraSilhouette.applyToFrame(atlas, 0, 32);
         CapeElytraSilhouette.applyToFrame(atlas, 32, 32);
 
-        assertTrue(CapeElytraSilhouette.isOpaqueExceptWingCutout(atlas, 2));
+        assertTrue(CapeElytraSilhouette.isOpaqueExceptElytraEnvelope(atlas, 2));
 
         atlas.setRGB(2, 3, 0x00117788);
-        assertFalse(CapeElytraSilhouette.isOpaqueExceptWingCutout(atlas, 2));
+        assertFalse(CapeElytraSilhouette.isOpaqueExceptElytraEnvelope(atlas, 2));
     }
 
     @Test
@@ -105,5 +125,28 @@ class CapeElytraSilhouetteTest {
             }
         }
         return image;
+    }
+
+    private static int countOpaque(
+            BufferedImage image, int x, int y, int width, int height) {
+        int opaque = 0;
+        for (int py = y; py < y + height; py++) {
+            for (int px = x; px < x + width; px++) {
+                if (((image.getRGB(px, py) >>> 24) & 0xFF) == 0xFF) {
+                    opaque++;
+                }
+            }
+        }
+        return opaque;
+    }
+
+    private static String alphaEnvelopeSha256(BufferedImage image) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        for (int y = 0; y < 22; y++) {
+            for (int x = 22; x < 46; x++) {
+                digest.update((byte) (((image.getRGB(x, y) >>> 24) & 0xFF) == 0xFF ? 1 : 0));
+            }
+        }
+        return HexFormat.of().formatHex(digest.digest());
     }
 }
