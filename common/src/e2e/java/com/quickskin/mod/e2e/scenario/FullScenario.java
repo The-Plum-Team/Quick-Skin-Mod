@@ -27,6 +27,7 @@ import com.quickskin.mod.common.util.CapeZoomRange;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.common.util.TextureAlphaDetector;
 import com.quickskin.mod.config.ClientConfig;
+import com.quickskin.mod.e2e.DefaultSkinEvidenceView;
 import com.quickskin.mod.e2e.E2ELog;
 import com.quickskin.mod.e2e.Scenario;
 import com.quickskin.mod.e2e.Step;
@@ -177,10 +178,11 @@ public final class FullScenario implements Scenario {
         steps.add(Step.of("baseline")
                 .action(() -> {
                     resetState();
-                    enterWorldView(mc);
+                    DefaultSkinEvidenceView.hold(mc, false);
                 })
                 .minTicks(40) // ~2s render warmup so the first frame is real
-                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))
+                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player)
+                        && DefaultSkinEvidenceView.hold(mc, false))
                 .settleTicks(20) // reject a one-frame generic fallback before the UUID skin lands
                 .timeoutTicks(400)
                 .screenshot(prefix + "full_01_baseline" + suffix)
@@ -194,7 +196,8 @@ public final class FullScenario implements Scenario {
                     }
                     return Step.Result.pass("player present: " + VanillaShim.playerName(mc.player)
                             + " defaultSkin=" + actual + " activeSkin=" + svc.hasActiveSkin(uuid)
-                            + " activeCape=" + svc.hasActiveCape(uuid));
+                            + " activeCape=" + svc.hasActiveCape(uuid)
+                            + "; full-body evidence held");
                 }));
 
         // 2. local skin upload --------------------------------------------------------------------
