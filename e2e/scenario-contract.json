@@ -632,7 +632,7 @@
               "capture": {
                 "title": "Elytra hides cape",
                 "review_tier": "key",
-                "expectation": "The centered player has angled elytra wings and no flat rectangular cape hanging behind the main body.",
+                "expectation": "The centered crouching player has two distinct custom teal elytra wings whose outline is tapered like vanilla, with transparent space around and between them. No opaque rectangular panel from the full cape atlas or inner UV face is visible, and no flat cape hangs behind the player.",
                 "probes": []
               }
             },
