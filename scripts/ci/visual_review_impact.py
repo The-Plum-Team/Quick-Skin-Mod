@@ -14,6 +14,13 @@ SAFE_EXACT_PATHS = frozenset(
     {
         ".github/workflows/visual-review.yml",
         ".github/workflows/visual-review-drain.yml",
+        ".github/workflows/pages.yml",
+        "scripts/ci/github_api_retry.sh",
+        "scripts/ci/e2e_impact.py",
+        "scripts/ci/visual_review_queue.py",
+        "scripts/pages/rotate_artifacts.py",
+        "scripts/pages/select_artifact.py",
+        "scripts/release/tests/test_pages_artifact_rotation.py",
         "scripts/ci/visual_review_impact.py",
     }
 )

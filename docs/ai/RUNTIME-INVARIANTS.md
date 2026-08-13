@@ -147,16 +147,19 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   checkpoint whose contract says it is still outside the later inspection frame.
 - Adjusted-cape parity evidence must show a non-standard padded source before cropping and the final
   aligned atlas as separate semantic checkpoints. The source checkpoint must expose all four
-  padding bands; the aligned checkpoint must identify coloured pixels in auxiliary cape/elytra UV
-  faces as valid atlas content rather than padding. Back both views with exact source, transform,
-  preview, applied-atlas, and rendered-route assertions so model interpretation cannot replace the
-  deterministic contract.
+  padding bands, distinguish opaque black from transparency with a checkerboard, and label source
+  and output dimensions independently; the aligned checkpoint must identify coloured pixels in
+  auxiliary cape/elytra UV faces as valid atlas content rather than padding. Back both views with
+  exact source, transform, dimension-label, preview, applied-atlas, and rendered-route assertions
+  so model interpretation cannot replace the deterministic contract.
 - Every orchestrator invocation writes into a fresh owned workspace and promotes only its bounded
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's
   device/inode identity through every rename and rollback. An interrupted swap must roll back or
-  recover without touching a replacement or sibling path. Runtime installation, game directories,
-  and dependency caches never enter the promoted evidence tree.
+  recover without touching a replacement or sibling path. Reap every launched Minecraft process,
+  including after forced termination, before closing its log handle or freezing evidence; a kill
+  request alone does not prove that an in-flight log write has quiesced. Runtime installation, game
+  directories, and dependency caches never enter the promoted evidence tree.
 - Reusable Minecraft installations and downloads belong to `RuntimeStore/v1`, not an evidence
   directory. Recipe identity includes schema, host OS/architecture, Java major, Minecraft and
   loader versions, exact installer hash, launcher-library revision, and normalizer revision.
@@ -183,6 +186,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   bundle only when its authenticated originating target run and manifest both match the current
   release-branch head; a later protected Pages run may only roll that already validated bundle
   into cache.
+- Pages repository wakes and deploys use one shared publication concurrency group so a branch wave
+  cannot fan out multiple collectors. Discovery may defer on active release attestations, but must
+  not preselect every artifact and repeat selection in the collector. The collector owns exact
+  current-head selection; retryable GitHub API and installation-rate-limit failures use bounded
+  jittered backoff and remain distinguishable from authenticated evidence absence.
 - Retention is current-state, not longitudinal history. Keep exactly one durable Pages cache per
   release branch and exactly one lossless raw handoff for the matrix-derived Fabric 1.20.1 visual
   anchor. Treat raw packaged-E2E uploads, every other `pages-e2e-<branch>`, Pages fan-in, and the
@@ -232,7 +240,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
   entry for cooldown and retry. Each exact artifact ID locks its complete protected drain, from
   exact selection through cleanup, so duplicate wakes cannot overlap while unrelated capsules run
-  concurrently. Once a normalized report or durable block makes a source ineligible, an explicit
+  concurrently. Exact wakes must authenticate through ID-scoped capsule lookup and exact-name
+  report, cooldown, and generation-block lookup rather than multiplying a full artifact-inventory
+  scan across a parallel release wave; retryable GitHub API failures use bounded backoff and never
+  become an image verdict. Once a normalized report or durable block makes a source ineligible, an explicit
   GitHub installation-rate-limit response may defer input cleanup or the redundant continuation
   wake without turning the completed review red. The normalized report or block must outlive its
   durable input so deferred cleanup can never make reviewed work eligible again; artifact retention
