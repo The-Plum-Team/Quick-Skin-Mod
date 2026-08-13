@@ -615,6 +615,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
 
         admit = job_block("mod-compatibility-e2e.yml", "admit")
+        base_review_curate = job_block("visual-review.yml", "curate")
         prepare = job_block("mod-compatibility-e2e.yml", "prepare")
         runtime = job_block("mod-compatibility-e2e.yml", "compatibility-e2e")
         curate = job_block("mod-compatibility-e2e.yml", "curate")
@@ -627,6 +628,19 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("permissions: {}", execution_workflow)
         self.assertIn("permissions: {}", review_workflow)
         self.assertIn("visual-review-report.json", admit)
+        self.assertIn(
+            'manifest="$review_root/review-input/visual-review-manifest.json"',
+            admit,
+        )
+        self.assertNotIn(
+            'manifest="$review_root/visual-review-manifest.json"',
+            admit,
+        )
+        self.assertIn("${{ runner.temp }}/review-input/", base_review_curate)
+        self.assertIn(
+            "${{ runner.temp }}/curation-proof.json",
+            base_review_curate,
+        )
         self.assertIn(".semantic_valid == true", admit)
         self.assertIn(".defect == false", admit)
         self.assertIn('git rev-parse "$SOURCE_SHA^{tree}"', admit)
