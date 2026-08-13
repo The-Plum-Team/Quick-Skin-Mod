@@ -20,11 +20,11 @@ This `master` integration baseline exercises the following exact packaged lanes:
 
 | Artifact | Minecraft | Loader | Java | Contract scenarios |
 |---|---:|---|---:|---:|
-| `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `4` |
-| `forge-1.20.1` | `1.20.1` | Forge | `17` | `4` |
+| `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `5` |
+| `forge-1.20.1` | `1.20.1` | Forge | `17` | `5` |
 
-Scenario contract SHA-256: `1042d118516421b5fcd936792c71bd1639052354ae5ce401893d3e4295d1ee03`
-Contract totals: `49` ordered steps, `43` captures.
+Scenario contract SHA-256: `965cac86ee35f90c31a82f74d320d2752a580869086b049c639a5ebd9342eb64`
+Contract totals: `52` ordered steps, `45` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
@@ -32,6 +32,7 @@ Contract totals: `49` ordered steps, `43` captures.
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `7` | `5` |
 | `full` | `pr`, `release` | `single-client` | `client_a` | `34` | `32` |
+| `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->
@@ -273,7 +274,8 @@ never hide a semantic failure. It uploads only a schema-normalized report; raw p
 private. Transient provider failures create only a sanitized one-day cooldown marker, leaving the
 queue entry for retry while other entries progress. Terminal validation/configuration failures are
 marked and retired. An independent cleanup job deletes a settled entry by exact artifact id. The
-final small report remains for one day. Exact-policy verdict cache shards remain for seven days;
+final small report remains for seven days so it can release the delayed compatibility wave.
+Exact-policy verdict cache shards remain for seven days;
 parallel drains may briefly publish siblings, and a later protected successor combines and retires
 every authenticated shard it consumed without dropping concurrent verdicts.
 
@@ -287,6 +289,54 @@ and current anchor head before discovering every non-anchor branch. A stale cert
 no-op. There is no direct automatic fan-out for a documentation/site/administration-only tip,
 because that tip may include an older uncertified runtime change. Manual exact-target dispatch
 remains available for recovery.
+
+## Post-validation optional-mod compatibility
+
+An automatic release-tree run starts this wave only after that exact tree has passed Build, the
+complete packaged suite, and independent semantic AI review. The execution unit is one release
+artifact plus one optional mod. Every applicable unit runs concurrently, first executes the
+`mod-compatibility` activation scenario, and then executes the complete ordinary release scenario
+set. Unsupported combinations are retained as explicit `not_applicable` plan rows rather than
+silently disappearing.
+
+[`mod-compatibility-contract.json`](mod-compatibility-contract.json) locks Customizable Player
+Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, and ReplayMod. Player Armor Stands
+is intentionally absent and unsupported. A runtime may install only the exact URL, filename, byte
+size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth for `latest`.
+Inspect the current branch plan without launching Minecraft:
+
+```bash
+python3 e2e/mod_compatibility.py --plan
+```
+
+To exercise one lane manually after staging the ordinary release artifacts, use the same
+orchestrator and include both the activation scenario and the complete base profile:
+
+```bash
+python3 e2e/orchestrator.py \
+  --packaged \
+  --artifacts-manifest build/release/artifacts.json \
+  --artifact-node fabric-1.20.1 \
+  --runtime-version 1.20.1 \
+  --compatibility-mod cpm \
+  --scenarios mod-compatibility,phase0-smoke,propagation,propagation-live,full
+```
+
+Refreshing external versions is a deliberate maintenance operation, not a test step. From a
+trusted checkout with current remote release branches, run the updater and review every selected
+version, URL, applicability change, and checksum diff before committing it:
+
+```bash
+python3 e2e/update_mod_compatibility_lock.py
+python3 e2e/mod_compatibility.py --validate
+```
+
+After every deterministic lane passes, a secretless job authenticates the full modded result and
+the clean same-version/loader result, pairs every contracted capture, and re-encodes only bounded,
+metadata-free PNGs. The credential-bearing review workflow receives that curated capsule, never
+the raw packaged artifacts. Sonnet reviews every pair semantically—even byte-identical pairs—and
+Opus confirms every concern or confidence below high. A first Opus-confirmed defect creates a
+durable source-wave block and cancels the remaining compatibility review jobs.
 
 ## Public visual evidence
 

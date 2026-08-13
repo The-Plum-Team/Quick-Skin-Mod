@@ -135,6 +135,16 @@ immutable workflow and governance activation contract.
   conclusions never depend on model output. The semantic certificate gates only scheduling of the
   cross-version wave: provider failure or a semantic defect deliberately delays that wave instead
   of blessing an unverified baseline.
+- A clean semantic review of an exact synchronized release tree starts a separate optional-mod
+  compatibility wave. Protected planning derives every `version x loader x mod` lane from the
+  release matrix and `e2e/mod-compatibility-contract.json`, including explicit N/A rows. Applicable
+  lanes run concurrently, prove that the selected integration activated, and execute both the
+  compatibility scenario and the complete base suite with only immutable size/SHA-256/SHA-512
+  verified external JARs. Secretless curation pairs the full modded result with the clean
+  same-version/loader result; Sonnet semantically reviews every pair, including identical pixels,
+  and Opus verifies every non-high-clean result. The first confirmed defect records a durable wave
+  block and cancels sibling reviews. This post-validation signal does not replace or weaken Build,
+  Packaged E2E, or the independent 1.20.1 semantic certification gate.
 - Pages wake and deploy events share one coalescing lock. A parallel release-attestation burst
   retains only the running publication member and the newest pending survivor; the survivor
   rediscovers every exact current release head. Discovery defers while a release attestation is
@@ -143,17 +153,20 @@ immutable workflow and governance activation contract.
   to installation-rate-limit and transient transport/server responses; those responses are never
   reclassified as missing evidence.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
-  named exceptions are the seven-day queued visual-review capsules, semantic certificates, and
-  rolling exact-policy visual verdict caches, plus three 90-day current-state artifacts: the
+  named seven-day exceptions are automatic-sync packaged evidence/input bundles needed by delayed
+  compatibility review, compatibility plans/evidence/capsules/reports/block markers, queued visual
+  review capsules, semantic certificates, and rolling exact-policy visual verdict caches. Three
+  90-day current-state artifacts remain: the
   SHA-bound Pages cache, the matrix-derived lossless
   Fabric 1.20.1 anchor handoff, and the immutable `release-<release-id>` bundle. The release bundle
   spans protected environment
   approvals and provides bounded recovery for an interrupted publication. After a successful Pages
   replacement, protected rotation deletes by exact artifact ID the superseded cache, ordinary
   consumed `pages-e2e-<branch>` handoffs, older lossless anchor generations, Pages fan-in artifacts,
-  and the deploy artifact while preserving the current lossless anchor. Raw packaged-E2E proof
-  retains its one-day window because a concurrent branch attestation may still consume it; a
-  completed or terminally invalid AI queue entry is deleted immediately, while a transiently
+  and the deploy artifact while preserving the current lossless anchor. Ordinary raw packaged-E2E
+  proof retains its one-day window because a concurrent branch attestation may still consume it;
+  an automatic synchronization source retains seven days for the post-semantic compatibility wave.
+  A completed or terminally invalid AI queue entry is deleted immediately, while a transiently
   failed entry remains bounded for retry. A
   protected schedule also deletes by exact cache ID Actions caches scoped to branch
   refs that no longer exist. On live branches it recognizes only SHA-bearing `setup-gradle` home
