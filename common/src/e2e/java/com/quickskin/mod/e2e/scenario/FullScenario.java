@@ -78,7 +78,8 @@ import javax.imageio.ImageIO;
  *   <li>known cape &mdash; cape menu shot; {@code applyCape("known:test")}; cape id + location.</li>
  *   <li>CapeAdjustScreen &mdash; opened with a test image + harness-owned {@code onApply} consumer.</li>
  *   <li>BMO editor parity &mdash; crop a black-padded 128&times;64 import and compare its cape and
- *       elytra atlas/render paths with the bundled 64&times;32 original.</li>
+ *       elytra atlas/render paths with the bundled 64&times;32 original, then remove it through the
+ *       cape menu and prove the still-equipped wings return to vanilla's elytra texture.</li>
  *   <li>animated cape &mdash; apply a valid bundled GIF cape atlas, pin two distinct frames, and
  *       prove both the active animation state and the rendered cape change.</li>
  *   <li>HD cape no-downscale &mdash; import a 256&times;128 cape; metadata resolution == source dims.</li>
@@ -171,6 +172,7 @@ public final class FullScenario implements Scenario {
         final String bundledBmoElytraShot = prefix + "full_05i_bmo_bundled_elytra" + suffix;
         final String adjustedBmoCapeShot = prefix + "full_05l_bmo_adjusted_cape" + suffix;
         final String adjustedBmoElytraShot = prefix + "full_05m_bmo_adjusted_elytra" + suffix;
+        final String removedBmoElytraShot = prefix + "full_05n_bmo_removed_vanilla_elytra" + suffix;
 
         List<Step> steps = new ArrayList<>();
 
@@ -960,7 +962,11 @@ public final class FullScenario implements Scenario {
                     enterWorldView(mc);
                     setChestSlot(mc, ItemStack.EMPTY);
                     if (adjustedBmoCapeHash != null) {
-                        svc.applyCape(uuid, "local_cape:" + adjustedBmoCapeHash);
+                        String capeId = "local_cape:" + adjustedBmoCapeHash;
+                        ClientConfig config = ClientConfig.getInstance();
+                        config.activeCapeHash = capeId;
+                        config.save();
+                        svc.applyCape(uuid, capeId);
                     }
                 })
                 .minTicks(30)
@@ -1000,6 +1006,74 @@ public final class FullScenario implements Scenario {
                         ? assertAdjustedBmoRoute(mc, svc, uuid, true)
                         : Step.Result.fail("BMO setup failed before adjusted elytra: "
                                 + bmoSetupFailure.get())));
+
+        // 5n-5o. removing an active cape restores the vanilla elytra texture ---------------------
+        // Start from the immediately preceding, render-truthful adjusted-BMO elytra checkpoint.
+        // One step opens the real cape menu and presses Remove Cape; the next returns to the exact
+        // same equipped, crouching rear view. Keeping UI action and world capture separate matters:
+        // opening a paused screen releases movement keys, so it cannot itself certify the pose.
+        steps.add(Step.of("remove_cape_with_elytra")
+                .action(() -> {
+                    enterWorldView(mc);
+                    poseElytraForEvidence(mc);
+                    VanillaShim.setScreen(mc, new PlayerCapeMenuScreen(null));
+                })
+                .minTicks(8)
+                .ready(() -> VanillaShim.currentScreen(mc) instanceof PlayerCapeMenuScreen screen
+                        && !screen.children().isEmpty())
+                .timeoutTicks(300)
+                .assertion(() -> {
+                    Step.Result customRoute = assertAdjustedBmoRoute(
+                            mc, svc, uuid, true, false);
+                    if (!customRoute.pass()) {
+                        return Step.Result.fail("custom elytra precondition failed: "
+                                + customRoute.message());
+                    }
+                    String expectedCapeId = "local_cape:" + adjustedBmoCapeHash;
+                    if (!expectedCapeId.equals(ClientConfig.getInstance().activeCapeHash)) {
+                        return Step.Result.fail("persisted cape precondition failed: "
+                                + ClientConfig.getInstance().activeCapeHash
+                                + " expected " + expectedCapeId);
+                    }
+                    String removeLabel = Component.translatable(
+                            "quickskin.button.remove_cape").getString();
+                    if (!pressActiveButton(mc, removeLabel)) {
+                        return Step.Result.fail(
+                                "active Remove Cape button not found in cape menu");
+                    }
+                    if (svc.hasActiveCape(uuid)
+                            || svc.getCapeLocation(uuid) != null
+                            || !ClientConfig.getInstance().activeCapeHash.isEmpty()) {
+                        return Step.Result.fail(
+                                "Remove Cape did not synchronously clear config and service state");
+                    }
+                    return Step.Result.pass("real Remove Cape button cleared the active custom "
+                            + "cape while the elytra remained equipped");
+                }));
+
+        // The wings must keep rendering, but both custom texture inputs must disappear so
+        // vanilla's minecraft:textures/entity/elytra.png fallback owns the captured surface.
+        final AtomicInteger vanillaElytraWaitTicks = new AtomicInteger(0);
+        steps.add(Step.of("vanilla_elytra_after_cape_removal")
+                .action(() -> {
+                    vanillaElytraWaitTicks.set(0);
+                    enterWorldView(mc);
+                    poseElytraForEvidence(mc);
+                })
+                .minTicks(25)
+                .ready(() -> {
+                    poseElytraForEvidence(mc);
+                    String problem = vanillaElytraFallbackProblem(mc, svc, uuid);
+                    int waited = vanillaElytraWaitTicks.incrementAndGet();
+                    if (problem != null && waited % 40 == 0) {
+                        E2ELog.info("waiting for vanilla elytra fallback: " + problem);
+                    }
+                    return problem == null;
+                })
+                .settleTicks(12)
+                .timeoutTicks(300)
+                .screenshot(removedBmoElytraShot)
+                .assertion(() -> assertVanillaElytraAfterCapeRemoval(mc, svc, uuid)));
 
         steps.add(Step.of("bmo_render_parity")
                 .minTicks(15)
@@ -2353,9 +2427,12 @@ public final class FullScenario implements Scenario {
      * @return false when no enabled button carries that label
      */
     private static boolean pressResolutionButton(Minecraft mc, String label) {
-        if (VanillaShim.currentScreen(mc) == null) {
-            return false;
-        }
+        return pressActiveButton(mc, label);
+    }
+
+    /** Press an enabled button on the current screen by its rendered, localized label. */
+    private static boolean pressActiveButton(Minecraft mc, String label) {
+        if (VanillaShim.currentScreen(mc) == null) return false;
         for (GuiEventListener child : VanillaShim.currentScreen(mc).children()) {
             if (child instanceof Button button
                     && label.equals(button.getMessage().getString())
@@ -2383,6 +2460,17 @@ public final class FullScenario implements Scenario {
             String capeId,
             boolean expectElytra
     ) {
+        return assertCapeRoute(mc, service, uuid, capeId, expectElytra, true);
+    }
+
+    private static Step.Result assertCapeRoute(
+            Minecraft mc,
+            PlayerAppearanceService service,
+            UUID uuid,
+            String capeId,
+            boolean expectElytra,
+            boolean requireStablePose
+    ) {
         if (!hasExpectedCape(service, uuid, capeId)) {
             PlayerAppearance appearance = service.getAppearance(uuid);
             return Step.Result.fail("active cape="
@@ -2394,10 +2482,11 @@ public final class FullScenario implements Scenario {
         if (hasElytra != expectElytra) {
             return Step.Result.fail("elytra equipped=" + hasElytra + " expected " + expectElytra);
         }
-        if (expectElytra && !mc.player.isCrouching()) {
+        if (expectElytra && requireStablePose && !mc.player.isCrouching()) {
             return Step.Result.fail("elytra evidence pose is not crouching");
         }
-        if (expectElytra && (!sameRotation(mc.player.getYRot(), mc.player.yRotO)
+        if (expectElytra && requireStablePose
+                && (!sameRotation(mc.player.getYRot(), mc.player.yRotO)
                 || !sameRotation(mc.player.getYRot(), mc.player.yHeadRot)
                 || !sameRotation(mc.player.getYRot(), mc.player.yHeadRotO)
                 || !sameRotation(mc.player.getYRot(), mc.player.yBodyRot)
@@ -2411,17 +2500,95 @@ public final class FullScenario implements Scenario {
         }
         String cloak = VanillaShim.cloakTexture(mc.player);
         if (cloak == null) return Step.Result.fail("cloak texture is null for " + capeId);
+        if (!String.valueOf(resolved).equals(cloak)) {
+            return Step.Result.fail("renderer cloak=" + cloak + " expected " + resolved);
+        }
         return Step.Result.pass(capeId + " resolved to " + resolved
                 + (expectElytra ? " with elytra equipped" : " with an empty chest slot"));
     }
 
+    private static String vanillaElytraFallbackProblem(
+            Minecraft mc, PlayerAppearanceService service, UUID uuid) {
+        if (mc.player == null) return "player is null";
+        if (!mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)) {
+            return "CHEST slot is not elytra";
+        }
+        if (!mc.player.isCrouching()) return "player is not crouching";
+        if (service.hasActiveCape(uuid)) return "cape service remains active";
+        Object serviceCape = service.getCapeLocation(uuid);
+        if (serviceCape != null) return "cape service location=" + serviceCape;
+        String configuredCape = ClientConfig.getInstance().activeCapeHash;
+        if (!configuredCape.isEmpty()) return "persisted cape=" + configuredCape;
+        PlayerAppearance appearance = service.getAppearance(uuid);
+        if (appearance == null) return "appearance is null";
+        String capeId = appearance.getCapeId();
+        if (capeId != null && !capeId.isEmpty()) return "appearance cape=" + capeId;
+        String cloak = VanillaShim.cloakTexture(mc.player);
+        if (cloak != null) return "renderer cloak=" + cloak;
+        String profileElytra = VanillaShim.elytraTexture(mc.player);
+        if (profileElytra != null) return "profile elytra=" + profileElytra;
+        return null;
+    }
+
+    private static Step.Result assertVanillaElytraAfterCapeRemoval(
+            Minecraft mc, PlayerAppearanceService service, UUID uuid) {
+        if (mc.player == null) return Step.Result.fail("player null");
+        if (!mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)) {
+            return Step.Result.fail("Remove Cape also removed the equipped elytra");
+        }
+        if (!mc.player.isCrouching()) {
+            return Step.Result.fail("vanilla elytra evidence pose is not crouching");
+        }
+        if (!sameRotation(mc.player.getYRot(), mc.player.yRotO)
+                || !sameRotation(mc.player.getYRot(), mc.player.yHeadRot)
+                || !sameRotation(mc.player.getYRot(), mc.player.yHeadRotO)
+                || !sameRotation(mc.player.getYRot(), mc.player.yBodyRot)
+                || !sameRotation(mc.player.getYRot(), mc.player.yBodyRotO)) {
+            return Step.Result.fail("vanilla elytra camera/body yaw is not stably aligned");
+        }
+        PlayerAppearance appearance = service.getAppearance(uuid);
+        String capeId = appearance == null ? null : appearance.getCapeId();
+        if (capeId != null && !capeId.isEmpty()) {
+            return Step.Result.fail("cape id survived Remove Cape: " + capeId);
+        }
+        if (service.hasActiveCape(uuid) || service.getCapeLocation(uuid) != null) {
+            return Step.Result.fail("cape service still exposes an active cape after removal");
+        }
+        if (!ClientConfig.getInstance().activeCapeHash.isEmpty()) {
+            return Step.Result.fail("persisted active cape survived Remove Cape: "
+                    + ClientConfig.getInstance().activeCapeHash);
+        }
+        String cloak = VanillaShim.cloakTexture(mc.player);
+        if (cloak != null) {
+            return Step.Result.fail("renderer cloak survived Remove Cape: " + cloak);
+        }
+        String profileElytra = VanillaShim.elytraTexture(mc.player);
+        if (profileElytra != null) {
+            return Step.Result.fail("test profile unexpectedly supplies an elytra texture: "
+                    + profileElytra);
+        }
+        return Step.Result.pass("Remove Cape cleared persisted, service and renderer cape state; "
+                + "elytra remains equipped and renderer inputs select "
+                + "minecraft:textures/entity/elytra.png");
+    }
+
     private Step.Result assertAdjustedBmoRoute(
             Minecraft mc, PlayerAppearanceService service, UUID uuid, boolean expectElytra) {
+        return assertAdjustedBmoRoute(mc, service, uuid, expectElytra, true);
+    }
+
+    private Step.Result assertAdjustedBmoRoute(
+            Minecraft mc,
+            PlayerAppearanceService service,
+            UUID uuid,
+            boolean expectElytra,
+            boolean requireStablePose) {
         if (adjustedBmoCapeHash == null) {
             return Step.Result.fail("adjusted BMO cape was not catalogued");
         }
         String capeId = "local_cape:" + adjustedBmoCapeHash;
-        Step.Result route = assertCapeRoute(mc, service, uuid, capeId, expectElytra);
+        Step.Result route = assertCapeRoute(
+                mc, service, uuid, capeId, expectElytra, requireStablePose);
         if (!route.pass()) return route;
         BufferedImage expected = bundledBmoAtlas.get();
         BufferedImage adjusted = adjustedBmoAtlas.get();
