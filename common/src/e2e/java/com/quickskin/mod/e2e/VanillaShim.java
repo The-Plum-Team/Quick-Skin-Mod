@@ -33,10 +33,11 @@ import java.util.function.Consumer;
  *       (26.x).</li>
  *   <li><b>current screen</b>: {@code Minecraft.screen} field (1.20.1..1.21.x) vs {@code mc.gui.screen()}
  *       (26.x).</li>
- *   <li><b>skin/cape texture location</b> (the render-truthful value the player renderer samples):
- *       {@code getSkinTextureLocation()}/{@code getCloakTextureLocation()} (1.20.1) →
- *       {@code getSkin().texture()/capeTexture()} returning a ResourceLocation (1.21.x) →
- *       {@code getSkin().body()/cape()} returning a {@code ClientAsset.Texture} whose
+ *   <li><b>skin/cape/elytra texture location</b> (the render-truthful values the player renderer
+ *       samples): {@code getSkinTextureLocation()}/{@code getCloakTextureLocation()}/
+ *       {@code getElytraTextureLocation()} (1.20.1) → {@code getSkin().texture()/capeTexture()/
+ *       elytraTexture()} returning a ResourceLocation (1.21.x) →
+ *       {@code getSkin().body()/cape()/elytra()} returning a {@code ClientAsset.Texture} whose
  *       {@code texturePath()} is the Identifier (26.x). Returned as a String so no renamed type
  *       ({@code ResourceLocation}→{@code Identifier}) is imported.</li>
  *   <li><b>player model geometry</b>: {@code getModelName()} (1.20.1) vs the model component of
@@ -280,6 +281,11 @@ public final class VanillaShim {
         return resolveLoc(p, "getCloakTextureLocation", new String[]{"capeTexture", "cape"});
     }
 
+    /** As {@link #skinTexture} for a profile-provided elytra ({@code null} for vanilla fallback). */
+    public static String elytraTexture(AbstractClientPlayer p) {
+        return resolveLoc(p, "getElytraTextureLocation", new String[]{"elytraTexture", "elytra"});
+    }
+
     /** Null-safe ("null" string) variants for diagnostic logging. */
     public static String skinTextureStr(AbstractClientPlayer p) { return String.valueOf(skinTexture(p)); }
     public static String cloakTextureStr(AbstractClientPlayer p) { return String.valueOf(cloakTexture(p)); }
@@ -298,11 +304,21 @@ public final class VanillaShim {
         if (p == null) return null;
         try {
             // 1.20.1: a direct getter returning a ResourceLocation.
+            String intermediaryName = switch (directName) {
+                case "getSkinTextureLocation" -> "method_3117";
+                case "getElytraTextureLocation" -> "method_3122";
+                default -> "method_3119";
+            };
+            String officialName = switch (directName) {
+                case "getSkinTextureLocation" -> "m_108560_";
+                case "getElytraTextureLocation" -> "m_108563_";
+                default -> "m_108561_";
+            };
             Method direct = findNoArg(
                     p.getClass(),
                     directName,
-                    directName.equals("getSkinTextureLocation") ? "method_3117" : "method_3119",
-                    directName.equals("getSkinTextureLocation") ? "m_108560_" : "m_108561_"
+                    intermediaryName,
+                    officialName
             );
             if (direct != null) {
                 Object r = direct.invoke(p);
@@ -317,6 +333,7 @@ public final class VanillaShim {
                         Method m = switch (acc) {
                             case "texture" -> findNoArg(skin.getClass(), acc, "comp_1626");
                             case "capeTexture" -> findNoArg(skin.getClass(), acc, "comp_1627");
+                            case "elytraTexture" -> findNoArg(skin.getClass(), acc, "comp_1628");
                             default -> findNoArg(skin.getClass(), acc);
                         };
                         if (m == null) continue;
