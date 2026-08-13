@@ -30,6 +30,8 @@ SHA = re.compile(r"^[0-9a-f]{40}$")
 PAGES_WORKFLOW = ".github/workflows/pages.yml"
 E2E_WORKFLOW = ".github/workflows/on-demand-e2e.yml"
 PAGES_EVENTS = frozenset({"schedule", "workflow_dispatch", "workflow_run"})
+REQUEST_ATTEMPTS = 4
+RETRYABLE_HTTP_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
 
 
 class RotationError(RuntimeError):
@@ -240,25 +242,65 @@ class GitHubApi:
         self.token = token
         self.api_url = api_url.rstrip("/")
 
-    def _request(self, method: str, path: str) -> Any:
-        request = urllib.request.Request(
-            f"{self.api_url}{path}",
-            method=method,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {self.token}",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "Quick-Skin-Pages-evidence-rotation/1",
-            },
+    @staticmethod
+    def _retry_delay(path: str, attempt: int) -> float:
+        jitter = (sum(path.encode("utf-8")) % 997) / 997
+        return min(2**attempt, 30) + jitter
+
+    @staticmethod
+    def _retryable_http_error(
+        exc: urllib.error.HTTPError, detail: str
+    ) -> bool:
+        if exc.code in RETRYABLE_HTTP_STATUSES:
+            return True
+        if exc.code != 403:
+            return False
+        return bool(
+            exc.headers.get("X-RateLimit-Remaining", "") == "0"
+            or exc.headers.get("Retry-After", "")
+            or "rate limit" in detail.lower()
         )
-        try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                body = response.read()
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            raise ApiError(exc.code, f"GitHub API {method} {path} failed: {detail}") from exc
-        except urllib.error.URLError as exc:
-            raise RotationError(f"GitHub API {method} {path} failed: {exc}") from exc
+
+    def _request(self, method: str, path: str) -> Any:
+        last_error: BaseException | None = None
+        last_status = 0
+        last_detail = ""
+        for attempt in range(REQUEST_ATTEMPTS):
+            request = urllib.request.Request(
+                f"{self.api_url}{path}",
+                method=method,
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "Authorization": f"Bearer {self.token}",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                    "User-Agent": "Quick-Skin-Pages-evidence-rotation/1",
+                },
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    body = response.read()
+                break
+            except urllib.error.HTTPError as exc:
+                last_error = exc
+                last_status = exc.code
+                last_detail = exc.read().decode("utf-8", errors="replace")
+                retryable = self._retryable_http_error(exc, last_detail)
+            except (urllib.error.URLError, TimeoutError) as exc:
+                last_error = exc
+                last_status = 0
+                last_detail = str(exc)
+                retryable = True
+            if not retryable or attempt + 1 == REQUEST_ATTEMPTS:
+                raise ApiError(
+                    last_status,
+                    f"GitHub API {method} {path} failed: {last_detail}",
+                ) from last_error
+            time.sleep(self._retry_delay(path, attempt))
+        else:  # pragma: no cover - the loop either breaks or raises
+            raise ApiError(
+                last_status,
+                f"GitHub API {method} {path} failed: {last_detail}",
+            ) from last_error
         if not body:
             return None
         try:
