@@ -23,15 +23,15 @@ This `fabric-and-neoforge-1.21.9` release branch exercises the following exact p
 | `fabric-1.21.9` | `1.21.9` | Fabric | `21` | `4` |
 | `neoforge-1.21.9` | `1.21.9` | NeoForge | `21` | `4` |
 
-Scenario contract SHA-256: `68b93a835e000ca4c1f04b6ec5f5ba09190cccacd22a4b833e620591d62d2802`
-Contract totals: `47` ordered steps, `42` captures.
+Scenario contract SHA-256: `244073d94af1428d4ec21a6dca3dfbb4ba026418f6ec4399126a4bb697ad2a3a`
+Contract totals: `49` ordered steps, `43` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `7` | `5` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `32` | `31` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `34` | `32` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->
@@ -175,7 +175,10 @@ the preview, applied, and persisted atlases to remain pixel-identical to the bun
 Separate direct and adjusted world captures cover both the cape and elytra render routes; their
 tightly cropped comparison allows only small entity-animation and lighting drift. The elytra
 captures hold the player in a deterministic crouching pose, opening the two wings far enough for
-semantic review to distinguish elytra geometry from a draped cape.
+semantic review to distinguish elytra geometry from a draped cape. A following checkpoint presses
+the real Remove Cape control without unequipping the elytra, requires persisted, service and
+renderer cape state to clear, and captures the same pose using Minecraft's vanilla elytra fallback.
+Its bounded comparison against the adjusted BMO wings must show a material texture change.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves

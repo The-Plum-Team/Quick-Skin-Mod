@@ -18,6 +18,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             re.compile(r"\.getMainRenderTarget\s*\("),
             re.compile(r"\.getSkinTextureLocation\s*\("),
             re.compile(r"\.getCloakTextureLocation\s*\("),
+            re.compile(r"\.getElytraTextureLocation\s*\("),
         )
         offenders: list[str] = []
         for source in sorted(E2E_JAVA.rglob("*.java")):
@@ -96,6 +97,22 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn('.ready(() -> holdModelEvidenceView(mc, "classic"))', scenario)
         self.assertIn("expectedModel.equals(VanillaShim.playerModel(mc.player))", scenario)
         self.assertIn("restoreModelEvidenceView(mc);", scenario)
+
+    def test_elytra_texture_adapter_pins_exact_runtime_names(self) -> None:
+        """Wrong reflection aliases can resolve unrelated methods with plausible values."""
+
+        shim = SHIM.read_text(encoding="utf-8")
+        self.assertIn("public static String elytraTexture", shim)
+        self.assertIn(
+            'case "getElytraTextureLocation" -> "method_3122";', shim
+        )
+        self.assertIn(
+            'case "getElytraTextureLocation" -> "m_108563_";', shim
+        )
+        self.assertIn(
+            'case "elytraTexture" -> findNoArg(skin.getClass(), acc, "comp_1628")',
+            shim,
+        )
 
     def test_propagation_observer_baseline_hides_the_already_custom_subject(self) -> None:
         scenario = (
