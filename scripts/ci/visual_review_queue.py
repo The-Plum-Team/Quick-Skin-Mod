@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -39,6 +40,9 @@ DRAIN_EVENTS = frozenset({"repository_dispatch", "schedule", "workflow_dispatch"
 MAX_ARTIFACTS = 10_000
 MAX_INPUT_BYTES = 536_870_912
 DEFAULT_COOLDOWN_MINUTES = 30
+MAX_NAMED_ARTIFACTS = 1_000
+REQUEST_ATTEMPTS = 4
+RETRYABLE_HTTP_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
 
 
 class QueueError(RuntimeError):
@@ -64,6 +68,10 @@ class Artifact:
 
 class QueueApi(Protocol):
     def list_artifacts(self) -> list[Artifact]: ...
+
+    def list_artifacts_named(self, name: str) -> list[Artifact]: ...
+
+    def get_artifact(self, artifact_id: int) -> Artifact | None: ...
 
     def get_run(self, run_id: int) -> dict[str, Any]: ...
 
@@ -328,6 +336,83 @@ def select_pending(
     return min(candidates, key=priority)
 
 
+def select_requested(
+    api: QueueApi,
+    *,
+    repository: str,
+    requested_artifact_id: int,
+    now: datetime | None = None,
+    cooldown: timedelta = timedelta(minutes=DEFAULT_COOLDOWN_MINUTES),
+) -> tuple[Artifact, int] | None:
+    """Authenticate one exact wake without scanning the repository-wide queue.
+
+    Direct wakes already carry an immutable artifact id and are isolated by that id's workflow
+    concurrency group. Query only that capsule and the three exact marker names that can make it
+    ineligible. Generic scheduled recovery still uses :func:`select_pending` so it can prioritize
+    the oldest source across the complete durable queue.
+    """
+
+    if requested_artifact_id <= 0:
+        raise QueueError("requested artifact id must be a positive integer")
+    requested = api.get_artifact(requested_artifact_id)
+    if requested is None:
+        # A duplicate wake may start after the successful drain deleted its exact capsule.
+        return None
+    match = INPUT_NAME.fullmatch(requested.name)
+    if (
+        match is None
+        or requested.expired
+        or requested.size_in_bytes > MAX_INPUT_BYTES
+    ):
+        return None
+    source_run_id = int(match.group("source"))
+    generation = input_generation(requested)
+    related: list[Artifact] = []
+    for name in (
+        f"visual-review-{source_run_id}",
+        f"visual-review-attempt-{source_run_id}",
+        f"visual-review-wave-block-{generation}",
+    ):
+        named = api.list_artifacts_named(name)
+        if len(named) > MAX_NAMED_ARTIFACTS:
+            raise QueueError(f"visual review artifact name exceeds {MAX_NAMED_ARTIFACTS}")
+        related.extend(named)
+
+    if source_run_id in reviewed_sources(api, related, repository=repository):
+        return None
+    if generation in blocked_generations(api, related, repository=repository):
+        return None
+    attempts = _valid_sources(
+        api,
+        related,
+        repository=repository,
+        pattern=ATTEMPT_NAME,
+        workflow=DRAIN_WORKFLOW,
+        events=DRAIN_EVENTS,
+        conclusions=frozenset({"failure"}),
+        allow_in_progress=True,
+    )
+    current_time = now or datetime.now(timezone.utc)
+    if any(
+        artifact.created_at + cooldown > current_time
+        for artifact in attempts.get(source_run_id, [])
+    ):
+        return None
+    pending = _valid_sources(
+        api,
+        [requested],
+        repository=repository,
+        pattern=INPUT_NAME,
+        workflow=PREPARE_WORKFLOW,
+        events=PREPARE_EVENTS,
+        conclusions=frozenset({"success", "failure"}),
+    )
+    authenticated = pending.get(source_run_id, [])
+    if len(authenticated) != 1 or authenticated[0].artifact_id != requested_artifact_id:
+        return None
+    return requested, source_run_id
+
+
 class GitHubApi:
     def __init__(self, *, repository: str, token: str, api_url: str) -> None:
         self.repository = repository
@@ -335,21 +420,55 @@ class GitHubApi:
         self.api_url = api_url.rstrip("/")
         self._runs: dict[int, dict[str, Any]] = {}
 
-    def _request(self, path: str) -> Any:
-        request = urllib.request.Request(
-            f"{self.api_url}{path}",
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {self.token}",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "Quick-Skin-visual-review-queue/1",
-            },
-        )
+    @staticmethod
+    def _retryable_http_error(exc: urllib.error.HTTPError) -> bool:
+        if exc.code in RETRYABLE_HTTP_STATUSES:
+            return True
+        if exc.code != 403:
+            return False
+        remaining = exc.headers.get("X-RateLimit-Remaining", "")
+        retry_after = exc.headers.get("Retry-After", "")
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                payload = response.read()
-        except (urllib.error.HTTPError, urllib.error.URLError) as exc:
-            raise QueueError(f"GitHub API request failed: {path}") from exc
+            body = exc.read().decode("utf-8", errors="replace").lower()
+        except OSError:
+            body = ""
+        return remaining == "0" or bool(retry_after) or "rate limit" in body
+
+    @staticmethod
+    def _retry_delay(path: str, attempt: int) -> float:
+        # Deterministic sub-second skew prevents a parallel release wave from retrying in lockstep.
+        jitter = (sum(path.encode("utf-8")) % 997) / 997
+        return min(2**attempt, 30) + jitter
+
+    def _request(self, path: str, *, missing_ok: bool = False) -> Any:
+        last_error: BaseException | None = None
+        for attempt in range(REQUEST_ATTEMPTS):
+            request = urllib.request.Request(
+                f"{self.api_url}{path}",
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "Authorization": f"Bearer {self.token}",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                    "User-Agent": "Quick-Skin-visual-review-queue/1",
+                },
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    payload = response.read()
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code == 404 and missing_ok:
+                    return None
+                last_error = exc
+                retryable = self._retryable_http_error(exc)
+            except (urllib.error.URLError, TimeoutError) as exc:
+                last_error = exc
+                retryable = True
+            if not retryable or attempt + 1 == REQUEST_ATTEMPTS:
+                raise QueueError(f"GitHub API request failed: {path}") from last_error
+            time.sleep(self._retry_delay(path, attempt))
+        else:  # pragma: no cover - the loop either breaks or raises
+            raise QueueError(f"GitHub API request failed: {path}") from last_error
         try:
             return json.loads(payload)
         except json.JSONDecodeError as exc:
@@ -379,6 +498,44 @@ class GitHubApi:
             if len(batch) < 100:
                 return artifacts
         raise QueueError(f"artifact inventory exceeds {MAX_ARTIFACTS}")
+
+    def list_artifacts_named(self, name: str) -> list[Artifact]:
+        if not name or len(name) > 255:
+            raise QueueError("artifact name is invalid")
+        artifacts: list[Artifact] = []
+        for page in range(1, 12):
+            query = urllib.parse.urlencode(
+                {"name": name, "per_page": 100, "page": page}
+            )
+            payload = self._request(
+                f"/repos/{self.repository}/actions/artifacts?{query}"
+            )
+            if not isinstance(payload, dict) or not isinstance(
+                payload.get("artifacts"), list
+            ):
+                raise QueueError("artifact inventory response is invalid")
+            batch = payload["artifacts"]
+            artifacts.extend(
+                parse_artifact(item)
+                for item in batch
+                if isinstance(item, dict) and item.get("name") == name
+            )
+            if len(artifacts) > MAX_NAMED_ARTIFACTS:
+                raise QueueError(
+                    f"visual review artifact name exceeds {MAX_NAMED_ARTIFACTS}"
+                )
+            if len(batch) < 100:
+                return artifacts
+        raise QueueError(f"visual review artifact name exceeds {MAX_NAMED_ARTIFACTS}")
+
+    def get_artifact(self, artifact_id: int) -> Artifact | None:
+        if artifact_id <= 0:
+            raise QueueError("artifact id must be a positive integer")
+        payload = self._request(
+            f"/repos/{self.repository}/actions/artifacts/{artifact_id}",
+            missing_ok=True,
+        )
+        return None if payload is None else parse_artifact(payload)
 
     def get_run(self, run_id: int) -> dict[str, Any]:
         cached = self._runs.get(run_id)
@@ -418,15 +575,23 @@ def main(argv: list[str] | None = None) -> int:
         token = os.environ.get("GH_TOKEN", "")
         if not token:
             raise QueueError("GH_TOKEN is required")
-        selected = select_pending(
-            GitHubApi(
-                repository=repository,
-                token=token,
-                api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
-            ),
+        api = GitHubApi(
             repository=repository,
-            cooldown=timedelta(minutes=args.cooldown_minutes),
-            requested_artifact_id=args.requested_artifact_id,
+            token=token,
+            api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
+        )
+        selection_arguments = {
+            "repository": repository,
+            "cooldown": timedelta(minutes=args.cooldown_minutes),
+        }
+        selected = (
+            select_requested(
+                api,
+                requested_artifact_id=args.requested_artifact_id,
+                **selection_arguments,
+            )
+            if args.requested_artifact_id is not None
+            else select_pending(api, **selection_arguments)
         )
         with args.github_output.open("a", encoding="utf-8") as output:
             if selected is None:
