@@ -43,13 +43,12 @@ on:
 permissions: {}
 
 concurrency:
-  # GitHub keeps at most one running and one pending member of a concurrency group. A burst of
-  # release attestations therefore retains the running wake-up plus the newest pending wake-up;
-  # every actual deploy still rediscovers all current release heads.
+  # Wakes and deploys share one lock. A release-wave burst therefore retains the running member
+  # plus only the newest pending wake/deploy, and the final survivor rediscovers every current
+  # release head. Rotation remains independent and can never replace publication work.
   group: >-
-    ${{ github.event_name == 'repository_dispatch' && 'quick-skin-pages-wake' ||
-    (github.event_name == 'workflow_dispatch' && inputs.operation == 'rotate' &&
-    'quick-skin-pages-evidence-rotation' || 'quick-skin-github-pages') }}
+    ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'rotate' &&
+    'quick-skin-pages-evidence-rotation' || 'quick-skin-github-pages' }}
   cancel-in-progress: false
 
 jobs:
@@ -78,6 +77,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          protected_gh_api_retry() {
+            local api_status attempt delay output
+            delay=5
+            for attempt in 1 2 3 4; do
+              api_status=0
+              if output="$(gh api "$@" 2>&1)"; then
+                printf '%s\n' "$output"
+                return 0
+              else
+                api_status=$?
+              fi
+              if ! grep -Eqi \
+                  'API rate limit exceeded|secondary rate limit|HTTP (408|429|5[0-9][0-9])|connection (reset|refused)|timed out|timeout|temporary failure|TLS handshake|unexpected EOF' \
+                  <<< "$output" || (( attempt == 4 )); then
+                printf '%s\n' "$output" >&2
+                return "$api_status"
+              fi
+              printf 'GitHub API authentication attempt %s/4 failed transiently; retrying.\n' \
+                "$attempt" >&2
+              sleep "$delay"
+              delay=$(( delay < 20 ? delay * 2 : 20 ))
+            done
+          }
           printf 'eligible=false\n' >> "$GITHUB_OUTPUT"
           [[ "$EVIDENCE_REPOSITORY" == "$GITHUB_REPOSITORY" ]]
           [[ "$EVIDENCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
@@ -86,14 +108,14 @@ jobs:
 
           source_run=''
           for attempt in {1..30}; do
-            source_run="$(gh api \
+            source_run="$(protected_gh_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$EVIDENCE_RUN_ID")"
             if [[ "$(jq -r .status <<< "$source_run")" == completed ]]; then
               break
             fi
             sleep 2
           done
-          workflow_id="$(gh api \
+          workflow_id="$(protected_gh_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/workflows/on-demand-e2e.yml" --jq .id)"
           jq -e \
             --arg branch "$EVIDENCE_BRANCH" \
@@ -110,8 +132,8 @@ jobs:
           # A merged port may already have advanced this branch past the attested evidence.
           # That superseding head's own attestation is guaranteed to emit a newer wake, so a
           # stale wake ends cleanly instead of failing red.
-          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/$EVIDENCE_BRANCH" \
-            --jq .commit.sha)"
+          current_sha="$(protected_gh_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/$EVIDENCE_BRANCH" --jq .commit.sha)"
           if [[ "$current_sha" != "$EVIDENCE_SHA" ]]; then
             printf 'Branch %s advanced from %s to %s; deferring to its newer attestation wake.\n' \
               "$EVIDENCE_BRANCH" "$EVIDENCE_SHA" "$current_sha"
@@ -119,7 +141,7 @@ jobs:
           fi
 
           handoff_name="pages-e2e-$EVIDENCE_BRANCH"
-          artifacts="$(gh api --paginate --slurp \
+          artifacts="$(protected_gh_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/runs/$EVIDENCE_RUN_ID/artifacts?per_page=100")"
           [[ "$(jq \
             --arg branch "$EVIDENCE_BRANCH" \
@@ -132,7 +154,7 @@ jobs:
               .workflow_run.head_branch == $branch and
               .workflow_run.head_sha == $sha)] | length' <<< "$artifacts")" == 1 ]]
 
-          implementation_sha="$(gh api \
+          implementation_sha="$(protected_gh_api_retry \
             "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
           [[ "$implementation_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
@@ -198,14 +220,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           printf 'branches=[]\n' >> "$GITHUB_OUTPUT"
           printf 'eligible=false\n' >> "$GITHUB_OUTPUT"
 
-          default_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          default_sha="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
           [[ "$(git rev-parse HEAD)" == "$default_sha" ]]
           printf 'implementation_sha=%s\n' "$default_sha" >> "$GITHUB_OUTPUT"
 
-          workflow_id="$(gh api \
+          workflow_id="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/workflows/on-demand-e2e.yml" --jq .id)"
           authenticate_handoff() {
             local source_run_id="$1"
@@ -218,7 +242,7 @@ jobs:
               --target "$source_branch" > /dev/null
 
             local source_run
-            source_run="$(gh api \
+            source_run="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id")"
             jq -e \
               --arg branch "$source_branch" \
@@ -232,12 +256,12 @@ jobs:
                .head_sha == $sha and .path == ".github/workflows/on-demand-e2e.yml" and
                .head_repository.full_name == $repository' \
               <<< "$source_run" > /dev/null
-            [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$source_branch" \
+            [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$source_branch" \
               --jq .commit.sha)" == "$source_sha" ]]
 
             local artifacts handoff_name
             handoff_name="pages-e2e-$source_branch"
-            artifacts="$(gh api --paginate --slurp \
+            artifacts="$(github_api_retry --paginate --slurp \
               "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id/artifacts?per_page=100")"
             [[ "$(jq \
               --arg branch "$source_branch" \
@@ -256,7 +280,7 @@ jobs:
               "$DISPATCH_RUN_ID" "$DISPATCH_BRANCH" "$DISPATCH_SHA"
           fi
 
-          branches="$(gh api --paginate \
+          branches="$(github_api_retry --paginate \
             "repos/$GITHUB_REPOSITORY/branches?per_page=100" --jq '.[].name' \
             | python3 scripts/release/version_branches.py)"
           [[ "$(jq 'length' <<< "$branches")" -gt 0 ]]
@@ -266,21 +290,22 @@ jobs:
           # before fan-out only when every exact current head already has a cache owned by a
           # completed successful protected Pages run.
           if [[ "$DISPATCH_OPERATION" == deploy ]]; then
-            pages_workflow_id="$(gh api \
+            pages_workflow_id="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/workflows/pages.yml" --jq .id)"
             all_current=true
             while IFS= read -r branch; do
-              current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/$branch" \
+              current_sha="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/branches/$branch" \
                 --jq .commit.sha)"
               cache_name="pages-cache-$branch--$current_sha"
-              cache_artifacts="$(gh api --paginate --slurp \
+              cache_artifacts="$(github_api_retry --paginate --slurp \
                 "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$cache_name&per_page=100")"
               cached=false
               while IFS=$'\t' read -r cache_run_id cache_branch cache_sha expired; do
                 [[ -n "$cache_run_id" ]] || continue
                 [[ "$expired" == false && "$cache_branch" == master ]] || continue
                 [[ "$cache_sha" =~ ^[0-9a-f]{40}$ ]] || continue
-                if owner_run="$(gh api \
+                if owner_run="$(github_api_retry \
                     "repos/$GITHUB_REPOSITORY/actions/runs/$cache_run_id" 2>/dev/null)" \
                     && jq -e \
                       --arg repository "$GITHUB_REPOSITORY" \
@@ -311,27 +336,33 @@ jobs:
               exit 0
             fi
 
-            # A deployment that fans out while release heads are still advancing is
-            # guaranteed waste: a just-merged branch has no current-head evidence yet, and
-            # its finished attestation is guaranteed to emit another wake. Defer the whole
-            # automatic run cleanly; schedule and manual runs keep their strict semantics.
-            pending=()
-            while IFS= read -r branch; do
-              probe_status=0
-              python3 scripts/pages/select_artifact.py \
-                --repository "$GITHUB_REPOSITORY" \
-                --branch "$branch" \
-                --probe || probe_status=$?
-              if [[ "$probe_status" -eq 3 ]]; then
-                pending+=("$branch")
-              elif [[ "$probe_status" -ne 0 ]]; then
-                exit "$probe_status"
-              fi
-            done < <(jq -r '.[]' <<< "$branches")
-            if [[ "${#pending[@]}" -gt 0 ]]; then
-              printf 'Not eligible: no authenticated current-head evidence yet for: %s\n' \
-                "${pending[*]}"
-              printf 'Each pending branch attestation dispatches its own later wake.\n'
+            # Do not multiply exact artifact selection across both discovery and fan-out. If any
+            # release-head attestation is still active, its eventual successful handoff is
+            # guaranteed to emit a newer coalesced wake. Once none remain, the bounded collector
+            # performs the one authoritative exact-head selection and provenance check per branch.
+            active_runs='[]'
+            for active_status in requested queued pending waiting in_progress; do
+              active_page="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id/runs?status=$active_status&per_page=100")"
+              jq -e \
+                '.total_count >= 0 and .total_count <= 100 and
+                 (.workflow_runs | type == "array" and length == .total_count)' \
+                <<< "$active_page" > /dev/null
+              active_runs="$(jq -cn \
+                --argjson previous "$active_runs" \
+                --argjson current "$(jq '.workflow_runs' <<< "$active_page")" \
+                '$previous + $current')"
+            done
+            active_release_runs="$(jq \
+              --argjson branches "$branches" \
+              '[.[] | select(
+                .event == "workflow_dispatch" and .status != "completed" and
+                (.head_branch as $branch | $branches | index($branch)))] | length' \
+              <<< "$active_runs")"
+            if [[ "$active_release_runs" -gt 0 ]]; then
+              printf 'Deferring publication while %s release attestations are active.\n' \
+                "$active_release_runs"
+              printf 'Their successful handoffs emit a newer coalesced wake.\n'
               exit 0
             fi
           fi
@@ -403,6 +434,7 @@ jobs:
           OWNER_RUN_ID: ${{ steps.artifact.outputs.run_id }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           target_run_argument=()
           kind_argument=()
           if [[ "$ARTIFACT_NAME" == "pages-e2e-$BRANCH" ]]; then
@@ -425,9 +457,9 @@ jobs:
           source_created_at="$(jq -er .provenance.source.created_at "$manifest")"
           target_run_id="$(jq -er .provenance.target.run_id "$manifest")"
           target_created_at="$(jq -er .provenance.target.created_at "$manifest")"
-          source_run="$(gh api \
+          source_run="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id")"
-          target_run="$(gh api \
+          target_run="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$target_run_id")"
           jq -e \
             --arg branch "$source_branch" \
@@ -449,7 +481,7 @@ jobs:
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == env.GITHUB_REPOSITORY' \
             <<< "$target_run" > /dev/null
-          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
+          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
             --jq .commit.sha)" == "$EXPECTED_SHA" ]]
 
       - name: Convert the validated handoff into an atomic compact bundle
@@ -537,13 +569,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           found=0
           for manifest in public-evidence/*/manifest.json; do
             test -f "$manifest"
             found=$((found + 1))
             branch="$(basename "$(dirname "$manifest")")"
             expected_sha="$(jq -er .provenance.target.sha "$manifest")"
-            [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$branch" \
+            [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$branch" \
               --jq .commit.sha)" == "$expected_sha" ]]
             python3 scripts/pages/evidence.py validate \
               --evidence-root public-evidence \
@@ -644,12 +677,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           manifest="public-evidence/$BRANCH/manifest.json"
           manifest_branch="$(jq -er .release.branch "$manifest")"
           target_sha="$(jq -er .provenance.target.sha "$manifest")"
           [[ "$manifest_branch" == "$BRANCH" ]]
           [[ "$target_sha" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
+          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
             --jq .commit.sha)" == "$target_sha" ]]
           python3 scripts/pages/evidence.py validate \
             --evidence-root public-evidence \
@@ -724,6 +758,29 @@ jobs:
           PAGES_RUN_SHA: ${{ inputs.pages_run_sha }}
         run: |
           set -euo pipefail
+          protected_gh_api_retry() {
+            local api_status attempt delay output
+            delay=5
+            for attempt in 1 2 3 4; do
+              api_status=0
+              if output="$(gh api "$@" 2>&1)"; then
+                printf '%s\n' "$output"
+                return 0
+              else
+                api_status=$?
+              fi
+              if ! grep -Eqi \
+                  'API rate limit exceeded|secondary rate limit|HTTP (408|429|5[0-9][0-9])|connection (reset|refused)|timed out|timeout|temporary failure|TLS handshake|unexpected EOF' \
+                  <<< "$output" || (( attempt == 4 )); then
+                printf '%s\n' "$output" >&2
+                return "$api_status"
+              fi
+              printf 'GitHub API rotation authentication attempt %s/4 failed transiently; retrying.\n' \
+                "$attempt" >&2
+              sleep "$delay"
+              delay=$(( delay < 20 ? delay * 2 : 20 ))
+            done
+          }
           printf 'eligible=false\n' >> "$GITHUB_OUTPUT"
           [[ "$PAGES_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$PAGES_RUN_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -731,14 +788,14 @@ jobs:
 
           pages_run=''
           for attempt in {1..30}; do
-            pages_run="$(gh api \
+            pages_run="$(protected_gh_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$PAGES_RUN_ID")"
             if [[ "$(jq -r .status <<< "$pages_run")" == completed ]]; then
               break
             fi
             sleep 2
           done
-          workflow_id="$(gh api \
+          workflow_id="$(protected_gh_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/workflows/pages.yml" --jq .id)"
           jq -e \
             --arg repository "$GITHUB_REPOSITORY" \
@@ -754,7 +811,7 @@ jobs:
              .head_repository.full_name == $repository' \
             <<< "$pages_run" > /dev/null
 
-          artifacts="$(gh api --paginate --slurp \
+          artifacts="$(protected_gh_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/runs/$PAGES_RUN_ID/artifacts?per_page=100")"
           cache_count="$(jq --argjson run_id "$PAGES_RUN_ID" \
             '[.[].artifacts[] | select(
@@ -767,7 +824,7 @@ jobs:
             exit 0
           fi
 
-          implementation_sha="$(gh api \
+          implementation_sha="$(protected_gh_api_retry \
             "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
           [[ "$implementation_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
