@@ -598,7 +598,10 @@ class WorkflowSecurityTest(unittest.TestCase):
             discover,
         )
         self.assertIn("status=$active_status&per_page=100", discover)
-        self.assertIn(".total_count <= 100", discover)
+        self.assertIn(".total_count as $total_count", discover)
+        self.assertIn("$total_count <= 100", discover)
+        self.assertIn("length == $total_count", discover)
+        self.assertNotIn("length == .total_count", discover)
         self.assertIn("source scripts/ci/github_api_retry.sh", discover)
         self.assertIn("github_api_retry", collect)
         self.assertIn("github_api_retry", build)
