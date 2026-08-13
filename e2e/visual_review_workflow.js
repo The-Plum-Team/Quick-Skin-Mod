@@ -3,7 +3,8 @@
 // Run with:  Workflow({ scriptPath: "<repo>/e2e/visual_review_workflow.js", args: <manifest> })
 // where <manifest> is the JSON array produced by `python3 e2e/visual_review.py --all` in paired
 // `--reference-evidence-root/--reference-branch/--reference-artifact-node` mode
-// (items: {path, reference_path, reference_label, label, capture_id, kind, expectation}).
+// (items: {path, reference_path, reference_label, label, capture_id, kind, expectation,
+// runtime_evidence}).
 // Expectations come from the canonical scenario-contract.json and are passed through per item —
 // this script does not duplicate them.
 //
@@ -49,8 +50,9 @@ const VERIFY_SCHEMA = {
 let items = args
 if (typeof items === 'string') items = JSON.parse(items)
 if (!Array.isArray(items)) throw new Error('args is not an array (got ' + typeof items + ')')
-if (!items.every(it => it && typeof it.path === 'string' && typeof it.reference_path === 'string')) {
-  throw new Error('every manifest entry must contain candidate and 1.20.1 reference paths')
+if (!items.every(it => it && typeof it.path === 'string' &&
+    typeof it.reference_path === 'string' && typeof it.runtime_evidence === 'string')) {
+  throw new Error('every manifest entry must contain candidate/reference paths and runtime evidence')
 }
 log(`reviewing ${items.length} screenshot pairs`)
 
@@ -61,6 +63,7 @@ const results = await pipeline(
     `Use the Read tool to OPEN and LOOK AT BOTH images at these exact paths:\n` +
     `Candidate: ${it.path}\nReference (${it.reference_label || 'Minecraft 1.20.1'}): ${it.reference_path}\n\n` +
     `It SHOULD show: ${it.expectation || '(describe what is shown)'}\n\n` +
+    `Passed deterministic runtime evidence: ${it.runtime_evidence}\n\n` +
     `Report what you actually see, whether the candidate satisfies the expectation independently, ` +
     `whether it semantically matches the reference, and any visual anomalies (garbled/wrong textures, ` +
     `a cape clipping through an elytra, transparency or background-compositing artifacts, missing elements, ` +
@@ -79,6 +82,7 @@ const results = await pipeline(
       `Independently re-examine a Minecraft screenshot a first reviewer flagged.\n` +
       `Use the Read tool to open the candidate ${r.it.path} and reference ${r.it.reference_path}.\n\n` +
       `It SHOULD show: ${r.it.expectation || ''}\n` +
+      `Passed deterministic runtime evidence: ${r.it.runtime_evidence}\n` +
       `First reviewer said: semanticValid=${r.v.semanticValid}; ` +
       `matchesReference=${r.v.matchesReference}; anomalies=${JSON.stringify(r.v.anomalies)}.\n\n` +
       `Decide if this is a GENUINE rendering bug or acceptable. Default to NOT a real problem unless the ` +

@@ -23,7 +23,7 @@ This `master` integration baseline exercises the following exact packaged lanes:
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `5` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `5` |
 
-Scenario contract SHA-256: `965cac86ee35f90c31a82f74d320d2752a580869086b049c639a5ebd9342eb64`
+Scenario contract SHA-256: `dd97d3ea81cdde7d4fd870b1637fcb53c04b80973108bdadb6406179ce37b982`
 Contract totals: `52` ordered steps, `45` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -232,10 +232,13 @@ authenticates every artifact and exact matrix row. It imports the exact source c
 Git objects—never as a checkout executed by the privileged workflow—then fully decodes the complete
 scenario product, requires one production JAR, and re-encodes every captured frame as a bounded
 metadata-free RGB PNG
-named by its served-byte SHA-256. A 1.20.1 run exposes every Fabric and Forge frame without any
-reference image. Both loaders must have the same complete `capture_id` set, and each screenshot is
-judged independently against its expectation. This prevents a shared renderer, state, or equipment
-bug from becoming correct merely because both loaders agree. For each semantic `capture_id`, a
+named by its served-byte SHA-256. Each curated manifest row also carries the bounded message from
+that capture's required passed assertion as `runtime_evidence`; this gives the reviewer exact
+renderer/state evidence where pixels are intrinsically ambiguous without allowing it to excuse a
+visible contradiction. A 1.20.1 run exposes every Fabric and Forge frame without any reference
+image. Both loaders must have the same complete `capture_id` set, and each screenshot is judged
+independently against its expectation. This prevents a shared renderer, state, or equipment bug
+from becoming correct merely because both loaders agree. For each semantic `capture_id`, a
 later-version candidate is paired with the authenticated current-head Fabric 1.20.1 frame selected
 only from the protected lossless Pages handoff; the compact WebP cache is never an AI oracle.
 Candidate and reference are normalized to the same dimensions without changing aspect ratio. The
@@ -255,9 +258,9 @@ reviews.
 The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
 over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
 candidate/reference pair clean without a model call. It may also reuse a protected verdict only
-when candidate and reference PNG digests, expectation, capture identity, loader artifact, scenario
-contract, release matrix, prompts, reviewer/checker/cache code, models, mode, and chunk policy all
-match exactly;
+when candidate and reference PNG digests, expectation, passed runtime evidence, capture identity,
+loader artifact, scenario contract, release matrix, prompts, reviewer/checker/cache code, models,
+mode, and chunk policy all match exactly;
 unpaired anchor semantics are never cached. Sonnet triages the remaining frames in loader-sibling
 chunks of at most eight. All independent chunks run concurrently, and each concern or confidence
 below high is independently rechecked by Opus in concurrent chunks of at most four as soon as its
@@ -347,8 +350,9 @@ The required runtime does not treat a filename as screenshot identity. Each vali
 the semantic key `<artifact>/<scenario>/<client-role>/<step>`, and
 [`scenario-contract.json`](scenario-contract.json) supplies its stable title, expectation, and
 advisory review tier. `result.json` remains authoritative for the screenshot path, status,
-SHA-256, dimensions, and before/after pixel metrics. The canonical contract and runtime evidence
-must have exact test-enforced coverage.
+SHA-256, dimensions, passed assertion message, and before/after pixel metrics. The canonical
+contract and runtime evidence must have exact test-enforced coverage. AI review receives that
+bounded assertion message explicitly; all manifest strings remain untrusted review data.
 
 `visual_review_workflow.js` is an optional manual Workflow adapter, not the GitHub Actions entry
 point. It consumes the generated manifest and emits the same exact verdict-array contract that CI

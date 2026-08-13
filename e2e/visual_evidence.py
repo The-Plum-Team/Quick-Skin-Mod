@@ -86,6 +86,7 @@ STEP_FIELDS = frozenset({"name", "status", "message", "screenshot"})
 PIXEL_VALIDATION_FIELDS = frozenset({"screenshots", "comparisons"})
 MAX_RESULT_FILES = 256
 MAX_RESULT_BYTES = 4 * 1024 * 1024
+MAX_RUNTIME_EVIDENCE_LENGTH = 4096
 MAX_EVIDENCE_SCREENSHOT_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_IMAGE_PIXELS = 20_000_000
 MIN_REVIEW_IMAGE_WIDTH = 640
@@ -771,9 +772,18 @@ def collect_evidence(
                         f"successful report contains a non-pass step: "
                         f"{lane_id}/{role}/{expected_step.id}"
                     )
-                if not isinstance(step_record.get("message"), str):
+                runtime_evidence = step_record.get("message")
+                if (
+                    not isinstance(runtime_evidence, str)
+                    or not runtime_evidence.strip()
+                    or len(runtime_evidence) > MAX_RUNTIME_EVIDENCE_LENGTH
+                    or any(
+                        ord(character) < 32 or ord(character) == 127
+                        for character in runtime_evidence
+                    )
+                ):
                     raise VisualEvidenceError(
-                        f"report step message must be a string: "
+                        f"report step message must be non-empty, bounded printable evidence: "
                         f"{lane_id}/{role}/{expected_step.id}"
                     )
                 if (
@@ -885,6 +895,7 @@ def collect_evidence(
                         "capture_order": capture_order[capture["capture_id"]],
                         "title": capture["title"],
                         "expectation": capture["expectation"],
+                        "runtime_evidence": step_record["message"].strip(),
                         "review_tier": capture["review_tier"],
                         "artifact_node": artifact_node,
                         "version": version,

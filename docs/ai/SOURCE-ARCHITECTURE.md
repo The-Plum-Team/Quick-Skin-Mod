@@ -111,8 +111,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   Its content-addressed recipes include every compatibility input, and callers materialize a fresh
   copy before launch. `RuntimeStore` is never uploaded as evidence.
 - `e2e/visual_evidence.py` reads successful `result.json` reports, verifies the scenario-contract
-  hash and exact graph, PNG containment, full decode, dimensions, SHA-256, probes, and comparisons,
-  and exposes the shared evidence model used by the AI review and public site.
+  hash and exact graph, bounded printable passed-assertion messages, PNG containment, full decode,
+  dimensions, SHA-256, probes, and comparisons, and exposes the shared evidence model used by the
+  AI review and public site.
 - `e2e/mod-compatibility-contract.json` is the reviewed optional-mod artifact lock. It owns the
   supported integration ids, applicability rules, Modrinth project identities, and every immutable
   external JAR URL/filename/size/SHA-256/SHA-512 tuple. `e2e/mod_compatibility.py` is its fail-closed
@@ -135,15 +136,17 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   requires complete, identical Fabric/Forge capture-id sets and exposes each frame without any
   reference. It atomically re-encodes candidates and any later-version references as metadata-free
   RGB PNGs. `e2e/check_visual_review.py` validates the all-single or all-paired bounded capsule,
-  keeps `semantic_valid` independent from nullable `matches_reference`, and normalizes bounded model
-  output. `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Sonnet
+  including each capture's exact passed assertion as `runtime_evidence`, keeps `semantic_valid`
+  independent from nullable `matches_reference`, and normalizes bounded model output.
+  `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Sonnet
   triage, runs independent loader-grouped chunks concurrently, pipelines suspicious or uncertain
   results into concurrent bounded Opus verification, cancels outstanding calls after the first
   confirmed defect, publishes a protected exact-generation block and cancels sibling drains, skips
   byte-identical certified comparison pairs, and keeps raw provider output private.
   `e2e/visual_review_cache.py` validates and combines bounded immutable paired-only verdict
-  cache shards: a hit binds candidate/reference pixels, expectation, capture and loader identity,
-  scenario contract, release matrix, reviewer code, prompts, models, mode, and chunk policy;
+  cache shards: a hit binds candidate/reference pixels, expectation, runtime evidence, capture and
+  loader identity, scenario contract, release matrix, reviewer code, prompts, models, mode, and
+  chunk policy;
   unpaired semantic anchors never consume it. Parallel drains may briefly publish sibling shards;
   a later protected successor combines and retires every authenticated shard it consumed.
 - `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only

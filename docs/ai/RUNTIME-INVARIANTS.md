@@ -141,9 +141,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   threshold. A changing logical frame counter alone does not prove that Minecraft sampled the
   intended UVs or that the visible cape changed.
 - Slim/classic model evidence must assert both Quick Skin's requested appearance and Minecraft's
-  renderer-facing model selection. Capture it in a close, pinned rear view where the 3-pixel Alex
-  and 4-pixel Steve arm widths are independently inspectable, restore the prior FOV afterwards, and
-  compare the bounded player region by a material threshold. Stored intent or an ambiguous distant
+  renderer-facing model selection. Capture it in a close, pinned rear view with a visibly plausible
+  narrow/wide silhouette, restore the prior FOV afterwards, and compare the bounded player region
+  by a material threshold. Angled arms and the inflated skin outer layer make total
+  sleeve-to-sleeve ratios an invalid 3-versus-4-pixel measurement; the exact renderer-facing
+  assertion must accompany the screenshot into AI review. Stored intent or an ambiguous distant
   silhouette alone cannot certify model geometry.
 - In the sequential propagation scenario, the observer baseline must wait for the remote subject,
   show the observer's complete UUID-selected vanilla model, and hold the subject decisively behind
@@ -239,16 +241,18 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   capsule whose later wake step failed, and cool recent failed attempts without blocking other
   sources. The review runner accepts only that immutable handoff, never skips an unpaired anchor
   frame, skips byte-identical paths only in paired comparison mode,
-  exposes only bounded manifests/images to concurrent loader-grouped Sonnet triage and selective
+  exposes only bounded manifests/images plus each passed capture assertion's bounded printable
+  runtime evidence to concurrent loader-grouped Sonnet triage and selective
   concurrent Opus verification with a read-only tool surface, captures each verdict from stdout,
   and validates exact labels and semantic coherence after every call. A first Opus-confirmed defect
   cancels outstanding work, emits only an explicit fail-closed partial report, publishes a sanitized
   marker bound to the exact protected automatic generation and reauthenticated reviewer
   implementation, and best-effort cancels its sibling
   drains; authenticated queue selection must skip every remaining capsule for that generation. A
-  blocked report can never certify an anchor. A paired cache hit must bind exact candidate/reference pixels, expectation,
-  capture and loader identity, scenario contract, release matrix, protected code, prompts, models,
-  mode, and chunk policy; never cache or reuse unpaired anchor semantics. It revalidates the
+  blocked report can never certify an anchor. A paired cache hit must bind exact candidate/reference
+  pixels, expectation, runtime evidence, capture and loader identity, scenario contract, release
+  matrix, protected code, prompts, models, mode, and chunk policy; never cache or reuse unpaired
+  anchor semantics. It revalidates the
   capsule after the model exits, publishes only a bounded normalized report or sanitized attempt
   marker, never uploads raw provider text, and
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
