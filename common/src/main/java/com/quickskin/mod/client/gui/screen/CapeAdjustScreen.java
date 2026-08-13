@@ -952,7 +952,7 @@ public class CapeAdjustScreen extends Screen {
     /**
      * Finish one composed frame: clear the pixels outside the cape body and elytra UV face regions,
      * flatten every pixel onto the chosen fill when requested, then restore the transparent
-     * cutout that gives the outer Elytra face its tapered silhouette.
+     * complete vanilla alpha envelope that gives the Elytra cuboid its tapered silhouette.
      *
      * <p>This is the only pass either composer makes over individual pixels, and it is the last
      * step of both {@link #composeFrame(int)} (which feeds the 2D thumbnails and, through
@@ -962,14 +962,16 @@ public class CapeAdjustScreen extends Screen {
      * there is one rule, invoked from one loop, and both callers run that loop over every frame.
      *
      * <p>With the toggle off the cleared value is {@code 0x00000000}; visible in-region pixels are
-     * unchanged, while invalid pixels outside the tapered outer-wing silhouette are normalized to
-     * transparent.
+     * unchanged, while invalid pixels outside the complete vanilla Elytra UV envelope are
+     * normalized to transparent. That includes the otherwise rectangular inner 10x20 face, which
+     * vanilla leaves transparent and which the 2D preview intentionally does not present as art.
      *
      * At 1x (64x32):
      *   Cape body:                (0,0)-(22,17)
      *   Elytra top/bottom faces:  (24,0)-(44,2)
      *   Elytra side/front/back:   (22,2)-(46,22)
-     * Everything else (including the outer-wing silhouette cutout) is cleared.
+     * Everything else is cleared, and the complete Elytra region is then intersected with
+     * vanilla's structural alpha envelope.
      */
     private void finalizeCapeFrame(BufferedImage image, int yOffset, int frameH) {
         int capeW = image.getWidth();
@@ -991,7 +993,7 @@ public class CapeAdjustScreen extends Screen {
         boolean fill = opaqueFill;
         int fillRgb = opaqueFillRgb;
         // Unused margins become the fill too so the toggle changes no cape-facing semantics. The
-        // one intentional exception is the Elytra silhouette cutout restored after this pass.
+        // one intentional exception is the complete Elytra alpha envelope restored after this pass.
         int clearedValue = fill ? CapeOpaqueFill.opaque(fillRgb) : 0x00000000;
 
         for (int y = yOffset; y < yOffset + frameH; y++) {
