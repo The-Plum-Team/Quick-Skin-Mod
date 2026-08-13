@@ -1313,7 +1313,9 @@ jobs:
             ${{ runner.temp }}/visual-review-capsule/visual-review-report.json
             ${{ runner.temp }}/visual-review-capsule/visual-review-completion.json
           if-no-files-found: error
-          retention-days: 1
+          # Match the durable input's recovery window. If GitHub rate-limits the exact cleanup,
+          # this authenticated marker must outlive that input so it can never become eligible again.
+          retention-days: 7
 
       - name: Upload only a sanitized attempt marker
         if: >-
@@ -1360,15 +1362,32 @@ jobs:
           [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
           metadata_error="$(mktemp "$RUNNER_TEMP/visual-review-metadata.XXXXXX")"
           metadata=""
-          if ! metadata="$(gh api \
-              "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" \
-              2>"$metadata_error")"; then
+          for attempt in 1 2 3; do
+            : > "$metadata_error"
+            if metadata="$(gh api \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" \
+                2>"$metadata_error")"; then
+              break
+            fi
             if grep -Fq '(HTTP 404)' "$metadata_error"; then
               exit 0
             fi
+            # The normalized report already makes this source ineligible. Retaining its bounded
+            # input until Actions retention expires is safe when GitHub's installation quota is
+            # exhausted; cleanup is housekeeping, not review correctness.
+            if grep -Fq 'API rate limit exceeded' "$metadata_error"; then
+              echo "::warning::GitHub API quota exhausted; queue cleanup deferred"
+              exit 0
+            fi
+            if grep -Eq 'secondary rate limit|abuse detection|\(HTTP 429\)' \
+                "$metadata_error" && (( attempt < 3 )); then
+              sleep $((attempt * 5))
+              continue
+            fi
             cat "$metadata_error" >&2
             exit 1
-          fi
+          done
+          [[ -n "$metadata" ]]
           jq -e \
             --arg digest "sha256:$ARTIFACT_DIGEST" \
             --arg name "$ARTIFACT_NAME" \
@@ -1378,19 +1397,30 @@ jobs:
              .expired == false and .workflow_run.id == $run_id' \
             <<< "$metadata" > /dev/null
           delete_error="$(mktemp "$RUNNER_TEMP/visual-review-delete.XXXXXX")"
-          if gh api --method DELETE \
-              "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" \
-              2>"$delete_error"; then
-            exit 0
-          fi
-          # Another authenticated cleanup may have settled the exact same immutable artifact after
-          # the metadata read. Missing is the desired postcondition; every other API failure stays
-          # visible and leaves the durable entry available for a later scheduled retry.
-          if grep -Fq '(HTTP 404)' "$delete_error"; then
-            exit 0
-          fi
-          cat "$delete_error" >&2
-          exit 1
+          for attempt in 1 2 3; do
+            : > "$delete_error"
+            if gh api --method DELETE \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" \
+                2>"$delete_error"; then
+              exit 0
+            fi
+            # Another authenticated cleanup may have settled the exact same immutable artifact
+            # after the metadata read. Missing is the desired postcondition.
+            if grep -Fq '(HTTP 404)' "$delete_error"; then
+              exit 0
+            fi
+            if grep -Fq 'API rate limit exceeded' "$delete_error"; then
+              echo "::warning::GitHub API quota exhausted; queue cleanup deferred"
+              exit 0
+            fi
+            if grep -Eq 'secondary rate limit|abuse detection|\(HTTP 429\)' \
+                "$delete_error" && (( attempt < 3 )); then
+              sleep $((attempt * 5))
+              continue
+            fi
+            cat "$delete_error" >&2
+            exit 1
+          done
 
   release-anchor:
     name: Release the certified cross-version wave
@@ -1493,6 +1523,7 @@ jobs:
           [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ \
             || "$ARTIFACT_NAME" =~ \
               ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA$ ]]
+          payload="$(mktemp "$RUNNER_TEMP/visual-review-continuation.XXXXXX")"
           jq -n \
             --arg artifact_id "$ARTIFACT_ID" \
             --arg artifact_name "$ARTIFACT_NAME" \
@@ -1500,4 +1531,26 @@ jobs:
             '{event_type:"visual-review-drain-requested",client_payload:{
               artifact_id:$artifact_id,artifact_name:$artifact_name,
               generation_sha:$generation_sha}}' \
-            | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
+            > "$payload"
+          dispatch_error="$(mktemp "$RUNNER_TEMP/visual-review-dispatch.XXXXXX")"
+          for attempt in 1 2 3; do
+            : > "$dispatch_error"
+            if gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+                --input "$payload" 2>"$dispatch_error"; then
+              exit 0
+            fi
+            # Every curated capsule receives an exact wake when it is enqueued, and the scheduled
+            # sweep can recover a coalesced wake. This continuation is deliberately redundant, so
+            # an exhausted installation quota must not turn a completed clean review red.
+            if grep -Fq 'API rate limit exceeded' "$dispatch_error"; then
+              echo "::warning::GitHub API quota exhausted; queue continuation deferred"
+              exit 0
+            fi
+            if grep -Eq 'secondary rate limit|abuse detection|\(HTTP 429\)' \
+                "$dispatch_error" && (( attempt < 3 )); then
+              sleep $((attempt * 5))
+              continue
+            fi
+            cat "$dispatch_error" >&2
+            exit 1
+          done

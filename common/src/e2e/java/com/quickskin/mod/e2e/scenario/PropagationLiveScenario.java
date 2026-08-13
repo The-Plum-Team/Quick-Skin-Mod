@@ -6,6 +6,7 @@ import com.quickskin.mod.client.storage.NetworkTextureCache;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.PlayerAppearance;
 import com.quickskin.mod.common.data.PlayerAppearanceRepository;
+import com.quickskin.mod.e2e.DefaultSkinEvidenceView;
 import com.quickskin.mod.e2e.E2ELog;
 import com.quickskin.mod.e2e.Scenario;
 import com.quickskin.mod.e2e.Step;
@@ -133,6 +134,7 @@ public final class PropagationLiveScenario implements Scenario {
         // 2. THE LIVE CHANGE — both players in-world, B watching from its vantage; A swaps skin+cape now.
         steps.add(Step.of("apply_live")
                 .action(() -> {
+                    DefaultSkinEvidenceView.enterFirstPerson(mc);
                     try {
                         Path skinFile = TestAssets.makeClassicSkin();
                         AssetMetadata skinMeta = SkinImporter.importSkin(skinFile);
@@ -284,9 +286,12 @@ public final class PropagationLiveScenario implements Scenario {
 
     // ===== shared =============================================================================
     private Step baseline(Minecraft mc, String v, String role) {
+        boolean observer = "client_b".equals(role);
         return Step.of("baseline")
+                .action(() -> DefaultSkinEvidenceView.hold(mc, observer))
                 .minTicks(40) // ~2s render warmup so the first frame is real
-                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))
+                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player)
+                        && DefaultSkinEvidenceView.hold(mc, observer))
                 .settleTicks(20) // reject a one-frame generic fallback before the UUID skin lands
                 .timeoutTicks(400)
                 .screenshot(v + "_live_00_baseline_" + role + ".png")
@@ -299,7 +304,8 @@ public final class PropagationLiveScenario implements Scenario {
                                 + expected + " actual=" + actual);
                     }
                     return Step.Result.pass("player present: " + VanillaShim.playerName(mc.player)
-                            + " defaultSkin=" + actual);
+                            + " defaultSkin=" + actual + "; full-body evidence held"
+                            + (observer ? "; remote subject present behind third-person camera" : ""));
                 });
     }
 
@@ -384,6 +390,7 @@ public final class PropagationLiveScenario implements Scenario {
      */
     private void stepTowardVantage(Minecraft mc) {
         try {
+            DefaultSkinEvidenceView.enterFirstPerson(mc);
             AbstractClientPlayer a = findOther(mc);
             if (a == null || mc.player == null) return;
 
