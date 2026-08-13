@@ -112,6 +112,9 @@ Only the current invocation's complete, bounded evidence is promoted to `e2e-out
 atomic promotion uses guarded same-filesystem renames and an owned last-good sibling, so an
 interrupted or failed promotion restores or preserves the previous complete generation. Consumers
 read only `e2e-out/current`; stale files from earlier invocations cannot enter a result or gallery.
+Before that snapshot is frozen, the launcher and every descendant in its isolated process group
+must be gone. In particular, Forge's shell launcher may exit before its Java child finishes shutdown
+logging; the exporter waits for the complete group and force-stops it as a unit when necessary.
 
 `RuntimeStore/v1` is the independent reusable store:
 
