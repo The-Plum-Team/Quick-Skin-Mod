@@ -42,6 +42,7 @@ def paired(
         "capture_id": f"{scenario}.{role}.{step}",
         "kind": f"{scenario}.{role}.{step}",
         "expectation": f"Expected {step}",
+        "runtime_evidence": f"assertion passed for {step}",
     }
 
 
@@ -53,6 +54,7 @@ def unpaired(label: str, candidate: str) -> dict[str, str]:
         "capture_id": f"{scenario}.{role}.{step}",
         "kind": f"{scenario}.{role}.{step}",
         "expectation": f"Expected {step}",
+        "runtime_evidence": f"assertion passed for {step}",
     }
 
 

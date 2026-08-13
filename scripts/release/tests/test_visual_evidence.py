@@ -397,6 +397,9 @@ class VisualEvidenceTest(unittest.TestCase):
         self.assertEqual(2, len(frames))
         self.assertEqual(2, len({frame["frame_id"] for frame in frames}))
         self.assertEqual(
+            {"assertion passed"}, {frame["runtime_evidence"] for frame in frames}
+        )
+        self.assertEqual(
             {
                 "phase0-smoke.client_a.baseline",
                 "propagation.client_a.baseline",
@@ -476,6 +479,7 @@ class VisualEvidenceTest(unittest.TestCase):
 
         self.assertEqual(1, len(manifest))
         self.assertEqual("fabric-1.20.1/phase0-smoke/client_a/baseline", manifest[0]["label"])
+        self.assertEqual("assertion passed", manifest[0]["runtime_evidence"])
 
     def test_curated_ai_manifest_contains_only_content_addressed_frames(self) -> None:
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
@@ -492,6 +496,7 @@ class VisualEvidenceTest(unittest.TestCase):
 
         expected_path = curated[0]["path"]
         self.assertEqual(expected_path, curated[0]["path"])
+        self.assertEqual("assertion passed", curated[0]["runtime_evidence"])
         served = self.root / expected_path
         self.assertEqual(expected_path.split("/")[-1][:-4], hashlib.sha256(served.read_bytes()).hexdigest())
         self.assertEqual(PNG_PIXEL_SHA256, validate_png_snapshot(served)[2])
@@ -591,6 +596,7 @@ class VisualEvidenceTest(unittest.TestCase):
             "capture_id": "phase0-smoke.client_a.baseline",
             "kind": "phase0-smoke.client_a.baseline",
             "expectation": "Expected baseline",
+            "runtime_evidence": "assertion passed",
         }
         manifest = [
             {
@@ -1085,6 +1091,7 @@ class VisualReviewContractTest(unittest.TestCase):
                 "capture_id": "scenario.client.step",
                 "kind": "scenario.client.step",
                 "expectation": "Expected player",
+                "runtime_evidence": "assertion passed",
             }
         ]
         self.clean = [
@@ -1255,6 +1262,14 @@ class VisualReviewContractTest(unittest.TestCase):
         self.assertEqual(
             [paired], validate_manifest([paired], require_paired=True)[0]
         )
+
+    def test_manifest_requires_bounded_runtime_evidence(self) -> None:
+        missing = {key: value for key, value in self.manifest[0].items()
+                   if key != "runtime_evidence"}
+        with self.assertRaisesRegex(ReviewError, "single or paired review schema"):
+            validate_manifest([missing])
+        with self.assertRaisesRegex(ReviewError, "runtime_evidence"):
+            validate_manifest([{**self.manifest[0], "runtime_evidence": ""}])
 
     def test_rejects_control_characters_and_bounded_output_overflow(self) -> None:
         cases = (
