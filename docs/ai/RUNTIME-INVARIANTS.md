@@ -152,6 +152,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   the third-person camera. The subject is allowed to have completed its custom apply before the
   observer launches; startup speed must never decide whether that custom subject leaks into a
   checkpoint whose contract says it is still outside the later inspection frame.
+- Remote propagation inspection must pin the disposable subject's previous/current yaw plus head
+  and body rotations, keep the observer at an asserted rear-vector cosine, and include that geometry
+  in passed runtime evidence. A facial head turn must not make a rear-mounted cape look like it
+  crossed the chest, while a genuinely front-facing subject or front-side observer must fail before
+  semantic review.
 - Adjusted-cape parity evidence must show a non-standard padded source before cropping and the final
   aligned atlas as separate semantic checkpoints. The source checkpoint must expose all four
   padding bands, distinguish opaque black from transparency with a checkerboard, and label source
