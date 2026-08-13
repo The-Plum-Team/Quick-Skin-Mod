@@ -269,6 +269,11 @@ class ScenarioContractTest(unittest.TestCase):
         )
         self.assertIn("auxiliary side, top and bottom UV faces", aligned_bmo.expectation)
         self.assertIn("dark, subtly starred background", skin_menu.expectation)
+        observer_baseline = self.contract.capture_by_id(
+            "propagation.client_b.baseline"
+        )
+        self.assertIn("remote subject is deliberately held behind", observer_baseline.expectation)
+        self.assertIn("must not be visible", observer_baseline.expectation)
 
         for capture_id in (
             "phase0-smoke.client_a.baseline",
