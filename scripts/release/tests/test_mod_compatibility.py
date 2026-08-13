@@ -94,22 +94,45 @@ class ModCompatibilityContractTest(unittest.TestCase):
         for artifact in matrix["artifacts"]:
             self.assertNotIn("pas", artifact["metadata"].get("suggests", {}))
 
-    def test_master_plan_is_parallel_complete_and_records_replay_forge_as_na(self) -> None:
+    def test_plan_is_parallel_complete_and_records_every_lane(self) -> None:
+        matrix_path = ROOT / "release" / "release-matrix.json"
         plan = mod_compatibility.build_plan(
-            ROOT / "release" / "release-matrix.json",
+            matrix_path,
             self.contract_path,
         )
+        matrix = mod_compatibility.load_matrix(matrix_path)
+        contract = mod_compatibility.load_contract(self.contract_path)
+        base_rows = mod_compatibility.gha_matrix(
+            matrix,
+            "runtime",
+            mod_compatibility.read_mod_version(matrix_path, matrix),
+        )["include"]
+        expected_lanes = {
+            (row["artifact_node"], compatibility_mod.id)
+            for row in base_rows
+            for compatibility_mod in contract.mods
+        }
+        actual_lanes = {
+            (lane["artifact_node"], lane.get("compatibility_mod", lane.get("mod")))
+            for lane in (*plan["runnable"], *plan["not_applicable"])
+        }
 
-        self.assertEqual(11, len(plan["runnable"]))
-        self.assertEqual(1, len(plan["not_applicable"]))
+        self.assertEqual(expected_lanes, actual_lanes)
         self.assertEqual(
-            ("forge-1.20.1", "replaymod", "not-applicable"),
-            (
-                plan["not_applicable"][0]["artifact_node"],
-                plan["not_applicable"][0]["mod"],
-                plan["not_applicable"][0]["status"],
-            ),
+            len(expected_lanes),
+            len(plan["runnable"]) + len(plan["not_applicable"]),
         )
+        if plan["release_branch"] == "forge-and-fabric-1.20.1":
+            self.assertEqual(11, len(plan["runnable"]))
+            self.assertEqual(1, len(plan["not_applicable"]))
+            self.assertEqual(
+                ("forge-1.20.1", "replaymod", "not-applicable"),
+                (
+                    plan["not_applicable"][0]["artifact_node"],
+                    plan["not_applicable"][0]["mod"],
+                    plan["not_applicable"][0]["status"],
+                ),
+            )
         ids = [lane["id"] for lane in plan["runnable"]]
         self.assertEqual(len(ids), len(set(ids)))
         for lane in plan["runnable"]:
