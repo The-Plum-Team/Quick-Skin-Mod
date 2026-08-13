@@ -88,20 +88,32 @@ jobs:
             [[ -z "$REQUESTED_ARTIFACT_NAME" ]]
           fi
           queue_output="$(mktemp "$RUNNER_TEMP/visual-review-queue.XXXXXX")"
+          selector_status=0
           for (( attempt = 1; attempt <= attempts; attempt++ )); do
             : > "$queue_output"
-            python3 scripts/ci/visual_review_queue.py \
-              --repository "$GITHUB_REPOSITORY" \
-              --github-output "$queue_output" \
-              --cooldown-minutes 30 \
-              "${requested_arguments[@]}"
-            if grep -qx 'eligible=true' "$queue_output"; then
+            selector_status=0
+            if python3 scripts/ci/visual_review_queue.py \
+                --repository "$GITHUB_REPOSITORY" \
+                --github-output "$queue_output" \
+                --cooldown-minutes 30 \
+                "${requested_arguments[@]}"; then
+              selector_status=0
+            else
+              selector_status=$?
+            fi
+            if [[ "$selector_status" -eq 0 ]] && \
+                grep -qx 'eligible=true' "$queue_output"; then
               break
             fi
             if (( attempt < attempts )); then
+              printf 'Exact queue selection attempt %s/%s did not settle; retrying.\n' \
+                "$attempt" "$attempts"
               sleep 5
             fi
           done
+          if [[ "$selector_status" -ne 0 ]]; then
+            exit "$selector_status"
+          fi
           if [[ "$direct" == true ]] && grep -qx 'eligible=true' "$queue_output"; then
             grep -qx "artifact_id=$REQUESTED_ARTIFACT_ID" "$queue_output"
             grep -qx "artifact_name=$REQUESTED_ARTIFACT_NAME" "$queue_output"

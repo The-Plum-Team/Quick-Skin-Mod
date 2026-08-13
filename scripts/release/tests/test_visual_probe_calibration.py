@@ -36,6 +36,10 @@ TEXT_CANARY = {
         ("cape editor title", (675, 20, 925, 50), 75, 400),
         ("cape editor instructions", (335, 624, 725, 655), 75, 750),
     ),
+    ("full", "client_a", "bmo_padded_source_screen"): (
+        ("BMO source dimensions", (45, 100, 250, 140), 75, 120),
+        ("BMO output dimensions", (1035, 100, 1255, 140), 75, 120),
+    ),
     ("full", "client_a", "settings_screen"): (
         ("Open Skin Menu setting label", (445, 235, 655, 265), 175, 300),
     ),
@@ -230,6 +234,10 @@ class VisualProbeCalibrationTest(unittest.TestCase):
         padded = steps["bmo_padded_source_screen"]["capture"]["expectation"]
         aligned = steps["bmo_adjust_screen"]["capture"]["expectation"]
         self.assertIn("padding on all four sides", padded)
+        self.assertIn("Source: 128x64", padded)
+        self.assertIn("Output: 64x32", padded)
+        self.assertIn("output selector describes the final atlas", padded)
+        self.assertIn("checkerboard visible only through transparent source pixels", padded)
         self.assertIn("before-crop checkpoint", padded)
         self.assertNotIn("auxiliary", padded)
         self.assertIn("auxiliary side, top and bottom UV faces", aligned)
@@ -259,6 +267,16 @@ class VisualProbeCalibrationTest(unittest.TestCase):
             'return Step.Result.fail("BMO transform is scale="',
             source[padded_start:aligned_start],
         )
+        self.assertIn('"sourceDimensions"', source[padded_start:aligned_start])
+        self.assertIn('"outputDimensions"', source[padded_start:aligned_start])
+        screen = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/client/gui/screen/CapeAdjustScreen.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn("renderSourceTransparencyBackdrop(graphics);", screen)
+        self.assertIn("renderSourceBoundary(graphics);", screen)
+        self.assertIn("quickskin.cape.adjust_source_dimensions", screen)
+        self.assertIn("quickskin.cape.adjust_output_resolution", screen)
         self.assertIn(
             "long composedDrift = countDifferingPixels(expected, composed);",
             source[aligned_start:adjusted_start],
