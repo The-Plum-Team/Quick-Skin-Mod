@@ -24,4 +24,9 @@ Makena has dark hair and a yellow or orange top. Those clothing colours are not 
 custom skin. Judge whether the complete texture is intact and inspectable. This exception never
 applies when the expectation names a custom skin, cape, motif or colour.
 
+At the padded BMO editor checkpoint, `Source: 128x64` identifies the imported image while
+`Output: 64x32` identifies the selected final atlas; those values are intentionally different.
+Opaque-black padding must be visible on every side of the centred atlas, while the checkerboard is
+expected only where pixels inside the source are transparent.
+
 Return only the structured result requested by the runner. Do not edit files or attempt a fix.
