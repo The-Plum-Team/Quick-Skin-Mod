@@ -36,4 +36,9 @@ Alex, Noor, or Ari) is acceptable even when its model, outfit, or colours differ
 reference. This exception never applies when the expectation names a custom skin or cape. The
 reference is a semantic visual anchor, not a strict whole-image golden screenshot.
 
+At the padded BMO cape checkpoint, `Source: 128x64` identifies the deliberately doubled import
+canvas and `Output: 64x32` identifies the final selected cape resolution. That size difference is
+intentional. Require visible opaque-black padding on all four sides of the centred BMO artwork;
+the checkerboard may show only through transparent source pixels, not through opaque black.
+
 Return only the structured result requested by the runner. Do not edit files or attempt a fix.
