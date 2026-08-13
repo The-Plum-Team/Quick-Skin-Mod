@@ -422,13 +422,13 @@
                     "kind": "required-gui-text",
                     "label": "cape editor instructions",
                     "box": [
-                      335,
+                      300,
                       624,
-                      725,
-                      655
+                      780,
+                      672
                     ],
                     "minimum_luma_exclusive": 75,
-                    "minimum_pixels": 750
+                    "minimum_pixels": 900
                   }
                 ]
               }
@@ -579,6 +579,20 @@
               }
             },
             {
+              "id": "remove_cape_with_elytra",
+              "assertion_required": true
+            },
+            {
+              "id": "vanilla_elytra_after_cape_removal",
+              "assertion_required": true,
+              "capture": {
+                "title": "Vanilla elytra after cape removal",
+                "review_tier": "key",
+                "expectation": "After the active BMO cape is removed through the cape menu, the same crouching player still wears two clearly separated elytra wings, now using Minecraft's ordinary gray-brown vanilla elytra texture. No cyan BMO artwork, custom cape texture, flat cape panel or missing wing is visible.",
+                "probes": []
+              }
+            },
+            {
               "id": "bmo_render_parity",
               "assertion_required": true
             },
@@ -711,6 +725,17 @@
                 0.18,
                 0.62,
                 0.96
+              ]
+            },
+            {
+              "first_step": "adjusted_bmo_elytra",
+              "second_step": "vanilla_elytra_after_cape_removal",
+              "minimum_changed_fraction": 0.005,
+              "region": [
+                0.4,
+                0.35,
+                0.6,
+                0.9
               ]
             },
             {
