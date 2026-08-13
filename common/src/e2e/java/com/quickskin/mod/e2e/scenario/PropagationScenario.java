@@ -13,6 +13,7 @@ import com.quickskin.mod.e2e.TestAssets;
 import com.quickskin.mod.e2e.VanillaShim;
 import com.quickskin.mod.e2e.generated.ScenarioContract.ScenarioId;
 import com.quickskin.mod.networking.NetworkSyncService;
+import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -194,9 +195,14 @@ public final class PropagationScenario implements Scenario {
 
     // ===== shared =========================================================================
     private Step baseline(Minecraft mc, String v, String role) {
+        boolean observer = "client_b".equals(role);
         return Step.of("baseline")
+                .action(() -> {
+                    if (observer) holdObserverBaseline(mc);
+                })
                 .minTicks(40) // ~2s render warmup so the first frame is real
-                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))
+                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player)
+                        && (!observer || holdObserverBaseline(mc)))
                 .settleTicks(20) // reject a one-frame generic fallback before the UUID skin lands
                 .timeoutTicks(400)
                 .screenshot(v + "_01_baseline_" + role + ".png")
@@ -208,9 +214,66 @@ public final class PropagationScenario implements Scenario {
                         return Step.Result.fail("default skin did not stabilize: expected="
                                 + expected + " actual=" + actual);
                     }
+                    if (observer && !holdObserverBaseline(mc)) {
+                        return Step.Result.fail(
+                                "observer baseline did not keep the remote subject behind the camera");
+                    }
                     return Step.Result.pass("player present: " + VanillaShim.playerName(mc.player)
-                            + " defaultSkin=" + actual);
+                            + " defaultSkin=" + actual
+                            + (observer ? "; remote subject present behind first-person camera" : ""));
                 });
+    }
+
+    /**
+     * Keep B's pre-inspection frame semantically honest even when A finished applying its custom
+     * look before the slower client joined. The sequential propagation scenario intentionally lets
+     * A apply first, so B's baseline must prove B's own vanilla appearance without accidentally
+     * framing A. Wait for A to exist, then point exactly away from it and hold that camera through
+     * the screenshot settle window. The later {@code observe_a} step deliberately turns back.
+     */
+    private boolean holdObserverBaseline(Minecraft mc) {
+        try {
+            AbstractClientPlayer subject = findOther(mc);
+            if (mc.player == null || mc.options == null || subject == null) return false;
+
+            mc.options.setCameraType(CameraType.FIRST_PERSON);
+            VanillaShim.setScreen(mc, null);
+
+            double awayX = mc.player.getX() - subject.getX();
+            double awayZ = mc.player.getZ() - subject.getZ();
+            double distance = Math.hypot(awayX, awayZ);
+            if (distance < 3.0) {
+                // Two players can join at almost the same spawn coordinate. Walk B away in small
+                // server-accepted increments before composing the frame so A cannot clip through
+                // the first-person camera even though the look vector points backwards.
+                double stepX = distance < 0.01 ? 1.0 : awayX / distance;
+                double stepZ = distance < 0.01 ? 0.0 : awayZ / distance;
+                mc.player.setDeltaMovement(0, 0, 0);
+                mc.player.setPos(
+                        mc.player.getX() + stepX * 0.25,
+                        mc.player.getY(),
+                        mc.player.getZ() + stepZ * 0.25);
+                return false;
+            }
+
+            float yaw = (float) Math.toDegrees(Math.atan2(-awayX, awayZ));
+            mc.player.setYRot(yaw);
+            mc.player.yRotO = yaw;
+            mc.player.setXRot(0f);
+            mc.player.xRotO = 0f;
+            mc.player.setYHeadRot(yaw);
+            mc.player.yHeadRotO = yaw;
+
+            // Require the subject to be decisively behind, not merely outside the centre reticle.
+            double subjectX = (subject.getX() - mc.player.getX()) / distance;
+            double subjectZ = (subject.getZ() - mc.player.getZ()) / distance;
+            double lookX = -Math.sin(Math.toRadians(yaw));
+            double lookZ = Math.cos(Math.toRadians(yaw));
+            return lookX * subjectX + lookZ * subjectZ <= -0.95;
+        } catch (Throwable t) {
+            E2ELog.warn("holdObserverBaseline: " + t);
+            return false;
+        }
     }
 
     /**
