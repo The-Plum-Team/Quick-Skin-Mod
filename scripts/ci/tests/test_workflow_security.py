@@ -87,7 +87,10 @@ class WorkflowSecurityTest(unittest.TestCase):
                 secret_steps += 1
                 with self.subTest(workflow=workflow.name, step=block.splitlines()[0]):
                     self.assertIn('CLAUDE_CODE_SKIP_PROMPT_HISTORY: "1"', block)
-                    if workflow.name == "visual-review-drain.yml":
+                    if workflow.name in {
+                        "visual-review-drain.yml",
+                        "mod-compatibility-review.yml",
+                    }:
                         runner = (
                             ROOT / "e2e" / "visual_review_runner.py"
                         ).read_text(encoding="utf-8")
@@ -115,7 +118,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                     if ",Edit," in block:
                         self.assertIn('"Edit(./**)"', block)
                     self.assertIn('"Write(', block)
-        self.assertEqual(secret_steps, 3)
+        self.assertEqual(secret_steps, 4)
 
     def test_external_actions_are_pinned_to_full_commit_shas(self) -> None:
         definitions = [
@@ -155,7 +158,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("e2e-out/runs/**", action)
         self.assertIn("if-no-files-found: error", action)
         self.assertIn("name: ${{ inputs.evidence-name }}", action)
-        self.assertIn("retention-days: 1", action)
+        self.assertIn('default: "1"', action)
+        self.assertIn(
+            "retention-days: ${{ inputs.evidence-retention-days }}",
+            action,
+        )
+        self.assertIn(
+            "evidence-retention-days: ${{ startsWith(github.ref_name, "
+            "'automation/sync/') && '7' || '1' }}",
+            on_demand,
+        )
 
     def test_pr_and_nightly_e2e_select_matrix_owned_coverage(self) -> None:
         workflow = (WORKFLOWS / "on-demand-e2e.yml").read_text(encoding="utf-8")
@@ -217,6 +229,36 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "visual-review-drain.yml",
                 "Upload the sanitized generation block marker",
                 "${{ steps.wave-block.outputs.artifact_name }}",
+            ): "7",
+            (
+                "on-demand-e2e.yml",
+                "Upload immutable E2E input bundle",
+                "e2e-input-bundle",
+            ): "${{ startsWith(github.ref_name, 'automation/sync/') && 7 || 1 }}",
+            (
+                "mod-compatibility-e2e.yml",
+                "Upload the authenticated compatibility plan",
+                "mod-compatibility-plan",
+            ): "7",
+            (
+                "mod-compatibility-e2e.yml",
+                "Re-publish the exact source bundle for parallel consumers",
+                "${{ steps.plan.outputs.bundle_name }}",
+            ): "7",
+            (
+                "mod-compatibility-e2e.yml",
+                "Upload the bounded credential-free review capsule",
+                "mod-compatibility-review-input-${{ github.run_id }}-${{ matrix.id }}",
+            ): "7",
+            (
+                "mod-compatibility-review.yml",
+                "Upload the exact normalized lane report",
+                "mod-compatibility-review-${{ matrix.source_run_id }}-${{ matrix.id }}",
+            ): "7",
+            (
+                "mod-compatibility-review.yml",
+                "Upload the durable confirmed-defect marker",
+                "mod-compatibility-wave-block-${{ matrix.source_run_id }}-${{ matrix.id }}",
             ): "7",
         }
         observed_overrides: set[tuple[str, str, str]] = set()
@@ -314,6 +356,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         review = job_block("visual-review-drain.yml", "review")
         cleanup = job_block("visual-review-drain.yml", "cleanup")
         release_anchor = job_block("visual-review-drain.yml", "release-anchor")
+        release_compatibility = job_block(
+            "visual-review-drain.yml", "release-mod-compatibility"
+        )
         continuation = job_block("visual-review-drain.yml", "continue")
         pages = job_block("on-demand-e2e.yml", "prepare-pages-evidence")
         notify = job_block("on-demand-e2e.yml", "notify-version-port")
@@ -340,6 +385,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "dispatch-selected",
                 "review",
                 "cleanup",
+                "release-mod-compatibility",
                 "release-anchor",
                 "continue",
             },
@@ -367,6 +413,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", dispatch_selected)
         self.assertNotIn("actions/checkout@", dispatch_selected)
         self.assertIn("needs.select.outputs.direct == 'true'", review)
+        self.assertIn("mod-compatibility-requested", release_compatibility)
+        self.assertIn("needs.review.outputs.compatibility_eligible == 'true'", release_compatibility)
+        self.assertIn("automated-version-sync", release_compatibility)
+        self.assertIn("contents: write", release_compatibility)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_compatibility)
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
         self.assertIn('endswith(" - contract scenarios")', authenticate)
@@ -543,6 +594,93 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("TRIAGE_CONFIDENCE", (
             ROOT / "e2e" / "check_visual_review.py"
         ).read_text(encoding="utf-8"))
+
+    def test_mod_compatibility_wave_is_locked_parallel_and_credential_separated(self) -> None:
+        execution_workflow = (
+            WORKFLOWS / "mod-compatibility-e2e.yml"
+        ).read_text(encoding="utf-8")
+        review_workflow = (
+            WORKFLOWS / "mod-compatibility-review.yml"
+        ).read_text(encoding="utf-8")
+        compatibility_runtime = (
+            ROOT / "e2e" / "mod_compatibility.py"
+        ).read_text(encoding="utf-8")
+        updater = (
+            ROOT / "e2e" / "update_mod_compatibility_lock.py"
+        ).read_text(encoding="utf-8")
+        contract = json.loads(
+            (ROOT / "e2e" / "mod-compatibility-contract.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        admit = job_block("mod-compatibility-e2e.yml", "admit")
+        prepare = job_block("mod-compatibility-e2e.yml", "prepare")
+        runtime = job_block("mod-compatibility-e2e.yml", "compatibility-e2e")
+        curate = job_block("mod-compatibility-e2e.yml", "curate")
+        execution_gate = job_block("mod-compatibility-e2e.yml", "gate")
+        enumerate_review = job_block("mod-compatibility-review.yml", "enumerate")
+        review = job_block("mod-compatibility-review.yml", "review")
+        review_gate = job_block("mod-compatibility-review.yml", "gate")
+
+        self.assertIn("types:\n      - mod-compatibility-requested", execution_workflow)
+        self.assertIn("permissions: {}", execution_workflow)
+        self.assertIn("permissions: {}", review_workflow)
+        self.assertIn("visual-review-report.json", admit)
+        self.assertIn(".semantic_valid == true", admit)
+        self.assertIn(".defect == false", admit)
+        self.assertIn('git rev-parse "$SOURCE_SHA^{tree}"', admit)
+        self.assertIn("automated-version-sync", admit)
+        self.assertIn("e2e-input-bundle", admit)
+        self.assertIn("e2e/mod_compatibility.py --plan", prepare)
+        self.assertIn("not_applicable", prepare)
+        self.assertIn(".release_branch == $target_branch", prepare)
+        self.assertIn("all(.runnable[];", prepare)
+        self.assertIn("strategy:\n      fail-fast: false", runtime)
+        self.assertNotIn("max-parallel", runtime)
+        self.assertIn("compatibility-mod: ${{ matrix.compatibility_mod }}", runtime)
+        self.assertIn("needs.compatibility-e2e.result == 'success'", curate)
+        self.assertIn("same-version baseline", curate)
+        self.assertIn("CURATE_RESULT", execution_gate)
+
+        self.assertIn("workflow_run:", review_workflow)
+        self.assertIn(
+            "github.event.workflow_run.conclusion == 'success'", enumerate_review
+        )
+        self.assertIn("strategy:\n      fail-fast: false", review)
+        self.assertNotIn("max-parallel", review.split("\n    steps:", 1)[0])
+        self.assertIn("--review-identical", review)
+        self.assertNotIn("--cache ", review)
+        self.assertIn("git show", enumerate_review)
+        self.assertIn("$plan_source_sha:e2e/mod-compatibility-contract.json", enumerate_review)
+        self.assertIn("${{ matrix.source_sha }}:e2e/scenario-contract.json", review)
+        self.assertIn("--triage-model claude-sonnet-5", review)
+        self.assertIn("--verify-model claude-opus-5", review)
+        self.assertIn("mod-compatibility-wave-block", review)
+        self.assertIn("/cancel", review)
+        self.assertIn("REVIEW_RESULT", review_gate)
+        self.assertNotIn("base-evidence", review)
+        self.assertNotIn("candidate-evidence", review)
+        self.assertEqual(review.count("actions/download-artifact@"), 0)
+
+        self.assertIn("locked.url", compatibility_runtime)
+        self.assertIn("locked.sha256", compatibility_runtime)
+        self.assertIn("locked.sha512", compatibility_runtime)
+        self.assertNotIn("/project/", compatibility_runtime)
+        self.assertIn("/project/", updater)
+        self.assertEqual(
+            {
+                "cpm",
+                "ears",
+                "skin-layers-3d",
+                "customnpcs",
+                "essential",
+                "replaymod",
+            },
+            {item["id"] for item in contract["mods"]},
+        )
+        self.assertNotIn("player-armor-stands", execution_workflow.lower())
+        self.assertNotIn("player-armor-stands", review_workflow.lower())
 
     def test_pages_fan_in_uses_protected_code_and_exact_release_heads(self) -> None:
         workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")

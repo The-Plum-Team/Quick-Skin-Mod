@@ -94,10 +94,13 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 ## Optional integrations
 
-- CPM, Ears, CustomNPCs, and 3D Skin Layers are optional. Guard their entry points and preserve the
-  normal skin/cape path when an optional mod or API is absent.
+- CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, and ReplayMod are optional. Guard their entry
+  points and preserve the normal skin/cape path when an optional mod or API is absent.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
+- Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
+  accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
+  a complete compatibility lane.
 
 ## Public E2E evidence
 
@@ -207,8 +210,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   replacement artifact identity, and every deletion ID before retiring the exact ordinary consumed
   handoff, older lossless-anchor generations, Pages-run intermediates, and caches older than the
   successful replacement. It must revalidate the retained raw anchor before every deletion. Raw
-  packaged-E2E proof expires after one day; do not delete it during promotion because a concurrent
-  branch attestation may still consume it. A failed E2E, deployment, validation, or rotation must
+  packaged-E2E proof normally expires after one day; an automatic synchronization source and its
+  immutable input bundle retain seven days so delayed semantic approval can still launch and
+  compare the compatibility wave. Do not delete either during promotion because a concurrent branch
+  attestation or compatibility curator may still consume it. A failed E2E, deployment, validation,
+  or rotation must
   preserve the previous usable cache and raw anchor, and a delayed rotation must never delete a
   concurrent newer generation.
 - Discovery records one protected `master` SHA for the Pages run. Every collection and render job
@@ -266,6 +272,21 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   protected CI tests, or documentation. Missing, oversized, multiple, or runtime-bearing diffs
   remain eligible for the ordinary review path. The automatic matrix-derived 1.20.1 anchor must
   never use this suppression, irrespective of its immediate file inventory.
+- Optional-mod E2E is a post-validation wave. It may start only for an exact release-branch tree
+  whose Build, complete packaged suite, and independent semantic visual review are all clean. Its
+  authored unit is `release artifact x optional mod`: every applicable unit first proves that the
+  named Quick Skin integration is active, then runs the complete ordinary scenario profile plus
+  the compatibility scenario. All applicable units run in parallel; unsupported loader/mod pairs
+  remain explicit `not_applicable` records. External JARs must come from
+  `e2e/mod-compatibility-contract.json` by exact HTTPS URL, filename, byte size, SHA-256, and
+  SHA-512. CI never selects a newest upstream version or silently substitutes a dependency.
+- Compatibility visual judgment must compare the complete modded capture product with the clean
+  same-version, same-loader packaged result while still judging every frame semantically. It never
+  treats byte-identical pairs as an automatic pass. Every pair reaches Sonnet; every concern or
+  confidence below high reaches Opus. The first Opus-confirmed defect publishes a durable
+  source-wave marker and cancels remaining review jobs. Raw packaged artifacts are authenticated
+  and re-encoded by a secretless curator; a credential-bearing reviewer receives only the bounded,
+  metadata-free capsule and its source/target/artifact proof.
 - Every automatic `master` synchronization releases non-anchor version branches only after the
   protected drainer produces a semantic 1.20.1 certificate. The certificate must cover identical
   non-empty Fabric and Forge capture sets, contain no reference, report every frame semantically
