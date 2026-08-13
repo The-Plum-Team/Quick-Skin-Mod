@@ -152,6 +152,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   auxiliary cape/elytra UV faces as valid atlas content rather than padding. Back both views with
   exact source, transform, dimension-label, preview, applied-atlas, and rendered-route assertions
   so model interpretation cannot replace the deterministic contract.
+- Cape-removal evidence must begin from a renderer-confirmed custom-cape elytra, activate the real
+  Remove Cape control while leaving the elytra equipped, and then hold the same separated-wing pose.
+  Require persisted, service, cloak, and profile-elytra inputs to be empty so the renderer is forced
+  onto Minecraft's vanilla elytra texture; compare the bounded player region against the custom
+  wings so a stale custom surface cannot pass on state assertions alone.
 - Every orchestrator invocation writes into a fresh owned workspace and promotes only its bounded
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's
