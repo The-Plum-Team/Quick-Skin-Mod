@@ -4,6 +4,7 @@ import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.PlayerAppearance;
+import com.quickskin.mod.e2e.DefaultSkinEvidenceView;
 import com.quickskin.mod.e2e.E2ELog;
 import com.quickskin.mod.e2e.Scenario;
 import com.quickskin.mod.e2e.Step;
@@ -43,8 +44,10 @@ public final class Phase0Smoke implements Scenario {
         List<Step> steps = new ArrayList<>();
 
         steps.add(Step.of("baseline")
+                .action(() -> DefaultSkinEvidenceView.hold(mc, false))
                 .minTicks(40) // ~2s render warmup so the first frame is real
-                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))
+                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player)
+                        && DefaultSkinEvidenceView.hold(mc, false))
                 .settleTicks(20) // reject a one-frame generic fallback before the UUID skin lands
                 .timeoutTicks(400)
                 .screenshot(v + "_01_baseline_" + role + ".png")
@@ -57,11 +60,12 @@ public final class Phase0Smoke implements Scenario {
                                 + expected + " actual=" + actual);
                     }
                     return Step.Result.pass("player present: " + VanillaShim.playerName(mc.player)
-                            + " defaultSkin=" + actual);
+                            + " defaultSkin=" + actual + "; full-body evidence held");
                 }));
 
         steps.add(Step.of("apply_local_skin")
                 .action(() -> {
+                    DefaultSkinEvidenceView.enterFirstPerson(mc);
                     try {
                         Path file = TestAssets.makeClassicSkin();
                         AssetMetadata meta = SkinImporter.importSkin(file);
