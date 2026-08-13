@@ -6,6 +6,7 @@ import com.quickskin.mod.client.storage.NetworkTextureCache;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.PlayerAppearance;
 import com.quickskin.mod.common.data.PlayerAppearanceRepository;
+import com.quickskin.mod.e2e.DefaultSkinEvidenceView;
 import com.quickskin.mod.e2e.E2ELog;
 import com.quickskin.mod.e2e.Scenario;
 import com.quickskin.mod.e2e.Step;
@@ -83,6 +84,7 @@ public final class PropagationScenario implements Scenario {
 
         steps.add(Step.of("apply_local_look")
                 .action(() -> {
+                    DefaultSkinEvidenceView.enterFirstPerson(mc);
                     try {
                         Path skinFile = TestAssets.makeClassicSkin();
                         AssetMetadata skinMeta = SkinImporter.importSkin(skinFile);
@@ -194,9 +196,12 @@ public final class PropagationScenario implements Scenario {
 
     // ===== shared =========================================================================
     private Step baseline(Minecraft mc, String v, String role) {
+        boolean observer = "client_b".equals(role);
         return Step.of("baseline")
+                .action(() -> DefaultSkinEvidenceView.hold(mc, observer))
                 .minTicks(40) // ~2s render warmup so the first frame is real
-                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))
+                .ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player)
+                        && DefaultSkinEvidenceView.hold(mc, observer))
                 .settleTicks(20) // reject a one-frame generic fallback before the UUID skin lands
                 .timeoutTicks(400)
                 .screenshot(v + "_01_baseline_" + role + ".png")
@@ -208,8 +213,13 @@ public final class PropagationScenario implements Scenario {
                         return Step.Result.fail("default skin did not stabilize: expected="
                                 + expected + " actual=" + actual);
                     }
+                    if (!DefaultSkinEvidenceView.hold(mc, observer)) {
+                        return Step.Result.fail(
+                                "observer baseline did not keep the remote subject behind the camera");
+                    }
                     return Step.Result.pass("player present: " + VanillaShim.playerName(mc.player)
-                            + " defaultSkin=" + actual);
+                            + " defaultSkin=" + actual + "; full-body evidence held"
+                            + (observer ? "; remote subject present behind third-person camera" : ""));
                 });
     }
 
@@ -275,6 +285,7 @@ public final class PropagationScenario implements Scenario {
      */
     private void stepTowardVantage(Minecraft mc) {
         try {
+            DefaultSkinEvidenceView.enterFirstPerson(mc);
             AbstractClientPlayer a = findOther(mc);
             if (a == null || mc.player == null) return;
 
