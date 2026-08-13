@@ -153,7 +153,10 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
   the oldest eligible source except that a completed certifiable automatic 1.20.1 anchor preempts
-  advisory work. An exact wake may select only its requested authenticated artifact. Queue state
+  advisory work. An exact wake may select only its requested authenticated artifact and queries
+  only that immutable capsule plus its exact report, cooldown, and generation-block names; it does
+  not rescan the repository-wide queue. Transient GitHub API and installation-rate-limit responses
+  receive bounded backoff before the durable wake is allowed to fail visibly. Queue state
   lives in Actions artifacts rather than pending workflow runs, so GitHub concurrency coalescing
   cannot lose a review. Exact artifact IDs define drain concurrency groups: duplicate wakes cannot
   overlap, while distinct capsules run in parallel. Scheduled/manual recovery sweeps share a
@@ -162,11 +165,16 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   from failed/in-progress protected drains and skips only inputs carrying the exact blocked master
   generation; the marker's owner still binds it to its exact protected reviewer implementation.
 - `scripts/ci/visual_review_impact.py` is the narrow fail-open cost filter for replicated version
-  ports. Protected automation supplies a complete, bounded GitHub PR file inventory; only the two
-  visual-review workflows, the classifier itself, CI tests, and documentation may skip another
-  model review on a non-anchor port. The matrix-derived 1.20.1 port can never use this skip because
+  ports. Protected automation supplies a complete, bounded GitHub PR file inventory; only the
+  visual-review/Pages orchestration and queue clients, the classifier itself, their tests, and
+  documentation may skip another model review on a non-anchor port. The matrix-derived 1.20.1 port
+  can never use this skip because
   its semantic review certifies the cumulative current `master` generation. Unknown paths,
   malformed inventories, and unsafe rename origins remain reviewable.
+- `scripts/ci/github_api_retry.sh` is the protected Pages-side wrapper for read-only GitHub API
+  calls after checkout. It keeps response bytes isolated on stdout and retries only classified
+  rate-limit, transport, and server failures with bounded run-skewed backoff; provenance and exact
+  identity checks remain in each caller.
 - `scripts/ci/gradle_cache_policy.py` is the fail-closed writer policy for Gradle state. It permits
   writes only from protected `master`; release branches, packaged E2E, and release jobs remain
   read-only.
