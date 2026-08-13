@@ -23,7 +23,7 @@ This `fabric-and-neoforge-1.21.11` release branch exercises the following exact 
 | `fabric-1.21.11` | `1.21.11` | Fabric | `21` | `4` |
 | `neoforge-1.21.11` | `1.21.11` | NeoForge | `21` | `4` |
 
-Scenario contract SHA-256: `39fa84a1cf271168c440b6fa5d2c26a69943a72257adbe09357e578208025783`
+Scenario contract SHA-256: `68b93a835e000ca4c1f04b6ec5f5ba09190cccacd22a4b833e620591d62d2802`
 Contract totals: `47` ordered steps, `42` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -166,7 +166,9 @@ Minecraft-version rendering differences are allowed. Every result records the li
 The `full` scenario also exercises adjusted-cape parity against the production BMO asset. It
 centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import. One editor capture keeps
 the reset fit so the complete source, centred atlas, and four black padding bands are independently
-visible; the next drives the real zoom control to a 1:1 crop. In that crop, narrow coloured regions
+visible. A cyan source boundary, transparency checkerboard, and separate `Source: 128x64` /
+`Output: 64x32` labels make the import geometry unambiguous; fixed text probes require both labels
+in the screenshot. The next capture drives the real zoom control to a 1:1 crop. In that crop, narrow coloured regions
 outside the three highlighted front/back/outer-wing faces are legitimate auxiliary cape and elytra
 UV faces, not padding leakage. The harness saves through the adjusted-import boundary and requires
 the preview, applied, and persisted atlases to remain pixel-identical to the bundled original.
