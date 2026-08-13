@@ -85,7 +85,7 @@ class CapeImportProcessorTest {
                 transparentCape, 1, vanillaElytra);
         assertEquals(0xffcc3300, composite.getRGB(0, 0));
 
-        transparentCape.setRGB(22, 2, 0xff00aa00);
+        transparentCape.setRGB(36, 2, 0xff00aa00);
         assertFalse(CapeImportProcessor.isElytraAreaTransparent(transparentCape));
         assertSame(
                 transparentCape,
@@ -103,6 +103,8 @@ class CapeImportProcessorTest {
         assertFalse(masked == opaqueCape, "an invalid opaque atlas needs a presentation copy");
         assertTrue(CapeElytraSilhouette.hasRequiredCutout(masked, 1));
         assertEquals(0x00000000, masked.getRGB(45 * 4, 2 * 4));
+        assertEquals(0x00000000, masked.getRGB(24 * 4, 2 * 4),
+                "the unused inner face must not expose the opaque canvas");
         assertEquals(0xff117788, masked.getRGB(36 * 4, 2 * 4));
         assertEquals(0xff117788, masked.getRGB(1, 1), "cape pixels must stay untouched");
         assertFalse(CapeElytraSilhouette.hasRequiredCutout(opaqueCape, 1),
@@ -126,6 +128,10 @@ class CapeImportProcessorTest {
         BufferedImage cape = new BufferedImage(64, 32, BufferedImage.TYPE_INT_ARGB);
         cape.setRGB(63, 31, 0xffffffff);
         assertTrue(CapeImportProcessor.isElytraAreaTransparent(cape));
+
+        cape.setRGB(24, 2, 0xffffffff);
+        assertTrue(CapeImportProcessor.isElytraAreaTransparent(cape),
+                "pixels outside vanilla's Elytra envelope are not renderable content");
 
         cape.setRGB(36, 2, 0xffffffff);
         assertFalse(CapeImportProcessor.isElytraAreaTransparent(cape));
