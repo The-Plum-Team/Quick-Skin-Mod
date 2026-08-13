@@ -25,7 +25,7 @@
               "capture": {
                 "title": "Smoke baseline",
                 "review_tier": "all",
-                "expectation": "A normal first-person flat-world view before the local skin is applied. The local player has an intact vanilla default skin; any valid default skin variant is acceptable.",
+                "expectation": "A stable third-person flat-world view shows the complete local player before the local skin is applied. The UUID-selected vanilla default skin is intact; modern defaults such as Noor with a red top and green trousers are valid and must not be mistaken for a custom skin.",
                 "probes": []
               }
             },
@@ -73,7 +73,7 @@
               "capture": {
                 "title": "Propagation subject baseline",
                 "review_tier": "all",
-                "expectation": "The subject starts in a normal first-person flat-world view with an intact vanilla default appearance; any valid default skin variant is acceptable.",
+                "expectation": "A stable third-person flat-world view shows the complete subject with the intact UUID-selected vanilla default skin. Modern defaults such as Noor with a red top and green trousers are valid and must not be mistaken for a custom skin.",
                 "probes": []
               }
             },
@@ -105,7 +105,7 @@
               "capture": {
                 "title": "Propagation observer baseline",
                 "review_tier": "all",
-                "expectation": "A stable first-person world view whose lower-right hand and arm show the observer's intact vanilla default skin; any valid default skin variant is acceptable. The remote subject is deliberately held behind the camera and must not be visible before the later inspection checkpoint.",
+                "expectation": "A stable third-person world view shows the complete observer with the intact UUID-selected vanilla default skin. Modern defaults such as Makena with dark hair and a yellow or orange top are valid. The remote subject is deliberately held behind the camera and must not be visible before the later inspection checkpoint.",
                 "probes": []
               }
             },
@@ -162,7 +162,7 @@
               "capture": {
                 "title": "Live subject baseline",
                 "review_tier": "all",
-                "expectation": "The subject starts in a normal first-person flat-world view with an intact vanilla default appearance; any valid default skin variant is acceptable.",
+                "expectation": "A stable third-person flat-world view shows the complete subject with the intact UUID-selected vanilla default skin. Modern defaults such as Noor with a red top and green trousers are valid and must not be mistaken for a custom skin.",
                 "probes": []
               }
             },
@@ -198,7 +198,7 @@
               "capture": {
                 "title": "Live observer baseline",
                 "review_tier": "all",
-                "expectation": "The observer starts in a normal first-person world view with an intact vanilla default appearance after joining; any valid default skin variant is acceptable.",
+                "expectation": "A stable third-person world view shows the complete observer with the intact UUID-selected vanilla default skin after joining. Modern defaults such as Makena with dark hair and a yellow or orange top are valid; the remote subject must remain outside this baseline frame.",
                 "probes": []
               }
             },
@@ -212,7 +212,7 @@
               "capture": {
                 "title": "Live observer before",
                 "review_tier": "key",
-                "expectation": "The observer sees Alice with an intact vanilla default skin and no cape before the live change; any valid default skin variant is acceptable.",
+                "expectation": "The observer sees the complete Alice model with her intact UUID-selected vanilla default skin and no cape before the live change. Noor's dark hair, red top, green trousers and salmon hands are valid vanilla colours, not evidence of a custom skin.",
                 "probes": []
               }
             },
@@ -262,7 +262,7 @@
               "capture": {
                 "title": "Full-suite baseline",
                 "review_tier": "all",
-                "expectation": "A player with an intact vanilla default skin in a flat daytime world before Quick Skin applies a custom appearance; any valid default skin variant is acceptable.",
+                "expectation": "A centered complete player model in a stable third-person flat daytime world view has the intact UUID-selected vanilla default skin before Quick Skin applies a custom appearance. Modern defaults such as Noor with a red top and green trousers are valid and must not be mistaken for a custom skin.",
                 "probes": []
               }
             },

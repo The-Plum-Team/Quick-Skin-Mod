@@ -286,7 +286,26 @@ class ScenarioContractTest(unittest.TestCase):
         ):
             with self.subTest(capture_id=capture_id):
                 expectation = self.contract.capture_by_id(capture_id).expectation
-                self.assertIn("any valid default skin variant is acceptable", expectation)
+                self.assertIn("UUID-selected vanilla default skin", expectation)
+
+        for capture_id in (
+            "phase0-smoke.client_a.baseline",
+            "propagation.client_a.baseline",
+            "propagation.client_b.baseline",
+            "propagation-live.client_a.baseline",
+            "propagation-live.client_b.baseline",
+            "full.client_a.baseline",
+        ):
+            with self.subTest(full_body_capture_id=capture_id):
+                expectation = self.contract.capture_by_id(capture_id).expectation
+                self.assertIn("third-person", expectation)
+                self.assertIn("complete", expectation)
+
+        live_before = self.contract.capture_by_id(
+            "propagation-live.client_b.observe_before"
+        ).expectation
+        self.assertIn("Noor", live_before)
+        self.assertIn("red top", live_before)
 
     def test_comparisons_preserve_thresholds_regions_and_order(self) -> None:
         def values(scenario: str, role: str) -> list[tuple[object, ...]]:

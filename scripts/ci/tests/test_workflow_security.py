@@ -527,6 +527,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("deliberately no reference image", semantic_prompt)
         self.assertIn("Do not compare loaders", semantic_prompt)
         self.assertIn("matches_reference=null", semantic_verify_prompt)
+        for prompt in (semantic_prompt, semantic_verify_prompt):
+            self.assertIn("Noor", prompt)
+            self.assertIn("Makena", prompt)
+            self.assertIn("red top", prompt)
+            self.assertIn("yellow or orange top", prompt)
         self.assertIn("DEFAULT_TRIAGE_CHUNK_SIZE = 8", runner)
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
         self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
