@@ -124,6 +124,8 @@
   "quickskin.cape.adjust_reset": "Reset Position",
   "quickskin.cape.adjust_apply": "Apply Cape",
   "quickskin.cape.adjust_resolution": "Resolution:",
+  "quickskin.cape.adjust_source_dimensions": "Source: %s",
+  "quickskin.cape.adjust_output_resolution": "Output: %s",
   "quickskin.cape.adjust_preview": "Preview:",
   "quickskin.cape.adjust_back": "Cape Back",
   "quickskin.cape.adjust_front": "Front",
