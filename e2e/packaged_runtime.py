@@ -183,6 +183,7 @@ MAX_EVIDENCE_SCREENSHOT_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_CRASH_REPORT_BYTES = 16 * 1024 * 1024
 PROCESS_GRACEFUL_STOP_SECONDS = 15
 PROCESS_FORCE_STOP_SECONDS = 15
+PROCESS_GROUP_POLL_SECONDS = 0.1
 
 
 @dataclass(frozen=True)
@@ -1069,11 +1070,47 @@ def start_process(command: list[str], cwd: Path, log_path: Path, env: dict[str, 
     return process, handle
 
 
-def stop_process(process: subprocess.Popen[bytes] | None) -> None:
-    if process is None or process.poll() is not None:
-        return
+def _posix_process_group_exists(process_group_id: int) -> bool:
+    """Return whether any process still belongs to an isolated launcher group."""
+
     try:
-        if os.name == "nt":
+        os.killpg(process_group_id, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # A group that exists but cannot be signalled is still not safe to snapshot.
+        return True
+    return True
+
+
+def _wait_for_posix_process_group_exit(
+    process: subprocess.Popen[bytes],
+    process_group_id: int,
+    timeout: float,
+) -> bool:
+    """Reap the launcher and wait until every descendant in its group has exited."""
+
+    deadline = time.monotonic() + timeout
+    while True:
+        # poll() performs the non-blocking waitpid needed to reap an exited launcher. The
+        # group probe remains authoritative because Forge starts through run.sh: that shell
+        # can exit before its Java child has finished shutdown logging.
+        process.poll()
+        if not _posix_process_group_exists(process_group_id):
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(PROCESS_GROUP_POLL_SECONDS, remaining))
+
+
+def stop_process(process: subprocess.Popen[bytes] | None) -> None:
+    if process is None:
+        return
+    if os.name == "nt":
+        if process.poll() is not None:
+            return
+        try:
             subprocess.run(
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],
                 stdout=subprocess.DEVNULL,
@@ -1083,21 +1120,49 @@ def stop_process(process: subprocess.Popen[bytes] | None) -> None:
             # taskkill returning only means the termination request completed. Reap the
             # launcher before closing its inherited log descriptor and snapshotting evidence.
             process.wait(timeout=PROCESS_FORCE_STOP_SECONDS)
-        else:
-            os.killpg(process.pid, signal.SIGTERM)
-            try:
-                process.wait(timeout=PROCESS_GRACEFUL_STOP_SECONDS)
-            except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                # Do not export a file while the killed JVM can still finish an in-flight
-                # write. Waiting here also reaps the process instead of leaving a zombie.
-                process.wait(timeout=PROCESS_FORCE_STOP_SECONDS)
-    except (OSError, subprocess.SubprocessError):
-        if process.poll() is None:
-            process.kill()
-        # The fallback has the same quiescence contract as the process-group path: callers
-        # may freeze logs only after this function has observed process termination.
-        process.wait(timeout=PROCESS_FORCE_STOP_SECONDS)
+        except (OSError, subprocess.SubprocessError):
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=PROCESS_FORCE_STOP_SECONDS)
+        return
+
+    process_group_id = process.pid
+    if not _posix_process_group_exists(process_group_id):
+        process.poll()
+        return
+    try:
+        os.killpg(process_group_id, signal.SIGTERM)
+    except ProcessLookupError:
+        process.poll()
+        return
+    except OSError as exc:
+        raise RuntimeFailure(
+            f"could not stop isolated process group {process_group_id}"
+        ) from exc
+    if _wait_for_posix_process_group_exit(
+        process,
+        process_group_id,
+        PROCESS_GRACEFUL_STOP_SECONDS,
+    ):
+        return
+
+    try:
+        os.killpg(process_group_id, signal.SIGKILL)
+    except ProcessLookupError:
+        process.poll()
+        return
+    except OSError as exc:
+        raise RuntimeFailure(
+            f"could not force-stop isolated process group {process_group_id}"
+        ) from exc
+    if not _wait_for_posix_process_group_exit(
+        process,
+        process_group_id,
+        PROCESS_FORCE_STOP_SECONDS,
+    ):
+        raise RuntimeFailure(
+            f"isolated process group {process_group_id} did not quiesce"
+        )
 
 
 def wait_for_log(process: subprocess.Popen[bytes], log: Path, text: str, timeout: int) -> None:

@@ -731,21 +731,20 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
                 ):
                     packaged_runtime.scan_runtime_logs([log])
 
-    def test_forced_process_stop_is_reaped_before_evidence_can_be_exported(self) -> None:
+    def test_forced_process_stop_waits_for_full_group_before_export(self) -> None:
         process = mock.Mock()
         process.pid = 4242
         process.poll.return_value = None
-        process.wait.side_effect = [
-            packaged_runtime.subprocess.TimeoutExpired(
-                cmd=["java"],
-                timeout=packaged_runtime.PROCESS_GRACEFUL_STOP_SECONDS,
-            ),
-            0,
-        ]
 
         with mock.patch.object(packaged_runtime.os, "name", "posix"), mock.patch.object(
             packaged_runtime.os, "killpg"
-        ) as kill_group:
+        ) as kill_group, mock.patch.object(
+            packaged_runtime, "_posix_process_group_exists", return_value=True
+        ), mock.patch.object(
+            packaged_runtime,
+            "_wait_for_posix_process_group_exit",
+            side_effect=[False, True],
+        ) as wait_for_group:
             packaged_runtime.stop_process(process)
 
         self.assertEqual(
@@ -757,11 +756,61 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
         )
         self.assertEqual(
             [
-                mock.call(timeout=packaged_runtime.PROCESS_GRACEFUL_STOP_SECONDS),
-                mock.call(timeout=packaged_runtime.PROCESS_FORCE_STOP_SECONDS),
+                mock.call(
+                    process,
+                    4242,
+                    packaged_runtime.PROCESS_GRACEFUL_STOP_SECONDS,
+                ),
+                mock.call(
+                    process,
+                    4242,
+                    packaged_runtime.PROCESS_FORCE_STOP_SECONDS,
+                ),
             ],
-            process.wait.call_args_list,
+            wait_for_group.call_args_list,
         )
+
+    def test_exited_forge_shell_does_not_hide_lingering_java_child(self) -> None:
+        process = mock.Mock()
+        process.pid = 4242
+        process.poll.return_value = 0
+
+        with mock.patch.object(packaged_runtime.os, "name", "posix"), mock.patch.object(
+            packaged_runtime.os, "killpg"
+        ) as kill_group, mock.patch.object(
+            packaged_runtime, "_posix_process_group_exists", return_value=True
+        ), mock.patch.object(
+            packaged_runtime,
+            "_wait_for_posix_process_group_exit",
+            return_value=True,
+        ) as wait_for_group:
+            packaged_runtime.stop_process(process)
+
+        kill_group.assert_called_once_with(4242, packaged_runtime.signal.SIGTERM)
+        wait_for_group.assert_called_once_with(
+            process,
+            4242,
+            packaged_runtime.PROCESS_GRACEFUL_STOP_SECONDS,
+        )
+
+    def test_process_group_wait_reaps_launcher_and_observes_descendants(self) -> None:
+        process = mock.Mock()
+        process.poll.side_effect = [None, 0]
+
+        with mock.patch.object(
+            packaged_runtime,
+            "_posix_process_group_exists",
+            side_effect=[True, False],
+        ), mock.patch.object(packaged_runtime.time, "sleep") as sleep:
+            exited = packaged_runtime._wait_for_posix_process_group_exit(
+                process,
+                4242,
+                1,
+            )
+
+        self.assertTrue(exited)
+        self.assertEqual(2, process.poll.call_count)
+        sleep.assert_called_once_with(packaged_runtime.PROCESS_GROUP_POLL_SECONDS)
 
     def test_compatibility_marker_is_required_in_every_process_log(self) -> None:
         marker = packaged_runtime.COMPATIBILITY_LOG_MARKERS[
