@@ -23,7 +23,7 @@ This `fabric-and-neoforge-1.21.1` release branch exercises the following exact p
 | `fabric-1.21.1` | `1.21.1` | Fabric | `21` | `4` |
 | `neoforge-1.21.1` | `1.21.1` | NeoForge | `21` | `4` |
 
-Scenario contract SHA-256: `244073d94af1428d4ec21a6dca3dfbb4ba026418f6ec4399126a4bb697ad2a3a`
+Scenario contract SHA-256: `1042d118516421b5fcd936792c71bd1639052354ae5ce401893d3e4295d1ee03`
 Contract totals: `49` ordered steps, `43` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -112,6 +112,9 @@ Only the current invocation's complete, bounded evidence is promoted to `e2e-out
 atomic promotion uses guarded same-filesystem renames and an owned last-good sibling, so an
 interrupted or failed promotion restores or preserves the previous complete generation. Consumers
 read only `e2e-out/current`; stale files from earlier invocations cannot enter a result or gallery.
+Before that snapshot is frozen, the launcher and every descendant in its isolated process group
+must be gone. In particular, Forge's shell launcher may exit before its Java child finishes shutdown
+logging; the exporter waits for the complete group and force-stops it as a unit when necessary.
 
 `RuntimeStore/v1` is the independent reusable store:
 
@@ -179,6 +182,13 @@ semantic review to distinguish elytra geometry from a draped cape. A following c
 the real Remove Cape control without unequipping the elytra, requires persisted, service and
 renderer cape state to clear, and captures the same pose using Minecraft's vanilla elytra fallback.
 Its bounded comparison against the adjusted BMO wings must show a material texture change.
+
+The later HD-cape checkpoint deliberately imports a fully opaque 256x128 atlas. Before that atlas
+reaches local, network or animated presentation, the harness requires it to be intersected with
+Minecraft's complete Elytra alpha envelope—including the transparent inner 10x20 face—and proves
+that no other source pixel changed. Its crouching world capture holds both custom wings apart, so
+an opaque full-atlas rectangle cannot hide behind an overlapping standing pose or a tapered 2D
+editor preview.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves
