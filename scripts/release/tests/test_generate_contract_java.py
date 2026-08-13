@@ -63,6 +63,14 @@ class GenerateContractJavaTest(unittest.TestCase):
         self.assertIn('new StepSpec("confirm_self", true, false)', source)
         self.assertIn('new StepSpec("skin_menu_screen", true, true)', source)
         self.assertIn(
+            'new StepSpec("remove_cape_with_elytra", true, false)',
+            source,
+        )
+        self.assertIn(
+            'new StepSpec("vanilla_elytra_after_cape_removal", true, true)',
+            source,
+        )
+        self.assertIn(
             "public static RoleSpec role(ScenarioId scenario, String role)",
             source,
         )
