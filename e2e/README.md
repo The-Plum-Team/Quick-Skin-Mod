@@ -166,7 +166,9 @@ Minecraft-version rendering differences are allowed. Every result records the li
 The `full` scenario also exercises adjusted-cape parity against the production BMO asset. It
 centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import. One editor capture keeps
 the reset fit so the complete source, centred atlas, and four black padding bands are independently
-visible; the next drives the real zoom control to a 1:1 crop. In that crop, narrow coloured regions
+visible. A cyan source boundary, transparency checkerboard, and separate `Source: 128x64` /
+`Output: 64x32` labels make the import geometry unambiguous; fixed text probes require both labels
+in the screenshot. The next capture drives the real zoom control to a 1:1 crop. In that crop, narrow coloured regions
 outside the three highlighted front/back/outer-wing faces are legitimate auxiliary cape and elytra
 UV faces, not padding leakage. The harness saves through the adjusted-import boundary and requires
 the preview, applied, and persisted atlases to remain pixel-identical to the bundled original.

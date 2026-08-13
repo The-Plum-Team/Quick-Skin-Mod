@@ -147,10 +147,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   checkpoint whose contract says it is still outside the later inspection frame.
 - Adjusted-cape parity evidence must show a non-standard padded source before cropping and the final
   aligned atlas as separate semantic checkpoints. The source checkpoint must expose all four
-  padding bands; the aligned checkpoint must identify coloured pixels in auxiliary cape/elytra UV
-  faces as valid atlas content rather than padding. Back both views with exact source, transform,
-  preview, applied-atlas, and rendered-route assertions so model interpretation cannot replace the
-  deterministic contract.
+  padding bands, distinguish opaque black from transparency with a checkerboard, and label source
+  and output dimensions independently; the aligned checkpoint must identify coloured pixels in
+  auxiliary cape/elytra UV faces as valid atlas content rather than padding. Back both views with
+  exact source, transform, dimension-label, preview, applied-atlas, and rendered-route assertions
+  so model interpretation cannot replace the deterministic contract.
 - Every orchestrator invocation writes into a fresh owned workspace and promotes only its bounded
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's
