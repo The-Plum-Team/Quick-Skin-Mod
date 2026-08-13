@@ -21,6 +21,11 @@ player skin (for example Steve, Alex, Noor, or Ari) is acceptable even when its 
 colours differ from the 1.20.1 reference. This exception never applies when the expectation names
 a custom skin or cape. The reference is not a strict whole-pixel golden image.
 
+At the padded BMO cape checkpoint, `Source: 128x64` is the doubled import canvas while
+`Output: 64x32` is the final selected cape resolution; this difference is intentional. The BMO
+artwork must be centred with opaque-black padding visible on all four sides. Checkerboard showing
+through transparent source pixels is valid, but it must not replace opaque-black padding.
+
 Set `semantic_valid` from the expectation alone and `matches_reference` from the semantic
 comparison. A false value in either field requires `defect=true` and at least one concrete anomaly;
 both must be true for a clean result. Keep `visible` to one short sentence. Return only the
