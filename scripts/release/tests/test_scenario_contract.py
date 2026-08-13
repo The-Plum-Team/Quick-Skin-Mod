@@ -58,6 +58,8 @@ EXPECTED_STEPS = {
         "bmo_adjust_screen",
         "adjusted_bmo_cape",
         "adjusted_bmo_elytra",
+        "remove_cape_with_elytra",
+        "vanilla_elytra_after_cape_removal",
         "bmo_render_parity",
         "animated_cape_apply",
         "animated_cape_advance",
@@ -85,7 +87,7 @@ EXPECTED_CAPTURES = {
     ("full", "client_a"): tuple(
         step
         for step in EXPECTED_STEPS[("full", "client_a")]
-        if step != "bmo_render_parity"
+        if step not in {"remove_cape_with_elytra", "bmo_render_parity"}
     ),
 }
 
@@ -234,7 +236,7 @@ class ScenarioContractTest(unittest.TestCase):
             for role in scenario["roles"]
             for step in role["steps"]
         )
-        self.assertEqual(42, authored_capture_count)
+        self.assertEqual(43, authored_capture_count)
         self.assertEqual(authored_capture_count, len(self.contract.captures))
 
     def test_capture_metadata_and_ids_are_derived_from_steps(self) -> None:
@@ -244,7 +246,7 @@ class ScenarioContractTest(unittest.TestCase):
             for step in steps
         }
         self.assertEqual(expected_ids, set(self.contract.capture_ids))
-        self.assertEqual(42, len(expected_ids))
+        self.assertEqual(43, len(expected_ids))
         first = self.contract.capture_by_id("full.client_a.baseline")
         self.assertIs(
             first,
@@ -354,6 +356,12 @@ class ScenarioContractTest(unittest.TestCase):
                     "model_classic",
                     0.001,
                     (0.38, 0.18, 0.62, 0.96),
+                ),
+                (
+                    "adjusted_bmo_elytra",
+                    "vanilla_elytra_after_cape_removal",
+                    0.005,
+                    (0.4, 0.35, 0.6, 0.9),
                 ),
                 (
                     "animated_cape_apply",
@@ -468,9 +476,9 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "cape_adjust_screen",
                     "cape editor instructions",
-                    (335, 624, 725, 655),
+                    (300, 624, 780, 672),
                     75,
-                    750,
+                    900,
                 ),
                 (
                     "bmo_padded_source_screen",
