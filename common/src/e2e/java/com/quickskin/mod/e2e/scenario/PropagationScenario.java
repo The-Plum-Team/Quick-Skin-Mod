@@ -54,6 +54,9 @@ import java.util.UUID;
  */
 public final class PropagationScenario implements Scenario {
 
+    /** Fixed subject pose used to make the remote cape checkpoint an unambiguous rear view. */
+    private static final float SUBJECT_REAR_YAW = 180.0f;
+
     /** Set by A's apply action; read by A's ready/assert. */
     private volatile String skinHash;
     private volatile String capeHash;
@@ -188,7 +191,11 @@ public final class PropagationScenario implements Scenario {
                 .screenshot(v + "_09_propagation_observe_" + role + ".png")
                 .assertion(() -> {
                     logObserveGeometry(mc);
-                    return checkPropagation(mc);
+                    Step.Result propagated = checkPropagation(mc);
+                    if (!propagated.pass()) return propagated;
+                    Step.Result rearView = checkRearComposition(mc);
+                    if (!rearView.pass()) return rearView;
+                    return Step.Result.pass(propagated.message() + "; " + rearView.message());
                 }));
 
         return steps;
@@ -289,6 +296,10 @@ public final class PropagationScenario implements Scenario {
             AbstractClientPlayer a = findOther(mc);
             if (a == null || mc.player == null) return;
 
+            // Pose the disposable remote entity locally on B. This removes head/body interpolation
+            // ambiguity from the screenshot without changing the appearance or cape render paths.
+            DefaultSkinEvidenceView.pinStandingPose(a, SUBJECT_REAR_YAW);
+
             if (!vantageSet) {
                 // A's forward look vector (MC convention: x=-sin(yaw), z=cos(yaw)).
                 double rad = Math.toRadians(a.getYRot());
@@ -321,6 +332,13 @@ public final class PropagationScenario implements Scenario {
             mc.player.setYHeadRot(yaw);
         } catch (Throwable ignored) {
         }
+    }
+
+    private Step.Result checkRearComposition(Minecraft mc) {
+        if (mc.player == null) return Step.Result.fail("rear-view observer is unavailable");
+        AbstractClientPlayer a = findOther(mc);
+        if (a == null) return Step.Result.fail("rear-view subject is unavailable");
+        return DefaultSkinEvidenceView.checkRearView(a, mc.player, SUBJECT_REAR_YAW);
     }
 
     /** Rich one-line diagnostic of the observation geometry + resolved textures (greppable). */
