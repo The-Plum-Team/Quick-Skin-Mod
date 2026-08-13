@@ -277,6 +277,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   parents, compare its stable evidence byte-for-byte, import only the recomputed AI-conflict paths
   from that index, rerun protected generators, and require the final real index tree to equal both
   the isolated candidate tree and the plan tree. Never apply the full patch to the real index.
+- After a version-port validation matrix settles, one protected authorization job must read its
+  complete latest job inventory once and bind the exact successful target set to the workflow run,
+  protected source SHA, attempt, and discovered inventory. A writer may reconstruct only when its
+  own target is present in that authenticated same-run output. Never poll the inventory per target:
+  fan-out polling amplifies installation-API load across a parallel release wave without adding a
+  stronger trust binding; the proposal artifact is already immutable within that run.
 - A successful automated version port may publish the stable Packaged E2E status only after the
   protected evaluator sees exactly one successful control job, the exact target-branch PR-anchor
   lane set, and byte-identical protected workflow, attestation workflow, composite action, contract,

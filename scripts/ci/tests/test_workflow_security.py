@@ -1169,16 +1169,33 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
 
     def test_port_publisher_requires_a_complete_proposal(self) -> None:
+        authorize = job_block("sync-version-branches.yml", "authorize")
         publish = job_block("sync-version-branches.yml", "publish")
         self.assertIn("needs.propose.result != 'cancelled'", publish)
         self.assertIn("needs.validate.result != 'cancelled'", publish)
-        self.assertIn("Require this target's own validate leg", publish)
-        self.assertIn("jobs?filter=latest&per_page=100", publish)
-        self.assertIn("for attempt in {1..12}", publish)
-        self.assertIn("sleep 5", publish)
-        self.assertIn("validate_result=api-error", publish)
-        self.assertIn('[[ "$validate_result" == success ]]', publish)
+        self.assertIn("needs.authorize.result == 'success'", publish)
+        self.assertIn("Build one immutable settled validation index", authorize)
+        self.assertIn("jobs?filter=latest&per_page=100", authorize)
+        self.assertEqual(authorize.count("jobs?filter=latest&per_page=100"), 2)
+        self.assertIn(".conclusion == \"success\"", authorize)
+        self.assertIn(".run_id == ($run_id | tonumber)", authorize)
+        self.assertIn(".head_sha == $source_sha", authorize)
+        self.assertIn(". <= ($run_attempt | tonumber)", authorize)
+        self.assertIn("validation_index: ${{ steps.validation-index.outputs.value }}", authorize)
+        self.assertIn("Require this target's centrally authorized validation", publish)
+        self.assertIn("VALIDATION_INDEX: ${{ needs.authorize.outputs.validation_index }}", publish)
+        self.assertIn('.run_id == $run_id', publish)
+        self.assertIn("tonumber <= ($max_attempt | tonumber)", publish)
+        self.assertIn('.source_sha == $source_sha', publish)
+        self.assertIn("index($target) != null", publish)
+        self.assertNotIn("jobs?filter=latest&per_page=100", publish)
+        self.assertNotIn("validate_result=", publish)
         self.assertIn("Download the immutable validated proposal", publish)
+        self.assertNotIn("actions/upload-artifact@", authorize)
+        self.assertLess(
+            publish.index("Require this target's centrally authorized validation"),
+            publish.index("Download the immutable validated proposal"),
+        )
 
     def test_version_sync_accepts_only_master_as_its_source(self) -> None:
         discover = job_block("sync-version-branches.yml", "discover")
