@@ -33,18 +33,24 @@ class VisualReviewImpactTest(unittest.TestCase):
         inventory = pages(
             changed(".github/workflows/visual-review.yml"),
             changed(".github/workflows/visual-review-drain.yml"),
+            changed(".github/workflows/pages.yml"),
+            changed("scripts/ci/github_api_retry.sh", status="added"),
+            changed("scripts/ci/e2e_impact.py"),
+            changed("scripts/ci/visual_review_queue.py"),
+            changed("scripts/pages/rotate_artifacts.py"),
+            changed("scripts/pages/select_artifact.py"),
+            changed("scripts/release/tests/test_pages_artifact_rotation.py"),
             changed("scripts/ci/visual_review_impact.py"),
             changed("scripts/ci/tests/test_visual_review_impact.py", status="added"),
             changed("docs/ai/PROJECT.md"),
         )
-        self.assertTrue(infrastructure_only(inventory, changed_files=5))
+        self.assertTrue(infrastructure_only(inventory, changed_files=12))
 
     def test_runtime_or_unknown_path_requires_review(self) -> None:
         for path in (
             "common/src/main/java/com/quickskin/mod/QuickSkin.java",
             "e2e/visual_review_prompt.md",
             ".github/workflows/on-demand-e2e.yml",
-            "scripts/ci/visual_review_queue.py",
             "README.md",
         ):
             with self.subTest(path=path):
