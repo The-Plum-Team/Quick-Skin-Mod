@@ -34,7 +34,11 @@ TEXT_CANARY = {
     ),
     ("full", "client_a", "cape_adjust_screen"): (
         ("cape editor title", (675, 20, 925, 50), 75, 400),
-        ("cape editor instructions", (335, 624, 725, 655), 75, 750),
+        # Minecraft's effective GUI scale puts the hint at y=627..649 on a 1920x1080
+        # framebuffer and y=645..671 on a native 1600x900 framebuffer. Stop before the
+        # earliest control row and require more bright pixels than those controls contribute,
+        # so the responsive union still fails closed when the hint itself is absent.
+        ("cape editor instructions", (300, 624, 780, 672), 75, 900),
     ),
     ("full", "client_a", "bmo_padded_source_screen"): (
         ("BMO source dimensions", (45, 100, 250, 140), 75, 120),
@@ -128,6 +132,38 @@ class VisualProbeCalibrationTest(unittest.TestCase):
                 bright_path, packaged_runtime.OPAQUE_STARS_PROBES[key]
             )
 
+    def test_cape_editor_hint_probe_covers_both_real_layouts_but_not_controls(self) -> None:
+        key = ("full", "client_a", "cape_adjust_screen")
+
+        def write_frame(name: str, hint_top: int | None) -> Path:
+            image = Image.new("RGB", (1600, 900), (12, 14, 18))
+            draw = ImageDraw.Draw(image)
+            draw.rectangle((700, 25, 899, 28), fill=(255, 255, 255))
+            # A narrow slice of the earliest real control row overlaps the responsive union.
+            # It must not be enough to impersonate the missing hint.
+            draw.rectangle((430, 660, 579, 662), fill=(255, 255, 255))
+            if hint_top is not None:
+                # Three separated glyph-like strokes model the hint at each observed Y offset.
+                for y in (hint_top, hint_top + 6, hint_top + 12):
+                    draw.rectangle((330, y, 699, y + 1), fill=(255, 255, 255))
+            path = self.root / name
+            image.save(path, format="PNG")
+            return path
+
+        for name, hint_top in (("1920-layout", 627), ("1600-layout", 645)):
+            with self.subTest(layout=name):
+                packaged_runtime.validate_required_gui_text(
+                    write_frame(f"{name}.png", hint_top), *key
+                )
+
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure,
+            "required GUI text is missing or unreadable",
+        ):
+            packaged_runtime.validate_required_gui_text(
+                write_frame("controls-only.png", None), *key
+            )
+
     def test_title_splash_probe_excludes_denser_yellow_panorama_content(self) -> None:
         """Regression canary for the real 1.21.10 flower-field false positive."""
 
@@ -184,10 +220,19 @@ class VisualProbeCalibrationTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         bmo_section = source[source.index('Step.of("bundled_bmo_elytra")'):
                              source.index("// 6. animated cape")]
-        self.assertEqual(2, bmo_section.count(".settleTicks(12)"))
-        # Each of the two captures reapplies the pose in both action() and ready(), so it cannot
-        # drift during the wait for textures/equipment to settle.
-        self.assertEqual(4, source.count("poseElytraForEvidence(mc);"))
+        self.assertEqual(3, bmo_section.count(".settleTicks(12)"))
+        # Both custom captures and the post-removal vanilla capture reapply the pose in action()
+        # and ready(); the removal transition also restores it after opening the menu releases
+        # movement keys, so no checkpoint can drift while textures/equipment settle.
+        self.assertEqual(7, source.count("poseElytraForEvidence(mc);"))
+        self.assertIn('Step.of("remove_cape_with_elytra")', bmo_section)
+        self.assertIn('Step.of("vanilla_elytra_after_cape_removal")', bmo_section)
+        self.assertIn('"quickskin.button.remove_cape"', bmo_section)
+        self.assertIn("vanillaElytraFallbackProblem(mc, svc, uuid)", bmo_section)
+        self.assertIn(
+            "String profileElytra = VanillaShim.elytraTexture(mc.player);", source
+        )
+        self.assertIn("if (profileElytra != null)", source)
         self.assertIn("mc.player.setYRot(yaw);", source)
         self.assertIn("mc.player.yRotO = yaw;", source)
         self.assertIn("mc.player.setYHeadRot(yaw);", source)
