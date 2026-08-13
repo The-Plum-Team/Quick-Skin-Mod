@@ -217,6 +217,7 @@ def curate(
                     f"Compatibility mod: {lane.mod.name} {lane.artifact.version_number}. "
                     + frame["expectation"]
                 ),
+                "runtime_evidence": frame["runtime_evidence"],
                 "_verified_file_sha256": frame["file_sha256"],
                 "_verified_pixel_sha256": frame["pixel_validation"]["pixel_sha256"],
                 "_verified_width": frame["width"],
