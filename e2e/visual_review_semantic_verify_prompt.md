@@ -14,8 +14,9 @@ Reject missing, garbled or wrong textures; absent named colours or motifs; cape/
 transparency defects; blurred Quick Skin-owned UI; incorrect custom backdrops; black or crashed
 frames; and missing expected transitions. Ordinary Vanilla chrome, lighting, time of day and
 harmless camera variation are acceptable only when the expected feature remains inspectable. A
-default-skin checkpoint accepts any intact Vanilla default skin, but named custom assets must be
-visibly present.
+default-skin checkpoint accepts any intact Vanilla default skin. Modern vanilla defaults include
+Noor (dark hair, red top, green trousers and salmon hands) and Makena (dark hair with a yellow or orange top); those colours alone never prove customization. Judge the complete visible texture,
+while named custom assets must be visibly present.
 
 Keep `visible` to one short sentence. Return only the structured result requested by the runner.
 Do not edit files or attempt a fix.
