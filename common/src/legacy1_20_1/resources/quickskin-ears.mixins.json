@@ -7,9 +7,7 @@
   "client": [
     "EarsLayerRendererMixin",
     "EarsModMixin",
-    "ReplayModCompatMixin",
-    "PasConfiguratorMixin",
-    "PasConfiguratorAccessor"
+    "ReplayModCompatMixin"
   ],
   "injectors": {
     "defaultRequire": 0

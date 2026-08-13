@@ -1,0 +1,2161 @@
+{
+  "schema_version": 1,
+  "lock_revision": "2026-08-13",
+  "artifact_source": {
+    "kind": "modrinth-v2",
+    "api_base": "https://api.modrinth.com/v2",
+    "selection_policy": "newest-compatible-published-version-v1"
+  },
+  "mods": [
+    {
+      "id": "cpm",
+      "name": "Customizable Player Models",
+      "project_id": "h1E7sQNL",
+      "install_on": "client",
+      "loaders": [
+        "fabric",
+        "forge",
+        "neoforge"
+      ],
+      "allowed_version_types": [
+        "release"
+      ],
+      "provided_dependencies": [
+        "P7dR8mSH"
+      ],
+      "supported_game_versions": null,
+      "artifacts": [
+        {
+          "version_id": "3XedKRav",
+          "version_number": "1.20v0.6.27a-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:03:57.455469Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-1.20-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/3XedKRav/CustomPlayerModels-Fabric-1.20-0.6.27a.jar",
+              "size": 2847779,
+              "sha256": "40e998fea033ba6dd250d9fd4697f3c557053b7c99e66cc95154ec863a369c7b",
+              "sha512": "ba87ccd347f4a7163718481f8008a1cea47367465d50b721560e60f4e65a0ef335bfa2e7a5876d38fa8dffc9b24230e138f6740022e944bab1891a46f137ba54"
+            }
+          ]
+        },
+        {
+          "version_id": "BZZSHBbA",
+          "version_number": "1.20v0.6.27a-forge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:03:52.858981Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-1.20-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/BZZSHBbA/CustomPlayerModels-1.20-0.6.27a.jar",
+              "size": 2805930,
+              "sha256": "f4964fb5b008eea1401853c6ba19a623b5fd6f10e3e14c77d686d999a0bb7c42",
+              "sha512": "ec0ae724e5cc58180f1203d0c155cecf5f362030bb445083d15abd4c1d09585e2000c68e7e074f78bd8416267e792f98322e551b09cd0e9bd0fbf94eb7cf9331"
+            }
+          ]
+        },
+        {
+          "version_id": "7REwdnKp",
+          "version_number": "1.21v0.6.27a-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:01.427793Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-1.21-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/7REwdnKp/CustomPlayerModels-Fabric-1.21-0.6.27a.jar",
+              "size": 2845602,
+              "sha256": "d6544dfc5b04809a7cc83e2eb71e463bb7be2846a3207a5f0627b47653046a94",
+              "sha512": "6ed6cc86c94fbb22e6e7552219a5bbdb22bfe293fdc0b785baf0286e1e4febd92b96305f5257cdb9e5618cd571ab26f4b08a36b937d7ad6ed87ea3ed26b7b36b"
+            }
+          ]
+        },
+        {
+          "version_id": "m5tTLcdS",
+          "version_number": "1.21v0.6.27a-forge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:04:56.700634Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModelsLexForge-1.21-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/m5tTLcdS/CustomPlayerModelsLexForge-1.21-0.6.27a.jar",
+              "size": 2790813,
+              "sha256": "ab5e926c48f534fe8ca7098db79b71436c52b6c798356def7f495c6898b0288c",
+              "sha512": "d2184d81875c317f799e151a1d913b4ddac4c626fb43297cbb8bb2e8b8e73c44eb7740f666a4f05adcfce70fffed59c1684e1a90309c071dd82146f43a47744a"
+            }
+          ]
+        },
+        {
+          "version_id": "YXfPij2E",
+          "version_number": "1.21v0.6.27a-neoforge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:04:52.094627Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-1.21-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/YXfPij2E/CustomPlayerModels-1.21-0.6.27a.jar",
+              "size": 2793136,
+              "sha256": "b5d3a473998648eefdf646e10a48af95dac57add0df681ca4407e83c716d6c84",
+              "sha512": "5af1150d16bfc3adfa942bf606a8e4d829cdcc15d3ec46eb98cdb03bd85db81ceac4b85274b4207a928497d78a4f53afeab1cf5b43ac73219d20147948fea38b"
+            }
+          ]
+        },
+        {
+          "version_id": "SWa0mmPU",
+          "version_number": "1.21.3v0.6.27a-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:19.746217Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.2",
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-1.21.3-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/SWa0mmPU/CustomPlayerModels-Fabric-1.21.3-0.6.27a.jar",
+              "size": 2844335,
+              "sha256": "b5d128729ad3c8f7f8a44e563208845bea91d5f75f4b11647cf9dff30b3e9953",
+              "sha512": "7472e288df3ebdf348471c38fdc9aa896b26969cc78510d5d3d4fa0720789f466ee8f103442b7087176f8bc8a684688877bc0d4961e5f93f3a020943fcb4b97a"
+            }
+          ]
+        },
+        {
+          "version_id": "R6HbPVWM",
+          "version_number": "1.21.3v0.6.27a-forge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:15.185302Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.2",
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModelsLexForge-1.21.3-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/R6HbPVWM/CustomPlayerModelsLexForge-1.21.3-0.6.27a.jar",
+              "size": 2972573,
+              "sha256": "7d5a685a525bef949dbd3a9816a63310c7a863c4934d154a14a7c89ccb4bd10b",
+              "sha512": "bf49b63fd0f5e9d771894ca60e4eed54055700e81934e075c8f872e3c72f0b8c08aff76085c155b4c3d2165ff2653db6906ea40d8e74e2d21d7052fdcd859132"
+            }
+          ]
+        },
+        {
+          "version_id": "miVYmYGL",
+          "version_number": "1.21.3v0.6.27a-neoforge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:10.388313Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.2",
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-1.21.3-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/miVYmYGL/CustomPlayerModels-1.21.3-0.6.27a.jar",
+              "size": 2793066,
+              "sha256": "5d34d0078e0adbc7a0e9d8eec583eeced2ae841e26b71785bbae5aa4bf22355a",
+              "sha512": "0fb17065b5afcb14acf339089a5ab3a48601ea5c4ab39fa1465f1f6c36e0339362860d13b766e7fa2531b541a6e81a29be8d7a57b473e53bf41e7151405fbed6"
+            }
+          ]
+        },
+        {
+          "version_id": "MkPemZGx",
+          "version_number": "1.21.4v0.6.27a-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:34.002440Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-1.21.4-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/MkPemZGx/CustomPlayerModels-Fabric-1.21.4-0.6.27a.jar",
+              "size": 2844739,
+              "sha256": "397f8afdc4a30c1c3f27ec32bc27a379ade744622a3e9ce813c27ba78225254b",
+              "sha512": "eb4668fd6823261f4d165aa7cadfdf5767a2ec9e73f253e292b1690a5d0219fd03293d46ffdac9ce2ecaa0786772e65490b420bd6e4b9efc2406aef2bfcae4c7"
+            }
+          ]
+        },
+        {
+          "version_id": "wxYQ2GwQ",
+          "version_number": "1.21.4v0.6.27a-forge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:29.479496Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModelsLexForge-1.21.4-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/wxYQ2GwQ/CustomPlayerModelsLexForge-1.21.4-0.6.27a.jar",
+              "size": 2973181,
+              "sha256": "917228d6a814dbecdddc23f76c8865bf21727c30a819db9ce92b02d0e2316a1b",
+              "sha512": "3354439f2a2d23b7ba2e187451a047b0815c1a4114e7f86d42f6a8b4f3362e717c6a1d660c23da1214483afa1316e046db31b2ddedbf8e8e320a3db890756a18"
+            }
+          ]
+        },
+        {
+          "version_id": "JfClBIfO",
+          "version_number": "1.21.4v0.6.27a-neoforge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:24.354886Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-1.21.4-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/JfClBIfO/CustomPlayerModels-1.21.4-0.6.27a.jar",
+              "size": 2793739,
+              "sha256": "fab7bdc9e526383871b2f5025701f0038e72861f2faa2eab3f38c9bd912f9543",
+              "sha512": "5465df4d9f8ba659c75784670d48f8a9ceb72aeb6086919090bd7c8d4577fa22463a3a7d229c50d64bfa50309d224aad66e8b6918bcac48e774353fe6353f312"
+            }
+          ]
+        },
+        {
+          "version_id": "cHdHyIHI",
+          "version_number": "1.21.5v0.6.27a-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:47.497923Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-1.21.5-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/cHdHyIHI/CustomPlayerModels-Fabric-1.21.5-0.6.27a.jar",
+              "size": 2844229,
+              "sha256": "200995dcb7966793b19a9f2ec1c6a7230d4ac9cc35485c028bdaacc79cbb5941",
+              "sha512": "ea0144e0c929da66f4d5040c85924b9e8fc49eed67e113e030aaac8bead68e8cfa5a58b9f160af9faa71a420d45e7ecaf8fc9b8f163f93904a738e01a4e75ac2"
+            }
+          ]
+        },
+        {
+          "version_id": "xKX29kmH",
+          "version_number": "1.21.5v0.6.27a-forge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:43.040491Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModelsLexForge-1.21.5-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/xKX29kmH/CustomPlayerModelsLexForge-1.21.5-0.6.27a.jar",
+              "size": 2972565,
+              "sha256": "da8b52aa7ac118d8a7c01b491cf4fcfadcc3439875175568e5d4724d46edfabd",
+              "sha512": "9f625a24db6e46fa041e21c6d2f2d0e1cdbbdf2045f62498e2f75fabb5c54672e72a41ef8cd7c002354a4446fefa688116dfca59e2e4839a699d50d15e92a808"
+            }
+          ]
+        },
+        {
+          "version_id": "6qrB1qW7",
+          "version_number": "1.21.5v0.6.27a-neoforge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:38.475543Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-1.21.5-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/6qrB1qW7/CustomPlayerModels-1.21.5-0.6.27a.jar",
+              "size": 2793347,
+              "sha256": "b020abd87462117735394b94e51c3c2bef104c19f2bd460e4cafd988ab0ce13d",
+              "sha512": "2e59f8b9daebfd9ed7bd461d530ca8c6d91e8f3c300dd504f0c80948b2dfc2690d9f76d3a1f805360161de5b05c0f7cefddb9ad31001341a4e59904b7bb47cb1"
+            }
+          ]
+        },
+        {
+          "version_id": "4dfUYcrp",
+          "version_number": "1.21.6v0.6.22e-fabric",
+          "version_type": "release",
+          "published_at": "2025-06-29T12:54:42.865697Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.6"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-1.21.6-0.6.22e.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/4dfUYcrp/CustomPlayerModels-Fabric-1.21.6-0.6.22e.jar",
+              "size": 2833205,
+              "sha256": "66edc3acb78a4db51b82b157dcbd3464a85590ffe54de62f0b58083a8b52f098",
+              "sha512": "4d9d5b45d0fc080a0d97bb7432855a8e0c64ce7db79a7dd60bdf947d5b1c8e36635a2bc88f042975cc170daf5132f39c73832a658726d9487c3a121ba35520b0"
+            }
+          ]
+        },
+        {
+          "version_id": "DQvBqL49",
+          "version_number": "1.21.8v0.6.27a-forge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:56.661Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.6",
+            "1.21.7",
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModelsLexForge-1.21.8-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/DQvBqL49/CustomPlayerModelsLexForge-1.21.8-0.6.27a.jar",
+              "size": 2989203,
+              "sha256": "4a2af47d6d537c054caeb2fbfb87ca9a3211efcb4f87b5e2fed927044c267c8e",
+              "sha512": "1183e143ab1c3d21e6ae6a9660b92f21ed9ee49a44b4abefe3a99429fa5a08b42671befb3b365ce4bdca36aa4af26cf572b2c4309c3ab8f4edefdd2a5a408df5"
+            }
+          ]
+        },
+        {
+          "version_id": "M5gdScGc",
+          "version_number": "1.21.6v0.6.22c-neoforge",
+          "version_type": "release",
+          "published_at": "2025-06-29T12:54:28.665228Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.6"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-1.21.6-0.6.22c.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/M5gdScGc/CustomPlayerModels-1.21.6-0.6.22c.jar",
+              "size": 2780894,
+              "sha256": "d48bd26199ba95d6236bb4fbc6daac80949951ea1fa43142ae855f50f69e8fd8",
+              "sha512": "aeaf0df883ab25424a357a864757f23e09ae257421fbc884fe371f8ba667970408968a09a06bda2de013af4c39764b84ac83f37a47e9d9498d033d9bc08c9dd5"
+            }
+          ]
+        },
+        {
+          "version_id": "E0T7n0xA",
+          "version_number": "1.21.8v0.6.27a-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:01.238777Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.7",
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-1.21.8-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/E0T7n0xA/CustomPlayerModels-Fabric-1.21.8-0.6.27a.jar",
+              "size": 2860514,
+              "sha256": "c287bd73be3880d0cc5bf58eec58c6119b5281188d47254d56e77ce7d709714f",
+              "sha512": "dda238d04582f94ce61c460dddc7e4221e4c5c6b0fca5212d22bf0713be9fb8a64fb7be032612cbc5e5846599e898a9f6b97a2aa7623dda010c7fd2032e124c3"
+            }
+          ]
+        },
+        {
+          "version_id": "H7C3DTGd",
+          "version_number": "1.21.8v0.6.27a-neoforge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:05:52.018535Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.7",
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-1.21.8-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/H7C3DTGd/CustomPlayerModels-1.21.8-0.6.27a.jar",
+              "size": 2810109,
+              "sha256": "eb4f83d61554b5894cd2b97b81f214d635ca9157799df886b75a4ed55e439f56",
+              "sha512": "2869e2f8932a59ebe1ff13e750e86bab48afcd1778b4e10f4386df80235add0c33a545793ba6710a80f2f0dc777631d3ca28fa09ac52f389acb7ffb995e5d239"
+            }
+          ]
+        },
+        {
+          "version_id": "ip86L1T7",
+          "version_number": "1.21.10v0.6.27a-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:15.097186Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-1.21.10-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/ip86L1T7/CustomPlayerModels-Fabric-1.21.10-0.6.27a.jar",
+              "size": 2875189,
+              "sha256": "785e0ea68be60ce478fe6add33a67635db646c40b7adbbfa60a5bac7cb739c4f",
+              "sha512": "f5af3933cd9b0c0f1354c5be9add65b8c1cbbb3006baf0097e9158472374dbc0cfae56c91f5a46ccaef60a3259b0e7fad7ebda293338e6264f61cb7820d9313c"
+            }
+          ]
+        },
+        {
+          "version_id": "ufKYI6aZ",
+          "version_number": "1.21.10v0.6.27a-forge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:10.299780Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModelsLexForge-1.21.10-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/ufKYI6aZ/CustomPlayerModelsLexForge-1.21.10-0.6.27a.jar",
+              "size": 3004174,
+              "sha256": "1dd1ed323cc0e62c33b05ac4715b245f9c55a3c7f182b36eb2bfbb2aa4bb31dc",
+              "sha512": "9b71d8b8a8e32ade11093a67d60d49674306ebbb420670186ea25d68bc62afb1571dda3c5e48cb67d130044bc2b353db6e0eacd07c9c2f821ea5c029269abc79"
+            }
+          ]
+        },
+        {
+          "version_id": "9lgFAOrU",
+          "version_number": "1.21.10v0.6.27a-neoforge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:05.705360Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-1.21.10-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/9lgFAOrU/CustomPlayerModels-1.21.10-0.6.27a.jar",
+              "size": 2824473,
+              "sha256": "9284a97b6a712c7ef25baecd4fd61b2f5bc893b849ab6697b6fb896b75459132",
+              "sha512": "57ce804c3f1de013f926867cf82094754c3a2e1e6a723a0d59debc84f9463f178f869e3d29a0afb5987fdf1999bcf593c25050d4cabc18d56bdd72d7c463868b"
+            }
+          ]
+        },
+        {
+          "version_id": "uHdKq7aj",
+          "version_number": "1.21.11v0.6.27a-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:29.403960Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-1.21.11-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/uHdKq7aj/CustomPlayerModels-Fabric-1.21.11-0.6.27a.jar",
+              "size": 2867845,
+              "sha256": "ccb01c88a46a2ec1253d469261a8c58de7bd6277eec8c40cc680e875c4480b87",
+              "sha512": "94ae4187f0b700d8407d32374208ccc53ee0b5e06151a048eca2ed10e7dcb2b9536d6b5b8ae988121972c78d8030e8343f42dfa234d6387a4e49a48afa84bd0e"
+            }
+          ]
+        },
+        {
+          "version_id": "3IujwyKt",
+          "version_number": "1.21.11v0.6.27a-forge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:24.591153Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModelsLexForge-1.21.11-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/3IujwyKt/CustomPlayerModelsLexForge-1.21.11-0.6.27a.jar",
+              "size": 3004797,
+              "sha256": "6a999af3f6c9ab6cf8c520294cf6e71061f5b95b1f394da34fc8d03457eb384b",
+              "sha512": "7437cb01f51b6f205e091709fb843a6dc23fdef5a892b3ca8f49e2123f2ce42d8db4d42eac536039e83f8bbc1da0247210fe4e83e53872c2f62295581146066f"
+            }
+          ]
+        },
+        {
+          "version_id": "oGp97F4J",
+          "version_number": "1.21.11v0.6.27a-neoforge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:19.524136Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-1.21.11-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/oGp97F4J/CustomPlayerModels-1.21.11-0.6.27a.jar",
+              "size": 2820751,
+              "sha256": "8f0b177be5a30fd5974d0304eca128625e5c0a1ad5e9d41cfc92fb6b29d03113",
+              "sha512": "37c76428b0357390eab252e8b285d08d7a5b0589e06f74f4410516c39ec61f74a16b00875cd666ca7548d108a351e570cb4cea523397a6a8aa7cbe8ac93bc366"
+            }
+          ]
+        },
+        {
+          "version_id": "5TBX9e3S",
+          "version_number": "26.1v0.6.27a-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:45.244388Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.1",
+            "26.1.1",
+            "26.1.2"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-26.1-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/5TBX9e3S/CustomPlayerModels-Fabric-26.1-0.6.27a.jar",
+              "size": 2842277,
+              "sha256": "8434106eced795ca82482574bb7371b7b5fa23f890fd70bc60d53d39dcdddec0",
+              "sha512": "b9e0fc4c7dd7799f386150771c6248c3e21f94f0e92d503c3eb159c91c02d643a34eb4be5d8f6a7fc638bb18011eb2e1fc1e63ae98df75b89178f934ffc77945"
+            }
+          ]
+        },
+        {
+          "version_id": "t3yIkfvy",
+          "version_number": "26.1v0.6.27a-forge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:40.675436Z",
+          "loader": "forge",
+          "game_versions": [
+            "26.1",
+            "26.1.1",
+            "26.1.2"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModelsLexForge-26.1-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/t3yIkfvy/CustomPlayerModelsLexForge-26.1-0.6.27a.jar",
+              "size": 2829141,
+              "sha256": "85f53e8ec577ef676469a8566adc72da502d14559d39e4ce6de789c0d347ae82",
+              "sha512": "a65626fe9c123f38e142072efd8c99f01bca9ba821921524744749563b6b9f8d91bbc8eebe8b86fb7248417ccec535ac91665d97e1fc09c425d33cd6bf4a33d0"
+            }
+          ]
+        },
+        {
+          "version_id": "wEheoeGX",
+          "version_number": "26.1v0.6.27a-neoforge",
+          "version_type": "release",
+          "published_at": "2026-07-05T15:06:34.046843Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "26.1",
+            "26.1.1",
+            "26.1.2"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-26.1-0.6.27a.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/wEheoeGX/CustomPlayerModels-26.1-0.6.27a.jar",
+              "size": 2828014,
+              "sha256": "76bde8c4f920b6473f08d155542b0bb30b63965aff14c66a857f950105edb9c5",
+              "sha512": "6340c6dc9b6a7b8af9c9440e2d78d934e4ac7a49d98419301108c75c35b8abb9ca4e7e4c1ce76f4f4bb032f2d2bbf53d825262623544d0e3ac6a68c09c576277"
+            }
+          ]
+        },
+        {
+          "version_id": "OrhGNAuA",
+          "version_number": "26.2v0.6.27b-fabric",
+          "version_type": "release",
+          "published_at": "2026-07-26T19:00:59.555805Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.2"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-Fabric-26.2-0.6.27b.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/OrhGNAuA/CustomPlayerModels-Fabric-26.2-0.6.27b.jar",
+              "size": 2836595,
+              "sha256": "d5c9b12d7e06e8d4ec803489c5d0e0de280004aa80277529bc66ef6b21d04dad",
+              "sha512": "d1424c17bb49d40ba1fdc9df6ad62c576bf21ea76dd57afd2409df1aaa814fb602379b5488f7b732f18662f2129909361a56fcf9b5e29fc2b486e70f7a2e2eb1"
+            }
+          ]
+        },
+        {
+          "version_id": "rkSBlx1j",
+          "version_number": "26.2v0.6.27b-forge",
+          "version_type": "release",
+          "published_at": "2026-07-26T19:00:55.184567Z",
+          "loader": "forge",
+          "game_versions": [
+            "26.2"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModelsLexForge-26.2-0.6.27b.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/rkSBlx1j/CustomPlayerModelsLexForge-26.2-0.6.27b.jar",
+              "size": 2824912,
+              "sha256": "65fcbad1e1a350193f8e648df8aa6cf1a1605a06058802e8c72ed2263adfca7f",
+              "sha512": "36af81bf8c49220cdcfd7b496438ea397a483fdcd395c0de5cf2d5a0549aa07a1fa26ea73d4e06f78749b1a3ce59636647c42159d5110a94e337d4e860168a85"
+            }
+          ]
+        },
+        {
+          "version_id": "Hh8LeMGi",
+          "version_number": "26.2v0.6.27b-neoforge",
+          "version_type": "release",
+          "published_at": "2026-07-26T19:00:50.809740Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "26.2"
+          ],
+          "files": [
+            {
+              "filename": "CustomPlayerModels-26.2-0.6.27b.jar",
+              "url": "https://cdn.modrinth.com/data/h1E7sQNL/versions/Hh8LeMGi/CustomPlayerModels-26.2-0.6.27b.jar",
+              "size": 2823406,
+              "sha256": "e89e50795b5f7fee93610cc4605c3d50c5f4e6ca651b4192383f7c329ff7ea3b",
+              "sha512": "e0f60f591e1b8dde4dec2f372ee5b82db453a195aeb444497ae3cf0582aa8fa8072f49b1b5f4664d84b840843e3af106f2e6b9e48d15f9a60f9db42595d5cc22"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ears",
+      "name": "Ears",
+      "project_id": "mfzaZK3Z",
+      "install_on": "client",
+      "loaders": [
+        "fabric",
+        "forge",
+        "neoforge"
+      ],
+      "allowed_version_types": [
+        "release",
+        "beta"
+      ],
+      "provided_dependencies": [
+        "P7dR8mSH"
+      ],
+      "supported_game_versions": null,
+      "artifacts": [
+        {
+          "version_id": "49nmGOvy",
+          "version_number": "1.4.7+fabric-1.20",
+          "version_type": "release",
+          "published_at": "2025-02-07T05:00:06.687228Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "ears-fabric-1.20-1.4.7.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/49nmGOvy/ears-fabric-1.20-1.4.7.jar",
+              "size": 170868,
+              "sha256": "827150d5cf67edaf13f5ff8cd9e749809a1811d55e5a10e24ecf9dcb60f8edb0",
+              "sha512": "853617ac0d17f94d8354ac1c2fcb647e504cc5273673c91142860b21601a5eeac3eb7f80bab0f0c43106e4e91d6e994c8970dce481db2ced7690c2d6a92877bf"
+            }
+          ]
+        },
+        {
+          "version_id": "x0gO3b5F",
+          "version_number": "1.4.7+forge-1.19.4",
+          "version_type": "beta",
+          "published_at": "2025-02-07T05:01:45.400697Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "ears-forge-1.19.4-1.4.7.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/x0gO3b5F/ears-forge-1.19.4-1.4.7.jar",
+              "size": 160424,
+              "sha256": "9f2ac20341d6d32bae9e87d416931a2f5ae4ae16635e24be6060da6416eaa6ae",
+              "sha512": "3d5ddc09d72e44c9a369ae5e7ffaaff0a6914c36d2df53a55d0428cb68d48431c6c43dc7e6a6828996ecc6bccb0037ae5b89da765ec290e86a3a3ad5793ef676"
+            }
+          ]
+        },
+        {
+          "version_id": "x0gO3b5F",
+          "version_number": "1.4.7+forge-1.19.4",
+          "version_type": "beta",
+          "published_at": "2025-02-07T05:01:45.400697Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "ears-forge-1.19.4-1.4.7.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/x0gO3b5F/ears-forge-1.19.4-1.4.7.jar",
+              "size": 160424,
+              "sha256": "9f2ac20341d6d32bae9e87d416931a2f5ae4ae16635e24be6060da6416eaa6ae",
+              "sha512": "3d5ddc09d72e44c9a369ae5e7ffaaff0a6914c36d2df53a55d0428cb68d48431c6c43dc7e6a6828996ecc6bccb0037ae5b89da765ec290e86a3a3ad5793ef676"
+            }
+          ]
+        },
+        {
+          "version_id": "rEnDH8t5",
+          "version_number": "1.4.7+fabric-1.21",
+          "version_type": "release",
+          "published_at": "2025-02-07T05:00:22.438785Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "ears-fabric-1.21-1.4.7.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/rEnDH8t5/ears-fabric-1.21-1.4.7.jar",
+              "size": 168746,
+              "sha256": "06f66c98a8efeed7bb25288cc83061939fbbec4fdb250b9bca2d768dbfbbd474",
+              "sha512": "fd1dacb165536923232b3af4b1e008260a5790ab1d5e05a9bad18c2fa17770896d5c21999d1118d4eb1a5d318f3a5207d0d2bbdc9be5996a08bee83c4a6adc68"
+            }
+          ]
+        },
+        {
+          "version_id": "Dxc2NR3x",
+          "version_number": "1.4.7+neoforge-1.21",
+          "version_type": "beta",
+          "published_at": "2025-02-07T05:05:34.694847Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "ears-neoforge-1.21-1.4.7.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/Dxc2NR3x/ears-neoforge-1.21-1.4.7.jar",
+              "size": 162004,
+              "sha256": "33283d5f583e8474b1cb366fb3790b540f113b98287f6ae26e0375046479ab18",
+              "sha512": "52fc315373bd014fd388c970c17bbd6873593e169841edb8d346bbf176401a527a65f074f1ddf28ebcb87cd5c469aadf64b3f99700f7112c1e0966b42920c7d8"
+            }
+          ]
+        },
+        {
+          "version_id": "TPdnkxJj",
+          "version_number": "1.4.7_03+fabric-1.21.4",
+          "version_type": "release",
+          "published_at": "2026-06-08T20:16:01.395581Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "ears-fabric-1.21.4-1.4.7_03.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/TPdnkxJj/ears-fabric-1.21.4-1.4.7_03.jar",
+              "size": 174182,
+              "sha256": "6cd0fe9ca76ca6e11afd09df0d5629b15c59c689817837f8976b822d355997b8",
+              "sha512": "2a57cd2d41a2c72198858db670016b0b88b4bdb7bc45ba93facf6934854150f57bc58bf6b1c17e96387c2364d34b2f146e5621f1c93d4f50e96aedbb07a2c675"
+            }
+          ]
+        },
+        {
+          "version_id": "5JGTCity",
+          "version_number": "1.4.7_02+neoforge-1.21.4",
+          "version_type": "beta",
+          "published_at": "2026-06-08T20:16:05.237699Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "ears-neoforge-1.21.4-1.4.7_02.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/5JGTCity/ears-neoforge-1.21.4-1.4.7_02.jar",
+              "size": 168301,
+              "sha256": "ec9c4adabd7d49afed0791fb27f6693ea1491867fa11fa84aeb4797c34ea5d6e",
+              "sha512": "7e72c3c755f2567e886d85accafb60e898618831d374b475be7941d538739a874f11c96ca8c16d5053a20c08351148ee5334ee703609201524732ff876b985f1"
+            }
+          ]
+        },
+        {
+          "version_id": "oS1LdJxh",
+          "version_number": "1.4.7_03+fabric-1.21.5",
+          "version_type": "release",
+          "published_at": "2026-06-08T20:16:09.401284Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.5",
+            "1.21.6",
+            "1.21.7"
+          ],
+          "files": [
+            {
+              "filename": "ears-fabric-1.21.5-1.4.7_03.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/oS1LdJxh/ears-fabric-1.21.5-1.4.7_03.jar",
+              "size": 174538,
+              "sha256": "7278c1e79e13102817a8beb7a342ca43949902550405b2cd87b00ecfc2eadeda",
+              "sha512": "ceefcd6468135dd4a8100c35bb5583f302df9ea4563ae25f2c60126fb9c0b771b4304901f03284b792f339cf5a051188dfba74d9b6feccd47941b403c49f0f23"
+            }
+          ]
+        },
+        {
+          "version_id": "CjjJ4Y5V",
+          "version_number": "1.4.7_03+neoforge-1.21.5",
+          "version_type": "beta",
+          "published_at": "2026-06-08T20:16:13.682072Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.5",
+            "1.21.6",
+            "1.21.7"
+          ],
+          "files": [
+            {
+              "filename": "ears-neoforge-1.21.5-1.4.7_03.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/CjjJ4Y5V/ears-neoforge-1.21.5-1.4.7_03.jar",
+              "size": 168658,
+              "sha256": "fc37629af2726881a4308c1bf2e8be028c806b6610d3d1a868bc05be8ab56825",
+              "sha512": "65364b5716dec558128dd3c7c379e8b9884deab59fb981b3bbd3e1a5cf9de77d65836cbcf5d9767bc64970ef1b62749da492984bada5d771cd894431251074f0"
+            }
+          ]
+        },
+        {
+          "version_id": "ssiog3u8",
+          "version_number": "1.4.7_01+fabric-1.21.5",
+          "version_type": "release",
+          "published_at": "2025-07-11T17:08:20.544265Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "ears-fabric-1.21.5-1.4.7_01.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/ssiog3u8/ears-fabric-1.21.5-1.4.7_01.jar",
+              "size": 174359,
+              "sha256": "1d0f2ea4857804ea9bdd3f0b284ff4357871c958d2e4e40427211311878894c2",
+              "sha512": "16c4a184383a156b1137e6e1ed8f114b90689854e90806d36bd3ba430cc523c880b36bd208534bff152ea051fb151a8b712154ec696a86e9aee28637e0cff979"
+            }
+          ]
+        },
+        {
+          "version_id": "hHwl9j4r",
+          "version_number": "1.4.7_01+neoforge-1.21.5",
+          "version_type": "beta",
+          "published_at": "2025-07-11T17:08:29.253649Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "ears-neoforge-1.21.5-1.4.7_01.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/hHwl9j4r/ears-neoforge-1.21.5-1.4.7_01.jar",
+              "size": 168486,
+              "sha256": "3713ce8838127b7b1719aae951d3500e276b1683098b7820d6fcea5fcc255eef",
+              "sha512": "e2b919dee6b8faee6741505953b32e7dd2ae32730555da529aac079149f639279ac05d123d9ceed37d96a2451e86854fe77b9f9cf737e0ffb903f4911ed3b9a4"
+            }
+          ]
+        },
+        {
+          "version_id": "a9IE3zQy",
+          "version_number": "1.4.7_03+fabric-1.21.10",
+          "version_type": "release",
+          "published_at": "2026-06-08T20:15:44.332950Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "ears-fabric-1.21.10-1.4.7_03.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/a9IE3zQy/ears-fabric-1.21.10-1.4.7_03.jar",
+              "size": 176896,
+              "sha256": "e9fea91fd429119b5916ba1260965c8ac1272bf8664cdf4e333f2191ef7f3f6c",
+              "sha512": "3d2906942e15cb8ca1ae3eb08d335aa8fdf837ab1d016385e792cc25d938d3441a38afea711358e689ef7a6b90dce026357afce06921d718cb58f772f3e5d097"
+            }
+          ]
+        },
+        {
+          "version_id": "mgYdVHWn",
+          "version_number": "1.4.7_04+neoforge-1.21.10",
+          "version_type": "beta",
+          "published_at": "2026-06-08T20:15:50.091747Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "ears-neoforge-1.21.10-1.4.7_04.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/mgYdVHWn/ears-neoforge-1.21.10-1.4.7_04.jar",
+              "size": 170967,
+              "sha256": "127a89487ed9d1da7a74476873c9d6d0d58da75adda8c20d8ab46e54543fad0b",
+              "sha512": "7c400ec02fcd0d340e0314563ce0dc9a0c030068357ab583e62adfe8b4f097f2c204a59d03ea3f01da48effa7d47a3e7ce3c35e959dac5c0fbe10a7b20b5eb19"
+            }
+          ]
+        },
+        {
+          "version_id": "WiPt3Pqh",
+          "version_number": "1.4.7_02+fabric-1.21.11",
+          "version_type": "release",
+          "published_at": "2026-06-08T20:15:53.898808Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "ears-fabric-1.21.11-1.4.7_02.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/WiPt3Pqh/ears-fabric-1.21.11-1.4.7_02.jar",
+              "size": 175235,
+              "sha256": "1a54f4bc67d456a7e7522820a53893fa441f517866f91e4f0edbce69babdad9a",
+              "sha512": "47e96ce3f67439ab9b1593f1646261449b9d2c8aed32247a4bf72ebb6aee64d82d45e066d3745677a85b7aecd3978ca36756d29be90c508f2312ec47e778f163"
+            }
+          ]
+        },
+        {
+          "version_id": "O4uyNQD2",
+          "version_number": "1.4.7_03+neoforge-1.21.11",
+          "version_type": "beta",
+          "published_at": "2026-06-08T20:15:57.712673Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "ears-neoforge-1.21.11-1.4.7_03.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/O4uyNQD2/ears-neoforge-1.21.11-1.4.7_03.jar",
+              "size": 170518,
+              "sha256": "f819a9ac7e68325159284640de395590aac9c08b69f6c3675e67815146c5b8f9",
+              "sha512": "c76ad10307610a89d6ffab593aa1cc7d317c4594ce5abdc29934f80c902699172148b15dc2221b6a30cf52ae91547c0169cdae26b8c8a623d9a74bdcdabada95"
+            }
+          ]
+        },
+        {
+          "version_id": "l1AXTUdE",
+          "version_number": "1.4.7_01+fabric-26.1",
+          "version_type": "release",
+          "published_at": "2026-06-08T20:16:17.912749Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.1",
+            "26.1.1",
+            "26.1.2",
+            "26.2"
+          ],
+          "files": [
+            {
+              "filename": "ears-fabric-26.1-1.4.7_01.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/l1AXTUdE/ears-fabric-26.1-1.4.7_01.jar",
+              "size": 172829,
+              "sha256": "c6fdbf2a0dda104d77d551bd907f48f9fd1204dcf76123108958661f21b90de0",
+              "sha512": "a65f82aa40888da87e8f7c887c1aac307b27b912bfce776214e42e246977c140b70741c06037109b1bf149b5444bbd8a7504723ac2b6ebd3cb0d166f6bb3ea79"
+            }
+          ]
+        },
+        {
+          "version_id": "F77amHhu",
+          "version_number": "1.4.7_01+neoforge-26.1",
+          "version_type": "beta",
+          "published_at": "2026-06-08T20:16:22.035672Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "26.1",
+            "26.1.1",
+            "26.1.2"
+          ],
+          "files": [
+            {
+              "filename": "ears-neoforge-26.1-1.4.7_01.jar",
+              "url": "https://cdn.modrinth.com/data/mfzaZK3Z/versions/F77amHhu/ears-neoforge-26.1-1.4.7_01.jar",
+              "size": 170704,
+              "sha256": "fd34f29c0d160a37ad740e0611a54c84213581e726174a6072ce616f9b2dbc03",
+              "sha512": "dcbe0106d0b32dbb02cc5fcaba451bb4c6587707cc636ad02b573f05d3921a59afab363a834e31018690d16b6c2ccf37ec02d41f5f54ae3d6218e5c68a10041b"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "skin-layers-3d",
+      "name": "3D Skin Layers",
+      "project_id": "zV5r3pPn",
+      "install_on": "client",
+      "loaders": [
+        "fabric",
+        "forge",
+        "neoforge"
+      ],
+      "allowed_version_types": [
+        "release"
+      ],
+      "provided_dependencies": [
+        "P7dR8mSH"
+      ],
+      "supported_game_versions": null,
+      "artifacts": [
+        {
+          "version_id": "ehuN4Oh0",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:24.984885Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc1.20.1.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/ehuN4Oh0/skinlayers3d-fabric-1.11.2-mc1.20.1.jar",
+              "size": 1988537,
+              "sha256": "9f76e7018eca0a20bb6c4f269d7192e14beba375f7fb9064425804d6fbdaab96",
+              "sha512": "d27ba70fccd42bf73ccdc3fe080e9f17751a39afc41479d986e35660677b116393d3709413130541741869aaba77a60638eefe7f9588d37242c083ca1537014f"
+            }
+          ]
+        },
+        {
+          "version_id": "4oWvC9eo",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:25.550652Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-forge-1.11.2-mc1.20.1.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/4oWvC9eo/skinlayers3d-forge-1.11.2-mc1.20.1.jar",
+              "size": 2168901,
+              "sha256": "2d35eff3e2642e8a6f7fb4cc7461211699ee2e32b9644e0d3b3bd6ba1574551c",
+              "sha512": "87f06a52665d5eec7cf7d9dcd73a94ba9aa2d0f1651578d3852afab128e17836cff76e40aa5661915ba106910cef0104a00ef04883977af74de1acc02bcecc1d"
+            }
+          ]
+        },
+        {
+          "version_id": "IrL0IGkV",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:31.687386Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc1.21.1.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/IrL0IGkV/skinlayers3d-fabric-1.11.2-mc1.21.1.jar",
+              "size": 1988649,
+              "sha256": "392dd2e967f2ff3c83bd5fe71e528a05dd6a5f01bf4f0027b8fbe88d5f68c95b",
+              "sha512": "69b93264704afb767921a2566658b16d13a2ff8e1d1da5cd7a6c78484092e277a1b8a66e8ca542c11e04ca3708fb20e518d35a53964079a49882626ae9da6496"
+            }
+          ]
+        },
+        {
+          "version_id": "54WsU8I9",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:31.925414Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-forge-1.11.2-mc1.21.1.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/54WsU8I9/skinlayers3d-forge-1.11.2-mc1.21.1.jar",
+              "size": 2162542,
+              "sha256": "70623fa16307d466c403c89b0a6f0ee535089849db4d4834763605ec53006ab8",
+              "sha512": "813b27ef7deb5d4aa9d1e758dc51c98926028169019413825bc13faea85957a3fe16ff33ef2964bfe3fad83c10219d9b3f05459ee98ba4728953826cedfb1a1f"
+            }
+          ]
+        },
+        {
+          "version_id": "xPYbAPfz",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:32.927972Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.11.2-mc1.21.1.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/xPYbAPfz/skinlayers3d-neoforge-1.11.2-mc1.21.1.jar",
+              "size": 1979027,
+              "sha256": "21724b7f676696f8d3716142406440adba9e63fc6519eeadc2b7ee8aae64c760",
+              "sha512": "c017d098874697ba93a03c06cfb4fe8a8bbc619448bff55c3c821089b164677fae2c8c2059e99fc9933af6ff519759c399deae763b1ac9e34593cd6e4f427f3a"
+            }
+          ]
+        },
+        {
+          "version_id": "V0iLGkQC",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:36.565546Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc1.21.3.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/V0iLGkQC/skinlayers3d-fabric-1.11.2-mc1.21.3.jar",
+              "size": 1984610,
+              "sha256": "04cb8a37869162f97dd317d019307156f916a5cb9cee7841cbabce20d6c97f50",
+              "sha512": "535c6c0ee452d4a9e28c1bc0bd4bb37b20e25214ff3815dc91587b7c0c0c4f0e7e51cccbfda4544909e89978c3f4f8171510bef270b9368c3233ff41636aaa41"
+            }
+          ]
+        },
+        {
+          "version_id": "1dOHrdRl",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:36.696014Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-forge-1.11.2-mc1.21.3.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/1dOHrdRl/skinlayers3d-forge-1.11.2-mc1.21.3.jar",
+              "size": 2158607,
+              "sha256": "e7a63a43bb0a8ab068595f3d35d4e94f456a6322cb54de710977530043545bb1",
+              "sha512": "898bd0861a3cf789520615ddbed34aa73ecbb3a853bd4e20baa9226715c1ef9a48a4d414ce84140a79f22bb28f1a262f1a48c034c61c4a4af64e4dd6550d2ab0"
+            }
+          ]
+        },
+        {
+          "version_id": "y8NG47od",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:37.378050Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.11.2-mc1.21.3.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/y8NG47od/skinlayers3d-neoforge-1.11.2-mc1.21.3.jar",
+              "size": 1974936,
+              "sha256": "e4dfe578143475f5aabb7853c32ae49d4e05adbf0ca0eaf8815c0bd4251b5bc8",
+              "sha512": "83c7731ef91318497b7c732d608f6ea723323e09747fac5871d09d44a358ecfa4bdab285c0caccfdd8a9936132e1879be3baa6761c1b8401a41719b04d774d82"
+            }
+          ]
+        },
+        {
+          "version_id": "Ysm7drOz",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:38.265753Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc1.21.4.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/Ysm7drOz/skinlayers3d-fabric-1.11.2-mc1.21.4.jar",
+              "size": 1983996,
+              "sha256": "6a47933cd7989f4c1bed2f576f342bc7ef35df2ac4eba0b06e8b1fce23a825a4",
+              "sha512": "2a0cc2aafb2e1db1b02b360c044d6fcb4022212faa1f428a47f9b6e37167573d55011f79a939de921c99cf7374e7c300fc779d084e240239b8f871f462b26f61"
+            }
+          ]
+        },
+        {
+          "version_id": "rSKGfWei",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:38.093458Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-forge-1.11.2-mc1.21.4.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/rSKGfWei/skinlayers3d-forge-1.11.2-mc1.21.4.jar",
+              "size": 2157930,
+              "sha256": "65a4565587ddf4019984c1486de387a29ef9248e3e31038d3725a36648021a4c",
+              "sha512": "c2dc9596114c230bf4a632814eb603722b66143097b1c5299987f91f26fc2d191b6c8f12d4a4ff2c17f7afd37c06a2aaea75f1f3620cc6700172548b8c2f5207"
+            }
+          ]
+        },
+        {
+          "version_id": "BmoThdyv",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:38.930632Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.11.2-mc1.21.4.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/BmoThdyv/skinlayers3d-neoforge-1.11.2-mc1.21.4.jar",
+              "size": 1974310,
+              "sha256": "92f60586472d14c1c08e3471a9625e5ea9290192045ae75475ee1aea135e1116",
+              "sha512": "95070a0d11349b964b354e98fca8c656a65d525190402b158ab2ca6d47ded6d33fd5b0b6098cdab3288095a2cc01d571ca1de5ffc7a4e931ec9d40c8436f3f65"
+            }
+          ]
+        },
+        {
+          "version_id": "F7gPzIo2",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:39.777125Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc1.21.5.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/F7gPzIo2/skinlayers3d-fabric-1.11.2-mc1.21.5.jar",
+              "size": 1982852,
+              "sha256": "65a83e0816da6b6af8cb297a8a2c202b2dda4026d452f63aad193fe490b45f54",
+              "sha512": "f299f61aa630c48971c596c152e917219d7d70dd0ae3974c40308603dc5e158e5ed998a1e7bb9f33a1b9fac091b7a12847902c82b56c87a8586e796ba6866867"
+            }
+          ]
+        },
+        {
+          "version_id": "xP8HCRNR",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:40.253343Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-forge-1.11.2-mc1.21.5.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/xP8HCRNR/skinlayers3d-forge-1.11.2-mc1.21.5.jar",
+              "size": 2156807,
+              "sha256": "275380d0bf44536481b05e65dca7fa5f32df3a254b0333c4d130d8874b48ed89",
+              "sha512": "1db32fd713b91159fbd6b3ba91b3bfabade209fbfc5577da92b9953da1d233e4216884c3b719975669c6f76a0b312f9a82ba405fdbe213c9d13ac97b8d2ec91b"
+            }
+          ]
+        },
+        {
+          "version_id": "bOuG6glr",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:40.360681Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.11.2-mc1.21.5.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/bOuG6glr/skinlayers3d-neoforge-1.11.2-mc1.21.5.jar",
+              "size": 1973197,
+              "sha256": "3f038cc5dd04155b901505d71439d54e381c9ed1daea1ec601e4cde2604c5ac8",
+              "sha512": "d69ba96aa9a38e541f7ad0e2b759065c676e492fd3f257979b79fdef2d651ca8b225b8aa7b1b3be6879fb2cae2d64e14a2c647c05b538be44b42bb0334420671"
+            }
+          ]
+        },
+        {
+          "version_id": "nprDnVnJ",
+          "version_number": "1.9.0",
+          "version_type": "release",
+          "published_at": "2025-08-12T18:59:29.832961Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.6",
+            "1.21.7"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.9.0-mc1.21.6.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/nprDnVnJ/skinlayers3d-fabric-1.9.0-mc1.21.6.jar",
+              "size": 867372,
+              "sha256": "0222a76f6e1144344c16f6b77c52a2b6f8793c99aa28553eca5ab9bf14ea97a1",
+              "sha512": "17974abddf9ff24e63cbba477dc4d705e941c273cd186def2288e1976402c2cffb3dc8cc766c985dfc48f5482b9b399e0c873aeee7c18367258de90c59adbf83"
+            }
+          ]
+        },
+        {
+          "version_id": "CsFEAQRd",
+          "version_number": "1.9.0",
+          "version_type": "release",
+          "published_at": "2025-08-12T18:59:30.829467Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.6",
+            "1.21.7"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-forge-1.9.0-mc1.21.6.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/CsFEAQRd/skinlayers3d-forge-1.9.0-mc1.21.6.jar",
+              "size": 871906,
+              "sha256": "2df0f28545e368ad885da5457311b1fc272c10cd338411feb418b574338ecd3f",
+              "sha512": "0307b8002eb39edc3776cb403799b8ad64dedc8b680b18452747204f2a25b0463203ec3edb2bda5355f0526b4b259541d05c71295c0d93fe7432c241d7c0c486"
+            }
+          ]
+        },
+        {
+          "version_id": "m69E0MYU",
+          "version_number": "1.9.0",
+          "version_type": "release",
+          "published_at": "2025-08-12T18:59:31.239154Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.6",
+            "1.21.7"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.9.0-mc1.21.6.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/m69E0MYU/skinlayers3d-neoforge-1.9.0-mc1.21.6.jar",
+              "size": 871834,
+              "sha256": "fb7567056ee25ab531ca163a77d72869f804778d5771339b4b3e67306ed7af2f",
+              "sha512": "2a261a965562ce2da59e539cfb75e2b820cd8da31ffc11690d8c63177512a64c940f75a9edbbc5e76851c3c7f347063f2bf0f4eedbc06d8e571bfe59a15ec094"
+            }
+          ]
+        },
+        {
+          "version_id": "duLoGgJT",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:41.273197Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc1.21.8.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/duLoGgJT/skinlayers3d-fabric-1.11.2-mc1.21.8.jar",
+              "size": 1984024,
+              "sha256": "ca9e54da134bfbe627a0d99e792e728f05e03c0a5ed4e5055e55b6807b630147",
+              "sha512": "729cc1027589edaef331cdd13ef9c6567f3b2af8e5e9ea45bd437232bd5f6d065e6dd63c3f21cb818f76080998381e2ae8ccdde86a1fe37f7539eecadfc589f0"
+            }
+          ]
+        },
+        {
+          "version_id": "t2Dv6hrI",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:41.931687Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-forge-1.11.2-mc1.21.8.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/t2Dv6hrI/skinlayers3d-forge-1.11.2-mc1.21.8.jar",
+              "size": 2157665,
+              "sha256": "c9e6fd11dcb8940fde52169d637d43cc8c1dc7314ba6043c76a2b9a599a290c7",
+              "sha512": "10a5e06d2a5a2b51db69850c772ba30e65d4307d02f4202367bab1245ba5aa893b3d45e3e1fef336c13e98c558e5dd48f777b83cb62802b1c347670e5f54225b"
+            }
+          ]
+        },
+        {
+          "version_id": "RZCF8mHr",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:42.317626Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.11.2-mc1.21.8.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/RZCF8mHr/skinlayers3d-neoforge-1.11.2-mc1.21.8.jar",
+              "size": 1974459,
+              "sha256": "04e1ffe164083cd9bf0456b333def1e9689d435b95dcea6d02b25539bb20daa8",
+              "sha512": "94c93591e107f65c2e1a24e1585a5318518a1c62a6004830a632a4f54a04326343a5e2a3a615266b26d7ef0b138ced329b5d400aca285de5f0d8bdb6719a19b0"
+            }
+          ]
+        },
+        {
+          "version_id": "Uv7uC5kA",
+          "version_number": "1.9.2",
+          "version_type": "release",
+          "published_at": "2025-10-10T15:51:05.943968Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.9"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.9.2-mc1.21.10.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/Uv7uC5kA/skinlayers3d-fabric-1.9.2-mc1.21.10.jar",
+              "size": 869804,
+              "sha256": "5c21e7f2b738742754bde3ef2412ad131e2122dd3c08636f161cf845fbe79238",
+              "sha512": "1ee97cf138f9f345ad0c4ae2e336a11203025f6c8cabfa3e573e38a94ea3c3d4880da895cceac77bf52f0846b171644a33008497b8b9e78adf517fd7d2952869"
+            }
+          ]
+        },
+        {
+          "version_id": "1M0oA70A",
+          "version_number": "1.9.2",
+          "version_type": "release",
+          "published_at": "2025-10-10T15:51:13.080656Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.9"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.9.2-mc1.21.10.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/1M0oA70A/skinlayers3d-neoforge-1.9.2-mc1.21.10.jar",
+              "size": 874092,
+              "sha256": "9db668ced165318c09a4b08c24a42f1f26aa4aee9db2fa79a696be267fde0ede",
+              "sha512": "ea2f8aec8e2c1f31fdf0f8a75acc6b922ab663cd60483aeb845e08d94d9b72cd1574d3efcaf157336559f97c5fdf5230de9159a982452734268ce584ca7a0931"
+            }
+          ]
+        },
+        {
+          "version_id": "DIR22jMD",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:33.142188Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc1.21.10.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/DIR22jMD/skinlayers3d-fabric-1.11.2-mc1.21.10.jar",
+              "size": 1987260,
+              "sha256": "089cd4a3c6aa137b47c21e22a25e6826a5c9699974a35b9b91270159b32c9f17",
+              "sha512": "eee6612c35d54d348b08abdf502c686a58d89294cf04396148c66913d9add4ad2f9f9a0a2690f493eceb40dca3e320ed73ba7ae14573bfacd3a4a28e88af9c19"
+            }
+          ]
+        },
+        {
+          "version_id": "Ciqg3o2M",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:33.719156Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-forge-1.11.2-mc1.21.10.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/Ciqg3o2M/skinlayers3d-forge-1.11.2-mc1.21.10.jar",
+              "size": 2161172,
+              "sha256": "46a431519a526e0979a791159d5351ab5863a2e8e2cb510b749ede9ec5f427e3",
+              "sha512": "600192826a60e3481441bda0778c774e8841b9fe7a6b968554b1789117600596f4cd434fb7cb1a5e037a31a54772047136549e676c41abec2b1ffc62fd521f9d"
+            }
+          ]
+        },
+        {
+          "version_id": "mCm2VAnN",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:34.544809Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.11.2-mc1.21.10.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/mCm2VAnN/skinlayers3d-neoforge-1.11.2-mc1.21.10.jar",
+              "size": 1977937,
+              "sha256": "1138b36d7a60ee0427bfab17cf2cd6a71f3ca620b36ec09ec6e7df235569efab",
+              "sha512": "4319a1dea4a1e5d99c65ac57f20404e878edd9fbca03a758468fcc32de7c0a5d088e6a0809c17896fbfb2aa40318c6c3b691eba33ce90178a2e32b0d9f1517a5"
+            }
+          ]
+        },
+        {
+          "version_id": "3kCdl1bI",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:35.137654Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc1.21.11.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/3kCdl1bI/skinlayers3d-fabric-1.11.2-mc1.21.11.jar",
+              "size": 1988266,
+              "sha256": "31243ee08b76b3dab71d7761963f317125c536f6b8984795e7b02811b4f80e97",
+              "sha512": "d8911912a7935e8578c488b35711beaaf28127778a8ce120d77406c3636071b9b16813f4c467ee64fadda3104ae822711af237c1742005fce2d3defbb801f884"
+            }
+          ]
+        },
+        {
+          "version_id": "2utRsDcM",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:35.461117Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.11.2-mc1.21.11.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/2utRsDcM/skinlayers3d-neoforge-1.11.2-mc1.21.11.jar",
+              "size": 1979033,
+              "sha256": "4ef77e36904e5be8f6b43a66629e5097f5f2384f93809235c64dbc0ca1b9977e",
+              "sha512": "3c0d12ce9e17c024e5c6a7543b20394cfcfd2da601ec24426988290dacfd21523673b4ff621981594d265d9b5bbc3058d9ac6fbbd49308e551c05b3ba92e8304"
+            }
+          ]
+        },
+        {
+          "version_id": "yGhuC8Hx",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:42.841811Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.1",
+            "26.1.1",
+            "26.1.2"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc26.1.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/yGhuC8Hx/skinlayers3d-fabric-1.11.2-mc26.1.jar",
+              "size": 1964639,
+              "sha256": "8443efa729b276431052b135b75c5abc418b864b0a547e69d2902e1e0420b9ff",
+              "sha512": "e3158aac16887ba643e175af097a1f050be01b245d34da3beecea6a22586794ccfa8e0fe14e4b5760a333f1f524bd29e9cf9cecdfa9f70498d13e561aedc48f5"
+            }
+          ]
+        },
+        {
+          "version_id": "IEzXSo3w",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:43.772579Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "26.1.2"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-neoforge-1.11.2-mc26.1.2.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/IEzXSo3w/skinlayers3d-neoforge-1.11.2-mc26.1.2.jar",
+              "size": 1952149,
+              "sha256": "da55a664fb6c2b5aae0b7a01bba5de4238e226b7b6603c079b3a3932e2c7b577",
+              "sha512": "d9768ed874d9358ce8f5eaba59b2cc5855ee4e496fe569eee653f5e9b1032550299c3b3c112a7b33a08266603619ed4882a3f3aee066102a0db37796214824ec"
+            }
+          ]
+        },
+        {
+          "version_id": "rJYtiDew",
+          "version_number": "1.11.2",
+          "version_type": "release",
+          "published_at": "2026-06-18T18:52:44.147436Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.2"
+          ],
+          "files": [
+            {
+              "filename": "skinlayers3d-fabric-1.11.2-mc26.2.jar",
+              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/rJYtiDew/skinlayers3d-fabric-1.11.2-mc26.2.jar",
+              "size": 1966389,
+              "sha256": "3b553acd510f3395b00ca1c26b5bb2e990c420a415350aec84d0f4255f3ca0a5",
+              "sha512": "ead4a257e5ec2b092db84aebc7f5146dfb667a01f5d1362485f9ea9835e4558172949bcfb40c7a0bfbfb36e6c746b96c580f855af4109c806e0fc3591d48ad80"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "customnpcs",
+      "name": "CustomNPCs-Unofficial",
+      "project_id": "vFAmwl6B",
+      "install_on": "client-and-server",
+      "loaders": [
+        "fabric",
+        "forge",
+        "neoforge"
+      ],
+      "allowed_version_types": [
+        "release"
+      ],
+      "provided_dependencies": [
+        "P7dR8mSH"
+      ],
+      "supported_game_versions": null,
+      "artifacts": [
+        {
+          "version_id": "QNvMO1zC",
+          "version_number": "1.20.1.20251214",
+          "version_type": "release",
+          "published_at": "2025-12-14T14:36:50.200793Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "CustomNPCs-Unofficial-Fabric-1.20.1.20251214.jar",
+              "url": "https://cdn.modrinth.com/data/vFAmwl6B/versions/QNvMO1zC/CustomNPCs-Unofficial-Fabric-1.20.1.20251214.jar",
+              "size": 12981960,
+              "sha256": "47052671cdaf2fdf4d640aae25bb16a0745a222f2b5455b40346a7523627d5db",
+              "sha512": "147a902600e9329d2e0fe4d3cce0d8b745e31114b83fff00440c6964e2f6f8a431e53ca87f9a6bdb2a0a5d56adadab64402161be0f07597338adeb188dda70fd"
+            }
+          ]
+        },
+        {
+          "version_id": "CaWlRoYD",
+          "version_number": "1.20.1.20260227",
+          "version_type": "release",
+          "published_at": "2026-03-01T08:03:55.025360Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "CustomNPCs-1.20.1-GBPort-Unofficial-1.20.1.20260227.jar",
+              "url": "https://cdn.modrinth.com/data/vFAmwl6B/versions/CaWlRoYD/CustomNPCs-1.20.1-GBPort-Unofficial-1.20.1.20260227.jar",
+              "size": 10846030,
+              "sha256": "3756bed8a2b8b2a45fd8ba8aab2be54b0ea3d2e258819426f65e00a5f83ef4d9",
+              "sha512": "0b54411d98f903e0d01094634b0e79d6bddec146a70addf40656c254bcf1c7e7aa920bf31012061212d87d23e7ed3e9954623e4992b88b4c35ef18196102c4af"
+            }
+          ]
+        },
+        {
+          "version_id": "5vYVgtPS",
+          "version_number": "1.21.1.20260124",
+          "version_type": "release",
+          "published_at": "2026-01-28T20:39:43.872006Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "CustomNPCs-Unofficial-Fabric-1.21.1.20260124.jar",
+              "url": "https://cdn.modrinth.com/data/vFAmwl6B/versions/5vYVgtPS/CustomNPCs-Unofficial-Fabric-1.21.1.20260124.jar",
+              "size": 13042156,
+              "sha256": "b40f5a9e88789444d223c715853ae24c379cb7e13f26e84143ba6c6f8667f5a0",
+              "sha512": "37da644b61726b1eefa3efb7bf2a57e7fcdae6d633f4e1af6bdb2b914dde0cd126926afa9ba6e3f5b60bf84de684677ff80bac2e8310998ebe80027f696b92a9"
+            }
+          ]
+        },
+        {
+          "version_id": "5gdSEvLv",
+          "version_number": "NeoForge-1.21.1.20241226",
+          "version_type": "release",
+          "published_at": "2024-12-26T06:55:07.405456Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "CustomNPCs-Unofficial-NeoForge-1.21.1.20241226.jar",
+              "url": "https://cdn.modrinth.com/data/vFAmwl6B/versions/5gdSEvLv/CustomNPCs-Unofficial-NeoForge-1.21.1.20241226.jar",
+              "size": 10779627,
+              "sha256": "06edf28bb7b1887fa67eef6b3fa5db7a969bbbd4647cfe3db8838c68b11a3211",
+              "sha512": "b310a567d938480ed82b285da26e8b5e6925b2450fbcb4fb2ce4bc654465b4f2bee953bfcb32ac0a8e5a0b626bbe2ac13d89c10e59d3d04b8ef996465c78a8bf"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "essential",
+      "name": "Essential",
+      "project_id": "k2ZPuTBm",
+      "install_on": "client",
+      "loaders": [
+        "fabric",
+        "forge",
+        "neoforge"
+      ],
+      "allowed_version_types": [
+        "release"
+      ],
+      "provided_dependencies": [
+        "P7dR8mSH"
+      ],
+      "supported_game_versions": null,
+      "artifacts": [
+        {
+          "version_id": "btCD1TAt",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:29:06.327246Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_1-20-1.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/btCD1TAt/Essential_1-4-1-1_fabric_1-20-1.jar",
+              "size": 53003710,
+              "sha256": "aaff8dd92fffbda794848a9cdd35e1468bebd47ba6a221d22dbc4b53441b951d",
+              "sha512": "2ff3248e424dbac255fdf0d458b23bb985b5dbc203a557202138b2ded04b40a4f87222c7605046fae7e0dd4c39c054304cecc89d5a7699cc62a7103c902d12dd"
+            }
+          ]
+        },
+        {
+          "version_id": "QSyGZndT",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:29:43.336876Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_forge_1-20-1.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/QSyGZndT/Essential_1-4-1-1_forge_1-20-1.jar",
+              "size": 51920947,
+              "sha256": "7482310b7e677f34ca8747ddfee0d67428e6036ea258967f296e766cf897e12e",
+              "sha512": "0c0dcf4676a715932b4b522eeac0f399321919db2f6f56055e90e6b1cf1dc2254f4c4164b8fb962abc4344ff0e6328a4d6ee7081fccdee29ef380598836a164b"
+            }
+          ]
+        },
+        {
+          "version_id": "ydYSCHsU",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:57.569098Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_1-21-1.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/ydYSCHsU/Essential_1-4-1-1_fabric_1-21-1.jar",
+              "size": 53198111,
+              "sha256": "28f43ee3bf2f66ec4a416fb7104f47e6f307f02e6175eac6dceef6bbaaf01183",
+              "sha512": "523fbc7fb04ac8f286449feedaaaa9697dd9eaf2832fb42a9d7eb182b62bf2a33a2c7f9fe20bf20ebfef2ac29d5ed2e4db5c7238cfdabb80da87a21e124bbc50"
+            }
+          ]
+        },
+        {
+          "version_id": "cr5OqtFT",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:29:35.901878Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_forge_1-21-1.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/cr5OqtFT/Essential_1-4-1-1_forge_1-21-1.jar",
+              "size": 51897458,
+              "sha256": "9b4715fcff6765d40a75df70c9065a0bd70d60bd995b0d650d903b43666eb336",
+              "sha512": "5df321a48a1c76f03dac38d4390bfd7a9546e74cf33f29205565fb955e5767e02042864c1c010dced1af71bbe2ab52c41b97d1adeaf19b4a365f515357f03166"
+            }
+          ]
+        },
+        {
+          "version_id": "NbXyFjGP",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:30:06.568404Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_neoforge_1-21-1.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/NbXyFjGP/Essential_1-4-1-1_neoforge_1-21-1.jar",
+              "size": 51895049,
+              "sha256": "1f68a3d5050078e440408be21bb968be843e42631dee1d770201ccd435379589",
+              "sha512": "bef6c28584632783b204b38bc5d9cb594e5f5b0c59cd3a08c92fc8ebbb5f542cef310717c368149305a29271b4f269eb82dd50ef9ed00cc66f37e6866958fa38"
+            }
+          ]
+        },
+        {
+          "version_id": "C3sjIP14",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:57.352185Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.2",
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_1-21-3.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/C3sjIP14/Essential_1-4-1-1_fabric_1-21-3.jar",
+              "size": 53200134,
+              "sha256": "c7bf6c8f7f0b5c83fd207a2172e0af33028f87c12d58f78fc910cbfb859579fb",
+              "sha512": "cf388cd1af5381799a3a149373ab1c332a5e31d6899034fb7e4dca05f742405766facdb0953b1daeed479dfc60e8e3b3d9f8cab1762a116ad9988ffcc0ec4ad9"
+            }
+          ]
+        },
+        {
+          "version_id": "vxywePlv",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:29:33.202376Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_forge_1-21-3.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/vxywePlv/Essential_1-4-1-1_forge_1-21-3.jar",
+              "size": 51897082,
+              "sha256": "ce80507984415a04cda9164a8dbb93786d8b35388ce443e8c74046a2952522e0",
+              "sha512": "e7ab5fe9993a9d14f31258c627f27417cd3c186328825c88833ca776ecf518d347951776c64e9ccc82df785bf13d8d1e140ec4346f76774f2220cbfaf20d223b"
+            }
+          ]
+        },
+        {
+          "version_id": "9N2M57az",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:30:06.058119Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_neoforge_1-21-3.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/9N2M57az/Essential_1-4-1-1_neoforge_1-21-3.jar",
+              "size": 51893877,
+              "sha256": "bef9092ed1a01fa5e22171337d6cf9428a6de22c7c6cadbef9ab50d1a370a905",
+              "sha512": "656a534b64aa5ea735a9b40579b06b1219ed9d19d9b48cb62b52691dc05590d6d96f3cc98d358d815e015facaf65740105051428d41d9a5993c4eeb07ba986f8"
+            }
+          ]
+        },
+        {
+          "version_id": "RAPMKLqO",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:53.559756Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_1-21-4.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/RAPMKLqO/Essential_1-4-1-1_fabric_1-21-4.jar",
+              "size": 53198620,
+              "sha256": "4fe379a4c4bb0f57e538a38a1eecff6803724a52cc54f2f3f674a3de31afedfa",
+              "sha512": "94f4e4e5c1fe79f03fd7127deee1ae7c6219ae899fbd13eed75c6f38b5f831d3a509b90f8d4eec226161653fd4339165f0f2cdf04cb915c23fcfacf8ec0f9190"
+            }
+          ]
+        },
+        {
+          "version_id": "aXNnlCFI",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:29:31.204972Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_forge_1-21-4.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/aXNnlCFI/Essential_1-4-1-1_forge_1-21-4.jar",
+              "size": 51895751,
+              "sha256": "b3567a75cfbf25be2d161d326cabbc4bd2cb5acd4673ffd6afa3e079887020c9",
+              "sha512": "dae48ae5939cecfd2f79fe514f32419ee69e1546848709e791dba204ad8b637204be1cbbea5def3be75e365ba3f973db7b7e2731ec8be0d8cd781dd2c28cd64f"
+            }
+          ]
+        },
+        {
+          "version_id": "SPYAULE0",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:30:03.045178Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_neoforge_1-21-4.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/SPYAULE0/Essential_1-4-1-1_neoforge_1-21-4.jar",
+              "size": 51894051,
+              "sha256": "1f9717766011f3280fd82a57c25416f5971b79ea35232af21c8fdd7ff5243d59",
+              "sha512": "c3e9c7134546595576e7ce4eb1305c4547d7e6b68eb6a09210ca27113470e7b60920afb644522da952b7a69b3e9407b9a28dab4dc3549fa1ad5ff5524e7dbe43"
+            }
+          ]
+        },
+        {
+          "version_id": "cY9fpUuv",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:53.405873Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_1-21-5.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/cY9fpUuv/Essential_1-4-1-1_fabric_1-21-5.jar",
+              "size": 53184367,
+              "sha256": "b4c5bd42701936c8a1dabceb5249ac85ec744f2883a809188cb5e4636ed0bbc4",
+              "sha512": "bc0621f71f15ad707489a09cec6f5bfce9aab3e6871eb8bb1e4c4fd56bc637f402f3c2456633f21762f58284ae3c2b02fbb85e08720984f8666bead6fcd9187a"
+            }
+          ]
+        },
+        {
+          "version_id": "ok3wXI52",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:29:30.150738Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_forge_1-21-5.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/ok3wXI52/Essential_1-4-1-1_forge_1-21-5.jar",
+              "size": 51878279,
+              "sha256": "7d7f1a2ec8c77bda1d99de87614659f99f9765686f538628177144ae849b37bd",
+              "sha512": "39aef7b1334e71f485f3a4bbdd30df4a217c579dab3e18651b921670a899a711916a6dfd37658f5365db68432f23d10800347af029cc36971782682ccf990920"
+            }
+          ]
+        },
+        {
+          "version_id": "JC27FEJa",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:30:02.401871Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_neoforge_1-21-5.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/JC27FEJa/Essential_1-4-1-1_neoforge_1-21-5.jar",
+              "size": 51874308,
+              "sha256": "44cecf20b8c392084b1e0ddb4d3e0c1f271af3aa04d4ef22e18c0fe217467a03",
+              "sha512": "78124c1b69d9b4dff424bc9031cf1dc866d0d3a32070ba69270dd6b5043758c026f62ff9d051593151fba49655ea3065de0819bf5ecc113c881ffa26ecb9d9b0"
+            }
+          ]
+        },
+        {
+          "version_id": "BhxQYGdJ",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:50.091748Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.6"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_1-21-6.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/BhxQYGdJ/Essential_1-4-1-1_fabric_1-21-6.jar",
+              "size": 53227883,
+              "sha256": "b3ee2c32d21455a82246d52412e62f84a7d0caabab586b3a3ce1552397997993",
+              "sha512": "1dc5ba0e81576ed80b10d6f262f997025a730f53c9c76a754a2edcdb35f21a956ee44bb88132bac6a46448e01ef69db0526331f0459131b8016fd17c83bb14ee"
+            }
+          ]
+        },
+        {
+          "version_id": "EdpHP2QA",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:49.364072Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.7",
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_1-21-8.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/EdpHP2QA/Essential_1-4-1-1_fabric_1-21-8.jar",
+              "size": 53228562,
+              "sha256": "d80bbfcff23599aa475920ca776ab7d69046fecacb8040b33e361c96c1f6bef7",
+              "sha512": "01a46974ce8ca28aac22bdac991c24a6ed8839894de811a0197b14b4f9c58f61f0275a5d2b9e74827d50f779475299fd59480ba25fd7cb807abd1e0f0dc77b64"
+            }
+          ]
+        },
+        {
+          "version_id": "lmxGs4Ph",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:29:27.538519Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.7",
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_forge_1-21-8.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/lmxGs4Ph/Essential_1-4-1-1_forge_1-21-8.jar",
+              "size": 51919523,
+              "sha256": "1ee8a0be70314c5c60e66f81ee2b94ff78b7b710d48743cf5b9fc2d604c25148",
+              "sha512": "56add71fc994c1239358841f87638c468fd38d436315aedeb4d0a672ca9952f5b6a369ced7f0f14947c1f31712c93d8c4a469d22a45da033da3aee0f46b17493"
+            }
+          ]
+        },
+        {
+          "version_id": "zMMgCyVc",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:29:58.867588Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.7",
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_neoforge_1-21-8.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/zMMgCyVc/Essential_1-4-1-1_neoforge_1-21-8.jar",
+              "size": 51919204,
+              "sha256": "5af691b3e03e31b7cc193a4399392655376e2770f8cddfd0d15bdbc871d28f3e",
+              "sha512": "e66f3ad70e9e8b0798083f817a276db967ed181a3f156ef9456460c4ff6cd82afbcdadfb86735a53e355082530dda93bf28223bac764527a7639e66d22aa9c67"
+            }
+          ]
+        },
+        {
+          "version_id": "e7YYM7yT",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:45.316697Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.9",
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_1-21-10.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/e7YYM7yT/Essential_1-4-1-1_fabric_1-21-10.jar",
+              "size": 53230813,
+              "sha256": "34b871b228a97764ecdd9612a036315a74207aa747bee86422a38fc707c2772c",
+              "sha512": "02c4d00055ee6e87e8ad86ae52dc01e31bea12dde1461da8e64e177ed63395fded529cb26a84a91c034f325c3a553a845f0e08e252580a4db1b27f8f7312742a"
+            }
+          ]
+        },
+        {
+          "version_id": "x9zzI2c8",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:45.369766Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_1-21-11.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/x9zzI2c8/Essential_1-4-1-1_fabric_1-21-11.jar",
+              "size": 53248720,
+              "sha256": "67995df4f60a5910868ab8e7e057f62659639ca8e1135bfc5d735b28ee6f0364",
+              "sha512": "9877af2c9e8844dd709b8652ac1e8572ba473718f2cf9b63138642cc4ba1bb1c3c881486c156f38d46e185701924cd53953c5aa8781cc045dd0293628a669e9c"
+            }
+          ]
+        },
+        {
+          "version_id": "bB2cTcpq",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:41.055423Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.1",
+            "26.1.1",
+            "26.1.2"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_26-1-2.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/bB2cTcpq/Essential_1-4-1-1_fabric_26-1-2.jar",
+              "size": 53168275,
+              "sha256": "36a8263400323d11c5a849fc36617b365a863113672269d653f8cb7293144227",
+              "sha512": "68c507561d06f52d10c07560f287a4b0aa49c519fa7db69c67baa9f8fc9052ca5901fcc7755e9f25a60bdda02be30cea10e9c49d1f24f4fe9e602d5ff452f26c"
+            }
+          ]
+        },
+        {
+          "version_id": "F6WKM1HY",
+          "version_number": "1.4.1.1",
+          "version_type": "release",
+          "published_at": "2026-07-30T11:28:41.049868Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.2"
+          ],
+          "files": [
+            {
+              "filename": "Essential_1-4-1-1_fabric_26-2.jar",
+              "url": "https://cdn.modrinth.com/data/k2ZPuTBm/versions/F6WKM1HY/Essential_1-4-1-1_fabric_26-2.jar",
+              "size": 53170671,
+              "sha256": "314d97a4dc869667c9260ab900d5302162ebe3f15e0e90ddbfbe46240e13db57",
+              "sha512": "65859309671b7c750d90f841477bfcea0e1461bd5b0e0ab280fc90cda0a89b6977b5ad83c479f6145519185a5a9578d0bb10ef97b197209a708c1cfbbade87da"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "replaymod",
+      "name": "ReplayMod",
+      "project_id": "Nv2fQJo5",
+      "install_on": "client",
+      "loaders": [
+        "fabric"
+      ],
+      "allowed_version_types": [
+        "release"
+      ],
+      "provided_dependencies": [
+        "P7dR8mSH"
+      ],
+      "supported_game_versions": [
+        "1.20.1"
+      ],
+      "artifacts": [
+        {
+          "version_id": "ReB0T2tK",
+          "version_number": "1.20.1-2.6.23",
+          "version_type": "release",
+          "published_at": "2025-07-05T08:01:03.593388Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-1.20.1-2.6.23.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/ReB0T2tK/replaymod-1.20.1-2.6.23.jar",
+              "size": 14739015,
+              "sha256": "a46491d73456187ac888d31f6cc1160e42304427a63da88874c84abeb4d14033",
+              "sha512": "dc255bf916acca75c4bbf1df0ad45a944bbbf014c0246082c31df56d4fa8425d6ddecf1f6c4cf81c4588c494a6da36436e639b989def9c02d1a80d58a39db66f"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

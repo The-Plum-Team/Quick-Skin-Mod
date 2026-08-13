@@ -50,10 +50,7 @@
       "metadata": {
         "file": "fabric.mod.json",
         "loader": ">=0.17.0",
-        "architectury": ">=9.2.14",
-        "suggests": {
-          "pas": "*"
-        }
+        "architectury": ">=9.2.14"
       }
     },
     {

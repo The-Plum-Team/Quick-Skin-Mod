@@ -22,6 +22,16 @@ public class ReplayModHelper {
     private static final String CAMERA_ENTITY_CLASS = "com.replaymod.replay.camera.CameraEntity";
     private static final AtomicBoolean skinAppliedInReplay = new AtomicBoolean(false);
 
+    /** Returns whether the ReplayMod client API needed by this bridge is installed. */
+    public static boolean isAvailable() {
+        try {
+            Class.forName(CAMERA_ENTITY_CLASS, false, ReplayModHelper.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException | LinkageError ignored) {
+            return false;
+        }
+    }
+
     /**
      * Checks if the current player is a Replay Mod CameraEntity.
      * @return true if we're in a replay, false otherwise
