@@ -647,6 +647,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn(
             "github.event.workflow_run.conclusion == 'success'", enumerate_review
         )
+        self.assertIn("ref: ${{ github.sha }}", review)
+        self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
         self.assertIn("strategy:\n      fail-fast: false", review)
         self.assertNotIn("max-parallel", review.split("\n    steps:", 1)[0])
         self.assertIn("--review-identical", review)

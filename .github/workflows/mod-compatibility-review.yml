@@ -179,7 +179,7 @@ jobs:
       - name: Check out the exact protected reviewer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ matrix.implementation_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Install Python
