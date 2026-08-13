@@ -519,8 +519,33 @@
               "capture": {
                 "title": "Black-padded BMO source",
                 "review_tier": "key",
-                "expectation": "At the editor's 100% reset zoom, the complete BMO atlas is visibly centred at half size inside the double-sized 128x64 source, with broad opaque-black padding on all four sides; at this before-crop checkpoint it is intentionally not aligned to the coloured UV guides yet.",
-                "probes": []
+                "expectation": "At the editor's 100% reset zoom, Source: 128x64 and Output: 64x32 are both visible: the output selector describes the final atlas, not the imported source. The complete BMO atlas is centred at half size inside that double-sized source, with broad opaque-black padding on all four sides and a checkerboard visible only through transparent source pixels; at this before-crop checkpoint it is intentionally not aligned to the coloured UV guides yet.",
+                "probes": [
+                  {
+                    "kind": "required-gui-text",
+                    "label": "BMO source dimensions",
+                    "box": [
+                      45,
+                      100,
+                      250,
+                      140
+                    ],
+                    "minimum_luma_exclusive": 75,
+                    "minimum_pixels": 120
+                  },
+                  {
+                    "kind": "required-gui-text",
+                    "label": "BMO output dimensions",
+                    "box": [
+                      1035,
+                      100,
+                      1255,
+                      140
+                    ],
+                    "minimum_luma_exclusive": 75,
+                    "minimum_pixels": 120
+                  }
+                ]
               }
             },
             {
