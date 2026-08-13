@@ -340,11 +340,22 @@ jobs:
             # release-head attestation is still active, its eventual successful handoff is
             # guaranteed to emit a newer coalesced wake. Once none remain, the bounded collector
             # performs the one authoritative exact-head selection and provenance check per branch.
-            active_runs="$(github_api_retry --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id/runs?per_page=100")"
+            active_runs='[]'
+            for active_status in requested queued pending waiting in_progress; do
+              active_page="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id/runs?status=$active_status&per_page=100")"
+              jq -e \
+                '.total_count >= 0 and .total_count <= 100 and
+                 (.workflow_runs | type == "array" and length == .total_count)' \
+                <<< "$active_page" > /dev/null
+              active_runs="$(jq -cn \
+                --argjson previous "$active_runs" \
+                --argjson current "$(jq '.workflow_runs' <<< "$active_page")" \
+                '$previous + $current')"
+            done
             active_release_runs="$(jq \
               --argjson branches "$branches" \
-              '[.[].workflow_runs[] | select(
+              '[.[] | select(
                 .event == "workflow_dispatch" and .status != "completed" and
                 (.head_branch as $branch | $branches | index($branch)))] | length' \
               <<< "$active_runs")"

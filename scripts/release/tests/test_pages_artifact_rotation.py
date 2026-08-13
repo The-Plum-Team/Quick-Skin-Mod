@@ -4,9 +4,11 @@ import os
 import sys
 import tempfile
 import unittest
+import urllib.error
+from io import BytesIO
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -154,6 +156,30 @@ class FakeApi:
 
 
 class PagesArtifactRotationTest(unittest.TestCase):
+    def test_pages_api_retries_installation_rate_limit_then_returns_clean_json(self) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="token",
+            api_url="https://api.github.test",
+        )
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b'{"ok":true}'
+        rate_limit = urllib.error.HTTPError(
+            "https://api.github.test/repos/example",
+            403,
+            "forbidden",
+            {"X-RateLimit-Remaining": "0"},
+            BytesIO(b'{"message":"API rate limit exceeded for installation"}'),
+        )
+
+        with patch("rotate_artifacts.urllib.request.urlopen", side_effect=[rate_limit, response]), patch(
+            "rotate_artifacts.time.sleep"
+        ) as sleep:
+            self.assertEqual(api._request("GET", "/repos/example"), {"ok": True})
+
+        sleep.assert_called_once()
+
     def setUp(self) -> None:
         self.keep = artifact(
             200,

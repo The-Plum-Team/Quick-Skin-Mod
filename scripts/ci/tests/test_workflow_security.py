@@ -593,6 +593,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("Every release head already belongs", discover)
         self.assertIn("Deferring publication while", discover)
         self.assertNotIn("--probe", discover)
+        self.assertIn(
+            "for active_status in requested queued pending waiting in_progress",
+            discover,
+        )
+        self.assertIn("status=$active_status&per_page=100", discover)
+        self.assertIn(".total_count <= 100", discover)
         self.assertIn("source scripts/ci/github_api_retry.sh", discover)
         self.assertIn("github_api_retry", collect)
         self.assertIn("github_api_retry", build)
