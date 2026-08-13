@@ -19,6 +19,7 @@ from rotate_artifacts import (  # noqa: E402
     REPOSITORY,
     Artifact,
     ArtifactApi,
+    ApiError,
     GitHubApi,
     RotationError,
     _validate_run,
@@ -186,6 +187,10 @@ def main(argv: list[str] | None = None) -> int:
                     current_sha=current_sha,
                     require_raw=args.require_raw,
                 )
+            except ApiError:
+                # Infrastructure failure is not evidence absence. Keep it visible so the
+                # protected caller retries instead of waiting for a wake that may never arrive.
+                raise
             except RotationError as exc:
                 print(f"Pages evidence probe: {exc}", file=sys.stderr)
                 return PROBE_NO_EVIDENCE_EXIT
