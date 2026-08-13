@@ -143,7 +143,7 @@ jobs:
               [$artifacts.artifacts[] | select(.name == $name and .expired == false and
                 .workflow_run.id == $source_run_id and
                 (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
-                (.size_in_bytes | type == "number" and .size_in_bytes > 0 and
+                ((.size_in_bytes | type) == "number" and .size_in_bytes > 0 and
                  .size_in_bytes <= 536870912))] as $matches |
               if ($matches|length) != 1 then
                 error("missing or duplicate review capsule for " + $lane.id)
