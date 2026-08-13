@@ -3,12 +3,13 @@ package com.quickskin.mod.common.util;
 import java.awt.image.BufferedImage;
 
 /**
- * Structural alpha mask for the outer Elytra face stored in a Minecraft cape atlas.
+ * Structural alpha mask for the complete Elytra UV footprint stored in a Minecraft cape atlas.
  *
- * <p>The Elytra model is a rectangular cuboid. Its familiar tapered outline comes from transparent
- * pixels in the outer 10x20 UV face, not from the model geometry. Consequently, flattening or
- * importing an otherwise fully opaque cape atlas without restoring this cutout renders each wing
- * as a rectangle. This class owns the one scale-independent mask used by import, preview, local
+ * <p>The Elytra model is a rectangular cuboid. Its familiar tapered outline comes from the alpha
+ * envelope across the model's complete 24x22 UV footprint, not from the model geometry. In
+ * particular, Minecraft's 10x20 inner face is transparent; leaving that face opaque draws the
+ * source canvas as a large rectangular panel even when the outer face itself is tapered. This
+ * class owns the one scale-independent vanilla envelope used by import, preview, local
  * presentation, network presentation, and animation paths.</p>
  *
  * <p>Methods that normalize an atlas preserve the input object when no pixel needs changing. The
@@ -16,6 +17,42 @@ import java.awt.image.BufferedImage;
  * masked copy only when necessary.</p>
  */
 public final class CapeElytraSilhouette {
+
+    private static final int ELYTRA_MIN_X = 22;
+    private static final int ELYTRA_MAX_X = 46;
+    private static final int ELYTRA_HEIGHT = 22;
+
+    /**
+     * Visible x spans, end-exclusive, for each row of Minecraft's 24x22 Elytra UV footprint.
+     *
+     * <p>These binary alpha rows are shared by every supported vanilla Elytra texture. Applying
+     * them only removes pixels the model must not sample; custom colour and transparency inside
+     * the envelope remain untouched.</p>
+     */
+    private static final int[][] ELYTRA_VISIBLE_SPANS = {
+            {31, 40},
+            {32, 34},
+            {34, 42},
+            {34, 43},
+            {35, 44},
+            {35, 44},
+            {35, 44},
+            {35, 45},
+            {35, 45},
+            {35, 45},
+            {35, 45},
+            {22, 23, 36, 46},
+            {22, 23, 36, 46},
+            {22, 23, 36, 46},
+            {22, 23, 36, 46},
+            {22, 23, 36, 46},
+            {22, 23, 37, 46},
+            {22, 23, 37, 46},
+            {22, 23, 37, 46},
+            {22, 23, 38, 46},
+            {22, 23, 38, 46},
+            {22, 23, 39, 46}
+    };
 
     /** Visible columns for each row of the 10x20 outer wing face, end-exclusive. */
     private static final int[][] WING_ROWS = {
@@ -42,7 +79,7 @@ public final class CapeElytraSilhouette {
 
     /**
      * Return the original atlas when its required cutout is already transparent, otherwise an
-     * exact ARGB copy with only the out-of-silhouette outer-wing pixels cleared.
+     * exact ARGB copy with only pixels outside the vanilla Elytra alpha envelope cleared.
      */
     public static BufferedImage maskedCopy(BufferedImage atlas, int frameCount) {
         Layout layout = layout(atlas, frameCount);
@@ -63,19 +100,24 @@ public final class CapeElytraSilhouette {
         }
         int scale = image.getWidth() / 64;
         boolean changed = false;
-        for (int row = 0; row < WING_ROWS.length; row++) {
-            int rowY = yOffset + (2 + row) * scale;
-            int start = WING_ROWS[row][0];
-            int end = WING_ROWS[row][1];
-            changed |= clearBlock(image, 36 * scale, rowY, 0,
-                    start * scale, scale);
-            changed |= clearBlock(image, 36 * scale, rowY, end * scale,
-                    (10 - end) * scale, scale);
+        for (int row = 0; row < ELYTRA_VISIBLE_SPANS.length; row++) {
+            int rowY = yOffset + row * scale;
+            int cursor = ELYTRA_MIN_X;
+            int[] spans = ELYTRA_VISIBLE_SPANS[row];
+            for (int index = 0; index < spans.length; index += 2) {
+                int start = spans[index];
+                int end = spans[index + 1];
+                changed |= clearBlock(image, cursor * scale, rowY, 0,
+                        (start - cursor) * scale, scale);
+                cursor = end;
+            }
+            changed |= clearBlock(image, cursor * scale, rowY, 0,
+                    (ELYTRA_MAX_X - cursor) * scale, scale);
         }
         return changed;
     }
 
-    /** Whether every pixel outside the tapered outer-wing outline is fully transparent. */
+    /** Whether every pixel outside the vanilla Elytra UV envelope is fully transparent. */
     public static boolean hasRequiredCutout(BufferedImage atlas, int frameCount) {
         Layout layout = layout(atlas, frameCount);
         return layout != null && hasRequiredCutout(atlas, layout);
@@ -83,9 +125,9 @@ public final class CapeElytraSilhouette {
 
     /**
      * Predicate used by the editor's opaque-fill regression checks: every non-structural pixel is
-     * opaque and every required wing-cutout pixel remains fully transparent.
+     * opaque and every pixel outside the required Elytra envelope remains fully transparent.
      */
-    public static boolean isOpaqueExceptWingCutout(BufferedImage atlas, int frameCount) {
+    public static boolean isOpaqueExceptElytraEnvelope(BufferedImage atlas, int frameCount) {
         Layout layout = layout(atlas, frameCount);
         if (layout == null) {
             return false;
@@ -138,22 +180,12 @@ public final class CapeElytraSilhouette {
             return true;
         }
         int scale = layout.scale();
-
-        // Top and bottom faces: (24,0)-(44,2).
-        if (hasVisiblePixel(frame, 24 * scale, 0, 20 * scale, 2 * scale)) {
-            return false;
-        }
-        // Left side, inner face and right side: (22,2)-(36,22).
-        if (hasVisiblePixel(frame, 22 * scale, 2 * scale, 14 * scale, 20 * scale)) {
-            return false;
-        }
-        // Outer face: only pixels inside the tapered silhouette count as Elytra content.
-        for (int row = 0; row < WING_ROWS.length; row++) {
-            int start = WING_ROWS[row][0];
-            int end = WING_ROWS[row][1];
-            if (hasVisiblePixel(frame, (36 + start) * scale, (2 + row) * scale,
-                    (end - start) * scale, scale)) {
-                return false;
+        for (int y = 0; y < ELYTRA_HEIGHT * scale; y++) {
+            for (int x = ELYTRA_MIN_X * scale; x < ELYTRA_MAX_X * scale; x++) {
+                if (!isCutoutPixel(x, y, scale)
+                        && ((frame.getRGB(x, y) >>> 24) & 0xFF) > 10) {
+                    return false;
+                }
             }
         }
         return true;
@@ -168,7 +200,8 @@ public final class CapeElytraSilhouette {
     private static boolean hasRequiredCutout(BufferedImage atlas, Layout layout) {
         for (int y = 0; y < atlas.getHeight(); y++) {
             int frameY = y % layout.frameHeight();
-            for (int x = 36 * layout.scale(); x < 46 * layout.scale(); x++) {
+            for (int x = ELYTRA_MIN_X * layout.scale();
+                    x < ELYTRA_MAX_X * layout.scale(); x++) {
                 if (isCutoutPixel(x, frameY, layout.scale())
                         && ((atlas.getRGB(x, y) >>> 24) & 0xFF) != 0) {
                     return false;
@@ -179,16 +212,22 @@ public final class CapeElytraSilhouette {
     }
 
     private static boolean isCutoutPixel(int x, int frameY, int scale) {
-        int firstY = 2 * scale;
-        int lastY = 22 * scale;
-        int firstX = 36 * scale;
-        int lastX = 46 * scale;
+        int firstY = 0;
+        int lastY = ELYTRA_HEIGHT * scale;
+        int firstX = ELYTRA_MIN_X * scale;
+        int lastX = ELYTRA_MAX_X * scale;
         if (x < firstX || x >= lastX || frameY < firstY || frameY >= lastY) {
             return false;
         }
-        int row = frameY / scale - 2;
-        int column = x / scale - 36;
-        return column < WING_ROWS[row][0] || column >= WING_ROWS[row][1];
+        int row = frameY / scale;
+        int column = x / scale;
+        int[] spans = ELYTRA_VISIBLE_SPANS[row];
+        for (int index = 0; index < spans.length; index += 2) {
+            if (column >= spans[index] && column < spans[index + 1]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean clearBlock(
@@ -207,18 +246,6 @@ public final class CapeElytraSilhouette {
             }
         }
         return changed;
-    }
-
-    private static boolean hasVisiblePixel(
-            BufferedImage image, int x, int y, int width, int height) {
-        for (int py = y; py < y + height; py++) {
-            for (int px = x; px < x + width; px++) {
-                if (((image.getRGB(px, py) >>> 24) & 0xFF) > 10) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private static BufferedImage copyOf(BufferedImage image) {
