@@ -18,7 +18,10 @@ visibly represented. Only the Minecraft world behind an overlay may intentionall
 
 Ordinary Vanilla chrome, lighting, time of day, HUD notices and harmless camera variation are
 acceptable unless they prevent the checkpoint from being inspected. Ignore the small lower-corner
-player-preview thumbnail. At a default-skin checkpoint any intact Vanilla default skin is valid.
-This exception never applies when the expectation names a custom skin, cape, motif or colour.
+player-preview thumbnail. At a default-skin checkpoint any intact Vanilla default skin is valid,
+including modern defaults: Noor has dark hair, a red top, green trousers and salmon hands, while
+Makena has dark hair and a yellow or orange top. Those clothing colours are not evidence of a
+custom skin. Judge whether the complete texture is intact and inspectable. This exception never
+applies when the expectation names a custom skin, cape, motif or colour.
 
 Return only the structured result requested by the runner. Do not edit files or attempt a fix.
