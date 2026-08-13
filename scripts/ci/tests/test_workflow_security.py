@@ -1288,9 +1288,12 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_version_sync_renders_and_revalidates_target_readme(self) -> None:
         propose = job_block("sync-version-branches.yml", "propose")
+        validate = job_block("sync-version-branches.yml", "validate")
         publish = job_block("sync-version-branches.yml", "publish")
 
-        self.assertIn("--normalize-e2e-policy", propose)
+        for block in (propose, validate, publish):
+            self.assertIn("--normalize-e2e-policy", block)
+            self.assertIn("--retire-player-armor-stands", block)
         self.assertIn("--write", propose)
         self.assertLess(
             propose.index("--normalize-e2e-policy"),
@@ -1318,7 +1321,6 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("scripts/release/e2e_readme.py \\", publish)
         self.assertIn("--contract e2e/scenario-contract.json", publish)
         self.assertIn("--readme e2e/README.md", publish)
-        self.assertIn("--normalize-e2e-policy", publish)
         self.assertIn("--write > /dev/null", publish)
         self.assertIn(
             "git add -- README.md docs/ai/WORKFLOW.md e2e/README.md", publish
