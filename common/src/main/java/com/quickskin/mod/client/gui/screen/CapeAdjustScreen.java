@@ -134,6 +134,11 @@ public class CapeAdjustScreen extends Screen {
     private static final int ZOOM_FLOOR_W = 20;
     private static final int CONTROL_MIN_W = 70;
     private static final int CONTROL_MAX_W = 110;
+    /** Makes opaque-black padding distinguishable from transparent source pixels in evidence. */
+    private static final int SOURCE_CHECKER_SIZE = 16;
+    private static final int SOURCE_CHECKER_DARK = 0xFF20242A;
+    private static final int SOURCE_CHECKER_LIGHT = 0xFF343A42;
+    private static final int SOURCE_BOUNDARY_COLOR = 0xFF55FFFF;
 
     // Source image texture
     //? if <1.21.11 {
@@ -1076,6 +1081,7 @@ public class CapeAdjustScreen extends Screen {
 
         // Draw dark background for the grid area
         graphics.fill(gridX - 2, gridY - 2, gridX + gridW + 2, gridY + gridH + 2, 0xFF111111);
+        renderSourceTransparencyBackdrop(graphics);
 
         // Enable scissor to clip the source image to the grid area
         graphics.enableScissor(gridX, gridY, gridX + gridW, gridY + gridH);
@@ -1087,6 +1093,19 @@ public class CapeAdjustScreen extends Screen {
 
         // Render cape grid overlay
         renderCapeGridOverlay(graphics);
+        renderSourceBoundary(graphics);
+
+        // The source and output are intentionally different concepts. Keeping both dimensions
+        // visible prevents a padded 128x64 import targeting a 64x32 atlas from looking like the
+        // editor silently resized or selected the wrong input.
+        //? if <26.1.2 {
+        graphics.drawString(this.font,
+        //?} else {
+        graphics.text(this.font,
+        //?}
+                Component.translatable("quickskin.cape.adjust_source_dimensions",
+                        sourceDimensions()),
+                gridX, gridY - 14, SOURCE_BOUNDARY_COLOR);
 
         // Render preview panel
         renderPreview(graphics);
@@ -1098,7 +1117,8 @@ public class CapeAdjustScreen extends Screen {
         //?} else {
         graphics.text(this.font,
         //?}
-                Component.translatable("quickskin.cape.adjust_resolution"),
+                Component.translatable("quickskin.cape.adjust_output_resolution",
+                        outputDimensions()),
                 rightPanelX, gridY - 14, 0xFFFFFF55);
 
         // Highlight selected resolution by drawing an outline around its button area
@@ -1179,6 +1199,26 @@ public class CapeAdjustScreen extends Screen {
     }
 
     //? if <26.1.2 {
+    private void renderSourceTransparencyBackdrop(GuiGraphics graphics) {
+    //?} else {
+    private void renderSourceTransparencyBackdrop(GuiGraphicsExtractor graphics) {
+    //?}
+        graphics.fill(gridX, gridY, gridX + gridW, gridY + gridH, SOURCE_CHECKER_DARK);
+        for (int y = gridY; y < gridY + gridH; y += SOURCE_CHECKER_SIZE) {
+            int row = (y - gridY) / SOURCE_CHECKER_SIZE;
+            for (int x = gridX; x < gridX + gridW; x += SOURCE_CHECKER_SIZE) {
+                int column = (x - gridX) / SOURCE_CHECKER_SIZE;
+                if (((row + column) & 1) == 0) {
+                    graphics.fill(x, y,
+                            Math.min(x + SOURCE_CHECKER_SIZE, gridX + gridW),
+                            Math.min(y + SOURCE_CHECKER_SIZE, gridY + gridH),
+                            SOURCE_CHECKER_LIGHT);
+                }
+            }
+        }
+    }
+
+    //? if <26.1.2 {
     private void renderSourceImage(GuiGraphics graphics) {
     //?} else {
     private void renderSourceImage(GuiGraphicsExtractor graphics) {
@@ -1198,6 +1238,49 @@ public class CapeAdjustScreen extends Screen {
         GuiCompat.blit(graphics, sourceTextureLocation, drawX, drawY, drawW, drawH,
                 0, 0, sourceImage.getWidth(), srcFrameHeight,
                 sourceImage.getWidth(), srcFrameHeight);
+    }
+
+    //? if <26.1.2 {
+    private void renderSourceBoundary(GuiGraphics graphics) {
+    //?} else {
+    private void renderSourceBoundary(GuiGraphicsExtractor graphics) {
+    //?}
+        int left = gridX + (int) (imgOffsetX * displayScale);
+        int top = gridY + (int) (imgOffsetY * displayScale);
+        int right = left + (int) (sourceImage.getWidth() * imgScale * displayScale);
+        int bottom = top + (int) (srcFrameHeight * imgScale * displayScale);
+        int clippedLeft = Math.max(left, gridX);
+        int clippedTop = Math.max(top, gridY);
+        int clippedRight = Math.min(right, gridX + gridW);
+        int clippedBottom = Math.min(bottom, gridY + gridH);
+        if (clippedRight - clippedLeft < 2 || clippedBottom - clippedTop < 2) {
+            return;
+        }
+        if (left >= gridX && left <= gridX + gridW) {
+            graphics.fill(left, clippedTop, Math.min(left + 2, clippedRight),
+                    clippedBottom, SOURCE_BOUNDARY_COLOR);
+        }
+        if (right >= gridX && right <= gridX + gridW) {
+            graphics.fill(Math.max(right - 2, clippedLeft), clippedTop, right,
+                    clippedBottom, SOURCE_BOUNDARY_COLOR);
+        }
+        if (top >= gridY && top <= gridY + gridH) {
+            graphics.fill(clippedLeft, top, clippedRight,
+                    Math.min(top + 2, clippedBottom), SOURCE_BOUNDARY_COLOR);
+        }
+        if (bottom >= gridY && bottom <= gridY + gridH) {
+            graphics.fill(clippedLeft, Math.max(bottom - 2, clippedTop), clippedRight,
+                    bottom, SOURCE_BOUNDARY_COLOR);
+        }
+    }
+
+    /** Stable dimension strings shared by the rendered labels and packaged evidence assertions. */
+    private String sourceDimensions() {
+        return sourceImage.getWidth() + "x" + srcFrameHeight;
+    }
+
+    private String outputDimensions() {
+        return RESOLUTIONS[selectedResolution][0] + "x" + RESOLUTIONS[selectedResolution][1];
     }
 
     //? if <26.1.2 {

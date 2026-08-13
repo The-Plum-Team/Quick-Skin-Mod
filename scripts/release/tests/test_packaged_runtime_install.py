@@ -731,6 +731,38 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
                 ):
                     packaged_runtime.scan_runtime_logs([log])
 
+    def test_forced_process_stop_is_reaped_before_evidence_can_be_exported(self) -> None:
+        process = mock.Mock()
+        process.pid = 4242
+        process.poll.return_value = None
+        process.wait.side_effect = [
+            packaged_runtime.subprocess.TimeoutExpired(
+                cmd=["java"],
+                timeout=packaged_runtime.PROCESS_GRACEFUL_STOP_SECONDS,
+            ),
+            0,
+        ]
+
+        with mock.patch.object(packaged_runtime.os, "name", "posix"), mock.patch.object(
+            packaged_runtime.os, "killpg"
+        ) as kill_group:
+            packaged_runtime.stop_process(process)
+
+        self.assertEqual(
+            [
+                mock.call(4242, packaged_runtime.signal.SIGTERM),
+                mock.call(4242, packaged_runtime.signal.SIGKILL),
+            ],
+            kill_group.call_args_list,
+        )
+        self.assertEqual(
+            [
+                mock.call(timeout=packaged_runtime.PROCESS_GRACEFUL_STOP_SECONDS),
+                mock.call(timeout=packaged_runtime.PROCESS_FORCE_STOP_SECONDS),
+            ],
+            process.wait.call_args_list,
+        )
+
     def test_compatibility_marker_is_required_in_every_process_log(self) -> None:
         marker = packaged_runtime.COMPATIBILITY_LOG_MARKERS[
             "neoforge-26.1-break-event-v1"
