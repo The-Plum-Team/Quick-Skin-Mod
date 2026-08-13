@@ -102,8 +102,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Packaged offline clients use the server's standard `OfflinePlayer:<name>` UUID. Their fresh,
   disposable Quick Skin config disables the asynchronous own-skin importer and clears persisted
   selections before mod initialization. A default-skin capture then waits until the renderer has
-  held the vanilla texture selected for that exact UUID; never accept an account import or the
-  earlier generic fallback frame as stable baseline evidence.
+  held the vanilla texture selected for that exact UUID and must show the complete local model in
+  a stable third-person view. Modern built-in clothing palettes must remain recognizable as one
+  intact skin instead of an ambiguous isolated sleeve; never accept an account import or the
+  earlier generic fallback frame as stable baseline evidence. Restore first-person explicitly
+  before any later checkpoint whose contract inspects the local arm.
 - A public screenshot is valid only when a successful packaged `result.json` references it and its
   recorded SHA-256 and dimensions match the PNG. Do not infer scenario, role, or step from a
   filename, and do not let sets or duplicate labels collapse two frames into false coverage.
@@ -137,6 +140,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   and 4-pixel Steve arm widths are independently inspectable, restore the prior FOV afterwards, and
   compare the bounded player region by a material threshold. Stored intent or an ambiguous distant
   silhouette alone cannot certify model geometry.
+- In the sequential propagation scenario, the observer baseline must wait for the remote subject,
+  show the observer's complete UUID-selected vanilla model, and hold the subject decisively behind
+  the third-person camera. The subject is allowed to have completed its custom apply before the
+  observer launches; startup speed must never decide whether that custom subject leaks into a
+  checkpoint whose contract says it is still outside the later inspection frame.
 - Adjusted-cape parity evidence must show a non-standard padded source before cropping and the final
   aligned atlas as separate semantic checkpoints. The source checkpoint must expose all four
   padding bands; the aligned checkpoint must identify coloured pixels in auxiliary cape/elytra UV
@@ -224,7 +232,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
   entry for cooldown and retry. Each exact artifact ID locks its complete protected drain, from
   exact selection through cleanup, so duplicate wakes cannot overlap while unrelated capsules run
-  concurrently. A separately locked scheduled/manual sweep never reviews directly: it converts
+  concurrently. Once a normalized report or durable block makes a source ineligible, an explicit
+  GitHub installation-rate-limit response may defer input cleanup or the redundant continuation
+  wake without turning the completed review red. The normalized report or block must outlive its
+  durable input so deferred cleanup can never make reviewed work eligible again; artifact retention
+  and the scheduled sweep own eventual housekeeping/recovery, while every other API error remains visible. A separately locked
+  scheduled/manual sweep never reviews directly: it converts
   one authenticated oldest-entry selection into an exact wake. Pending-run coalescing remains safe
   because queue state is durable and a settled drain dispatches its own continuation. The curator
   may suppress a replicated non-anchor
@@ -267,6 +280,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   parents, compare its stable evidence byte-for-byte, import only the recomputed AI-conflict paths
   from that index, rerun protected generators, and require the final real index tree to equal both
   the isolated candidate tree and the plan tree. Never apply the full patch to the real index.
+- After a version-port validation matrix settles, one protected authorization job must read its
+  complete latest job inventory once and bind the exact successful target set to the workflow run,
+  protected source SHA, attempt, and discovered inventory. A writer may reconstruct only when its
+  own target is present in that authenticated same-run output. Never poll the inventory per target:
+  fan-out polling amplifies installation-API load across a parallel release wave without adding a
+  stronger trust binding; the proposal artifact is already immutable within that run.
 - A successful automated version port may publish the stable Packaged E2E status only after the
   protected evaluator sees exactly one successful control job, the exact target-branch PR-anchor
   lane set, and byte-identical protected workflow, attestation workflow, composite action, contract,
