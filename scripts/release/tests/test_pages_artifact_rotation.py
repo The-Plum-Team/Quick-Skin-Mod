@@ -1066,6 +1066,18 @@ class SelectArtifactProbeTest(unittest.TestCase):
                     select_artifact.main(self.probe_argv()), PROBE_NO_EVIDENCE_EXIT
                 )
 
+    def test_probe_does_not_reclassify_api_failure_as_missing_evidence(self) -> None:
+        with patch.dict(os.environ, {"GH_TOKEN": "token"}), patch.object(
+            select_artifact, "GitHubApi"
+        ) as api_factory:
+            api_factory.return_value.get_branch_sha.return_value = TARGET_SHA
+            with patch.object(
+                select_artifact,
+                "select_source",
+                side_effect=ApiError(403, "installation rate limit"),
+            ):
+                self.assertEqual(select_artifact.main(self.probe_argv()), 2)
+
     def test_probe_keeps_the_ordinary_error_exit_for_bad_configuration(self) -> None:
         with patch.dict(os.environ, {"GH_TOKEN": ""}):
             self.assertEqual(select_artifact.main(self.probe_argv()), 2)

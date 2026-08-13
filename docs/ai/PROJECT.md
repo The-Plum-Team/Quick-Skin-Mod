@@ -135,6 +135,13 @@ immutable workflow and governance activation contract.
   conclusions never depend on model output. The semantic certificate gates only scheduling of the
   cross-version wave: provider failure or a semantic defect deliberately delays that wave instead
   of blessing an unverified baseline.
+- Pages wake and deploy events share one coalescing lock. A parallel release-attestation burst
+  retains only the running publication member and the newest pending survivor; the survivor
+  rediscovers every exact current release head. Discovery defers while a release attestation is
+  active and never duplicates per-branch artifact selection: the bounded collector owns the single
+  authoritative selection/provenance pass. Its GitHub API client applies bounded jittered backoff
+  to installation-rate-limit and transient transport/server responses; those responses are never
+  reclassified as missing evidence.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
   named exceptions are the seven-day queued visual-review capsules, semantic certificates, and
   rolling exact-policy visual verdict caches, plus three 90-day current-state artifacts: the
