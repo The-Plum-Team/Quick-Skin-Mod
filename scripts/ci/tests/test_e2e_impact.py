@@ -23,7 +23,10 @@ class E2EImpactTest(unittest.TestCase):
                 "docs/ai/PROJECT.md",
                 "site/app.js",
                 "scripts/ci/ai_patch_policy.py",
+                "scripts/ci/github_api_retry.sh",
+                "scripts/ci/visual_review_queue.py",
                 "scripts/ci/tests/test_ai_patch_policy.py",
+                "scripts/ci/tests/test_visual_review_queue.py",
             ]
         )
         self.assertFalse(result.runtime_required)
