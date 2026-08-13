@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sys
 import unittest
+import urllib.error
+from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -12,10 +14,12 @@ sys.path.insert(0, str(ROOT / "scripts" / "ci"))
 
 from visual_review_queue import (  # noqa: E402
     DRAIN_WORKFLOW,
+    GitHubApi,
     PREPARE_WORKFLOW,
     Artifact,
     blocked_generations,
     select_pending,
+    select_requested,
 )
 
 
@@ -72,6 +76,19 @@ class FakeApi:
     def list_artifacts(self) -> list[Artifact]:
         return list(self.artifacts)
 
+    def list_artifacts_named(self, name: str) -> list[Artifact]:
+        return [artifact for artifact in self.artifacts if artifact.name == name]
+
+    def get_artifact(self, artifact_id: int) -> Artifact | None:
+        return next(
+            (
+                artifact
+                for artifact in self.artifacts
+                if artifact.artifact_id == artifact_id
+            ),
+            None,
+        )
+
     def get_run(self, run_id: int) -> dict[str, Any]:
         return self.runs[run_id]
 
@@ -87,6 +104,86 @@ class FakeApi:
 
 
 class VisualReviewQueueTest(unittest.TestCase):
+    def test_installation_rate_limit_is_classified_as_retryable(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://api.github.test",
+            403,
+            "forbidden",
+            {"X-RateLimit-Remaining": "0"},
+            BytesIO(b'{"message":"API rate limit exceeded for installation"}'),
+        )
+
+        self.assertTrue(GitHubApi._retryable_http_error(error))
+
+    def test_exact_wake_queries_only_its_capsule_and_related_markers(self) -> None:
+        requested = artifact(
+            2, "visual-review-input-200", run_id=20, minutes_ago=10
+        )
+        unrelated = artifact(
+            3, "visual-review-input-300", run_id=30, minutes_ago=90
+        )
+        api = FakeApi(
+            [unrelated, requested],
+            {
+                20: owner(20, PREPARE_WORKFLOW),
+                30: owner(30, PREPARE_WORKFLOW),
+            },
+        )
+
+        self.assertEqual(
+            (requested, 200),
+            select_requested(
+                api,
+                repository=REPOSITORY,
+                requested_artifact_id=requested.artifact_id,
+            ),
+        )
+
+    def test_exact_wake_is_clean_after_capsule_cleanup(self) -> None:
+        self.assertIsNone(
+            select_requested(
+                FakeApi([], {}),
+                repository=REPOSITORY,
+                requested_artifact_id=999,
+            )
+        )
+
+    def test_exact_wake_honors_report_cooldown_and_generation_block(self) -> None:
+        requested = artifact(
+            2, "visual-review-input-200", run_id=20, minutes_ago=10
+        )
+        report = artifact(3, "visual-review-200", run_id=30, minutes_ago=5)
+        attempt = artifact(
+            4, "visual-review-attempt-200", run_id=40, minutes_ago=5
+        )
+        block = artifact(
+            5, f"visual-review-wave-block-{SHA}", run_id=50, minutes_ago=5
+        )
+        base_runs = {20: owner(20, PREPARE_WORKFLOW)}
+
+        for marker, marker_owner in (
+            (report, owner(30, DRAIN_WORKFLOW, conclusion="failure")),
+            (
+                attempt,
+                owner(40, DRAIN_WORKFLOW, conclusion=None, status="in_progress"),
+            ),
+            (
+                block,
+                owner(50, DRAIN_WORKFLOW, conclusion=None, status="in_progress"),
+            ),
+        ):
+            self.assertIsNone(
+                select_requested(
+                    FakeApi(
+                        [requested, marker],
+                        {**base_runs, marker.run_id: marker_owner},
+                    ),
+                    repository=REPOSITORY,
+                    requested_artifact_id=requested.artifact_id,
+                    now=NOW,
+                )
+            )
+
     def test_certifiable_anchor_preempts_an_older_advisory_review(self) -> None:
         advisory = artifact(1, "visual-review-input-100", run_id=10, minutes_ago=90)
         anchor = artifact(2, "visual-review-input-200", run_id=20, minutes_ago=10)

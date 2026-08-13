@@ -4,9 +4,11 @@ import os
 import sys
 import tempfile
 import unittest
+import urllib.error
+from io import BytesIO
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -154,6 +156,30 @@ class FakeApi:
 
 
 class PagesArtifactRotationTest(unittest.TestCase):
+    def test_pages_api_retries_installation_rate_limit_then_returns_clean_json(self) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="token",
+            api_url="https://api.github.test",
+        )
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b'{"ok":true}'
+        rate_limit = urllib.error.HTTPError(
+            "https://api.github.test/repos/example",
+            403,
+            "forbidden",
+            {"X-RateLimit-Remaining": "0"},
+            BytesIO(b'{"message":"API rate limit exceeded for installation"}'),
+        )
+
+        with patch("rotate_artifacts.urllib.request.urlopen", side_effect=[rate_limit, response]), patch(
+            "rotate_artifacts.time.sleep"
+        ) as sleep:
+            self.assertEqual(api._request("GET", "/repos/example"), {"ok": True})
+
+        sleep.assert_called_once()
+
     def setUp(self) -> None:
         self.keep = artifact(
             200,
@@ -1065,6 +1091,18 @@ class SelectArtifactProbeTest(unittest.TestCase):
                 self.assertEqual(
                     select_artifact.main(self.probe_argv()), PROBE_NO_EVIDENCE_EXIT
                 )
+
+    def test_probe_does_not_reclassify_api_failure_as_missing_evidence(self) -> None:
+        with patch.dict(os.environ, {"GH_TOKEN": "token"}), patch.object(
+            select_artifact, "GitHubApi"
+        ) as api_factory:
+            api_factory.return_value.get_branch_sha.return_value = TARGET_SHA
+            with patch.object(
+                select_artifact,
+                "select_source",
+                side_effect=ApiError(403, "installation rate limit"),
+            ):
+                self.assertEqual(select_artifact.main(self.probe_argv()), 2)
 
     def test_probe_keeps_the_ordinary_error_exit_for_bad_configuration(self) -> None:
         with patch.dict(os.environ, {"GH_TOKEN": ""}):

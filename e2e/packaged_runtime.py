@@ -181,6 +181,8 @@ MAX_EVIDENCE_LOG_BYTES = 16 * 1024 * 1024
 MAX_EVIDENCE_REPORT_BYTES = 4 * 1024 * 1024
 MAX_EVIDENCE_SCREENSHOT_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_CRASH_REPORT_BYTES = 16 * 1024 * 1024
+PROCESS_GRACEFUL_STOP_SECONDS = 15
+PROCESS_FORCE_STOP_SECONDS = 15
 
 
 @dataclass(frozen=True)
@@ -1078,14 +1080,24 @@ def stop_process(process: subprocess.Popen[bytes] | None) -> None:
                 stderr=subprocess.DEVNULL,
                 timeout=20,
             )
+            # taskkill returning only means the termination request completed. Reap the
+            # launcher before closing its inherited log descriptor and snapshotting evidence.
+            process.wait(timeout=PROCESS_FORCE_STOP_SECONDS)
         else:
             os.killpg(process.pid, signal.SIGTERM)
             try:
-                process.wait(timeout=15)
+                process.wait(timeout=PROCESS_GRACEFUL_STOP_SECONDS)
             except subprocess.TimeoutExpired:
                 os.killpg(process.pid, signal.SIGKILL)
+                # Do not export a file while the killed JVM can still finish an in-flight
+                # write. Waiting here also reaps the process instead of leaving a zombie.
+                process.wait(timeout=PROCESS_FORCE_STOP_SECONDS)
     except (OSError, subprocess.SubprocessError):
-        process.kill()
+        if process.poll() is None:
+            process.kill()
+        # The fallback has the same quiescence contract as the process-group path: callers
+        # may freeze logs only after this function has observed process termination.
+        process.wait(timeout=PROCESS_FORCE_STOP_SECONDS)
 
 
 def wait_for_log(process: subprocess.Popen[bytes], log: Path, text: str, timeout: int) -> None:
