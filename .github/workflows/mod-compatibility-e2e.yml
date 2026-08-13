@@ -170,7 +170,10 @@ jobs:
             --max-compression-ratio 200 > /dev/null
           rm -f -- "$archive"
           proof="$review_root/curation-proof.json"
-          manifest="$review_root/visual-review-manifest.json"
+          # upload-artifact preserves the curated directory because the handoff also
+          # contains the root-level proof. Keep this consumer aligned with that exact
+          # four-file producer layout.
+          manifest="$review_root/review-input/visual-review-manifest.json"
           report="$review_root/visual-review-report.json"
           completion="$review_root/visual-review-completion.json"
           test -f "$proof" -a -f "$manifest" -a -f "$report" -a -f "$completion"

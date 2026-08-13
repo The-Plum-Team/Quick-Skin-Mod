@@ -87,9 +87,10 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `scripts/ci/version_port_conflicts.py` is the pure, fail-closed classifier for the original Git
   conflict set. It may assign a protected path only to an exact reviewed mechanical policy. Shared
   guidance and runtime documents use a source-preferred three-way merge, the release matrix uses
-  the target version, and a build script may be deleted only when its loader is inactive in that
-  target matrix. Unknown protected paths and active-loader build conflicts abort the port; only
-  unprotected residual conflicts may reach AI.
+  the target version, a build script may be deleted only when its loader is inactive in that
+  target matrix, and a path below a legacy overlay may be deleted only when that exact overlay root
+  is absent from the target matrix. Unknown protected paths, active-loader build conflicts, and
+  active-overlay conflicts abort the port; only unprotected residual conflicts may reach AI.
 - `scripts/release/branch_readme.py`, `scripts/release/e2e_readme.py`, and
   `scripts/release/workflow_guidance.py` are the protected renderers for matrix-owned branch
   profiles. The synchronizer runs them after conflict resolution, stages their exact outputs, and

@@ -310,10 +310,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   must not weaken or replace the required Build and Packaged E2E gates.
 - A version port must classify the complete original unmerged path set before AI runs. Exact
   protected paths may use only their reviewed mechanical resolution: source-preferred three-way
-  merge for shared guidance/runtime documents, target retention for the release matrix, or deletion
-  of a build script whose loader is absent from that target matrix. Any unknown protected conflict
-  or active-loader build conflict fails closed. Recompute the partition from the original paths and
-  target matrix in every downstream trust boundary; never let AI receive a protected path.
+  merge for shared guidance/runtime documents, target retention for the release matrix, deletion
+  of a build script whose loader is absent from that target matrix, or deletion below a legacy
+  overlay root absent from that target matrix. Any unknown protected conflict, active-loader build
+  conflict, or active-overlay conflict fails closed. Recompute the partition from the original
+  paths and target matrix in every downstream trust boundary; never let AI receive a protected path.
 - Treat a proposed version-port patch as untrusted even after policy validation. Apply it first to
   an isolated alternate index and authenticate its complete tree id. The credentialless validator
   and credentialed writer must each rerun the protected merge controller from the exact original
