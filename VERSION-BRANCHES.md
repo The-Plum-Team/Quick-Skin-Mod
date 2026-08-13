@@ -49,7 +49,9 @@ For each selected target the workflow:
 5. packages a bounded proposal, then applies it only to an alternate index; the credentialless
    validator reconstructs the merge from its parents, imports only recomputed AI paths, normalizes
    the target matrix, regenerates all matrix-owned profiles, requires the exact candidate tree, and
-   runs the release mutation tests;
+   runs the release mutation tests; after the complete parallel matrix settles, one authorization
+   job reads its latest job inventory once and exposes the exact successful target set as a
+   same-run, source-bound output instead of making every writer poll the API;
 6. opens a PR and explicitly dispatches both `Build gate` and `Packaged E2E` for its exact head;
 7. receives a trusted `repository_dispatch` when each gate settles;
 8. merges and deletes the automation branch only after both exact-head gates pass;
