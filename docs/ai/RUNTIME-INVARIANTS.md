@@ -183,6 +183,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   bundle only when its authenticated originating target run and manifest both match the current
   release-branch head; a later protected Pages run may only roll that already validated bundle
   into cache.
+- Pages repository wakes and deploys use one shared publication concurrency group so a branch wave
+  cannot fan out multiple collectors. Discovery may defer on active release attestations, but must
+  not preselect every artifact and repeat selection in the collector. The collector owns exact
+  current-head selection; retryable GitHub API and installation-rate-limit failures use bounded
+  jittered backoff and remain distinguishable from authenticated evidence absence.
 - Retention is current-state, not longitudinal history. Keep exactly one durable Pages cache per
   release branch and exactly one lossless raw handoff for the matrix-derived Fabric 1.20.1 visual
   anchor. Treat raw packaged-E2E uploads, every other `pages-e2e-<branch>`, Pages fan-in, and the
@@ -232,7 +237,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
   entry for cooldown and retry. Each exact artifact ID locks its complete protected drain, from
   exact selection through cleanup, so duplicate wakes cannot overlap while unrelated capsules run
-  concurrently. Once a normalized report or durable block makes a source ineligible, an explicit
+  concurrently. Exact wakes must authenticate through ID-scoped capsule lookup and exact-name
+  report, cooldown, and generation-block lookup rather than multiplying a full artifact-inventory
+  scan across a parallel release wave; retryable GitHub API failures use bounded backoff and never
+  become an image verdict. Once a normalized report or durable block makes a source ineligible, an explicit
   GitHub installation-rate-limit response may defer input cleanup or the redundant continuation
   wake without turning the completed review red. The normalized report or block must outlive its
   durable input so deferred cleanup can never make reviewed work eligible again; artifact retention
