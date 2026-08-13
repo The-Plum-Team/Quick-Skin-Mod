@@ -200,6 +200,11 @@ class WorkflowSecurityTest(unittest.TestCase):
             ): "7",
             (
                 "visual-review-drain.yml",
+                "Upload the source-bound normalized report",
+                "visual-review-${{ needs.select.outputs.source_run_id }}",
+            ): "7",
+            (
+                "visual-review-drain.yml",
                 "Upload the exact semantic anchor certificate",
                 "${{ steps.certify.outputs.artifact_name }}",
             ): "7",
@@ -497,6 +502,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-metadata", cleanup)
         self.assertIn("visual-review-delete", cleanup)
         self.assertEqual(cleanup.count("(HTTP 404)"), 2)
+        self.assertIn("API rate limit exceeded", cleanup)
+        self.assertIn("queue cleanup deferred", cleanup)
+        self.assertIn("authenticated marker must outlive", drain_workflow)
         self.assertIn("contents: write", release_anchor)
         self.assertIn("actions: read", release_anchor)
         self.assertIn("visual-anchor-certified", release_anchor)
@@ -505,6 +513,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("actions/checkout@", release_anchor)
         self.assertIn("contents: write", continuation)
         self.assertIn("needs.review.outputs.wave_blocked != 'true'", continuation)
+        self.assertIn("API rate limit exceeded", continuation)
+        self.assertIn("queue continuation deferred", continuation)
+        self.assertIn("visual-review-continuation", continuation)
 
         self.assertIn("lossless Minecraft 1.20.1", triage_prompt)
         self.assertIn("becoming softer or blurred", triage_prompt)
@@ -516,6 +527,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("deliberately no reference image", semantic_prompt)
         self.assertIn("Do not compare loaders", semantic_prompt)
         self.assertIn("matches_reference=null", semantic_verify_prompt)
+        for prompt in (semantic_prompt, semantic_verify_prompt):
+            self.assertIn("Noor", prompt)
+            self.assertIn("Makena", prompt)
+            self.assertIn("red top", prompt)
+            self.assertIn("yellow or orange top", prompt)
         self.assertIn("DEFAULT_TRIAGE_CHUNK_SIZE = 8", runner)
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
         self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
@@ -1158,16 +1174,33 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
 
     def test_port_publisher_requires_a_complete_proposal(self) -> None:
+        authorize = job_block("sync-version-branches.yml", "authorize")
         publish = job_block("sync-version-branches.yml", "publish")
         self.assertIn("needs.propose.result != 'cancelled'", publish)
         self.assertIn("needs.validate.result != 'cancelled'", publish)
-        self.assertIn("Require this target's own validate leg", publish)
-        self.assertIn("jobs?filter=latest&per_page=100", publish)
-        self.assertIn("for attempt in {1..12}", publish)
-        self.assertIn("sleep 5", publish)
-        self.assertIn("validate_result=api-error", publish)
-        self.assertIn('[[ "$validate_result" == success ]]', publish)
+        self.assertIn("needs.authorize.result == 'success'", publish)
+        self.assertIn("Build one immutable settled validation index", authorize)
+        self.assertIn("jobs?filter=latest&per_page=100", authorize)
+        self.assertEqual(authorize.count("jobs?filter=latest&per_page=100"), 2)
+        self.assertIn(".conclusion == \"success\"", authorize)
+        self.assertIn(".run_id == ($run_id | tonumber)", authorize)
+        self.assertIn(".head_sha == $source_sha", authorize)
+        self.assertIn(". <= ($run_attempt | tonumber)", authorize)
+        self.assertIn("validation_index: ${{ steps.validation-index.outputs.value }}", authorize)
+        self.assertIn("Require this target's centrally authorized validation", publish)
+        self.assertIn("VALIDATION_INDEX: ${{ needs.authorize.outputs.validation_index }}", publish)
+        self.assertIn('.run_id == $run_id', publish)
+        self.assertIn("tonumber <= ($max_attempt | tonumber)", publish)
+        self.assertIn('.source_sha == $source_sha', publish)
+        self.assertIn("index($target) != null", publish)
+        self.assertNotIn("jobs?filter=latest&per_page=100", publish)
+        self.assertNotIn("validate_result=", publish)
         self.assertIn("Download the immutable validated proposal", publish)
+        self.assertNotIn("actions/upload-artifact@", authorize)
+        self.assertLess(
+            publish.index("Require this target's centrally authorized validation"),
+            publish.index("Download the immutable validated proposal"),
+        )
 
     def test_version_sync_accepts_only_master_as_its_source(self) -> None:
         discover = job_block("sync-version-branches.yml", "discover")
