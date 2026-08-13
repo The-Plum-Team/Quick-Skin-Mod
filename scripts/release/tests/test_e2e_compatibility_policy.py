@@ -56,21 +56,23 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             E2E_JAVA / "scenario" / "PropagationLiveScenario.java",
             E2E_JAVA / "scenario" / "FullScenario.java",
         )
+        evidence_view = (E2E_JAVA / "DefaultSkinEvidenceView.java").read_text(
+            encoding="utf-8"
+        )
         for source in scenarios:
             with self.subTest(source=source.name):
                 text = source.read_text(encoding="utf-8")
-                if source.name == "PropagationScenario.java":
-                    self.assertIn(
-                        ".ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player)",
-                        text,
-                    )
-                    self.assertIn("&& (!observer || holdObserverBaseline(mc))", text)
-                else:
-                    self.assertIn(
-                        ".ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player))",
-                        text,
-                    )
+                self.assertIn(
+                    ".ready(() -> VanillaShim.isExpectedDefaultSkinResolved(mc.player)",
+                    text,
+                )
+                self.assertIn("DefaultSkinEvidenceView.hold(mc,", text)
                 self.assertIn("default skin did not stabilize", text)
+
+        self.assertIn("CameraType.THIRD_PERSON_BACK", evidence_view)
+        self.assertIn("setYBodyRot(yaw)", evidence_view)
+        self.assertIn("REMOTE_BEHIND_CAMERA_CLEARANCE", evidence_view)
+        self.assertIn("lookX * remoteX + lookZ * remoteZ <= -0.95", evidence_view)
 
         live = scenarios[2].read_text(encoding="utf-8")
         self.assertIn("VanillaShim.isExpectedDefaultSkinResolved(a)", live)
@@ -99,15 +101,28 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         scenario = (
             E2E_JAVA / "scenario" / "PropagationScenario.java"
         ).read_text(encoding="utf-8")
-
-        self.assertIn("holdObserverBaseline(mc)", scenario)
-        self.assertIn("CameraType.FIRST_PERSON", scenario)
-        self.assertIn("AbstractClientPlayer subject = findOther(mc);", scenario)
-        self.assertIn("if (distance < 3.0)", scenario)
-        self.assertIn("lookX * subjectX + lookZ * subjectZ <= -0.95", scenario)
-        self.assertIn(
-            "remote subject present behind first-person camera", scenario
+        evidence_view = (E2E_JAVA / "DefaultSkinEvidenceView.java").read_text(
+            encoding="utf-8"
         )
+
+        self.assertIn("DefaultSkinEvidenceView.hold(mc, observer)", scenario)
+        self.assertIn("CameraType.THIRD_PERSON_BACK", evidence_view)
+        self.assertIn("AbstractClientPlayer remote = findOther(mc);", evidence_view)
+        self.assertIn("if (distance < REMOTE_BEHIND_CAMERA_CLEARANCE)", evidence_view)
+        self.assertIn("lookX * remoteX + lookZ * remoteZ <= -0.95", evidence_view)
+        self.assertIn(
+            "remote subject present behind third-person camera", scenario
+        )
+
+    def test_arm_checkpoints_restore_first_person_after_full_body_baselines(self) -> None:
+        for name in (
+            "Phase0Smoke.java",
+            "PropagationScenario.java",
+            "PropagationLiveScenario.java",
+        ):
+            with self.subTest(source=name):
+                text = (E2E_JAVA / "scenario" / name).read_text(encoding="utf-8")
+                self.assertIn("DefaultSkinEvidenceView.enterFirstPerson(mc);", text)
 
     def test_string_class_lookups_declare_an_intermediary_fallback(self) -> None:
         """Fabric serves intermediary names at runtime; a Mojang name alone resolves only on Forge."""
