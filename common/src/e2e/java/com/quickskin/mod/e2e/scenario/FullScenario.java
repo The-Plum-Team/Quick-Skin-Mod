@@ -826,6 +826,18 @@ public final class FullScenario implements Scenario {
                         return Step.Result.fail("BMO source or expected atlas was not retained");
                     if (prepared.standardFormat())
                         return Step.Result.fail("128x64 padded BMO source bypassed the editor");
+                    try {
+                        if (adjustScreenInt(screen, "selectedResolution") != 0
+                                || !"128x64".equals(stringOnAdjustScreen(mc,
+                                        "sourceDimensions"))
+                                || !"64x32".equals(stringOnAdjustScreen(mc,
+                                        "outputDimensions"))) {
+                            return Step.Result.fail("BMO evidence labels or output resolution "
+                                    + "do not identify source=128x64 output=64x32");
+                        }
+                    } catch (Exception e) {
+                        return Step.Result.fail("could not read BMO evidence dimensions: " + e);
+                    }
 
                     String padding = validatePaddedBmoSource(prepared.atlas(), expected);
                     if (padding != null) return Step.Result.fail(padding);
@@ -2270,6 +2282,20 @@ public final class FullScenario implements Scenario {
         } catch (Throwable t) {
             E2ELog.error(method + " reflection failed", t);
             return Double.NaN;
+        }
+    }
+
+    private static String stringOnAdjustScreen(Minecraft mc, String method) {
+        if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen s)) {
+            return null;
+        }
+        try {
+            Method m = CapeAdjustScreen.class.getDeclaredMethod(method);
+            m.setAccessible(true);
+            return (String) m.invoke(s);
+        } catch (Throwable t) {
+            E2ELog.error(method + " reflection failed", t);
+            return null;
         }
     }
 
