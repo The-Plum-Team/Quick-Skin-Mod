@@ -35,8 +35,10 @@ from version_port_conflicts import (
     MAX_MATRIX_BYTES,
     ConflictClassification,
     ConflictClassificationError,
+    TargetMatrixProfile,
     classify_conflicts,
-    read_active_loaders,
+    is_inactive_overlay_path,
+    read_target_matrix_profile,
 )
 
 
@@ -540,14 +542,15 @@ def _resolve_delete_path(
     path: str,
     stages: Mapping[int, IndexEntry],
     oid_length: int,
+    policy: str,
 ) -> dict[str, Any]:
     if _tree_entry(repository, work_head, path, oid_length) is not None:
         raise VersionPortMergeError(
-            f"inactive-loader deletion {path!r} still exists in the target commit"
+            f"mechanical deletion {path!r} still exists in the target commit"
         )
     if 2 in stages:
         raise VersionPortMergeError(
-            f"inactive-loader deletion {path!r} unexpectedly has a target stage"
+            f"mechanical deletion {path!r} unexpectedly has a target stage"
         )
     _run_git(
         repository,
@@ -558,7 +561,7 @@ def _resolve_delete_path(
     )
     return {
         "path": path,
-        "policy": "delete-inactive-loader",
+        "policy": policy,
         "stages": _stages_payload(stages),
         "result": None,
     }
@@ -729,7 +732,7 @@ def _target_matrix(
     work_head: str,
     oid_length: int,
     temporary: Path,
-) -> tuple[IndexEntry, frozenset[str]]:
+) -> tuple[IndexEntry, TargetMatrixProfile]:
     entry = _tree_entry(repository, work_head, MATRIX_PATH, oid_length)
     if entry is None:
         raise VersionPortMergeError("target commit has no release matrix")
@@ -742,10 +745,10 @@ def _target_matrix(
     matrix_file = temporary / "target-release-matrix.json"
     matrix_file.write_bytes(payload)
     try:
-        loaders = read_active_loaders(matrix_file)
+        profile = read_target_matrix_profile(matrix_file)
     except ConflictClassificationError as exc:
         raise VersionPortMergeError(str(exc)) from exc
-    return entry, loaders
+    return entry, profile
 
 
 def _merge_bases(
@@ -905,9 +908,11 @@ def reproduce_merge(
         temporary = Path(raw_temporary)
         hooks_directory = temporary / "empty-hooks"
         hooks_directory.mkdir(mode=0o700)
-        matrix_entry, active_loaders = _target_matrix(
+        matrix_entry, target_profile = _target_matrix(
             repository, work_head, oid_length, temporary
         )
+        active_loaders = target_profile.active_loaders
+        active_overlay_roots = target_profile.active_overlay_roots
         bases = _merge_bases(repository, work_head, source, oid_length)
         candidate_copy: Path | None = None
         if candidate_payload is not None:
@@ -982,7 +987,11 @@ def reproduce_merge(
             classification: ConflictClassification | None = None
             if conflicts:
                 try:
-                    classification = classify_conflicts(conflicts, active_loaders)
+                    classification = classify_conflicts(
+                        conflicts,
+                        active_loaders,
+                        active_overlay_roots,
+                    )
                 except ConflictClassificationError as exc:
                     raise VersionPortMergeError(str(exc)) from exc
 
@@ -1016,6 +1025,11 @@ def reproduce_merge(
                             path,
                             _stage_map(grouped, path),
                             oid_length,
+                            (
+                                "delete-inactive-overlay"
+                                if is_inactive_overlay_path(path, active_overlay_roots)
+                                else "delete-inactive-loader"
+                            ),
                         )
                     )
 
