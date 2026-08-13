@@ -18,5 +18,9 @@ default-skin checkpoint accepts any intact Vanilla default skin. Modern vanilla 
 Noor (dark hair, red top, green trousers and salmon hands) and Makena (dark hair with a yellow or orange top); those colours alone never prove customization. Judge the complete visible texture,
 while named custom assets must be visibly present.
 
+At the padded BMO editor checkpoint, `Source: 128x64` is the imported image and `Output: 64x32`
+is the final atlas selection. The differing labels are correct; require opaque-black padding on all
+four sides of the centred atlas and allow checkerboard only through transparent source pixels.
+
 Keep `visible` to one short sentence. Return only the structured result requested by the runner.
 Do not edit files or attempt a fix.
