@@ -18,6 +18,7 @@ from visual_review_queue import (  # noqa: E402
     PREPARE_WORKFLOW,
     Artifact,
     blocked_generations,
+    list_pending_candidates,
     select_pending,
     select_requested,
 )
@@ -207,6 +208,41 @@ class VisualReviewQueueTest(unittest.TestCase):
         self.assertEqual(
             (anchor, 200),
             select_pending(FakeApi([advisory, anchor], runs), repository=REPOSITORY),
+        )
+
+        self.assertEqual(
+            [(anchor, 200), (advisory, 100)],
+            list_pending_candidates(
+                FakeApi([advisory, anchor], runs), repository=REPOSITORY
+            ),
+        )
+
+    def test_pending_fanout_keeps_only_newest_input_for_each_source(self) -> None:
+        older = artifact(1, "visual-review-input-100", run_id=10, minutes_ago=20)
+        newer = artifact(2, "visual-review-input-100", run_id=11, minutes_ago=10)
+        other = artifact(3, "visual-review-input-200", run_id=20, minutes_ago=15)
+        api = FakeApi(
+            [older, newer, other],
+            {
+                10: owner(10, PREPARE_WORKFLOW),
+                11: owner(11, PREPARE_WORKFLOW),
+                20: owner(20, PREPARE_WORKFLOW),
+                100: {
+                    "status": "completed",
+                    "conclusion": "success",
+                    "head_branch": "feature/one",
+                },
+                200: {
+                    "status": "completed",
+                    "conclusion": "success",
+                    "head_branch": "feature/two",
+                },
+            },
+        )
+
+        self.assertEqual(
+            [(other, 200), (newer, 100)],
+            list_pending_candidates(api, repository=REPOSITORY, now=NOW),
         )
 
     def test_requested_artifact_selects_its_exact_authenticated_entry(self) -> None:
