@@ -109,13 +109,10 @@ OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
-    "overlay:com/quickskin/mod/mixin/compat/PasConfiguratorMixin.java",
     "overlay:com/quickskin/mod/mixin/compat/ReplayModCompatMixin.java",
 }
 
-ACCESSOR_ONLY_MIXINS = {
-    "overlay:com/quickskin/mod/mixin/compat/PasConfiguratorAccessor.java",
-}
+ACCESSOR_ONLY_MIXINS: set[str] = set()
 
 # This empty pseudo mixin gives its config plugin a transformation point in an optional third-party
 # class. The plugin performs and validates the ASM rewrite; the mixin intentionally has no injector.

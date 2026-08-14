@@ -63,10 +63,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-//? if <1.21 {
-import java.util.function.Consumer;
-//?} else {
-//?}
 
 /**
  * Main skin selection menu for QuickSkin
@@ -130,13 +126,6 @@ public class PlayerSkinMenuScreen extends Screen {
     private Button sortButton;
     private boolean isSearching = false;
 
-//? if <1.21 {
-    // Selection mode for external integrations (e.g., Player Armor Stands mod)
-    @Nullable
-    private Consumer<AssetMetadata> selectionCallback;
-
-//?} else {
-//?}
     public PlayerSkinMenuScreen(@Nullable Screen parent) {
 //? if <1.21 {
         super(Component.translatable("quickskin.screen.skin_menu.title"));
@@ -144,40 +133,6 @@ public class PlayerSkinMenuScreen extends Screen {
         super(Component.literal("Quick Skin"));
 //?}
         this.parent = parent;
-//? if <1.21 {
-    }
-
-    /**
-     * Sets the screen to selection mode for external integrations.
-     * When a skin is selected and Done is pressed, the callback is fired and the screen closes.
-     * The skin will NOT be applied to the local player in selection mode.
-     *
-     * @param callback Consumer that receives the selected AssetMetadata
-     */
-    public void setSelectionCallback(@Nullable Consumer<AssetMetadata> callback) {
-        this.selectionCallback = callback;
-    }
-
-    /**
-     * Check if the screen is in selection mode (for external integrations)
-     */
-    public boolean isSelectionMode() {
-        return this.selectionCallback != null;
-    }
-
-    /**
-     * Get the currently selected skin metadata.
-     * Useful for external integrations to retrieve the selection.
-     *
-     * @return The selected skin's metadata, or null if none selected
-     */
-    @Nullable
-    public AssetMetadata getSelectedSkinMetadata() {
-        if (skinListPanel == null) return null;
-        SkinEntry selected = skinListPanel.getSelected();
-        return selected != null ? selected.getMetadata() : null;
-//?} else {
-//?}
     }
 
     @Override
@@ -460,20 +415,7 @@ public class PlayerSkinMenuScreen extends Screen {
 //?}
                     }
                 },
-//? if <1.21 {
-                () -> {
-                    // On Done Click - handle selection mode if active
-                    if (this.selectionCallback != null) {
-                        SkinEntry selected = skinListPanel != null ? skinListPanel.getSelected() : null;
-                        if (selected != null) {
-                            this.selectionCallback.accept(selected.getMetadata());
-                        }
-                    }
-                    this.onClose();
-                }
-//?} else {
                 this::onClose
-//?}
         );
 
         actionButtonsPanel = new ActionButtonsPanel(
@@ -1163,31 +1105,17 @@ public class PlayerSkinMenuScreen extends Screen {
                                 metadata.hash(), TextureQuality.PREVIEW)
 //?}
                 );
-//? if <1.21 {
-
-                // In selection mode, don't apply
-                if (isSelectionMode()) {
-                    return;
-                }
-
-//?} else if <1.21.11 {
-//?} else {
-//?}
                 if (!com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
                     showError(Component.literal("Unable to select CPM model."));
                 }
                 return;
             }
 
-//? if <1.21 {
             com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
 
             // Check if this skin is already the active skin
             boolean isSkinAlreadyActive = metadata.hash().equals(config.activeSkinHash)
                     && config.activeCpmModelHash.isEmpty();
-
-//?} else {
-//?}
             // Get the model type preference for this specific skin
 //? if <1.21 {
             String modelPreference = LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash());
@@ -1208,18 +1136,6 @@ public class PlayerSkinMenuScreen extends Screen {
                     metadata,
                     LocalAssetManager.getInstance().getTextureLocation(metadata.hash(), TextureQuality.FULL)
             );
-
-//? if <1.21 {
-            // In selection mode, don't apply to local player - just update preview
-            if (isSelectionMode()) {
-                return;
-            }
-//?} else {
-            // Check if this is a new skin selection
-            com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-            boolean isSkinAlreadyActive = metadata.hash().equals(config.activeSkinHash)
-                    && config.activeCpmModelHash.isEmpty();
-//?}
 
             // Apply the change if it's a new skin selection.
             if (!isSkinAlreadyActive) {

@@ -42,6 +42,7 @@ IDENTITY_KEYS = {
     "reference_sha256",
     "capture_id",
     "expectation_sha256",
+    "runtime_evidence_sha256",
 }
 CACHED_VERDICT_KEYS = {
     "semantic_valid",
@@ -192,6 +193,9 @@ def cache_identity(item: dict[str, Any], review_mode: str) -> dict[str, str]:
     expectation = item.get("expectation")
     if not isinstance(expectation, str):
         raise ReviewError("cache expectation is invalid")
+    runtime_evidence = item.get("runtime_evidence")
+    if not isinstance(runtime_evidence, str):
+        raise ReviewError("cache runtime evidence is invalid")
     return {
         "review_mode": review_mode,
         "artifact_node": artifact_node,
@@ -201,6 +205,7 @@ def cache_identity(item: dict[str, Any], review_mode: str) -> dict[str, str]:
         ),
         "capture_id": capture_id,
         "expectation_sha256": _sha256(expectation.encode("utf-8")),
+        "runtime_evidence_sha256": _sha256(runtime_evidence.encode("utf-8")),
     }
 
 
@@ -217,6 +222,7 @@ def _normalize_identity(value: Any, index: int) -> dict[str, str]:
         "candidate_sha256",
         "reference_sha256",
         "expectation_sha256",
+        "runtime_evidence_sha256",
     ):
         if not isinstance(value.get(key), str) or SHA256.fullmatch(value[key]) is None:
             raise ReviewError(f"cache entry {index}.{key} is invalid")
