@@ -72,6 +72,11 @@ EXPECTED_STEPS = {
         "hud_preview_overlay",
         "title_screen_splash_order",
     ),
+    ("mod-compatibility", "client_a"): (
+        "integration_active",
+        "baseline_with_mod",
+        "apply_local_skin_with_mod",
+    ),
 }
 
 EXPECTED_CAPTURES = {
@@ -88,6 +93,10 @@ EXPECTED_CAPTURES = {
         step
         for step in EXPECTED_STEPS[("full", "client_a")]
         if step not in {"remove_cape_with_elytra", "bmo_render_parity"}
+    ),
+    ("mod-compatibility", "client_a"): (
+        "baseline_with_mod",
+        "apply_local_skin_with_mod",
     ),
 }
 
@@ -136,7 +145,13 @@ class ScenarioContractTest(unittest.TestCase):
 
     def test_steps_captures_and_orchestration_are_exact(self) -> None:
         self.assertEqual(
-            ("phase0-smoke", "propagation", "propagation-live", "full"),
+            (
+                "phase0-smoke",
+                "propagation",
+                "propagation-live",
+                "full",
+                "mod-compatibility",
+            ),
             self.contract.scenario_ids,
         )
         self.assertEqual(
@@ -144,14 +159,18 @@ class ScenarioContractTest(unittest.TestCase):
             self.contract.scenarios_for_profile("runtime-default"),
         )
         self.assertEqual(
-            self.contract.scenario_ids,
+            ("phase0-smoke", "propagation", "propagation-live", "full"),
             self.contract.scenarios_for_profile("pr"),
         )
         self.assertEqual(
-            self.contract.scenario_ids,
+            ("phase0-smoke", "propagation", "propagation-live", "full"),
             scenario_contract.scenarios_for_profile(
                 "release", self.contract
             ),
+        )
+        self.assertEqual(
+            ("mod-compatibility",),
+            self.contract.scenarios_for_profile("compatibility"),
         )
         self.assertEqual(
             {
@@ -159,6 +178,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "propagation": ("client_a", "client_b"),
                 "propagation-live": ("client_a", "client_b"),
                 "full": ("client_a",),
+                "mod-compatibility": ("client_a",),
             },
             {
                 scenario: self.contract.expected_roles(scenario)
@@ -222,10 +242,15 @@ class ScenarioContractTest(unittest.TestCase):
                         )
                         self.assertIs(step["assertion_required"], True)
                         if "capture" in step:
-                            self.assertEqual(
-                                {"title", "review_tier", "expectation", "probes"},
-                                set(step["capture"]),
-                            )
+                            capture_fields = {
+                                "title",
+                                "review_tier",
+                                "expectation",
+                                "probes",
+                            }
+                            if scenario["scenario"] == "mod-compatibility":
+                                capture_fields.add("compatibility_reference_capture_id")
+                            self.assertEqual(capture_fields, set(step["capture"]))
                             self.assertNotIn("capture_id", step["capture"])
                             for probe in step["capture"]["probes"]:
                                 self.assertNotIn("step", probe)
@@ -236,7 +261,7 @@ class ScenarioContractTest(unittest.TestCase):
             for role in scenario["roles"]
             for step in role["steps"]
         )
-        self.assertEqual(43, authored_capture_count)
+        self.assertEqual(45, authored_capture_count)
         self.assertEqual(authored_capture_count, len(self.contract.captures))
 
     def test_capture_metadata_and_ids_are_derived_from_steps(self) -> None:
@@ -246,7 +271,7 @@ class ScenarioContractTest(unittest.TestCase):
             for step in steps
         }
         self.assertEqual(expected_ids, set(self.contract.capture_ids))
-        self.assertEqual(43, len(expected_ids))
+        self.assertEqual(45, len(expected_ids))
         first = self.contract.capture_by_id("full.client_a.baseline")
         self.assertIs(
             first,
@@ -647,6 +672,21 @@ class ScenarioContractTest(unittest.TestCase):
             )["capture"]["probes"]
             probes.append(copy.deepcopy(probes[0]))
 
+        def missing_compatibility_reference(value: dict[str, Any]) -> None:
+            del self.step(value, 4, 0, "baseline_with_mod")["capture"][
+                "compatibility_reference_capture_id"
+            ]
+
+        def unknown_compatibility_reference(value: dict[str, Any]) -> None:
+            self.step(value, 4, 0, "baseline_with_mod")["capture"][
+                "compatibility_reference_capture_id"
+            ] = "full.client_a.missing"
+
+        def compatibility_reference_is_not_release(value: dict[str, Any]) -> None:
+            self.step(value, 4, 0, "baseline_with_mod")["capture"][
+                "compatibility_reference_capture_id"
+            ] = "mod-compatibility.client_a.apply_local_skin_with_mod"
+
         cases = {
             "unknown root field": unknown_root,
             "boolean schema": lambda value: value.__setitem__(
@@ -689,6 +729,9 @@ class ScenarioContractTest(unittest.TestCase):
             "explicit probe step": explicit_probe_step,
             "probe box escapes": probe_box_escapes_reference,
             "duplicate probe": duplicate_probe,
+            "missing compatibility reference": missing_compatibility_reference,
+            "unknown compatibility reference": unknown_compatibility_reference,
+            "compatibility reference outside release": compatibility_reference_is_not_release,
         }
         for label, mutate in cases.items():
             with self.subTest(label=label):

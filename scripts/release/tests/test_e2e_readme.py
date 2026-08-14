@@ -29,8 +29,8 @@ class E2EReadmeTest(unittest.TestCase):
         for artifact in self.matrix["artifacts"]:
             self.assertIn(f"`{artifact['artifact_node']}`", rendered)
         self.assertIn("`concurrent-two-client`", rendered)
-        self.assertIn("`49`", rendered)
-        self.assertIn("`43`", rendered)
+        self.assertIn("`52`", rendered)
+        self.assertIn("`45`", rendered)
         self.assertIn("| Scenario | Profiles | Orchestration |", rendered)
         self.assertIn(
             "| `phase0-smoke` | `runtime-default`, `pr`, `release` |",
@@ -44,7 +44,12 @@ class E2EReadmeTest(unittest.TestCase):
 
     def test_execution_profile_order_is_rendered_from_the_contract(self) -> None:
         payload = json.loads(self.contract.read_text(encoding="utf-8"))
-        payload["scenarios"][-1]["execution_profiles"] = ["release", "pr"]
+        full = next(
+            scenario
+            for scenario in payload["scenarios"]
+            if scenario["scenario"] == "full"
+        )
+        full["execution_profiles"] = ["release", "pr"]
         with tempfile.TemporaryDirectory() as temporary:
             contract = Path(temporary) / "scenario-contract.json"
             contract.write_text(json.dumps(payload) + "\n", encoding="utf-8")
