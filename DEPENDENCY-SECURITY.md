@@ -84,6 +84,13 @@ outside Gradle's dependency engine. The wrapper has its separate checksum. Packa
 downloads are independently pinned in `release/release-matrix.json`. Any new custom downloader must
 add its own reviewed checksum before it is allowed in CI or release paths.
 
+Optional-mod E2E JARs use a separate reviewed lock,
+`e2e/mod-compatibility-contract.json`. Runtime jobs accept only its exact HTTPS CDN URL, filename,
+published size, SHA-256, and SHA-512 and never call a project/version API. The explicit
+`e2e/update_mod_compatibility_lock.py` maintainer command is the sole newest-version selector; its
+output is code-reviewed like any other executable dependency update. Adding an optional mod also
+requires an activation probe and explicit applicability or `not_applicable` rows.
+
 ## Updating dependencies
 
 Start from a trusted checkout and intentionally change the declared version first. Generate the
