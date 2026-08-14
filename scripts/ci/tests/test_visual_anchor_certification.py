@@ -29,6 +29,7 @@ class VisualAnchorCertificationTest(unittest.TestCase):
                 "capture_id": "full.client_a.baseline",
                 "kind": "full.client_a.baseline",
                 "expectation": "Expected baseline",
+                "runtime_evidence": "baseline assertion passed",
             },
             {
                 "path": image,
@@ -36,6 +37,7 @@ class VisualAnchorCertificationTest(unittest.TestCase):
                 "capture_id": "full.client_a.baseline",
                 "kind": "full.client_a.baseline",
                 "expectation": "Expected baseline",
+                "runtime_evidence": "baseline assertion passed",
             },
         ]
         self.report = [
