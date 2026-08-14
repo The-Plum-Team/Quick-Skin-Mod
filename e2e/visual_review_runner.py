@@ -115,6 +115,7 @@ def build_review_plan(
     *,
     triage_chunk_size: int = DEFAULT_TRIAGE_CHUNK_SIZE,
     cached_labels: frozenset[str] = frozenset(),
+    review_identical: bool = False,
 ) -> dict[str, Any]:
     """Split byte-identical pairs from bounded semantic-review chunks."""
 
@@ -125,12 +126,12 @@ def build_review_plan(
     identical = [
         item
         for item in entries
-        if paired and item["path"] == item["reference_path"]
+        if paired and not review_identical and item["path"] == item["reference_path"]
     ]
     semantic = [
         item
         for item in entries
-        if (not paired or item["path"] != item["reference_path"])
+        if (not paired or review_identical or item["path"] != item["reference_path"])
         and item["label"] not in cached_labels
     ]
     return {
@@ -151,6 +152,7 @@ def execute_review(
     verify_chunk_size: int = DEFAULT_VERIFY_CHUNK_SIZE,
     max_parallel_calls: int = DEFAULT_MAX_PARALLEL_CALLS,
     cache_hits: dict[str, dict[str, Any]] | None = None,
+    review_identical: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Pipeline concurrent triage and verification, stopping on one confirmed defect.
 
@@ -176,10 +178,15 @@ def execute_review(
             normalized_cache_hits[label] = validate(
                 [item], [verdict], require_paired=paired
             )[0]
+    if review_identical and normalized_cache_hits:
+        raise ReviewError(
+            "review-identical requires a fresh semantic verdict for every manifest entry"
+        )
     plan = build_review_plan(
         entries,
         triage_chunk_size=triage_chunk_size,
         cached_labels=frozenset(normalized_cache_hits),
+        review_identical=review_identical,
     )
     final_by_label: dict[str, dict[str, Any]] = dict(normalized_cache_hits)
     for item in plan["identical"]:
@@ -673,6 +680,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
         choices=("anchor-semantic", "reference-comparison"),
     )
+    parser.add_argument(
+        "--review-identical",
+        action="store_true",
+        help="send byte-identical pairs through semantic review instead of inheriting a pass",
+    )
     parser.add_argument("--triage-chunk-size", type=int, default=DEFAULT_TRIAGE_CHUNK_SIZE)
     parser.add_argument("--verify-chunk-size", type=int, default=DEFAULT_VERIFY_CHUNK_SIZE)
     parser.add_argument(
@@ -745,6 +757,7 @@ def main(argv: list[str] | None = None) -> int:
             verify_chunk_size=args.verify_chunk_size,
             max_parallel_calls=args.max_parallel_calls,
             cache_hits=cache_hits,
+            review_identical=args.review_identical,
         )
         write_normalized_report(args.output, verdicts)
         _write_json_new(

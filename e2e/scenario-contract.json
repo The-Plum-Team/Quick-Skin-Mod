@@ -123,7 +123,7 @@
               "capture": {
                 "title": "Propagation observed remotely",
                 "review_tier": "key",
-                "expectation": "The observer sees Alice wearing the custom skin with brown hair, a dark charcoal-and-gray plaid jacket and blue trousers, plus the orange or green face of a deep-blue cape.",
+                "expectation": "A fixed rear view shows Alice facing away from the observer: the plain brown back of her head, dark charcoal-and-gray plaid shoulders and sleeves, and blue trousers remain correctly oriented while an orange cape with a green stripe hangs from her back. Her eyes and chest must not face the camera, and the cape must not cross the front of her torso.",
                 "probes": []
               }
             }
@@ -212,7 +212,7 @@
               "capture": {
                 "title": "Live observer before",
                 "review_tier": "key",
-                "expectation": "The observer sees the complete Alice model with her intact UUID-selected vanilla default skin and no cape before the live change. Noor's dark hair, red top, green trousers and salmon hands are valid vanilla colours, not evidence of a custom skin.",
+                "expectation": "A fixed rear view shows the complete Alice model facing away from the observer with her intact UUID-selected vanilla default skin and no cape before the live change. Noor's dark hair, red top, green trousers and salmon hands are valid vanilla colours; Alice's face and chest must not point toward the camera.",
                 "probes": []
               }
             },
@@ -222,7 +222,7 @@
               "capture": {
                 "title": "Live observer after",
                 "review_tier": "key",
-                "expectation": "The observer sees the same Alice changed to the custom skin with brown hair, a dark charcoal-and-gray plaid jacket and blue trousers, plus a custom orange or green cape.",
+                "expectation": "From the same fixed rear view, Alice still faces away from the observer and has changed to the custom skin: the plain brown back of her head, dark charcoal-and-gray plaid shoulders and sleeves, and blue trousers are visible while an orange cape with a green stripe hangs from her back. Her eyes and chest must not face the camera, and the cape must not cross the front of her torso.",
                 "probes": []
               }
             }
@@ -339,7 +339,7 @@
               "capture": {
                 "title": "Slim model",
                 "review_tier": "key",
-                "expectation": "A close, stable rear view clearly shows the custom dark charcoal-and-gray plaid jacket and blue trousers on slim Alex geometry, with visibly narrow 3-pixel-wide arms.",
+                "expectation": "A stable FOV-50 rear view shows the complete custom dark charcoal-and-gray plaid jacket and blue trousers on the slim Alex renderer; each arm has the narrower silhouette produced by 3-pixel base geometry beneath the inflated jacket outer layer.",
                 "probes": []
               }
             },
@@ -349,7 +349,7 @@
               "capture": {
                 "title": "Classic model",
                 "review_tier": "key",
-                "expectation": "A close, stable rear view clearly shows the custom dark charcoal-and-gray plaid jacket and blue trousers on classic Steve geometry, with visibly wider 4-pixel-wide arms.",
+                "expectation": "A stable FOV-50 rear view shows the complete custom dark charcoal-and-gray plaid jacket and blue trousers on the classic Steve renderer; each arm has the wider silhouette produced by 4-pixel base geometry beneath the inflated jacket outer layer.",
                 "probes": []
               }
             },
@@ -767,6 +767,55 @@
             {
               "first_step": "cape_adjust_zoom_out",
               "second_step": "cape_adjust_zoom_in",
+              "minimum_changed_fraction": 1e-05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "mod-compatibility",
+      "execution_profiles": [
+        "compatibility"
+      ],
+      "orchestration": {
+        "mode": "single-client"
+      },
+      "roles": [
+        {
+          "role": "client_a",
+          "steps": [
+            {
+              "id": "integration_active",
+              "assertion_required": true
+            },
+            {
+              "id": "baseline_with_mod",
+              "assertion_required": true,
+              "capture": {
+                "title": "Compatibility baseline",
+                "review_tier": "all",
+                "expectation": "With the named compatibility mod loaded, a stable third-person flat-world view shows the complete local player with an intact UUID-selected vanilla default skin and no rendering corruption.",
+                "compatibility_reference_capture_id": "phase0-smoke.client_a.baseline",
+                "probes": []
+              }
+            },
+            {
+              "id": "apply_local_skin_with_mod",
+              "assertion_required": true,
+              "capture": {
+                "title": "Compatibility local skin",
+                "review_tier": "all",
+                "expectation": "With the named compatibility mod loaded, a normal first-person world view shows the custom skin's dark charcoal-and-gray plaid sleeve and brown hand without missing geometry, texture corruption, or interference from the other mod.",
+                "compatibility_reference_capture_id": "phase0-smoke.client_a.apply_local_skin",
+                "probes": []
+              }
+            }
+          ],
+          "comparisons": [
+            {
+              "first_step": "baseline_with_mod",
+              "second_step": "apply_local_skin_with_mod",
               "minimum_changed_fraction": 1e-05
             }
           ]

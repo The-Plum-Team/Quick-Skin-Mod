@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -87,16 +88,69 @@ public final class DefaultSkinEvidenceView {
         VanillaShim.setScreen(mc, null);
     }
 
+    /**
+     * Hold one player in a fully deterministic standing pose for a visual checkpoint.
+     *
+     * <p>Network interpolation keeps separate previous/current head and body rotations. Updating
+     * only the ordinary yaw can therefore leave a remote player's head apparently looking through
+     * its own cape for a frame, which makes an otherwise correct rear-view screenshot semantically
+     * ambiguous. Pinning every render-relevant value is limited to the disposable E2E client and
+     * does not change production rendering.</p>
+     */
+    public static void pinStandingPose(Player player, float yaw) {
+        player.setDeltaMovement(0, 0, 0);
+        player.setYRot(yaw);
+        player.yRotO = yaw;
+        player.setYHeadRot(yaw);
+        player.yHeadRotO = yaw;
+        player.setYBodyRot(yaw);
+        player.yBodyRotO = yaw;
+        player.setXRot(0f);
+        player.xRotO = 0f;
+    }
+
+    /**
+     * Deterministically prove that an observer used for cape evidence is behind the subject and
+     * that every interpolated subject rotation still carries the requested pose.
+     */
+    public static Step.Result checkRearView(Player subject, Player observer, float expectedYaw) {
+        float yawError = angularError(subject.getYRot(), expectedYaw);
+        float headError = angularError(subject.getYHeadRot(), expectedYaw);
+        float bodyError = angularError(subject.yBodyRot, expectedYaw);
+        if (yawError > 0.5f || headError > 0.5f || bodyError > 0.5f) {
+            return Step.Result.fail(String.format(Locale.ROOT,
+                    "rear-view subject pose drifted: yaw=%.1f head=%.1f body=%.1f expected=%.1f",
+                    subject.getYRot(), subject.getYHeadRot(), subject.yBodyRot, expectedYaw));
+        }
+
+        double observerX = observer.getX() - subject.getX();
+        double observerZ = observer.getZ() - subject.getZ();
+        double distance = Math.hypot(observerX, observerZ);
+        if (distance < 0.1) {
+            return Step.Result.fail("rear-view observer overlaps the subject");
+        }
+        double radians = Math.toRadians(subject.getYRot());
+        double forwardX = -Math.sin(radians);
+        double forwardZ = Math.cos(radians);
+        double observerCos = (forwardX * observerX + forwardZ * observerZ) / distance;
+        if (observerCos > -0.90) {
+            return Step.Result.fail(String.format(Locale.ROOT,
+                    "observer is not behind the subject: rearCos=%.3f", observerCos));
+        }
+        return Step.Result.pass(String.format(Locale.ROOT,
+                "fixed rear-view pose: subject yaw/head/body=%.0f/%.0f/%.0f, observer rearCos=%.3f",
+                subject.getYRot(), subject.getYHeadRot(), subject.yBodyRot, observerCos));
+    }
+
     private static void pinPlayer(Minecraft mc, float yaw) {
-        mc.player.setDeltaMovement(0, 0, 0);
-        mc.player.setYRot(yaw);
-        mc.player.yRotO = yaw;
-        mc.player.setYHeadRot(yaw);
-        mc.player.yHeadRotO = yaw;
-        mc.player.setYBodyRot(yaw);
-        mc.player.yBodyRotO = yaw;
-        mc.player.setXRot(0f);
-        mc.player.xRotO = 0f;
+        pinStandingPose(mc.player, yaw);
+    }
+
+    private static float angularError(float actual, float expected) {
+        float difference = (actual - expected) % 360.0f;
+        if (difference < -180.0f) difference += 360.0f;
+        if (difference > 180.0f) difference -= 360.0f;
+        return Math.abs(difference);
     }
 
     private static AbstractClientPlayer findOther(Minecraft mc) {

@@ -26,6 +26,10 @@ class VersionPortConflictsTest(unittest.TestCase):
                         {"artifact_node": f"{loader}-test", "loader": loader}
                         for loader in loaders
                     ],
+                    "source_overlays": {
+                        "common": {},
+                        **{loader: {} for loader in loaders},
+                    },
                 }
             ),
             encoding="utf-8",
@@ -43,9 +47,11 @@ class VersionPortConflictsTest(unittest.TestCase):
                 "forge/build.gradle.kts",
                 "docs/ai/WORKFLOW.md",
                 "common/src/main/java/com/quickskin/mod/Screen.java",
+                "common/src/legacy1_20_1/resources/quickskin.mixins.json",
                 "e2e/README.md",
             ),
             {"fabric", "neoforge"},
+            {"common/src/legacy1_21_10"},
         )
         self.assertEqual(
             result.to_payload(),
@@ -57,7 +63,10 @@ class VersionPortConflictsTest(unittest.TestCase):
                     "e2e/packaged_runtime.py",
                 ],
                 "target_paths": ["release/release-matrix.json"],
-                "delete_paths": ["forge/build.gradle.kts"],
+                "delete_paths": [
+                    "common/src/legacy1_20_1/resources/quickskin.mixins.json",
+                    "forge/build.gradle.kts",
+                ],
                 "ai_paths": [
                     "README.md",
                     "common/src/main/java/com/quickskin/mod/Screen.java",
@@ -72,7 +81,7 @@ class VersionPortConflictsTest(unittest.TestCase):
                 "active-loader",
             ):
                 version_port_conflicts.classify_conflicts(
-                    [f"{loader}/build.gradle.kts"], {loader}
+                    [f"{loader}/build.gradle.kts"], {loader}, set()
                 )
 
     def test_rejects_unknown_protected_conflicts(self) -> None:
@@ -88,7 +97,31 @@ class VersionPortConflictsTest(unittest.TestCase):
                 version_port_conflicts.ConflictClassificationError,
                 "unknown protected",
             ):
-                version_port_conflicts.classify_conflicts([path], {"fabric"})
+                version_port_conflicts.classify_conflicts(
+                    [path], {"fabric"}, set()
+                )
+
+    def test_rejects_conflicts_inside_an_active_overlay(self) -> None:
+        path = "common/src/legacy1_21_10/resources/quickskin.mixins.json"
+        with self.assertRaisesRegex(
+            version_port_conflicts.ConflictClassificationError,
+            "unknown protected",
+        ):
+            version_port_conflicts.classify_conflicts(
+                [path],
+                {"fabric", "neoforge"},
+                {"common/src/legacy1_21_10"},
+            )
+
+        with self.assertRaisesRegex(
+            version_port_conflicts.ConflictClassificationError,
+            "not owned by the target matrix",
+        ):
+            version_port_conflicts.classify_conflicts(
+                [path],
+                {"fabric", "neoforge"},
+                [None],  # type: ignore[list-item]
+            )
 
     def test_rejects_an_unbounded_ai_conflict_set(self) -> None:
         paths = [
@@ -102,6 +135,7 @@ class VersionPortConflictsTest(unittest.TestCase):
             version_port_conflicts.classify_conflicts(
                 paths,
                 {"fabric", "neoforge"},
+                set(),
             )
 
     def test_rejects_duplicate_case_colliding_and_unsafe_paths(self) -> None:
@@ -116,7 +150,9 @@ class VersionPortConflictsTest(unittest.TestCase):
             with self.subTest(paths=paths), self.assertRaisesRegex(
                 version_port_conflicts.ConflictClassificationError, message
             ):
-                version_port_conflicts.classify_conflicts(paths, {"fabric"})
+                version_port_conflicts.classify_conflicts(
+                    paths, {"fabric"}, set()
+                )
 
     def test_paths_file_is_strict_and_sorted(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -165,6 +201,39 @@ class VersionPortConflictsTest(unittest.TestCase):
                         version_port_conflicts.ConflictClassificationError
                     ):
                         version_port_conflicts.read_active_loaders(matrix)
+
+    def test_matrix_profile_reads_only_exact_live_overlay_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            matrix = self.write_matrix(root, ("fabric", "neoforge"))
+            payload = json.loads(matrix.read_text(encoding="utf-8"))
+            payload["source_overlays"]["common"] = {
+                "1.21.10": "legacy1_21_10"
+            }
+            matrix.write_text(json.dumps(payload), encoding="utf-8")
+
+            profile = version_port_conflicts.read_target_matrix_profile(matrix)
+            self.assertEqual(
+                profile.active_loaders,
+                frozenset({"fabric", "neoforge"}),
+            )
+            self.assertEqual(
+                profile.active_overlay_roots,
+                frozenset({"common/src/legacy1_21_10"}),
+            )
+
+            for invalid in (
+                None,
+                {"common": {}, "fabric": {}},
+                {"common": {"1.21.10": "../legacy"}, "fabric": {}, "neoforge": {}},
+            ):
+                with self.subTest(source_overlays=invalid):
+                    payload["source_overlays"] = invalid
+                    matrix.write_text(json.dumps(payload), encoding="utf-8")
+                    with self.assertRaises(
+                        version_port_conflicts.ConflictClassificationError
+                    ):
+                        version_port_conflicts.read_target_matrix_profile(matrix)
 
     def test_cli_emits_exact_compact_deterministic_schema(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
