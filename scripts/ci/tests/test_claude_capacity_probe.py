@@ -11,9 +11,11 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "ci"))
 
 from claude_capacity_probe import (  # noqa: E402
+    ProbeError,
     classify_probe,
     load_stream,
     probe_command,
+    resolve_claude_executable,
     write_marker,
 )
 
@@ -167,6 +169,36 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
         self.assertEqual("", command[tools + 1])
         self.assertNotIn("Read", command)
         self.assertNotIn("Bash", command)
+
+    def test_locked_npm_bin_symlink_resolves_inside_node_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            node_modules = Path(raw) / "node_modules"
+            package = node_modules / "@anthropic-ai" / "claude-code"
+            package.mkdir(parents=True)
+            executable = package / "cli.js"
+            executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+            bin_directory = node_modules / ".bin"
+            bin_directory.mkdir()
+            link = bin_directory / "claude"
+            link.symlink_to(Path("..") / "@anthropic-ai" / "claude-code" / "cli.js")
+
+            self.assertEqual(executable.resolve(), resolve_claude_executable(link))
+
+    def test_locked_npm_bin_symlink_cannot_escape_node_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            node_modules = root / "node_modules"
+            bin_directory = node_modules / ".bin"
+            bin_directory.mkdir(parents=True)
+            executable = root / "outside"
+            executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+            link = bin_directory / "claude"
+            link.symlink_to(executable)
+
+            with self.assertRaises(ProbeError):
+                resolve_claude_executable(link)
 
     def test_marker_contains_only_sanitized_machine_state(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
