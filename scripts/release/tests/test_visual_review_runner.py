@@ -42,6 +42,7 @@ def paired(
         "capture_id": f"{scenario}.{role}.{step}",
         "kind": f"{scenario}.{role}.{step}",
         "expectation": f"Expected {step}",
+        "runtime_evidence": f"assertion passed for {step}",
     }
 
 
@@ -53,6 +54,7 @@ def unpaired(label: str, candidate: str) -> dict[str, str]:
         "capture_id": f"{scenario}.{role}.{step}",
         "kind": f"{scenario}.{role}.{step}",
         "expectation": f"Expected {step}",
+        "runtime_evidence": f"assertion passed for {step}",
     }
 
 
@@ -84,6 +86,59 @@ class VisualReviewRunnerTest(unittest.TestCase):
         self.assertEqual([[self.manifest[1]], [self.manifest[2]]], plan["triage_chunks"])
         with self.assertRaises(ReviewError):
             build_review_plan(self.manifest, triage_chunk_size=9)
+
+    def test_compatibility_mode_reviews_even_byte_identical_pairs(self) -> None:
+        calls: list[list[str]] = []
+
+        def provider(
+            stage: str,
+            _chunk_index: int,
+            chunk: list[dict[str, Any]],
+            _schema: dict[str, Any],
+        ) -> list[dict[str, Any]]:
+            self.assertEqual("triage", stage)
+            calls.append([item["label"] for item in chunk])
+            return [
+                {
+                    "label": item["label"],
+                    "decision": "clean",
+                    "confidence": "high",
+                    "anomalies": [],
+                }
+                for item in chunk
+            ]
+
+        plan = build_review_plan(self.manifest, review_identical=True)
+        verdicts, stats = execute_review(
+            self.manifest,
+            provider,
+            review_identical=True,
+        )
+
+        self.assertEqual([], plan["identical"])
+        self.assertEqual(self.manifest, plan["semantic"])
+        self.assertIn(self.manifest[0]["label"], {label for call in calls for label in call})
+        self.assertEqual(0, stats["identical"])
+        self.assertEqual(3, stats["triaged"])
+        self.assertEqual(3, len(verdicts))
+
+        cached = {
+            self.manifest[0]["label"]: {
+                "label": self.manifest[0]["label"],
+                "visible": "The candidate is semantically correct.",
+                "semantic_valid": True,
+                "matches_reference": True,
+                "anomalies": [],
+                "defect": False,
+            }
+        }
+        with self.assertRaisesRegex(ReviewError, "fresh semantic verdict"):
+            execute_review(
+                self.manifest,
+                provider,
+                cache_hits=cached,
+                review_identical=True,
+            )
 
     def test_plan_keeps_loader_siblings_in_the_same_chunk(self) -> None:
         interleaved = [

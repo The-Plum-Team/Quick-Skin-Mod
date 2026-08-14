@@ -86,9 +86,10 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `scripts/ci/version_port_conflicts.py` is the pure, fail-closed classifier for the original Git
   conflict set. It may assign a protected path only to an exact reviewed mechanical policy. Shared
   guidance and runtime documents use a source-preferred three-way merge, the release matrix uses
-  the target version, and a build script may be deleted only when its loader is inactive in that
-  target matrix. Unknown protected paths and active-loader build conflicts abort the port; only
-  unprotected residual conflicts may reach AI.
+  the target version, a build script may be deleted only when its loader is inactive in that
+  target matrix, and a path below a legacy overlay may be deleted only when that exact overlay root
+  is absent from the target matrix. Unknown protected paths, active-loader build conflicts, and
+  active-overlay conflicts abort the port; only unprotected residual conflicts may reach AI.
 - `scripts/release/branch_readme.py`, `scripts/release/e2e_readme.py`, and
   `scripts/release/workflow_guidance.py` are the protected renderers for matrix-owned branch
   profiles. The synchronizer runs them after conflict resolution, stages their exact outputs, and
@@ -109,8 +110,24 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   Its content-addressed recipes include every compatibility input, and callers materialize a fresh
   copy before launch. `RuntimeStore` is never uploaded as evidence.
 - `e2e/visual_evidence.py` reads successful `result.json` reports, verifies the scenario-contract
-  hash and exact graph, PNG containment, full decode, dimensions, SHA-256, probes, and comparisons,
-  and exposes the shared evidence model used by the AI review and public site.
+  hash and exact graph, bounded printable passed-assertion messages, PNG containment, full decode,
+  dimensions, SHA-256, probes, and comparisons, and exposes the shared evidence model used by the
+  AI review and public site.
+- `e2e/mod-compatibility-contract.json` is the reviewed optional-mod artifact lock. It owns the
+  supported integration ids, applicability rules, Modrinth project identities, and every immutable
+  external JAR URL/filename/size/SHA-256/SHA-512 tuple. `e2e/mod_compatibility.py` is its fail-closed
+  runtime reader, planner, and materializer. `e2e/update_mod_compatibility_lock.py` is the only code
+  allowed to query Modrinth or select a newest upstream release; it is an explicit maintainer tool,
+  never part of an E2E run.
+- `e2e/mod_compatibility_visual.py` authenticates one complete modded result and its clean
+  same-version/loader packaged baseline, pairs every capture by semantic identity, and emits only
+  content-addressed metadata-free images plus an exact source/implementation/contract/artifact
+  proof. `.github/workflows/mod-compatibility-e2e.yml` owns admission, the fully parallel
+  artifact-by-mod runtime matrix, and secretless curation.
+  `.github/workflows/mod-compatibility-review.yml` is the separate credential-bearing consumer; it
+  downloads only curated capsules, sends every pair to Sonnet even when pixels are identical,
+  escalates every non-high-clean result to Opus, and publishes a durable source-wave block before
+  cancelling siblings after a confirmed defect.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every later-version candidate with the same semantic
@@ -118,15 +135,17 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   requires complete, identical Fabric/Forge capture-id sets and exposes each frame without any
   reference. It atomically re-encodes candidates and any later-version references as metadata-free
   RGB PNGs. `e2e/check_visual_review.py` validates the all-single or all-paired bounded capsule,
-  keeps `semantic_valid` independent from nullable `matches_reference`, and normalizes bounded model
-  output. `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Sonnet
+  including each capture's exact passed assertion as `runtime_evidence`, keeps `semantic_valid`
+  independent from nullable `matches_reference`, and normalizes bounded model output.
+  `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Sonnet
   triage, runs independent loader-grouped chunks concurrently, pipelines suspicious or uncertain
   results into concurrent bounded Opus verification, cancels outstanding calls after the first
   confirmed defect, publishes a protected exact-generation block and cancels sibling drains, skips
   byte-identical certified comparison pairs, and keeps raw provider output private.
   `e2e/visual_review_cache.py` validates and combines bounded immutable paired-only verdict
-  cache shards: a hit binds candidate/reference pixels, expectation, capture and loader identity,
-  scenario contract, release matrix, reviewer code, prompts, models, mode, and chunk policy;
+  cache shards: a hit binds candidate/reference pixels, expectation, runtime evidence, capture and
+  loader identity, scenario contract, release matrix, reviewer code, prompts, models, mode, and
+  chunk policy;
   unpaired semantic anchors never consume it. Parallel drains may briefly publish sibling shards;
   a later protected successor combines and retires every authenticated shard it consumed.
 - `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
