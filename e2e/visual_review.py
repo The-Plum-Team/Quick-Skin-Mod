@@ -44,7 +44,14 @@ MAX_REVIEW_IMAGE_PIXELS = 512 * 1024 * 1024
 SAFE_DIRECTORY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
-PUBLIC_MANIFEST_FIELDS = ("path", "label", "capture_id", "kind", "expectation")
+PUBLIC_MANIFEST_FIELDS = (
+    "path",
+    "label",
+    "capture_id",
+    "kind",
+    "expectation",
+    "runtime_evidence",
+)
 PUBLIC_REFERENCE_FIELDS = ("reference_path", "reference_label")
 MAX_REFERENCE_MANIFEST_BYTES = 10 * 1024 * 1024
 MAX_SINGLE_IMAGE_BYTES = 32 * 1024 * 1024
@@ -133,6 +140,7 @@ def build_manifest(
             "capture_id": frame["capture_id"],
             "kind": frame["capture_id"],
             "expectation": frame["expectation"],
+            "runtime_evidence": frame["runtime_evidence"],
             "_verified_file_sha256": frame["file_sha256"],
             "_verified_pixel_sha256": frame["pixel_validation"]["pixel_sha256"],
             "_verified_width": frame["width"],
