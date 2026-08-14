@@ -66,13 +66,10 @@ OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
-    "overlay:com/quickskin/mod/mixin/compat/PasConfiguratorMixin.java",
     "overlay:com/quickskin/mod/mixin/compat/ReplayModCompatMixin.java",
 }
 
-ACCESSOR_ONLY_MIXINS = {
-    "overlay:com/quickskin/mod/mixin/compat/PasConfiguratorAccessor.java",
-}
+ACCESSOR_ONLY_MIXINS: set[str] = set()
 
 # CPM changed the call made by playerRenderPre. Both optional injection points are kept so one
 # source supports both eras, which means neither alternative can truthfully declare expect=1.
