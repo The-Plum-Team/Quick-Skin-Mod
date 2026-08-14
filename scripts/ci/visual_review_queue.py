@@ -41,6 +41,7 @@ MAX_ARTIFACTS = 10_000
 MAX_INPUT_BYTES = 536_870_912
 DEFAULT_COOLDOWN_MINUTES = 30
 MAX_NAMED_ARTIFACTS = 1_000
+MAX_CAPACITY_FANOUT = 256
 REQUEST_ATTEMPTS = 4
 RETRYABLE_HTTP_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
 
@@ -265,8 +266,35 @@ def select_pending(
     cooldown: timedelta = timedelta(minutes=DEFAULT_COOLDOWN_MINUTES),
     requested_artifact_id: int | None = None,
 ) -> tuple[Artifact, int] | None:
-    if requested_artifact_id is not None and requested_artifact_id <= 0:
-        raise QueueError("requested artifact id must be a positive integer")
+    candidates = list_pending_candidates(
+        api,
+        repository=repository,
+        now=now,
+        cooldown=cooldown,
+    )
+    if requested_artifact_id is not None:
+        if requested_artifact_id <= 0:
+            raise QueueError("requested artifact id must be a positive integer")
+        requested = [
+            candidate
+            for candidate in candidates
+            if candidate[0].artifact_id == requested_artifact_id
+        ]
+        if len(requested) > 1:
+            raise QueueError("requested artifact id is ambiguous")
+        return requested[0] if requested else None
+    return candidates[0] if candidates else None
+
+
+def list_pending_candidates(
+    api: QueueApi,
+    *,
+    repository: str,
+    now: datetime | None = None,
+    cooldown: timedelta = timedelta(minutes=DEFAULT_COOLDOWN_MINUTES),
+) -> list[tuple[Artifact, int]]:
+    """Return every eligible source once, with a certifiable anchor first."""
+
     artifacts = api.list_artifacts()
     if len(artifacts) > MAX_ARTIFACTS:
         raise QueueError(f"visual review artifact inventory exceeds {MAX_ARTIFACTS}")
@@ -297,7 +325,7 @@ def select_pending(
         events=PREPARE_EVENTS,
         conclusions=frozenset({"success", "failure"}),
     )
-    candidates = [
+    raw_candidates = [
         (artifact, source_run_id)
         for source_run_id, values in pending.items()
         if source_run_id not in reviewed and source_run_id not in cooling
@@ -305,17 +333,6 @@ def select_pending(
         if artifact.size_in_bytes <= MAX_INPUT_BYTES
         and input_generation(artifact) not in blocked
     ]
-    if not candidates:
-        return None
-    if requested_artifact_id is not None:
-        requested = [
-            candidate
-            for candidate in candidates
-            if candidate[0].artifact_id == requested_artifact_id
-        ]
-        if len(requested) > 1:
-            raise QueueError("requested artifact id is ambiguous")
-        return requested[0] if requested else None
     source_run_cache: dict[int, dict[str, Any]] = {}
 
     def priority(candidate: tuple[Artifact, int]) -> tuple[int, datetime, int]:
@@ -333,7 +350,18 @@ def select_pending(
         )
         return (0 if certifiable_anchor else 1, artifact.created_at, artifact.artifact_id)
 
-    return min(candidates, key=priority)
+    # A retried curator can leave multiple still-authenticated inputs for one source run. Dispatch
+    # only its newest immutable artifact; a duplicate source must never multiply model sessions.
+    newest_by_source: dict[int, Artifact] = {}
+    for artifact, source_run_id in raw_candidates:
+        current = newest_by_source.get(source_run_id)
+        if current is None or artifact.order > current.order:
+            newest_by_source[source_run_id] = artifact
+    candidates = [
+        (artifact, source_run_id)
+        for source_run_id, artifact in newest_by_source.items()
+    ]
+    return sorted(candidates, key=priority)
 
 
 def select_requested(
@@ -554,7 +582,8 @@ class GitHubApi:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", required=True)
-    parser.add_argument("--github-output", type=Path, required=True)
+    parser.add_argument("--github-output", type=Path)
+    parser.add_argument("--list-pending-json", type=Path)
     parser.add_argument(
         "--cooldown-minutes",
         type=int,
@@ -584,6 +613,36 @@ def main(argv: list[str] | None = None) -> int:
             "repository": repository,
             "cooldown": timedelta(minutes=args.cooldown_minutes),
         }
+        if args.list_pending_json is not None:
+            if args.github_output is not None or args.requested_artifact_id is not None:
+                raise QueueError(
+                    "pending-list mode cannot write step outputs or select one artifact"
+                )
+            candidates = list_pending_candidates(api, **selection_arguments)
+            if len(candidates) > MAX_CAPACITY_FANOUT:
+                raise QueueError(
+                    f"Claude capacity fan-out exceeds {MAX_CAPACITY_FANOUT} entries"
+                )
+            payload = [
+                {
+                    "artifact_id": artifact.artifact_id,
+                    "artifact_name": artifact.name,
+                    "generation_sha": input_generation(artifact),
+                }
+                for artifact, _source_run_id in candidates
+            ]
+            with args.list_pending_json.open("x", encoding="utf-8") as output:
+                json.dump(
+                    payload,
+                    output,
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+                output.write("\n")
+            return 0
+        if args.github_output is None:
+            raise QueueError("--github-output is required when selecting one artifact")
         selected = (
             select_requested(
                 api,
