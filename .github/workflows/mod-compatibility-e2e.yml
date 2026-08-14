@@ -212,7 +212,7 @@ jobs:
             '[.artifacts[] | select(.name == "e2e-input-bundle" and
               .expired == false and .workflow_run.id == $run_id and
               (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
-              (.size_in_bytes | type == "number" and .size_in_bytes > 0))] |
+              ((.size_in_bytes | type) == "number" and .size_in_bytes > 0))] |
              length == 1' <<< "$bundle_metadata" > /dev/null
 
           printf 'source_branch=%s\n' "$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
@@ -463,7 +463,7 @@ jobs:
                [$inventory.artifacts[] | select(.name == $name and .expired == false and
                  .workflow_run.id == $run_id and
                  (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
-                 (.size_in_bytes | type == "number" and .size_in_bytes > 0 and
+                 ((.size_in_bytes | type) == "number" and .size_in_bytes > 0 and
                   .size_in_bytes <= 536870912))] |
                if length == 1 then .[0] |
                  {id,name,size_in_bytes,digest,run_id:$run_id}
