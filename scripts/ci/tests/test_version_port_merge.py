@@ -26,7 +26,14 @@ class VersionPortMergeTest(unittest.TestCase):
         self.git("config", "user.email", "author@example.invalid")
 
         self.write("e2e/README.md", self.readme())
-        self.write("release/release-matrix.json", self.matrix("base"))
+        self.write(
+            "release/release-matrix.json",
+            self.matrix("base", common_overlay="legacy1_20_1"),
+        )
+        self.write(
+            "common/src/legacy1_20_1/resources/quickskin-ears.mixins.json",
+            "base overlay\n",
+        )
         self.write("forge/build.gradle.kts", "base forge\n")
         self.write("src/Conflict.txt", "base choice\n")
         self.write("src/[literal]*?.txt", "base metachar choice\n")
@@ -42,7 +49,14 @@ class VersionPortMergeTest(unittest.TestCase):
             "e2e/README.md",
             self.readme(changes={30: "source conflict", 55: "source-only hunk"}),
         )
-        self.write("release/release-matrix.json", self.matrix("source"))
+        self.write(
+            "release/release-matrix.json",
+            self.matrix("source", common_overlay="legacy1_20_1"),
+        )
+        self.write(
+            "common/src/legacy1_20_1/resources/quickskin-ears.mixins.json",
+            "source overlay\n",
+        )
         self.write("forge/build.gradle.kts", "source forge\n")
         self.write("src/Conflict.txt", "source choice\n")
         self.write("src/[literal]*?.txt", "source metachar choice\n")
@@ -60,6 +74,10 @@ class VersionPortMergeTest(unittest.TestCase):
         self.write("src/Conflict.txt", "target choice\n")
         self.write("src/[literal]*?.txt", "target metachar choice\n")
         self.git("rm", "forge/build.gradle.kts")
+        self.git(
+            "rm",
+            "common/src/legacy1_20_1/resources/quickskin-ears.mixins.json",
+        )
         self.git("add", "--all")
         self.git("commit", "-m", "target changes")
         self.target = self.sha("HEAD")
@@ -114,7 +132,11 @@ class VersionPortMergeTest(unittest.TestCase):
     def matrix(
         description: str,
         loaders: tuple[str, ...] = ("fabric", "neoforge"),
+        common_overlay: str | None = None,
     ) -> str:
+        common_routes = (
+            {"1.20.1": common_overlay} if common_overlay is not None else {}
+        )
         return json.dumps(
             {
                 "schema_version": 2,
@@ -123,6 +145,10 @@ class VersionPortMergeTest(unittest.TestCase):
                     {"artifact_node": f"{loader}-test", "loader": loader}
                     for loader in loaders
                 ],
+                "source_overlays": {
+                    "common": common_routes,
+                    **{loader: {} for loader in loaders},
+                },
             },
             indent=2,
         ) + "\n"
@@ -262,6 +288,7 @@ class VersionPortMergeTest(unittest.TestCase):
         self.assertEqual(
             first["conflicts"],
             [
+                "common/src/legacy1_20_1/resources/quickskin-ears.mixins.json",
                 "e2e/README.md",
                 "forge/build.gradle.kts",
                 "release/release-matrix.json",
@@ -276,6 +303,7 @@ class VersionPortMergeTest(unittest.TestCase):
         self.assertEqual(
             [item["policy"] for item in first["protected_resolutions"]],
             [
+                "delete-inactive-overlay",
                 "source-preferred-three-way",
                 "delete-inactive-loader",
                 "retain-target",
@@ -346,6 +374,12 @@ class VersionPortMergeTest(unittest.TestCase):
             "target",
         )
         self.assertFalse((self.repository / "forge/build.gradle.kts").exists())
+        self.assertFalse(
+            (
+                self.repository
+                / "common/src/legacy1_20_1/resources/quickskin-ears.mixins.json"
+            ).exists()
+        )
         self.assertEqual(
             (self.repository / "safe.txt").read_text(encoding="utf-8"),
             "source safe\n",
