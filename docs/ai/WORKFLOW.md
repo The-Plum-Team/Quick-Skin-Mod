@@ -44,7 +44,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   coherence before it emits the only normalized report eligible for upload. Durable queue state
   must not depend on a pending workflow run: a sanitized marker may cool a failed entry, raw
   provider text must never be uploaded, and a final `actions: write` job may delete only a
-  completed handoff reauthenticated by exact id.
+  completed handoff reauthenticated by exact id. A repository-wide capacity circuit may serialize
+  only its tool-free preflight and marker publication; it must preserve parallel capsule review
+  after a fresh ready marker, fail closed on unknown/permanent probe failures, and retain every
+  capsule while an authenticated quota-pause marker is live.
 - Version-port and repair validation must check out candidate code with credentials disabled.
   For a version port, the complete patch goes only into an alternate index; the protected merge
   controller reconstructs the original merge and copies only recomputed AI-conflict entries from
