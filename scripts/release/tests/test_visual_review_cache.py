@@ -43,6 +43,7 @@ def paired(
         "capture_id": capture_id,
         "kind": capture_id,
         "expectation": expectation,
+        "runtime_evidence": "renderer-facing assertion passed",
     }
 
 
@@ -134,12 +135,21 @@ class VisualReviewCacheTest(unittest.TestCase):
             "fabric-1.21.1/full/client_a/cape", expectation="Different contract"
         )
         changed_artifact = paired("neoforge-1.21.1/full/client_a/cape")
+        changed_runtime_evidence = {
+            **same,
+            "runtime_evidence": "different renderer-facing assertion",
+        }
 
         self.assertEqual(
             [same["label"]],
             list(cached_verdicts([same], cache, review_mode="reference-comparison")),
         )
-        for candidate in (changed_pixels, changed_expectation, changed_artifact):
+        for candidate in (
+            changed_pixels,
+            changed_expectation,
+            changed_artifact,
+            changed_runtime_evidence,
+        ):
             with self.subTest(label=candidate["label"], path=candidate["path"]):
                 self.assertEqual(
                     {},
