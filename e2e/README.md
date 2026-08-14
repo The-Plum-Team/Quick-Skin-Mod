@@ -20,11 +20,11 @@ This `fabric-and-neoforge-26.1.1` release branch exercises the following exact p
 
 | Artifact | Minecraft | Loader | Java | Contract scenarios |
 |---|---:|---|---:|---:|
-| `fabric-26.1.1` | `26.1.1` | Fabric | `25` | `4` |
-| `neoforge-26.1.1` | `26.1.1` | NeoForge | `25` | `4` |
+| `fabric-26.1.1` | `26.1.1` | Fabric | `25` | `5` |
+| `neoforge-26.1.1` | `26.1.1` | NeoForge | `25` | `5` |
 
-Scenario contract SHA-256: `1042d118516421b5fcd936792c71bd1639052354ae5ce401893d3e4295d1ee03`
-Contract totals: `49` ordered steps, `43` captures.
+Scenario contract SHA-256: `824ab573c1ccfbfd7b0a6cc8815d665fb195d195f5ccb4e0f9bf9bf74a7ac673`
+Contract totals: `52` ordered steps, `45` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
@@ -32,6 +32,7 @@ Contract totals: `49` ordered steps, `43` captures.
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `7` | `5` |
 | `full` | `pr`, `release` | `single-client` | `client_a` | `34` | `32` |
+| `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->
@@ -173,6 +174,13 @@ use broad entropy/color and pairwise-change invariants rather than golden images
 Minecraft-version rendering differences are allowed. Every result records the literal fields
 `artifact_node`, `runtime_version`, `loader`, `scenario`, `jar_sha256`, and `port`.
 
+The remote propagation captures pin the disposable subject's current and interpolated head/body
+rotations and hold the observer at a numerically asserted rear vantage. Their passed runtime
+evidence records all three rotations and the observer/forward-vector cosine. This makes cape
+placement inspectable without treating a transient head turn as proof that a correctly rear-mounted
+cape crossed the player's chest; a front-facing subject or misplaced observer fails before AI
+review.
+
 The `full` scenario also exercises adjusted-cape parity against the production BMO asset. It
 centres the unchanged 64x32 BMO atlas inside an opaque-black 128x64 import. One editor capture keeps
 the reset fit so the complete source, centred atlas, and four black padding bands are independently
@@ -238,10 +246,13 @@ authenticates every artifact and exact matrix row. It imports the exact source c
 Git objects—never as a checkout executed by the privileged workflow—then fully decodes the complete
 scenario product, requires one production JAR, and re-encodes every captured frame as a bounded
 metadata-free RGB PNG
-named by its served-byte SHA-256. A 1.20.1 run exposes every Fabric and Forge frame without any
-reference image. Both loaders must have the same complete `capture_id` set, and each screenshot is
-judged independently against its expectation. This prevents a shared renderer, state, or equipment
-bug from becoming correct merely because both loaders agree. For each semantic `capture_id`, a
+named by its served-byte SHA-256. Each curated manifest row also carries the bounded message from
+that capture's required passed assertion as `runtime_evidence`; this gives the reviewer exact
+renderer/state evidence where pixels are intrinsically ambiguous without allowing it to excuse a
+visible contradiction. A 1.20.1 run exposes every Fabric and Forge frame without any reference
+image. Both loaders must have the same complete `capture_id` set, and each screenshot is judged
+independently against its expectation. This prevents a shared renderer, state, or equipment bug
+from becoming correct merely because both loaders agree. For each semantic `capture_id`, a
 later-version candidate is paired with the authenticated current-head Fabric 1.20.1 frame selected
 only from the protected lossless Pages handoff; the compact WebP cache is never an AI oracle.
 Candidate and reference are normalized to the same dimensions without changing aspect ratio. The
@@ -261,9 +272,9 @@ reviews.
 The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
 over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
 candidate/reference pair clean without a model call. It may also reuse a protected verdict only
-when candidate and reference PNG digests, expectation, capture identity, loader artifact, scenario
-contract, release matrix, prompts, reviewer/checker/cache code, models, mode, and chunk policy all
-match exactly;
+when candidate and reference PNG digests, expectation, passed runtime evidence, capture identity,
+loader artifact, scenario contract, release matrix, prompts, reviewer/checker/cache code, models,
+mode, and chunk policy all match exactly;
 unpaired anchor semantics are never cached. Sonnet triages the remaining frames in loader-sibling
 chunks of at most eight. All independent chunks run concurrently, and each concern or confidence
 below high is independently rechecked by Opus in concurrent chunks of at most four as soon as its
@@ -280,7 +291,8 @@ never hide a semantic failure. It uploads only a schema-normalized report; raw p
 private. Transient provider failures create only a sanitized one-day cooldown marker, leaving the
 queue entry for retry while other entries progress. Terminal validation/configuration failures are
 marked and retired. An independent cleanup job deletes a settled entry by exact artifact id. The
-final small report remains for one day. Exact-policy verdict cache shards remain for seven days;
+final small report remains for seven days so it can release the delayed compatibility wave.
+Exact-policy verdict cache shards remain for seven days;
 parallel drains may briefly publish siblings, and a later protected successor combines and retires
 every authenticated shard it consumed without dropping concurrent verdicts.
 
@@ -295,6 +307,54 @@ no-op. There is no direct automatic fan-out for a documentation/site/administrat
 because that tip may include an older uncertified runtime change. Manual exact-target dispatch
 remains available for recovery.
 
+## Post-validation optional-mod compatibility
+
+An automatic release-tree run starts this wave only after that exact tree has passed Build, the
+complete packaged suite, and independent semantic AI review. The execution unit is one release
+artifact plus one optional mod. Every applicable unit runs concurrently, first executes the
+`mod-compatibility` activation scenario, and then executes the complete ordinary release scenario
+set. Unsupported combinations are retained as explicit `not_applicable` plan rows rather than
+silently disappearing.
+
+[`mod-compatibility-contract.json`](mod-compatibility-contract.json) locks Customizable Player
+Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, and ReplayMod. Player Armor Stands
+is intentionally absent and unsupported. A runtime may install only the exact URL, filename, byte
+size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth for `latest`.
+Inspect the current branch plan without launching Minecraft:
+
+```bash
+python3 e2e/mod_compatibility.py --plan
+```
+
+To exercise one lane manually after staging the ordinary release artifacts, use the same
+orchestrator and include both the activation scenario and the complete base profile:
+
+```bash
+python3 e2e/orchestrator.py \
+  --packaged \
+  --artifacts-manifest build/release/artifacts.json \
+  --artifact-node fabric-1.20.1 \
+  --runtime-version 1.20.1 \
+  --compatibility-mod cpm \
+  --scenarios mod-compatibility,phase0-smoke,propagation,propagation-live,full
+```
+
+Refreshing external versions is a deliberate maintenance operation, not a test step. From a
+trusted checkout with current remote release branches, run the updater and review every selected
+version, URL, applicability change, and checksum diff before committing it:
+
+```bash
+python3 e2e/update_mod_compatibility_lock.py
+python3 e2e/mod_compatibility.py --validate
+```
+
+After every deterministic lane passes, a secretless job authenticates the full modded result and
+the clean same-version/loader result, pairs every contracted capture, and re-encodes only bounded,
+metadata-free PNGs. The credential-bearing review workflow receives that curated capsule, never
+the raw packaged artifacts. Sonnet reviews every pair semantically—even byte-identical pairs—and
+Opus confirms every concern or confidence below high. A first Opus-confirmed defect creates a
+durable source-wave block and cancels the remaining compatibility review jobs.
+
 ## Public visual evidence
 
 The architectural rationale, evaluated alternatives, and external precedents are recorded in
@@ -304,8 +364,9 @@ The required runtime does not treat a filename as screenshot identity. Each vali
 the semantic key `<artifact>/<scenario>/<client-role>/<step>`, and
 [`scenario-contract.json`](scenario-contract.json) supplies its stable title, expectation, and
 advisory review tier. `result.json` remains authoritative for the screenshot path, status,
-SHA-256, dimensions, and before/after pixel metrics. The canonical contract and runtime evidence
-must have exact test-enforced coverage.
+SHA-256, dimensions, passed assertion message, and before/after pixel metrics. The canonical
+contract and runtime evidence must have exact test-enforced coverage. AI review receives that
+bounded assertion message explicitly; all manifest strings remain untrusted review data.
 
 `visual_review_workflow.js` is an optional manual Workflow adapter, not the GitHub Actions entry
 point. It consumes the generated manifest and emits the same exact verdict-array contract that CI
