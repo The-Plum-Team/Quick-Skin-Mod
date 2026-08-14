@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import stat
 import sys
 from dataclasses import dataclass
@@ -61,6 +62,12 @@ class ConflictClassification:
             "delete_paths": list(self.delete_paths),
             "ai_paths": list(self.ai_paths),
         }
+
+
+@dataclass(frozen=True)
+class TargetMatrixProfile:
+    active_loaders: frozenset[str]
+    active_overlay_roots: frozenset[str]
 
 
 def _read_bounded_regular_utf8(path: Path, *, limit: int, label: str) -> str:
@@ -140,9 +147,7 @@ def _reject_nonfinite_json(value: str) -> None:
     raise ValueError(f"non-finite JSON number {value!r}")
 
 
-def read_active_loaders(matrix_path: Path) -> frozenset[str]:
-    """Read exactly the loader identities needed by the pure classifier."""
-
+def _read_matrix(matrix_path: Path) -> dict[str, Any]:
     text = _read_bounded_regular_utf8(
         matrix_path, limit=MAX_MATRIX_BYTES, label="release matrix"
     )
@@ -158,6 +163,10 @@ def read_active_loaders(matrix_path: Path) -> frozenset[str]:
         raise ConflictClassificationError(
             "release matrix must be a schema_version 2 object"
         )
+    return matrix
+
+
+def _active_loaders(matrix: dict[str, Any]) -> frozenset[str]:
     artifacts = matrix.get("artifacts")
     if not isinstance(artifacts, list) or not artifacts:
         raise ConflictClassificationError(
@@ -179,8 +188,74 @@ def read_active_loaders(matrix_path: Path) -> frozenset[str]:
     return frozenset(active)
 
 
+def read_active_loaders(matrix_path: Path) -> frozenset[str]:
+    """Read exactly the loader identities needed by the pure classifier."""
+
+    return _active_loaders(_read_matrix(matrix_path))
+
+
+def read_target_matrix_profile(matrix_path: Path) -> TargetMatrixProfile:
+    """Read the target loaders and exact matrix-owned live overlay roots."""
+
+    matrix = _read_matrix(matrix_path)
+    active_loaders = _active_loaders(matrix)
+    source_overlays = matrix.get("source_overlays")
+    expected_modules = {"common", *active_loaders}
+    if not isinstance(source_overlays, dict) or set(source_overlays) != expected_modules:
+        raise ConflictClassificationError(
+            "release matrix source_overlays must define common and every active loader"
+        )
+
+    roots: set[str] = set()
+    for module, routes in source_overlays.items():
+        if not isinstance(routes, dict):
+            raise ConflictClassificationError(
+                f"release matrix source_overlays.{module} must be an object"
+            )
+        module_roots: set[str] = set()
+        for version, overlay in routes.items():
+            if not isinstance(version, str) or not version:
+                raise ConflictClassificationError(
+                    f"release matrix source_overlays.{module} has an invalid version"
+                )
+            if not isinstance(overlay, str) or not re.fullmatch(
+                r"legacy[0-9A-Za-z_]+", overlay
+            ):
+                raise ConflictClassificationError(
+                    f"release matrix source_overlays.{module}.{version} "
+                    "must name a legacy* root"
+                )
+            if overlay in module_roots:
+                raise ConflictClassificationError(
+                    f"release matrix source_overlays.{module} reuses an overlay root"
+                )
+            module_roots.add(overlay)
+            roots.add(f"{module}/src/{overlay}")
+    return TargetMatrixProfile(active_loaders, frozenset(roots))
+
+
+def _overlay_root(path: str) -> str | None:
+    match = re.fullmatch(
+        rf"(?P<module>common|{'|'.join(sorted(KNOWN_LOADERS))})/src/"
+        r"(?P<overlay>legacy[0-9A-Za-z_]+)/.+",
+        path,
+    )
+    if match is None:
+        return None
+    return f"{match.group('module')}/src/{match.group('overlay')}"
+
+
+def is_inactive_overlay_path(
+    path: str, active_overlay_roots: Iterable[str]
+) -> bool:
+    root = _overlay_root(path)
+    return root is not None and root not in frozenset(active_overlay_roots)
+
+
 def classify_conflicts(
-    paths: Iterable[str], active_loaders: Iterable[str]
+    paths: Iterable[str],
+    active_loaders: Iterable[str],
+    active_overlay_roots: Iterable[str],
 ) -> ConflictClassification:
     """Classify normalized original conflicts into exact mechanical policies."""
 
@@ -189,6 +264,23 @@ def classify_conflicts(
         raise ConflictClassificationError(
             f"active loaders must be a non-empty subset of {sorted(KNOWN_LOADERS)}"
         )
+    overlay_roots = frozenset(active_overlay_roots)
+    for root in overlay_roots:
+        if not isinstance(root, str):
+            raise ConflictClassificationError(
+                f"active overlay root {root!r} is not owned by the target matrix"
+            )
+        match = re.fullmatch(
+            rf"(?P<module>common|{'|'.join(sorted(KNOWN_LOADERS))})/src/"
+            r"legacy[0-9A-Za-z_]+",
+            root,
+        )
+        if match is None or (
+            match.group("module") != "common" and match.group("module") not in active
+        ):
+            raise ConflictClassificationError(
+                f"active overlay root {root!r} is not owned by the target matrix"
+            )
 
     source_paths: list[str] = []
     target_paths: list[str] = []
@@ -227,6 +319,9 @@ def classify_conflicts(
                 )
             delete_paths.append(path)
             continue
+        if is_inactive_overlay_path(path, overlay_roots):
+            delete_paths.append(path)
+            continue
         if is_ai_protected(path):
             raise ConflictClassificationError(
                 f"unknown protected version-port conflict {path!r}"
@@ -256,8 +351,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         paths = read_conflict_paths(args.paths_file)
-        active_loaders = read_active_loaders(args.matrix)
-        result = classify_conflicts(paths, active_loaders)
+        profile = read_target_matrix_profile(args.matrix)
+        result = classify_conflicts(
+            paths,
+            profile.active_loaders,
+            profile.active_overlay_roots,
+        )
     except ConflictClassificationError as exc:
         print(f"version-port conflict classification error: {exc}", file=sys.stderr)
         return 2

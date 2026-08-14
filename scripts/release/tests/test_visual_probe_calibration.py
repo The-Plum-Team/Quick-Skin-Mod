@@ -271,8 +271,10 @@ class VisualProbeCalibrationTest(unittest.TestCase):
         self.assertIn("MODEL_EVIDENCE_FOV = 50", source)
         self.assertIn("pinRearEvidenceView(mc);", source)
         self.assertIn("renderer model=", source)
-        self.assertIn("3-pixel-wide arms", steps["model_slim"]["capture"]["expectation"])
-        self.assertIn("4-pixel-wide arms", steps["model_classic"]["capture"]["expectation"])
+        self.assertIn("FOV-50 rear view", steps["model_slim"]["capture"]["expectation"])
+        self.assertIn("3-pixel base geometry", steps["model_slim"]["capture"]["expectation"])
+        self.assertIn("inflated jacket outer layer", steps["model_slim"]["capture"]["expectation"])
+        self.assertIn("4-pixel base geometry", steps["model_classic"]["capture"]["expectation"])
 
     def test_bmo_padding_and_aligned_uv_semantics_are_separate_checkpoints(self) -> None:
         """Padding and auxiliary UV faces must never share one ambiguous model expectation."""

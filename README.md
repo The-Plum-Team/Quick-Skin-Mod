@@ -68,9 +68,12 @@ is not launched a second time merely to publish the result.
 - Choose automatic, classic, or slim player models.
 - Preview appearances in an interactive 3D player widget.
 - Synchronize Quick Skin appearances when the mod is installed on the server.
-- Use optional Customizable Player Models (`.cpmmodel`) and 3D Skin Layers integrations when their matching third-party mod is installed.
+- Use optional integrations with Customizable Player Models (`.cpmmodel`), Ears, 3D Skin Layers,
+  CustomNPCs, Essential, and ReplayMod when the matching third-party mod is installed.
 
-Quick Skin does not declare CPM or 3D Skin Layers as required dependencies. If an optional mod or API is unavailable, the corresponding integration disables itself and normal skin/cape behavior remains available.
+Quick Skin does not declare these integrations as required dependencies. If an optional mod or API
+is unavailable, its integration disables itself and normal skin/cape behavior remains available.
+Player Armor Stands is not a supported Quick Skin integration.
 
 ## Current branch build matrix
 
