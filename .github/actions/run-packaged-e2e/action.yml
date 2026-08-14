@@ -8,6 +8,9 @@ inputs:
   row-json:
     description: One authoritative runtime matrix row as JSON
     required: true
+  source-sha:
+    description: Exact checked-out commit bound to the immutable release bundle
+    required: true
   scenarios:
     description: Comma-separated contract scenario ids
     required: true
@@ -78,7 +81,14 @@ runs:
 
     - name: Reverify staged bytes, matrix, and source commit
       shell: bash
-      run: python scripts/release/verify_release.py --verify-staged
+      env:
+        EXPECTED_SOURCE_SHA: ${{ inputs.source-sha }}
+      run: |
+        set -euo pipefail
+        [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+        [[ "$(git rev-parse HEAD)" == "$EXPECTED_SOURCE_SHA" ]]
+        GITHUB_SHA="$EXPECTED_SOURCE_SHA" \
+          python scripts/release/verify_release.py --verify-staged
 
     - name: Run contract-declared packaged scenarios
       shell: bash
