@@ -21,7 +21,10 @@ REVIEW_TIERS = frozenset({"all", "key"})
 ORCHESTRATION_MODES = frozenset(
     {"single-client", "sequential-two-client", "concurrent-two-client"}
 )
-EXECUTION_PROFILES = frozenset({"runtime-default", "pr", "release"})
+EXECUTION_PROFILES = frozenset(
+    {"runtime-default", "pr", "release", "compatibility"}
+)
+REQUIRED_EXECUTION_PROFILES = frozenset({"runtime-default", "pr", "release"})
 
 
 class ScenarioContractError(ValueError):
@@ -122,6 +125,7 @@ class Capture:
     review_tier: str
     expectation: str
     probes: tuple[VisualProbe, ...]
+    compatibility_reference_capture_id: str | None = None
 
     @property
     def capture_id(self) -> str:
@@ -713,6 +717,7 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
                         step_raw["capture"],
                         f"{step_label}.capture",
                         frozenset({"title", "review_tier", "expectation", "probes"}),
+                        frozenset({"compatibility_reference_capture_id"}),
                     )
                     review_tier = _text(
                         capture_raw["review_tier"],
@@ -763,6 +768,14 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
                             f"{step_label}.capture.expectation",
                         ),
                         probes,
+                        (
+                            _text(
+                                capture_raw["compatibility_reference_capture_id"],
+                                f"{step_label}.capture.compatibility_reference_capture_id",
+                            )
+                            if "compatibility_reference_capture_id" in capture_raw
+                            else None
+                        ),
                     )
                 steps.append(StepContract(step_name, assertion_required, capture))
 
@@ -812,7 +825,40 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
             )
         )
 
-    for profile in EXECUTION_PROFILES:
+    capture_profiles = {
+        step.capture.capture_id: scenario.execution_profiles
+        for scenario in scenarios
+        for role in scenario.roles
+        for step in role.steps
+        if step.capture is not None
+    }
+    for scenario in scenarios:
+        is_compatibility = "compatibility" in scenario.execution_profiles
+        for role in scenario.roles:
+            for step in role.steps:
+                if step.capture is None:
+                    continue
+                reference = step.capture.compatibility_reference_capture_id
+                if is_compatibility and reference is None:
+                    raise ScenarioContractError(
+                        f"compatibility capture {step.capture.capture_id!r} has no base reference"
+                    )
+                if not is_compatibility and reference is not None:
+                    raise ScenarioContractError(
+                        f"non-compatibility capture {step.capture.capture_id!r} declares a compatibility reference"
+                    )
+                if reference is not None and reference not in capture_profiles:
+                    raise ScenarioContractError(
+                        f"compatibility capture {step.capture.capture_id!r} references unknown capture {reference!r}"
+                    )
+                if reference is not None and "release" not in capture_profiles[reference]:
+                    raise ScenarioContractError(
+                        f"compatibility capture {step.capture.capture_id!r} reference is not in the release profile"
+                    )
+
+    # Extension profiles are allowed to be absent from deliberately minimal contracts used by
+    # consumers and tests. The three base packaged-runtime profiles remain mandatory everywhere.
+    for profile in REQUIRED_EXECUTION_PROFILES:
         if not any(profile in scenario.execution_profiles for scenario in scenarios):
             raise ScenarioContractError(
                 f"E2E execution profile {profile!r} has no scenarios"
