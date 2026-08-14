@@ -134,6 +134,26 @@ def probe_command(claude: Path, model: str) -> list[str]:
     ]
 
 
+def resolve_claude_executable(claude: Path) -> Path:
+    """Resolve npm's expected ``.bin`` symlink without admitting an external target."""
+
+    if (
+        claude.name != "claude"
+        or claude.parent.name != ".bin"
+        or claude.parent.parent.name != "node_modules"
+    ):
+        raise ProbeError("Claude executable path is outside the locked npm layout")
+    try:
+        node_modules = claude.parent.parent.resolve(strict=True)
+        executable = claude.resolve(strict=True)
+        executable.relative_to(node_modules)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ProbeError("Claude executable escapes the locked npm layout") from exc
+    if not executable.is_file() or not os.access(executable, os.X_OK):
+        raise ProbeError("Claude executable is unavailable")
+    return executable
+
+
 def load_stream(path: Path) -> tuple[Any, list[dict[str, Any]]]:
     try:
         payload = path.read_bytes()
@@ -169,18 +189,13 @@ def load_stream(path: Path) -> tuple[Any, list[dict[str, Any]]]:
 
 
 def run_probe(claude: Path, model: str, work_root: Path) -> tuple[str, str]:
-    if (
-        not claude.is_file()
-        or claude.is_symlink()
-        or not os.access(claude, os.X_OK)
-    ):
-        raise ProbeError("Claude executable is unavailable")
+    executable = resolve_claude_executable(claude)
     work_root.mkdir(parents=True, exist_ok=False)
     stdout_path = work_root / "private-result.json"
     stderr_path = work_root / "private-stderr.log"
     with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
         process = subprocess.Popen(
-            probe_command(claude, model),
+            probe_command(executable, model),
             cwd=work_root,
             stdin=subprocess.DEVNULL,
             stdout=stdout,
