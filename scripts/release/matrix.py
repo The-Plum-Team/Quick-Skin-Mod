@@ -68,6 +68,7 @@ class MatrixError(ValueError):
 LEGACY_E2E_POLICY_FIELDS = frozenset(
     {"scheduled_scenarios", "pr_scenarios"}
 )
+PLAYER_ARMOR_STANDS_MOD_ID = "pas"
 
 
 def normalize_legacy_e2e_policy(data: dict[str, Any]) -> dict[str, Any]:
@@ -83,6 +84,34 @@ def normalize_legacy_e2e_policy(data: dict[str, Any]) -> dict[str, Any]:
         for runtime in runtimes:
             if isinstance(runtime, dict):
                 runtime.pop("scenario", None)
+    return normalized
+
+
+def retire_player_armor_stands_metadata(data: dict[str, Any]) -> dict[str, Any]:
+    """Return a deep copy without the retired Player Armor Stands suggestion.
+
+    Version branches intentionally keep their own loader metadata during a
+    semantic port.  This explicit migration removes only the obsolete optional
+    dependency while preserving every other branch-specific suggestion.
+    """
+
+    if not isinstance(data, dict):
+        raise MatrixError("release matrix root must be an object")
+    normalized = copy.deepcopy(data)
+    artifacts = normalized.get("artifacts")
+    if isinstance(artifacts, list):
+        for artifact in artifacts:
+            if not isinstance(artifact, dict):
+                continue
+            metadata = artifact.get("metadata")
+            if not isinstance(metadata, dict) or "suggests" not in metadata:
+                continue
+            suggestions = metadata["suggests"]
+            if not isinstance(suggestions, dict):
+                raise MatrixError("artifact metadata.suggests must be an object")
+            suggestions.pop(PLAYER_ARMOR_STANDS_MOD_ID, None)
+            if not suggestions:
+                metadata.pop("suggests")
     return normalized
 
 
@@ -811,6 +840,11 @@ def main() -> int:
         help="strip only legacy matrix-owned E2E scenario policy",
     )
     parser.add_argument(
+        "--retire-player-armor-stands",
+        action="store_true",
+        help="remove only the retired Player Armor Stands suggestion",
+    )
+    parser.add_argument(
         "--write",
         action="store_true",
         help="atomically write the normalized matrix back to --matrix",
@@ -819,23 +853,27 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        if args.write and not args.normalize_e2e_policy:
-            raise MatrixError("--write requires --normalize-e2e-policy")
+        normalizing = (
+            args.normalize_e2e_policy or args.retire_player_armor_stands
+        )
+        if args.write and not normalizing:
+            raise MatrixError("--write requires a normalization option")
         if args.matrix_properties is not None and args.kind is None:
             raise MatrixError("--matrix-properties requires --kind")
-        if args.normalize_e2e_policy:
+        if normalizing:
             if args.matrix_properties is not None:
                 raise MatrixError(
-                    "--normalize-e2e-policy cannot be combined with "
-                    "--matrix-properties"
+                    "normalization cannot be combined with --matrix-properties"
                 )
             if args.kind is not None:
                 raise MatrixError(
-                    "--normalize-e2e-policy cannot be combined with --kind"
+                    "normalization cannot be combined with --kind"
                 )
-            data = normalize_legacy_e2e_policy(
-                read_matrix_data(args.matrix)
-            )
+            data = read_matrix_data(args.matrix)
+            if args.normalize_e2e_policy:
+                data = normalize_legacy_e2e_policy(data)
+            if args.retire_player_armor_stands:
+                data = retire_player_armor_stands_metadata(data)
             validate_matrix_file(args.matrix, data)
             if args.write:
                 write_matrix_atomic(args.matrix, data)
