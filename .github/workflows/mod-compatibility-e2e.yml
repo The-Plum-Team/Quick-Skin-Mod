@@ -1,0 +1,537 @@
+name: Mod compatibility E2E
+
+# A clean, normalized base visual review requests this second wave. The protected admission job
+# reauthenticates that report, the tested source bytes, and the exact merged release tree before any
+# external mod is downloaded. Every applicable mod/loader lane then starts in parallel.
+on:
+  repository_dispatch:
+    types:
+      - mod-compatibility-requested
+
+permissions: {}
+
+concurrency:
+  group: mod-compatibility-${{ github.event.client_payload.target_sha || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
+  LIBGL_ALWAYS_SOFTWARE: "1"
+  GALLIUM_DRIVER: llvmpipe
+  __GLX_VENDOR_LIBRARY_NAME: mesa
+
+jobs:
+  admit:
+    name: Authenticate the clean base release
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      source_branch: ${{ steps.admit.outputs.source_branch }}
+      source_run_id: ${{ steps.admit.outputs.source_run_id }}
+      source_sha: ${{ steps.admit.outputs.source_sha }}
+      target_branch: ${{ steps.admit.outputs.target_branch }}
+      target_sha: ${{ steps.admit.outputs.target_sha }}
+
+    steps:
+      - name: Check out the protected admission policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Authenticate the normalized report and exact merged tree
+        id: admit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_ARTIFACT_DIGEST: ${{ github.event.client_payload.review_artifact_digest }}
+          REVIEW_ARTIFACT_ID: ${{ github.event.client_payload.review_artifact_id }}
+          REVIEW_ARTIFACT_NAME: ${{ github.event.client_payload.review_artifact_name }}
+          REVIEW_ARTIFACT_RUN_ID: ${{ github.event.client_payload.review_artifact_run_id }}
+          REVIEW_ARTIFACT_SIZE: ${{ github.event.client_payload.review_artifact_size }}
+          SOURCE_BRANCH: ${{ github.event.client_payload.source_branch }}
+          SOURCE_RUN_ID: ${{ github.event.client_payload.source_run_id }}
+          SOURCE_SHA: ${{ github.event.client_payload.source_sha }}
+          TARGET_BRANCH: ${{ github.event.client_payload.target_branch }}
+          TARGET_SHA: ${{ github.event.client_payload.target_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$ ]]
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TARGET_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$ ]]
+          [[ "$REVIEW_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$REVIEW_ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$REVIEW_ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
+          (( REVIEW_ARTIFACT_SIZE <= 16777216 ))
+          [[ "$REVIEW_ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$REVIEW_ARTIFACT_NAME" == "visual-review-$SOURCE_RUN_ID" ]]
+          python3 scripts/release/version_branches.py --target "$TARGET_BRANCH" > /dev/null
+
+          source_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          jq -e \
+            --arg branch "$SOURCE_BRANCH" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sha "$SOURCE_SHA" \
+            --argjson run_id "$SOURCE_RUN_ID" \
+            '.id == $run_id and .status == "completed" and .conclusion == "success" and
+             (.event == "pull_request" or .event == "schedule" or
+              .event == "workflow_dispatch") and .head_branch == $branch and
+             .head_sha == $sha and .path == ".github/workflows/on-demand-e2e.yml" and
+             .head_repository.full_name == $repository' \
+            <<< "$source_run" > /dev/null
+
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$TARGET_BRANCH" \
+            --jq .commit.sha)" == "$TARGET_SHA" ]]
+          git fetch --no-tags origin "$SOURCE_SHA" "$TARGET_SHA"
+          [[ "$(git rev-parse "$SOURCE_SHA^{tree}")" == \
+             "$(git rev-parse "$TARGET_SHA^{tree}")" ]]
+          if [[ "$SOURCE_SHA" != "$TARGET_SHA" ]]; then
+            [[ "$SOURCE_BRANCH" == automation/sync/* ]]
+            associated="$(gh api -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls?per_page=20")"
+            jq -e \
+              --arg repository "$GITHUB_REPOSITORY" \
+              --arg source_branch "$SOURCE_BRANCH" \
+              --arg source_sha "$SOURCE_SHA" \
+              --arg target_branch "$TARGET_BRANCH" \
+              --arg target_sha "$TARGET_SHA" \
+              '[.[] | select(
+                .base.ref == $target_branch and .base.repo.full_name == $repository and
+                .head.ref == $source_branch and .head.sha == $source_sha and
+                .head.repo.full_name == $repository and
+                .user.login == "github-actions[bot]" and
+                ([.labels[].name] | index("automated-version-sync")) != null and
+                .merged_at != null and .merge_commit_sha == $target_sha)] | length == 1' \
+              <<< "$associated" > /dev/null
+          else
+            [[ "$SOURCE_BRANCH" == "$TARGET_BRANCH" ]]
+          fi
+
+          review_metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$REVIEW_ARTIFACT_ID")"
+          jq -e \
+            --arg digest "$REVIEW_ARTIFACT_DIGEST" \
+            --arg name "$REVIEW_ARTIFACT_NAME" \
+            --argjson artifact_id "$REVIEW_ARTIFACT_ID" \
+            --argjson run_id "$REVIEW_ARTIFACT_RUN_ID" \
+            --argjson size "$REVIEW_ARTIFACT_SIZE" \
+            '.id == $artifact_id and .name == $name and .digest == $digest and
+             .size_in_bytes == $size and .expired == false and
+             .workflow_run.id == $run_id' \
+            <<< "$review_metadata" > /dev/null
+          review_owner=''
+          for attempt in {1..120}; do
+            review_owner="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$REVIEW_ARTIFACT_RUN_ID")"
+            if [[ "$(jq -r .status <<< "$review_owner")" == completed ]]; then
+              break
+            fi
+            sleep 5
+          done
+          review_owner_sha="$(jq -er \
+            '.head_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
+            <<< "$review_owner")"
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --argjson run_id "$REVIEW_ARTIFACT_RUN_ID" \
+            '.id == $run_id and .status == "completed" and .conclusion == "success" and
+             (.event == "repository_dispatch" or .event == "schedule" or
+              .event == "workflow_dispatch") and .head_branch == "master" and
+             .path == ".github/workflows/visual-review-drain.yml" and
+             .head_repository.full_name == $repository' \
+            <<< "$review_owner" > /dev/null
+          git merge-base --is-ancestor "$review_owner_sha" "$GITHUB_SHA"
+
+          archive="$RUNNER_TEMP/base-visual-review.zip"
+          gh api -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$REVIEW_ARTIFACT_ID/zip" \
+            > "$archive"
+          [[ "$(stat -c %s "$archive")" == "$REVIEW_ARTIFACT_SIZE" ]]
+          [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
+             "$REVIEW_ARTIFACT_DIGEST" ]]
+          review_root="$RUNNER_TEMP/base-visual-review"
+          python3 scripts/ci/bounded_zip.py "$archive" "$review_root" \
+            --max-archive-bytes 16777216 \
+            --max-entries 4 \
+            --max-total-bytes 16777216 \
+            --max-file-bytes 10485760 \
+            --max-compression-ratio 200 > /dev/null
+          rm -f -- "$archive"
+          proof="$review_root/curation-proof.json"
+          # upload-artifact preserves the curated directory because the handoff also
+          # contains the root-level proof. Keep this consumer aligned with that exact
+          # four-file producer layout.
+          manifest="$review_root/review-input/visual-review-manifest.json"
+          report="$review_root/visual-review-report.json"
+          completion="$review_root/visual-review-completion.json"
+          test -f "$proof" -a -f "$manifest" -a -f "$report" -a -f "$completion"
+          jq -e \
+            --arg branch "$SOURCE_BRANCH" \
+            --arg sha "$SOURCE_SHA" \
+            --argjson run_id "$SOURCE_RUN_ID" \
+            '.source_run_id == $run_id and .source_branch == $branch and
+             .source_sha == $sha and
+             (.review_mode == "anchor-semantic" or
+              .review_mode == "reference-comparison")' \
+            "$proof" > /dev/null
+          jq -e \
+            --argjson frames "$(jq length "$manifest")" \
+            '(keys | sort) == (["manifest_frames", "report_verdicts",
+              "schema_version", "state"] | sort) and .schema_version == 1 and
+             .state == "complete" and .manifest_frames == $frames and
+             .report_verdicts == $frames' "$completion" > /dev/null
+          report_arguments=(
+            --manifest "$manifest"
+            --report "$report"
+          )
+          if [[ "$(jq -er .review_mode "$proof")" == reference-comparison ]]; then
+            report_arguments+=(--require-paired)
+          fi
+          python3 e2e/check_visual_review.py "${report_arguments[@]}"
+          jq -e 'length > 0 and all(.[];
+            .semantic_valid == true and .defect == false and
+            (.matches_reference == null or .matches_reference == true))' \
+            "$report" > /dev/null
+
+          bundle_metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?name=e2e-input-bundle&per_page=100")"
+          jq -e \
+            --argjson run_id "$SOURCE_RUN_ID" \
+            '[.artifacts[] | select(.name == "e2e-input-bundle" and
+              .expired == false and .workflow_run.id == $run_id and
+              (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
+              ((.size_in_bytes | type) == "number" and .size_in_bytes > 0))] |
+             length == 1' <<< "$bundle_metadata" > /dev/null
+
+          printf 'source_branch=%s\n' "$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
+          printf 'source_run_id=%s\n' "$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+          printf 'source_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          printf 'target_branch=%s\n' "$TARGET_BRANCH" >> "$GITHUB_OUTPUT"
+          printf 'target_sha=%s\n' "$TARGET_SHA" >> "$GITHUB_OUTPUT"
+
+  prepare:
+    name: Resolve immutable mod lanes
+    needs: admit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      bundle_name: ${{ steps.plan.outputs.bundle_name }}
+      count: ${{ steps.plan.outputs.count }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+
+    steps:
+      - name: Check out the exact tested source tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.admit.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Fetch the exact already-tested production bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e2e-input-bundle
+          path: build/release
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.admit.outputs.source_run_id }}
+
+      - name: Reverify the source-bound bundle and resolve every applicable lane
+        id: plan
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ needs.admit.outputs.source_branch }}
+          SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
+          SOURCE_SHA: ${{ needs.admit.outputs.source_sha }}
+          TARGET_BRANCH: ${{ needs.admit.outputs.target_branch }}
+          TARGET_SHA: ${{ needs.admit.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/verify_release.py --verify-staged
+          python3 e2e/mod_compatibility.py --plan > "$RUNNER_TEMP/compatibility-plan.raw.json"
+          jq \
+            --arg source_branch "$SOURCE_BRANCH" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg target_branch "$TARGET_BRANCH" \
+            --arg target_sha "$TARGET_SHA" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '. + {source_run_id:$source_run_id,source_branch:$source_branch,
+              source_sha:$source_sha,target_branch:$target_branch,target_sha:$target_sha}' \
+            "$RUNNER_TEMP/compatibility-plan.raw.json" \
+            > "$RUNNER_TEMP/mod-compatibility-plan.json"
+          jq -e \
+            --arg source_branch "$SOURCE_BRANCH" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg target_branch "$TARGET_BRANCH" \
+            --arg target_sha "$TARGET_SHA" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '.schema_version == 1 and .release_branch == $target_branch and
+             .source_run_id == $source_run_id and .source_branch == $source_branch and
+             .source_sha == $source_sha and .target_branch == $target_branch and
+             .target_sha == $target_sha and
+             (.compatibility_contract_sha256 | type == "string" and
+              test("^[0-9a-f]{64}$")) and
+             (.runnable | type == "array" and length <= 64) and
+             (.not_applicable | type == "array" and length <= 64) and
+             (.compatibility_contract_sha256 as $lock |
+              all(.runnable[];
+                (.id | type == "string" and test("^[a-z0-9][a-z0-9_-]{0,255}$")) and
+                (.artifact_node | type == "string" and
+                  test("^[a-z0-9][a-z0-9.-]{0,127}$")) and
+                (.runtime_version | type == "string" and
+                  test("^[0-9]+([.][0-9]+)+$")) and
+                (.loader == "fabric" or .loader == "forge" or
+                  .loader == "neoforge") and
+                (.compatibility_mod | type == "string" and
+                  test("^[a-z][a-z0-9-]{1,63}$")) and
+                (.compatibility_name | type == "string" and
+                  test("^[A-Za-z0-9][A-Za-z0-9 ._+-]{0,127}$")) and
+                (.base_evidence_name | type == "string" and
+                  test("^packaged-e2e-[a-z0-9_-]{1,255}$")) and
+                .compatibility_contract_sha256 == $lock))' \
+            "$RUNNER_TEMP/mod-compatibility-plan.json" > /dev/null
+          matrix="$(jq -c '{include:.runnable}' \
+            "$RUNNER_TEMP/mod-compatibility-plan.json")"
+          count="$(jq '.runnable | length' "$RUNNER_TEMP/mod-compatibility-plan.json")"
+          [[ "$count" =~ ^[0-9]+$ ]]
+          bundle_name="mod-compatibility-input-$SOURCE_RUN_ID"
+          printf 'bundle_name=%s\n' "$bundle_name" >> "$GITHUB_OUTPUT"
+          printf 'count=%s\n' "$count" >> "$GITHUB_OUTPUT"
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+          {
+            printf '## Mod compatibility plan\n\n'
+            printf '%s runnable lanes; %s explicit N/A lanes.\n\n' \
+              "$count" "$(jq '.not_applicable | length' \
+                "$RUNNER_TEMP/mod-compatibility-plan.json")"
+            jq -r '.not_applicable[]? | "- N/A `\(.artifact_node)` / `\(.mod)`: \(.reason)"' \
+              "$RUNNER_TEMP/mod-compatibility-plan.json"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the authenticated compatibility plan
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mod-compatibility-plan
+          path: ${{ runner.temp }}/mod-compatibility-plan.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Re-publish the exact source bundle for parallel consumers
+        if: steps.plan.outputs.count != '0'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.plan.outputs.bundle_name }}
+          path: build/release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  compatibility-e2e:
+    name: ${{ matrix.artifact_node }} / ${{ matrix.compatibility_name }}
+    needs:
+      - admit
+      - prepare
+    if: needs.prepare.outputs.count != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+
+    steps:
+      - name: Check out exact tested runtime code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.admit.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Run the activation probe and complete packaged suite
+        uses: ./.github/actions/run-packaged-e2e
+        with:
+          bundle-name: ${{ needs.prepare.outputs.bundle_name }}
+          row-json: ${{ toJSON(matrix) }}
+          scenarios: ${{ matrix.scenarios }}
+          compatibility-mod: ${{ matrix.compatibility_mod }}
+          evidence-name: mod-compatibility-e2e-${{ matrix.id }}
+          evidence-retention-days: "7"
+
+  curate:
+    name: Curate ${{ matrix.artifact_node }} / ${{ matrix.compatibility_name }}
+    needs:
+      - admit
+      - prepare
+      - compatibility-e2e
+    if: >-
+      needs.prepare.outputs.count != '0' &&
+      needs.compatibility-e2e.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+
+    steps:
+      - name: Check out exact tested curation code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.admit.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install the hash-locked evidence decoder
+        run: >-
+          python -m pip install
+          --only-binary=:all:
+          --require-hashes
+          --requirement scripts/pages/requirements.txt
+
+      - name: Download the exact compatibility candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mod-compatibility-e2e-${{ matrix.id }}
+          path: candidate-evidence
+
+      - name: Download the clean same-version baseline
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ matrix.base_evidence_name }}
+          path: base-evidence
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.admit.outputs.source_run_id }}
+
+      - name: Snapshot artifact provenance and curate only inert PNG pairs
+        shell: bash
+        env:
+          BASE_NAME: ${{ matrix.base_evidence_name }}
+          CANDIDATE_NAME: mod-compatibility-e2e-${{ matrix.id }}
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          inventory="$RUNNER_TEMP/compatibility-artifact-inventory.json"
+          current=""
+          for attempt in {1..12}; do
+            current="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100")"
+            if jq -e --arg name "$CANDIDATE_NAME" --argjson run_id "$GITHUB_RUN_ID" \
+                '[.artifacts[] | select(.name == $name and .expired == false and
+                  .workflow_run.id == $run_id)] | length == 1' \
+                <<< "$current" > /dev/null; then
+              break
+            fi
+            sleep 5
+          done
+          base="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+          jq -n \
+            --arg base_name "$BASE_NAME" \
+            --arg candidate_name "$CANDIDATE_NAME" \
+            --argjson base "$base" \
+            --argjson candidate "$current" \
+            --argjson base_run_id "$SOURCE_RUN_ID" \
+            --argjson candidate_run_id "$GITHUB_RUN_ID" \
+            'def record($inventory;$name;$run_id):
+               [$inventory.artifacts[] | select(.name == $name and .expired == false and
+                 .workflow_run.id == $run_id and
+                 (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
+                 ((.size_in_bytes | type) == "number" and .size_in_bytes > 0 and
+                  .size_in_bytes <= 536870912))] |
+               if length == 1 then .[0] |
+                 {id,name,size_in_bytes,digest,run_id:$run_id}
+               else error("artifact identity is not unique") end;
+             {base:record($base;$base_name;$base_run_id),
+              candidate:record($candidate;$candidate_name;$candidate_run_id)}' \
+            > "$inventory"
+          capsule="$RUNNER_TEMP/mod-compatibility-capsule"
+          mkdir -p "$capsule"
+          python3 e2e/mod_compatibility_visual.py \
+            --candidate-root candidate-evidence \
+            --base-root base-evidence \
+            --scenario-contract e2e/scenario-contract.json \
+            --compatibility-contract e2e/mod-compatibility-contract.json \
+            --artifact-node "${{ matrix.artifact_node }}" \
+            --mod "${{ matrix.compatibility_mod }}" \
+            --output "$capsule/review-input" \
+            --proof "$capsule/curation-proof.json" \
+            --artifact-inventory "$inventory" \
+            --source-run-id "$SOURCE_RUN_ID" \
+            --source-sha "${{ needs.admit.outputs.source_sha }}" \
+            --target-branch "${{ needs.admit.outputs.target_branch }}" \
+            --target-sha "${{ needs.admit.outputs.target_sha }}" \
+            --compatibility-run-id "$GITHUB_RUN_ID" \
+            --implementation-sha "$GITHUB_SHA"
+
+      - name: Upload the bounded credential-free review capsule
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mod-compatibility-review-input-${{ github.run_id }}-${{ matrix.id }}
+          path: ${{ runner.temp }}/mod-compatibility-capsule/
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 7
+
+  gate:
+    name: Mod compatibility E2E gate
+    needs:
+      - admit
+      - prepare
+      - compatibility-e2e
+      - curate
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Require every applicable lane and preserve explicit N/A
+        shell: bash
+        env:
+          ADMIT_RESULT: ${{ needs.admit.result }}
+          COUNT: ${{ needs.prepare.outputs.count }}
+          CURATE_RESULT: ${{ needs.curate.result }}
+          E2E_RESULT: ${{ needs.compatibility-e2e.result }}
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+        run: |
+          set -euo pipefail
+          [[ "$ADMIT_RESULT" == success ]]
+          [[ "$PREPARE_RESULT" == success ]]
+          [[ "$COUNT" =~ ^[0-9]+$ ]]
+          if [[ "$COUNT" == 0 ]]; then
+            [[ "$E2E_RESULT" == skipped ]]
+            [[ "$CURATE_RESULT" == skipped ]]
+            printf 'Every compatibility tuple is explicitly N/A for this release.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+          else
+            [[ "$E2E_RESULT" == success ]]
+            [[ "$CURATE_RESULT" == success ]]
+            printf 'All %s applicable compatibility lanes passed and were curated.\n' \
+              "$COUNT" >> "$GITHUB_STEP_SUMMARY"
+          fi
