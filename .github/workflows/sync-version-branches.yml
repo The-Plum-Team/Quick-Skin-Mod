@@ -481,6 +481,7 @@ jobs:
             python3 "$RUNNER_TEMP/version-port-controller/scripts/release/matrix.py" \
               --matrix release/release-matrix.json \
               --normalize-e2e-policy \
+              --retire-player-armor-stands \
               --write > /dev/null
             python3 "$RUNNER_TEMP/version-port-controller/scripts/release/branch_readme.py" \
               --matrix release/release-matrix.json \
@@ -801,6 +802,7 @@ jobs:
           python3 ../controller/scripts/release/matrix.py \
             --matrix release/release-matrix.json \
             --normalize-e2e-policy \
+            --retire-player-armor-stands \
             --write > /dev/null
           python3 ../controller/scripts/release/branch_readme.py \
             --matrix release/release-matrix.json \
@@ -1232,6 +1234,7 @@ jobs:
           python3 ../controller/scripts/release/matrix.py \
             --matrix release/release-matrix.json \
             --normalize-e2e-policy \
+            --retire-player-armor-stands \
             --write > /dev/null
           python3 ../controller/scripts/release/branch_readme.py \
             --matrix release/release-matrix.json \
