@@ -646,6 +646,23 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('git rev-parse "$SOURCE_SHA^{tree}"', admit)
         self.assertIn("automated-version-sync", admit)
         self.assertIn("e2e-input-bundle", admit)
+        for workflow in (execution_workflow, review_workflow):
+            self.assertNotIn(
+                '.size_in_bytes | type == "number" and .size_in_bytes',
+                workflow,
+            )
+        self.assertEqual(
+            execution_workflow.count(
+                '((.size_in_bytes | type) == "number" and .size_in_bytes'
+            ),
+            2,
+        )
+        self.assertEqual(
+            review_workflow.count(
+                '((.size_in_bytes | type) == "number" and .size_in_bytes'
+            ),
+            1,
+        )
         self.assertIn("e2e/mod_compatibility.py --plan", prepare)
         self.assertIn("not_applicable", prepare)
         self.assertIn(".release_branch == $target_branch", prepare)
