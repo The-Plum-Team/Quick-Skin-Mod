@@ -62,6 +62,8 @@ public final class PropagationLiveScenario implements Scenario {
 
     private static final double VANTAGE_DISTANCE = 5.0;
     private static final double VANTAGE_SIDE = 1.5;
+    /** Fixed subject pose used to make both observer checkpoints unambiguous rear views. */
+    private static final float SUBJECT_REAR_YAW = 180.0f;
 
     /** Set by A's apply action; read by A's ready/assert. */
     private volatile String skinHash;
@@ -243,6 +245,8 @@ public final class PropagationLiveScenario implements Scenario {
                         return Step.Result.fail("A's default skin did not stabilize BEFORE: expected="
                                 + expected + " actual=" + skin);
                     }
+                    Step.Result rearView = checkRearComposition(mc);
+                    if (!rearView.pass()) return rearView;
                     try {
                         NetworkSyncService.getInstance().syncAppearance(me, "", "", "slim");
                         E2ELog.info("B acknowledged clean BEFORE via slim-model appearance");
@@ -253,7 +257,7 @@ public final class PropagationLiveScenario implements Scenario {
                     sawBefore = true;
                     return Step.Result.pass("BEFORE: A(" + VanillaShim.playerName(a)
                             + ") framed at vantage, non-custom skin=" + skin + " cape=" + cloak
-                            + "; acknowledgement sent");
+                            + "; acknowledgement sent; " + rearView.message());
                 }));
 
         // 3. Hold the vantage and await the LIVE change; capture AFTER from the SAME camera and assert
@@ -277,8 +281,10 @@ public final class PropagationLiveScenario implements Scenario {
                     logObserveGeometry(mc);
                     Step.Result r = checkPropagation(mc);
                     if (!r.pass()) return r;
+                    Step.Result rearView = checkRearComposition(mc);
+                    if (!rearView.pass()) return rearView;
                     return Step.Result.pass("LIVE transition witnessed (before: non-custom -> after: "
-                            + r.message() + ")");
+                            + r.message() + "; " + rearView.message() + ")");
                 }));
 
         return steps;
@@ -394,6 +400,10 @@ public final class PropagationLiveScenario implements Scenario {
             AbstractClientPlayer a = findOther(mc);
             if (a == null || mc.player == null) return;
 
+            // Pose the disposable remote entity locally on B. This removes head/body interpolation
+            // ambiguity from the screenshots without changing the appearance or cape render paths.
+            DefaultSkinEvidenceView.pinStandingPose(a, SUBJECT_REAR_YAW);
+
             if (!vantageSet) {
                 double rad = Math.toRadians(a.getYRot());
                 double fx = -Math.sin(rad), fz = Math.cos(rad);
@@ -423,6 +433,13 @@ public final class PropagationLiveScenario implements Scenario {
             mc.player.setYHeadRot(yaw);
         } catch (Throwable ignored) {
         }
+    }
+
+    private Step.Result checkRearComposition(Minecraft mc) {
+        if (mc.player == null) return Step.Result.fail("rear-view observer is unavailable");
+        AbstractClientPlayer a = findOther(mc);
+        if (a == null) return Step.Result.fail("rear-view subject is unavailable");
+        return DefaultSkinEvidenceView.checkRearView(a, mc.player, SUBJECT_REAR_YAW);
     }
 
     /** Rich one-line diagnostic of the observation geometry + resolved textures (greppable). */
