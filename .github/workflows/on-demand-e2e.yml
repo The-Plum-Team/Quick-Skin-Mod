@@ -392,6 +392,7 @@ jobs:
         with:
           bundle-name: e2e-input-bundle
           row-json: ${{ toJSON(matrix) }}
+          source-sha: ${{ github.sha }}
           scenarios: ${{ matrix.scenarios }}
           evidence-name: packaged-e2e-${{ matrix.id }}
           evidence-retention-days: ${{ startsWith(github.ref_name, 'automation/sync/') && '7' || '1' }}

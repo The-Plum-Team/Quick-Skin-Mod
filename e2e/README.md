@@ -269,6 +269,17 @@ recovery sweeps share a separate lock and only redispatch one authenticated exac
 queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without losing
 reviews.
 
+Before any exact drains fan out, they cross one repository-wide capacity section. A fresh
+authenticated success marker lets unrelated capsules continue concurrently for ten minutes. If no
+marker exists, competing probe jobs coalesce behind one tool-free, low-effort Sonnet call that
+checks whether the subscription can accept work. A fresh success redispatches every authenticated
+pending capsule by exact artifact ID, preserving parallel review even when earlier probe contenders
+were coalesced. A rejected or warning rate-limit event opens a sanitized thirty-minute circuit and
+leaves every capsule in the durable queue. When the headless event includes utilization, 95% also
+pauses the fan-out. Scheduled recovery probes again after the pause. Claude does not reliably expose
+the Pro/Max percentage remaining in headless output, so this is primarily an availability circuit
+rather than an invented quota estimate; neither provider text nor account-usage details are uploaded.
+
 The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
 over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
 candidate/reference pair clean without a model call. It may also reuse a protected verdict only
