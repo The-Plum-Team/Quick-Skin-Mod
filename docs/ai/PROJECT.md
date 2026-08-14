@@ -121,8 +121,16 @@ immutable workflow and governance activation contract.
   Only canonical content-addressed RGB PNGs, a bounded manifest, and provenance enter the durable
   queue; raw E2E ZIPs never share a runner with the credential. Protected drains are locked by
   exact queue artifact, so different capsules run concurrently while duplicate wakes coalesce;
-  generic recovery sweeps only redispatch an authenticated exact wake. A certifiable anchor is
-  prioritized before the cross-version wave. Each drain triages independent loader-grouped chunks
+  generic recovery sweeps only redispatch an authenticated exact wake. Before those independent
+  drains fan out, one global serialized capacity section reuses only a fresh marker from the exact
+  protected workflow. Its single tool-free Sonnet probe either opens a short shared ready window or
+  records a sanitized rejected/near-limit pause; paused capsules remain durable and the scheduled
+  sweep probes again later. A fresh ready probe enumerates and redispatches every authenticated
+  pending artifact independently, so coalescing probe contenders never serializes the actual
+  reviews. It consumes the bounded headless rate-limit status and optional utilization when
+  present, without pretending Claude provides a reliable Pro/Max percentage to headless CI. A
+  certifiable anchor is prioritized before the cross-version wave. Each drain triages independent
+  loader-grouped chunks
   concurrently with Sonnet and sends suspicious or uncertain frames to concurrent bounded Opus
   verification. The first Opus-confirmed defect publishes a protected generation-bound marker,
   cancels sibling drains and keeps later queue selection from spending more model calls on that

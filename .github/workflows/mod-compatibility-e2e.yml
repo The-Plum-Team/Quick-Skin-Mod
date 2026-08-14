@@ -266,7 +266,9 @@ jobs:
           TARGET_SHA: ${{ needs.admit.outputs.target_sha }}
         run: |
           set -euo pipefail
-          python3 scripts/release/verify_release.py --verify-staged
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          GITHUB_SHA="$SOURCE_SHA" \
+            python3 scripts/release/verify_release.py --verify-staged
           python3 e2e/mod_compatibility.py --plan > "$RUNNER_TEMP/compatibility-plan.raw.json"
           jq \
             --arg source_branch "$SOURCE_BRANCH" \
@@ -371,6 +373,7 @@ jobs:
         with:
           bundle-name: ${{ needs.prepare.outputs.bundle_name }}
           row-json: ${{ toJSON(matrix) }}
+          source-sha: ${{ needs.admit.outputs.source_sha }}
           scenarios: ${{ matrix.scenarios }}
           compatibility-mod: ${{ matrix.compatibility_mod }}
           evidence-name: mod-compatibility-e2e-${{ matrix.id }}
