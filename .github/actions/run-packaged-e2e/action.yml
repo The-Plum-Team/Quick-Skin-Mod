@@ -14,6 +14,14 @@ inputs:
   evidence-name:
     description: Unique Actions artifact name for this runtime lane
     required: true
+  compatibility-mod:
+    description: Optional lock-selected compatibility mod id
+    required: false
+    default: ""
+  evidence-retention-days:
+    description: Bounded retention needed by downstream authenticated consumers
+    required: false
+    default: "1"
 
 runs:
   using: composite
@@ -77,9 +85,17 @@ runs:
       env:
         E2E_ROW_JSON: ${{ inputs.row-json }}
         E2E_SCENARIOS: ${{ inputs.scenarios }}
+        E2E_COMPATIBILITY_MOD: ${{ inputs.compatibility-mod }}
         QUICKSKIN_E2E_RUNTIME_STORE: ${{ runner.temp }}/quick-skin-runtime-store
       run: |
         set -euo pipefail
+        compatibility_arguments=()
+        if [[ -n "$E2E_COMPATIBILITY_MOD" ]]; then
+          compatibility_arguments=(
+            --compatibility-contract e2e/mod-compatibility-contract.json
+            --compatibility-mod "$E2E_COMPATIBILITY_MOD"
+          )
+        fi
         xvfb-run --auto-servernum \
           --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset" \
           python e2e/orchestrator.py \
@@ -87,7 +103,8 @@ runs:
             --row-json "$E2E_ROW_JSON" \
             --artifacts-manifest build/release/artifacts.json \
             --packaged \
-            --scenarios "$E2E_SCENARIOS"
+            --scenarios "$E2E_SCENARIOS" \
+            "${compatibility_arguments[@]}"
 
     - name: Summarize runtime cost and cache behavior
       if: always()
@@ -115,4 +132,4 @@ runs:
           e2e-out/current/profiles/**/crash-reports/**
         if-no-files-found: error
         compression-level: 6
-        retention-days: 1
+        retention-days: ${{ inputs.evidence-retention-days }}

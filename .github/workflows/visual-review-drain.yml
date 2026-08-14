@@ -180,6 +180,11 @@ jobs:
       cooling: ${{ steps.guard.outputs.cooling }}
       failure_category: ${{ steps.classify.outputs.failure_category }}
       failure_transient: ${{ steps.classify.outputs.failure_transient }}
+      compatibility_eligible: ${{ steps.compatibility-release.outputs.eligible }}
+      compatibility_source_branch: ${{ steps.compatibility-release.outputs.source_branch }}
+      compatibility_source_run_id: ${{ steps.compatibility-release.outputs.source_run_id }}
+      compatibility_source_sha: ${{ steps.compatibility-release.outputs.source_sha }}
+      normalized_report_artifact_id: ${{ steps.normalized-report.outputs.artifact-id }}
       review_complete: ${{ steps.check.outputs.review_complete }}
       wave_blocked: ${{ (steps.wave-block.outputs.blocked == 'true' || steps.guard.outputs.wave_blocked == 'true') && 'true' || 'false' }}
 
@@ -1314,7 +1319,38 @@ jobs:
           printf 'failure_category=%s\n' "$category" >> "$GITHUB_OUTPUT"
           printf 'failure_transient=%s\n' "$transient" >> "$GITHUB_OUTPUT"
 
+      - name: Bind a clean automatic release identity for compatibility testing
+        id: compatibility-release
+        if: >-
+          steps.check.outcome == 'success' &&
+          steps.check.outputs.review_complete == 'true'
+        working-directory: ${{ runner.temp }}/visual-review-capsule
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'eligible=false\n' >> "$GITHUB_OUTPUT"
+          proof=curation-proof.json
+          report=visual-review-report.json
+          test -s "$proof" -a -s "$report"
+          jq -e 'length > 0 and all(.[];
+            .semantic_valid == true and .defect == false and
+            (.matches_reference == null or .matches_reference == true))' \
+            "$report" > /dev/null
+          source_branch="$(jq -er \
+            '.source_branch | select(type == "string" and
+              test("^automation/sync/[A-Za-z0-9._/-]+$"))' "$proof")"
+          source_run_id="$(jq -er \
+            '.source_run_id | select(type == "number" and . > 0)' "$proof")"
+          source_sha="$(jq -er \
+            '.source_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
+            "$proof")"
+          printf 'source_branch=%s\n' "$source_branch" >> "$GITHUB_OUTPUT"
+          printf 'source_run_id=%s\n' "$source_run_id" >> "$GITHUB_OUTPUT"
+          printf 'source_sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
+          printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
+
       - name: Upload the source-bound normalized report
+        id: normalized-report
         if: always() && steps.check.outputs.review_complete == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -1433,6 +1469,166 @@ jobs:
             cat "$delete_error" >&2
             exit 1
           done
+
+  release-mod-compatibility:
+    name: Release the authenticated mod compatibility wave
+    needs:
+      - select
+      - review
+      - cleanup
+    if: >-
+      always() && needs.cleanup.result == 'success' &&
+      needs.review.outputs.compatibility_eligible == 'true' &&
+      needs.review.outputs.normalized_report_artifact_id != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Check out the protected compatibility release policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Authenticate the merge, normalized report, and exact release tree
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_ARTIFACT_ID: ${{ needs.review.outputs.normalized_report_artifact_id }}
+          SOURCE_BRANCH: ${{ needs.review.outputs.compatibility_source_branch }}
+          SOURCE_RUN_ID: ${{ needs.review.outputs.compatibility_source_run_id }}
+          SOURCE_SHA: ${{ needs.review.outputs.compatibility_source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$REVIEW_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_BRANCH" =~ ^automation/sync/[A-Za-z0-9._/-]+$ ]]
+
+          source_run="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          jq -e \
+            --arg branch "$SOURCE_BRANCH" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sha "$SOURCE_SHA" \
+            --argjson run_id "$SOURCE_RUN_ID" \
+            '.id == $run_id and .status == "completed" and .conclusion == "success" and
+             .event == "workflow_dispatch" and .head_branch == $branch and
+             .head_sha == $sha and .path == ".github/workflows/on-demand-e2e.yml" and
+             .head_repository.full_name == $repository' \
+            <<< "$source_run" > /dev/null
+
+          associated=''
+          for attempt in {1..60}; do
+            associated="$(gh api -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls?per_page=20")"
+            if jq -e \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg source_branch "$SOURCE_BRANCH" \
+                --arg source_sha "$SOURCE_SHA" \
+                '[.[] | select(
+                  .head.ref == $source_branch and .head.sha == $source_sha and
+                  .head.repo.full_name == $repository and
+                  .base.repo.full_name == $repository and
+                  .user.login == "github-actions[bot]" and
+                  ([.labels[].name] | index("automated-version-sync")) != null and
+                  .merged_at != null and
+                  (.merge_commit_sha | type == "string" and
+                    test("^[0-9a-f]{40}$")))] | length == 1' \
+                <<< "$associated" > /dev/null; then
+              break
+            fi
+            sleep 5
+          done
+          merged_pr="$(jq -cer \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg source_branch "$SOURCE_BRANCH" \
+            --arg source_sha "$SOURCE_SHA" \
+            '[.[] | select(
+              .head.ref == $source_branch and .head.sha == $source_sha and
+              .head.repo.full_name == $repository and
+              .base.repo.full_name == $repository and
+              .user.login == "github-actions[bot]" and
+              ([.labels[].name] | index("automated-version-sync")) != null and
+              .merged_at != null and
+              (.merge_commit_sha | type == "string" and
+                test("^[0-9a-f]{40}$")))] |
+             select(length == 1) | .[0]' <<< "$associated")"
+          target_branch="$(jq -er .base.ref <<< "$merged_pr")"
+          target_sha="$(jq -er .merge_commit_sha <<< "$merged_pr")"
+          python3 scripts/release/version_branches.py \
+            --target "$target_branch" > /dev/null
+
+          # Never launch expensive compatibility sessions for an already superseded release.
+          current_target_sha="$(gh api \
+            "repos/$GITHUB_REPOSITORY/branches/$target_branch" --jq .commit.sha)"
+          if [[ "$current_target_sha" != "$target_sha" ]]; then
+            printf 'Release `%s` advanced from `%s` to `%s`; compatibility wave skipped.\n' \
+              "$target_branch" "$target_sha" "$current_target_sha" \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git fetch --no-tags origin "$SOURCE_SHA" "$target_sha"
+          git merge-base --is-ancestor "$SOURCE_SHA" "$target_sha"
+          [[ "$(git rev-parse "$SOURCE_SHA^{tree}")" == \
+             "$(git rev-parse "$target_sha^{tree}")" ]]
+
+          report_name="visual-review-$SOURCE_RUN_ID"
+          report_metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$REVIEW_ARTIFACT_ID")"
+          report_digest="$(jq -er \
+            '.digest | select(type == "string" and
+              test("^sha256:[0-9a-f]{64}$"))' <<< "$report_metadata")"
+          report_size="$(jq -er \
+            '.size_in_bytes | select(type == "number" and . > 0 and . <= 16777216)' \
+            <<< "$report_metadata")"
+          jq -e \
+            --arg name "$report_name" \
+            --arg sha "$GITHUB_SHA" \
+            --argjson artifact_id "$REVIEW_ARTIFACT_ID" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            '.id == $artifact_id and .name == $name and .expired == false and
+             .workflow_run.id == $run_id and .workflow_run.head_branch == "master" and
+             .workflow_run.head_sha == $sha' \
+            <<< "$report_metadata" > /dev/null
+
+          payload="$RUNNER_TEMP/mod-compatibility-dispatch.json"
+          jq -n \
+            --arg review_artifact_digest "$report_digest" \
+            --arg review_artifact_id "$REVIEW_ARTIFACT_ID" \
+            --arg review_artifact_name "$report_name" \
+            --arg review_artifact_run_id "$GITHUB_RUN_ID" \
+            --arg review_artifact_size "$report_size" \
+            --arg source_branch "$SOURCE_BRANCH" \
+            --arg source_run_id "$SOURCE_RUN_ID" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg target_branch "$target_branch" \
+            --arg target_sha "$target_sha" \
+            '{event_type:"mod-compatibility-requested",client_payload:{
+              source_run_id:$source_run_id,source_branch:$source_branch,
+              source_sha:$source_sha,target_branch:$target_branch,target_sha:$target_sha,
+              review_artifact_id:$review_artifact_id,
+              review_artifact_name:$review_artifact_name,
+              review_artifact_run_id:$review_artifact_run_id,
+              review_artifact_size:$review_artifact_size,
+              review_artifact_digest:$review_artifact_digest}}' \
+            > "$payload"
+          dispatched=false
+          for attempt in 1 2 3; do
+            if gh api --method POST \
+                "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload"; then
+              dispatched=true
+              break
+            fi
+            sleep $((attempt * 2))
+          done
+          [[ "$dispatched" == true ]]
+          printf 'Released compatibility wave for `%s` at `%s`.\n' \
+            "$target_branch" "$target_sha" >> "$GITHUB_STEP_SUMMARY"
 
   release-anchor:
     name: Release the certified cross-version wave
