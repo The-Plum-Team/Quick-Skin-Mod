@@ -22,6 +22,13 @@ from scenario_contract import (
     ScenarioContractError,
     load_contract,
 )
+from mod_compatibility import (
+    DEFAULT_CONTRACT as DEFAULT_COMPATIBILITY_CONTRACT,
+    CompatibilityContractError,
+    CompatibilityLane,
+    load_contract as load_compatibility_contract,
+    resolve_lane as resolve_compatibility_lane,
+)
 
 REPO = Path(__file__).resolve().parent.parent
 # Compatibility alias for existing --catalog callers. The only accepted source is now the
@@ -61,6 +68,9 @@ RESULT_FIELDS = frozenset(
         "reports",
     }
 )
+COMPATIBILITY_RESULT_FIELDS = frozenset(
+    {"compatibility", "installed_compatibility"}
+)
 REPORT_FIELDS = frozenset(
     {
         "version",
@@ -76,6 +86,7 @@ STEP_FIELDS = frozenset({"name", "status", "message", "screenshot"})
 PIXEL_VALIDATION_FIELDS = frozenset({"screenshots", "comparisons"})
 MAX_RESULT_FILES = 256
 MAX_RESULT_BYTES = 4 * 1024 * 1024
+MAX_RUNTIME_EVIDENCE_LENGTH = 4096
 MAX_EVIDENCE_SCREENSHOT_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_IMAGE_PIXELS = 20_000_000
 MIN_REVIEW_IMAGE_WIDTH = 640
@@ -518,9 +529,69 @@ def validate_installed_quickskin(
     return tuple(installed)
 
 
+def validate_installed_compatibility(
+    value: Any,
+    *,
+    expected_roles: set[str],
+    lane: CompatibilityLane,
+    label: str,
+) -> tuple[dict[str, str], ...]:
+    """Validate every exact optional-mod copy and its declared install side."""
+
+    expected_roots = set(expected_roles)
+    if lane.mod.install_on == "client-and-server":
+        expected_roots.add("server")
+    expected_files = {
+        item.filename: item.sha256 for item in lane.artifact.files
+    }
+    expected_pairs = {
+        (root, filename)
+        for root in expected_roots
+        for filename in expected_files
+    }
+    if not isinstance(value, list) or len(value) != len(expected_pairs):
+        raise VisualEvidenceError(
+            f"{label} must contain every declared compatibility file/install root"
+        )
+    observed: set[tuple[str, str]] = set()
+    installed: list[dict[str, str]] = []
+    for index, item in enumerate(value):
+        entry_label = f"{label}[{index}]"
+        if not isinstance(item, dict) or set(item) != {"path", "sha256"}:
+            raise VisualEvidenceError(
+                f"{entry_label} must contain exactly path and sha256"
+            )
+        raw_path = item.get("path")
+        if not isinstance(raw_path, str) or "\\" in raw_path:
+            raise VisualEvidenceError(f"{entry_label}.path is unsafe")
+        path = PurePosixPath(raw_path)
+        if (
+            path.is_absolute()
+            or raw_path != path.as_posix()
+            or len(path.parts) != 3
+            or path.parts[1] != "mods"
+            or any(part in {"", ".", ".."} for part in path.parts)
+        ):
+            raise VisualEvidenceError(f"{entry_label}.path is unsafe")
+        pair = (path.parts[0], path.parts[2])
+        if pair not in expected_pairs or pair in observed:
+            raise VisualEvidenceError(f"{entry_label}.path is unexpected or duplicated")
+        observed.add(pair)
+        digest = item.get("sha256")
+        if digest != expected_files[pair[1]]:
+            raise VisualEvidenceError(f"{entry_label}.sha256 disagrees with the lock")
+        installed.append({"path": path.as_posix(), "sha256": digest})
+    if observed != expected_pairs:
+        raise VisualEvidenceError(f"{label} install coverage is incomplete")
+    return tuple(installed)
+
+
 def collect_evidence(
     output_root: Path,
     catalog: Catalog,
+    *,
+    compatibility_id: str | None = None,
+    compatibility_contract_path: Path = DEFAULT_COMPATIBILITY_CONTRACT,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Return lanes, frames and directed pixel comparisons from successful result files."""
 
@@ -549,12 +620,23 @@ def collect_evidence(
     frame_ids: set[str] = set()
     comparison_ids: set[str] = set()
 
+    compatibility_contract = (
+        load_compatibility_contract(compatibility_contract_path)
+        if compatibility_id is not None
+        else None
+    )
     for result_path in result_paths:
         reject_symlinks(result_path, profiles, "packaged result path")
         result = _read_json(result_path, "packaged E2E result")
-        if not isinstance(result, dict) or set(result) != RESULT_FIELDS:
+        expected_result_fields = (
+            RESULT_FIELDS | COMPATIBILITY_RESULT_FIELDS
+            if compatibility_id is not None
+            else RESULT_FIELDS
+        )
+        if not isinstance(result, dict) or set(result) != expected_result_fields:
             raise VisualEvidenceError(
-                f"packaged result must contain exactly {sorted(RESULT_FIELDS)}: {result_path}"
+                "packaged result must contain exactly "
+                f"{sorted(expected_result_fields)}: {result_path}"
             )
         artifact_node = _nonempty_string(result.get("artifact_node"), "result.artifact_node")
         version = _nonempty_string(result.get("runtime_version"), "result.runtime_version")
@@ -596,7 +678,28 @@ def collect_evidence(
             raise VisualEvidenceError(
                 f"result profile identity mismatch: {result.get('profile')!r} != {expected_profile!r}"
             )
-        lane_id = f"{artifact_node}/{scenario}"
+        compatibility_lane: CompatibilityLane | None = None
+        if compatibility_id is not None:
+            if compatibility_contract is None:  # pragma: no cover - guarded above
+                raise VisualEvidenceError("compatibility contract was not loaded")
+            try:
+                compatibility_lane = resolve_compatibility_lane(
+                    compatibility_contract,
+                    mod_id=compatibility_id,
+                    artifact_node=artifact_node,
+                    runtime_version=version,
+                    loader=loader,
+                )
+            except CompatibilityContractError as exc:
+                raise VisualEvidenceError(str(exc)) from exc
+            if result.get("compatibility") != compatibility_lane.public_identity():
+                raise VisualEvidenceError(
+                    f"packaged compatibility identity disagrees with its lock in {result_path}"
+                )
+        compatibility_segment = (
+            f"/{compatibility_id}" if compatibility_id is not None else ""
+        )
+        lane_id = f"{artifact_node}{compatibility_segment}/{scenario}"
         if lane_id in lane_ids:
             raise VisualEvidenceError(f"duplicate packaged result lane {lane_id!r}")
         lane_ids.add(lane_id)
@@ -617,6 +720,13 @@ def collect_evidence(
             jar_sha256=jar_sha256,
             label=f"result.installed_quickskin for {lane_id}",
         )
+        if compatibility_lane is not None:
+            validate_installed_compatibility(
+                result.get("installed_compatibility"),
+                expected_roles=expected_roles,
+                lane=compatibility_lane,
+                label=f"result.installed_compatibility for {lane_id}",
+            )
         lane_frame_ids: dict[tuple[str, str], str] = {}
         for role in sorted(reports):
             if role not in {"client_a", "client_b"}:
@@ -662,9 +772,18 @@ def collect_evidence(
                         f"successful report contains a non-pass step: "
                         f"{lane_id}/{role}/{expected_step.id}"
                     )
-                if not isinstance(step_record.get("message"), str):
+                runtime_evidence = step_record.get("message")
+                if (
+                    not isinstance(runtime_evidence, str)
+                    or not runtime_evidence.strip()
+                    or len(runtime_evidence) > MAX_RUNTIME_EVIDENCE_LENGTH
+                    or any(
+                        ord(character) < 32 or ord(character) == 127
+                        for character in runtime_evidence
+                    )
+                ):
                     raise VisualEvidenceError(
-                        f"report step message must be a string: "
+                        f"report step message must be non-empty, bounded printable evidence: "
                         f"{lane_id}/{role}/{expected_step.id}"
                     )
                 if (
@@ -762,7 +881,9 @@ def collect_evidence(
                     raise VisualEvidenceError(
                         f"screenshot pixel digest disagrees for {lane_id}/{role}/{step}"
                     )
-                frame_id = f"{artifact_node}/{scenario}/{role}/{step}"
+                frame_id = (
+                    f"{artifact_node}{compatibility_segment}/{scenario}/{role}/{step}"
+                )
                 if frame_id in frame_ids:
                     raise VisualEvidenceError(f"duplicate visual frame {frame_id!r}")
                 frame_ids.add(frame_id)
@@ -774,6 +895,7 @@ def collect_evidence(
                         "capture_order": capture_order[capture["capture_id"]],
                         "title": capture["title"],
                         "expectation": capture["expectation"],
+                        "runtime_evidence": step_record["message"].strip(),
                         "review_tier": capture["review_tier"],
                         "artifact_node": artifact_node,
                         "version": version,
@@ -818,7 +940,9 @@ def collect_evidence(
                     raise VisualEvidenceError(
                         f"comparison endpoints are not catalogued frames: {lane_id}/{role}/{pair}"
                     )
-                comparison_id = f"{artifact_node}/{scenario}/{role}/{pair}"
+                comparison_id = (
+                    f"{artifact_node}{compatibility_segment}/{scenario}/{role}/{pair}"
+                )
                 if comparison_id in comparison_ids:
                     raise VisualEvidenceError(f"duplicate visual comparison {comparison_id!r}")
                 comparison_ids.add(comparison_id)
@@ -871,6 +995,11 @@ def collect_evidence(
                 "status": "pass",
                 "roles": sorted(reports),
                 "elapsed_s": elapsed,
+                **(
+                    {"compatibility_mod": compatibility_id}
+                    if compatibility_id is not None
+                    else {}
+                ),
             }
         )
 

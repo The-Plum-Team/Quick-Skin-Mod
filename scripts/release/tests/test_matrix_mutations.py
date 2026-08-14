@@ -121,6 +121,31 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
         runtime_only["runtimes"][0]["scenario"] = "stale-default"
         self.assert_invalid(runtime_only, "runtime rows must not own E2E scenario policy")
 
+    def test_player_armor_stands_retirement_preserves_other_suggestions(self) -> None:
+        legacy = self.mutated()
+        first, second = legacy["artifacts"][:2]
+        first["metadata"]["suggests"] = {"pas": "*", "another-mod": ">=1"}
+        second["metadata"]["suggests"] = {"pas": "*"}
+        untouched = copy.deepcopy(legacy)
+
+        normalized = release_matrix.retire_player_armor_stands_metadata(legacy)
+
+        self.assertEqual(untouched, legacy)
+        self.assertEqual(
+            {"another-mod": ">=1"},
+            normalized["artifacts"][0]["metadata"]["suggests"],
+        )
+        self.assertNotIn("suggests", normalized["artifacts"][1]["metadata"])
+        release_matrix.validate_matrix(normalized)
+
+        malformed = self.mutated()
+        malformed["artifacts"][0]["metadata"]["suggests"] = "pas"
+        with self.assertRaisesRegex(
+            release_matrix.MatrixError,
+            "metadata.suggests must be an object",
+        ):
+            release_matrix.retire_player_armor_stands_metadata(malformed)
+
     def test_scenario_addition_and_order_come_only_from_contract(self) -> None:
         contract_payload = json.loads(
             (ROOT / "e2e" / "scenario-contract.json").read_text(
@@ -192,6 +217,10 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
         legacy["pr_scenarios"] = ["ignored"]
         for runtime in legacy["runtimes"]:
             runtime["scenario"] = "ignored"
+        legacy["artifacts"][0]["metadata"]["suggests"] = {
+            "pas": "*",
+            "kept": "*",
+        }
         with tempfile.TemporaryDirectory() as temporary:
             matrix_path = Path(temporary) / "release-matrix.json"
             matrix_path.write_text(
@@ -203,6 +232,7 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
                 "--matrix",
                 str(matrix_path),
                 "--normalize-e2e-policy",
+                "--retire-player-armor-stands",
                 "--write",
             ]
             with (
@@ -220,8 +250,10 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
                 print_mock.assert_not_called()
 
             written = json.loads(matrix_path.read_text(encoding="utf-8"))
+            expected = release_matrix.normalize_legacy_e2e_policy(legacy)
+            expected = release_matrix.retire_player_armor_stands_metadata(expected)
             self.assertEqual(
-                release_matrix.normalize_legacy_e2e_policy(legacy),
+                expected,
                 written,
             )
             release_matrix.validate_matrix(written)
