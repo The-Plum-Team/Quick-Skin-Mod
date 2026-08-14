@@ -87,6 +87,20 @@ class WorkflowSecurityTest(unittest.TestCase):
                 secret_steps += 1
                 with self.subTest(workflow=workflow.name, step=block.splitlines()[0]):
                     self.assertIn('CLAUDE_CODE_SKIP_PROMPT_HISTORY: "1"', block)
+                    if "claude_capacity_probe.py" in block:
+                        probe = (
+                            ROOT / "scripts" / "ci" / "claude_capacity_probe.py"
+                        ).read_text(encoding="utf-8")
+                        self.assertIn("unset GH_TOKEN GITHUB_TOKEN", block)
+                        self.assertIn('"--safe-mode"', probe)
+                        self.assertIn('"--no-session-persistence"', probe)
+                        self.assertIn('"--permission-mode"', probe)
+                        self.assertIn('"dontAsk"', probe)
+                        self.assertIn('"--tools"', probe)
+                        self.assertIn('"--disallowedTools"', probe)
+                        self.assertNotIn('"Read"', probe)
+                        self.assertNotIn('"Bash"', probe)
+                        continue
                     if workflow.name in {
                         "visual-review-drain.yml",
                         "mod-compatibility-review.yml",
@@ -118,7 +132,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                     if ",Edit," in block:
                         self.assertIn('"Edit(./**)"', block)
                     self.assertIn('"Write(', block)
-        self.assertEqual(secret_steps, 4)
+        self.assertEqual(secret_steps, 5)
 
     def test_external_actions_are_pinned_to_full_commit_shas(self) -> None:
         definitions = [
@@ -360,6 +374,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         dispatch_selected = job_block(
             "visual-review-drain.yml", "dispatch-selected"
         )
+        capacity_check = job_block("visual-review-drain.yml", "capacity-check")
+        capacity_probe = job_block("visual-review-drain.yml", "capacity-probe")
+        capacity_resume = job_block(
+            "visual-review-drain.yml", "resume-capacity-queue"
+        )
         review = job_block("visual-review-drain.yml", "review")
         cleanup = job_block("visual-review-drain.yml", "cleanup")
         release_anchor = job_block("visual-review-drain.yml", "release-anchor")
@@ -390,6 +409,9 @@ class WorkflowSecurityTest(unittest.TestCase):
             {
                 "select",
                 "dispatch-selected",
+                "capacity-check",
+                "capacity-probe",
+                "resume-capacity-queue",
                 "review",
                 "cleanup",
                 "release-mod-compatibility",
@@ -406,6 +428,30 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("'queue-sweep'", drain_header)
         self.assertIn("cancel-in-progress: false", drain_header)
         self.assertNotIn("concurrency:", review)
+        self.assertNotIn("concurrency:", capacity_check)
+        self.assertIn("scripts/ci/claude_capacity_gate.py", capacity_check)
+        self.assertIn("needs.select.outputs.direct == 'true'", capacity_check)
+        self.assertIn("durable capsule will be retried", capacity_check)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_check)
+        self.assertIn("quick-skin-claude-capacity-probe", capacity_probe)
+        self.assertIn("cancel-in-progress: false", capacity_probe)
+        self.assertIn("scripts/ci/claude_capacity_gate.py", capacity_probe)
+        self.assertIn("scripts/ci/claude_capacity_probe.py", capacity_probe)
+        self.assertIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_probe)
+        capacity_probe_script = (
+            ROOT / "scripts" / "ci" / "claude_capacity_probe.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"--tools"', capacity_probe_script)
+        self.assertIn('"--disallowedTools"', capacity_probe_script)
+        self.assertIn("claude-capacity-marker.json", capacity_probe)
+        self.assertIn("the durable capsule remains queued", capacity_probe)
+        self.assertIn("scripts/ci/visual_review_queue.py", capacity_resume)
+        self.assertIn("--list-pending-json", capacity_resume)
+        self.assertIn('length <= 256', capacity_resume)
+        self.assertIn("CURRENT_ARTIFACT_ID", capacity_resume)
+        self.assertIn("visual-review-drain-requested", capacity_resume)
+        self.assertIn("contents: write", capacity_resume)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_resume)
         self.assertIn("scripts/ci/visual_review_queue.py", select)
         self.assertIn("--requested-artifact-id", select)
         self.assertIn("artifact_id=$REQUESTED_ARTIFACT_ID", select)
@@ -420,6 +466,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", dispatch_selected)
         self.assertNotIn("actions/checkout@", dispatch_selected)
         self.assertIn("needs.select.outputs.direct == 'true'", review)
+        self.assertIn("needs.capacity-check.outputs.ready == 'true'", review)
+        self.assertIn("needs.capacity-probe.outputs.ready == 'true'", review)
         self.assertIn("mod-compatibility-requested", release_compatibility)
         self.assertIn("needs.review.outputs.compatibility_eligible == 'true'", release_compatibility)
         self.assertIn("automated-version-sync", release_compatibility)
@@ -539,6 +587,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("steps.wave-block-artifact.outputs.artifact-id", review)
         self.assertIn("visual-review-failure.json", review)
         self.assertIn("visual-review-attempt-${{ needs.select.outputs.source_run_id }}", review)
+        self.assertIn("claude-capacity-pause", review)
         self.assertIn("cooling=true", review)
         self.assertNotIn("visual-review-report.raw.json", drain_workflow)
         self.assertNotIn("e2e-out", review)
@@ -1586,6 +1635,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         sync = job_block("sync-version-branches.yml", "propose")
         repair = job_block("handle-version-port-result.yml", "propose-repair")
         visual = job_block("visual-review-drain.yml", "review")
+        capacity = job_block("visual-review-drain.yml", "capacity-probe")
         self.assertIn("TRUSTED_SHA: ${{ github.sha }}", sync)
         self.assertIn("branches/master", repair)
         self.assertIn("ref: ${{ needs.select.outputs.implementation_sha }}", visual)
@@ -1594,6 +1644,12 @@ class WorkflowSecurityTest(unittest.TestCase):
             "node node_modules/@anthropic-ai/claude-code/install.cjs", visual
         )
         self.assertIn("node_modules/.bin/claude --version", visual)
+        self.assertIn("ref: ${{ github.sha }}", capacity)
+        self.assertIn("npm ci --ignore-scripts", capacity)
+        self.assertIn(
+            "node node_modules/@anthropic-ai/claude-code/install.cjs", capacity
+        )
+        self.assertIn("node_modules/.bin/claude --version", capacity)
 
     def test_marketplace_jobs_receive_only_the_selected_secret(self) -> None:
         workflow = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
