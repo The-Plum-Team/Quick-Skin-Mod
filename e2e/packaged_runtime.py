@@ -38,6 +38,7 @@ from runtime_store import (
     StoreCorruptionError,
 )
 from scenario_contract import OpaqueStarsProbe, RequiredGuiTextProbe, default_contract
+from mod_compatibility import CompatibilityLane
 
 
 FATAL_LOG_PATTERNS = (
@@ -1004,6 +1005,7 @@ def client_command(
     username: str,
     port: int,
     java: str,
+    compatibility_mod: str | None = None,
 ) -> list[str]:
     import minecraft_launcher_lib.command  # type: ignore[import-not-found]
     import minecraft_launcher_lib.utils  # type: ignore[import-not-found]
@@ -1044,6 +1046,10 @@ def client_command(
             ],
         }
     )
+    if compatibility_mod is not None:
+        options["jvmArguments"].append(
+            f"-Dquickskin.e2e.compatibility={compatibility_mod}"
+        )
     return minecraft_launcher_lib.command.get_minecraft_command(
         version_id, str(install_dir), options
     )
@@ -1815,9 +1821,18 @@ def run_packaged_row(
     manifest_path: Path,
     output_root: Path,
     runtime_session: PackagedRuntimeSession,
+    *,
+    compatibility_lane: CompatibilityLane | None = None,
+    compatibility_files: tuple[Path, ...] = (),
 ) -> dict[str, Any]:
     port = allocate_port()
-    identity = safe_id(f"{row['artifact_node']}--{row['runtime_version']}--{scenario}")
+    compatibility_suffix = (
+        f"--{compatibility_lane.mod.id}" if compatibility_lane is not None else ""
+    )
+    identity = safe_id(
+        f"{row['artifact_node']}--{row['runtime_version']}"
+        f"{compatibility_suffix}--{scenario}"
+    )
     profile = runtime_session.scenario_profile(identity)
     profiles_root = output_root / "profiles"
     evidence_profile = profiles_root / identity
@@ -1836,6 +1851,9 @@ def run_packaged_row(
         "status": "fail",
         "profile": evidence_profile.relative_to(output_root).as_posix(),
     }
+    if compatibility_lane is not None:
+        result["compatibility"] = compatibility_lane.public_identity()
+        result["installed_compatibility"] = []
     started = time.monotonic()
     processes: list[subprocess.Popen[bytes]] = []
     handles: list[BinaryIO] = []
@@ -1917,6 +1935,41 @@ def run_packaged_row(
                         repo / "e2e" / "fml.toml.neoforge",
                         game_dir / "config" / "fml.toml",
                     )
+            if compatibility_lane is not None:
+                locked_by_name = {
+                    item.filename: item for item in compatibility_lane.artifact.files
+                }
+                supplied_by_name = {item.name: item for item in compatibility_files}
+                if set(locked_by_name) != set(supplied_by_name):
+                    raise RuntimeFailure(
+                        "materialized compatibility files disagree with the locked artifact"
+                    )
+                install_roots = [client_directories[role] for role in roles]
+                if compatibility_lane.mod.install_on == "client-and-server":
+                    install_roots.insert(0, server)
+                installed_compatibility: list[dict[str, str]] = []
+                for game_dir in install_roots:
+                    for filename, locked in locked_by_name.items():
+                        source = supplied_by_name[filename]
+                        expected_destination = game_dir / "mods" / locked.filename
+                        if expected_destination.exists() or expected_destination.is_symlink():
+                            raise RuntimeFailure(
+                                "compatibility artifact filename collides with an installed JAR: "
+                                f"{locked.filename}"
+                            )
+                        destination = copy_verified(
+                            source,
+                            game_dir / "mods",
+                            locked.sha256,
+                            name=locked.filename,
+                        )
+                        installed_compatibility.append(
+                            {
+                                "path": destination.relative_to(profile).as_posix(),
+                                "sha256": sha256(destination),
+                            }
+                        )
+                result["installed_compatibility"] = installed_compatibility
         result["installed_quickskin"] = installed_quickskin
 
         env = process_env(java)
@@ -1942,6 +1995,7 @@ def run_packaged_row(
                 client_names[role],
                 port,
                 java,
+                compatibility_lane.mod.id if compatibility_lane is not None else None,
             )
             process, handle = start_process(command, game_dir, client_log, env)
             client_processes[role] = process

@@ -98,6 +98,24 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("expectedModel.equals(VanillaShim.playerModel(mc.player))", scenario)
         self.assertIn("restoreModelEvidenceView(mc);", scenario)
 
+    def test_visual_review_receives_passed_runtime_assertion_evidence(self) -> None:
+        evidence = (ROOT / "e2e/visual_evidence.py").read_text(encoding="utf-8")
+        review = (ROOT / "e2e/visual_review.py").read_text(encoding="utf-8")
+        checker = (ROOT / "e2e/check_visual_review.py").read_text(encoding="utf-8")
+        semantic_prompt = (ROOT / "e2e/visual_review_semantic_prompt.md").read_text(
+            encoding="utf-8"
+        )
+        verify_prompt = (
+            ROOT / "e2e/visual_review_semantic_verify_prompt.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('"runtime_evidence": step_record["message"].strip()', evidence)
+        self.assertIn('"runtime_evidence": frame["runtime_evidence"]', review)
+        self.assertIn('"runtime_evidence"', checker)
+        self.assertIn("final renderer-facing", semantic_prompt)
+        self.assertIn("sleeve-to-sleeve span", semantic_prompt)
+        self.assertIn("sleeve-to-sleeve span", verify_prompt)
+
     def test_elytra_texture_adapter_pins_exact_runtime_names(self) -> None:
         """Wrong reflection aliases can resolve unrelated methods with plausible values."""
 

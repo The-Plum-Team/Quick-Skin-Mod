@@ -19,6 +19,14 @@ from artifact_manifest import (  # noqa: E402
     load_artifact_manifest,
 )
 from matrix import MatrixError, load_matrix  # noqa: E402
+from mod_compatibility import (  # noqa: E402
+    DEFAULT_CONTRACT as DEFAULT_COMPATIBILITY_CONTRACT,
+    CompatibilityContractError,
+    CompatibilityLane,
+    load_contract as load_compatibility_contract,
+    materialize_lane,
+    resolve_lane as resolve_compatibility_lane,
+)
 from packaged_runtime import (  # noqa: E402
     PackagedRuntimeSession,
     RuntimeFailure,
@@ -48,6 +56,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--scenarios",
         help="comma-separated scenario selection emitted from the scenario contract",
+    )
+    parser.add_argument("--compatibility-mod", help="run with one lock-selected optional mod")
+    parser.add_argument(
+        "--compatibility-contract",
+        type=Path,
+        default=DEFAULT_COMPATIBILITY_CONTRACT,
     )
     parser.add_argument("--output-root", type=Path, default=Path("e2e-out"))
     parser.add_argument("--packaged", action="store_true", help="required acknowledgement")
@@ -177,12 +191,41 @@ def execute_packaged_rows(
             Path(scratch_parent), prefix=".runtime-run-"
         ) as scratch:
             runtime_session = PackagedRuntimeSession.from_environment(scratch.path)
+            compatibility_lane: CompatibilityLane | None = None
+            compatibility_files: tuple[Path, ...] = ()
+            compatibility_mod = getattr(args, "compatibility_mod", None)
+            if compatibility_mod:
+                if len(rows) != 1:
+                    raise ValueError("compatibility execution requires exactly one runtime row")
+                compatibility_contract = load_compatibility_contract(
+                    absolute(getattr(args, "compatibility_contract", DEFAULT_COMPATIBILITY_CONTRACT))
+                )
+                selected_row = rows[0]
+                compatibility_lane = resolve_compatibility_lane(
+                    compatibility_contract,
+                    mod_id=compatibility_mod,
+                    artifact_node=selected_row["artifact_node"],
+                    runtime_version=selected_row["runtime_version"],
+                    loader=selected_row["loader"],
+                )
+                compatibility_files = materialize_lane(
+                    compatibility_lane,
+                    scratch.path / "compatibility-mod",
+                )
             for row in rows:
                 for scenario in scenarios_for(data, row, args):
                     print(
                         f">>> {row['artifact_node']} artifact on {row['runtime_version']} "
                         f"{row['loader']} / {scenario}",
                         flush=True,
+                    )
+                    compatibility_arguments = (
+                        {
+                            "compatibility_lane": compatibility_lane,
+                            "compatibility_files": compatibility_files,
+                        }
+                        if compatibility_lane is not None
+                        else {}
                     )
                     result = run_packaged_row(
                         REPO,
@@ -193,6 +236,7 @@ def execute_packaged_rows(
                         manifest_path,
                         evidence.path,
                         runtime_session,
+                        **compatibility_arguments,
                     )
                     results.append(result)
                     print(
@@ -200,6 +244,16 @@ def execute_packaged_rows(
                         + (f": {result['error']}" if result.get("error") else ""),
                         flush=True,
                     )
+                    if (
+                        compatibility_lane is not None
+                        and scenario == "mod-compatibility"
+                        and result["status"] != "pass"
+                    ):
+                        print(
+                            "Compatibility activation failed; skipping the base suite for this lane.",
+                            flush=True,
+                        )
+                        break
 
             runtime_store_metrics = runtime_session.gc()
 
@@ -215,6 +269,11 @@ def execute_packaged_rows(
                     "port",
                 )
             }
+            | (
+                {"compatibility_mod": result["compatibility"]["id"]}
+                if "compatibility" in result
+                else {}
+            )
             for result in results
         ]
         (evidence.path / "resolved-matrix.json").write_text(
@@ -288,6 +347,7 @@ def main() -> int:
         return 0 if passed == len(results) else 1
     except (
         ArtifactManifestError,
+        CompatibilityContractError,
         MatrixError,
         ReleaseIdentityError,
         RuntimeFailure,
