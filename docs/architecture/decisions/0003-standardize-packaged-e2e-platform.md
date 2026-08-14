@@ -107,12 +107,13 @@ without write credentials in one job; a fresh narrow writer reproduces the exact
 using protected policy and hook-free Git plumbing before it authenticates and pushes.
 
 Partition version-port conflicts before invoking AI. A pure protected classifier receives the
-complete original conflict set and the target matrix. It permits only three exact mechanical
+complete original conflict set and the target matrix. It permits only four exact mechanical
 policies for protected divergence: source-preferred three-way merge for named shared
 guidance/runtime documents, target retention for the release matrix, and deletion of a loader build
-script only when that loader is inactive. Unknown protected conflicts and active-loader build
-conflicts fail closed. Only unprotected residual paths may enter the model capsule. Afterward,
-protected renderers normalize the matrix-owned README and workflow-guide profiles; the
+script only when that loader is inactive, or deletion below a legacy overlay root only when that
+exact root is inactive. Unknown protected conflicts, active-loader build conflicts, and
+active-overlay conflicts fail closed. Only unprotected residual paths may enter the model capsule.
+Afterward, protected renderers normalize the matrix-owned README and workflow-guide profiles; the
 credentialless validator and narrow writer independently rerun a protected no-commit merge
 controller from the exact parents and compare its stable evidence. The full proposed patch is
 applied only to an alternate index whose complete tree id is authenticated; the controller copies

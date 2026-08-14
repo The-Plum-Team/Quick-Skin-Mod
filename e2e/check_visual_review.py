@@ -27,7 +27,14 @@ VERDICT_KEYS = {
 TRIAGE_KEYS = {"label", "decision", "confidence", "anomalies"}
 TRIAGE_DECISIONS = frozenset({"clean", "needs_review"})
 TRIAGE_CONFIDENCE = frozenset({"high", "medium", "low"})
-MANIFEST_KEYS = {"path", "label", "capture_id", "kind", "expectation"}
+MANIFEST_KEYS = {
+    "path",
+    "label",
+    "capture_id",
+    "kind",
+    "expectation",
+    "runtime_evidence",
+}
 PAIRED_MANIFEST_KEYS = MANIFEST_KEYS | {"reference_path", "reference_label"}
 SHA256_PNG = re.compile(r"^(?P<digest>[0-9a-f]{64})\.png$")
 MAX_REVIEW_FRAMES = 512
@@ -38,6 +45,7 @@ MAX_LABEL_LENGTH = 512
 MAX_PATH_LENGTH = 512
 MAX_CAPTURE_ID_LENGTH = 128
 MAX_EXPECTATION_LENGTH = 4096
+MAX_RUNTIME_EVIDENCE_LENGTH = 4096
 MAX_VISIBLE_LENGTH = 2048
 MAX_ANOMALY_LENGTH = 1024
 MAX_ANOMALIES = 16
@@ -339,6 +347,11 @@ def validate_manifest(
             item.get("expectation"),
             f"manifest entry {index}.expectation",
             maximum=MAX_EXPECTATION_LENGTH,
+        )
+        _text(
+            item.get("runtime_evidence"),
+            f"manifest entry {index}.runtime_evidence",
+            maximum=MAX_RUNTIME_EVIDENCE_LENGTH,
         )
         label_parts = label.split("/")
         if len(label_parts) != 4 or ".".join(label_parts[1:]) != capture_id:
