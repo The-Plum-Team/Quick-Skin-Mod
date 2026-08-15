@@ -8,18 +8,16 @@ import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.multiplayer.ServerData;
-import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.io.File;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
+import java.nio.channels.SelectionKey;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Optional;
@@ -323,89 +321,6 @@ public final class VanillaShim {
     }
 
     /**
-     * Starts the same multiplayer connection path as the vanilla server list after the title screen
-     * is ready. The public method gains a trailing transfer-state argument in 26.x and ServerData's
-     * third constructor argument changes from boolean to an enum, so both calls are selected by
-     * stable parameter shape instead of mapped method names.
-     */
-    public static boolean startMultiplayerConnection(
-            Minecraft mc, Screen parent, String address) {
-        try {
-            int separator = address.lastIndexOf(':');
-            if (separator <= 0 || separator == address.length() - 1) {
-                throw new IllegalArgumentException("expected host:port, got " + address);
-            }
-            String host = address.substring(0, separator);
-            int port = Integer.parseInt(address.substring(separator + 1));
-            if (port < 1 || port > 65535) {
-                throw new IllegalArgumentException("port out of range: " + port);
-            }
-
-            ServerAddress serverAddress = new ServerAddress(host, port);
-            ServerData serverData = null;
-            for (Constructor<?> constructor : ServerData.class.getDeclaredConstructors()) {
-                Class<?>[] parameters = constructor.getParameterTypes();
-                if (parameters.length != 3
-                        || parameters[0] != String.class
-                        || parameters[1] != String.class) {
-                    continue;
-                }
-                Object kind;
-                if (parameters[2] == boolean.class) {
-                    kind = false;
-                } else if (parameters[2].isEnum()) {
-                    Object[] constants = parameters[2].getEnumConstants();
-                    if (constants == null || constants.length == 0) continue;
-                    kind = constants[0];
-                    for (Object constant : constants) {
-                        if (((Enum<?>) constant).name().equals("OTHER")) {
-                            kind = constant;
-                            break;
-                        }
-                    }
-                } else {
-                    continue;
-                }
-                constructor.setAccessible(true);
-                serverData = (ServerData) constructor.newInstance(
-                        "Quick Skin E2E", address, kind);
-                break;
-            }
-            if (serverData == null) {
-                throw new NoSuchMethodException("compatible ServerData constructor");
-            }
-
-            for (Method method : ConnectScreen.class.getDeclaredMethods()) {
-                Class<?>[] parameters = method.getParameterTypes();
-                if (!Modifier.isStatic(method.getModifiers())
-                        || method.getReturnType() != void.class
-                        || parameters.length < 5
-                        || parameters.length > 6
-                        || !Screen.class.isAssignableFrom(parameters[0])
-                        || parameters[1] != Minecraft.class
-                        || parameters[2] != ServerAddress.class
-                        || parameters[3] != ServerData.class
-                        || parameters[4] != boolean.class) {
-                    continue;
-                }
-                Object[] arguments = new Object[parameters.length];
-                arguments[0] = parent;
-                arguments[1] = mc;
-                arguments[2] = serverAddress;
-                arguments[3] = serverData;
-                arguments[4] = false;
-                method.setAccessible(true);
-                method.invoke(null, arguments);
-                return true;
-            }
-            throw new NoSuchMethodException("compatible ConnectScreen static entry point");
-        } catch (Throwable t) {
-            E2ELog.warn("delayed multiplayer connect failed: " + t);
-            return false;
-        }
-    }
-
-    /**
      * Bounded state from the live Netty channel behind a connection screen. This diagnostic is
      * intentionally structural: the private connection/channel field names are remapped on
      * Fabric, while their runtime types and channel contract are stable.
@@ -413,27 +328,82 @@ public final class VanillaShim {
     public static String connectionDiagnostic(Screen sc) {
         if (!isConnectScreen(sc)) return "not-connect-screen";
         try {
-            Channel channel = null;
-            for (Class<?> screenType = sc.getClass();
-                    screenType != null && Screen.class.isAssignableFrom(screenType);
-                    screenType = screenType.getSuperclass()) {
-                for (Field field : screenType.getDeclaredFields()) {
-                    if (Modifier.isStatic(field.getModifiers())) continue;
-                    field.setAccessible(true);
-                    channel = nestedChannel(field.get(sc));
-                    if (channel != null) break;
-                }
-                if (channel != null) break;
-            }
+            Channel channel = liveConnectionChannel(sc);
             if (channel == null) return "channel=<unavailable>";
-            return "channelActive=" + channel.isActive()
+            return "channelType=" + channel.getClass().getName()
+                    + "; channelActive=" + channel.isActive()
                     + "; open=" + channel.isOpen()
                     + "; registered=" + channel.isRegistered()
                     + "; writable=" + channel.isWritable()
                     + "; autoRead=" + channel.config().isAutoRead()
+                    + "; nio=" + nioReadDiagnostic(channel)
                     + "; pipeline=" + channel.pipeline().names();
         } catch (Throwable t) {
             return "channel=<diagnostic-failed:" + t.getClass().getSimpleName() + ">";
+        }
+    }
+
+    /** Rearms one already-live channel read without reconnecting or changing protocol bytes. */
+    public static boolean rearmConnectionRead(Screen sc) {
+        if (!isConnectScreen(sc)) return false;
+        try {
+            Channel channel = liveConnectionChannel(sc);
+            if (channel == null || !channel.isActive()) return false;
+            channel.eventLoop().execute(() -> {
+                if (!channel.isActive()) return;
+                if (channel.config().isAutoRead()) {
+                    channel.config().setAutoRead(false);
+                    channel.config().setAutoRead(true);
+                } else {
+                    channel.read();
+                }
+            });
+            return true;
+        } catch (Throwable t) {
+            E2ELog.warn("connection read rearm failed: " + t);
+            return false;
+        }
+    }
+
+    private static Channel liveConnectionChannel(Screen sc) throws IllegalAccessException {
+        for (Class<?> screenType = sc.getClass();
+                screenType != null && Screen.class.isAssignableFrom(screenType);
+                screenType = screenType.getSuperclass()) {
+            for (Field field : screenType.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers())) continue;
+                field.setAccessible(true);
+                Channel channel = nestedChannel(field.get(sc));
+                if (channel != null) return channel;
+            }
+        }
+        return null;
+    }
+
+    private static String nioReadDiagnostic(Channel channel) {
+        try {
+            SelectionKey key = null;
+            String readPending = "unavailable";
+            for (Class<?> type = channel.getClass(); type != null; type = type.getSuperclass()) {
+                for (Field field : type.getDeclaredFields()) {
+                    if (Modifier.isStatic(field.getModifiers())) continue;
+                    if (SelectionKey.class.isAssignableFrom(field.getType())) {
+                        field.setAccessible(true);
+                        Object value = field.get(channel);
+                        if (value instanceof SelectionKey selectionKey) key = selectionKey;
+                    } else if (field.getType() == boolean.class
+                            && field.getName().equals("readPending")) {
+                        field.setAccessible(true);
+                        readPending = Boolean.toString(field.getBoolean(channel));
+                    }
+                }
+            }
+            if (key == null) return "selectionKey=unavailable,readPending=" + readPending;
+            return "selectionKeyValid=" + key.isValid()
+                    + ",interestOps=" + key.interestOps()
+                    + ",readyOps=" + key.readyOps()
+                    + ",readPending=" + readPending;
+        } catch (Throwable t) {
+            return "unavailable:" + t.getClass().getSimpleName();
         }
     }
 

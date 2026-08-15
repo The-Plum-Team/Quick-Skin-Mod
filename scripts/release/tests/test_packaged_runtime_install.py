@@ -476,9 +476,9 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
             compatibility_options["jvmArguments"],
         )
         self.assertEqual(["java", "minecraft"], replaymod_launched)
-        self.assertNotIn("quickPlayMultiplayer", replaymod_options)
+        self.assertEqual("127.0.0.1:25566", replaymod_options["quickPlayMultiplayer"])
         self.assertIn(
-            "-Dquickskin.e2e.delayedConnect=127.0.0.1:25566",
+            "-Dquickskin.e2e.rearmStalledConnectionRead=true",
             replaymod_options["jvmArguments"],
         )
         self.assertEqual(

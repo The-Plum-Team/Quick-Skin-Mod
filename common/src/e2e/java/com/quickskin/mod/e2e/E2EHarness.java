@@ -9,7 +9,6 @@ import com.quickskin.mod.e2e.generated.ScenarioContract.ScenarioId;
 import dev.architectury.event.events.client.ClientTickEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.TitleScreen;
 
 import java.io.File;
 import java.util.List;
@@ -29,7 +28,6 @@ public final class E2EHarness {
     private final String version;
     private final String role;
     private final String scenarioId;
-    private final String delayedConnectAddress;
     private final E2EReport report;
 
     private State state = State.WAIT_WORLD;
@@ -37,8 +35,7 @@ public final class E2EHarness {
     private int worldWaitDeadline = 0;
     private String lastScreen = "";
     private int lastConnectionDiagnosticTick = 0;
-    private int titleScreenReadyTick = -1;
-    private boolean delayedConnectStarted = false;
+    private boolean stalledConnectionReadRearmed = false;
 
     private List<Step> steps;
     private int stepIndex = 0;
@@ -62,7 +59,6 @@ public final class E2EHarness {
         this.version = version;
         this.role = role;
         this.scenarioId = scenarioId;
-        this.delayedConnectAddress = System.getProperty("quickskin.e2e.delayedConnect", "").trim();
         this.report = new E2EReport(version, role, scenarioId);
     }
 
@@ -119,25 +115,6 @@ public final class E2EHarness {
         }
         // Diagnostic: log each screen transition so a stuck client (title vs loading vs error) is visible.
         Screen sc = VanillaShim.currentScreen(mc);
-        if (!delayedConnectAddress.isEmpty() && !delayedConnectStarted) {
-            if (sc instanceof TitleScreen) {
-                if (titleScreenReadyTick < 0) {
-                    titleScreenReadyTick = tick;
-                    E2ELog.info("title screen ready; delaying normal multiplayer connect for 2s");
-                } else if (tick - titleScreenReadyTick >= 20 * 2) {
-                    delayedConnectStarted = true;
-                    E2ELog.info("starting delayed multiplayer connect to " + delayedConnectAddress);
-                    if (!VanillaShim.startMultiplayerConnection(
-                            mc, sc, delayedConnectAddress)) {
-                        throw new IllegalStateException(
-                                "could not start delayed multiplayer connection");
-                    }
-                    sc = VanillaShim.currentScreen(mc);
-                }
-            } else {
-                titleScreenReadyTick = -1;
-            }
-        }
         String screen = VanillaShim.screenDiagnostic(sc);
         if (!screen.equals(lastScreen)) {
             E2ELog.info("screen -> " + screen);
@@ -174,6 +151,14 @@ public final class E2EHarness {
                 && tick - lastConnectionDiagnosticTick >= 20 * 10) {
             E2ELog.info("connection -> " + VanillaShim.connectionDiagnostic(sc));
             lastConnectionDiagnosticTick = tick;
+            if (!stalledConnectionReadRearmed
+                    && Boolean.getBoolean("quickskin.e2e.rearmStalledConnectionRead")) {
+                stalledConnectionReadRearmed = true;
+                if (!VanillaShim.rearmConnectionRead(sc)) {
+                    throw new IllegalStateException("could not rearm stalled connection read");
+                }
+                E2ELog.info("connection -> rearmed the live channel read once");
+            }
         }
         if (mc.player != null && mc.level != null) {
             Scenario scenario = resolveScenario();
