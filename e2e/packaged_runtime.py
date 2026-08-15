@@ -1146,6 +1146,13 @@ def client_command(
         options["jvmArguments"].append(
             f"-Dquickskin.e2e.compatibility={compatibility_mod}"
         )
+    if compatibility_mod == "replaymod" and row["runtime_version"] == "1.20.1":
+        # ReplayMod can expose an old-Netty startup race where an active auto-read NIO channel has
+        # no OP_READ interest. The harness repairs only that invalid state; QuickPlay and every
+        # protocol byte remain production-equivalent.
+        options["jvmArguments"].append(
+            "-Dquickskin.e2e.repairMissingConnectionRead=true"
+        )
     return minecraft_launcher_lib.command.get_minecraft_command(
         version_id, str(install_dir), options
     )
