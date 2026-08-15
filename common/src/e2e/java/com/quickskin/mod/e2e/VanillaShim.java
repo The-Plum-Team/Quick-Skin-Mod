@@ -3,17 +3,22 @@ package com.quickskin.mod.e2e;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.SplashRenderer;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -298,6 +303,102 @@ public final class VanillaShim {
         if (sc == null) return false;
         String cn = sc.getClass().getName().toLowerCase(Locale.ROOT);
         return cn.contains("loadingerror") || cn.contains("errorscreen") || cn.contains("warning");
+    }
+
+    /** Whether vanilla has already rejected or lost the connection before the world was joined. */
+    public static boolean isDisconnectedScreen(Screen sc) {
+        // Keep the class literal so Loom remaps it to Fabric's stable intermediary class at runtime.
+        // A string comparison against the Mojang name only works on Forge/NeoForge.
+        return sc instanceof DisconnectedScreen;
+    }
+
+    /**
+     * True only for vanilla's two explicit pre-world login timeout reasons. The E2E orchestrator
+     * may retry this infrastructure-shaped failure once; every other disconnect remains fatal.
+     */
+    public static boolean isConnectionTimeoutScreen(Screen sc) {
+        if (!isDisconnectedScreen(sc)) return false;
+        ScreenDetails details = inspectScreen(sc);
+        if (details.translationKeys.contains("disconnect.timeout")
+                || details.translationKeys.contains("multiplayer.disconnect.slow_login")) {
+            return true;
+        }
+        // The remote endpoint may send a literal component instead of retaining its translation
+        // key. Packaged E2E always runs with Minecraft's en_us default, so retain a narrow fallback.
+        for (String text : details.texts) {
+            String normalized = text.toLowerCase(Locale.ROOT);
+            if (normalized.equals("timed out") || normalized.equals("took too long to log in")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A bounded, credential-free description of the current screen for startup diagnostics. */
+    public static String screenDiagnostic(Screen sc) {
+        if (sc == null) return "screen=<none/in-world-hud>";
+        ScreenDetails details = inspectScreen(sc);
+        return "screen=" + sc.getClass().getName()
+                + "; translationKeys=" + details.translationKeys
+                + "; text=" + details.texts;
+    }
+
+    private record ScreenDetails(Set<String> translationKeys, Set<String> texts) {}
+
+    private static ScreenDetails inspectScreen(Screen sc) {
+        Set<String> keys = new LinkedHashSet<>();
+        Set<String> texts = new LinkedHashSet<>();
+        if (sc == null) return new ScreenDetails(keys, texts);
+
+        for (Class<?> type = sc.getClass();
+                type != null && Screen.class.isAssignableFrom(type);
+                type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers())) continue;
+                try {
+                    field.setAccessible(true);
+                    collectComponents(field.get(sc), 0, keys, texts);
+                } catch (Throwable ignored) {
+                    // One inaccessible implementation field must not hide other readable reasons.
+                }
+            }
+        }
+        return new ScreenDetails(keys, texts);
+    }
+
+    private static void collectComponents(
+            Object candidate,
+            int depth,
+            Set<String> keys,
+            Set<String> texts
+    ) {
+        if (candidate == null || depth > 3 || keys.size() + texts.size() >= 24) return;
+        if (candidate instanceof Component component) {
+            String text = component.getString().replaceAll("\\s+", " ").trim();
+            if (!text.isEmpty()) texts.add(text.length() <= 300 ? text : text.substring(0, 300));
+            if (component.getContents() instanceof TranslatableContents translated) {
+                keys.add(translated.getKey());
+            }
+            for (Component sibling : component.getSiblings()) {
+                collectComponents(sibling, depth + 1, keys, texts);
+            }
+            return;
+        }
+        if (candidate instanceof Optional<?> optional) {
+            optional.ifPresent(value -> collectComponents(value, depth + 1, keys, texts));
+            return;
+        }
+        Class<?> type = candidate.getClass();
+        if (!type.isRecord()) return;
+        for (RecordComponent component : type.getRecordComponents()) {
+            try {
+                Method accessor = component.getAccessor();
+                accessor.setAccessible(true);
+                collectComponents(accessor.invoke(candidate), depth + 1, keys, texts);
+            } catch (Throwable ignored) {
+                // Continue with the remaining bounded record components.
+            }
+        }
     }
 
     private static String resolveLoc(AbstractClientPlayer p, String directName, String[] skinAccessors) {
