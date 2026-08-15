@@ -35,7 +35,8 @@ public final class E2EHarness {
     private int worldWaitDeadline = 0;
     private String lastScreen = "";
     private int lastConnectionDiagnosticTick = 0;
-    private boolean missingConnectionReadRepaired = false;
+    private int missingConnectionReadRepairs = 0;
+    private static final int MAX_MISSING_CONNECTION_READ_REPAIRS = 5;
 
     private List<Step> steps;
     private int stepIndex = 0;
@@ -148,11 +149,13 @@ public final class E2EHarness {
             }
         }
         if (VanillaShim.isConnectScreen(sc)) {
-            if (!missingConnectionReadRepaired
+            if (missingConnectionReadRepairs < MAX_MISSING_CONNECTION_READ_REPAIRS
                     && Boolean.getBoolean("quickskin.e2e.repairMissingConnectionRead")
                     && VanillaShim.repairMissingConnectionRead(sc)) {
-                missingConnectionReadRepaired = true;
-                E2ELog.info("connection -> repaired one missing OP_READ interest");
+                missingConnectionReadRepairs++;
+                E2ELog.info("connection -> repaired missing OP_READ interest ("
+                        + missingConnectionReadRepairs + "/"
+                        + MAX_MISSING_CONNECTION_READ_REPAIRS + ")");
             }
             if (tick - lastConnectionDiagnosticTick >= 20 * 10) {
                 E2ELog.info("connection -> " + VanillaShim.connectionDiagnostic(sc));
