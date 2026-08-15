@@ -157,6 +157,38 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 lane["compatibility_contract_sha256"],
             )
 
+    def test_plan_binds_clean_evidence_to_the_source_run_profile(self) -> None:
+        matrix_path = ROOT / "release" / "release-matrix.json"
+
+        for matrix_kind, suffix in (
+            ("pr-anchors", "--pr-behavior"),
+            ("native-anchors", "--scheduled-behavior"),
+        ):
+            with self.subTest(matrix_kind=matrix_kind):
+                plan = mod_compatibility.build_plan(
+                    matrix_path,
+                    self.contract_path,
+                    base_matrix_kind=matrix_kind,
+                )
+                self.assertEqual(matrix_kind, plan["base_matrix_kind"])
+                self.assertGreater(len(plan["runnable"]), 0)
+                self.assertTrue(
+                    all(
+                        lane["base_evidence_name"].endswith(suffix)
+                        for lane in plan["runnable"]
+                    )
+                )
+
+        with self.assertRaisesRegex(
+            mod_compatibility.CompatibilityContractError,
+            "unsupported base matrix kind",
+        ):
+            mod_compatibility.build_plan(
+                matrix_path,
+                self.contract_path,
+                base_matrix_kind="untrusted",
+            )
+
     def test_contract_rejects_unknown_fields_unsafe_urls_and_ambiguous_lanes(self) -> None:
         mutations = []
         unknown = copy.deepcopy(self.payload)
@@ -433,6 +465,16 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 "must contain exactly",
             ):
                 mod_compatibility_visual._load_inventory(inventory)
+
+    def test_essential_title_screen_has_an_explicit_compatibility_expectation(self) -> None:
+        expectation = mod_compatibility_visual.COMPATIBILITY_EXPECTATION_OVERRIDES[
+            ("essential", "full.client_a.title_screen_splash_order")
+        ]
+
+        self.assertIn("Essential intentionally owns", expectation)
+        self.assertIn("suppress its duplicate PlayerWidget", expectation)
+        self.assertIn("Quick Skin action icon", expectation)
+        self.assertIn("need not overlap the vanilla splash", expectation)
 
 
 if __name__ == "__main__":
