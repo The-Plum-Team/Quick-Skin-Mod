@@ -102,13 +102,22 @@ jobs:
           HEAD_BRANCH: ${{ github.event.client_payload.head_branch }}
         run: |
           set -euo pipefail
-          if ! git fetch --no-tags origin "$HEAD_BRANCH"; then
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$HEAD_BRANCH" =~ ^automation/sync/[A-Za-z0-9._/-]+$ ]]
+          if ! git fetch --no-tags origin \
+              "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH" \
+              "+refs/heads/master:refs/remotes/origin/master"; then
             printf 'current=false\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [[ "$(git rev-parse FETCH_HEAD)" == "$EXPECTED_SHA" ]]; then
+          remote_head="$(git rev-parse "refs/remotes/origin/$HEAD_BRANCH")"
+          protected_sha="$(git rev-parse refs/remotes/origin/master)"
+          if [[ "$remote_head" == "$EXPECTED_SHA" ]] \
+              && git merge-base --is-ancestor "$protected_sha" "$EXPECTED_SHA"; then
             printf 'current=true\n' >> "$GITHUB_OUTPUT"
           else
+            printf 'Ignoring superseded port result at %s; remote head is %s and protected master is %s.\n' \
+              "$EXPECTED_SHA" "$remote_head" "$protected_sha"
             printf 'current=false\n' >> "$GITHUB_OUTPUT"
           fi
 
@@ -191,10 +200,12 @@ jobs:
         shell: bash
         env:
           EXPECTED_SHA: ${{ github.event.client_payload.head_sha }}
+          GATE_RUN_ID: ${{ github.event.client_payload.run_id }}
           HEAD_BRANCH: ${{ github.event.client_payload.head_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          [[ "$GATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           pr_json="$(gh pr list --state open --head "$HEAD_BRANCH" --limit 2 \
             --json number,baseRefName,baseRefOid,headRefName,headRefOid,isCrossRepository,labels,state)"
           jq -e \
@@ -221,6 +232,19 @@ jobs:
             --jq .object.sha)"
           [[ "$remote_base_sha" == "$base_sha" ]]
           printf 'pr_number=%s\n' "$pr_number" >> "$GITHUB_OUTPUT"
+
+          # A dependency-verification rejection is a supply-chain decision, not a source repair.
+          # Never give a model authority to bless new dependency bytes; leave the PR red until a
+          # protected change records a checksum that was independently reviewed.
+          failure_log="$RUNNER_TEMP/version-port-failure.log"
+          gh run view "$GATE_RUN_ID" --log-failed > "$failure_log" 2>&1
+          if grep -Fq 'Dependency verification failed for configuration' "$failure_log"; then
+            gh pr comment "$pr_number" --body \
+              "Gradle dependency verification rejected downloaded bytes. Automated AI repair is intentionally disabled for supply-chain failures; repository variants and checksums require independent review."
+            printf 'attempt=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if gh pr view "$pr_number" --json labels --jq '.labels[].name' \
               | grep -Fxq ai-repair-attempted; then
             gh pr comment "$pr_number" --body \
@@ -742,6 +766,11 @@ jobs:
           [[ "$(git rev-parse "refs/remotes/origin/$HEAD_BRANCH")" == "$head_sha" ]]
           [[ "$(git rev-parse "refs/remotes/origin/$target_branch")" == "$base_sha" ]]
           git merge-base --is-ancestor "$base_sha" "$head_sha"
+          if ! git merge-base --is-ancestor "$protected_sha" "$head_sha"; then
+            printf 'Protected master advanced beyond port %s; deferring to the newer synchronization wave.\n' \
+              "$head_sha"
+            exit 0
+          fi
 
           # Derive policy again from the exact PR diff with the current protected classifier. The
           # source branch cannot weaken this decision by modifying its own workflows or scripts.
