@@ -345,7 +345,7 @@ jobs:
             --argjson artifacts "$source_artifacts" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             '([.runnable[].base_evidence_name] | unique) as $names |
-             all($names[] as $name;
+             [$names[] as $name |
                ([$artifacts.artifacts[] | select(
                  .name == $name and .expired == false and
                  .workflow_run.id == $source_run_id and
@@ -353,7 +353,7 @@ jobs:
                   test("^sha256:[0-9a-f]{64}$")) and
                  ((.size_in_bytes | type) == "number" and
                   .size_in_bytes > 0 and .size_in_bytes <= 536870912))] |
-                length == 1))' \
+                length == 1)] | all' \
             "$RUNNER_TEMP/mod-compatibility-plan.json" > /dev/null
           matrix="$(jq -c '{include:.runnable}' \
             "$RUNNER_TEMP/mod-compatibility-plan.json")"
