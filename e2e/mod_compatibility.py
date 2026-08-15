@@ -30,7 +30,7 @@ from matrix import gha_matrix, load_matrix, read_mod_version  # noqa: E402
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("mod-compatibility-contract.json")
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MAX_CONTRACT_BYTES = 2 * 1024 * 1024
 MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
 MAX_FILES_PER_ARTIFACT = 4
@@ -76,6 +76,13 @@ class LockedArtifact:
 
 
 @dataclass(frozen=True)
+class ExcludedLane:
+    runtime_version: str
+    loader: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class CompatibilityMod:
     id: str
     name: str
@@ -85,6 +92,7 @@ class CompatibilityMod:
     allowed_version_types: tuple[str, ...]
     provided_dependencies: tuple[str, ...]
     supported_game_versions: tuple[str, ...] | None
+    excluded_lanes: tuple[ExcludedLane, ...]
     artifacts: tuple[LockedArtifact, ...]
 
 
@@ -288,6 +296,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             "allowed_version_types",
             "provided_dependencies",
             "supported_game_versions",
+            "excluded_lanes",
             "artifacts",
         },
         label,
@@ -312,6 +321,35 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
         if supported is None
         else _string_list(supported, f"{label}.supported_game_versions", pattern=VERSION)
     )
+    excluded_value = item["excluded_lanes"]
+    if not isinstance(excluded_value, list) or len(excluded_value) > 64:
+        raise CompatibilityContractError(f"{label}.excluded_lanes must be a bounded list")
+    excluded_lanes: list[ExcludedLane] = []
+    excluded_keys: set[tuple[str, str]] = set()
+    for index, raw_exclusion in enumerate(excluded_value):
+        exclusion_label = f"{label}.excluded_lanes[{index}]"
+        exclusion = _exact_keys(
+            raw_exclusion, {"runtime_version", "loader", "reason"}, exclusion_label
+        )
+        runtime_version = _string(
+            exclusion["runtime_version"], f"{exclusion_label}.runtime_version", VERSION
+        )
+        loader = _string(exclusion["loader"], f"{exclusion_label}.loader", IDENTIFIER)
+        if loader not in loaders:
+            raise CompatibilityContractError(
+                f"{exclusion_label}.loader is outside the mod's supported loaders"
+            )
+        key = (runtime_version, loader)
+        if key in excluded_keys:
+            raise CompatibilityContractError(f"{label}.excluded_lanes contains duplicates")
+        excluded_keys.add(key)
+        excluded_lanes.append(
+            ExcludedLane(
+                runtime_version=runtime_version,
+                loader=loader,
+                reason=_string(exclusion["reason"], f"{exclusion_label}.reason"),
+            )
+        )
     artifacts_value = item["artifacts"]
     if not isinstance(artifacts_value, list) or len(artifacts_value) > MAX_ARTIFACTS:
         raise CompatibilityContractError(f"{label}.artifacts must be a bounded list")
@@ -367,6 +405,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             allow_empty=True,
         ),
         supported_game_versions=supported_versions,
+        excluded_lanes=tuple(excluded_lanes),
         artifacts=artifacts,
     )
 
@@ -397,7 +436,7 @@ def load_contract(path: Path = DEFAULT_CONTRACT) -> CompatibilityContract:
     if source != {
         "kind": "modrinth-v2",
         "api_base": "https://api.modrinth.com/v2",
-        "selection_policy": "newest-compatible-published-version-v1",
+        "selection_policy": "newest-compatible-published-version-with-authored-exclusions-v2",
     }:
         raise CompatibilityContractError("compatibility artifact source policy is unsupported")
     mods_value = root["mods"]
@@ -435,6 +474,18 @@ def resolve_lane(
         raise CompatibilityContractError(
             f"{mod.id} is not implemented by Quick Skin for Minecraft {runtime_version}"
         )
+    excluded = next(
+        (
+            item
+            for item in mod.excluded_lanes
+            if item.runtime_version == runtime_version and item.loader == loader
+        ),
+        None,
+    )
+    if excluded is not None:
+        raise CompatibilityContractError(
+            f"{mod.id} excludes {runtime_version}/{loader}: {excluded.reason}"
+        )
     matches = [
         artifact
         for artifact in mod.artifacts
@@ -467,7 +518,19 @@ def build_plan(
             reason: str | None = None
             if row["loader"] not in mod.loaders:
                 reason = f"Quick Skin does not implement {mod.name} for {row['loader']}"
-            elif (
+            else:
+                excluded = next(
+                    (
+                        item
+                        for item in mod.excluded_lanes
+                        if item.runtime_version == row["runtime_version"]
+                        and item.loader == row["loader"]
+                    ),
+                    None,
+                )
+                if excluded is not None:
+                    reason = excluded.reason
+            if reason is None and (
                 mod.supported_game_versions is not None
                 and row["runtime_version"] not in mod.supported_game_versions
             ):
@@ -475,7 +538,7 @@ def build_plan(
                     f"Quick Skin does not implement {mod.name} for Minecraft "
                     f"{row['runtime_version']}"
                 )
-            else:
+            elif reason is None:
                 matches = [
                     artifact
                     for artifact in mod.artifacts

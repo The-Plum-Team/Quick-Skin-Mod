@@ -115,7 +115,8 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   dimensions, SHA-256, probes, and comparisons, and exposes the shared evidence model used by the
   AI review and public site.
 - `e2e/mod-compatibility-contract.json` is the reviewed optional-mod artifact lock. It owns the
-  supported integration ids, applicability rules, Modrinth project identities, and every immutable
+  supported integration ids, applicability rules, authored loader/version exclusions with reasons,
+  Modrinth project identities, and every immutable
   external JAR URL/filename/size/SHA-256/SHA-512 tuple. `e2e/mod_compatibility.py` is its fail-closed
   runtime reader, planner, and materializer. `e2e/update_mod_compatibility_lock.py` is the only code
   allowed to query Modrinth or select a newest upstream release; it is an explicit maintainer tool,
@@ -124,7 +125,8 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   same-version/loader packaged baseline, pairs every capture by semantic identity, and emits only
   content-addressed metadata-free images plus an exact source/implementation/contract/artifact
   proof. `.github/workflows/mod-compatibility-e2e.yml` owns admission, the fully parallel
-  artifact-by-mod runtime matrix, and secretless curation.
+  artifact-by-mod runtime matrix, and per-successful-lane secretless curation; one failed matrix
+  sibling never suppresses capsules already produced by successful lanes.
   `.github/workflows/mod-compatibility-review.yml` is the separate credential-bearing consumer; it
   downloads only curated capsules, sends every pair to Sonnet even when pixels are identical,
   escalates every non-high-clean result to Opus, and publishes a durable source-wave block before
@@ -154,6 +156,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   report digests to exact Git identities supplied by protected workflow checks. The version
   synchronizer accepts the resulting artifact only from a successful protected drain run, for the
   exact current `master` SHA and exact current merged anchor head.
+  `scripts/ci/visual_review_queue.py` also authenticates that protected artifact name and owner
+  before suppressing a duplicate scheduled or automatic review of the exact generation; it never
+  applies this shortcut to an ordinary feature-PR semantic review.
 - `scripts/pages/evidence.py` creates and validates a small branch-scoped raw handoff, then
   atomically compacts a validated bundle to protected WebP derivatives. It may copy only contracted
   screenshots and structured provenance—never runtime logs or arbitrary HTML. The compact schema
