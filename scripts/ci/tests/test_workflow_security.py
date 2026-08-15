@@ -1297,6 +1297,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('endswith(" - contract scenarios")', inspect)
         self.assertIn("gh api --paginate --slurp", inspect)
         self.assertIn("[.[].jobs[]", inspect)
+        self.assertIn(
+            '"+refs/heads/master:refs/remotes/origin/master"', inspect
+        )
+        self.assertIn(
+            'git merge-base --is-ancestor "$protected_sha" "$EXPECTED_SHA"',
+            inspect,
+        )
+        self.assertIn("Ignoring superseded port result", inspect)
         self.assertIn('gh run view "$GATE_RUN_ID" --log-failed', inspect)
         self.assertIn("Dependency verification failed for configuration", inspect)
         self.assertIn("Automated AI repair is intentionally disabled", inspect)
@@ -1307,6 +1315,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("-f runtime_policy=full", repair)
 
         self.assertIn("branches/master", merge)
+        self.assertIn(
+            'if ! git merge-base --is-ancestor "$protected_sha" "$head_sha"; then',
+            merge,
+        )
+        self.assertIn("Protected master advanced beyond port", merge)
         self.assertIn('git show "$protected_sha:scripts/ci/e2e_impact.py"', merge)
         self.assertIn('git show "$protected_sha:release/release-matrix.json"', merge)
         self.assertIn('--base "$base_sha"', merge)
