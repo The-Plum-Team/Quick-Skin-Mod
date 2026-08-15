@@ -21,7 +21,8 @@ jobs:
     name: Authenticate compatibility capsules
     if: >-
       github.ref == 'refs/heads/master' &&
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' ||
+       github.event.workflow_run.conclusion == 'failure')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -41,7 +42,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Authenticate the successful source workflow
+      - name: Authenticate the completed source workflow
         id: owner
         shell: bash
         env:
@@ -58,7 +59,8 @@ jobs:
             --arg implementation_sha "$implementation_sha" \
             --arg repository "$GITHUB_REPOSITORY" \
             --argjson run_id "$SOURCE_RUN_ID" \
-            '.id == $run_id and .status == "completed" and .conclusion == "success" and
+            '.id == $run_id and .status == "completed" and
+             (.conclusion == "success" or .conclusion == "failure") and
              .event == "repository_dispatch" and .head_branch == "master" and
              .head_sha == $implementation_sha and
              .path == ".github/workflows/mod-compatibility-e2e.yml" and
@@ -77,7 +79,7 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ steps.owner.outputs.source_run_id }}
 
-      - name: Require one bounded capsule for every runnable lane
+      - name: Select every unique capsule produced by a successful lane
         id: matrix
         shell: bash
         env:
@@ -145,8 +147,9 @@ jobs:
                 (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
                 ((.size_in_bytes | type) == "number" and .size_in_bytes > 0 and
                  .size_in_bytes <= 536870912))] as $matches |
-              if ($matches|length) != 1 then
-                error("missing or duplicate review capsule for " + $lane.id)
+              if ($matches|length) > 1 then
+                error("duplicate review capsule for " + $lane.id)
+              elif ($matches|length) == 0 then empty
               else $matches[0] as $artifact |
                 {id:$lane.id,artifact_node:$lane.artifact_node,
                  runtime_version:$lane.runtime_version,loader:$lane.loader,
@@ -158,7 +161,8 @@ jobs:
                  source_sha:$.source_sha,target_branch:$.target_branch,target_sha:$.target_sha}
               end] | {include:.}' "$plan")"
           count="$(jq '.include | length' <<< "$matrix")"
-          [[ "$count" == "$(jq '.runnable | length' "$plan")" ]]
+          [[ "$count" =~ ^[0-9]+$ ]]
+          (( count <= $(jq '.runnable | length' "$plan") ))
           printf 'count=%s\n' "$count" >> "$GITHUB_OUTPUT"
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
 
@@ -317,7 +321,8 @@ jobs:
               jq -e \
                 --arg implementation_sha "${{ matrix.implementation_sha }}" \
                 --arg repository "$GITHUB_REPOSITORY" \
-                '.status == "completed" and .conclusion == "success" and
+                '.status == "completed" and
+                 (.conclusion == "success" or .conclusion == "failure") and
                  .head_sha == $implementation_sha and
                  .path == ".github/workflows/mod-compatibility-e2e.yml" and
                  .head_repository.full_name == $repository' \
