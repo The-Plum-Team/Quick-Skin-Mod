@@ -500,6 +500,50 @@ jobs:
           SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
         run: |
           set -euo pipefail
+          protected_gh_api_retry() {
+            local api_status attempt delay now output reset_at skew wait_seconds
+            delay=5
+            for attempt in {1..4}; do
+              output=''
+              api_status=0
+              if output="$(gh api "$@" 2>&1)"; then
+                printf '%s\n' "$output"
+                return 0
+              else
+                api_status=$?
+              fi
+              if ! grep -Eqi \
+                  'API rate limit exceeded|secondary rate limit|HTTP (408|429|5[0-9][0-9])|connection (reset|refused)|timed out|timeout|temporary failure|TLS handshake|unexpected EOF' \
+                  <<< "$output" || (( attempt == 4 )); then
+                printf '%s\n' "$output" >&2
+                return "$api_status"
+              fi
+              wait_seconds="$delay"
+              if grep -Fqi 'API rate limit exceeded' <<< "$output"; then
+                reset_at="$(gh api rate_limit --jq .resources.core.reset \
+                  2>/dev/null || true)"
+                if [[ "$reset_at" =~ ^[1-9][0-9]*$ ]]; then
+                  now="$(date +%s)"
+                  skew=$(( (GITHUB_RUN_ID + attempt) % 5 ))
+                  wait_seconds=$(( reset_at - now + 2 + skew ))
+                  (( wait_seconds > 0 )) || wait_seconds=1
+                  if (( wait_seconds > 3700 )); then
+                    printf '%s\n' "$output" >&2
+                    return "$api_status"
+                  fi
+                else
+                  wait_seconds=60
+                fi
+              elif grep -Eqi 'secondary rate limit|HTTP 429' <<< "$output"; then
+                (( wait_seconds >= 60 )) || wait_seconds=60
+              fi
+              printf 'GitHub API review guard attempt %s/4 failed transiently; waiting %ss.\n' \
+                "$attempt" "$wait_seconds" >&2
+              sleep "$wait_seconds"
+              delay=$(( delay < 60 ? delay * 2 : 60 ))
+              (( delay <= 60 )) || delay=60
+            done
+          }
           printf 'already_reviewed=false\n' >> "$GITHUB_OUTPUT"
           printf 'cooling=false\n' >> "$GITHUB_OUTPUT"
           printf 'reviewable=true\n' >> "$GITHUB_OUTPUT"
@@ -520,7 +564,7 @@ jobs:
           # exact propagated generation. The marker's protected implementation is reauthenticated
           # from its owner; a name alone, or an artifact from another workflow, cannot suppress work.
           block_name="visual-review-wave-block-$GENERATION_SHA"
-          blocks="$(gh api --paginate --slurp \
+          blocks="$(protected_gh_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$block_name&per_page=100")"
           jq -e \
             '(type == "array") and
@@ -532,7 +576,7 @@ jobs:
             [[ "$size" =~ ^[1-9][0-9]*$ ]] || continue
             (( size <= 1048576 )) || continue
             [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || continue
-            block_run="$(gh api \
+            block_run="$(protected_gh_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$block_run_id" 2>/dev/null || true)"
             if [[ -n "$block_run" ]] && jq -e \
                 --arg implementation_sha "$head_sha" \
@@ -588,7 +632,7 @@ jobs:
               .workflow_run.head_sha] | @tsv' <<< "$blocks")
 
           report_name="visual-review-$SOURCE_RUN_ID"
-          reports="$(gh api --paginate --slurp \
+          reports="$(protected_gh_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$report_name&per_page=100")"
           jq -e \
             '(type == "array") and
@@ -597,7 +641,7 @@ jobs:
             <<< "$reports" > /dev/null
           while IFS=$'\t' read -r report_run_id expired; do
             [[ -n "$report_run_id" && "$expired" == false ]] || continue
-            report_run="$(gh api \
+            report_run="$(protected_gh_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$report_run_id" 2>/dev/null || true)"
             if [[ -n "$report_run" ]] && jq -e \
                 --arg repository "$GITHUB_REPOSITORY" \
@@ -622,7 +666,7 @@ jobs:
           # Re-check the exact source's fixed-name marker after entering that group so a recent
           # provider failure cannot be retried by an already-pending duplicate drain.
           attempt_name="visual-review-attempt-$SOURCE_RUN_ID"
-          attempts="$(gh api --paginate --slurp \
+          attempts="$(protected_gh_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$attempt_name&per_page=100")"
           jq -e \
             '(type == "array") and
@@ -635,7 +679,7 @@ jobs:
                 '($created_at | fromdateiso8601) + 1800 > now'; then
               continue
             fi
-            attempt_run="$(gh api \
+            attempt_run="$(protected_gh_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$attempt_run_id" 2>/dev/null || true)"
             if [[ -n "$attempt_run" ]] && jq -e \
                 --arg repository "$GITHUB_REPOSITORY" \
@@ -655,7 +699,7 @@ jobs:
             '.[].artifacts[] | select(.name == $name) |
              [.workflow_run.id, .expired, .created_at] | @tsv' <<< "$attempts")
 
-          metadata="$(gh api \
+          metadata="$(protected_gh_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
           jq -e \
             --arg digest "sha256:$ARTIFACT_DIGEST" \
@@ -670,7 +714,7 @@ jobs:
              .workflow_run.head_branch == "master" and
              .workflow_run.head_sha == $implementation_sha' \
             <<< "$metadata" > /dev/null
-          owner="$(gh api \
+          owner="$(protected_gh_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$ARTIFACT_RUN_ID")"
           jq -e \
             --arg implementation_sha "$IMPLEMENTATION_SHA" \
