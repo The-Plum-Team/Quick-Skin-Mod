@@ -98,6 +98,11 @@ def _load_authored_contract(path: Path) -> dict[str, Any]:
 def _allowed_lane(mod: dict[str, Any], version: str, loader: str) -> bool:
     if loader not in mod["loaders"]:
         return False
+    if any(
+        item["runtime_version"] == version and item["loader"] == loader
+        for item in mod["excluded_lanes"]
+    ):
+        return False
     supported = mod["supported_game_versions"]
     return supported is None or version in supported
 
