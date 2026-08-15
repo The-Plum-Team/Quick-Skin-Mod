@@ -482,6 +482,35 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
             json.loads(config_path.read_text(encoding="utf-8")),
         )
 
+    def test_replaymod_compatibility_config_disables_unrelated_recording(self) -> None:
+        game_dir = self.root / "replaymod-game"
+
+        config_path = packaged_runtime.write_compatibility_client_config(
+            game_dir, "replaymod"
+        )
+
+        self.assertEqual(game_dir / "config" / "replaymod.json", config_path)
+        assert config_path is not None
+        self.assertEqual(
+            {"recording": {"recordServer": False}},
+            json.loads(config_path.read_text(encoding="utf-8")),
+        )
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure,
+            "compatibility client config must start absent",
+        ):
+            packaged_runtime.write_compatibility_client_config(game_dir, "replaymod")
+
+    def test_other_compatibility_mods_do_not_receive_foreign_config(self) -> None:
+        game_dir = self.root / "ears-game"
+
+        config_path = packaged_runtime.write_compatibility_client_config(
+            game_dir, "ears"
+        )
+
+        self.assertIsNone(config_path)
+        self.assertFalse(game_dir.exists())
+
 
 class PackagedRuntimeDependencyTest(unittest.TestCase):
     def setUp(self) -> None:
