@@ -240,7 +240,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "visual-review-drain.yml",
                 "Upload the exact semantic anchor certificate",
                 "${{ steps.certify.outputs.artifact_name }}",
-            ): "7",
+            ): "90",
             (
                 "visual-review-drain.yml",
                 "Upload the protected exact-policy verdict cache",
@@ -350,6 +350,9 @@ class WorkflowSecurityTest(unittest.TestCase):
             encoding="utf-8"
         )
         drain_workflow = (WORKFLOWS / "visual-review-drain.yml").read_text(
+            encoding="utf-8"
+        )
+        queue = (ROOT / "scripts" / "ci" / "visual_review_queue.py").read_text(
             encoding="utf-8"
         )
         triage_prompt = (ROOT / "e2e" / "visual_review_prompt.md").read_text(
@@ -471,6 +474,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("mod-compatibility-requested", release_compatibility)
         self.assertIn("needs.review.outputs.compatibility_eligible == 'true'", release_compatibility)
         self.assertIn("automated-version-sync", release_compatibility)
+        self.assertIn("has no automatic release identity", review)
         self.assertIn("contents: write", release_compatibility)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_compatibility)
 
@@ -596,6 +600,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-report.json", review)
         self.assertIn("scripts/ci/visual_anchor_certification.py", review)
         self.assertIn("visual-anchor-certification-$master_source_sha", review)
+        self.assertIn("visual-anchor-certification-{generation}", queue)
+        self.assertIn("generation in certified", queue)
+        self.assertIn('api.get_branch_sha("master")', queue)
+        self.assertIn('pull.get("state") == "open"', queue)
         self.assertIn('commits/$anchor_source_sha/pulls', review)
         self.assertIn('.user.login == "github-actions[bot]"', review)
         self.assertIn('[[ "${source_commit[2]}" == "$master_source_sha" ]]', review)
@@ -674,7 +682,6 @@ class WorkflowSecurityTest(unittest.TestCase):
         base_review_curate = job_block("visual-review.yml", "curate")
         prepare = job_block("mod-compatibility-e2e.yml", "prepare")
         runtime = job_block("mod-compatibility-e2e.yml", "compatibility-e2e")
-        curate = job_block("mod-compatibility-e2e.yml", "curate")
         execution_gate = job_block("mod-compatibility-e2e.yml", "gate")
         enumerate_review = job_block("mod-compatibility-review.yml", "enumerate")
         review = job_block("mod-compatibility-review.yml", "review")
@@ -729,14 +736,19 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("max-parallel", runtime)
         self.assertIn("compatibility-mod: ${{ matrix.compatibility_mod }}", runtime)
         self.assertIn("source-sha: ${{ needs.admit.outputs.source_sha }}", runtime)
-        self.assertIn("needs.compatibility-e2e.result == 'success'", curate)
-        self.assertIn("same-version baseline", curate)
-        self.assertIn("CURATE_RESULT", execution_gate)
+        self.assertIn("same-version baseline", runtime)
+        self.assertIn("--candidate-root e2e-out/current", runtime)
+        self.assertIn("mod-compatibility-review-input-${{ github.run_id }}", runtime)
+        self.assertNotRegex(execution_workflow, r"(?m)^  curate:$")
+        self.assertNotIn("CURATE_RESULT", execution_gate)
 
         self.assertIn("workflow_run:", review_workflow)
         self.assertIn(
-            "github.event.workflow_run.conclusion == 'success'", enumerate_review
+            "github.event.workflow_run.conclusion == 'failure'", enumerate_review
         )
+        self.assertIn('(.conclusion == "success" or .conclusion == "failure")', enumerate_review)
+        self.assertIn('elif ($matches|length) == 0 then empty', enumerate_review)
+        self.assertIn('error("duplicate review capsule', enumerate_review)
         self.assertIn("ref: ${{ github.sha }}", review)
         self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
         self.assertIn("strategy:\n      fail-fast: false", review)
@@ -773,6 +785,24 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertNotIn("player-armor-stands", execution_workflow.lower())
         self.assertNotIn("player-armor-stands", review_workflow.lower())
+        self.assertEqual(2, contract["schema_version"])
+        self.assertEqual(
+            [
+                {
+                    "runtime_version": "1.21.9",
+                    "loader": "neoforge",
+                    "reason": (
+                        "3D Skin Layers upstream does not support Minecraft 1.21.9 "
+                        "on NeoForge - use 1.21.10"
+                    ),
+                }
+            ],
+            next(
+                item["excluded_lanes"]
+                for item in contract["mods"]
+                if item["id"] == "skin-layers-3d"
+            ),
+        )
 
     def test_pages_fan_in_uses_protected_code_and_exact_release_heads(self) -> None:
         workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")

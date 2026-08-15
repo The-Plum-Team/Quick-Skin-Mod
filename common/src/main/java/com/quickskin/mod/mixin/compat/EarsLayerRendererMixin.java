@@ -28,7 +28,7 @@ public class EarsLayerRendererMixin {
             cancellable = true,
             require = 0,
             expect = 1,
-            allow = 1,
+            allow = 2,
             remap = false
     )
     private static void quickskin$getEarsFeatures(AbstractClientPlayer peer, CallbackInfoReturnable<Object> cir) {

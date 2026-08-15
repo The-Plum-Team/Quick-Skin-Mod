@@ -160,6 +160,8 @@ class RuntimeFailure(RuntimeError):
 
 NEOFORGE_CLIENT_INSTALL_ATTEMPTS = 3
 NEOFORGE_CLIENT_INSTALL_BACKOFF_SECONDS = (5, 15)
+NEOFORGE_SERVER_INSTALL_ATTEMPTS = 3
+NEOFORGE_SERVER_INSTALL_BACKOFF_SECONDS = (5, 15)
 LAUNCHER_LIBRARY_VERSION = "8.0"
 LAUNCHER_LIBRARY_REVISION = "minecraft-launcher-lib==8.0"
 PROFILE_NORMALIZER_REVISION = "normalize-inherited-profile-v1"
@@ -925,15 +927,59 @@ def prepare_server(
 
         if row["loader"] not in {"forge", "neoforge"}:
             raise RuntimeFailure(f"unsupported loader {row['loader']!r}")
-        install_flag = (
-            "--installServer" if row["loader"] == "forge" else "--install-server"
-        )
-        run_checked(
-            [java, "-jar", str(installer), install_flag, str(server)],
-            server,
-            log,
-            env,
-        )
+        if row["loader"] == "forge":
+            run_checked(
+                [java, "-jar", str(installer), "--installServer", str(server)],
+                server,
+                log,
+                env,
+            )
+        else:
+            # NeoForge installers download Maven dependencies at install time. A transient
+            # CDN failure must not leave a half-populated server tree for the retry (or for a
+            # later scenario) to consume, so every attempt gets an isolated staging directory.
+            last_error: Exception | None = None
+            for attempt_number in range(1, NEOFORGE_SERVER_INSTALL_ATTEMPTS + 1):
+                attempt = Path(
+                    tempfile.mkdtemp(
+                        prefix=f".neoforge-server-attempt-{attempt_number}-",
+                        dir=server.parent,
+                    )
+                )
+                try:
+                    run_checked(
+                        [java, "-jar", str(installer), "--install-server", str(attempt)],
+                        attempt,
+                        log,
+                        env,
+                        append=attempt_number > 1,
+                    )
+                    expected_script = attempt / ("run.bat" if os.name == "nt" else "run.sh")
+                    if not expected_script.is_file():
+                        raise RuntimeFailure(
+                            f"NeoForge server installer did not create {expected_script}"
+                        )
+                    if any(server.iterdir()):
+                        raise RuntimeFailure(
+                            f"refusing to replace non-empty server directory {server}"
+                        )
+                    server.rmdir()
+                    os.replace(attempt, server)
+                    last_error = None
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    if attempt_number < NEOFORGE_SERVER_INSTALL_ATTEMPTS:
+                        time.sleep(
+                            NEOFORGE_SERVER_INSTALL_BACKOFF_SECONDS[attempt_number - 1]
+                        )
+                finally:
+                    shutil.rmtree(attempt, ignore_errors=True)
+            if last_error is not None:
+                raise RuntimeFailure(
+                    "NeoForge server installation failed after "
+                    f"{NEOFORGE_SERVER_INSTALL_ATTEMPTS} isolated attempts: {last_error}"
+                ) from last_error
     (server / "user_jvm_args.txt").write_text("-Xms512M\n-Xmx1024M\n", encoding="utf-8")
     if os.name == "nt":
         script = server / "run.bat"
@@ -1039,14 +1085,16 @@ def client_command(
                 f"-Dquickskin.e2e.role={role}",
                 f"-Dquickskin.e2e.scenario={scenario}",
                 f"-Dquickskin.e2e.version={row['runtime_version']}",
-                # Exercise injector `expect` counts in packaged clients without making optional
-                # integrations fail-closed in ordinary production launches.
-                "-Dmixin.debug.countInjections=true",
                 "-Dfml.earlyprogresswindow=false",
             ],
         }
     )
-    if compatibility_mod is not None:
+    if compatibility_mod is None:
+        # Exercise Quick Skin's own injector expectations in the clean runtime. Enabling this
+        # global Mixin debug switch in compatibility lanes also turns optional injectors owned
+        # by third-party mods into fatal assertions, which is not production-equivalent.
+        options["jvmArguments"].append("-Dmixin.debug.countInjections=true")
+    else:
         options["jvmArguments"].append(
             f"-Dquickskin.e2e.compatibility={compatibility_mod}"
         )
