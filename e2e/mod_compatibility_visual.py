@@ -33,6 +33,18 @@ ARTIFACT_RECORD_FIELDS = {
     "digest",
     "run_id",
 }
+COMPATIBILITY_EXPECTATION_OVERRIDES = {
+    (
+        "essential",
+        "full.client_a.title_screen_splash_order",
+    ): (
+        "Essential intentionally owns the title-screen player model, so Quick Skin must suppress "
+        "its duplicate PlayerWidget. The Essential model must visibly retain the selected dark "
+        "charcoal-and-gray plaid Quick Skin skin, the Quick Skin action icon must remain present, "
+        "and the title UI must be intact. This intentional layout need not overlap the vanilla "
+        "splash or match the clean title-screen layout."
+    ),
+}
 
 
 class CompatibilityVisualError(ValueError):
@@ -207,6 +219,9 @@ def curate(
             )
         if (reference["version"], reference["loader"]) != (version, loader):
             raise CompatibilityVisualError("compatibility reference is not the same runtime lane")
+        expectation = COMPATIBILITY_EXPECTATION_OVERRIDES.get(
+            (mod_id, frame["capture_id"]), frame["expectation"]
+        )
         private_manifest.append(
             {
                 "path": frame["source_path"],
@@ -215,7 +230,7 @@ def curate(
                 "kind": frame["capture_id"],
                 "expectation": (
                     f"Compatibility mod: {lane.mod.name} {lane.artifact.version_number}. "
-                    + frame["expectation"]
+                    + expectation
                 ),
                 "runtime_evidence": frame["runtime_evidence"],
                 "_verified_file_sha256": frame["file_sha256"],
