@@ -346,6 +346,11 @@ size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth 
 The ReplayMod lane seeds ReplayMod's supported `recordServer=false` client setting: the mod and
 Quick Skin bridge remain loaded, while its unrelated replay writer cannot turn the disposable
 multiplayer probe into a recording/recovery failure before the rendering assertions begin.
+On Fabric 1.20.1, ReplayMod can expose an old-Netty Quick Play race in which an active auto-read
+channel loses its NIO `OP_READ` interest while login data is already waiting. The E2E-only harness
+detects exactly that invalid state, restores the interest, and wakes the selector a bounded maximum
+of five times. It does not reconnect, replace handlers, alter server compression, or fabricate any
+protocol traffic; repeated login failure remains fatal after the existing single clean retry.
 Essential's title-screen checkpoint follows its production integration contract: Essential owns
 the menu player model, Quick Skin suppresses the duplicate preview, preserves its action icon and
 registers the selected appearance for Essential's renderer. Its compatibility-review expectation
