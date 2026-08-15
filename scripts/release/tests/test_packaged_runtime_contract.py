@@ -140,5 +140,166 @@ class PackagedRuntimeReportContractTest(unittest.TestCase):
                     self.validate("propagation", "client_b")
 
 
+class PackagedRuntimeTransientConnectRetryTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.profile = self.root / "execution"
+        self.game_dir = self.profile / "client_a"
+        (self.game_dir / "e2e-report").mkdir(parents=True)
+        self.row = {"runtime_version": "1.20.1"}
+        self.report = {
+            "version": "1.20.1",
+            "role": "client_a",
+            "scenario": "full",
+            "contract_sha256": packaged_runtime.SCENARIO_CONTRACT.sha256,
+            "status": "fail",
+            "steps": [
+                {
+                    "name": "join_world",
+                    "status": "fail",
+                    "message": (
+                        "category=connection_timeout; disconnected before world join; "
+                        "screen=net.minecraft.class_419; "
+                        "translationKeys=[disconnect.timeout]; text=[Timed out]"
+                    ),
+                    "screenshot": "1.20.1_00_join_disconnect_client_a.png",
+                }
+            ],
+        }
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def write_report(self, report: dict[str, object] | None = None) -> None:
+        (self.game_dir / "e2e-report" / "report.json").write_text(
+            json.dumps(self.report if report is None else report),
+            encoding="utf-8",
+        )
+        (self.game_dir / "e2e-report" / "done.marker").write_text(
+            "fail", encoding="utf-8"
+        )
+
+    def test_only_exact_harness_connection_timeout_is_retryable(self) -> None:
+        self.write_report()
+        self.assertTrue(
+            packaged_runtime.is_transient_connect_timeout_report(
+                self.game_dir, self.row, "full", "client_a"
+            )
+        )
+
+        cases: list[tuple[str, dict[str, object]]] = []
+        rejected = copy.deepcopy(self.report)
+        rejected["steps"][0]["message"] = (
+            "category=connection_rejected; disconnected before world join"
+        )
+        cases.append(("different disconnect", rejected))
+
+        scenario_failure = copy.deepcopy(self.report)
+        scenario_failure["steps"][0]["name"] = "apply_local_skin"
+        cases.append(("scenario assertion", scenario_failure))
+
+        extra_failure = copy.deepcopy(self.report)
+        extra_failure["steps"].append(copy.deepcopy(extra_failure["steps"][0]))
+        cases.append(("multiple failures", extra_failure))
+
+        wrong_identity = copy.deepcopy(self.report)
+        wrong_identity["contract_sha256"] = "0" * 64
+        cases.append(("untrusted report", wrong_identity))
+
+        for label, report in cases:
+            with self.subTest(label=label):
+                self.write_report(report)
+                self.assertFalse(
+                    packaged_runtime.is_transient_connect_timeout_report(
+                        self.game_dir, self.row, "full", "client_a"
+                    )
+                )
+
+    def test_retry_archives_and_exports_the_first_attempt_evidence(self) -> None:
+        self.write_report()
+        client_log = self.profile / "logs" / "client_a.log"
+        client_log.parent.mkdir(parents=True)
+        client_log.write_text("first attempt timed out\n", encoding="utf-8")
+        screenshots = self.game_dir / "screenshots"
+        screenshots.mkdir()
+        (screenshots / "1.20.1_00_join_disconnect_client_a.png").write_bytes(
+            b"diagnostic png"
+        )
+
+        packaged_runtime.archive_transient_connect_attempt(
+            self.profile, self.game_dir, client_log, "client_a"
+        )
+
+        diagnostic = (
+            self.profile
+            / "diagnostics"
+            / "transient-connect-attempt-1"
+            / "client_a"
+        )
+        self.assertFalse(client_log.exists())
+        self.assertTrue((diagnostic / "logs" / "client.log").is_file())
+        self.assertTrue((diagnostic / "e2e-report" / "report.json").is_file())
+        self.assertTrue(
+            (
+                diagnostic
+                / "screenshots"
+                / "1.20.1_00_join_disconnect_client_a.png"
+            ).is_file()
+        )
+
+        client_log.write_text("second attempt passed\n", encoding="utf-8")
+        (self.game_dir / "e2e-report").mkdir()
+        (self.game_dir / "e2e-report" / "report.json").write_text(
+            "{}", encoding="utf-8"
+        )
+        (self.game_dir / "e2e-report" / "done.marker").write_text(
+            "pass", encoding="utf-8"
+        )
+        evidence = self.root / "evidence" / "profiles" / "lane"
+        packaged_runtime.export_profile_evidence(
+            self.profile,
+            evidence,
+            {"status": "pass", "profile": "profiles/lane"},
+        )
+
+        exported = (
+            evidence
+            / "diagnostics"
+            / "transient-connect-attempt-1"
+            / "client_a"
+        )
+        self.assertEqual(
+            "first attempt timed out\n",
+            (exported / "logs" / "client.log").read_text(encoding="utf-8"),
+        )
+        self.assertTrue((exported / "e2e-report" / "report.json").is_file())
+        self.assertTrue(
+            (
+                exported
+                / "screenshots"
+                / "1.20.1_00_join_disconnect_client_a.png"
+            ).is_file()
+        )
+
+    def test_retry_log_scan_ignores_only_the_expected_failed_marker(self) -> None:
+        log = self.root / "client_a.log"
+        log.write_text(
+            "[QS-E2E] FINISHED status=fail\nvanilla connection timed out\n",
+            encoding="utf-8",
+        )
+        packaged_runtime.scan_runtime_logs([log], require_client_pass=False)
+
+        log.write_text(
+            "[QS-E2E] FINISHED status=fail\n"
+            "org.spongepowered.asm.mixin.transformer.throwables.MixinApplyError\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure, "fatal runtime log evidence"
+        ):
+            packaged_runtime.scan_runtime_logs([log], require_client_pass=False)
+
+
 if __name__ == "__main__":
     unittest.main()
