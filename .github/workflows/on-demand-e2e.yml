@@ -355,8 +355,11 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == pull_request && \
               "$HEAD_REF" == diagnostic/replaymod-linux-login ]]; then
             matrix="$(jq -c \
-              '{include: [.include[] | select(.loader == "fabric") |
-                .scenarios = "mod-compatibility"]}' <<< "$matrix")"
+              '(.include[] | select(.loader == "fabric")) as $row |
+                {include: [range(1; 7) as $repeat | $row + {
+                  id: ($row.id + "--diagnostic-" + ($repeat | tostring)),
+                  scenarios: "mod-compatibility"
+                }]}' <<< "$matrix")"
           fi
           python -c 'import json,sys; value=json.loads(sys.argv[1]); assert value' "$matrix"
           printf 'coverage matrix: %s\n' "$MATRIX_KIND"
@@ -384,7 +387,7 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: ${{ github.head_ref == 'diagnostic/replaymod-linux-login' && 6 || 2 }}
       matrix: ${{ fromJSON(needs.build.outputs.anchors) }}
 
     steps:
