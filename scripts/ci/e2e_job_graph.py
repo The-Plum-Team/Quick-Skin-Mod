@@ -10,7 +10,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
@@ -102,10 +102,20 @@ VERSION_SPECIFIC_CONTROLLER_PATHS = (
     # Resource-pack format follows the target Minecraft version.
     "common/src/e2e/resources/pack.mcmeta",
 )
+CONTROLLER_SKEW_EXIT_CODE = 78
+MAX_ADVISORY_CONTROLLER_PATHS = 100
+ADVISORY_CONTROLLER_PREFIXES = (
+    ".github/workflows/",
+    "scripts/ci/",
+)
 
 
 class JobGraphError(ValueError):
     """Raised when a run did not execute the protected expected topology."""
+
+
+class ControllerSkewError(JobGraphError):
+    """Raised when evidence was produced by code that is not yet protected."""
 
 
 @dataclass(frozen=True)
@@ -193,7 +203,7 @@ def validate_controller_parity(
         protected_exists = _git_object_exists(repository, f"{protected_sha}:{path}")
         head_exists = _git_object_exists(repository, f"{head_sha}:{path}")
         if protected_exists != head_exists:
-            raise JobGraphError(
+            raise ControllerSkewError(
                 f"port E2E controller presence differs from protected master: {path}"
             )
     outside_roots = [
@@ -231,11 +241,65 @@ def validate_controller_parity(
         path for path in changed if path not in set(version_specific_paths)
     )
     if unexpected:
-        raise JobGraphError(
+        raise ControllerSkewError(
             "port E2E controller differs from protected master: "
             + ", ".join(unexpected)
         )
     return paths
+
+
+def validate_advisory_controller_skew(
+    repository: Path,
+    *,
+    protected_sha: str,
+    head_sha: str,
+) -> tuple[str, ...]:
+    """Allow a skipped advisory review only for a bounded CI-only pull request."""
+
+    changed_raw = _git(
+        repository,
+        "diff",
+        "--no-ext-diff",
+        "--no-renames",
+        "--name-only",
+        "--diff-filter=ACDMRTUXB",
+        "-z",
+        protected_sha,
+        head_sha,
+        "--",
+    )
+    try:
+        changed = tuple(
+            sorted(
+                item.decode("utf-8", errors="strict")
+                for item in changed_raw.split(b"\0")
+                if item
+            )
+        )
+    except UnicodeDecodeError as exc:
+        raise JobGraphError("advisory controller diff contains a non-UTF-8 path") from exc
+    if not changed or len(changed) > MAX_ADVISORY_CONTROLLER_PATHS:
+        raise JobGraphError("advisory controller diff is empty or exceeds its path bound")
+    unsafe: list[str] = []
+    for path in changed:
+        parsed = PurePosixPath(path)
+        canonical = (
+            "\\" not in path
+            and not any(ord(character) < 32 or ord(character) == 127 for character in path)
+            and not parsed.is_absolute()
+            and not any(part in {"", ".", ".."} for part in parsed.parts)
+            and parsed.as_posix() == path
+        )
+        if not canonical or not any(
+            path.startswith(prefix) for prefix in ADVISORY_CONTROLLER_PREFIXES
+        ):
+            unsafe.append(path)
+    if unsafe:
+        raise JobGraphError(
+            "controller skew is mixed with non-CI paths: "
+            + ", ".join(repr(path) for path in unsafe)
+        )
+    return changed
 
 
 def expected_scenario_jobs(matrix_path: Path) -> tuple[str, ...]:
@@ -606,15 +670,9 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_BOOTSTRAP_CONTRACT,
     )
     parser.add_argument("--runtime-policy", choices=("full", "not-applicable"), required=True)
+    parser.add_argument("--allow-advisory-controller-skew", action="store_true")
     args = parser.parse_args(argv)
     try:
-        protected_paths = validate_controller_parity(
-            args.repository,
-            protected_sha=args.protected_sha,
-            head_sha=args.head_sha,
-            repository_head_sha=args.repository_head_sha,
-            version_specific_paths=VERSION_SPECIFIC_CONTROLLER_PATHS,
-        )
         if args.matrix_properties is None:
             matrix_data = load_matrix(args.matrix)
             mod_version = read_mod_version(args.matrix, matrix_data)
@@ -638,6 +696,34 @@ def main(argv: list[str] | None = None) -> int:
             policy=args.runtime_policy,
             expected_scenarios=expected,
         )
+        # Validate the inert matrix, loader bootstrap, and observed job topology before
+        # classifying a controller-only PR as advisory. A changed workflow cannot earn a green
+        # skip merely by replacing the expected jobs with a fabricated successful gate.
+        protected_paths = validate_controller_parity(
+            args.repository,
+            protected_sha=args.protected_sha,
+            head_sha=args.head_sha,
+            repository_head_sha=args.repository_head_sha,
+            version_specific_paths=VERSION_SPECIFIC_CONTROLLER_PATHS,
+        )
+    except ControllerSkewError as exc:
+        if not args.allow_advisory_controller_skew:
+            print(f"Packaged E2E job graph validation failed: {exc}", file=sys.stderr)
+            return 2
+        try:
+            validate_advisory_controller_skew(
+                args.repository,
+                protected_sha=args.protected_sha,
+                head_sha=args.head_sha,
+            )
+        except JobGraphError as policy_exc:
+            print(
+                f"Packaged E2E job graph validation failed: {exc}; {policy_exc}",
+                file=sys.stderr,
+            )
+            return 2
+        print(f"Packaged E2E controller skew: {exc}", file=sys.stderr)
+        return CONTROLLER_SKEW_EXIT_CODE
     except (JobGraphError, MatrixError) as exc:
         print(f"Packaged E2E job graph validation failed: {exc}", file=sys.stderr)
         return 2
