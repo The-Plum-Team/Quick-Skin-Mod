@@ -31,7 +31,10 @@ jobs:
       github.event_name == 'repository_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # A source wake can coincide with a wide release fan-out that exhausts the installation API
+    # quota. Authentication waits for the declared reset without repeatedly probing the closed
+    # window; it never holds a Claude-capacity slot.
+    timeout-minutes: 75
     permissions:
       actions: read
       contents: read
@@ -58,12 +61,16 @@ jobs:
           DISPATCH_REPOSITORY: ${{ github.event.client_payload.source_repository }}
           DISPATCH_RUN_ID: ${{ github.event.client_payload.source_run_id }}
           DISPATCH_SHA: ${{ github.event.client_payload.source_sha }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
           TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           printf 'eligible=false\n' >> "$GITHUB_OUTPUT"
 
           if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
@@ -83,7 +90,7 @@ jobs:
           source_run=''
           for attempt in {1..120}; do
             # A transient API error consumes one bounded attempt instead of failing the job.
-            if ! source_run="$(gh api \
+            if ! source_run="$(github_api_retry \
                 "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id" 2>/dev/null)"; then
               source_run=''
               sleep 2
@@ -102,7 +109,7 @@ jobs:
             printf 'source run not settled within budget; skipping advisory review\n'
             exit 0
           fi
-          workflow_id="$(gh api \
+          workflow_id="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/workflows/on-demand-e2e.yml" --jq .id)"
           jq -e \
             --arg branch "$source_branch" \
@@ -137,7 +144,7 @@ jobs:
             # capacity without adding product signal. Skip only an exact, bot-owned non-anchor PR
             # whose complete server-side file inventory is confined to this orchestration, its
             # contracts, and documentation. Any ambiguity or renamed runtime path falls through.
-            associated_pulls="$(gh api -H 'Accept: application/vnd.github+json' \
+            associated_pulls="$(github_api_retry -H 'Accept: application/vnd.github+json' \
               "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20" \
               2>/dev/null || true)"
             source_pr_number=""
@@ -156,7 +163,7 @@ jobs:
                 <<< "$associated_pulls" 2>/dev/null || true)"
             fi
             if [[ "$source_pr_number" =~ ^[1-9][0-9]*$ ]]; then
-              source_pr="$(gh api \
+              source_pr="$(github_api_retry \
                 "repos/$GITHUB_REPOSITORY/pulls/$source_pr_number" \
                 2>/dev/null || true)"
               changed_files=""
@@ -192,7 +199,7 @@ jobs:
                 exit 0
               fi
               if [[ "$changed_files" =~ ^[1-9][0-9]*$ ]]; then
-                source_pr_files="$(gh api \
+                source_pr_files="$(github_api_retry \
                   "repos/$GITHUB_REPOSITORY/pulls/$source_pr_number/files?per_page=100" \
                   2>/dev/null || true)"
                 if [[ -n "$source_pr_files" ]]; then
@@ -221,7 +228,7 @@ jobs:
           # here for one API call, before the heavier jobs and artifact validation below.
           report_name="visual-review-$source_run_id"
           input_name="visual-review-input-$source_run_id"
-          artifacts="$(gh api --paginate --slurp \
+          artifacts="$(github_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100")"
           jq -e \
             '(type == "array") and
@@ -241,7 +248,7 @@ jobs:
               [[ "$artifact_name" == "$input_name" \
                 || "$artifact_name" =~ ^visual-review-input-$source_run_id-[0-9a-f]{40}$ ]]
             fi
-            owner_run="$(gh api \
+            owner_run="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$artifact_run_id" 2>/dev/null || true)"
             if [[ -n "$owner_run" ]] && jq -e \
                 --arg repository "$GITHUB_REPOSITORY" \
@@ -268,7 +275,7 @@ jobs:
 
           # List endpoints are read as --paginate --slurp page arrays, the same shape every other
           # trusted workflow consumes, then flattened before any count or identity assertion.
-          jobs="$(gh api --paginate --slurp \
+          jobs="$(github_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id/jobs?filter=latest&per_page=100")"
           jq -e \
             '(type == "array") and
@@ -304,7 +311,7 @@ jobs:
             ("packaged-e2e-" + (.name | sub(" - contract scenarios$"; "")))] |
             sort' <<< "$jobs")"
           scenario_job_count="$(jq length <<< "$expected_artifact_names")"
-          source_artifacts="$(gh api --paginate --slurp \
+          source_artifacts="$(github_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id/artifacts?per_page=100")"
           jq -e \
             '(type == "array") and
@@ -351,7 +358,7 @@ jobs:
     needs: authenticate
     if: needs.authenticate.outputs.eligible == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 90
     permissions:
       actions: read
       contents: read
@@ -387,12 +394,16 @@ jobs:
         shell: bash
         env:
           ARTIFACT_INVENTORY: ${{ needs.authenticate.outputs.artifact_inventory }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           IMPLEMENTATION_SHA: ${{ github.sha }}
           SOURCE_RUN_ID: ${{ needs.authenticate.outputs.source_run_id }}
           SOURCE_SHA: ${{ needs.authenticate.outputs.source_sha }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           [[ "$GITHUB_REF" == refs/heads/master ]]
           [[ "$IMPLEMENTATION_SHA" == "$GITHUB_SHA" ]]
           [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -402,7 +413,7 @@ jobs:
             <<< "$ARTIFACT_INVENTORY" > /dev/null
           printf 'review_skipped=false\n' >> "$GITHUB_OUTPUT"
 
-          source_run="$(gh api \
+          source_run="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
           jq -e \
             --arg repository "$GITHUB_REPOSITORY" \
@@ -447,7 +458,7 @@ jobs:
           fi
 
           jobs="$RUNNER_TEMP/source-jobs.json"
-          gh api --paginate --slurp \
+          github_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs?filter=latest&per_page=100" \
             > "$jobs"
           jq -e \
@@ -607,7 +618,7 @@ jobs:
           # Reauthenticate and normalize the exact current-head 1.20.1 Pages artifact. The
           # selector already validated its owner workflow; the numeric-ID fetch below binds the
           # bytes used by this run to that selection and to its immutable artifact digest.
-          reference_metadata="$(gh api \
+          reference_metadata="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/artifacts/$REFERENCE_ARTIFACT_ID")"
           reference_artifact_digest="$(jq -er .digest <<< "$reference_metadata")"
           [[ "$reference_artifact_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
@@ -622,9 +633,10 @@ jobs:
              .workflow_run.id == $run_id' \
             <<< "$reference_metadata" > /dev/null
           reference_archive="$RUNNER_TEMP/reference-artifact-$REFERENCE_ARTIFACT_ID.zip"
-          gh api -H 'Accept: application/vnd.github+json' \
+          github_api_retry_to_file "$reference_archive" \
+            -H 'Accept: application/vnd.github+json' \
             "repos/$GITHUB_REPOSITORY/actions/artifacts/$REFERENCE_ARTIFACT_ID/zip" \
-            > "$reference_archive"
+            > /dev/null
           [[ "$(stat -c %s "$reference_archive")" == "$REFERENCE_ARTIFACT_SIZE" ]]
           [[ "sha256:$(sha256sum "$reference_archive" | cut -d ' ' -f 1)" \
             == "$reference_artifact_digest" ]]
@@ -657,9 +669,9 @@ jobs:
           reference_target_run_id="$(jq -er .provenance.target.run_id "$reference_manifest")"
           reference_target_created_at="$(jq -er \
             .provenance.target.created_at "$reference_manifest")"
-          reference_source_run="$(gh api \
+          reference_source_run="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$reference_source_run_id")"
-          reference_target_run="$(gh api \
+          reference_target_run="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$reference_target_run_id")"
           jq -e \
             --arg branch "$reference_source_branch" \
@@ -683,7 +695,7 @@ jobs:
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == $repository' \
             <<< "$reference_target_run" > /dev/null
-          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$REFERENCE_BRANCH" \
+          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$REFERENCE_BRANCH" \
             --jq .commit.sha)" == "$REFERENCE_SHA" ]]
           else
             REFERENCE_ARTIFACT_ID=0
@@ -706,7 +718,7 @@ jobs:
             [[ "$declared_size" =~ ^[1-9][0-9]*$ ]]
             [[ "$artifact_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
 
-            metadata="$(gh api \
+            metadata="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id")"
             jq -e \
               --arg digest "$artifact_digest" \
@@ -720,9 +732,10 @@ jobs:
               <<< "$metadata" > /dev/null
 
             archive="$RUNNER_TEMP/source-artifact-$artifact_id.zip"
-            gh api -H 'Accept: application/vnd.github+json' \
+            github_api_retry_to_file "$archive" \
+              -H 'Accept: application/vnd.github+json' \
               "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
-              > "$archive"
+              > /dev/null
             [[ "$(stat -c %s "$archive")" == "$declared_size" ]]
             [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" \
               == "$artifact_digest" ]]
@@ -927,6 +940,7 @@ jobs:
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA$ ]]
+          payload="$RUNNER_TEMP/visual-review-drain-request.json"
           jq -n \
             --arg artifact_id "$ARTIFACT_ID" \
             --arg artifact_name "$ARTIFACT_NAME" \
@@ -934,4 +948,25 @@ jobs:
             '{event_type:"visual-review-drain-requested",
               client_payload:{artifact_id:$artifact_id,artifact_name:$artifact_name,
                 generation_sha:$generation_sha}}' \
-            | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
+            > "$payload"
+          dispatch_error="$RUNNER_TEMP/visual-review-drain-request.error"
+          for attempt in 1 2 3; do
+            : > "$dispatch_error"
+            if gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+                --input "$payload" 2> "$dispatch_error"; then
+              exit 0
+            fi
+            if grep -Fq 'API rate limit exceeded' "$dispatch_error"; then
+              # The source-bound capsule is already durable. The scheduled sweep will recover
+              # this wake after quota returns, so another primary request cannot improve safety.
+              echo "::warning::GitHub API quota exhausted; durable visual-review wake deferred"
+              exit 0
+            fi
+            if grep -Eq 'secondary rate limit|abuse detection|\(HTTP 429\)' \
+                "$dispatch_error" && (( attempt < 3 )); then
+              sleep $((attempt * 5))
+              continue
+            fi
+            cat "$dispatch_error" >&2
+            exit 1
+          done

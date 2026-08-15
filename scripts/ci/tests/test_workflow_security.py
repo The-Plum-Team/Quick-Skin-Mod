@@ -490,6 +490,11 @@ class WorkflowSecurityTest(unittest.TestCase):
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
         self.assertIn('endswith(" - contract scenarios")', authenticate)
+        self.assertIn("timeout-minutes: 75", authenticate)
+        self.assertIn("source scripts/ci/github_api_retry.sh", authenticate)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', authenticate)
+        self.assertIn("github_api_retry --paginate --slurp", authenticate)
+        self.assertNotIn("gh api", authenticate)
         self.assertIn("pull-requests: read", authenticate)
         self.assertIn('commits/$source_sha/pulls', authenticate)
         self.assertIn('pulls/$source_pr_number/files?per_page=100', authenticate)
@@ -513,6 +518,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("artifact_inventory", authenticate)
 
         self.assertIn("git fetch --no-tags origin \"$SOURCE_SHA\"", curate)
+        self.assertIn("timeout-minutes: 90", curate)
+        self.assertIn("source scripts/ci/github_api_retry.sh", curate)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', curate)
+        self.assertIn("github_api_retry_to_file", curate)
+        self.assertNotIn("gh api", curate)
         self.assertIn("actions/artifacts/$artifact_id", curate)
         self.assertIn("scripts/ci/bounded_zip.py", curate)
         self.assertIn("scripts/ci/e2e_job_graph.py", curate)
@@ -568,6 +578,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("persist-credentials: false", curate)
         self.assertIn("contents: write", request)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", request)
+        self.assertIn("durable visual-review wake deferred", request)
+        self.assertEqual(request.count("gh api --method POST"), 1)
 
         self.assertIn("actions/artifacts/$ARTIFACT_ID", review)
         self.assertIn("actions: write", review)
