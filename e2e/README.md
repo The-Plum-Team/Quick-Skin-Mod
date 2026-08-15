@@ -175,6 +175,10 @@ most one client per scenario whose authenticated harness report contains exactly
 vanilla `connection_timeout` failure may be relaunched once. The first attempt's bounded log,
 report, marker, and screenshot remain in the uploaded diagnostics. A repeated timeout, any other
 disconnect reason, an assertion failure, malformed identity, or extra failed step remains fatal.
+ReplayMod's 1.20.1 login hook can fail before it emits its first recording-policy marker; on POSIX,
+the runner requests one non-terminating JVM thread dump from both the client and server after 12
+seconds without login progress. Those live stacks are retained in the same bounded logs before
+vanilla replaces the useful login state with its 30-second timeout screen.
 
 The remote propagation captures pin the disposable subject's current and interpolated head/body
 rotations and hold the observer at a numerically asserted rear vantage. Their passed runtime
