@@ -30,6 +30,9 @@ ATTEMPT_NAME = re.compile(r"^visual-review-attempt-(?P<source>[1-9][0-9]*)$")
 WAVE_BLOCK_NAME = re.compile(
     r"^visual-review-wave-block-(?P<generation>[0-9a-f]{40})$"
 )
+CERTIFICATE_NAME = re.compile(
+    r"^visual-anchor-certification-(?P<generation>[0-9a-f]{40})$"
+)
 ANCHOR_SOURCE_BRANCH = re.compile(
     r"^automation/sync/forge-and-fabric-1\.20\.1/[A-Za-z0-9._/-]+$"
 )
@@ -77,6 +80,10 @@ class QueueApi(Protocol):
     def get_run(self, run_id: int) -> dict[str, Any]: ...
 
     def get_source_run(self, run_id: int) -> dict[str, Any]: ...
+
+    def get_branch_sha(self, branch: str) -> str: ...
+
+    def get_pull(self, number: int) -> dict[str, Any]: ...
 
 
 def _positive_int(value: Any, label: str) -> int:
@@ -249,6 +256,33 @@ def blocked_generations(
     return blocks
 
 
+def certified_generations(
+    api: QueueApi, artifacts: list[Artifact], *, repository: str
+) -> set[str]:
+    """Return generations with a successful protected semantic anchor certificate."""
+
+    certified: set[str] = set()
+    run_cache: dict[int, dict[str, Any]] = {}
+    for artifact in artifacts:
+        match = CERTIFICATE_NAME.fullmatch(artifact.name)
+        if match is None or artifact.expired or artifact.size_in_bytes > 16_777_216:
+            continue
+        run = run_cache.get(artifact.run_id)
+        if run is None:
+            run = api.get_run(artifact.run_id)
+            run_cache[artifact.run_id] = run
+        if valid_owner(
+            run,
+            repository=repository,
+            artifact=artifact,
+            workflow=DRAIN_WORKFLOW,
+            events=DRAIN_EVENTS,
+            conclusions=frozenset({"success"}),
+        ):
+            certified.add(match.group("generation"))
+    return certified
+
+
 def input_generation(artifact: Artifact) -> str:
     """Generation encoded by a current input, with a legacy implementation-SHA fallback."""
 
@@ -256,6 +290,65 @@ def input_generation(artifact: Artifact) -> str:
     if match is None:
         raise QueueError("visual review input name is invalid")
     return match.group("generation") or artifact.head_sha
+
+
+def source_is_eligible(
+    api: QueueApi,
+    *,
+    artifact: Artifact,
+    source_run_id: int,
+    certified: set[str],
+    repository: str,
+) -> bool:
+    """Reject superseded release anchors and closed PR evidence before model admission."""
+
+    source_run = api.get_source_run(source_run_id)
+    if not isinstance(source_run, dict):
+        return False
+    branch = source_run.get("head_branch")
+    event = source_run.get("event")
+    generation = input_generation(artifact)
+    release_anchor = bool(
+        isinstance(branch, str)
+        and (
+            ANCHOR_SOURCE_BRANCH.fullmatch(branch)
+            or (event == "schedule" and branch == "master")
+        )
+    )
+    if release_anchor:
+        if generation in certified:
+            return False
+        current_master = api.get_branch_sha("master")
+        if not SHA.fullmatch(current_master) or generation != current_master:
+            return False
+
+    # GitHub preserves the pull_request association on completed workflow runs. If it is
+    # available, require that exact head to remain open; evidence for a closed or superseded PR
+    # cannot affect the current product and must not spend reviewer capacity.
+    pull_requests = source_run.get("pull_requests")
+    if event == "pull_request" and isinstance(pull_requests, list) and pull_requests:
+        exact_open = False
+        for association in pull_requests:
+            if not isinstance(association, dict):
+                continue
+            number = association.get("number")
+            if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+                continue
+            pull = api.get_pull(number)
+            head = pull.get("head") if isinstance(pull, dict) else None
+            repo = head.get("repo") if isinstance(head, dict) else None
+            if (
+                pull.get("state") == "open"
+                and head.get("sha") == source_run.get("head_sha")
+                and head.get("ref") == branch
+                and isinstance(repo, dict)
+                and repo.get("full_name") == repository
+            ):
+                exact_open = True
+                break
+        if not exact_open:
+            return False
+    return True
 
 
 def select_pending(
@@ -300,6 +393,7 @@ def list_pending_candidates(
         raise QueueError(f"visual review artifact inventory exceeds {MAX_ARTIFACTS}")
     reviewed = reviewed_sources(api, artifacts, repository=repository)
     blocked = blocked_generations(api, artifacts, repository=repository)
+    certified = certified_generations(api, artifacts, repository=repository)
     attempts = _valid_sources(
         api,
         artifacts,
@@ -325,14 +419,23 @@ def list_pending_candidates(
         events=PREPARE_EVENTS,
         conclusions=frozenset({"success", "failure"}),
     )
-    raw_candidates = [
-        (artifact, source_run_id)
-        for source_run_id, values in pending.items()
-        if source_run_id not in reviewed and source_run_id not in cooling
-        for artifact in values
-        if artifact.size_in_bytes <= MAX_INPUT_BYTES
-        and input_generation(artifact) not in blocked
-    ]
+    raw_candidates: list[tuple[Artifact, int]] = []
+    for source_run_id, values in pending.items():
+        if source_run_id in reviewed or source_run_id in cooling:
+            continue
+        for artifact in values:
+            if (
+                artifact.size_in_bytes <= MAX_INPUT_BYTES
+                and input_generation(artifact) not in blocked
+                and source_is_eligible(
+                    api,
+                    artifact=artifact,
+                    source_run_id=source_run_id,
+                    certified=certified,
+                    repository=repository,
+                )
+            ):
+                raw_candidates.append((artifact, source_run_id))
     source_run_cache: dict[int, dict[str, Any]] = {}
 
     def priority(candidate: tuple[Artifact, int]) -> tuple[int, datetime, int]:
@@ -400,6 +503,7 @@ def select_requested(
         f"visual-review-{source_run_id}",
         f"visual-review-attempt-{source_run_id}",
         f"visual-review-wave-block-{generation}",
+        f"visual-anchor-certification-{generation}",
     ):
         named = api.list_artifacts_named(name)
         if len(named) > MAX_NAMED_ARTIFACTS:
@@ -410,6 +514,7 @@ def select_requested(
         return None
     if generation in blocked_generations(api, related, repository=repository):
         return None
+    certified = certified_generations(api, related, repository=repository)
     attempts = _valid_sources(
         api,
         related,
@@ -438,6 +543,14 @@ def select_requested(
     authenticated = pending.get(source_run_id, [])
     if len(authenticated) != 1 or authenticated[0].artifact_id != requested_artifact_id:
         return None
+    if not source_is_eligible(
+        api,
+        artifact=requested,
+        source_run_id=source_run_id,
+        certified=certified,
+        repository=repository,
+    ):
+        return None
     return requested, source_run_id
 
 
@@ -447,6 +560,8 @@ class GitHubApi:
         self.token = token
         self.api_url = api_url.rstrip("/")
         self._runs: dict[int, dict[str, Any]] = {}
+        self._branches: dict[str, str] = {}
+        self._pulls: dict[int, dict[str, Any]] = {}
 
     @staticmethod
     def _retryable_http_error(exc: urllib.error.HTTPError) -> bool:
@@ -519,7 +634,10 @@ class GitHubApi:
                 for item in batch
                 if isinstance(item, dict)
                 and isinstance(item.get("name"), str)
-                and item["name"].startswith("visual-review")
+                and (
+                    item["name"].startswith("visual-review")
+                    or item["name"].startswith("visual-anchor-certification-")
+                )
             )
             if len(artifacts) > MAX_ARTIFACTS:
                 raise QueueError(f"artifact inventory exceeds {MAX_ARTIFACTS}")
@@ -577,6 +695,35 @@ class GitHubApi:
 
     def get_source_run(self, run_id: int) -> dict[str, Any]:
         return self.get_run(run_id)
+
+    def get_branch_sha(self, branch: str) -> str:
+        cached = self._branches.get(branch)
+        if cached is not None:
+            return cached
+        encoded = urllib.parse.quote(branch, safe="")
+        payload = self._request(
+            f"/repos/{self.repository}/branches/{encoded}"
+        )
+        try:
+            sha = payload["commit"]["sha"]
+        except (KeyError, TypeError) as exc:
+            raise QueueError("branch response is invalid") from exc
+        if not isinstance(sha, str) or not SHA.fullmatch(sha):
+            raise QueueError("branch response has an invalid SHA")
+        self._branches[branch] = sha
+        return sha
+
+    def get_pull(self, number: int) -> dict[str, Any]:
+        if number <= 0:
+            raise QueueError("pull request number must be positive")
+        cached = self._pulls.get(number)
+        if cached is not None:
+            return cached
+        payload = self._request(f"/repos/{self.repository}/pulls/{number}")
+        if not isinstance(payload, dict):
+            raise QueueError("pull request response is invalid")
+        self._pulls[number] = payload
+        return payload
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
