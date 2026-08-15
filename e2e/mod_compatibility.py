@@ -49,6 +49,7 @@ LOADERS = frozenset({"fabric", "forge", "neoforge"})
 INSTALL_SIDES = frozenset({"client", "client-and-server"})
 VERSION_TYPES = frozenset({"release", "beta"})
 ALLOWED_DOWNLOAD_HOSTS = frozenset({"cdn.modrinth.com"})
+BASE_MATRIX_KINDS = frozenset({"runtime", "native-anchors", "pr-anchors"})
 
 
 class CompatibilityContractError(ValueError):
@@ -503,12 +504,18 @@ def resolve_lane(
 def build_plan(
     matrix_path: Path,
     contract_path: Path = DEFAULT_CONTRACT,
+    *,
+    base_matrix_kind: str = "runtime",
 ) -> dict[str, Any]:
+    if base_matrix_kind not in BASE_MATRIX_KINDS:
+        raise CompatibilityContractError(
+            f"unsupported base matrix kind {base_matrix_kind!r}"
+        )
     matrix = load_matrix(matrix_path)
     contract = load_contract(contract_path)
     base_rows = gha_matrix(
         matrix,
-        "runtime",
+        base_matrix_kind,
         read_mod_version(matrix_path, matrix),
     )["include"]
     runnable: list[dict[str, Any]] = []
@@ -590,6 +597,7 @@ def build_plan(
     return {
         "schema_version": 1,
         "release_branch": matrix["project"]["release_branch"],
+        "base_matrix_kind": base_matrix_kind,
         "compatibility_contract_sha256": contract.sha256,
         "lock_revision": contract.lock_revision,
         "runnable": runnable,
@@ -685,6 +693,12 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     parser.add_argument("--matrix", type=Path, default=REPO / "release/release-matrix.json")
+    parser.add_argument(
+        "--base-matrix-kind",
+        choices=sorted(BASE_MATRIX_KINDS),
+        default="runtime",
+        help="matrix profile that produced the clean packaged evidence",
+    )
     actions = parser.add_mutually_exclusive_group(required=True)
     actions.add_argument("--validate", action="store_true")
     actions.add_argument("--plan", action="store_true")
@@ -700,7 +714,11 @@ def main(argv: Iterable[str] | None = None) -> int:
             contract = load_contract(args.contract)
             print(contract.sha256)
             return 0
-        plan = build_plan(args.matrix, args.contract)
+        plan = build_plan(
+            args.matrix,
+            args.contract,
+            base_matrix_kind=args.base_matrix_kind,
+        )
         output: Any = {"include": plan["runnable"]} if args.github_matrix else plan
         json.dump(
             output,
