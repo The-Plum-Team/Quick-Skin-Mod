@@ -715,18 +715,17 @@ jobs:
         if: steps.plan.outputs.needed == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.plan.outputs.source_sha }}
+          ref: ${{ github.sha }}
           path: controller
           persist-credentials: false
 
-      - name: Check out exact port base without credentials
+      # Keep the untrusted port absent while setup actions and dependency installation can still
+      # access the default-branch cache service. The final validation step materializes it only
+      # after removing every cache/runtime credential from its process environment.
+      - name: Prepare an empty isolated port workspace
         if: steps.plan.outputs.needed == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ steps.plan.outputs.work_head_sha }}
-          fetch-depth: 0
-          path: port
-          persist-credentials: false
+        shell: bash
+        run: mkdir port
 
       - name: Install Python
         if: steps.plan.outputs.needed == 'true'
@@ -757,6 +756,15 @@ jobs:
           WORK_HEAD_SHA: ${{ steps.plan.outputs.work_head_sha }}
         run: |
           set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL \
+            ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL \
+            ACTIONS_CACHE_URL ACTIONS_RESULTS_URL
+          [[ "$(git -C ../controller rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          git init --quiet
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags origin "$WORK_HEAD_SHA"
+          [[ "$(git rev-parse FETCH_HEAD)" == "$WORK_HEAD_SHA" ]]
+          git checkout --quiet --detach "$WORK_HEAD_SHA"
           if git fetch --no-tags origin "$HEAD_BRANCH"; then
             [[ "$(git rev-parse FETCH_HEAD)" == "$WORK_HEAD_SHA" ]]
           elif git ls-remote --exit-code origin "refs/heads/$HEAD_BRANCH" \
@@ -1152,18 +1160,14 @@ jobs:
         if: steps.plan.outputs.needed == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.plan.outputs.source_sha }}
+          ref: ${{ github.sha }}
           path: controller
           persist-credentials: false
 
-      - name: Check out exact port base without persisted credentials
+      - name: Prepare an empty isolated port workspace
         if: steps.plan.outputs.needed == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ steps.plan.outputs.work_head_sha }}
-          fetch-depth: 0
-          path: port
-          persist-credentials: false
+        shell: bash
+        run: mkdir port
 
       - name: Reproduce only the protected validated tree
         if: steps.plan.outputs.needed == 'true'
@@ -1181,6 +1185,15 @@ jobs:
           WORK_HEAD_SHA: ${{ steps.plan.outputs.work_head_sha }}
         run: |
           set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL \
+            ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL \
+            ACTIONS_CACHE_URL ACTIONS_RESULTS_URL
+          [[ "$(git -C ../controller rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          git init --quiet
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags origin "$WORK_HEAD_SHA"
+          [[ "$(git rev-parse FETCH_HEAD)" == "$WORK_HEAD_SHA" ]]
+          git checkout --quiet --detach "$WORK_HEAD_SHA"
           if git fetch --no-tags origin "$HEAD_BRANCH"; then
             fetched_head="$(git rev-parse FETCH_HEAD)"
             if [[ "$fetched_head" != "$WORK_HEAD_SHA" ]]; then

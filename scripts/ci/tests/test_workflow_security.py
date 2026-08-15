@@ -878,17 +878,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("protected_gh_api_retry", wake)
         self.assertIn("on-demand-e2e.yml", wake)
         self.assertIn("pages-e2e-$EVIDENCE_BRANCH", wake)
-        self.assertIn("ref: ${{ steps.request.outputs.implementation_sha }}", wake)
+        self.assertIn("ref: ${{ github.sha }}", wake)
         self.assertIn("persist-credentials: false", wake)
         self.assertIn("gh workflow run pages.yml --ref master", wake)
-        self.assertIn("ref: master", discover)
-        self.assertIn("implementation_sha:", discover)
+        self.assertIn("ref: ${{ github.sha }}", discover)
+        self.assertNotIn("implementation_sha", workflow)
         self.assertIn("git rev-parse HEAD", discover)
         for block in (collect, build):
-            self.assertIn(
-                "ref: ${{ needs.discover.outputs.implementation_sha }}",
-                block,
-            )
+            self.assertIn("ref: ${{ github.sha }}", block)
         for block in (discover, collect, build):
             self.assertIn("persist-credentials: false", block)
             self.assertNotIn("id-token: write", block)
@@ -945,9 +942,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("name=pages-cache-%s--%s", refresh)
         self.assertIn("name: ${{ steps.cache.outputs.name }}", refresh)
         self.assertIn("actions/checkout@", refresh)
-        self.assertIn(
-            "ref: ${{ needs.discover.outputs.implementation_sha }}", refresh
-        )
+        self.assertIn("ref: ${{ github.sha }}", refresh)
         self.assertIn("persist-credentials: false", refresh)
         self.assertIn("scripts/pages/evidence.py validate", refresh)
         self.assertIn("--kind compact", refresh)
@@ -995,8 +990,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('.head_branch == "master"', rotate)
         self.assertIn(".head_repository.full_name == $repository", rotate)
         self.assertIn(".workflow_id == $workflow_id", rotate)
-        self.assertIn('"repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha', rotate)
-        self.assertIn("ref: ${{ steps.owner.outputs.implementation_sha }}", rotate)
+        self.assertNotIn("implementation_sha", rotate)
+        self.assertIn("ref: ${{ github.sha }}", rotate)
         self.assertIn("persist-credentials: false", rotate)
         self.assertIn("pattern: pages-cache-*", rotate)
         self.assertIn("run-id: ${{ steps.owner.outputs.pages_run_id }}", rotate)
@@ -1466,6 +1461,17 @@ class WorkflowSecurityTest(unittest.TestCase):
 
         for block in (validate, publish):
             with self.subTest(job=block.splitlines()[0].strip()):
+                self.assertIn("ref: ${{ github.sha }}", block)
+                self.assertNotIn("ref: ${{ steps.plan.outputs.source_sha }}", block)
+                self.assertNotIn("ref: ${{ steps.plan.outputs.work_head_sha }}", block)
+                self.assertIn("Prepare an empty isolated port workspace", block)
+                self.assertIn('git fetch --no-tags origin "$WORK_HEAD_SHA"', block)
+                self.assertIn("ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL", block)
+                self.assertIn("ACTIONS_CACHE_URL ACTIONS_RESULTS_URL", block)
+                self.assertIn(
+                    '[[ "$(git -C ../controller rev-parse HEAD)" == "$SOURCE_SHA" ]]',
+                    block,
+                )
                 self.assertIn('GIT_INDEX_FILE="$candidate_index" git read-tree', block)
                 self.assertIn('GIT_INDEX_FILE="$candidate_index" git apply --cached', block)
                 self.assertNotIn("git apply --index", block)
@@ -1481,6 +1487,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('[[ "$validated_tree" == "$EXPECTED_TREE" ]]', validate)
         self.assertIn('[[ "$tree" == "$candidate_tree" ]]', publish)
         self.assertIn('[[ "$tree" == "$EXPECTED_TREE" ]]', publish)
+
+        dependency_install = validate.index(
+            "Install hash-locked Pages image dependency"
+        )
+        materialize = validate.index('git fetch --no-tags origin "$WORK_HEAD_SHA"')
+        self.assertLess(dependency_install, materialize)
 
     def test_version_sync_renders_and_revalidates_target_readme(self) -> None:
         propose = job_block("sync-version-branches.yml", "propose")
@@ -1635,6 +1647,22 @@ class WorkflowSecurityTest(unittest.TestCase):
         merge_pr = merge.index('gh pr merge "$pr_number"')
         self.assertLess(revalidation, publish)
         self.assertLess(publish, merge_pr)
+
+    def test_gate_attestation_never_executes_the_release_checkout(self) -> None:
+        verify = job_block("verify-gate-attestation.yml", "verify")
+
+        self.assertIn("ref: master", verify)
+        self.assertIn("path: controller", verify)
+        self.assertNotIn("ref: ${{ inputs.target_sha }}", verify)
+        self.assertIn("source controller/scripts/ci/github_api_retry.sh", verify)
+        self.assertIn("git/commits/$TESTED_SHA", verify)
+        self.assertIn("git/commits/$TARGET_SHA", verify)
+        self.assertIn("compare/$TESTED_SHA...$TARGET_SHA", verify)
+        self.assertIn('.merge_base_commit.sha == $tested', verify)
+        self.assertIn('.commits[-1].sha == $target', verify)
+        self.assertNotIn("python3 scripts/", verify)
+        self.assertNotIn("git checkout", verify)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', verify)
 
     def test_credentialed_writers_do_not_receive_claude_credentials(self) -> None:
         for workflow, job in (

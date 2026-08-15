@@ -30,20 +30,24 @@ jobs:
   verify:
     name: Verify exact tested tree
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 75
 
     steps:
-      - name: Check out the final release commit
+      # The release commit is authenticated as inert GitHub API data below. Never check out or
+      # execute it in this default-branch cache context; only the protected retry helper is loaded.
+      - name: Check out protected attestation transport
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.target_sha }}
-          fetch-depth: 0
+          ref: master
+          path: controller
           persist-credentials: false
 
       - name: Verify branch, commit, tree, and source run
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
           SOURCE_WORKFLOW: ${{ inputs.source_workflow }}
           TARGET_SHA: ${{ inputs.target_sha }}
@@ -51,22 +55,39 @@ jobs:
           TESTED_SHA: ${{ inputs.tested_sha }}
         run: |
           set -euo pipefail
+          source controller/scripts/ci/github_api_retry.sh
           [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]
           [[ "$SOURCE_WORKFLOW" == build-gate.yml \
             || "$SOURCE_WORKFLOW" == on-demand-e2e.yml ]]
           [[ "$TESTED_BRANCH" == automation/sync/* ]]
+          [[ "$TESTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_REF_NAME" =~ ^[a-z0-9]+(-and-[a-z0-9]+)*-[0-9]+(\.[0-9]+)+$ ]]
           [[ "$GITHUB_SHA" == "$TARGET_SHA" ]]
-          python3 scripts/release/version_branches.py \
-            --target "$GITHUB_REF_NAME" > /dev/null
-          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$GITHUB_REF_NAME" \
+          [[ "$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/$GITHUB_REF_NAME" \
             --jq .commit.sha)" == "$TARGET_SHA" ]]
 
-          git cat-file -e "${TESTED_SHA}^{commit}"
-          git merge-base --is-ancestor "$TESTED_SHA" "$TARGET_SHA"
-          [[ "$(git rev-parse "${TESTED_SHA}^{tree}")" \
-            == "$(git rev-parse "${TARGET_SHA}^{tree}")" ]]
+          tested_commit="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/git/commits/$TESTED_SHA")"
+          target_commit="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/git/commits/$TARGET_SHA")"
+          jq -e --arg sha "$TESTED_SHA" \
+            '.sha == $sha and (.tree.sha | test("^[0-9a-f]{40}$"))' \
+            <<< "$tested_commit" > /dev/null
+          jq -e --arg sha "$TARGET_SHA" \
+            '.sha == $sha and (.tree.sha | test("^[0-9a-f]{40}$"))' \
+            <<< "$target_commit" > /dev/null
+          [[ "$(jq -r .tree.sha <<< "$tested_commit")" \
+            == "$(jq -r .tree.sha <<< "$target_commit")" ]]
+          comparison="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/compare/$TESTED_SHA...$TARGET_SHA")"
+          jq -e --arg tested "$TESTED_SHA" --arg target "$TARGET_SHA" \
+            '.status == "ahead" and .merge_base_commit.sha == $tested and
+             .base_commit.sha == $tested and .commits[-1].sha == $target' \
+            <<< "$comparison" > /dev/null
 
-          run_json="$(gh api \
+          run_json="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
           [[ "$(jq -r .status <<< "$run_json")" == completed ]]
           [[ "$(jq -r .conclusion <<< "$run_json")" == success ]]
@@ -77,9 +98,6 @@ jobs:
             == ".github/workflows/$SOURCE_WORKFLOW" ]]
           [[ "$(jq -r '.head_repository.full_name // ""' <<< "$run_json")" \
             == "$GITHUB_REPOSITORY" ]]
-
-          python3 scripts/release/matrix.py \
-            --matrix release/release-matrix.json > /dev/null
 
           {
             printf '### Verified release gate\n\n'
