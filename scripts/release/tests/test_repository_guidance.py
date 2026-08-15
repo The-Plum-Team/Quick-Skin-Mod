@@ -77,7 +77,10 @@ class RepositoryGuidanceTest(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/verify-gate-attestation.yml", e2e_gate)
         self.assertIn("gh workflow run build-gate.yml --ref \"$target_branch\"", handler)
         self.assertIn("gh workflow run on-demand-e2e.yml --ref \"$target_branch\"", handler)
-        self.assertIn('${TESTED_SHA}^{tree}', attestation)
+        self.assertIn("git/commits/$TESTED_SHA", attestation)
+        self.assertIn("git/commits/$TARGET_SHA", attestation)
+        self.assertIn("compare/$TESTED_SHA...$TARGET_SHA", attestation)
+        self.assertNotIn("ref: ${{ inputs.target_sha }}", attestation)
         self.assertIn("scripts/release/status_table.py", refresh)
 
     def test_shared_delivery_and_ephemeral_worktrees_are_explicit(self) -> None:
