@@ -24,9 +24,9 @@ public abstract class CpmRenderDepthMixin {
                     shift = At.Shift.AFTER,
                     remap = false
             ),
-            // Legacy and modern CPM call different bind methods. Neither alternative can carry
-            // expect=1 independently because one is deliberately absent in every CPM era.
+            // Legacy and modern CPM call different bind methods, so either target can be absent.
             require = 0,
+            expect = 0,
             allow = 1,
             remap = false
     )
@@ -43,6 +43,7 @@ public abstract class CpmRenderDepthMixin {
                     remap = false
             ),
             require = 0,
+            expect = 0,
             allow = 1,
             remap = false
     )
