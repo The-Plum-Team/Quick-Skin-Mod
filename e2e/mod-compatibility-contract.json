@@ -1,10 +1,10 @@
 {
-  "schema_version": 1,
-  "lock_revision": "2026-08-13",
+  "schema_version": 2,
+  "lock_revision": "2026-08-15",
   "artifact_source": {
     "kind": "modrinth-v2",
     "api_base": "https://api.modrinth.com/v2",
-    "selection_policy": "newest-compatible-published-version-v1"
+    "selection_policy": "newest-compatible-published-version-with-authored-exclusions-v2"
   },
   "mods": [
     {
@@ -23,6 +23,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "excluded_lanes": [],
       "supported_game_versions": null,
       "artifacts": [
         {
@@ -646,6 +647,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "excluded_lanes": [],
       "supported_game_versions": null,
       "artifacts": [
         {
@@ -997,6 +999,13 @@
       ],
       "provided_dependencies": [
         "P7dR8mSH"
+      ],
+      "excluded_lanes": [
+        {
+          "runtime_version": "1.21.9",
+          "loader": "neoforge",
+          "reason": "3D Skin Layers upstream does not support Minecraft 1.21.9 on NeoForge - use 1.21.10"
+        }
       ],
       "supported_game_versions": null,
       "artifacts": [
@@ -1593,6 +1602,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "excluded_lanes": [],
       "supported_game_versions": null,
       "artifacts": [
         {
@@ -1689,6 +1699,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "excluded_lanes": [],
       "supported_game_versions": null,
       "artifacts": [
         {
@@ -2132,6 +2143,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "excluded_lanes": [],
       "supported_game_versions": [
         "1.20.1"
       ],

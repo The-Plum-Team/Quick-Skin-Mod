@@ -426,6 +426,20 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
                 25565,
                 "/fake/java",
             )
+            clean_options = dict(captured["options"])  # type: ignore[arg-type]
+            compatibility_launched = packaged_runtime.client_command(
+                self.root / "install",
+                "fabric-loader-1.21.10",
+                self.root / "compatibility-game",
+                {"runtime_version": "1.21.10"},
+                "mod-compatibility",
+                "client_a",
+                "Alice",
+                25565,
+                "/fake/java",
+                compatibility_mod="ears",
+            )
+            compatibility_options = dict(captured["options"])  # type: ignore[arg-type]
 
         self.assertEqual(["java", "minecraft"], launched)
         self.assertEqual("fabric-loader-1.21.10", captured["version_id"])
@@ -436,6 +450,16 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
         self.assertEqual(
             "10920508d5d83eed93d292f193afe7d7",
             options["uuid"],
+        )
+        self.assertIn("-Dmixin.debug.countInjections=true", clean_options["jvmArguments"])
+        self.assertEqual(["java", "minecraft"], compatibility_launched)
+        self.assertNotIn(
+            "-Dmixin.debug.countInjections=true",
+            compatibility_options["jvmArguments"],
+        )
+        self.assertIn(
+            "-Dquickskin.e2e.compatibility=ears",
+            compatibility_options["jvmArguments"],
         )
 
     def test_e2e_client_config_disables_ambient_own_skin_import(self) -> None:
@@ -653,6 +677,109 @@ class PackagedRuntimeDependencyTest(unittest.TestCase):
         self.assertNotEqual(commands[0][1], commands[1][1])
         self.assertEqual(self.store.path_for_blob(installer_sha), Path(commands[0][0][2]))
         self.assertEqual(self.store.path_for_blob(installer_sha), Path(commands[1][0][2]))
+
+    def test_neoforge_server_retry_discards_partial_install_before_publish(self) -> None:
+        installer = self.root / "neoforge-installer.jar"
+        installer.write_bytes(b"neoforge installer")
+        installer_sha = hashlib.sha256(installer.read_bytes()).hexdigest()
+        matrix = {
+            "installers": {
+                "neoforge": {
+                    "url": "https://example.invalid/neoforge-installer.jar",
+                    "sha256": installer_sha,
+                }
+            }
+        }
+        row = {
+            "installer": "neoforge",
+            "loader": "neoforge",
+            "runtime_version": "1.21.7",
+            "loader_version": "21.7.25-beta",
+        }
+        attempts: list[Path] = []
+
+        def fetch(store: runtime_store.RuntimeStore, **_kwargs: object) -> Path:
+            return store.admit_blob(installer, installer_sha)
+
+        def run(
+            _command: list[str], cwd: Path, _log: Path, _env: dict[str, str], **_kwargs: object
+        ) -> None:
+            attempts.append(cwd)
+            if len(attempts) == 1:
+                (cwd / "partial-library.jar").write_bytes(b"partial")
+                raise packaged_runtime.RuntimeFailure("transient Maven failure")
+            (cwd / "run.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+
+        server = self.root / "neoforge-server"
+        server.mkdir()
+        with mock.patch.object(
+            packaged_runtime, "fetch_verified_blob", side_effect=fetch
+        ), mock.patch.object(
+            packaged_runtime, "run_checked", side_effect=run
+        ) as checked, mock.patch.object(packaged_runtime.time, "sleep") as sleep:
+            command = packaged_runtime.prepare_server(
+                matrix, row, server, self.store, "/fake/java", self.root / "install.log"
+            )
+
+        self.assertEqual(["bash", str(server / "run.sh"), "nogui"], command)
+        self.assertEqual(2, len(attempts))
+        self.assertNotEqual(attempts[0], attempts[1])
+        self.assertFalse((server / "partial-library.jar").exists())
+        self.assertTrue((server / "run.sh").is_file())
+        self.assertEqual(False, checked.call_args_list[0].kwargs["append"])
+        self.assertEqual(True, checked.call_args_list[1].kwargs["append"])
+        sleep.assert_called_once_with(5)
+
+    def test_neoforge_server_retry_fails_closed_without_partial_tree(self) -> None:
+        installer = self.root / "neoforge-installer-failing.jar"
+        installer.write_bytes(b"neoforge installer")
+        installer_sha = hashlib.sha256(installer.read_bytes()).hexdigest()
+        matrix = {
+            "installers": {
+                "neoforge": {
+                    "url": "https://example.invalid/neoforge-installer.jar",
+                    "sha256": installer_sha,
+                }
+            }
+        }
+        row = {
+            "installer": "neoforge",
+            "loader": "neoforge",
+            "runtime_version": "1.21.7",
+            "loader_version": "21.7.25-beta",
+        }
+
+        def fetch(store: runtime_store.RuntimeStore, **_kwargs: object) -> Path:
+            return store.admit_blob(installer, installer_sha)
+
+        def fail(
+            _command: list[str], cwd: Path, _log: Path, _env: dict[str, str], **_kwargs: object
+        ) -> None:
+            (cwd / "partial-library.jar").write_bytes(b"partial")
+            raise packaged_runtime.RuntimeFailure("transient Maven failure")
+
+        server = self.root / "neoforge-server-failing"
+        server.mkdir()
+        with mock.patch.object(
+            packaged_runtime, "fetch_verified_blob", side_effect=fetch
+        ), mock.patch.object(
+            packaged_runtime, "run_checked", side_effect=fail
+        ) as checked, mock.patch.object(packaged_runtime.time, "sleep"):
+            with self.assertRaisesRegex(
+                packaged_runtime.RuntimeFailure, "after 3 isolated attempts"
+            ):
+                packaged_runtime.prepare_server(
+                    matrix,
+                    row,
+                    server,
+                    self.store,
+                    "/fake/java",
+                    self.root / "failing-install.log",
+                )
+
+        self.assertEqual(3, checked.call_count)
+        self.assertEqual([], list(server.iterdir()))
+        self.assertEqual([], list(self.root.glob(".neoforge-server-attempt-*")))
 
 
 class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
