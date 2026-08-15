@@ -113,7 +113,7 @@ public final class E2EHarness {
         }
         // Diagnostic: log each screen transition so a stuck client (title vs loading vs error) is visible.
         Screen sc = VanillaShim.currentScreen(mc);
-        String screen = (sc == null) ? "<none/in-world-hud>" : sc.getClass().getName();
+        String screen = VanillaShim.screenDiagnostic(sc);
         if (!screen.equals(lastScreen)) {
             E2ELog.info("screen -> " + screen);
             lastScreen = screen;
@@ -129,6 +129,21 @@ public final class E2EHarness {
                 finish(mc);
                 return;
             }
+            // A disconnected screen cannot recover without user input. Finish immediately and
+            // expose its exact translated reason instead of waiting out the remaining 90s budget.
+            // Only the machine category below is eligible for one bounded orchestrator retry.
+            if (VanillaShim.isDisconnectedScreen(sc)) {
+                String shot = version + "_00_join_disconnect_" + role + ".png";
+                boolean captured = VanillaShim.screenshot(mc, shot);
+                String category = VanillaShim.isConnectionTimeoutScreen(sc)
+                        ? "connection_timeout"
+                        : "connection_rejected";
+                report.record("join_world", "fail",
+                        "category=" + category + "; disconnected before world join; " + screen,
+                        captured ? shot : null);
+                finish(mc);
+                return;
+            }
         }
         if (mc.player != null && mc.level != null) {
             Scenario scenario = resolveScenario();
@@ -140,9 +155,11 @@ public final class E2EHarness {
         }
         if (tick > worldWaitDeadline) {
             E2ELog.warn("timed out waiting for world join (lastScreen=" + lastScreen + ")");
-            VanillaShim.screenshot(mc, version + "_00_join_timeout_" + role + ".png");
+            String shot = version + "_00_join_timeout_" + role + ".png";
+            boolean captured = VanillaShim.screenshot(mc, shot);
             report.record("join_world", "timeout",
-                    "player/level null after 90s; lastScreen=" + lastScreen, null);
+                    "player/level null after 90s; lastScreen=" + lastScreen,
+                    captured ? shot : null);
             finish(mc);
         }
     }
