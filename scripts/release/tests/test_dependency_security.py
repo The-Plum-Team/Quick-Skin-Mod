@@ -204,6 +204,36 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             )
         self.assertEqual(expected - coordinates, set())
 
+    def test_shadow_marker_pom_trusts_only_the_verified_repository_variants(
+        self,
+    ) -> None:
+        root, namespace = _verification_tree()
+        component = root.find(
+            "v:components/v:component[@group='com.gradleup.shadow']"
+            "[@name='com.gradleup.shadow.gradle.plugin'][@version='8.3.11']",
+            namespace,
+        )
+        self.assertIsNotNone(component)
+        assert component is not None
+        artifact = component.find(
+            "v:artifact[@name='com.gradleup.shadow.gradle.plugin-8.3.11.pom']",
+            namespace,
+        )
+        self.assertIsNotNone(artifact)
+        assert artifact is not None
+        checksum = artifact.find("v:sha256", namespace)
+        self.assertIsNotNone(checksum)
+        assert checksum is not None
+        self.assertEqual(
+            checksum.get("value"),
+            "2209a68d4aa73f1c8d2077949cb3b66501b4392554ecc37d6f2c9d559dfcade6",
+        )
+        self.assertEqual(checksum.get("origin"), "Maven Central marker POM")
+        self.assertEqual(
+            [entry.get("value") for entry in checksum.findall("v:also-trust", namespace)],
+            ["a93dd818af331d766e93a10d8062408c02cd0837ef7b69ab5b126f36360284be"],
+        )
+
     def test_repository_policy_keeps_trusted_namespaces_local_only(self) -> None:
         policy = (ROOT / "gradle" / "repository-policy.gradle.kts").read_text(
             encoding="utf-8"
