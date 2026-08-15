@@ -400,7 +400,7 @@ jobs:
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           jq -e 'type == "array" and length > 0 and length <= 8' \
             <<< "$ARTIFACT_INVENTORY" > /dev/null
-          printf 'contract_skew=false\n' >> "$GITHUB_OUTPUT"
+          printf 'review_skipped=false\n' >> "$GITHUB_OUTPUT"
 
           source_run="$(gh api \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
@@ -432,7 +432,7 @@ jobs:
           master_contract_sha256="$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)"
           source_contract_sha256="$(sha256sum "$source_contract" | cut -d ' ' -f 1)"
           if [[ "$master_contract_sha256" != "$source_contract_sha256" ]]; then
-            printf 'contract_skew=true\n' >> "$GITHUB_OUTPUT"
+            printf 'review_skipped=true\n' >> "$GITHUB_OUTPUT"
             printf 'scenario-contract skew between master and source head; skipping advisory review\n' \
               | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -440,6 +440,10 @@ jobs:
           matrix_kind=pr-anchors
           if [[ "$(jq -r .event <<< "$source_run")" == schedule ]]; then
             matrix_kind=native-anchors
+          fi
+          controller_skew_arguments=()
+          if [[ "$(jq -r .event <<< "$source_run")" == pull_request ]]; then
+            controller_skew_arguments+=(--allow-advisory-controller-skew)
           fi
 
           jobs="$RUNNER_TEMP/source-jobs.json"
@@ -452,6 +456,7 @@ jobs:
              ([.[].jobs[]] | length > 0 and length <= 100)' \
             "$jobs" > /dev/null
 
+          job_graph_status=0
           python3 scripts/ci/e2e_job_graph.py \
             --matrix "$source_matrix" \
             --matrix-properties "$source_properties" \
@@ -463,7 +468,16 @@ jobs:
             --bootstrap-contract e2e/loader-bootstrap-contract.json \
             --matrix-kind "$matrix_kind" \
             --runtime-policy full \
-            > "$RUNNER_TEMP/e2e-job-graph.json"
+            "${controller_skew_arguments[@]}" \
+            > "$RUNNER_TEMP/e2e-job-graph.json" || job_graph_status=$?
+          if [[ "$job_graph_status" -eq 78 ]]; then
+            printf 'review_skipped=true\n' >> "$GITHUB_OUTPUT"
+            printf '%s\n' \
+              'CI-only E2E controller skew; deferring visual validation to the protected post-merge generation' \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [[ "$job_graph_status" -eq 0 ]]
           python3 scripts/release/matrix.py \
             --matrix "$source_matrix" \
             --matrix-properties "$source_properties" \
@@ -858,7 +872,7 @@ jobs:
 
       - name: Name the source-bound curated handoff
         id: identity
-        if: steps.evidence.outputs.contract_skew == 'false'
+        if: steps.evidence.outputs.review_skipped == 'false'
         shell: bash
         env:
           GENERATION_SHA: ${{ steps.evidence.outputs.generation_sha }}
@@ -873,7 +887,7 @@ jobs:
 
       - name: Upload only the curated review input
         id: handoff
-        if: steps.evidence.outputs.contract_skew == 'false'
+        if: steps.evidence.outputs.review_skipped == 'false'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.identity.outputs.artifact_name }}
