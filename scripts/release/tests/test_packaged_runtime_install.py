@@ -440,9 +440,23 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
                 compatibility_mod="ears",
             )
             compatibility_options = dict(captured["options"])  # type: ignore[arg-type]
+            compatibility_version_id = captured["version_id"]
+            replaymod_launched = packaged_runtime.client_command(
+                self.root / "install",
+                "fabric-loader-1.20.1",
+                self.root / "replaymod-game",
+                {"runtime_version": "1.20.1"},
+                "mod-compatibility",
+                "client_a",
+                "Alice",
+                25566,
+                "/fake/java",
+                compatibility_mod="replaymod",
+            )
+            replaymod_options = dict(captured["options"])  # type: ignore[arg-type]
 
         self.assertEqual(["java", "minecraft"], launched)
-        self.assertEqual("fabric-loader-1.21.10", captured["version_id"])
+        self.assertEqual("fabric-loader-1.21.10", compatibility_version_id)
         options = captured["options"]
         self.assertIsInstance(options, dict)
         assert isinstance(options, dict)
@@ -460,6 +474,19 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
         self.assertIn(
             "-Dquickskin.e2e.compatibility=ears",
             compatibility_options["jvmArguments"],
+        )
+        self.assertEqual(["java", "minecraft"], replaymod_launched)
+        self.assertEqual("127.0.0.1:25566", replaymod_options["quickPlayMultiplayer"])
+        self.assertIn(
+            "-Dquickskin.e2e.repairMissingConnectionRead=true",
+            replaymod_options["jvmArguments"],
+        )
+        self.assertNotIn(
+            "-Dquickskin.e2e.repairMissingConnectionRead=true",
+            compatibility_options["jvmArguments"],
+        )
+        self.assertEqual(
+            "127.0.0.1:25565", compatibility_options["quickPlayMultiplayer"]
         )
 
     def test_e2e_client_config_disables_ambient_own_skin_import(self) -> None:
@@ -967,6 +994,98 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
         self.assertTrue(exited)
         self.assertEqual(2, process.poll.call_count)
         sleep.assert_called_once_with(packaged_runtime.PROCESS_GROUP_POLL_SECONDS)
+
+    def test_replaymod_login_stall_requests_one_live_thread_dump(self) -> None:
+        log = self.root / "client.log"
+        process = mock.Mock()
+        process.poll.return_value = None
+        server_log = self.root / "server.log"
+        server = mock.Mock()
+        server.poll.return_value = None
+        state = packaged_runtime.ReplayModLoginDiagnostic()
+
+        log.write_text("client starting\n", encoding="utf-8")
+        packaged_runtime.maybe_capture_replaymod_login_stall(
+            process, log, state, now=100.0
+        )
+        process.send_signal.assert_not_called()
+
+        log.write_text("Connecting to 127.0.0.1, 25565\n", encoding="utf-8")
+        packaged_runtime.maybe_capture_replaymod_login_stall(
+            process, log, state, now=101.0
+        )
+        packaged_runtime.maybe_capture_replaymod_login_stall(
+            process,
+            log,
+            state,
+            now=101.0 + packaged_runtime.REPLAYMOD_LOGIN_STALL_SECONDS - 0.1,
+        )
+        process.send_signal.assert_not_called()
+
+        with mock.patch.object(packaged_runtime.os, "name", "posix"):
+            packaged_runtime.maybe_capture_replaymod_login_stall(
+                process,
+                log,
+                state,
+                server_process=server,
+                server_log=server_log,
+                now=101.0 + packaged_runtime.REPLAYMOD_LOGIN_STALL_SECONDS,
+            )
+            packaged_runtime.maybe_capture_replaymod_login_stall(
+                process,
+                log,
+                state,
+                server_process=server,
+                server_log=server_log,
+                now=200.0,
+            )
+
+        process.send_signal.assert_called_once_with(packaged_runtime.signal.SIGQUIT)
+        server.send_signal.assert_called_once_with(packaged_runtime.signal.SIGQUIT)
+        self.assertTrue(state.dump_requested)
+
+    def test_replaymod_login_progress_suppresses_thread_dump(self) -> None:
+        log = self.root / "client.log"
+        log.write_text(
+            "Connecting to 127.0.0.1, 25565\nMultiplayer Recording is disabled\n",
+            encoding="utf-8",
+        )
+        process = mock.Mock()
+        process.poll.return_value = None
+        state = packaged_runtime.ReplayModLoginDiagnostic(connecting_seen_at=1.0)
+
+        packaged_runtime.maybe_capture_replaymod_login_stall(
+            process, log, state, now=100.0
+        )
+
+        process.send_signal.assert_not_called()
+        self.assertTrue(state.login_progressed)
+        self.assertFalse(state.dump_requested)
+
+    def test_wait_for_marker_runs_live_diagnostic_callback(self) -> None:
+        game_dir = self.root / "client_a"
+        report = game_dir / "e2e-report"
+        report.mkdir(parents=True)
+        process = mock.Mock()
+        process.poll.return_value = None
+        polls = 0
+
+        def on_poll() -> None:
+            nonlocal polls
+            polls += 1
+            (report / "done.marker").write_text("pass", encoding="utf-8")
+
+        with mock.patch.object(packaged_runtime.time, "sleep"):
+            marker = packaged_runtime.wait_for_marker(
+                process,
+                game_dir,
+                "client_a",
+                timeout=1,
+                on_poll=on_poll,
+            )
+
+        self.assertEqual("pass", marker)
+        self.assertEqual(1, polls)
 
     def test_compatibility_marker_is_required_in_every_process_log(self) -> None:
         marker = packaged_runtime.COMPATIBILITY_LOG_MARKERS[

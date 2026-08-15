@@ -175,6 +175,10 @@ most one client per scenario whose authenticated harness report contains exactly
 vanilla `connection_timeout` failure may be relaunched once. The first attempt's bounded log,
 report, marker, and screenshot remain in the uploaded diagnostics. A repeated timeout, any other
 disconnect reason, an assertion failure, malformed identity, or extra failed step remains fatal.
+ReplayMod's 1.20.1 login hook can fail before it emits its first recording-policy marker; on POSIX,
+the runner requests one non-terminating JVM thread dump from both the client and server after 12
+seconds without login progress. Those live stacks are retained in the same bounded logs before
+vanilla replaces the useful login state with its 30-second timeout screen.
 
 The remote propagation captures pin the disposable subject's current and interpolated head/body
 rotations and hold the observer at a numerically asserted rear vantage. Their passed runtime
@@ -342,6 +346,11 @@ size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth 
 The ReplayMod lane seeds ReplayMod's supported `recordServer=false` client setting: the mod and
 Quick Skin bridge remain loaded, while its unrelated replay writer cannot turn the disposable
 multiplayer probe into a recording/recovery failure before the rendering assertions begin.
+On Fabric 1.20.1, ReplayMod can expose an old-Netty Quick Play race in which an active auto-read
+channel loses its NIO `OP_READ` interest while login data is already waiting. The E2E-only harness
+detects exactly that invalid state, restores the interest, and wakes the selector a bounded maximum
+of five times. It does not reconnect, replace handlers, alter server compression, or fabricate any
+protocol traffic; repeated login failure remains fatal after the existing single clean retry.
 Essential's title-screen checkpoint follows its production integration contract: Essential owns
 the menu player model, Quick Skin suppresses the duplicate preview, preserves its action icon and
 registers the selected appearance for Essential's renderer. Its compatibility-review expectation
