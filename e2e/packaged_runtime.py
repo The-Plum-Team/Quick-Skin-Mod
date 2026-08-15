@@ -1270,15 +1270,93 @@ def wait_for_marker(
     marker = game_dir / "e2e-report" / "done.marker"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if marker.is_file():
-            value = marker.read_text(encoding="utf-8").strip()
-            if value not in {"pass", "fail"}:
-                raise RuntimeFailure(f"invalid {role} done.marker value {value!r}")
+        value = marker_value(game_dir, role)
+        if value is not None:
             return value
         if process.poll() is not None:
             raise RuntimeFailure(f"{role} exited before writing {marker}")
         time.sleep(2)
     raise RuntimeFailure(f"timed out waiting for {role} marker {marker}")
+
+
+def marker_value(game_dir: Path, role: str) -> str | None:
+    """Return a completed harness marker, or ``None`` while it has not been written."""
+
+    marker = game_dir / "e2e-report" / "done.marker"
+    if not marker.is_file():
+        return None
+    value = marker.read_text(encoding="utf-8").strip()
+    if value not in {"pass", "fail"}:
+        raise RuntimeFailure(f"invalid {role} done.marker value {value!r}")
+    return value
+
+
+def is_transient_connect_timeout_report(
+    game_dir: Path,
+    row: Mapping[str, Any],
+    scenario: str,
+    role: str,
+) -> bool:
+    """Recognize only the harness's exact pre-world vanilla connection-timeout category."""
+
+    report_path = game_dir / "e2e-report" / "report.json"
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(report, dict):
+        return False
+    if (
+        report.get("version") != row.get("runtime_version")
+        or report.get("role") != role
+        or report.get("scenario") != scenario
+        or report.get("contract_sha256") != SCENARIO_CONTRACT.sha256
+        or report.get("status") != "fail"
+    ):
+        return False
+    steps = report.get("steps")
+    if not isinstance(steps, list) or len(steps) != 1 or not isinstance(steps[0], dict):
+        return False
+    step = steps[0]
+    message = step.get("message")
+    return (
+        step.get("name") == "join_world"
+        and step.get("status") == "fail"
+        and isinstance(message, str)
+        and message.startswith("category=connection_timeout;")
+    )
+
+
+def archive_transient_connect_attempt(
+    profile: Path,
+    game_dir: Path,
+    client_log: Path,
+    role: str,
+) -> None:
+    """Move the first failed login's bounded evidence aside before one fresh client retry."""
+
+    if role not in {"client_a", "client_b"} or game_dir != profile / role:
+        raise RuntimeFailure("unsafe transient-connect diagnostic identity")
+    if client_log != profile / "logs" / f"{role}.log":
+        raise RuntimeFailure("unsafe transient-connect diagnostic log path")
+    destination = profile / "diagnostics" / "transient-connect-attempt-1" / role
+    if destination.exists() or destination.is_symlink():
+        raise RuntimeFailure(f"transient-connect diagnostics already exist: {destination}")
+    (destination / "logs").mkdir(parents=True)
+
+    moves = (
+        (client_log, destination / "logs" / "client.log", True),
+        (game_dir / "e2e-report", destination / "e2e-report", True),
+        (game_dir / "screenshots", destination / "screenshots", False),
+    )
+    for source, target, required in moves:
+        if source.is_symlink():
+            raise RuntimeFailure(f"transient-connect evidence is a symbolic link: {source}")
+        if not source.exists():
+            if required:
+                raise RuntimeFailure(f"missing transient-connect evidence: {source}")
+            continue
+        source.rename(target)
 
 
 def failed_marker_summary(game_dir: Path, role: str) -> str:
@@ -1676,13 +1754,19 @@ def is_benign_kqueue_debug_appender_line(
     return False
 
 
-def scan_runtime_logs(logs: list[Path]) -> None:
+def scan_runtime_logs(
+    logs: list[Path], *, require_client_pass: bool = True
+) -> None:
     hits: list[str] = []
     for log in logs:
         if not log.is_file():
             raise RuntimeFailure(f"runtime log missing: {log}")
         content = log.read_text(encoding="utf-8", errors="replace")
-        if "client" in log.stem.lower() and "[QS-E2E] FINISHED status=pass" not in content:
+        if (
+            require_client_pass
+            and "client" in log.stem.lower()
+            and "[QS-E2E] FINISHED status=pass" not in content
+        ):
             hits.append(f"{log}: missing [QS-E2E] FINISHED status=pass")
         lines = content.splitlines()
         for line_index, line in enumerate(lines):
@@ -1865,6 +1949,42 @@ def export_profile_evidence(
                     recursive=True,
                     allowed=lambda path: path.suffix == ".txt",
                     maximum_bytes=MAX_EVIDENCE_CRASH_REPORT_BYTES,
+                )
+                retry_diagnostic = (
+                    execution_profile
+                    / "diagnostics"
+                    / "transient-connect-attempt-1"
+                    / owner
+                )
+                copy_group(
+                    retry_diagnostic / "logs",
+                    Path("diagnostics")
+                    / "transient-connect-attempt-1"
+                    / owner
+                    / "logs",
+                    recursive=False,
+                    allowed=lambda path: path.as_posix() == "client.log",
+                    maximum_bytes=MAX_EVIDENCE_LOG_BYTES,
+                )
+                copy_group(
+                    retry_diagnostic / "e2e-report",
+                    Path("diagnostics")
+                    / "transient-connect-attempt-1"
+                    / owner
+                    / "e2e-report",
+                    recursive=False,
+                    allowed=lambda path: path.as_posix() in {"report.json", "done.marker"},
+                    maximum_bytes=MAX_EVIDENCE_REPORT_BYTES,
+                )
+                copy_group(
+                    retry_diagnostic / "screenshots",
+                    Path("diagnostics")
+                    / "transient-connect-attempt-1"
+                    / owner
+                    / "screenshots",
+                    recursive=False,
+                    allowed=lambda path: len(path.parts) == 1 and path.suffix == ".png",
+                    maximum_bytes=MAX_EVIDENCE_SCREENSHOT_BYTES,
                 )
             copy_group(
                 execution_profile / "server" / "crash-reports",
@@ -2066,6 +2186,10 @@ def run_packaged_row(
         wait_for_log(server_process, server_log, "Done (", timeout=1200)
 
         client_processes: dict[str, subprocess.Popen[bytes]] = {}
+        client_handles: dict[str, BinaryIO] = {}
+        client_logs: dict[str, Path] = {}
+        client_deadlines: dict[str, float] = {}
+        transient_retry_used = False
 
         def launch_client(role: str) -> None:
             game_dir = client_directories[role]
@@ -2084,46 +2208,134 @@ def run_packaged_row(
             )
             process, handle = start_process(command, game_dir, client_log, env)
             client_processes[role] = process
+            client_handles[role] = handle
+            client_logs[role] = client_log
+            client_deadlines[role] = time.monotonic() + 600
             processes.append(process)
             handles.append(handle)
             runtime_logs.append(client_log)
 
+        def retry_transient_connection(role: str, marker: str) -> str | None:
+            nonlocal transient_retry_used
+            if (
+                marker != "fail"
+                or compatibility_lane is None
+                or transient_retry_used
+                or not is_transient_connect_timeout_report(
+                    client_directories[role], row, scenario, role
+                )
+            ):
+                return marker
+
+            transient_retry_used = True
+            print(
+                f"Transient vanilla login timeout for {role}; preserving attempt 1 and "
+                "retrying this client once.",
+                flush=True,
+            )
+            stop_process(client_processes[role])
+            client_handles[role].close()
+            failed_log = client_logs[role]
+            # A timeout category does not excuse a simultaneous loader, mixin, linkage, or crash
+            # signature. Check the failed attempt before removing it from the final pass-only scan.
+            scan_runtime_logs([failed_log], require_client_pass=False)
+            archive_transient_connect_attempt(
+                profile, client_directories[role], failed_log, role
+            )
+            runtime_logs.remove(failed_log)
+            launch_client(role)
+            return None
+
+        def await_role(role: str) -> str:
+            while True:
+                marker = wait_for_marker(
+                    client_processes[role], client_directories[role], role
+                )
+                resolved = retry_transient_connection(role, marker)
+                if resolved is not None:
+                    return resolved
+
+        def await_server_join(role: str, text: str, timeout: int) -> None:
+            """Wait for the first concurrent client without hiding an early harness failure."""
+
+            deadline = time.monotonic() + timeout
+            while True:
+                content = (
+                    server_log.read_text(encoding="utf-8", errors="replace")
+                    if server_log.exists()
+                    else ""
+                )
+                if text in content:
+                    return
+                marker = marker_value(client_directories[role], role)
+                if marker is not None:
+                    resolved = retry_transient_connection(role, marker)
+                    if resolved is None:
+                        deadline = time.monotonic() + timeout
+                        continue
+                    raise RuntimeFailure(
+                        f"{role} failed before server marker {text!r}; "
+                        f"{failed_marker_summary(client_directories[role], role)}"
+                    )
+                if client_processes[role].poll() is not None:
+                    raise RuntimeFailure(
+                        f"{role} exited before server marker {text!r}; see {server_log}"
+                    )
+                if time.monotonic() >= deadline:
+                    raise RuntimeFailure(
+                        f"timed out waiting for server marker {text!r}; see {server_log}"
+                    )
+                time.sleep(2)
+
+        def await_concurrent_roles(concurrent_roles: tuple[str, ...]) -> dict[str, str]:
+            completed: dict[str, str] = {}
+            pending = set(concurrent_roles)
+            while pending:
+                now = time.monotonic()
+                for role in tuple(pending):
+                    marker = marker_value(client_directories[role], role)
+                    if marker is not None:
+                        resolved = retry_transient_connection(role, marker)
+                        if resolved is not None:
+                            completed[role] = resolved
+                            pending.remove(role)
+                        continue
+                    if client_processes[role].poll() is not None:
+                        raise RuntimeFailure(
+                            f"{role} exited before writing "
+                            f"{client_directories[role] / 'e2e-report' / 'done.marker'}"
+                        )
+                    if now >= client_deadlines[role]:
+                        raise RuntimeFailure(
+                            f"timed out waiting for {role} marker "
+                            f"{client_directories[role] / 'e2e-report' / 'done.marker'}"
+                        )
+                if pending:
+                    time.sleep(2)
+            return completed
+
         markers: dict[str, str] = {}
         if orchestration.mode == "single-client":
             launch_client(roles[0])
-            markers[roles[0]] = wait_for_marker(
-                client_processes[roles[0]],
-                client_directories[roles[0]],
-                roles[0],
-            )
+            markers[roles[0]] = await_role(roles[0])
         elif orchestration.mode == "sequential-two-client":
             for role in orchestration.role_order:
                 launch_client(role)
-                markers[role] = wait_for_marker(
-                    client_processes[role],
-                    client_directories[role],
-                    role,
-                )
+                markers[role] = await_role(role)
         elif orchestration.mode == "concurrent-two-client":
             pending = list(roles)
             if orchestration.start_after is not None:
                 first_role = orchestration.start_after.role
                 launch_client(first_role)
                 pending.remove(first_role)
-                wait_for_log(
-                    client_processes[first_role],
-                    server_log,
+                await_server_join(
+                    first_role,
                     orchestration.start_after.server_log_marker,
-                    timeout=orchestration.start_after.timeout_seconds,
+                    orchestration.start_after.timeout_seconds,
                 )
             for role in pending:
                 launch_client(role)
-            for role in roles:
-                markers[role] = wait_for_marker(
-                    client_processes[role],
-                    client_directories[role],
-                    role,
-                )
+            markers.update(await_concurrent_roles(roles))
         else:  # pragma: no cover - scenario_contract rejects unknown modes
             raise RuntimeFailure(
                 f"unsupported E2E orchestration mode {orchestration.mode!r}"
