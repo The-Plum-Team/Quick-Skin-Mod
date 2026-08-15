@@ -1499,6 +1499,8 @@ public final class FullScenario implements Scenario {
         final AtomicReference<int[]> splashRegion = new AtomicReference<>();
         final AtomicReference<int[]> splashPixels = new AtomicReference<>();
         final AtomicReference<String> titleFailure = new AtomicReference<>();
+        final boolean essentialOwnsTitlePreview =
+                com.quickskin.mod.client.compat.EssentialCompatIntegration.isAvailable();
         steps.add(Step.of("title_screen_splash_order")
                 .action(() -> {
                     ClientConfig c = ClientConfig.getInstance();
@@ -1519,11 +1521,16 @@ public final class FullScenario implements Scenario {
                     VanillaShim.setScreen(mc, probeScreen);
                 })
                 .minTicks(TITLE_HOLD_TICKS)
-                .ready(() -> titleProbeReady(mc, titlePhase, titleHold, splashRegion, splashPixels,
-                        titleFailure, probeBefore, probeAfter))
+                .ready(() -> essentialOwnsTitlePreview
+                        ? VanillaShim.currentScreen(mc) instanceof TitleScreen
+                        : titleProbeReady(mc, titlePhase, titleHold, splashRegion, splashPixels,
+                                titleFailure, probeBefore, probeAfter))
                 .timeoutTicks(600)
                 .screenshot(prefix + "full_12_title_splash_order" + suffix)
                 .assertion(() -> {
+                    if (essentialOwnsTitlePreview) {
+                        return verifyEssentialTitleReplacement(mc);
+                    }
                     String failure = titleFailure.get();
                     if (failure != null) return Step.Result.fail(failure);
                     if (!(VanillaShim.currentScreen(mc) instanceof TitleScreen))
@@ -1840,6 +1847,50 @@ public final class FullScenario implements Scenario {
             if (child instanceof PlayerWidget widget) return widget;
         }
         return null;
+    }
+
+    /** Verify the intentional Essential-owned alternative to Quick Skin's title preview. */
+    private Step.Result verifyEssentialTitleReplacement(Minecraft mc) {
+        Screen screen = VanillaShim.currentScreen(mc);
+        if (!(screen instanceof TitleScreen)) {
+            return Step.Result.fail("Essential title screen not open: " + screenName(mc));
+        }
+        if (titlePreviewWidget(mc) != null) {
+            return Step.Result.fail(
+                    "Quick Skin rendered a duplicate PlayerWidget beside Essential's model");
+        }
+        boolean quickSkinActionPresent = false;
+        for (GuiEventListener child : screen.children()) {
+            if (child instanceof com.quickskin.mod.client.gui.widget.IconActionButton) {
+                quickSkinActionPresent = true;
+                break;
+            }
+        }
+        if (!quickSkinActionPresent) {
+            return Step.Result.fail(
+                    "Essential title screen has no Quick Skin action button");
+        }
+        if (com.quickskin.mod.client.compat.EssentialCompatIntegration
+                .findBottomEssentialWidget(screen) == null) {
+            return Step.Result.fail("Essential title widgets were not detected");
+        }
+
+        String activeHash = ClientConfig.getInstance().activeSkinHash;
+        if (activeHash == null || activeHash.isEmpty()) {
+            return Step.Result.fail("Essential title replacement has no active Quick Skin hash");
+        }
+        UUID profileId = mc.getUser() == null ? null : mc.getUser().getProfileId();
+        PlayerAppearance appearance = profileId == null
+                ? null
+                : PlayerAppearanceService.getInstance().getAppearance(profileId);
+        String expectedSkinId = "local_skin:" + activeHash;
+        if (appearance == null || !expectedSkinId.equals(appearance.getSkinId())) {
+            return Step.Result.fail(
+                    "Essential title replacement did not retain " + expectedSkinId);
+        }
+        return Step.Result.pass(
+                "Essential owns the title player model; Quick Skin suppressed its duplicate, "
+                        + "kept its action button, and registered " + expectedSkinId);
     }
 
     // ===== cape-editor elytra probe ============================================================
