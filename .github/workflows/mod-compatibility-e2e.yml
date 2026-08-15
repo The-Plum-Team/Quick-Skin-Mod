@@ -25,7 +25,7 @@ jobs:
     name: Authenticate the clean base release
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 75
     permissions:
       actions: read
       contents: read
@@ -54,6 +54,9 @@ jobs:
         id: admit
         shell: bash
         env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           REVIEW_ARTIFACT_DIGEST: ${{ github.event.client_payload.review_artifact_digest }}
           REVIEW_ARTIFACT_ID: ${{ github.event.client_payload.review_artifact_id }}
@@ -67,6 +70,7 @@ jobs:
           TARGET_SHA: ${{ github.event.client_payload.target_sha }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$ ]]
@@ -80,7 +84,8 @@ jobs:
           [[ "$REVIEW_ARTIFACT_NAME" == "visual-review-$SOURCE_RUN_ID" ]]
           python3 scripts/release/version_branches.py --target "$TARGET_BRANCH" > /dev/null
 
-          source_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          source_run="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
           jq -e \
             --arg branch "$SOURCE_BRANCH" \
             --arg repository "$GITHUB_REPOSITORY" \
@@ -98,14 +103,15 @@ jobs:
             *) exit 1 ;;
           esac
 
-          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$TARGET_BRANCH" \
+          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$TARGET_BRANCH" \
             --jq .commit.sha)" == "$TARGET_SHA" ]]
           git fetch --no-tags origin "$SOURCE_SHA" "$TARGET_SHA"
           [[ "$(git rev-parse "$SOURCE_SHA^{tree}")" == \
              "$(git rev-parse "$TARGET_SHA^{tree}")" ]]
           if [[ "$SOURCE_SHA" != "$TARGET_SHA" ]]; then
             [[ "$SOURCE_BRANCH" == automation/sync/* ]]
-            associated="$(gh api -H 'Accept: application/vnd.github+json' \
+            associated="$(github_api_retry \
+              -H 'Accept: application/vnd.github+json' \
               "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls?per_page=20")"
             jq -e \
               --arg repository "$GITHUB_REPOSITORY" \
@@ -125,7 +131,7 @@ jobs:
             [[ "$SOURCE_BRANCH" == "$TARGET_BRANCH" ]]
           fi
 
-          review_metadata="$(gh api \
+          review_metadata="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/artifacts/$REVIEW_ARTIFACT_ID")"
           jq -e \
             --arg digest "$REVIEW_ARTIFACT_DIGEST" \
@@ -139,7 +145,7 @@ jobs:
             <<< "$review_metadata" > /dev/null
           review_owner=''
           for attempt in {1..120}; do
-            review_owner="$(gh api \
+            review_owner="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$REVIEW_ARTIFACT_RUN_ID")"
             if [[ "$(jq -r .status <<< "$review_owner")" == completed ]]; then
               break
@@ -161,9 +167,9 @@ jobs:
           git merge-base --is-ancestor "$review_owner_sha" "$GITHUB_SHA"
 
           archive="$RUNNER_TEMP/base-visual-review.zip"
-          gh api -H 'Accept: application/vnd.github+json' \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$REVIEW_ARTIFACT_ID/zip" \
-            > "$archive"
+          github_api_retry_to_file "$archive" \
+            -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$REVIEW_ARTIFACT_ID/zip"
           [[ "$(stat -c %s "$archive")" == "$REVIEW_ARTIFACT_SIZE" ]]
           [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
              "$REVIEW_ARTIFACT_DIGEST" ]]
@@ -211,7 +217,7 @@ jobs:
             (.matches_reference == null or .matches_reference == true))' \
             "$report" > /dev/null
 
-          bundle_metadata="$(gh api \
+          bundle_metadata="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?name=e2e-input-bundle&per_page=100")"
           jq -e \
             --argjson run_id "$SOURCE_RUN_ID" \
@@ -232,7 +238,7 @@ jobs:
     name: Resolve immutable mod lanes
     needs: admit
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 75
     permissions:
       actions: read
       contents: read
@@ -267,6 +273,10 @@ jobs:
         shell: bash
         env:
           BASE_MATRIX_KIND: ${{ needs.admit.outputs.base_matrix_kind }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
+          GH_TOKEN: ${{ github.token }}
           SOURCE_BRANCH: ${{ needs.admit.outputs.source_branch }}
           SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
           SOURCE_SHA: ${{ needs.admit.outputs.source_sha }}
@@ -274,6 +284,7 @@ jobs:
           TARGET_SHA: ${{ needs.admit.outputs.target_sha }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
           [[ "$BASE_MATRIX_KIND" == pr-anchors || \
              "$BASE_MATRIX_KIND" == native-anchors ]]
@@ -328,7 +339,7 @@ jobs:
                    else endswith("--scheduled-behavior") end)) and
                 .compatibility_contract_sha256 == $lock))' \
              "$RUNNER_TEMP/mod-compatibility-plan.json" > /dev/null
-          source_artifacts="$(gh api \
+          source_artifacts="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
           jq -e \
             --argjson artifacts "$source_artifacts" \
@@ -433,14 +444,18 @@ jobs:
         env:
           BASE_NAME: ${{ matrix.base_evidence_name }}
           CANDIDATE_NAME: mod-compatibility-e2e-${{ matrix.id }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           inventory="$RUNNER_TEMP/compatibility-artifact-inventory.json"
           current=""
           for attempt in {1..12}; do
-            current="$(gh api \
+            current="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100")"
             if jq -e --arg name "$CANDIDATE_NAME" --argjson run_id "$GITHUB_RUN_ID" \
                 '[.artifacts[] | select(.name == $name and .expired == false and
@@ -450,7 +465,7 @@ jobs:
             fi
             sleep 5
           done
-          base="$(gh api \
+          base="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
           jq -n \
             --arg base_name "$BASE_NAME" \
