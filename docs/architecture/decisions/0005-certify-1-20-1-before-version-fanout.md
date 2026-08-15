@@ -99,6 +99,11 @@ version wave is created; the anchor problem remains visible for a corrective `ma
 begins a fresh generation. A newer `master` push also invalidates an older pending certificate
 naturally.
 
+An authenticated certificate for the exact current generation also makes later automatic or
+scheduled anchor capsules redundant. Queue admission drops those identities before model access;
+it does not cache or replay their unpaired frame verdicts. Pending anchors for an older `master`
+generation and evidence tied to a closed or superseded pull request are likewise ineligible.
+
 The certificate is an authenticated handoff, not historical storage. Seven-day retention covers
 normal fan-out and bounded recovery. Source reports remain bounded and provider-authored raw output
 remains private. The system adds GitHub orchestration and model latency, but removes the more

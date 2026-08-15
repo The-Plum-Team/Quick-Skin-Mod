@@ -30,6 +30,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      pull-requests: read
     outputs:
       artifact_digest: ${{ steps.queue.outputs.artifact_digest }}
       artifact_id: ${{ steps.queue.outputs.artifact_id }}
@@ -1589,7 +1590,12 @@ jobs:
             "$report" > /dev/null
           source_branch="$(jq -er \
             '.source_branch | select(type == "string" and
-              test("^automation/sync/[A-Za-z0-9._/-]+$"))' "$proof")"
+              test("^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$"))' "$proof")"
+          if [[ ! "$source_branch" =~ ^automation/sync/[A-Za-z0-9._/-]+$ ]]; then
+            printf 'A clean advisory or scheduled anchor has no automatic release identity.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           source_run_id="$(jq -er \
             '.source_run_id | select(type == "number" and . > 0)' "$proof")"
           source_sha="$(jq -er \
