@@ -478,6 +478,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("needs.select.outputs.direct == 'true'", review)
         self.assertIn("needs.capacity-check.outputs.ready == 'true'", review)
         self.assertIn("needs.capacity-probe.outputs.ready == 'true'", review)
+        self.assertIn("protected_gh_api_retry()", review)
+        self.assertIn("GitHub API review guard attempt", review)
+        self.assertIn("gh api rate_limit --jq .resources.core.reset", review)
+        self.assertIn("protected_gh_api_retry --paginate --slurp", review)
         self.assertIn("mod-compatibility-requested", release_compatibility)
         self.assertIn("needs.review.outputs.compatibility_eligible == 'true'", release_compatibility)
         self.assertIn("automated-version-sync", release_compatibility)
@@ -813,6 +817,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('(.conclusion == "success" or .conclusion == "failure")', enumerate_review)
         self.assertIn('elif ($matches|length) == 0 then empty', enumerate_review)
         self.assertIn('error("duplicate review capsule', enumerate_review)
+        self.assertIn("timeout-minutes: 75", enumerate_review)
+        self.assertGreaterEqual(
+            enumerate_review.count("source scripts/ci/github_api_retry.sh"), 2
+        )
+        self.assertIn(
+            'GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', enumerate_review
+        )
+        self.assertNotIn("gh api", enumerate_review)
         self.assertIn("ref: ${{ github.sha }}", review)
         self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
         self.assertIn("strategy:\n      fail-fast: false", review)
@@ -826,6 +838,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--verify-model claude-opus-5", review)
         self.assertIn("mod-compatibility-wave-block", review)
         self.assertIn("/cancel", review)
+        self.assertGreaterEqual(
+            review.count("source scripts/ci/github_api_retry.sh"), 2
+        )
+        self.assertIn("github_api_retry_to_file", review)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', review)
+        self.assertNotIn("gh api", review)
         self.assertIn("REVIEW_RESULT", review_gate)
         self.assertNotIn("base-evidence", review)
         self.assertNotIn("candidate-evidence", review)
