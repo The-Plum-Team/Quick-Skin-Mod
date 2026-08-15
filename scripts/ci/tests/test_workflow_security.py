@@ -87,6 +87,20 @@ class WorkflowSecurityTest(unittest.TestCase):
                 secret_steps += 1
                 with self.subTest(workflow=workflow.name, step=block.splitlines()[0]):
                     self.assertIn('CLAUDE_CODE_SKIP_PROMPT_HISTORY: "1"', block)
+                    if "claude_capacity_probe.py" in block:
+                        probe = (
+                            ROOT / "scripts" / "ci" / "claude_capacity_probe.py"
+                        ).read_text(encoding="utf-8")
+                        self.assertIn("unset GH_TOKEN GITHUB_TOKEN", block)
+                        self.assertIn('"--safe-mode"', probe)
+                        self.assertIn('"--no-session-persistence"', probe)
+                        self.assertIn('"--permission-mode"', probe)
+                        self.assertIn('"dontAsk"', probe)
+                        self.assertIn('"--tools"', probe)
+                        self.assertIn('"--disallowedTools"', probe)
+                        self.assertNotIn('"Read"', probe)
+                        self.assertNotIn('"Bash"', probe)
+                        continue
                     if workflow.name in {
                         "visual-review-drain.yml",
                         "mod-compatibility-review.yml",
@@ -118,7 +132,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                     if ",Edit," in block:
                         self.assertIn('"Edit(./**)"', block)
                     self.assertIn('"Write(', block)
-        self.assertEqual(secret_steps, 4)
+        self.assertEqual(secret_steps, 5)
 
     def test_external_actions_are_pinned_to_full_commit_shas(self) -> None:
         definitions = [
@@ -144,12 +158,19 @@ class WorkflowSecurityTest(unittest.TestCase):
 
         self.assertIn("uses: ./.github/actions/run-packaged-e2e", on_demand)
         self.assertIn("bundle-name: e2e-input-bundle", on_demand)
+        self.assertIn("source-sha: ${{ github.sha }}", on_demand)
         self.assertIn("evidence-name: packaged-e2e-${{ matrix.id }}", on_demand)
         self.assertIn("uses: ./.github/actions/run-packaged-e2e", release)
         self.assertIn(
             "bundle-name: release-${{ needs.build.outputs.release_id }}", release
         )
+        self.assertIn("source-sha: ${{ github.sha }}", release)
         self.assertIn("evidence-name: release-behavior-${{ matrix.id }}", release)
+        self.assertIn("source-sha:\n", action)
+        self.assertIn("required: true", action)
+        self.assertIn("EXPECTED_SOURCE_SHA: ${{ inputs.source-sha }}", action)
+        self.assertIn('[[ "$(git rev-parse HEAD)" == "$EXPECTED_SOURCE_SHA" ]]', action)
+        self.assertIn('GITHUB_SHA="$EXPECTED_SOURCE_SHA"', action)
         self.assertIn("QUICKSKIN_E2E_RUNTIME_STORE", action)
         self.assertIn("e2e/ci_summary.py", action)
         self.assertIn("e2e-out/current/profiles/**/result.json", action)
@@ -219,7 +240,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "visual-review-drain.yml",
                 "Upload the exact semantic anchor certificate",
                 "${{ steps.certify.outputs.artifact_name }}",
-            ): "7",
+            ): "90",
             (
                 "visual-review-drain.yml",
                 "Upload the protected exact-policy verdict cache",
@@ -331,6 +352,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         drain_workflow = (WORKFLOWS / "visual-review-drain.yml").read_text(
             encoding="utf-8"
         )
+        queue = (ROOT / "scripts" / "ci" / "visual_review_queue.py").read_text(
+            encoding="utf-8"
+        )
         triage_prompt = (ROOT / "e2e" / "visual_review_prompt.md").read_text(
             encoding="utf-8"
         )
@@ -352,6 +376,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         select = job_block("visual-review-drain.yml", "select")
         dispatch_selected = job_block(
             "visual-review-drain.yml", "dispatch-selected"
+        )
+        capacity_check = job_block("visual-review-drain.yml", "capacity-check")
+        capacity_probe = job_block("visual-review-drain.yml", "capacity-probe")
+        capacity_resume = job_block(
+            "visual-review-drain.yml", "resume-capacity-queue"
         )
         review = job_block("visual-review-drain.yml", "review")
         cleanup = job_block("visual-review-drain.yml", "cleanup")
@@ -383,6 +412,9 @@ class WorkflowSecurityTest(unittest.TestCase):
             {
                 "select",
                 "dispatch-selected",
+                "capacity-check",
+                "capacity-probe",
+                "resume-capacity-queue",
                 "review",
                 "cleanup",
                 "release-mod-compatibility",
@@ -399,6 +431,30 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("'queue-sweep'", drain_header)
         self.assertIn("cancel-in-progress: false", drain_header)
         self.assertNotIn("concurrency:", review)
+        self.assertNotIn("concurrency:", capacity_check)
+        self.assertIn("scripts/ci/claude_capacity_gate.py", capacity_check)
+        self.assertIn("needs.select.outputs.direct == 'true'", capacity_check)
+        self.assertIn("durable capsule will be retried", capacity_check)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_check)
+        self.assertIn("quick-skin-claude-capacity-probe", capacity_probe)
+        self.assertIn("cancel-in-progress: false", capacity_probe)
+        self.assertIn("scripts/ci/claude_capacity_gate.py", capacity_probe)
+        self.assertIn("scripts/ci/claude_capacity_probe.py", capacity_probe)
+        self.assertIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_probe)
+        capacity_probe_script = (
+            ROOT / "scripts" / "ci" / "claude_capacity_probe.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"--tools"', capacity_probe_script)
+        self.assertIn('"--disallowedTools"', capacity_probe_script)
+        self.assertIn("claude-capacity-marker.json", capacity_probe)
+        self.assertIn("the durable capsule remains queued", capacity_probe)
+        self.assertIn("scripts/ci/visual_review_queue.py", capacity_resume)
+        self.assertIn("--list-pending-json", capacity_resume)
+        self.assertIn('length <= 256', capacity_resume)
+        self.assertIn("CURRENT_ARTIFACT_ID", capacity_resume)
+        self.assertIn("visual-review-drain-requested", capacity_resume)
+        self.assertIn("contents: write", capacity_resume)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_resume)
         self.assertIn("scripts/ci/visual_review_queue.py", select)
         self.assertIn("--requested-artifact-id", select)
         self.assertIn("artifact_id=$REQUESTED_ARTIFACT_ID", select)
@@ -413,9 +469,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", dispatch_selected)
         self.assertNotIn("actions/checkout@", dispatch_selected)
         self.assertIn("needs.select.outputs.direct == 'true'", review)
+        self.assertIn("needs.capacity-check.outputs.ready == 'true'", review)
+        self.assertIn("needs.capacity-probe.outputs.ready == 'true'", review)
         self.assertIn("mod-compatibility-requested", release_compatibility)
         self.assertIn("needs.review.outputs.compatibility_eligible == 'true'", release_compatibility)
         self.assertIn("automated-version-sync", release_compatibility)
+        self.assertIn("has no automatic release identity", review)
         self.assertIn("contents: write", release_compatibility)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_compatibility)
 
@@ -532,6 +591,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("steps.wave-block-artifact.outputs.artifact-id", review)
         self.assertIn("visual-review-failure.json", review)
         self.assertIn("visual-review-attempt-${{ needs.select.outputs.source_run_id }}", review)
+        self.assertIn("claude-capacity-pause", review)
         self.assertIn("cooling=true", review)
         self.assertNotIn("visual-review-report.raw.json", drain_workflow)
         self.assertNotIn("e2e-out", review)
@@ -540,6 +600,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-report.json", review)
         self.assertIn("scripts/ci/visual_anchor_certification.py", review)
         self.assertIn("visual-anchor-certification-$master_source_sha", review)
+        self.assertIn("visual-anchor-certification-{generation}", queue)
+        self.assertIn("generation in certified", queue)
+        self.assertIn('api.get_branch_sha("master")', queue)
+        self.assertIn('pull.get("state") == "open"', queue)
         self.assertIn('commits/$anchor_source_sha/pulls', review)
         self.assertIn('.user.login == "github-actions[bot]"', review)
         self.assertIn('[[ "${source_commit[2]}" == "$master_source_sha" ]]', review)
@@ -618,7 +682,6 @@ class WorkflowSecurityTest(unittest.TestCase):
         base_review_curate = job_block("visual-review.yml", "curate")
         prepare = job_block("mod-compatibility-e2e.yml", "prepare")
         runtime = job_block("mod-compatibility-e2e.yml", "compatibility-e2e")
-        curate = job_block("mod-compatibility-e2e.yml", "curate")
         execution_gate = job_block("mod-compatibility-e2e.yml", "gate")
         enumerate_review = job_block("mod-compatibility-review.yml", "enumerate")
         review = job_block("mod-compatibility-review.yml", "review")
@@ -664,20 +727,28 @@ class WorkflowSecurityTest(unittest.TestCase):
             1,
         )
         self.assertIn("e2e/mod_compatibility.py --plan", prepare)
+        self.assertIn('[[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]', prepare)
+        self.assertIn('GITHUB_SHA="$SOURCE_SHA"', prepare)
         self.assertIn("not_applicable", prepare)
         self.assertIn(".release_branch == $target_branch", prepare)
         self.assertIn("all(.runnable[];", prepare)
         self.assertIn("strategy:\n      fail-fast: false", runtime)
         self.assertNotIn("max-parallel", runtime)
         self.assertIn("compatibility-mod: ${{ matrix.compatibility_mod }}", runtime)
-        self.assertIn("needs.compatibility-e2e.result == 'success'", curate)
-        self.assertIn("same-version baseline", curate)
-        self.assertIn("CURATE_RESULT", execution_gate)
+        self.assertIn("source-sha: ${{ needs.admit.outputs.source_sha }}", runtime)
+        self.assertIn("same-version baseline", runtime)
+        self.assertIn("--candidate-root e2e-out/current", runtime)
+        self.assertIn("mod-compatibility-review-input-${{ github.run_id }}", runtime)
+        self.assertNotRegex(execution_workflow, r"(?m)^  curate:$")
+        self.assertNotIn("CURATE_RESULT", execution_gate)
 
         self.assertIn("workflow_run:", review_workflow)
         self.assertIn(
-            "github.event.workflow_run.conclusion == 'success'", enumerate_review
+            "github.event.workflow_run.conclusion == 'failure'", enumerate_review
         )
+        self.assertIn('(.conclusion == "success" or .conclusion == "failure")', enumerate_review)
+        self.assertIn('elif ($matches|length) == 0 then empty', enumerate_review)
+        self.assertIn('error("duplicate review capsule', enumerate_review)
         self.assertIn("ref: ${{ github.sha }}", review)
         self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
         self.assertIn("strategy:\n      fail-fast: false", review)
@@ -714,6 +785,24 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertNotIn("player-armor-stands", execution_workflow.lower())
         self.assertNotIn("player-armor-stands", review_workflow.lower())
+        self.assertEqual(2, contract["schema_version"])
+        self.assertEqual(
+            [
+                {
+                    "runtime_version": "1.21.9",
+                    "loader": "neoforge",
+                    "reason": (
+                        "3D Skin Layers upstream does not support Minecraft 1.21.9 "
+                        "on NeoForge - use 1.21.10"
+                    ),
+                }
+            ],
+            next(
+                item["excluded_lanes"]
+                for item in contract["mods"]
+                if item["id"] == "skin-layers-3d"
+            ),
+        )
 
     def test_pages_fan_in_uses_protected_code_and_exact_release_heads(self) -> None:
         workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
@@ -1576,6 +1665,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         sync = job_block("sync-version-branches.yml", "propose")
         repair = job_block("handle-version-port-result.yml", "propose-repair")
         visual = job_block("visual-review-drain.yml", "review")
+        capacity = job_block("visual-review-drain.yml", "capacity-probe")
         self.assertIn("TRUSTED_SHA: ${{ github.sha }}", sync)
         self.assertIn("branches/master", repair)
         self.assertIn("ref: ${{ needs.select.outputs.implementation_sha }}", visual)
@@ -1584,6 +1674,12 @@ class WorkflowSecurityTest(unittest.TestCase):
             "node node_modules/@anthropic-ai/claude-code/install.cjs", visual
         )
         self.assertIn("node_modules/.bin/claude --version", visual)
+        self.assertIn("ref: ${{ github.sha }}", capacity)
+        self.assertIn("npm ci --ignore-scripts", capacity)
+        self.assertIn(
+            "node node_modules/@anthropic-ai/claude-code/install.cjs", capacity
+        )
+        self.assertIn("node_modules/.bin/claude --version", capacity)
 
     def test_marketplace_jobs_receive_only_the_selected_secret(self) -> None:
         workflow = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")

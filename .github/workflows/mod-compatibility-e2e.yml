@@ -266,7 +266,9 @@ jobs:
           TARGET_SHA: ${{ needs.admit.outputs.target_sha }}
         run: |
           set -euo pipefail
-          python3 scripts/release/verify_release.py --verify-staged
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          GITHUB_SHA="$SOURCE_SHA" \
+            python3 scripts/release/verify_release.py --verify-staged
           python3 e2e/mod_compatibility.py --plan > "$RUNNER_TEMP/compatibility-plan.raw.json"
           jq \
             --arg source_branch "$SOURCE_BRANCH" \
@@ -371,40 +373,11 @@ jobs:
         with:
           bundle-name: ${{ needs.prepare.outputs.bundle_name }}
           row-json: ${{ toJSON(matrix) }}
+          source-sha: ${{ needs.admit.outputs.source_sha }}
           scenarios: ${{ matrix.scenarios }}
           compatibility-mod: ${{ matrix.compatibility_mod }}
           evidence-name: mod-compatibility-e2e-${{ matrix.id }}
           evidence-retention-days: "7"
-
-  curate:
-    name: Curate ${{ matrix.artifact_node }} / ${{ matrix.compatibility_name }}
-    needs:
-      - admit
-      - prepare
-      - compatibility-e2e
-    if: >-
-      needs.prepare.outputs.count != '0' &&
-      needs.compatibility-e2e.result == 'success'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    permissions:
-      actions: read
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
-
-    steps:
-      - name: Check out exact tested curation code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.admit.outputs.source_sha }}
-          persist-credentials: false
-
-      - name: Install Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.13"
 
       - name: Install the hash-locked evidence decoder
         run: >-
@@ -412,12 +385,6 @@ jobs:
           --only-binary=:all:
           --require-hashes
           --requirement scripts/pages/requirements.txt
-
-      - name: Download the exact compatibility candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: mod-compatibility-e2e-${{ matrix.id }}
-          path: candidate-evidence
 
       - name: Download the clean same-version baseline
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -474,7 +441,7 @@ jobs:
           capsule="$RUNNER_TEMP/mod-compatibility-capsule"
           mkdir -p "$capsule"
           python3 e2e/mod_compatibility_visual.py \
-            --candidate-root candidate-evidence \
+            --candidate-root e2e-out/current \
             --base-root base-evidence \
             --scenario-contract e2e/scenario-contract.json \
             --compatibility-contract e2e/mod-compatibility-contract.json \
@@ -505,7 +472,6 @@ jobs:
       - admit
       - prepare
       - compatibility-e2e
-      - curate
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -516,7 +482,6 @@ jobs:
         env:
           ADMIT_RESULT: ${{ needs.admit.result }}
           COUNT: ${{ needs.prepare.outputs.count }}
-          CURATE_RESULT: ${{ needs.curate.result }}
           E2E_RESULT: ${{ needs.compatibility-e2e.result }}
           PREPARE_RESULT: ${{ needs.prepare.result }}
         run: |
@@ -526,12 +491,10 @@ jobs:
           [[ "$COUNT" =~ ^[0-9]+$ ]]
           if [[ "$COUNT" == 0 ]]; then
             [[ "$E2E_RESULT" == skipped ]]
-            [[ "$CURATE_RESULT" == skipped ]]
             printf 'Every compatibility tuple is explicitly N/A for this release.\n' \
               >> "$GITHUB_STEP_SUMMARY"
           else
             [[ "$E2E_RESULT" == success ]]
-            [[ "$CURATE_RESULT" == success ]]
             printf 'All %s applicable compatibility lanes passed and were curated.\n' \
               "$COUNT" >> "$GITHUB_STEP_SUMMARY"
           fi

@@ -143,7 +143,9 @@ installing a content-addressed name is refused instead of silently producing a m
 ignores. Installer hashes and runtime/version facts remain matrix-owned; the staged
 production and harness JAR hashes remain manifest-owned. GitHub-hosted jobs do not upload
 `RuntimeStore`; persistence is useful only on a developer machine or an explicitly managed
-self-hosted runner.
+self-hosted runner. NeoForge server installation retries bounded transient Maven failures in a fresh isolated
+directory each time and publishes only a complete tree with its launcher script, so an incomplete
+download can never contaminate the next attempt.
 
 ## Fail-closed contract
 
@@ -262,6 +264,17 @@ recovery sweeps share a separate lock and only redispatch one authenticated exac
 queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without losing
 reviews.
 
+Before any exact drains fan out, they cross one repository-wide capacity section. A fresh
+authenticated success marker lets unrelated capsules continue concurrently for ten minutes. If no
+marker exists, competing probe jobs coalesce behind one tool-free, low-effort Sonnet call that
+checks whether the subscription can accept work. A fresh success redispatches every authenticated
+pending capsule by exact artifact ID, preserving parallel review even when earlier probe contenders
+were coalesced. A rejected or warning rate-limit event opens a sanitized thirty-minute circuit and
+leaves every capsule in the durable queue. When the headless event includes utilization, 95% also
+pauses the fan-out. Scheduled recovery probes again after the pause. Claude does not reliably expose
+the Pro/Max percentage remaining in headless output, so this is primarily an availability circuit
+rather than an invented quota estimate; neither provider text nor account-usage details are uploaded.
+
 The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
 over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
 candidate/reference pair clean without a model call. It may also reuse a protected verdict only
@@ -289,7 +302,7 @@ Exact-policy verdict cache shards remain for seven days;
 parallel drains may briefly publish siblings, and a later protected successor combines and retires
 every authenticated shard it consumed without dropping concurrent verdicts.
 
-A completely clean synchronized 1.20.1 report creates a seven-day certificate only after the
+A completely clean synchronized 1.20.1 report creates a 90-day certificate only after the
 bot-owned anchor PR is merged and that exact-tree merge is still the current anchor head. The
 certificate binds the `master` source SHA, tested and merged anchor SHAs, source run, protected
 review implementation, scenario contract, curation proof, manifest, and normalized report. The
@@ -299,6 +312,10 @@ and current anchor head before discovering every non-anchor branch. A stale cert
 no-op. There is no direct automatic fan-out for a documentation/site/administration-only tip,
 because that tip may include an older uncertified runtime change. Manual exact-target dispatch
 remains available for recovery.
+The queue authenticates the same certificate before model admission, so a later scheduled or
+automatic capsule for that exact generation is discarded without another Claude call. This does
+not cache unpaired frame verdicts. Superseded automatic generations and closed pull-request
+evidence are discarded for the same reason.
 
 ## Post-validation optional-mod compatibility
 
@@ -307,7 +324,9 @@ complete packaged suite, and independent semantic AI review. The execution unit 
 artifact plus one optional mod. Every applicable unit runs concurrently, first executes the
 `mod-compatibility` activation scenario, and then executes the complete ordinary release scenario
 set. Unsupported combinations are retained as explicit `not_applicable` plan rows rather than
-silently disappearing.
+silently disappearing. The contract may also record a reviewed loader/version exclusion with an
+explicit reason when upstream metadata advertises a lane that upstream itself does not support;
+the lock updater preserves those authored exclusions.
 
 [`mod-compatibility-contract.json`](mod-compatibility-contract.json) locks Customizable Player
 Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, and ReplayMod. Player Armor Stands
@@ -341,12 +360,16 @@ python3 e2e/update_mod_compatibility_lock.py
 python3 e2e/mod_compatibility.py --validate
 ```
 
-After every deterministic lane passes, a secretless job authenticates the full modded result and
-the clean same-version/loader result, pairs every contracted capture, and re-encodes only bounded,
-metadata-free PNGs. The credential-bearing review workflow receives that curated capsule, never
-the raw packaged artifacts. Sonnet reviews every pair semantically—even byte-identical pairs—and
-Opus confirms every concern or confidence below high. A first Opus-confirmed defect creates a
-durable source-wave block and cancels the remaining compatibility review jobs.
+Each deterministic lane that passes immediately authenticates its full modded result and the clean
+same-version/loader result, pairs every contracted capture, and re-encodes only bounded,
+metadata-free PNGs. A failing sibling keeps the runtime wave red but cannot erase or suppress these
+successful capsules. Compatibility launches omit Mixin's global debug injection-count flag because
+it changes optional third-party mixin behavior; the clean packaged suite retains that stricter
+Quick Skin injector check. The credential-bearing review workflow receives only the successful
+curated capsules, never raw packaged artifacts, and reviews them concurrently. Sonnet reviews every
+pair semantically—even byte-identical pairs—and Opus confirms every concern or confidence below
+high. A first Opus-confirmed defect creates a durable source-wave block and cancels the remaining
+compatibility review jobs.
 
 ## Public visual evidence
 

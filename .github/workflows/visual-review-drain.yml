@@ -30,6 +30,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      pull-requests: read
     outputs:
       artifact_digest: ${{ steps.queue.outputs.artifact_digest }}
       artifact_id: ${{ steps.queue.outputs.artifact_id }}
@@ -159,12 +160,263 @@ jobs:
                 generation_sha:$generation_sha}}' \
             | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
 
-  review:
-    name: Review one queued capsule
+  capacity-check:
+    name: Read shared Claude capacity
     needs: select
     if: >-
       needs.select.outputs.eligible == 'true' &&
       needs.select.outputs.direct == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      probe_required: ${{ steps.circuit.outputs.probe_required }}
+      ready: ${{ steps.circuit.outputs.ready }}
+
+    steps:
+      - name: Check out the protected capacity policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Reuse only a fresh authenticated capacity marker
+        id: circuit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/claude_capacity_gate.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --implementation-sha "$GITHUB_SHA" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Report an active subscription pause
+        if: >-
+          steps.circuit.outputs.probe_required == 'false' &&
+          steps.circuit.outputs.ready == 'false'
+        run: |
+          printf 'Claude capacity remains paused; the durable capsule will be retried by the scheduled sweep.\n' \
+            >> "$GITHUB_STEP_SUMMARY"
+
+  capacity-probe:
+    name: Probe shared Claude capacity once
+    needs:
+      - select
+      - capacity-check
+    if: >-
+      needs.select.outputs.eligible == 'true' &&
+      needs.select.outputs.direct == 'true' &&
+      needs.capacity-check.outputs.probe_required == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+    concurrency:
+      group: quick-skin-claude-capacity-probe
+      cancel-in-progress: false
+    outputs:
+      fresh_ready: ${{ steps.resolve.outputs.fresh_ready }}
+      ready: ${{ steps.resolve.outputs.ready }}
+
+    steps:
+      - name: Check out the protected capacity probe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Recheck capacity after acquiring the global probe slot
+        id: circuit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/claude_capacity_gate.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --implementation-sha "$GITHUB_SHA" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Install Node for the locked capacity probe
+        if: steps.circuit.outputs.probe_required == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Install locked Claude Code outside the repository
+        if: steps.circuit.outputs.probe_required == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/claude-capacity-cli"
+          cp .github/claude/package.json .github/claude/package-lock.json \
+            "$RUNNER_TEMP/claude-capacity-cli/"
+          (
+            cd "$RUNNER_TEMP/claude-capacity-cli"
+            npm ci --ignore-scripts
+            node node_modules/@anthropic-ai/claude-code/install.cjs
+            node_modules/.bin/claude --version
+          )
+
+      - name: Probe once without tools before parallel review fan-out
+        id: probe
+        if: steps.circuit.outputs.probe_required == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_CODE_SKIP_PROMPT_HISTORY: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLAUDE_CODE_OAUTH_TOKEN"
+          unset GH_TOKEN GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN \
+            ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL \
+            ACTIONS_CACHE_URL ACTIONS_RESULTS_URL
+          python3 scripts/ci/claude_capacity_probe.py \
+            --claude \
+              "$RUNNER_TEMP/claude-capacity-cli/node_modules/.bin/claude" \
+            --model claude-sonnet-5 \
+            --work-root "$RUNNER_TEMP/claude-capacity-probe" \
+            --marker "$RUNNER_TEMP/claude-capacity-marker.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Publish only the sanitized shared capacity marker
+        if: steps.circuit.outputs.probe_required == 'true' && steps.probe.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.probe.outputs.marker_name }}
+          path: ${{ runner.temp }}/claude-capacity-marker.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Resolve whether model sessions may start
+        id: resolve
+        if: always() && steps.circuit.outcome == 'success' && steps.probe.outcome != 'failure'
+        shell: bash
+        env:
+          CACHED_READY: ${{ steps.circuit.outputs.ready }}
+          PROBE_READY: ${{ steps.probe.outputs.ready }}
+          PROBE_REQUIRED: ${{ steps.circuit.outputs.probe_required }}
+        run: |
+          set -euo pipefail
+          [[ "$CACHED_READY" == true || "$CACHED_READY" == false ]]
+          [[ "$PROBE_REQUIRED" == true || "$PROBE_REQUIRED" == false ]]
+          if [[ "$PROBE_REQUIRED" == true ]]; then
+            [[ "$PROBE_READY" == true || "$PROBE_READY" == false ]]
+            ready="$PROBE_READY"
+            fresh_ready="$PROBE_READY"
+          else
+            ready="$CACHED_READY"
+            fresh_ready=false
+          fi
+          printf 'ready=%s\n' "$ready" >> "$GITHUB_OUTPUT"
+          printf 'fresh_ready=%s\n' "$fresh_ready" >> "$GITHUB_OUTPUT"
+          if [[ "$ready" != true ]]; then
+            printf 'Claude capacity is paused; the durable capsule remains queued.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  resume-capacity-queue:
+    name: Wake every capsule after capacity returns
+    needs:
+      - select
+      - capacity-probe
+    if: >-
+      always() && needs.capacity-probe.result == 'success' &&
+      needs.capacity-probe.outputs.fresh_ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Check out the protected queue fan-out policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Dispatch every authenticated pending capsule independently
+        shell: bash
+        env:
+          CURRENT_ARTIFACT_ID: ${{ needs.select.outputs.artifact_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$CURRENT_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          pending="$RUNNER_TEMP/visual-review-capacity-pending.json"
+          python3 scripts/ci/visual_review_queue.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --list-pending-json "$pending"
+          jq -e \
+            'type == "array" and length <= 256 and all(.[];
+              (keys | sort) == (["artifact_id", "artifact_name",
+                "generation_sha"] | sort) and
+              (.artifact_id | type == "number" and . > 0) and
+              (.artifact_name | type == "string" and
+                test("^visual-review-input-[1-9][0-9]*(-[0-9a-f]{40})?$")) and
+              (.generation_sha | type == "string" and
+                test("^[0-9a-f]{40}$")))' "$pending" > /dev/null
+          while IFS= read -r entry; do
+            artifact_id="$(jq -er '.artifact_id | tostring' <<< "$entry")"
+            if [[ "$artifact_id" == "$CURRENT_ARTIFACT_ID" ]]; then
+              continue
+            fi
+            artifact_name="$(jq -er .artifact_name <<< "$entry")"
+            generation_sha="$(jq -er .generation_sha <<< "$entry")"
+            payload="$RUNNER_TEMP/visual-review-capacity-$artifact_id.json"
+            jq -n \
+              --arg artifact_id "$artifact_id" \
+              --arg artifact_name "$artifact_name" \
+              --arg generation_sha "$generation_sha" \
+              '{event_type:"visual-review-drain-requested",client_payload:{
+                artifact_id:$artifact_id,artifact_name:$artifact_name,
+                generation_sha:$generation_sha}}' > "$payload"
+            dispatched=false
+            for attempt in 1 2 3; do
+              if gh api --method POST \
+                  "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload"; then
+                dispatched=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+            [[ "$dispatched" == true ]]
+          done < <(jq -c '.[]' "$pending")
+
+  review:
+    name: Review one queued capsule
+    needs:
+      - select
+      - capacity-check
+      - capacity-probe
+    if: >-
+      always() &&
+      needs.select.outputs.eligible == 'true' &&
+      needs.select.outputs.direct == 'true' &&
+      needs.capacity-check.result == 'success' &&
+      (needs.capacity-check.outputs.ready == 'true' ||
+       (needs.capacity-probe.result == 'success' &&
+        needs.capacity-probe.outputs.ready == 'true'))
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -1285,7 +1537,7 @@ jobs:
           name: ${{ steps.certify.outputs.artifact_name }}
           path: ${{ runner.temp }}/visual-review-capsule/visual-anchor-certification.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
 
       - name: Classify a failed attempt without provider text
         id: classify
@@ -1338,7 +1590,12 @@ jobs:
             "$report" > /dev/null
           source_branch="$(jq -er \
             '.source_branch | select(type == "string" and
-              test("^automation/sync/[A-Za-z0-9._/-]+$"))' "$proof")"
+              test("^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$"))' "$proof")"
+          if [[ ! "$source_branch" =~ ^automation/sync/[A-Za-z0-9._/-]+$ ]]; then
+            printf 'A clean advisory or scheduled anchor has no automatic release identity.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           source_run_id="$(jq -er \
             '.source_run_id | select(type == "number" and . > 0)' "$proof")"
           source_sha="$(jq -er \
@@ -1373,6 +1630,17 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: visual-review-attempt-${{ needs.select.outputs.source_run_id }}
+          path: ${{ runner.temp }}/visual-review-capsule/visual-review-failure.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Open the shared Claude circuit after a quota rejection
+        if: >-
+          always() && steps.classify.outputs.failure_category ==
+          'quota_or_rate_limit'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: claude-capacity-pause
           path: ${{ runner.temp }}/visual-review-capsule/visual-review-failure.json
           if-no-files-found: error
           retention-days: 1

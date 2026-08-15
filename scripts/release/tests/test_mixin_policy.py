@@ -150,6 +150,17 @@ INJECTION_COUNT_OVERRIDES = {
     ): {2},
 }
 
+ALLOW_COUNT_OVERRIDES = {
+    (
+        "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
+        "quickskin$getEarsFeatures",
+    ): {2},
+    (
+        "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
+        "quickskin$getEarsFeatures",
+    ): {2},
+}
+
 
 def assignment_values(context: str, name: str) -> set[int]:
     context = JAVA_COMMENT.sub("", context)
@@ -211,9 +222,12 @@ class MixinPolicyTest(unittest.TestCase):
 
                 with self.subTest(source=source_name, handler=handler_name):
                     self.assertEqual(assignment_values(context, "require"), {expected_require})
-                    self.assertEqual(assignment_values(context, "allow"), expected_counts)
+                    self.assertEqual(
+                        assignment_values(context, "allow"),
+                        ALLOW_COUNT_OVERRIDES.get((source_name, handler_name), expected_counts),
+                    )
                     if (source_name, handler_name) in ALTERNATIVE_HOOKS:
-                        self.assertEqual(assignment_values(context, "expect"), set())
+                        self.assertEqual(assignment_values(context, "expect"), {0})
                     else:
                         self.assertEqual(assignment_values(context, "expect"), expected_counts)
 
