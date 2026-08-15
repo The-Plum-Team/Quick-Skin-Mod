@@ -345,9 +345,9 @@ public final class VanillaShim {
 
     /**
      * Repairs the one invalid NIO state observed in ReplayMod's 1.20.1 startup path: auto-read is
-     * enabled on an active channel, but its selection key has no OP_READ interest. Calling read()
-     * on the channel's own event loop restores the missing interest without reconnecting, replacing
-     * handlers, or manufacturing any protocol traffic.
+     * enabled on an active channel, but its selection key has no OP_READ interest and its event
+     * loop is asleep in select(). Restore that interest and wake the selector without reconnecting,
+     * replacing handlers, or manufacturing any protocol traffic.
      */
     public static boolean repairMissingConnectionRead(Screen sc) {
         if (!isConnectScreen(sc)) return false;
@@ -361,21 +361,10 @@ public final class VanillaShim {
                     || (key.interestOps() & SelectionKey.OP_READ) != 0) {
                 return false;
             }
-            channel.eventLoop().execute(() -> {
-                if (!channel.isActive() || !channel.config().isAutoRead()) return;
-                try {
-                    SelectionKey currentKey = nioSelectionKey(channel);
-                    if (currentKey == null || !currentKey.isValid()
-                            || (currentKey.interestOps() & SelectionKey.OP_READ) != 0) {
-                        return;
-                    }
-                    E2ELog.info("connection read repair before -> " + nioReadDiagnostic(channel));
-                    channel.read();
-                    E2ELog.info("connection read repair after -> " + nioReadDiagnostic(channel));
-                } catch (Throwable t) {
-                    E2ELog.warn("connection read repair failed on event loop: " + t);
-                }
-            });
+            E2ELog.info("connection read repair before -> " + nioReadDiagnostic(channel));
+            key.interestOps(key.interestOps() | SelectionKey.OP_READ);
+            key.selector().wakeup();
+            E2ELog.info("connection read repair after -> " + nioReadDiagnostic(channel));
             return true;
         } catch (Throwable t) {
             E2ELog.warn("connection read repair inspection failed: " + t);

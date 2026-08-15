@@ -152,7 +152,7 @@ public final class E2EHarness {
                     && Boolean.getBoolean("quickskin.e2e.repairMissingConnectionRead")
                     && VanillaShim.repairMissingConnectionRead(sc)) {
                 missingConnectionReadRepaired = true;
-                E2ELog.info("connection -> scheduled one missing OP_READ repair");
+                E2ELog.info("connection -> repaired one missing OP_READ interest");
             }
             if (tick - lastConnectionDiagnosticTick >= 20 * 10) {
                 E2ELog.info("connection -> " + VanillaShim.connectionDiagnostic(sc));
