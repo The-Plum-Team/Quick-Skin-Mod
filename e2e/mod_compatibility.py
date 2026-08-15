@@ -383,6 +383,11 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
                 )
         for game_version in artifact.game_versions:
             key = (game_version, artifact.loader)
+            if key in excluded_keys:
+                raise CompatibilityContractError(
+                    f"{label} locks an artifact for excluded lane "
+                    f"{game_version}/{artifact.loader}"
+                )
             if key in lane_owners:
                 raise CompatibilityContractError(
                     f"{label} locks multiple artifacts for {game_version}/{artifact.loader}"
