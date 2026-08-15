@@ -47,7 +47,7 @@ Propagate every automatic `master` generation in two waves.
    tested source. Bind the certificate to the exact `master` source SHA, tested source and merged
    target SHAs, source branch and run, protected reviewer implementation, scenario-contract hash,
    proof hash, manifest hash, report hash, frame count, capture count, version, and loaders.
-6. Upload that small certificate for seven days and dispatch only its immutable artifact identity.
+6. Upload that small certificate for 90 days and dispatch only its immutable artifact identity.
    The consuming synchronizer reauthenticates the artifact id, name, size, digest, successful
    protected drain owner, source E2E run, strict certificate schema, contract hash, Git parents,
    equal tested/merged trees, exact current `master`, and exact current anchor head. It then discovers
@@ -99,8 +99,14 @@ version wave is created; the anchor problem remains visible for a corrective `ma
 begins a fresh generation. A newer `master` push also invalidates an older pending certificate
 naturally.
 
-The certificate is an authenticated handoff, not historical storage. Seven-day retention covers
-normal fan-out and bounded recovery. Source reports remain bounded and provider-authored raw output
+An authenticated certificate for the exact current generation also makes later automatic or
+scheduled anchor capsules redundant. Queue admission drops those identities before model access;
+it does not cache or replay their unpaired frame verdicts. Pending anchors for an older `master`
+generation and evidence tied to a closed or superseded pull request are likewise ineligible.
+
+The certificate is an authenticated current-generation marker, not historical storage. Its 90-day
+retention covers normal fan-out, bounded recovery, and unchanged daily runtime checks without
+repeating semantic model work. Source reports remain bounded and provider-authored raw output
 remains private. The system adds GitHub orchestration and model latency, but removes the more
 expensive failure mode in which all supported versions validate against a semantically broken
 reference.
