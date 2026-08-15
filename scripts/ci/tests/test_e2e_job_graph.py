@@ -407,8 +407,10 @@ class E2EJobGraphTest(unittest.TestCase):
             git("config", "user.email", "e2e@example.invalid")
             workflow = repository / ".github/workflows/e2e.yml"
             policy = repository / "scripts/ci/policy.py"
+            e2e_contract = repository / "e2e/contract.json"
+            release_test = repository / "scripts/release/tests/test_policy.py"
             product = repository / "common/src/main/java/QuickSkin.java"
-            for path in (workflow, policy, product):
+            for path in (workflow, policy, e2e_contract, release_test, product):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("one\n", encoding="utf-8")
             git("add", ".")
@@ -417,11 +419,18 @@ class E2EJobGraphTest(unittest.TestCase):
 
             workflow.write_text("two\n", encoding="utf-8")
             policy.write_text("two\n", encoding="utf-8")
+            e2e_contract.write_text("two\n", encoding="utf-8")
+            release_test.write_text("two\n", encoding="utf-8")
             git("add", ".")
             git("commit", "--quiet", "-m", "ci only")
             ci_sha = git("rev-parse", "HEAD")
             self.assertEqual(
-                (".github/workflows/e2e.yml", "scripts/ci/policy.py"),
+                (
+                    ".github/workflows/e2e.yml",
+                    "e2e/contract.json",
+                    "scripts/ci/policy.py",
+                    "scripts/release/tests/test_policy.py",
+                ),
                 graph.validate_advisory_controller_skew(
                     repository,
                     protected_sha=protected_sha,
