@@ -686,6 +686,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         enumerate_review = job_block("mod-compatibility-review.yml", "enumerate")
         review = job_block("mod-compatibility-review.yml", "review")
         review_gate = job_block("mod-compatibility-review.yml", "gate")
+        plan_step_start = prepare.index(
+            "- name: Reverify the source-bound bundle and resolve every applicable lane"
+        )
+        plan_step_end = prepare.find("\n      - name:", plan_step_start + 1)
+        plan_step = prepare[
+            plan_step_start : plan_step_end if plan_step_end >= 0 else len(prepare)
+        ]
 
         self.assertIn("types:\n      - mod-compatibility-requested", execution_workflow)
         self.assertIn("permissions: {}", execution_workflow)
@@ -733,6 +740,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn(".base_matrix_kind == $base_matrix_kind", prepare)
         self.assertIn('.base_matrix_kind == "pr-anchors"', enumerate_review)
         self.assertIn("source_artifacts=", prepare)
+        self.assertIn("GH_TOKEN: ${{ github.token }}", plan_step)
+        self.assertLess(plan_step.index("GH_TOKEN:"), plan_step.index("gh api"))
         self.assertIn("[.runnable[].base_evidence_name] | unique", prepare)
         self.assertIn(".source_branch == .target_branch", enumerate_review)
         self.assertIn('[[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]', prepare)
