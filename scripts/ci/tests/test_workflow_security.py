@@ -515,6 +515,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("actions/artifacts/$artifact_id", curate)
         self.assertIn("scripts/ci/bounded_zip.py", curate)
         self.assertIn("scripts/ci/e2e_job_graph.py", curate)
+        self.assertIn('if [[ "$job_graph_status" -eq 78 ]]', curate)
+        self.assertIn(
+            '"$(jq -r .event <<< "$source_run")" == pull_request', curate
+        )
+        self.assertIn("--allow-advisory-controller-skew", curate)
+        self.assertIn("protected post-merge generation", curate)
+        self.assertIn(
+            "steps.evidence.outputs.review_skipped == 'false'", prepare_workflow
+        )
+        self.assertNotIn("continue-on-error", curate)
         self.assertNotIn("path: source", curate)
         self.assertNotIn("git -C source", curate)
         self.assertIn('git show "$SOURCE_SHA:e2e/scenario-contract.json"', curate)
