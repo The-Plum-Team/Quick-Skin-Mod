@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -854,6 +855,70 @@ class WorkflowSecurityTest(unittest.TestCase):
                 if item["id"] == "skin-layers-3d"
             ),
         )
+
+    def test_mod_compatibility_artifact_inventory_filter_executes(self) -> None:
+        prepare = job_block("mod-compatibility-e2e.yml", "prepare")
+        inventory_block = prepare[prepare.index("source_artifacts=") :]
+        match = re.search(
+            r'--argjson source_run_id "\$SOURCE_RUN_ID" \\\n\s+\'(?P<program>.*?)\' \\\n\s+"\$RUNNER_TEMP/mod-compatibility-plan\.json"',
+            inventory_block,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        program = match.group("program")
+        self.assertNotIn("all($names[] as $name;", program)
+
+        plan = {
+            "runnable": [
+                {"base_evidence_name": "packaged-e2e-fabric--pr-behavior"},
+                {"base_evidence_name": "packaged-e2e-fabric--pr-behavior"},
+            ]
+        }
+        artifact = {
+            "name": "packaged-e2e-fabric--pr-behavior",
+            "expired": False,
+            "workflow_run": {"id": 123},
+            "digest": "sha256:" + "a" * 64,
+            "size_in_bytes": 1024,
+        }
+
+        accepted = subprocess.run(
+            [
+                "jq",
+                "-e",
+                "--argjson",
+                "artifacts",
+                json.dumps({"artifacts": [artifact]}),
+                "--argjson",
+                "source_run_id",
+                "123",
+                program,
+            ],
+            input=json.dumps(plan),
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+        duplicate = subprocess.run(
+            [
+                "jq",
+                "-e",
+                "--argjson",
+                "artifacts",
+                json.dumps({"artifacts": [artifact, artifact]}),
+                "--argjson",
+                "source_run_id",
+                "123",
+                program,
+            ],
+            input=json.dumps(plan),
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertEqual(duplicate.returncode, 1, duplicate.stderr)
 
     def test_pages_fan_in_uses_protected_code_and_exact_release_heads(self) -> None:
         workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
