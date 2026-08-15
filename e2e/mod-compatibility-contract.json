@@ -23,7 +23,13 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
-      "excluded_lanes": [],
+      "excluded_lanes": [
+        {
+          "runtime_version": "1.21.2",
+          "loader": "neoforge",
+          "reason": "Upstream CPM 1.21.2 NeoForge metadata points to a Minecraft 1.21.3 NeoForge 21.3 binary that cannot link against NeoForge 21.2 RenderPlayerEvent.getRenderer"
+        }
+      ],
       "supported_game_versions": null,
       "artifacts": [
         {
@@ -168,7 +174,6 @@
           "published_at": "2026-07-05T15:05:10.388313Z",
           "loader": "neoforge",
           "game_versions": [
-            "1.21.2",
             "1.21.3"
           ],
           "files": [
@@ -1408,25 +1413,6 @@
               "size": 869804,
               "sha256": "5c21e7f2b738742754bde3ef2412ad131e2122dd3c08636f161cf845fbe79238",
               "sha512": "1ee97cf138f9f345ad0c4ae2e336a11203025f6c8cabfa3e573e38a94ea3c3d4880da895cceac77bf52f0846b171644a33008497b8b9e78adf517fd7d2952869"
-            }
-          ]
-        },
-        {
-          "version_id": "1M0oA70A",
-          "version_number": "1.9.2",
-          "version_type": "release",
-          "published_at": "2025-10-10T15:51:13.080656Z",
-          "loader": "neoforge",
-          "game_versions": [
-            "1.21.9"
-          ],
-          "files": [
-            {
-              "filename": "skinlayers3d-neoforge-1.9.2-mc1.21.10.jar",
-              "url": "https://cdn.modrinth.com/data/zV5r3pPn/versions/1M0oA70A/skinlayers3d-neoforge-1.9.2-mc1.21.10.jar",
-              "size": 874092,
-              "sha256": "9db668ced165318c09a4b08c24a42f1f26aa4aee9db2fa79a696be267fde0ede",
-              "sha512": "ea2f8aec8e2c1f31fdf0f8a75acc6b922ab663cd60483aeb845e08d94d9b72cd1574d3efcaf157336559f97c5fdf5230de9159a982452734268ce584ca7a0931"
             }
           ]
         },
