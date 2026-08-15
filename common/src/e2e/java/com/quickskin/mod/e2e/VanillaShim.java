@@ -8,11 +8,14 @@ import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -317,6 +320,89 @@ public final class VanillaShim {
     /** Whether vanilla is still showing its live multiplayer connection screen. */
     public static boolean isConnectScreen(Screen sc) {
         return sc instanceof ConnectScreen;
+    }
+
+    /**
+     * Starts the same multiplayer connection path as the vanilla server list after the title screen
+     * is ready. The public method gains a trailing transfer-state argument in 26.x and ServerData's
+     * third constructor argument changes from boolean to an enum, so both calls are selected by
+     * stable parameter shape instead of mapped method names.
+     */
+    public static boolean startMultiplayerConnection(
+            Minecraft mc, Screen parent, String address) {
+        try {
+            int separator = address.lastIndexOf(':');
+            if (separator <= 0 || separator == address.length() - 1) {
+                throw new IllegalArgumentException("expected host:port, got " + address);
+            }
+            String host = address.substring(0, separator);
+            int port = Integer.parseInt(address.substring(separator + 1));
+            if (port < 1 || port > 65535) {
+                throw new IllegalArgumentException("port out of range: " + port);
+            }
+
+            ServerAddress serverAddress = new ServerAddress(host, port);
+            ServerData serverData = null;
+            for (Constructor<?> constructor : ServerData.class.getDeclaredConstructors()) {
+                Class<?>[] parameters = constructor.getParameterTypes();
+                if (parameters.length != 3
+                        || parameters[0] != String.class
+                        || parameters[1] != String.class) {
+                    continue;
+                }
+                Object kind;
+                if (parameters[2] == boolean.class) {
+                    kind = false;
+                } else if (parameters[2].isEnum()) {
+                    Object[] constants = parameters[2].getEnumConstants();
+                    if (constants == null || constants.length == 0) continue;
+                    kind = constants[0];
+                    for (Object constant : constants) {
+                        if (((Enum<?>) constant).name().equals("OTHER")) {
+                            kind = constant;
+                            break;
+                        }
+                    }
+                } else {
+                    continue;
+                }
+                constructor.setAccessible(true);
+                serverData = (ServerData) constructor.newInstance(
+                        "Quick Skin E2E", address, kind);
+                break;
+            }
+            if (serverData == null) {
+                throw new NoSuchMethodException("compatible ServerData constructor");
+            }
+
+            for (Method method : ConnectScreen.class.getDeclaredMethods()) {
+                Class<?>[] parameters = method.getParameterTypes();
+                if (!Modifier.isStatic(method.getModifiers())
+                        || method.getReturnType() != void.class
+                        || parameters.length < 5
+                        || parameters.length > 6
+                        || !Screen.class.isAssignableFrom(parameters[0])
+                        || parameters[1] != Minecraft.class
+                        || parameters[2] != ServerAddress.class
+                        || parameters[3] != ServerData.class
+                        || parameters[4] != boolean.class) {
+                    continue;
+                }
+                Object[] arguments = new Object[parameters.length];
+                arguments[0] = parent;
+                arguments[1] = mc;
+                arguments[2] = serverAddress;
+                arguments[3] = serverData;
+                arguments[4] = false;
+                method.setAccessible(true);
+                method.invoke(null, arguments);
+                return true;
+            }
+            throw new NoSuchMethodException("compatible ConnectScreen static entry point");
+        } catch (Throwable t) {
+            E2ELog.warn("delayed multiplayer connect failed: " + t);
+            return false;
+        }
     }
 
     /**

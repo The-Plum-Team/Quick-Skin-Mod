@@ -1125,7 +1125,6 @@ def client_command(
             # in CI. It only governs how legible the captured evidence is.
             "resolutionWidth": "1920",
             "resolutionHeight": "1080",
-            "quickPlayMultiplayer": f"127.0.0.1:{port}",
             "jvmArguments": [
                 "-Xms512M",
                 "-Xmx1024M",
@@ -1146,6 +1145,15 @@ def client_command(
         options["jvmArguments"].append(
             f"-Dquickskin.e2e.compatibility={compatibility_mod}"
         )
+    if compatibility_mod == "replaymod" and row["runtime_version"] == "1.20.1":
+        # ReplayMod makes Minecraft 1.20.1's startup Quick Play connection intermittently stop
+        # consuming Fabric login queries. Exercise the production-equivalent user path instead:
+        # let startup settle at the title screen, then have the harness initiate a normal connect.
+        options["jvmArguments"].append(
+            f"-Dquickskin.e2e.delayedConnect=127.0.0.1:{port}"
+        )
+    else:
+        options["quickPlayMultiplayer"] = f"127.0.0.1:{port}"
     return minecraft_launcher_lib.command.get_minecraft_command(
         version_id, str(install_dir), options
     )

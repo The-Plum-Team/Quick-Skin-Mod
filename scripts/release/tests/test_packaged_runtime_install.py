@@ -440,9 +440,23 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
                 compatibility_mod="ears",
             )
             compatibility_options = dict(captured["options"])  # type: ignore[arg-type]
+            compatibility_version_id = captured["version_id"]
+            replaymod_launched = packaged_runtime.client_command(
+                self.root / "install",
+                "fabric-loader-1.20.1",
+                self.root / "replaymod-game",
+                {"runtime_version": "1.20.1"},
+                "mod-compatibility",
+                "client_a",
+                "Alice",
+                25566,
+                "/fake/java",
+                compatibility_mod="replaymod",
+            )
+            replaymod_options = dict(captured["options"])  # type: ignore[arg-type]
 
         self.assertEqual(["java", "minecraft"], launched)
-        self.assertEqual("fabric-loader-1.21.10", captured["version_id"])
+        self.assertEqual("fabric-loader-1.21.10", compatibility_version_id)
         options = captured["options"]
         self.assertIsInstance(options, dict)
         assert isinstance(options, dict)
@@ -460,6 +474,15 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
         self.assertIn(
             "-Dquickskin.e2e.compatibility=ears",
             compatibility_options["jvmArguments"],
+        )
+        self.assertEqual(["java", "minecraft"], replaymod_launched)
+        self.assertNotIn("quickPlayMultiplayer", replaymod_options)
+        self.assertIn(
+            "-Dquickskin.e2e.delayedConnect=127.0.0.1:25566",
+            replaymod_options["jvmArguments"],
+        )
+        self.assertEqual(
+            "127.0.0.1:25565", compatibility_options["quickPlayMultiplayer"]
         )
 
     def test_e2e_client_config_disables_ambient_own_skin_import(self) -> None:
