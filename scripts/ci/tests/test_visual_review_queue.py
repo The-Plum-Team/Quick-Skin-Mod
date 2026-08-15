@@ -7,6 +7,7 @@ from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -15,6 +16,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "ci"))
 from visual_review_queue import (  # noqa: E402
     DRAIN_WORKFLOW,
     GitHubApi,
+    GitHubRateLimitError,
     PREPARE_WORKFLOW,
     Artifact,
     blocked_generations,
@@ -136,6 +138,66 @@ class VisualReviewQueueTest(unittest.TestCase):
         )
 
         self.assertTrue(GitHubApi._retryable_http_error(error))
+
+    def test_installation_rate_limit_has_a_longer_bounded_retry_window(self) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="token",
+            api_url="https://api.github.test",
+        )
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b'{"ok":true}'
+
+        def rate_limit() -> urllib.error.HTTPError:
+            return urllib.error.HTTPError(
+                "https://api.github.test/repos/example",
+                403,
+                "forbidden",
+                {
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": "1800000060",
+                },
+                BytesIO(b'{"message":"API rate limit exceeded for installation"}'),
+            )
+
+        with patch(
+            "visual_review_queue.urllib.request.urlopen",
+            side_effect=[*(rate_limit() for _ in range(5)), response],
+        ), patch("visual_review_queue.time.sleep") as sleep, patch(
+            "visual_review_queue.time.time", return_value=1_800_000_000
+        ):
+            self.assertEqual(api._request("/repos/example"), {"ok": True})
+
+        self.assertEqual(sleep.call_count, 5)
+        self.assertTrue(all(call.args[0] <= 61 for call in sleep.call_args_list))
+
+    def test_exhausted_installation_rate_limit_is_distinct_from_bad_evidence(
+        self,
+    ) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="token",
+            api_url="https://api.github.test",
+        )
+
+        def rate_limit() -> urllib.error.HTTPError:
+            return urllib.error.HTTPError(
+                "https://api.github.test/repos/example",
+                403,
+                "forbidden",
+                {"X-RateLimit-Remaining": "0"},
+                BytesIO(b'{"message":"API rate limit exceeded for installation"}'),
+            )
+
+        with patch(
+            "visual_review_queue.urllib.request.urlopen",
+            side_effect=[rate_limit() for _ in range(12)],
+        ), patch("visual_review_queue.time.sleep") as sleep:
+            with self.assertRaises(GitHubRateLimitError):
+                api._request("/repos/example")
+
+        self.assertEqual(sleep.call_count, 11)
 
     def test_exact_wake_queries_only_its_capsule_and_related_markers(self) -> None:
         requested = artifact(

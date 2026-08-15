@@ -455,8 +455,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-drain-requested", capacity_resume)
         self.assertIn("contents: write", capacity_resume)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_resume)
+        self.assertIn("source scripts/ci/github_api_retry.sh", capacity_resume)
+        self.assertIn('selector_status" -eq 75', capacity_resume)
+        self.assertIn("capacity fan-out deferred", capacity_resume)
         self.assertIn("scripts/ci/visual_review_queue.py", select)
         self.assertIn("--requested-artifact-id", select)
+        self.assertIn('selector_status" -eq 75', select)
+        self.assertIn("durable queue selection deferred", select)
         self.assertIn("artifact_id=$REQUESTED_ARTIFACT_ID", select)
         self.assertIn("artifact_name=$REQUESTED_ARTIFACT_NAME", select)
         self.assertIn("generation_sha=$REQUESTED_GENERATION_SHA", select)
@@ -468,6 +473,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("contents: write", dispatch_selected)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", dispatch_selected)
         self.assertNotIn("actions/checkout@", dispatch_selected)
+        self.assertIn("exact queue wake deferred", dispatch_selected)
         self.assertIn("needs.select.outputs.direct == 'true'", review)
         self.assertIn("needs.capacity-check.outputs.ready == 'true'", review)
         self.assertIn("needs.capacity-probe.outputs.ready == 'true'", review)
@@ -477,6 +483,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("has no automatic release identity", review)
         self.assertIn("contents: write", release_compatibility)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_compatibility)
+        self.assertIn("source scripts/ci/github_api_retry.sh", release_compatibility)
+        self.assertIn("github_api_retry --method POST", release_compatibility)
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
         self.assertIn('endswith(" - contract scenarios")', authenticate)
@@ -523,6 +531,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("visual reference did not reach protected", curate)
         self.assertIn("sleep 5", curate)
+        self.assertIn("github_api_retry_to_file", review)
+        self.assertIn(
+            'source "$GITHUB_WORKSPACE/scripts/ci/github_api_retry.sh"', review
+        )
         self.assertIn("--kind raw", curate)
         self.assertNotIn("scripts/pages/evidence.py compact", curate)
         self.assertIn("--reference-evidence-root \"$reference_selected\"", curate)
@@ -600,6 +612,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-report.json", review)
         self.assertIn("scripts/ci/visual_anchor_certification.py", review)
         self.assertIn("visual-anchor-certification-$master_source_sha", review)
+        self.assertIn("associated=\"$(github_api_retry", review)
         self.assertIn("visual-anchor-certification-{generation}", queue)
         self.assertIn("generation in certified", queue)
         self.assertIn('api.get_branch_sha("master")', queue)
@@ -626,6 +639,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("actions/artifacts/$ARTIFACT_ID", release_anchor)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_anchor)
         self.assertNotIn("actions/checkout@", release_anchor)
+        self.assertIn("for attempt in {1..10}", release_anchor)
+        self.assertIn("github_api_retry --method POST", release_anchor)
         self.assertIn("contents: write", continuation)
         self.assertIn("needs.review.outputs.wave_blocked != 'true'", continuation)
         self.assertIn("API rate limit exceeded", continuation)
@@ -741,7 +756,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('.base_matrix_kind == "pr-anchors"', enumerate_review)
         self.assertIn("source_artifacts=", prepare)
         self.assertIn("GH_TOKEN: ${{ github.token }}", plan_step)
-        self.assertLess(plan_step.index("GH_TOKEN:"), plan_step.index("gh api"))
+        self.assertLess(
+            plan_step.index("GH_TOKEN:"), plan_step.index("github_api_retry")
+        )
+        self.assertIn("source scripts/ci/github_api_retry.sh", admit)
+        self.assertIn("github_api_retry_to_file", admit)
+        self.assertIn("source scripts/ci/github_api_retry.sh", prepare)
+        self.assertIn("source scripts/ci/github_api_retry.sh", runtime)
         self.assertIn("[.runnable[].base_evidence_name] | unique", prepare)
         self.assertIn(".source_branch == .target_branch", enumerate_review)
         self.assertIn('[[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]', prepare)
@@ -1054,6 +1075,27 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("needs.build.result", required)
         self.assertIn("needs.e2e.result", required)
         self.assertIn("inputs.attest_run_id == ''", required)
+
+    def test_rate_limited_gate_notifications_use_protected_bounded_retry(self) -> None:
+        e2e_notify = job_block("on-demand-e2e.yml", "notify-version-port")
+        pages_notify = job_block("on-demand-e2e.yml", "notify-pages")
+        build_notify = job_block("build-gate.yml", "notify-version-port")
+        sync_discover = job_block("sync-version-branches.yml", "discover")
+
+        for block in (e2e_notify, pages_notify, build_notify):
+            with self.subTest(name=block.splitlines()[0]):
+                self.assertIn("ref: master", block)
+                self.assertIn("persist-credentials: false", block)
+                self.assertIn("source scripts/ci/github_api_retry.sh", block)
+                self.assertIn('GITHUB_API_RETRY_ATTEMPTS: "10"', block)
+                self.assertIn("github_api_retry --method POST", block)
+
+        self.assertIn("source scripts/ci/github_api_retry.sh", sync_discover)
+        self.assertIn("github_api_retry_to_file", sync_discover)
+        self.assertIn(
+            "github_cli_retry gh label create automated-version-sync",
+            sync_discover,
+        )
 
     def test_not_applicable_e2e_is_internal_exact_and_fail_closed(self) -> None:
         workflow = (WORKFLOWS / "on-demand-e2e.yml").read_text(encoding="utf-8")

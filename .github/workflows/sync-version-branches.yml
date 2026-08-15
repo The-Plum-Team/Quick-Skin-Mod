@@ -55,6 +55,8 @@ jobs:
         shell: bash
         env:
           EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GH_TOKEN: ${{ github.token }}
           PAYLOAD_ANCHOR_SOURCE_SHA: ${{ github.event.client_payload.anchor_source_sha }}
           PAYLOAD_ANCHOR_TARGET_SHA: ${{ github.event.client_payload.anchor_target_sha }}
@@ -67,12 +69,14 @@ jobs:
           REQUESTED_TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           reference_identity="$(python3 e2e/visual_review.py \
             --matrix release/release-matrix.json --reference-identity)"
           anchor_branch="$(jq -er .release_branch <<< "$reference_identity")"
           [[ "$(jq -er .version <<< "$reference_identity")" == 1.20.1 ]]
           branches="$RUNNER_TEMP/release-branches.txt"
-          gh api --paginate "repos/$GITHUB_REPOSITORY/branches?per_page=100" \
+          github_api_retry --paginate \
+            "repos/$GITHUB_REPOSITORY/branches?per_page=100" \
             --jq '.[].name' > "$branches"
           grep -Fxq "$anchor_branch" "$branches"
           python3 scripts/release/version_branches.py \
@@ -93,7 +97,7 @@ jobs:
               printf 'value=[]\n' >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/master" \
+            [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" \
               --jq .commit.sha)" == "$GITHUB_SHA" ]]
             [[ "$PAYLOAD_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
             [[ "$PAYLOAD_ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
@@ -105,7 +109,7 @@ jobs:
             [[ "$PAYLOAD_ARTIFACT_NAME" == \
               "visual-anchor-certification-$GITHUB_SHA" ]]
 
-            metadata="$(gh api \
+            metadata="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/artifacts/$PAYLOAD_ARTIFACT_ID")"
             jq -e \
               --arg digest "$PAYLOAD_ARTIFACT_DIGEST" \
@@ -120,7 +124,7 @@ jobs:
                .workflow_run.head_sha == $sha' <<< "$metadata" > /dev/null
             owner=''
             for attempt in {1..60}; do
-              owner="$(gh api \
+              owner="$(github_api_retry \
                 "repos/$GITHUB_REPOSITORY/actions/runs/$PAYLOAD_ARTIFACT_RUN_ID")"
               if [[ "$(jq -r .status <<< "$owner")" == completed ]]; then
                 break
@@ -139,9 +143,9 @@ jobs:
                .head_repository.full_name == $repository' <<< "$owner" > /dev/null
 
             archive="$RUNNER_TEMP/visual-anchor-certification.zip"
-            gh api -H 'Accept: application/vnd.github+json' \
-              "repos/$GITHUB_REPOSITORY/actions/artifacts/$PAYLOAD_ARTIFACT_ID/zip" \
-              > "$archive"
+            github_api_retry_to_file "$archive" \
+              -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$PAYLOAD_ARTIFACT_ID/zip"
             [[ "$(stat -c %s "$archive")" == "$PAYLOAD_ARTIFACT_SIZE" ]]
             [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
               "$PAYLOAD_ARTIFACT_DIGEST" ]]
@@ -179,7 +183,8 @@ jobs:
                .scenario_contract_sha256 == $scenario_contract_sha256' \
               "$certificate" > /dev/null
 
-            [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$anchor_branch" \
+            [[ "$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/branches/$anchor_branch" \
               --jq .commit.sha)" == "$PAYLOAD_ANCHOR_TARGET_SHA" ]]
             git fetch --no-tags origin \
               "$PAYLOAD_ANCHOR_SOURCE_SHA" "$PAYLOAD_ANCHOR_TARGET_SHA"
@@ -197,7 +202,7 @@ jobs:
 
             source_run_id="$(jq -er .source_run_id "$certificate")"
             source_branch="$(jq -er .source_branch "$certificate")"
-            source_run="$(gh api \
+            source_run="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id")"
             jq -e \
               --arg branch "$source_branch" \
@@ -227,12 +232,15 @@ jobs:
         if: steps.targets.outputs.value != '[]'
         shell: bash
         env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           # Created once per propagation instead of once per publish leg; the writer legs only
           # attach the already existing label.
-          gh label create automated-version-sync \
+          github_cli_retry gh label create automated-version-sync \
             --color 1D76DB \
             --description 'Trusted master-to-version synchronization' \
             --force

@@ -604,24 +604,37 @@ jobs:
       needs.prepare-pages-evidence.outputs.published == 'true'
     continue-on-error: true
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
       contents: write
 
     steps:
+      - name: Check out the protected notification policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          persist-credentials: false
+
       - name: Dispatch the exact release-branch handoff
         shell: bash
         env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
+          payload="$RUNNER_TEMP/pages-evidence-ready.json"
           jq -n \
             --arg evidence_branch "$GITHUB_REF_NAME" \
             --arg evidence_repository "$GITHUB_REPOSITORY" \
             --arg evidence_run_id "$GITHUB_RUN_ID" \
             --arg evidence_sha "$GITHUB_SHA" \
             '{event_type:"pages-evidence-ready",client_payload:{evidence_branch:$evidence_branch,evidence_repository:$evidence_repository,evidence_run_id:$evidence_run_id,evidence_sha:$evidence_sha}}' \
-            | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
+            > "$payload"
+          github_api_retry --method POST \
+            "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" \
+            > /dev/null
 
   notify-version-port:
     name: Notify version port controller
@@ -638,23 +651,33 @@ jobs:
       inputs.attest_run_id == '' &&
       startsWith(github.ref_name, 'automation/sync/')
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
       contents: write
 
     steps:
+      - name: Check out the protected notification policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          persist-credentials: false
+
       - name: Dispatch the settled E2E result
         shell: bash
         env:
           GATE_RESULT: ${{ needs.required-gate.result }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GH_TOKEN: ${{ github.token }}
           RUNTIME_POLICY: ${{ needs.runtime-policy.outputs.effective || inputs.runtime_policy }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           conclusion=success
           if [[ "$GATE_RESULT" != success ]]; then
             conclusion=failure
           fi
+          payload="$RUNNER_TEMP/version-port-e2e-result.json"
           jq -n \
             --arg gate on-demand-e2e.yml \
             --arg conclusion "$conclusion" \
@@ -665,7 +688,10 @@ jobs:
             --arg source_event "$GITHUB_EVENT_NAME" \
             --arg source_repository "$GITHUB_REPOSITORY" \
             '{event_type:"version-port-gate-completed",client_payload:{gate:$gate,conclusion:$conclusion,head_branch:$head_branch,head_sha:$head_sha,run_id:$run_id,runtime_policy:$runtime_policy,source_event:$source_event,source_repository:$source_repository}}' \
-            | gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -
+            > "$payload"
+          github_api_retry --method POST \
+            "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" \
+            > /dev/null
 
       - name: Request the separate AI visual review
         if: >-
@@ -674,9 +700,12 @@ jobs:
         continue-on-error: true
         shell: bash
         env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           payload="$RUNNER_TEMP/visual-review-dispatch.json"
           jq -n \
             --arg source_branch "$GITHUB_REF_NAME" \
@@ -685,5 +714,6 @@ jobs:
             --arg source_sha "$GITHUB_SHA" \
             '{event_type:"visual-review-requested",client_payload:{source_branch:$source_branch,source_repository:$source_repository,source_run_id:$source_run_id,source_sha:$source_sha}}' \
             > "$payload"
-          timeout 20s gh api --method POST \
-            "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload"
+          github_api_retry --method POST \
+            "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" \
+            > /dev/null
