@@ -64,7 +64,22 @@ class ModCompatibilityContractTest(unittest.TestCase):
             {item.id for item in contract.mods},
         )
         self.assertNotIn("player-armor-stands", {item.id for item in contract.mods})
-        self.assertEqual(105, sum(len(item.artifacts) for item in contract.mods))
+        self.assertEqual(104, sum(len(item.artifacts) for item in contract.mods))
+        cpm = contract.mod("cpm")
+        self.assertEqual(
+            (("1.21.2", "neoforge"),),
+            tuple(
+                (item.runtime_version, item.loader)
+                for item in cpm.excluded_lanes
+            ),
+        )
+        self.assertFalse(
+            any(
+                artifact.loader == "neoforge"
+                and "1.21.2" in artifact.game_versions
+                for artifact in cpm.artifacts
+            )
+        )
         skin_layers = contract.mod("skin-layers-3d")
         self.assertEqual(
             (("1.21.9", "neoforge"),),
@@ -214,6 +229,16 @@ class ModCompatibilityContractTest(unittest.TestCase):
         )
         mutations.append(ambiguous)
 
+        excluded_artifact = copy.deepcopy(self.payload)
+        excluded_artifact["mods"][0]["excluded_lanes"].append(
+            {
+                "runtime_version": "1.20.1",
+                "loader": "fabric",
+                "reason": "test exclusion",
+            }
+        )
+        mutations.append(excluded_artifact)
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             for index, mutation in enumerate(mutations):
@@ -288,6 +313,17 @@ class ModCompatibilityContractTest(unittest.TestCase):
         contract = mod_compatibility.load_contract(self.contract_path)
         with self.assertRaisesRegex(
             mod_compatibility.CompatibilityContractError,
+            "excludes 1.21.2/neoforge",
+        ):
+            mod_compatibility.resolve_lane(
+                contract,
+                mod_id="cpm",
+                artifact_node="neoforge-1.21.2",
+                runtime_version="1.21.2",
+                loader="neoforge",
+            )
+        with self.assertRaisesRegex(
+            mod_compatibility.CompatibilityContractError,
             "excludes 1.21.9/neoforge",
         ):
             mod_compatibility.resolve_lane(
@@ -319,6 +355,18 @@ class ModCompatibilityContractTest(unittest.TestCase):
         )
         self.assertTrue(
             update_mod_compatibility_lock._allowed_lane(mod, "1.21.9", "fabric")
+        )
+
+        cpm = next(
+            copy.deepcopy(item)
+            for item in self.payload["mods"]
+            if item["id"] == "cpm"
+        )
+        self.assertFalse(
+            update_mod_compatibility_lock._allowed_lane(cpm, "1.21.2", "neoforge")
+        )
+        self.assertTrue(
+            update_mod_compatibility_lock._allowed_lane(cpm, "1.21.2", "fabric")
         )
 
     def test_materialization_accepts_only_the_exact_locked_bytes(self) -> None:
