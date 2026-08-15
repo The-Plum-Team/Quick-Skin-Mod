@@ -1267,6 +1267,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('endswith(" - contract scenarios")', inspect)
         self.assertIn("gh api --paginate --slurp", inspect)
         self.assertIn("[.[].jobs[]", inspect)
+        self.assertIn('gh run view "$GATE_RUN_ID" --log-failed', inspect)
+        self.assertIn("Dependency verification failed for configuration", inspect)
+        self.assertIn("Automated AI repair is intentionally disabled", inspect)
+        self.assertLess(
+            inspect.index("Dependency verification failed for configuration"),
+            inspect.index("gh label create ai-repair-attempted"),
+        )
         self.assertIn("-f runtime_policy=full", repair)
 
         self.assertIn("branches/master", merge)
