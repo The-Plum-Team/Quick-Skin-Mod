@@ -864,10 +864,29 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("github.event.ref_type == 'branch'", workflow)
         self.assertIn("quick-skin-actions-cache-pruning", workflow)
         self.assertIn("cancel-in-progress: false", workflow)
+        self.assertIn("timeout-minutes: 75", workflow)
 
         authenticate = workflow.index("Authenticate protected cleanup implementation")
         checkout = workflow.index("Check out the exact protected cleanup implementation")
         self.assertLess(authenticate, checkout)
+        self.assertIn("protected_gh_api_retry()", workflow)
+        self.assertIn("gh api rate_limit --jq .resources.core.reset", workflow)
+        self.assertIn("reset_at - now + 2 + skew", workflow)
+        self.assertIn("wait_seconds > 3700", workflow)
+        self.assertIn(
+            'repository_json="$(protected_gh_api_retry "repos/$GITHUB_REPOSITORY")"',
+            workflow,
+        )
+        self.assertIn(
+            'run_json="$(protected_gh_api_retry \\\n'
+            '            "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"',
+            workflow,
+        )
+        self.assertIn(
+            'implementation_sha="$(protected_gh_api_retry \\\n'
+            '            "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"',
+            workflow,
+        )
         self.assertIn('.default_branch == "master"', workflow)
         self.assertIn('.path == ".github/workflows/prune-actions-caches.yml"', workflow)
         self.assertIn('.head_branch == "master"', workflow)
