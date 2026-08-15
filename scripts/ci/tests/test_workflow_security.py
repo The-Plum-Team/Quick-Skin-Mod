@@ -173,6 +173,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('[[ "$(git rev-parse HEAD)" == "$EXPECTED_SOURCE_SHA" ]]', action)
         self.assertIn('GITHUB_SHA="$EXPECTED_SOURCE_SHA"', action)
         self.assertIn("QUICKSKIN_E2E_RUNTIME_STORE", action)
+        self.assertIn("xvfb-run --auto-servernum", action)
+        self.assertNotIn("-noreset", action)
         self.assertIn("e2e/ci_summary.py", action)
         self.assertIn("e2e-out/current/profiles/**/result.json", action)
         self.assertIn("e2e-out/current/summary.json", action)
