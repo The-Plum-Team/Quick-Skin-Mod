@@ -105,7 +105,7 @@ immutable workflow and governance activation contract.
   without any reference image and reviewed independently against every contract expectation, so a
   defect shared by both loaders cannot certify itself. The protected report records semantic
   validity separately from reference similarity. Only a completely clean, loader-complete report
-  for the exact bot-owned synchronization commit may produce a seven-day semantic certificate,
+  for the exact bot-owned synchronization commit may produce a 90-day semantic certificate,
   and only after its exact-tree merge is the current 1.20.1 branch head. The certificate binds the
   `master` source SHA, tested and merged anchor SHAs, source run, protected implementation,
   scenario contract, manifest, and normalized report. A protected `repository_dispatch`
@@ -172,8 +172,8 @@ immutable workflow and governance activation contract.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
   named seven-day exceptions are automatic-sync packaged evidence/input bundles needed by delayed
   compatibility review, compatibility plans/evidence/capsules/reports/block markers, queued visual
-  review capsules, semantic certificates, and rolling exact-policy visual verdict caches. Three
-  90-day current-state artifacts remain: the
+  review capsules, and rolling exact-policy visual verdict caches. Four 90-day current-state
+  artifacts remain: the semantic certificate, the
   SHA-bound Pages cache, the matrix-derived lossless
   Fabric 1.20.1 anchor handoff, and the immutable `release-<release-id>` bundle. The release bundle
   spans protected environment

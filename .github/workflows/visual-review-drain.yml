@@ -1537,7 +1537,7 @@ jobs:
           name: ${{ steps.certify.outputs.artifact_name }}
           path: ${{ runner.temp }}/visual-review-capsule/visual-anchor-certification.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
 
       - name: Classify a failed attempt without provider text
         id: classify

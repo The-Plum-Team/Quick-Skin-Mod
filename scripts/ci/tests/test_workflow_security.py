@@ -240,7 +240,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "visual-review-drain.yml",
                 "Upload the exact semantic anchor certificate",
                 "${{ steps.certify.outputs.artifact_name }}",
-            ): "7",
+            ): "90",
             (
                 "visual-review-drain.yml",
                 "Upload the protected exact-policy verdict cache",

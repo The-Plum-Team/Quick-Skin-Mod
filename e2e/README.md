@@ -302,7 +302,7 @@ Exact-policy verdict cache shards remain for seven days;
 parallel drains may briefly publish siblings, and a later protected successor combines and retires
 every authenticated shard it consumed without dropping concurrent verdicts.
 
-A completely clean synchronized 1.20.1 report creates a seven-day certificate only after the
+A completely clean synchronized 1.20.1 report creates a 90-day certificate only after the
 bot-owned anchor PR is merged and that exact-tree merge is still the current anchor head. The
 certificate binds the `master` source SHA, tested and merged anchor SHAs, source run, protected
 review implementation, scenario contract, curation proof, manifest, and normalized report. The
