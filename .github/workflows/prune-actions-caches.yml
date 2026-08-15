@@ -21,7 +21,10 @@ jobs:
       github.event_name == 'schedule' ||
       (github.event_name == 'delete' && github.event.ref_type == 'branch')
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # Authentication may need to wait for the installation's primary API window to reset. Cache
+    # cleanup is isolated from every build/review concurrency group, so that bounded wait cannot
+    # delay release work.
+    timeout-minutes: 75
     permissions:
       actions: write
       contents: read
@@ -39,6 +42,54 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          protected_gh_api_retry() {
+            local api_status attempt delay now output reset_at skew wait_seconds
+            delay=5
+            for attempt in {1..4}; do
+              output=''
+              api_status=0
+              if output="$(gh api "$@" 2>&1)"; then
+                printf '%s\n' "$output"
+                return 0
+              else
+                api_status=$?
+              fi
+              if ! grep -Eqi \
+                  'API rate limit exceeded|secondary rate limit|HTTP (408|429|5[0-9][0-9])|connection (reset|refused)|timed out|timeout|temporary failure|TLS handshake|unexpected EOF' \
+                  <<< "$output" || (( attempt == 4 )); then
+                printf '%s\n' "$output" >&2
+                return "$api_status"
+              fi
+
+              wait_seconds="$delay"
+              if grep -Fqi 'API rate limit exceeded' <<< "$output"; then
+                # GET /rate_limit does not consume primary quota. Respect the installation's
+                # declared reset instead of repeatedly spending requests inside a closed window.
+                reset_at="$(gh api rate_limit --jq .resources.core.reset \
+                  2>/dev/null || true)"
+                if [[ "$reset_at" =~ ^[1-9][0-9]*$ ]]; then
+                  now="$(date +%s)"
+                  skew=$(( (GITHUB_RUN_ID + attempt) % 5 ))
+                  wait_seconds=$(( reset_at - now + 2 + skew ))
+                  (( wait_seconds > 0 )) || wait_seconds=1
+                  if (( wait_seconds > 3700 )); then
+                    printf '%s\n' "$output" >&2
+                    return "$api_status"
+                  fi
+                else
+                  wait_seconds=60
+                fi
+              elif grep -Eqi 'secondary rate limit|HTTP 429' <<< "$output"; then
+                (( wait_seconds >= 60 )) || wait_seconds=60
+              fi
+
+              printf 'GitHub API cleanup authentication attempt %s/4 failed transiently; waiting %ss.\n' \
+                "$attempt" "$wait_seconds" >&2
+              sleep "$wait_seconds"
+              delay=$(( delay < 60 ? delay * 2 : 60 ))
+              (( delay <= 60 )) || delay=60
+            done
+          }
           [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$GITHUB_REF" == refs/heads/master ]]
@@ -55,10 +106,10 @@ jobs:
               ;;
           esac
 
-          repository_json="$(gh api "repos/$GITHUB_REPOSITORY")"
+          repository_json="$(protected_gh_api_retry "repos/$GITHUB_REPOSITORY")"
           jq -e '.default_branch == "master"' <<< "$repository_json" > /dev/null
 
-          run_json="$(gh api \
+          run_json="$(protected_gh_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"
           jq -e \
             --arg event "$GITHUB_EVENT_NAME" \
@@ -71,7 +122,7 @@ jobs:
              .head_repository.full_name == $repository' \
             <<< "$run_json" > /dev/null
 
-          implementation_sha="$(gh api \
+          implementation_sha="$(protected_gh_api_retry \
             "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
           [[ "$implementation_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'implementation_sha=%s\n' "$implementation_sha" >> "$GITHUB_OUTPUT"
