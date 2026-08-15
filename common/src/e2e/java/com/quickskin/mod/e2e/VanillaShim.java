@@ -1,8 +1,10 @@
 package com.quickskin.mod.e2e;
 
+import io.netty.channel.Channel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.SplashRenderer;
+import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.AbstractClientPlayer;
@@ -15,6 +17,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
+import java.nio.channels.SelectionKey;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Optional;
@@ -310,6 +313,133 @@ public final class VanillaShim {
         // Keep the class literal so Loom remaps it to Fabric's stable intermediary class at runtime.
         // A string comparison against the Mojang name only works on Forge/NeoForge.
         return sc instanceof DisconnectedScreen;
+    }
+
+    /** Whether vanilla is still showing its live multiplayer connection screen. */
+    public static boolean isConnectScreen(Screen sc) {
+        return sc instanceof ConnectScreen;
+    }
+
+    /**
+     * Bounded state from the live Netty channel behind a connection screen. This diagnostic is
+     * intentionally structural: the private connection/channel field names are remapped on
+     * Fabric, while their runtime types and channel contract are stable.
+     */
+    public static String connectionDiagnostic(Screen sc) {
+        if (!isConnectScreen(sc)) return "not-connect-screen";
+        try {
+            Channel channel = liveConnectionChannel(sc);
+            if (channel == null) return "channel=<unavailable>";
+            return "channelType=" + channel.getClass().getName()
+                    + "; channelActive=" + channel.isActive()
+                    + "; open=" + channel.isOpen()
+                    + "; registered=" + channel.isRegistered()
+                    + "; writable=" + channel.isWritable()
+                    + "; autoRead=" + channel.config().isAutoRead()
+                    + "; nio=" + nioReadDiagnostic(channel)
+                    + "; pipeline=" + channel.pipeline().names();
+        } catch (Throwable t) {
+            return "channel=<diagnostic-failed:" + t.getClass().getSimpleName() + ">";
+        }
+    }
+
+    /**
+     * Repairs the one invalid NIO state observed in ReplayMod's 1.20.1 startup path: auto-read is
+     * enabled on an active channel, but its selection key has no OP_READ interest and its event
+     * loop is asleep in select(). Restore that interest and wake the selector without reconnecting,
+     * replacing handlers, or manufacturing any protocol traffic.
+     */
+    public static boolean repairMissingConnectionRead(Screen sc) {
+        if (!isConnectScreen(sc)) return false;
+        try {
+            Channel channel = liveConnectionChannel(sc);
+            if (channel == null || !channel.isActive() || !channel.config().isAutoRead()) {
+                return false;
+            }
+            SelectionKey key = nioSelectionKey(channel);
+            if (key == null || !key.isValid()
+                    || (key.interestOps() & SelectionKey.OP_READ) != 0) {
+                return false;
+            }
+            E2ELog.info("connection read repair before -> " + nioReadDiagnostic(channel));
+            key.interestOps(key.interestOps() | SelectionKey.OP_READ);
+            key.selector().wakeup();
+            E2ELog.info("connection read repair after -> " + nioReadDiagnostic(channel));
+            return true;
+        } catch (Throwable t) {
+            E2ELog.warn("connection read repair inspection failed: " + t);
+            return false;
+        }
+    }
+
+    private static Channel liveConnectionChannel(Screen sc) throws IllegalAccessException {
+        for (Class<?> screenType = sc.getClass();
+                screenType != null && Screen.class.isAssignableFrom(screenType);
+                screenType = screenType.getSuperclass()) {
+            for (Field field : screenType.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers())) continue;
+                field.setAccessible(true);
+                Channel channel = nestedChannel(field.get(sc));
+                if (channel != null) return channel;
+            }
+        }
+        return null;
+    }
+
+    private static String nioReadDiagnostic(Channel channel) {
+        try {
+            SelectionKey key = nioSelectionKey(channel);
+            String readPending = "unavailable";
+            for (Class<?> type = channel.getClass(); type != null; type = type.getSuperclass()) {
+                for (Field field : type.getDeclaredFields()) {
+                    if (Modifier.isStatic(field.getModifiers())) continue;
+                    if (field.getType() == boolean.class
+                            && field.getName().equals("readPending")) {
+                        field.setAccessible(true);
+                        readPending = Boolean.toString(field.getBoolean(channel));
+                    }
+                }
+            }
+            if (key == null) return "selectionKey=unavailable,readPending=" + readPending;
+            return "selectionKeyValid=" + key.isValid()
+                    + ",interestOps=" + key.interestOps()
+                    + ",readyOps=" + key.readyOps()
+                    + ",readPending=" + readPending;
+        } catch (Throwable t) {
+            return "unavailable:" + t.getClass().getSimpleName();
+        }
+    }
+
+    private static SelectionKey nioSelectionKey(Channel channel) throws IllegalAccessException {
+        for (Class<?> type = channel.getClass(); type != null; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers())
+                        || !SelectionKey.class.isAssignableFrom(field.getType())) {
+                    continue;
+                }
+                field.setAccessible(true);
+                Object value = field.get(channel);
+                if (value instanceof SelectionKey key) return key;
+            }
+        }
+        return null;
+    }
+
+    private static Channel nestedChannel(Object owner) throws IllegalAccessException {
+        if (owner instanceof Channel direct) return direct;
+        if (owner == null) return null;
+        for (Class<?> type = owner.getClass(); type != null; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers())
+                        || !Channel.class.isAssignableFrom(field.getType())) {
+                    continue;
+                }
+                field.setAccessible(true);
+                Object value = field.get(owner);
+                if (value instanceof Channel channel) return channel;
+            }
+        }
+        return null;
     }
 
     /**
