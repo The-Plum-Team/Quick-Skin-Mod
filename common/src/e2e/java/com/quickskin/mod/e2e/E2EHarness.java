@@ -34,6 +34,7 @@ public final class E2EHarness {
     private int tick = 0;
     private int worldWaitDeadline = 0;
     private String lastScreen = "";
+    private int lastConnectionDiagnosticTick = 0;
 
     private List<Step> steps;
     private int stepIndex = 0;
@@ -144,6 +145,11 @@ public final class E2EHarness {
                 finish(mc);
                 return;
             }
+        }
+        if (VanillaShim.isConnectScreen(sc)
+                && tick - lastConnectionDiagnosticTick >= 20 * 10) {
+            E2ELog.info("connection -> " + VanillaShim.connectionDiagnostic(sc));
+            lastConnectionDiagnosticTick = tick;
         }
         if (mc.player != null && mc.level != null) {
             Scenario scenario = resolveScenario();

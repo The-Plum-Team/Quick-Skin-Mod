@@ -1,8 +1,10 @@
 package com.quickskin.mod.e2e;
 
+import io.netty.channel.Channel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.SplashRenderer;
+import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.AbstractClientPlayer;
@@ -310,6 +312,60 @@ public final class VanillaShim {
         // Keep the class literal so Loom remaps it to Fabric's stable intermediary class at runtime.
         // A string comparison against the Mojang name only works on Forge/NeoForge.
         return sc instanceof DisconnectedScreen;
+    }
+
+    /** Whether vanilla is still showing its live multiplayer connection screen. */
+    public static boolean isConnectScreen(Screen sc) {
+        return sc instanceof ConnectScreen;
+    }
+
+    /**
+     * Bounded state from the live Netty channel behind a connection screen. This diagnostic is
+     * intentionally structural: the private connection/channel field names are remapped on
+     * Fabric, while their runtime types and channel contract are stable.
+     */
+    public static String connectionDiagnostic(Screen sc) {
+        if (!isConnectScreen(sc)) return "not-connect-screen";
+        try {
+            Channel channel = null;
+            for (Class<?> screenType = sc.getClass();
+                    screenType != null && Screen.class.isAssignableFrom(screenType);
+                    screenType = screenType.getSuperclass()) {
+                for (Field field : screenType.getDeclaredFields()) {
+                    if (Modifier.isStatic(field.getModifiers())) continue;
+                    field.setAccessible(true);
+                    channel = nestedChannel(field.get(sc));
+                    if (channel != null) break;
+                }
+                if (channel != null) break;
+            }
+            if (channel == null) return "channel=<unavailable>";
+            return "channelActive=" + channel.isActive()
+                    + "; open=" + channel.isOpen()
+                    + "; registered=" + channel.isRegistered()
+                    + "; writable=" + channel.isWritable()
+                    + "; autoRead=" + channel.config().isAutoRead()
+                    + "; pipeline=" + channel.pipeline().names();
+        } catch (Throwable t) {
+            return "channel=<diagnostic-failed:" + t.getClass().getSimpleName() + ">";
+        }
+    }
+
+    private static Channel nestedChannel(Object owner) throws IllegalAccessException {
+        if (owner instanceof Channel direct) return direct;
+        if (owner == null) return null;
+        for (Class<?> type = owner.getClass(); type != null; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers())
+                        || !Channel.class.isAssignableFrom(field.getType())) {
+                    continue;
+                }
+                field.setAccessible(true);
+                Object value = field.get(owner);
+                if (value instanceof Channel channel) return channel;
+            }
+        }
+        return null;
     }
 
     /**
