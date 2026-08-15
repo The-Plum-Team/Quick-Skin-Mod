@@ -30,6 +30,7 @@ jobs:
       actions: read
       contents: read
     outputs:
+      base_matrix_kind: ${{ steps.admit.outputs.base_matrix_kind }}
       source_branch: ${{ steps.admit.outputs.source_branch }}
       source_run_id: ${{ steps.admit.outputs.source_run_id }}
       source_sha: ${{ steps.admit.outputs.source_sha }}
@@ -91,6 +92,11 @@ jobs:
              .head_sha == $sha and .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == $repository' \
             <<< "$source_run" > /dev/null
+          case "$(jq -r .event <<< "$source_run")" in
+            schedule) base_matrix_kind=native-anchors ;;
+            pull_request|workflow_dispatch) base_matrix_kind=pr-anchors ;;
+            *) exit 1 ;;
+          esac
 
           [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$TARGET_BRANCH" \
             --jq .commit.sha)" == "$TARGET_SHA" ]]
@@ -215,6 +221,7 @@ jobs:
               ((.size_in_bytes | type) == "number" and .size_in_bytes > 0))] |
              length == 1' <<< "$bundle_metadata" > /dev/null
 
+          printf 'base_matrix_kind=%s\n' "$base_matrix_kind" >> "$GITHUB_OUTPUT"
           printf 'source_branch=%s\n' "$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
           printf 'source_run_id=%s\n' "$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
           printf 'source_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
@@ -259,6 +266,7 @@ jobs:
         id: plan
         shell: bash
         env:
+          BASE_MATRIX_KIND: ${{ needs.admit.outputs.base_matrix_kind }}
           SOURCE_BRANCH: ${{ needs.admit.outputs.source_branch }}
           SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
           SOURCE_SHA: ${{ needs.admit.outputs.source_sha }}
@@ -267,9 +275,13 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          [[ "$BASE_MATRIX_KIND" == pr-anchors || \
+             "$BASE_MATRIX_KIND" == native-anchors ]]
           GITHUB_SHA="$SOURCE_SHA" \
             python3 scripts/release/verify_release.py --verify-staged
-          python3 e2e/mod_compatibility.py --plan > "$RUNNER_TEMP/compatibility-plan.raw.json"
+          python3 e2e/mod_compatibility.py --plan \
+            --base-matrix-kind "$BASE_MATRIX_KIND" \
+            > "$RUNNER_TEMP/compatibility-plan.raw.json"
           jq \
             --arg source_branch "$SOURCE_BRANCH" \
             --arg source_sha "$SOURCE_SHA" \
@@ -281,12 +293,14 @@ jobs:
             "$RUNNER_TEMP/compatibility-plan.raw.json" \
             > "$RUNNER_TEMP/mod-compatibility-plan.json"
           jq -e \
+            --arg base_matrix_kind "$BASE_MATRIX_KIND" \
             --arg source_branch "$SOURCE_BRANCH" \
             --arg source_sha "$SOURCE_SHA" \
             --arg target_branch "$TARGET_BRANCH" \
             --arg target_sha "$TARGET_SHA" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             '.schema_version == 1 and .release_branch == $target_branch and
+             .base_matrix_kind == $base_matrix_kind and
              .source_run_id == $source_run_id and .source_branch == $source_branch and
              .source_sha == $source_sha and .target_branch == $target_branch and
              .target_sha == $target_sha and
@@ -308,8 +322,27 @@ jobs:
                 (.compatibility_name | type == "string" and
                   test("^[A-Za-z0-9][A-Za-z0-9 ._+-]{0,127}$")) and
                 (.base_evidence_name | type == "string" and
-                  test("^packaged-e2e-[a-z0-9_-]{1,255}$")) and
+                  test("^packaged-e2e-[a-z0-9_-]{1,255}$") and
+                  (if $base_matrix_kind == "pr-anchors" then
+                     endswith("--pr-behavior")
+                   else endswith("--scheduled-behavior") end)) and
                 .compatibility_contract_sha256 == $lock))' \
+             "$RUNNER_TEMP/mod-compatibility-plan.json" > /dev/null
+          source_artifacts="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+          jq -e \
+            --argjson artifacts "$source_artifacts" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '([.runnable[].base_evidence_name] | unique) as $names |
+             all($names[] as $name;
+               ([$artifacts.artifacts[] | select(
+                 .name == $name and .expired == false and
+                 .workflow_run.id == $source_run_id and
+                 (.digest | type == "string" and
+                  test("^sha256:[0-9a-f]{64}$")) and
+                 ((.size_in_bytes | type) == "number" and
+                  .size_in_bytes > 0 and .size_in_bytes <= 536870912))] |
+                length == 1))' \
             "$RUNNER_TEMP/mod-compatibility-plan.json" > /dev/null
           matrix="$(jq -c '{include:.runnable}' \
             "$RUNNER_TEMP/mod-compatibility-plan.json")"
