@@ -191,10 +191,12 @@ jobs:
         shell: bash
         env:
           EXPECTED_SHA: ${{ github.event.client_payload.head_sha }}
+          GATE_RUN_ID: ${{ github.event.client_payload.run_id }}
           HEAD_BRANCH: ${{ github.event.client_payload.head_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          [[ "$GATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           pr_json="$(gh pr list --state open --head "$HEAD_BRANCH" --limit 2 \
             --json number,baseRefName,baseRefOid,headRefName,headRefOid,isCrossRepository,labels,state)"
           jq -e \
@@ -221,6 +223,19 @@ jobs:
             --jq .object.sha)"
           [[ "$remote_base_sha" == "$base_sha" ]]
           printf 'pr_number=%s\n' "$pr_number" >> "$GITHUB_OUTPUT"
+
+          # A dependency-verification rejection is a supply-chain decision, not a source repair.
+          # Never give a model authority to bless new dependency bytes; leave the PR red until a
+          # protected change records a checksum that was independently reviewed.
+          failure_log="$RUNNER_TEMP/version-port-failure.log"
+          gh run view "$GATE_RUN_ID" --log-failed > "$failure_log" 2>&1
+          if grep -Fq 'Dependency verification failed for configuration' "$failure_log"; then
+            gh pr comment "$pr_number" --body \
+              "Gradle dependency verification rejected downloaded bytes. Automated AI repair is intentionally disabled for supply-chain failures; repository variants and checksums require independent review."
+            printf 'attempt=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if gh pr view "$pr_number" --json labels --jq '.labels[].name' \
               | grep -Fxq ai-repair-attempted; then
             gh pr comment "$pr_number" --body \

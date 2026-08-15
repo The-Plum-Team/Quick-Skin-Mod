@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -477,6 +478,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("needs.select.outputs.direct == 'true'", review)
         self.assertIn("needs.capacity-check.outputs.ready == 'true'", review)
         self.assertIn("needs.capacity-probe.outputs.ready == 'true'", review)
+        self.assertIn("protected_gh_api_retry()", review)
+        self.assertIn("GitHub API review guard attempt", review)
+        self.assertIn("gh api rate_limit --jq .resources.core.reset", review)
+        self.assertIn("protected_gh_api_retry --paginate --slurp", review)
         self.assertIn("mod-compatibility-requested", release_compatibility)
         self.assertIn("needs.review.outputs.compatibility_eligible == 'true'", release_compatibility)
         self.assertIn("automated-version-sync", release_compatibility)
@@ -489,6 +494,11 @@ class WorkflowSecurityTest(unittest.TestCase):
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
         self.assertIn('endswith(" - contract scenarios")', authenticate)
+        self.assertIn("timeout-minutes: 75", authenticate)
+        self.assertIn("source scripts/ci/github_api_retry.sh", authenticate)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', authenticate)
+        self.assertIn("github_api_retry --paginate --slurp", authenticate)
+        self.assertNotIn("gh api", authenticate)
         self.assertIn("pull-requests: read", authenticate)
         self.assertIn('commits/$source_sha/pulls', authenticate)
         self.assertIn('pulls/$source_pr_number/files?per_page=100', authenticate)
@@ -512,6 +522,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("artifact_inventory", authenticate)
 
         self.assertIn("git fetch --no-tags origin \"$SOURCE_SHA\"", curate)
+        self.assertIn("timeout-minutes: 90", curate)
+        self.assertIn("source scripts/ci/github_api_retry.sh", curate)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', curate)
+        self.assertIn("github_api_retry_to_file", curate)
+        self.assertNotIn("gh api", curate)
         self.assertIn("actions/artifacts/$artifact_id", curate)
         self.assertIn("scripts/ci/bounded_zip.py", curate)
         self.assertIn("scripts/ci/e2e_job_graph.py", curate)
@@ -567,6 +582,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("persist-credentials: false", curate)
         self.assertIn("contents: write", request)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", request)
+        self.assertIn("durable visual-review wake deferred", request)
+        self.assertEqual(request.count("gh api --method POST"), 1)
 
         self.assertIn("actions/artifacts/$ARTIFACT_ID", review)
         self.assertIn("actions: write", review)
@@ -800,6 +817,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('(.conclusion == "success" or .conclusion == "failure")', enumerate_review)
         self.assertIn('elif ($matches|length) == 0 then empty', enumerate_review)
         self.assertIn('error("duplicate review capsule', enumerate_review)
+        self.assertIn("timeout-minutes: 75", enumerate_review)
+        self.assertGreaterEqual(
+            enumerate_review.count("source scripts/ci/github_api_retry.sh"), 2
+        )
+        self.assertIn(
+            'GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', enumerate_review
+        )
+        self.assertNotIn("gh api", enumerate_review)
         self.assertIn("ref: ${{ github.sha }}", review)
         self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
         self.assertIn("strategy:\n      fail-fast: false", review)
@@ -813,6 +838,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--verify-model claude-opus-5", review)
         self.assertIn("mod-compatibility-wave-block", review)
         self.assertIn("/cancel", review)
+        self.assertGreaterEqual(
+            review.count("source scripts/ci/github_api_retry.sh"), 2
+        )
+        self.assertIn("github_api_retry_to_file", review)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', review)
+        self.assertNotIn("gh api", review)
         self.assertIn("REVIEW_RESULT", review_gate)
         self.assertNotIn("base-evidence", review)
         self.assertNotIn("candidate-evidence", review)
@@ -854,6 +885,70 @@ class WorkflowSecurityTest(unittest.TestCase):
                 if item["id"] == "skin-layers-3d"
             ),
         )
+
+    def test_mod_compatibility_artifact_inventory_filter_executes(self) -> None:
+        prepare = job_block("mod-compatibility-e2e.yml", "prepare")
+        inventory_block = prepare[prepare.index("source_artifacts=") :]
+        match = re.search(
+            r'--argjson source_run_id "\$SOURCE_RUN_ID" \\\n\s+\'(?P<program>.*?)\' \\\n\s+"\$RUNNER_TEMP/mod-compatibility-plan\.json"',
+            inventory_block,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        program = match.group("program")
+        self.assertNotIn("all($names[] as $name;", program)
+
+        plan = {
+            "runnable": [
+                {"base_evidence_name": "packaged-e2e-fabric--pr-behavior"},
+                {"base_evidence_name": "packaged-e2e-fabric--pr-behavior"},
+            ]
+        }
+        artifact = {
+            "name": "packaged-e2e-fabric--pr-behavior",
+            "expired": False,
+            "workflow_run": {"id": 123},
+            "digest": "sha256:" + "a" * 64,
+            "size_in_bytes": 1024,
+        }
+
+        accepted = subprocess.run(
+            [
+                "jq",
+                "-e",
+                "--argjson",
+                "artifacts",
+                json.dumps({"artifacts": [artifact]}),
+                "--argjson",
+                "source_run_id",
+                "123",
+                program,
+            ],
+            input=json.dumps(plan),
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+        duplicate = subprocess.run(
+            [
+                "jq",
+                "-e",
+                "--argjson",
+                "artifacts",
+                json.dumps({"artifacts": [artifact, artifact]}),
+                "--argjson",
+                "source_run_id",
+                "123",
+                program,
+            ],
+            input=json.dumps(plan),
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertEqual(duplicate.returncode, 1, duplicate.stderr)
 
     def test_pages_fan_in_uses_protected_code_and_exact_release_heads(self) -> None:
         workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
@@ -1202,6 +1297,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('endswith(" - contract scenarios")', inspect)
         self.assertIn("gh api --paginate --slurp", inspect)
         self.assertIn("[.[].jobs[]", inspect)
+        self.assertIn('gh run view "$GATE_RUN_ID" --log-failed', inspect)
+        self.assertIn("Dependency verification failed for configuration", inspect)
+        self.assertIn("Automated AI repair is intentionally disabled", inspect)
+        self.assertLess(
+            inspect.index("Dependency verification failed for configuration"),
+            inspect.index("gh label create ai-repair-attempted"),
+        )
         self.assertIn("-f runtime_policy=full", repair)
 
         self.assertIn("branches/master", merge)
