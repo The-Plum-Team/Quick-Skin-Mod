@@ -35,7 +35,6 @@ public final class E2EHarness {
     private int worldWaitDeadline = 0;
     private String lastScreen = "";
     private int lastConnectionDiagnosticTick = 0;
-    private boolean stalledConnectionReadRearmed = false;
 
     private List<Step> steps;
     private int stepIndex = 0;
@@ -151,14 +150,6 @@ public final class E2EHarness {
                 && tick - lastConnectionDiagnosticTick >= 20 * 10) {
             E2ELog.info("connection -> " + VanillaShim.connectionDiagnostic(sc));
             lastConnectionDiagnosticTick = tick;
-            if (!stalledConnectionReadRearmed
-                    && Boolean.getBoolean("quickskin.e2e.rearmStalledConnectionRead")) {
-                stalledConnectionReadRearmed = true;
-                if (!VanillaShim.rearmConnectionRead(sc)) {
-                    throw new IllegalStateException("could not rearm stalled connection read");
-                }
-                E2ELog.info("connection -> rearmed the live channel read once");
-            }
         }
         if (mc.player != null && mc.level != null) {
             Scenario scenario = resolveScenario();

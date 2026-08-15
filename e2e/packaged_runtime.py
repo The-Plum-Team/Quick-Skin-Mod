@@ -1147,11 +1147,10 @@ def client_command(
             f"-Dquickskin.e2e.compatibility={compatibility_mod}"
         )
     if compatibility_mod == "replaymod" and row["runtime_version"] == "1.20.1":
-        # On affected Linux runners the live channel can intermittently stop consuming Fabric
-        # login queries even though TCP ACKs them and Netty still reports autoRead=true. Let the
-        # harness rearm that exact channel once if the connection screen remains stalled.
+        # Probe whether Netty's selected-key optimization is dropping readiness notifications on
+        # the affected Linux runner. QuickPlay and every protocol byte remain production-equivalent.
         options["jvmArguments"].append(
-            "-Dquickskin.e2e.rearmStalledConnectionRead=true"
+            "-Dio.netty.noKeySetOptimization=true"
         )
     return minecraft_launcher_lib.command.get_minecraft_command(
         version_id, str(install_dir), options

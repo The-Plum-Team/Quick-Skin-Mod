@@ -330,7 +330,9 @@ public final class VanillaShim {
         try {
             Channel channel = liveConnectionChannel(sc);
             if (channel == null) return "channel=<unavailable>";
-            return "channelType=" + channel.getClass().getName()
+            return "noKeySetOptimization="
+                    + System.getProperty("io.netty.noKeySetOptimization", "<unset>")
+                    + "; channelType=" + channel.getClass().getName()
                     + "; channelActive=" + channel.isActive()
                     + "; open=" + channel.isOpen()
                     + "; registered=" + channel.isRegistered()
@@ -340,28 +342,6 @@ public final class VanillaShim {
                     + "; pipeline=" + channel.pipeline().names();
         } catch (Throwable t) {
             return "channel=<diagnostic-failed:" + t.getClass().getSimpleName() + ">";
-        }
-    }
-
-    /** Rearms one already-live channel read without reconnecting or changing protocol bytes. */
-    public static boolean rearmConnectionRead(Screen sc) {
-        if (!isConnectScreen(sc)) return false;
-        try {
-            Channel channel = liveConnectionChannel(sc);
-            if (channel == null || !channel.isActive()) return false;
-            channel.eventLoop().execute(() -> {
-                if (!channel.isActive()) return;
-                if (channel.config().isAutoRead()) {
-                    channel.config().setAutoRead(false);
-                    channel.config().setAutoRead(true);
-                } else {
-                    channel.read();
-                }
-            });
-            return true;
-        } catch (Throwable t) {
-            E2ELog.warn("connection read rearm failed: " + t);
-            return false;
         }
     }
 
