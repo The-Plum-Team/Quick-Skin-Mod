@@ -107,7 +107,7 @@ runs:
           )
         fi
         xvfb-run --auto-servernum \
-          --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset" \
+          --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render" \
           python e2e/orchestrator.py \
             --matrix release/release-matrix.json \
             --row-json "$E2E_ROW_JSON" \
