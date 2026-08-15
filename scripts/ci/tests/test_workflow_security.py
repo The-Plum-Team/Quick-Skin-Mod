@@ -455,8 +455,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-drain-requested", capacity_resume)
         self.assertIn("contents: write", capacity_resume)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_resume)
+        self.assertIn("source scripts/ci/github_api_retry.sh", capacity_resume)
+        self.assertIn('selector_status" -eq 75', capacity_resume)
+        self.assertIn("capacity fan-out deferred", capacity_resume)
         self.assertIn("scripts/ci/visual_review_queue.py", select)
         self.assertIn("--requested-artifact-id", select)
+        self.assertIn('selector_status" -eq 75', select)
+        self.assertIn("durable queue selection deferred", select)
         self.assertIn("artifact_id=$REQUESTED_ARTIFACT_ID", select)
         self.assertIn("artifact_name=$REQUESTED_ARTIFACT_NAME", select)
         self.assertIn("generation_sha=$REQUESTED_GENERATION_SHA", select)
@@ -468,6 +473,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("contents: write", dispatch_selected)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", dispatch_selected)
         self.assertNotIn("actions/checkout@", dispatch_selected)
+        self.assertIn("exact queue wake deferred", dispatch_selected)
         self.assertIn("needs.select.outputs.direct == 'true'", review)
         self.assertIn("needs.capacity-check.outputs.ready == 'true'", review)
         self.assertIn("needs.capacity-probe.outputs.ready == 'true'", review)
@@ -477,6 +483,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("has no automatic release identity", review)
         self.assertIn("contents: write", release_compatibility)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_compatibility)
+        self.assertIn("source scripts/ci/github_api_retry.sh", release_compatibility)
+        self.assertIn("github_api_retry --method POST", release_compatibility)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', release_compatibility)
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
         self.assertIn('endswith(" - contract scenarios")', authenticate)
@@ -506,6 +515,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("actions/artifacts/$artifact_id", curate)
         self.assertIn("scripts/ci/bounded_zip.py", curate)
         self.assertIn("scripts/ci/e2e_job_graph.py", curate)
+        self.assertIn('if [[ "$job_graph_status" -eq 78 ]]', curate)
+        self.assertIn(
+            '"$(jq -r .event <<< "$source_run")" == pull_request', curate
+        )
+        self.assertIn("--allow-advisory-controller-skew", curate)
+        self.assertIn("protected post-merge generation", curate)
+        self.assertIn(
+            "steps.evidence.outputs.review_skipped == 'false'", prepare_workflow
+        )
+        self.assertNotIn("continue-on-error", curate)
         self.assertNotIn("path: source", curate)
         self.assertNotIn("git -C source", curate)
         self.assertIn('git show "$SOURCE_SHA:e2e/scenario-contract.json"', curate)
@@ -523,6 +542,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("visual reference did not reach protected", curate)
         self.assertIn("sleep 5", curate)
+        self.assertIn("github_api_retry_to_file", review)
+        self.assertIn(
+            'source "$GITHUB_WORKSPACE/scripts/ci/github_api_retry.sh"', review
+        )
         self.assertIn("--kind raw", curate)
         self.assertNotIn("scripts/pages/evidence.py compact", curate)
         self.assertIn("--reference-evidence-root \"$reference_selected\"", curate)
@@ -600,6 +623,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-report.json", review)
         self.assertIn("scripts/ci/visual_anchor_certification.py", review)
         self.assertIn("visual-anchor-certification-$master_source_sha", review)
+        self.assertIn("associated=\"$(github_api_retry", review)
         self.assertIn("visual-anchor-certification-{generation}", queue)
         self.assertIn("generation in certified", queue)
         self.assertIn('api.get_branch_sha("master")', queue)
@@ -626,6 +650,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("actions/artifacts/$ARTIFACT_ID", release_anchor)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_anchor)
         self.assertNotIn("actions/checkout@", release_anchor)
+        self.assertIn("for attempt in {1..4}", release_anchor)
+        self.assertIn("gh api rate_limit --jq .resources.core.reset", release_anchor)
+        self.assertIn("github_api_retry --method POST", release_anchor)
         self.assertIn("contents: write", continuation)
         self.assertIn("needs.review.outputs.wave_blocked != 'true'", continuation)
         self.assertIn("API rate limit exceeded", continuation)
@@ -741,7 +768,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('.base_matrix_kind == "pr-anchors"', enumerate_review)
         self.assertIn("source_artifacts=", prepare)
         self.assertIn("GH_TOKEN: ${{ github.token }}", plan_step)
-        self.assertLess(plan_step.index("GH_TOKEN:"), plan_step.index("gh api"))
+        self.assertLess(
+            plan_step.index("GH_TOKEN:"), plan_step.index("github_api_retry")
+        )
+        self.assertIn("source scripts/ci/github_api_retry.sh", admit)
+        self.assertIn("github_api_retry_to_file", admit)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', admit)
+        self.assertIn("source scripts/ci/github_api_retry.sh", prepare)
+        self.assertIn("source scripts/ci/github_api_retry.sh", runtime)
         self.assertIn("[.runnable[].base_evidence_name] | unique", prepare)
         self.assertIn(".source_branch == .target_branch", enumerate_review)
         self.assertIn('[[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]', prepare)
@@ -844,17 +878,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("protected_gh_api_retry", wake)
         self.assertIn("on-demand-e2e.yml", wake)
         self.assertIn("pages-e2e-$EVIDENCE_BRANCH", wake)
-        self.assertIn("ref: ${{ steps.request.outputs.implementation_sha }}", wake)
+        self.assertIn("ref: ${{ github.sha }}", wake)
         self.assertIn("persist-credentials: false", wake)
         self.assertIn("gh workflow run pages.yml --ref master", wake)
-        self.assertIn("ref: master", discover)
-        self.assertIn("implementation_sha:", discover)
+        self.assertIn("ref: ${{ github.sha }}", discover)
+        self.assertNotIn("implementation_sha", workflow)
         self.assertIn("git rev-parse HEAD", discover)
         for block in (collect, build):
-            self.assertIn(
-                "ref: ${{ needs.discover.outputs.implementation_sha }}",
-                block,
-            )
+            self.assertIn("ref: ${{ github.sha }}", block)
         for block in (discover, collect, build):
             self.assertIn("persist-credentials: false", block)
             self.assertNotIn("id-token: write", block)
@@ -911,9 +942,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("name=pages-cache-%s--%s", refresh)
         self.assertIn("name: ${{ steps.cache.outputs.name }}", refresh)
         self.assertIn("actions/checkout@", refresh)
-        self.assertIn(
-            "ref: ${{ needs.discover.outputs.implementation_sha }}", refresh
-        )
+        self.assertIn("ref: ${{ github.sha }}", refresh)
         self.assertIn("persist-credentials: false", refresh)
         self.assertIn("scripts/pages/evidence.py validate", refresh)
         self.assertIn("--kind compact", refresh)
@@ -961,8 +990,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('.head_branch == "master"', rotate)
         self.assertIn(".head_repository.full_name == $repository", rotate)
         self.assertIn(".workflow_id == $workflow_id", rotate)
-        self.assertIn('"repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha', rotate)
-        self.assertIn("ref: ${{ steps.owner.outputs.implementation_sha }}", rotate)
+        self.assertNotIn("implementation_sha", rotate)
+        self.assertIn("ref: ${{ github.sha }}", rotate)
         self.assertIn("persist-credentials: false", rotate)
         self.assertIn("pattern: pages-cache-*", rotate)
         self.assertIn("run-id: ${{ steps.owner.outputs.pages_run_id }}", rotate)
@@ -1054,6 +1083,31 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("needs.build.result", required)
         self.assertIn("needs.e2e.result", required)
         self.assertIn("inputs.attest_run_id == ''", required)
+
+    def test_rate_limited_gate_notifications_use_protected_bounded_retry(self) -> None:
+        e2e_notify = job_block("on-demand-e2e.yml", "notify-version-port")
+        pages_notify = job_block("on-demand-e2e.yml", "notify-pages")
+        build_notify = job_block("build-gate.yml", "notify-version-port")
+        sync_discover = job_block("sync-version-branches.yml", "discover")
+
+        for block in (e2e_notify, pages_notify, build_notify):
+            with self.subTest(name=block.splitlines()[0]):
+                self.assertIn("ref: master", block)
+                self.assertIn("persist-credentials: false", block)
+                self.assertIn("source scripts/ci/github_api_retry.sh", block)
+                self.assertIn('GITHUB_API_RETRY_ATTEMPTS: "10"', block)
+                self.assertIn("github_api_retry --method POST", block)
+
+        for block in (e2e_notify, build_notify):
+            self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', block)
+
+        self.assertIn("source scripts/ci/github_api_retry.sh", sync_discover)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', sync_discover)
+        self.assertIn("github_api_retry_to_file", sync_discover)
+        self.assertIn(
+            "github_cli_retry gh label create automated-version-sync",
+            sync_discover,
+        )
 
     def test_not_applicable_e2e_is_internal_exact_and_fail_closed(self) -> None:
         workflow = (WORKFLOWS / "on-demand-e2e.yml").read_text(encoding="utf-8")
@@ -1407,6 +1461,17 @@ class WorkflowSecurityTest(unittest.TestCase):
 
         for block in (validate, publish):
             with self.subTest(job=block.splitlines()[0].strip()):
+                self.assertIn("ref: ${{ github.sha }}", block)
+                self.assertNotIn("ref: ${{ steps.plan.outputs.source_sha }}", block)
+                self.assertNotIn("ref: ${{ steps.plan.outputs.work_head_sha }}", block)
+                self.assertIn("Prepare an empty isolated port workspace", block)
+                self.assertIn('git fetch --no-tags origin "$WORK_HEAD_SHA"', block)
+                self.assertIn("ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL", block)
+                self.assertIn("ACTIONS_CACHE_URL ACTIONS_RESULTS_URL", block)
+                self.assertIn(
+                    '[[ "$(git -C ../controller rev-parse HEAD)" == "$SOURCE_SHA" ]]',
+                    block,
+                )
                 self.assertIn('GIT_INDEX_FILE="$candidate_index" git read-tree', block)
                 self.assertIn('GIT_INDEX_FILE="$candidate_index" git apply --cached', block)
                 self.assertNotIn("git apply --index", block)
@@ -1422,6 +1487,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('[[ "$validated_tree" == "$EXPECTED_TREE" ]]', validate)
         self.assertIn('[[ "$tree" == "$candidate_tree" ]]', publish)
         self.assertIn('[[ "$tree" == "$EXPECTED_TREE" ]]', publish)
+
+        dependency_install = validate.index(
+            "Install hash-locked Pages image dependency"
+        )
+        materialize = validate.index('git fetch --no-tags origin "$WORK_HEAD_SHA"')
+        self.assertLess(dependency_install, materialize)
 
     def test_version_sync_renders_and_revalidates_target_readme(self) -> None:
         propose = job_block("sync-version-branches.yml", "propose")
@@ -1576,6 +1647,22 @@ class WorkflowSecurityTest(unittest.TestCase):
         merge_pr = merge.index('gh pr merge "$pr_number"')
         self.assertLess(revalidation, publish)
         self.assertLess(publish, merge_pr)
+
+    def test_gate_attestation_never_executes_the_release_checkout(self) -> None:
+        verify = job_block("verify-gate-attestation.yml", "verify")
+
+        self.assertIn("ref: master", verify)
+        self.assertIn("path: controller", verify)
+        self.assertNotIn("ref: ${{ inputs.target_sha }}", verify)
+        self.assertIn("source controller/scripts/ci/github_api_retry.sh", verify)
+        self.assertIn("git/commits/$TESTED_SHA", verify)
+        self.assertIn("git/commits/$TARGET_SHA", verify)
+        self.assertIn("compare/$TESTED_SHA...$TARGET_SHA", verify)
+        self.assertIn('.merge_base_commit.sha == $tested', verify)
+        self.assertIn('.commits[-1].sha == $target', verify)
+        self.assertNotIn("python3 scripts/", verify)
+        self.assertNotIn("git checkout", verify)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', verify)
 
     def test_credentialed_writers_do_not_receive_claude_credentials(self) -> None:
         for workflow, job in (

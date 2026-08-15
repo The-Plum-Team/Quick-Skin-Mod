@@ -60,9 +60,6 @@ jobs:
     permissions:
       actions: write
       contents: read
-    outputs:
-      implementation_sha: ${{ steps.request.outputs.implementation_sha }}
-
     steps:
       # The source run may still be settling because its final advisory notification created this
       # event. Authenticate it before checking out or executing any repository code.
@@ -154,17 +151,13 @@ jobs:
               .workflow_run.head_branch == $branch and
               .workflow_run.head_sha == $sha)] | length' <<< "$artifacts")" == 1 ]]
 
-          implementation_sha="$(protected_gh_api_retry \
-            "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
-          [[ "$implementation_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
-          printf 'implementation_sha=%s\n' "$implementation_sha" >> "$GITHUB_OUTPUT"
 
       - name: Check out the exact protected dispatcher
         if: steps.request.outputs.eligible == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.request.outputs.implementation_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Dispatch one protected all-branch deployment
@@ -177,7 +170,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          [[ "$(git rev-parse HEAD)" == "${{ steps.request.outputs.implementation_sha }}" ]]
+          [[ "$GITHUB_REF" == refs/heads/master ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
           python3 scripts/release/version_branches.py \
             --target "$EVIDENCE_BRANCH" > /dev/null
           gh workflow run pages.yml --ref master \
@@ -200,13 +194,12 @@ jobs:
     outputs:
       branches: ${{ steps.inventory.outputs.branches }}
       eligible: ${{ steps.inventory.outputs.eligible }}
-      implementation_sha: ${{ steps.inventory.outputs.implementation_sha }}
 
     steps:
       - name: Check out protected site implementation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: master
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Discover release branches and validate the wake-up event
@@ -224,10 +217,9 @@ jobs:
           printf 'branches=[]\n' >> "$GITHUB_OUTPUT"
           printf 'eligible=false\n' >> "$GITHUB_OUTPUT"
 
-          default_sha="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
-          [[ "$(git rev-parse HEAD)" == "$default_sha" ]]
-          printf 'implementation_sha=%s\n' "$default_sha" >> "$GITHUB_OUTPUT"
+          [[ "$GITHUB_REF" == refs/heads/master ]]
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
 
           workflow_id="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/workflows/on-demand-e2e.yml" --jq .id)"
@@ -388,7 +380,7 @@ jobs:
       - name: Check out protected evidence validator
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.discover.outputs.implementation_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Install Python
@@ -541,7 +533,7 @@ jobs:
       - name: Check out protected site implementation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.discover.outputs.implementation_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Install Python
@@ -648,7 +640,7 @@ jobs:
       - name: Check out the exact protected evidence validator
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.discover.outputs.implementation_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Install Python
@@ -825,11 +817,7 @@ jobs:
             exit 0
           fi
 
-          implementation_sha="$(protected_gh_api_retry \
-            "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
-          [[ "$implementation_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
-          printf 'implementation_sha=%s\n' "$implementation_sha" >> "$GITHUB_OUTPUT"
           printf 'pages_run_id=%s\n' "$PAGES_RUN_ID" >> "$GITHUB_OUTPUT"
           printf 'pages_run_sha=%s\n' "$PAGES_RUN_SHA" >> "$GITHUB_OUTPUT"
 
@@ -837,7 +825,7 @@ jobs:
         if: steps.owner.outputs.eligible == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.owner.outputs.implementation_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Install Python
