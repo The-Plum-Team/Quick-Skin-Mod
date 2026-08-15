@@ -304,7 +304,7 @@ class E2EJobGraphTest(unittest.TestCase):
             git("add", ".")
             git("commit", "--quiet", "-m", "weaken controller")
             weakened_sha = git("rev-parse", "HEAD")
-            with self.assertRaisesRegex(graph.JobGraphError, "controller.txt"):
+            with self.assertRaisesRegex(graph.ControllerSkewError, "controller.txt"):
                 graph.validate_controller_parity(
                     repository,
                     protected_sha=protected_sha,
@@ -339,6 +339,105 @@ class E2EJobGraphTest(unittest.TestCase):
                     head_sha=weakened_sha,
                     paths=("controller.txt",),
                     version_specific_paths=("variant.txt",),
+                )
+
+    def test_controller_skew_has_a_distinct_cli_exit_code(self) -> None:
+        with (
+            mock.patch.object(graph, "load_matrix", return_value={}),
+            mock.patch.object(graph, "read_mod_version", return_value="1.20.1"),
+            mock.patch.object(
+                graph, "validate_loader_bootstraps", return_value=("fabric", "forge")
+            ),
+            mock.patch.object(
+                graph, "expected_scenario_jobs_from_data", return_value=self.expected
+            ),
+            mock.patch.object(graph, "_read_json", return_value={"jobs": []}),
+            mock.patch.object(graph, "validate_job_graph", return_value={}),
+            mock.patch.object(
+                graph,
+                "validate_controller_parity",
+                side_effect=graph.ControllerSkewError("controller changed"),
+            ),
+            mock.patch.object(
+                graph,
+                "validate_advisory_controller_skew",
+                return_value=(".github/workflows/e2e.yml",),
+            ) as advisory,
+        ):
+            error = io.StringIO()
+            with redirect_stdout(io.StringIO()), mock.patch("sys.stderr", error):
+                result = graph.main(
+                    [
+                        "--matrix",
+                        "unused-matrix.json",
+                        "--jobs",
+                        "unused-jobs.json",
+                        "--repository",
+                        str(ROOT),
+                        "--protected-sha",
+                        "0" * 40,
+                        "--head-sha",
+                        "1" * 40,
+                        "--runtime-policy",
+                        "full",
+                        "--allow-advisory-controller-skew",
+                    ]
+                )
+
+        self.assertEqual(78, graph.CONTROLLER_SKEW_EXIT_CODE)
+        self.assertEqual(graph.CONTROLLER_SKEW_EXIT_CODE, result)
+        self.assertIn("Packaged E2E controller skew", error.getvalue())
+        advisory.assert_called_once()
+
+    def test_advisory_controller_skip_rejects_a_mixed_product_diff(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+
+            def git(*arguments: str) -> str:
+                return subprocess.run(
+                    ("git", *arguments),
+                    cwd=repository,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    text=True,
+                ).stdout.strip()
+
+            git("init", "--quiet")
+            git("config", "user.name", "E2E test")
+            git("config", "user.email", "e2e@example.invalid")
+            workflow = repository / ".github/workflows/e2e.yml"
+            policy = repository / "scripts/ci/policy.py"
+            product = repository / "common/src/main/java/QuickSkin.java"
+            for path in (workflow, policy, product):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("one\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "--quiet", "-m", "base")
+            protected_sha = git("rev-parse", "HEAD")
+
+            workflow.write_text("two\n", encoding="utf-8")
+            policy.write_text("two\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "--quiet", "-m", "ci only")
+            ci_sha = git("rev-parse", "HEAD")
+            self.assertEqual(
+                (".github/workflows/e2e.yml", "scripts/ci/policy.py"),
+                graph.validate_advisory_controller_skew(
+                    repository,
+                    protected_sha=protected_sha,
+                    head_sha=ci_sha,
+                ),
+            )
+
+            product.write_text("two\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "--quiet", "-m", "mixed product")
+            mixed_sha = git("rev-parse", "HEAD")
+            with self.assertRaisesRegex(graph.JobGraphError, "QuickSkin.java"):
+                graph.validate_advisory_controller_skew(
+                    repository,
+                    protected_sha=protected_sha,
+                    head_sha=mixed_sha,
                 )
 
     def test_active_loader_bootstrap_and_final_gradle_binding_are_exact(self) -> None:
