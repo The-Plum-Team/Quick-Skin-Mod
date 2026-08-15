@@ -70,9 +70,18 @@ def owner(
 
 
 class FakeApi:
-    def __init__(self, artifacts: list[Artifact], runs: dict[int, dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        artifacts: list[Artifact],
+        runs: dict[int, dict[str, Any]],
+        *,
+        branch_sha: str = SHA,
+        pulls: dict[int, dict[str, Any]] | None = None,
+    ) -> None:
         self.artifacts = artifacts
         self.runs = runs
+        self.branch_sha = branch_sha
+        self.pulls = pulls or {}
 
     def list_artifacts(self) -> list[Artifact]:
         return list(self.artifacts)
@@ -102,6 +111,18 @@ class FakeApi:
                 "head_branch": "feature/example",
             },
         )
+
+    def get_branch_sha(self, branch: str) -> str:
+        self.assert_master(branch)
+        return self.branch_sha
+
+    @staticmethod
+    def assert_master(branch: str) -> None:
+        if branch != "master":
+            raise AssertionError(f"unexpected branch lookup: {branch}")
+
+    def get_pull(self, number: int) -> dict[str, Any]:
+        return self.pulls[number]
 
 
 class VisualReviewQueueTest(unittest.TestCase):
@@ -147,6 +168,90 @@ class VisualReviewQueueTest(unittest.TestCase):
                 repository=REPOSITORY,
                 requested_artifact_id=999,
             )
+        )
+
+    def test_certified_release_generation_never_reenters_semantic_review(self) -> None:
+        requested = artifact(
+            2,
+            f"visual-review-input-200-{SHA}",
+            run_id=20,
+            minutes_ago=10,
+        )
+        certificate = artifact(
+            3,
+            f"visual-anchor-certification-{SHA}",
+            run_id=30,
+            minutes_ago=5,
+        )
+        runs = {
+            20: owner(20, PREPARE_WORKFLOW),
+            30: owner(30, DRAIN_WORKFLOW),
+            200: {
+                "status": "completed",
+                "conclusion": "success",
+                "event": "workflow_dispatch",
+                "head_branch": "automation/sync/forge-and-fabric-1.20.1/200-1",
+                "head_sha": "c" * 40,
+            },
+        }
+        api = FakeApi([requested, certificate], runs)
+
+        self.assertIsNone(select_pending(api, repository=REPOSITORY, now=NOW))
+        self.assertIsNone(
+            select_requested(
+                api,
+                repository=REPOSITORY,
+                requested_artifact_id=requested.artifact_id,
+                now=NOW,
+            )
+        )
+
+    def test_superseded_release_anchor_and_closed_pull_request_are_skipped(self) -> None:
+        old_generation = "c" * 40
+        superseded = artifact(
+            2,
+            f"visual-review-input-200-{old_generation}",
+            run_id=20,
+            minutes_ago=20,
+        )
+        closed_pr = artifact(3, "visual-review-input-300", run_id=30, minutes_ago=10)
+        runs = {
+            20: owner(20, PREPARE_WORKFLOW),
+            30: owner(30, PREPARE_WORKFLOW),
+            200: {
+                "status": "completed",
+                "conclusion": "success",
+                "event": "workflow_dispatch",
+                "head_branch": "automation/sync/forge-and-fabric-1.20.1/200-1",
+                "head_sha": "d" * 40,
+            },
+            300: {
+                "status": "completed",
+                "conclusion": "success",
+                "event": "pull_request",
+                "head_branch": "feature/closed",
+                "head_sha": SHA,
+                "pull_requests": [{"number": 42}],
+            },
+        }
+        pulls = {
+            42: {
+                "state": "closed",
+                "head": {
+                    "sha": SHA,
+                    "ref": "feature/closed",
+                    "repo": {"full_name": REPOSITORY},
+                },
+            }
+        }
+
+        self.assertEqual(
+            [],
+            list_pending_candidates(
+                FakeApi([superseded, closed_pr], runs, pulls=pulls),
+                repository=REPOSITORY,
+                now=NOW,
+            ),
         )
 
     def test_exact_wake_honors_report_cooldown_and_generation_block(self) -> None:
