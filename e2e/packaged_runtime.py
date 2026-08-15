@@ -1032,6 +1032,39 @@ def write_e2e_client_config(game_dir: Path) -> Path:
     return config_path
 
 
+def write_compatibility_client_config(
+    game_dir: Path, compatibility_mod: str
+) -> Path | None:
+    """Seed only the third-party settings needed for a deterministic compatibility probe.
+
+    ReplayMod records every multiplayer connection by default. Recording is unrelated to the
+    Quick Skin rendering bridge exercised by this lane, and a replay writer/recovery failure in a
+    disposable profile would be an upstream false failure. Use ReplayMod's own supported setting
+    to leave the integration loaded while preventing that unrelated recorder from owning the test
+    connection.
+    """
+
+    if compatibility_mod != "replaymod":
+        return None
+
+    config_path = game_dir / "config" / "replaymod.json"
+    if config_path.exists() or config_path.is_symlink():
+        raise RuntimeFailure(
+            f"compatibility client config must start absent: {config_path}"
+        )
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        json.dumps(
+            {"recording": {"recordServer": False}},
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return config_path
+
+
 def offline_player_uuid(username: str) -> str:
     """Return Java's ``UUID.nameUUIDFromBytes`` identity for an offline player."""
 
@@ -1978,6 +2011,10 @@ def run_packaged_row(
                     repo / "e2e" / "options.txt.template", game_dir / "options.txt"
                 )
                 write_e2e_client_config(game_dir)
+                if compatibility_lane is not None:
+                    write_compatibility_client_config(
+                        game_dir, compatibility_lane.mod.id
+                    )
                 if row["loader"] == "neoforge":
                     shutil.copy2(
                         repo / "e2e" / "fml.toml.neoforge",

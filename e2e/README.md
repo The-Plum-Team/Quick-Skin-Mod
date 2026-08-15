@@ -332,6 +332,13 @@ the lock updater preserves those authored exclusions.
 Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, and ReplayMod. Player Armor Stands
 is intentionally absent and unsupported. A runtime may install only the exact URL, filename, byte
 size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth for `latest`.
+The ReplayMod lane seeds ReplayMod's supported `recordServer=false` client setting: the mod and
+Quick Skin bridge remain loaded, while its unrelated replay writer cannot turn the disposable
+multiplayer probe into a recording/recovery failure before the rendering assertions begin.
+Essential's title-screen checkpoint follows its production integration contract: Essential owns
+the menu player model, Quick Skin suppresses the duplicate preview, preserves its action icon and
+registers the selected appearance for Essential's renderer. Its compatibility-review expectation
+describes that intentional alternative instead of requiring the clean splash-overlap layout.
 Inspect the current branch plan without launching Minecraft:
 
 ```bash
@@ -361,7 +368,8 @@ python3 e2e/mod_compatibility.py --validate
 ```
 
 Each deterministic lane that passes immediately authenticates its full modded result and the clean
-same-version/loader result, pairs every contracted capture, and re-encodes only bounded,
+same-version/loader result from the exact source run and source profile, pairs every contracted
+capture, and re-encodes only bounded,
 metadata-free PNGs. A failing sibling keeps the runtime wave red but cannot erase or suppress these
 successful capsules. Compatibility launches omit Mixin's global debug injection-count flag because
 it changes optional third-party mixin behavior; the clean packaged suite retains that stricter
