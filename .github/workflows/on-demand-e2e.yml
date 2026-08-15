@@ -345,12 +345,19 @@ jobs:
         id: matrix
         shell: bash
         env:
+          HEAD_REF: ${{ github.head_ref }}
           MATRIX_KIND: ${{ github.event_name == 'schedule' && 'native-anchors' || 'pr-anchors' }}
         run: |
           set -euo pipefail
           matrix="$(python scripts/release/matrix.py \
             --matrix release/release-matrix.json \
             --kind "$MATRIX_KIND")"
+          if [[ "$GITHUB_EVENT_NAME" == pull_request && \
+              "$HEAD_REF" == diagnostic/replaymod-linux-login ]]; then
+            matrix="$(jq -c \
+              '{include: [.include[] | select(.loader == "fabric") |
+                .scenarios = "mod-compatibility"]}' <<< "$matrix")"
+          fi
           python -c 'import json,sys; value=json.loads(sys.argv[1]); assert value' "$matrix"
           printf 'coverage matrix: %s\n' "$MATRIX_KIND"
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
@@ -394,6 +401,7 @@ jobs:
           row-json: ${{ toJSON(matrix) }}
           source-sha: ${{ github.sha }}
           scenarios: ${{ matrix.scenarios }}
+          compatibility-mod: ${{ github.head_ref == 'diagnostic/replaymod-linux-login' && 'replaymod' || '' }}
           evidence-name: packaged-e2e-${{ matrix.id }}
           evidence-retention-days: ${{ startsWith(github.ref_name, 'automation/sync/') && '7' || '1' }}
 
