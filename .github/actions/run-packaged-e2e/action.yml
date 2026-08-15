@@ -58,6 +58,7 @@ runs:
         sudo apt-get install --yes --no-install-recommends \
           xvfb \
           xauth \
+          tcpdump \
           mesa-utils \
           libgl1-mesa-dri \
           libglx-mesa0 \
@@ -106,6 +107,10 @@ runs:
             --compatibility-mod "$E2E_COMPATIBILITY_MOD"
           )
         fi
+        network_trace="$RUNNER_TEMP/quick-skin-loopback-tcp.log"
+        sudo tcpdump -i lo -nn -tttt -vvv -s 0 -XX tcp > "$network_trace" 2>&1 &
+        tcpdump_pid=$!
+        runtime_status=0
         xvfb-run --auto-servernum \
           --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render" \
           python e2e/orchestrator.py \
@@ -114,7 +119,13 @@ runs:
             --artifacts-manifest build/release/artifacts.json \
             --packaged \
             --scenarios "$E2E_SCENARIOS" \
-            "${compatibility_arguments[@]}"
+            "${compatibility_arguments[@]}" || runtime_status=$?
+        sudo kill -INT "$tcpdump_pid" 2> /dev/null || true
+        wait "$tcpdump_pid" || true
+        if [[ -d e2e-out/current ]]; then
+          cp "$network_trace" e2e-out/current/network.log
+        fi
+        exit "$runtime_status"
 
     - name: Summarize runtime cost and cache behavior
       if: always()
@@ -135,6 +146,7 @@ runs:
           e2e-out/current/summary.json
           e2e-out/current/resolved-matrix.json
           e2e-out/current/runtime-store.json
+          e2e-out/current/network.log
           e2e-out/current/profiles/**/result.json
           e2e-out/current/profiles/**/logs/**
           e2e-out/current/profiles/**/e2e-report/**
