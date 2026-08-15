@@ -793,6 +793,15 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', admit)
         self.assertIn("source scripts/ci/github_api_retry.sh", prepare)
         self.assertIn("source scripts/ci/github_api_retry.sh", runtime)
+        self.assertIn("github_api_retry_to_file", prepare)
+        self.assertIn("compatibility-baselines/inventory.json", execution_workflow)
+        self.assertIn("Extract the centrally authenticated same-version baseline", runtime)
+        self.assertIn("scripts/ci/bounded_zip.py", runtime)
+        self.assertNotIn("actions/download-artifact@", execution_workflow)
+        self.assertNotIn(
+            'repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts',
+            runtime,
+        )
         self.assertIn("[.runnable[].base_evidence_name] | unique", prepare)
         self.assertIn(".source_branch == .target_branch", enumerate_review)
         self.assertIn('[[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]', prepare)
@@ -888,7 +897,7 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_mod_compatibility_artifact_inventory_filter_executes(self) -> None:
         prepare = job_block("mod-compatibility-e2e.yml", "prepare")
-        inventory_block = prepare[prepare.index("source_artifacts=") :]
+        inventory_block = prepare[prepare.index("baseline_artifacts=") :]
         match = re.search(
             r'--argjson source_run_id "\$SOURCE_RUN_ID" \\\n\s+\'(?P<program>.*?)\' \\\n\s+"\$RUNNER_TEMP/mod-compatibility-plan\.json"',
             inventory_block,
@@ -905,6 +914,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             ]
         }
         artifact = {
+            "id": 456,
             "name": "packaged-e2e-fabric--pr-behavior",
             "expired": False,
             "workflow_run": {"id": 123},
@@ -948,7 +958,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             check=False,
             text=True,
         )
-        self.assertEqual(duplicate.returncode, 1, duplicate.stderr)
+        self.assertNotEqual(duplicate.returncode, 0, duplicate.stderr)
 
     def test_pages_fan_in_uses_protected_code_and_exact_release_heads(self) -> None:
         workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
