@@ -2,7 +2,8 @@ name: Mod compatibility E2E
 
 # A clean, normalized base visual review requests this second wave. The protected admission job
 # reauthenticates that report, the tested source bytes, and the exact merged release tree before any
-# external mod is downloaded. Every applicable mod/loader lane then starts in parallel.
+# external mod is downloaded. Preparation fetches each clean baseline once with reset-aware retries;
+# every applicable mod/loader lane then starts in parallel from that authenticated local copy.
 on:
   repository_dispatch:
     types:
@@ -259,15 +260,6 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Fetch the exact already-tested production bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: e2e-input-bundle
-          path: build/release
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.admit.outputs.source_run_id }}
-
       - name: Reverify the source-bound bundle and resolve every applicable lane
         id: plan
         shell: bash
@@ -288,6 +280,56 @@ jobs:
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
           [[ "$BASE_MATRIX_KIND" == pr-anchors || \
              "$BASE_MATRIX_KIND" == native-anchors ]]
+
+          source_artifacts="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+          bundle="$(jq -cer \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '[.artifacts[] | select(
+              .name == "e2e-input-bundle" and .expired == false and
+              .workflow_run.id == $source_run_id and
+              ((.id | type) == "number" and .id > 0) and
+              (.digest | type == "string" and
+                test("^sha256:[0-9a-f]{64}$")) and
+              ((.size_in_bytes | type) == "number" and
+                .size_in_bytes > 0 and .size_in_bytes <= 536870912))] |
+             if length == 1 then .[0]
+             else error("production bundle identity is not unique") end' \
+            <<< "$source_artifacts")"
+          IFS=$'\t' read -r bundle_id bundle_size bundle_digest < <(
+            jq -r '[.id,.size_in_bytes,.digest] | @tsv' <<< "$bundle"
+          )
+          [[ "$bundle_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$bundle_size" =~ ^[1-9][0-9]*$ ]]
+          (( bundle_size <= 536870912 ))
+          [[ "$bundle_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          bundle_metadata="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$bundle_id")"
+          jq -e \
+            --arg digest "$bundle_digest" \
+            --argjson artifact_id "$bundle_id" \
+            --argjson run_id "$SOURCE_RUN_ID" \
+            --argjson size "$bundle_size" \
+            '.id == $artifact_id and .name == "e2e-input-bundle" and
+             .digest == $digest and .size_in_bytes == $size and
+             .expired == false and .workflow_run.id == $run_id' \
+            <<< "$bundle_metadata" > /dev/null
+          bundle_archive="$RUNNER_TEMP/e2e-input-bundle.zip"
+          github_api_retry_to_file "$bundle_archive" \
+            -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$bundle_id/zip"
+          [[ "$(stat -c %s "$bundle_archive")" == "$bundle_size" ]]
+          [[ "sha256:$(sha256sum "$bundle_archive" | cut -d ' ' -f 1)" == \
+             "$bundle_digest" ]]
+          mkdir -p build
+          python3 scripts/ci/bounded_zip.py \
+            "$bundle_archive" build/release \
+            --max-archive-bytes 536870912 \
+            --max-entries 512 \
+            --max-total-bytes 536870912 \
+            --max-file-bytes 67108864 \
+            --max-compression-ratio 200 > /dev/null
+          rm -f -- "$bundle_archive"
           GITHUB_SHA="$SOURCE_SHA" \
             python3 scripts/release/verify_release.py --verify-staged
           python3 e2e/mod_compatibility.py --plan \
@@ -339,9 +381,7 @@ jobs:
                    else endswith("--scheduled-behavior") end)) and
                 .compatibility_contract_sha256 == $lock))' \
              "$RUNNER_TEMP/mod-compatibility-plan.json" > /dev/null
-          source_artifacts="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
-          jq -e \
+          baseline_artifacts="$(jq -cer \
             --argjson artifacts "$source_artifacts" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             '([.runnable[].base_evidence_name] | unique) as $names |
@@ -349,13 +389,60 @@ jobs:
                ([$artifacts.artifacts[] | select(
                  .name == $name and .expired == false and
                  .workflow_run.id == $source_run_id and
+                 ((.id | type) == "number" and .id > 0) and
                  (.digest | type == "string" and
                   test("^sha256:[0-9a-f]{64}$")) and
                  ((.size_in_bytes | type) == "number" and
                   .size_in_bytes > 0 and .size_in_bytes <= 536870912))] |
-                length == 1)] | all' \
-            "$RUNNER_TEMP/mod-compatibility-plan.json" > /dev/null
-          matrix="$(jq -c '{include:.runnable}' \
+                if length == 1 then .[0] |
+                  {id,name,size_in_bytes,digest,expired,
+                   workflow_run:{id:.workflow_run.id}}
+                else error("baseline artifact identity is not unique") end)]' \
+            "$RUNNER_TEMP/mod-compatibility-plan.json")"
+          # Keep the original authenticated ZIP bytes inside the shared input bundle. This avoids
+          # one cross-run REST download per mod lane without weakening digest or extraction checks.
+          baseline_root=build/release/compatibility-baselines
+          mkdir -p "$baseline_root"
+          jq -n \
+            --argjson artifacts "$baseline_artifacts" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '{schema_version:1,source_run_id:$source_run_id,artifacts:$artifacts}' \
+            > "$baseline_root/inventory.json"
+          while IFS=$'\t' read -r artifact_id artifact_name artifact_size artifact_digest; do
+            [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]]
+            [[ "$artifact_name" =~ ^packaged-e2e-[a-z0-9_-]{1,255}$ ]]
+            [[ "$artifact_size" =~ ^[1-9][0-9]*$ ]]
+            (( artifact_size <= 536870912 ))
+            [[ "$artifact_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            metadata="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id")"
+            jq -e \
+              --arg digest "$artifact_digest" \
+              --arg name "$artifact_name" \
+              --argjson artifact_id "$artifact_id" \
+              --argjson run_id "$SOURCE_RUN_ID" \
+              --argjson size "$artifact_size" \
+              '.id == $artifact_id and .name == $name and .digest == $digest and
+               .size_in_bytes == $size and .expired == false and
+               .workflow_run.id == $run_id' <<< "$metadata" > /dev/null
+            archive="$baseline_root/$artifact_id.zip"
+            github_api_retry_to_file "$archive" \
+              -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip"
+            [[ "$(stat -c %s "$archive")" == "$artifact_size" ]]
+            [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
+               "$artifact_digest" ]]
+          done < <(
+            jq -r '.[] | [.id,.name,.size_in_bytes,.digest] | @tsv' \
+              <<< "$baseline_artifacts"
+          )
+          matrix="$(jq -c \
+            --argjson artifacts "$baseline_artifacts" \
+            '{include:[.runnable[] as $lane |
+              ($artifacts[] | select(.name == $lane.base_evidence_name)) as $artifact |
+              $lane + {base_artifact:{id:$artifact.id,name:$artifact.name,
+                size_in_bytes:$artifact.size_in_bytes,digest:$artifact.digest,
+                run_id:$artifact.workflow_run.id}}]}' \
             "$RUNNER_TEMP/mod-compatibility-plan.json")"
           count="$(jq '.runnable | length' "$RUNNER_TEMP/mod-compatibility-plan.json")"
           [[ "$count" =~ ^[0-9]+$ ]]
@@ -430,14 +517,48 @@ jobs:
           --require-hashes
           --requirement scripts/pages/requirements.txt
 
-      - name: Download the clean same-version baseline
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: ${{ matrix.base_evidence_name }}
-          path: base-evidence
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.admit.outputs.source_run_id }}
+      - name: Extract the centrally authenticated same-version baseline
+        shell: bash
+        env:
+          ARTIFACT_DIGEST: ${{ matrix.base_artifact.digest }}
+          ARTIFACT_ID: ${{ matrix.base_artifact.id }}
+          ARTIFACT_NAME: ${{ matrix.base_artifact.name }}
+          ARTIFACT_RUN_ID: ${{ matrix.base_artifact.run_id }}
+          ARTIFACT_SIZE: ${{ matrix.base_artifact.size_in_bytes }}
+          BASE_NAME: ${{ matrix.base_evidence_name }}
+          SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
+          (( ARTIFACT_SIZE <= 536870912 ))
+          [[ "$ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$ARTIFACT_NAME" == "$BASE_NAME" ]]
+          [[ "$ARTIFACT_RUN_ID" == "$SOURCE_RUN_ID" ]]
+          inventory=build/release/compatibility-baselines/inventory.json
+          jq -e \
+            --arg digest "$ARTIFACT_DIGEST" \
+            --arg name "$BASE_NAME" \
+            --argjson artifact_id "$ARTIFACT_ID" \
+            --argjson run_id "$SOURCE_RUN_ID" \
+            --argjson size "$ARTIFACT_SIZE" \
+            '.schema_version == 1 and .source_run_id == $run_id and
+             ([.artifacts[] | select(
+               .id == $artifact_id and .name == $name and .digest == $digest and
+               .size_in_bytes == $size and .expired == false and
+               .workflow_run.id == $run_id)] | length == 1)' \
+            "$inventory" > /dev/null
+          archive="build/release/compatibility-baselines/$ARTIFACT_ID.zip"
+          test -f "$archive" -a ! -L "$archive"
+          [[ "$(stat -c %s "$archive")" == "$ARTIFACT_SIZE" ]]
+          [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
+             "$ARTIFACT_DIGEST" ]]
+          python3 scripts/ci/bounded_zip.py "$archive" base-evidence \
+            --max-archive-bytes 536870912 \
+            --max-entries 512 \
+            --max-total-bytes 536870912 \
+            --max-file-bytes 33554432 \
+            --max-compression-ratio 200 > /dev/null
 
       - name: Snapshot artifact provenance and curate only inert PNG pairs
         shell: bash
@@ -465,12 +586,12 @@ jobs:
             fi
             sleep 5
           done
-          base="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+          base=build/release/compatibility-baselines/inventory.json
+          base_json="$(<"$base")"
           jq -n \
             --arg base_name "$BASE_NAME" \
             --arg candidate_name "$CANDIDATE_NAME" \
-            --argjson base "$base" \
+            --argjson base "$base_json" \
             --argjson candidate "$current" \
             --argjson base_run_id "$SOURCE_RUN_ID" \
             --argjson candidate_run_id "$GITHUB_RUN_ID" \
