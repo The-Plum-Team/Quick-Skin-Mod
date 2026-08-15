@@ -57,6 +57,7 @@ jobs:
           EVENT_ACTION: ${{ github.event.action }}
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           PAYLOAD_ANCHOR_SOURCE_SHA: ${{ github.event.client_payload.anchor_source_sha }}
           PAYLOAD_ANCHOR_TARGET_SHA: ${{ github.event.client_payload.anchor_target_sha }}
@@ -234,6 +235,7 @@ jobs:
         env:
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail

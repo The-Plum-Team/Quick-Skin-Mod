@@ -485,6 +485,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_compatibility)
         self.assertIn("source scripts/ci/github_api_retry.sh", release_compatibility)
         self.assertIn("github_api_retry --method POST", release_compatibility)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', release_compatibility)
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
         self.assertIn('endswith(" - contract scenarios")', authenticate)
@@ -639,7 +640,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("actions/artifacts/$ARTIFACT_ID", release_anchor)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", release_anchor)
         self.assertNotIn("actions/checkout@", release_anchor)
-        self.assertIn("for attempt in {1..10}", release_anchor)
+        self.assertIn("for attempt in {1..4}", release_anchor)
+        self.assertIn("gh api rate_limit --jq .resources.core.reset", release_anchor)
         self.assertIn("github_api_retry --method POST", release_anchor)
         self.assertIn("contents: write", continuation)
         self.assertIn("needs.review.outputs.wave_blocked != 'true'", continuation)
@@ -761,6 +763,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("source scripts/ci/github_api_retry.sh", admit)
         self.assertIn("github_api_retry_to_file", admit)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', admit)
         self.assertIn("source scripts/ci/github_api_retry.sh", prepare)
         self.assertIn("source scripts/ci/github_api_retry.sh", runtime)
         self.assertIn("[.runnable[].base_evidence_name] | unique", prepare)
@@ -1090,7 +1093,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 self.assertIn('GITHUB_API_RETRY_ATTEMPTS: "10"', block)
                 self.assertIn("github_api_retry --method POST", block)
 
+        for block in (e2e_notify, build_notify):
+            self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', block)
+
         self.assertIn("source scripts/ci/github_api_retry.sh", sync_discover)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', sync_discover)
         self.assertIn("github_api_retry_to_file", sync_discover)
         self.assertIn(
             "github_cli_retry gh label create automated-version-sync",

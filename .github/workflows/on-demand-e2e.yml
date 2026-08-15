@@ -651,7 +651,7 @@ jobs:
       inputs.attest_run_id == '' &&
       startsWith(github.ref_name, 'automation/sync/')
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 75
     permissions:
       contents: write
 
@@ -668,6 +668,7 @@ jobs:
           GATE_RESULT: ${{ needs.required-gate.result }}
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           RUNTIME_POLICY: ${{ needs.runtime-policy.outputs.effective || inputs.runtime_policy }}
         run: |
@@ -702,6 +703,7 @@ jobs:
         env:
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail

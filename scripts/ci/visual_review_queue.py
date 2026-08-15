@@ -46,8 +46,8 @@ DEFAULT_COOLDOWN_MINUTES = 30
 MAX_NAMED_ARTIFACTS = 1_000
 MAX_CAPACITY_FANOUT = 256
 REQUEST_ATTEMPTS = 4
-RATE_LIMIT_REQUEST_ATTEMPTS = 12
-MAX_RATE_LIMIT_RETRY_DELAY_SECONDS = 60
+RATE_LIMIT_REQUEST_ATTEMPTS = 4
+MAX_RATE_LIMIT_WAIT_SECONDS = 300
 RETRYABLE_HTTP_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
 
 
@@ -595,25 +595,31 @@ class GitHubApi:
     def _retry_delay(
         path: str,
         attempt: int,
-        *,
-        maximum: int = 30,
-        headers: Any | None = None,
     ) -> float:
         # Deterministic sub-second skew prevents a parallel release wave from retrying in lockstep.
         jitter = (sum(path.encode("utf-8")) % 997) / 997
-        delay = min(2**attempt, maximum)
-        if headers is not None:
-            retry_after = headers.get("Retry-After", "")
-            reset_at = headers.get("X-RateLimit-Reset", "")
-            try:
-                delay = max(delay, int(retry_after))
-            except (TypeError, ValueError):
-                pass
-            try:
-                delay = max(delay, int(reset_at) - int(time.time()) + 2)
-            except (TypeError, ValueError):
-                pass
-        return min(max(delay, 0), maximum) + jitter
+        return min(2**attempt, 30) + jitter
+
+    @staticmethod
+    def _rate_limit_retry_delay(
+        path: str, attempt: int, *, headers: Any
+    ) -> float:
+        # GitHub explicitly requires primary callers to wait until X-RateLimit-Reset and secondary
+        # callers without Retry-After to wait at least one minute. Never cap that declared delay and
+        # accidentally poll the exhausted bucket early.
+        jitter = (sum(path.encode("utf-8")) % 997) / 997
+        delay = max(60, 2**attempt)
+        retry_after = headers.get("Retry-After", "")
+        reset_at = headers.get("X-RateLimit-Reset", "")
+        try:
+            delay = max(delay, int(retry_after))
+        except (TypeError, ValueError):
+            pass
+        try:
+            delay = max(delay, int(reset_at) - int(time.time()) + 2)
+        except (TypeError, ValueError):
+            pass
+        return max(delay, 0) + jitter
 
     def _request(self, path: str, *, missing_ok: bool = False) -> Any:
         last_error: BaseException | None = None
@@ -647,12 +653,13 @@ class GitHubApi:
                     retry_attempt = rate_limit_attempts
                     rate_limit_attempts += 1
                     exhausted = rate_limit_attempts >= RATE_LIMIT_REQUEST_ATTEMPTS
-                    retry_delay = self._retry_delay(
-                        path,
-                        retry_attempt,
-                        maximum=MAX_RATE_LIMIT_RETRY_DELAY_SECONDS,
-                        headers=exc.headers,
+                    retry_delay = self._rate_limit_retry_delay(
+                        path, retry_attempt, headers=exc.headers
                     )
+                    if retry_delay > MAX_RATE_LIMIT_WAIT_SECONDS:
+                        raise GitHubRateLimitError(
+                            f"GitHub API rate limit reset is beyond the queue wait bound: {path}"
+                        ) from last_error
                 else:
                     retry_attempt = transient_attempts
                     transient_attempts += 1

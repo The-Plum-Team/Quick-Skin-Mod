@@ -163,14 +163,14 @@ class VisualReviewQueueTest(unittest.TestCase):
 
         with patch(
             "visual_review_queue.urllib.request.urlopen",
-            side_effect=[*(rate_limit() for _ in range(5)), response],
+            side_effect=[*(rate_limit() for _ in range(3)), response],
         ), patch("visual_review_queue.time.sleep") as sleep, patch(
             "visual_review_queue.time.time", return_value=1_800_000_000
         ):
             self.assertEqual(api._request("/repos/example"), {"ok": True})
 
-        self.assertEqual(sleep.call_count, 5)
-        self.assertTrue(all(call.args[0] <= 61 for call in sleep.call_args_list))
+        self.assertEqual(sleep.call_count, 3)
+        self.assertTrue(all(60 <= call.args[0] <= 63 for call in sleep.call_args_list))
 
     def test_exhausted_installation_rate_limit_is_distinct_from_bad_evidence(
         self,
@@ -197,7 +197,34 @@ class VisualReviewQueueTest(unittest.TestCase):
             with self.assertRaises(GitHubRateLimitError):
                 api._request("/repos/example")
 
-        self.assertEqual(sleep.call_count, 11)
+        self.assertEqual(sleep.call_count, 3)
+
+    def test_distant_primary_reset_defers_without_polling(self) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="token",
+            api_url="https://api.github.test",
+        )
+        error = urllib.error.HTTPError(
+            "https://api.github.test/repos/example",
+            403,
+            "forbidden",
+            {
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": "1800003600",
+            },
+            BytesIO(b'{"message":"API rate limit exceeded for installation"}'),
+        )
+
+        with patch(
+            "visual_review_queue.urllib.request.urlopen", side_effect=error
+        ), patch("visual_review_queue.time.sleep") as sleep, patch(
+            "visual_review_queue.time.time", return_value=1_800_000_000
+        ):
+            with self.assertRaises(GitHubRateLimitError):
+                api._request("/repos/example")
+
+        sleep.assert_not_called()
 
     def test_exact_wake_queries_only_its_capsule_and_related_markers(self) -> None:
         requested = artifact(

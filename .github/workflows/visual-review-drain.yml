@@ -708,6 +708,7 @@ jobs:
           ARTIFACT_SIZE: ${{ needs.select.outputs.artifact_size }}
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
           SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
@@ -1477,6 +1478,7 @@ jobs:
         env:
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -1805,7 +1807,7 @@ jobs:
       needs.review.outputs.compatibility_eligible == 'true' &&
       needs.review.outputs.normalized_report_artifact_id != ''
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 75
     permissions:
       actions: read
       contents: write
@@ -1823,6 +1825,7 @@ jobs:
         env:
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           REVIEW_ARTIFACT_ID: ${{ needs.review.outputs.normalized_report_artifact_id }}
           SOURCE_BRANCH: ${{ needs.review.outputs.compatibility_source_branch }}
@@ -1960,7 +1963,7 @@ jobs:
       always() && needs.cleanup.result == 'success' &&
       needs.review.outputs.certificate_artifact_id != ''
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 75
     permissions:
       actions: read
       contents: write
@@ -1978,9 +1981,9 @@ jobs:
         run: |
           set -euo pipefail
           github_api_retry() {
-            local api_status attempt delay output
+            local api_status attempt delay now output reset_at skew wait_seconds
             delay=5
-            for attempt in {1..10}; do
+            for attempt in {1..4}; do
               output=''
               api_status=0
               if output="$(gh api "$@" 2>&1)"; then
@@ -1991,11 +1994,30 @@ jobs:
               fi
               if ! grep -Eqi \
                   'API rate limit exceeded|secondary rate limit|HTTP (408|429|5[0-9][0-9])|connection (reset|refused)|timed out|timeout|temporary failure|TLS handshake|unexpected EOF' \
-                  <<< "$output" || (( attempt == 10 )); then
+                  <<< "$output" || (( attempt == 4 )); then
                 printf '%s\n' "$output" >&2
                 return "$api_status"
               fi
-              sleep "$delay"
+              wait_seconds="$delay"
+              if grep -Fqi 'API rate limit exceeded' <<< "$output"; then
+                reset_at="$(gh api rate_limit --jq .resources.core.reset \
+                  2>/dev/null || true)"
+                if [[ "$reset_at" =~ ^[1-9][0-9]*$ ]]; then
+                  now="$(date +%s)"
+                  skew=$(( (GITHUB_RUN_ID + attempt) % 5 ))
+                  wait_seconds=$(( reset_at - now + 2 + skew ))
+                  (( wait_seconds > 0 )) || wait_seconds=1
+                  if (( wait_seconds > 3700 )); then
+                    printf '%s\n' "$output" >&2
+                    return "$api_status"
+                  fi
+                else
+                  wait_seconds=60
+                fi
+              elif grep -Eqi 'secondary rate limit|HTTP 429' <<< "$output"; then
+                (( wait_seconds >= 60 )) || wait_seconds=60
+              fi
+              sleep "$wait_seconds"
               delay=$(( delay < 60 ? delay * 2 : 60 ))
               (( delay <= 60 )) || delay=60
             done
