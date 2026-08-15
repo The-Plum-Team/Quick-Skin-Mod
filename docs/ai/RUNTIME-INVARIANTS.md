@@ -244,7 +244,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   source metadata; and emit a source/implementation/candidate/reference-artifact-bound proof. Queue
   selection must authenticate protected owners, survive pending-run replacement, accept a curated
   capsule whose later wake step failed, and cool recent failed attempts without blocking other
-  sources. The review runner accepts only that immutable handoff, never skips an unpaired anchor
+  sources. It must reject closed or superseded pull-request evidence, superseded automatic anchor
+  generations, and an exact automatic or scheduled anchor generation that already owns a
+  successful protected semantic certificate. A certificate is a terminal generation identity
+  here, never a reusable unpaired verdict cache. The review runner accepts only that immutable handoff, never skips an unpaired anchor
   frame, skips byte-identical paths only in paired comparison mode,
   exposes only bounded manifests/images plus each passed capture assertion's bounded printable
   runtime evidence to concurrent loader-grouped Sonnet triage and selective
@@ -286,7 +289,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   authored unit is `release artifact x optional mod`: every applicable unit first proves that the
   named Quick Skin integration is active, then runs the complete ordinary scenario profile plus
   the compatibility scenario. All applicable units run in parallel; unsupported loader/mod pairs
-  remain explicit `not_applicable` records. External JARs must come from
+  and reviewed upstream loader/version exclusions remain explicit `not_applicable` records. Each
+  successful unit must curate its capsule in that same matrix job; a failing sibling keeps the
+  runtime gate red but cannot suppress the successful capsule or its later parallel review.
+  Compatibility launches must not enable Mixin's global debug injection-count flag because that
+  changes third-party optional-injector semantics; the clean packaged suite still enables it to
+  enforce Quick Skin's own expectations. External JARs must come from
   `e2e/mod-compatibility-contract.json` by exact HTTPS URL, filename, byte size, SHA-256, and
   SHA-512. CI never selects a newest upstream version or silently substitutes a dependency.
 - Compatibility visual judgment must compare the complete modded capture product with the clean
