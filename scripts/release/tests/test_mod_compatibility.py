@@ -65,6 +65,14 @@ class ModCompatibilityContractTest(unittest.TestCase):
         )
         self.assertNotIn("player-armor-stands", {item.id for item in contract.mods})
         self.assertEqual(105, sum(len(item.artifacts) for item in contract.mods))
+        skin_layers = contract.mod("skin-layers-3d")
+        self.assertEqual(
+            (("1.21.9", "neoforge"),),
+            tuple(
+                (item.runtime_version, item.loader)
+                for item in skin_layers.excluded_lanes
+            ),
+        )
         for compatibility_mod in contract.mods:
             for artifact in compatibility_mod.artifacts:
                 for locked_file in artifact.files:
@@ -244,6 +252,43 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 mod, ["1.20.1"], [newest]
             )
 
+    def test_authored_loader_exclusion_is_not_scheduled_or_refreshed(self) -> None:
+        contract = mod_compatibility.load_contract(self.contract_path)
+        with self.assertRaisesRegex(
+            mod_compatibility.CompatibilityContractError,
+            "excludes 1.21.9/neoforge",
+        ):
+            mod_compatibility.resolve_lane(
+                contract,
+                mod_id="skin-layers-3d",
+                artifact_node="neoforge-1.21.9",
+                runtime_version="1.21.9",
+                loader="neoforge",
+            )
+        plan = mod_compatibility.build_plan(
+            ROOT / "release" / "release-matrix.json", self.contract_path
+        )
+        if plan["release_branch"] == "fabric-and-neoforge-1.21.9":
+            excluded = [
+                lane
+                for lane in plan["not_applicable"]
+                if lane["mod"] == "skin-layers-3d" and lane["loader"] == "neoforge"
+            ]
+            self.assertEqual(1, len(excluded))
+            self.assertIn("does not support", excluded[0]["reason"])
+
+        mod = next(
+            copy.deepcopy(item)
+            for item in self.payload["mods"]
+            if item["id"] == "skin-layers-3d"
+        )
+        self.assertFalse(
+            update_mod_compatibility_lock._allowed_lane(mod, "1.21.9", "neoforge")
+        )
+        self.assertTrue(
+            update_mod_compatibility_lock._allowed_lane(mod, "1.21.9", "fabric")
+        )
+
     def test_materialization_accepts_only_the_exact_locked_bytes(self) -> None:
         payload = b"immutable compatibility jar"
         url = "https://cdn.modrinth.com/data/AbCd1234/versions/EfGh5678/mod.jar"
@@ -272,6 +317,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
             allowed_version_types=("release",),
             provided_dependencies=(),
             supported_game_versions=None,
+            excluded_lanes=(),
             artifacts=(artifact,),
         )
         lane = mod_compatibility.CompatibilityLane(
