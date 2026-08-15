@@ -105,12 +105,16 @@ immutable workflow and governance activation contract.
   without any reference image and reviewed independently against every contract expectation, so a
   defect shared by both loaders cannot certify itself. The protected report records semantic
   validity separately from reference similarity. Only a completely clean, loader-complete report
-  for the exact bot-owned synchronization commit may produce a seven-day semantic certificate,
+  for the exact bot-owned synchronization commit may produce a 90-day semantic certificate,
   and only after its exact-tree merge is the current 1.20.1 branch head. The certificate binds the
   `master` source SHA, tested and merged anchor SHAs, source run, protected implementation,
   scenario contract, manifest, and normalized report. A protected `repository_dispatch`
   reauthenticates that artifact and releases every other discovered version branch. A stale,
   malformed, incomplete, defective, unavailable, or superseded certificate releases nothing.
+  Queue admission also treats that exact authenticated certificate as terminal for the same
+  automatic or scheduled anchor generation, and discards superseded anchor generations and closed
+  pull-request evidence before any model call. This is identity-level deduplication, not reuse of
+  an unpaired semantic verdict.
   No immediate-diff exception may fan out directly: a documentation-only tip can contain an older
   runtime change whose certification is still pending or failed. An explicit manual exact target
   remains an operator recovery path.
@@ -152,7 +156,11 @@ immutable workflow and governance activation contract.
   verified external JARs. Secretless curation pairs the full modded result with the clean
   same-version/loader result; Sonnet semantically reviews every pair, including identical pixels,
   and Opus verifies every non-high-clean result. The first confirmed defect records a durable wave
-  block and cancels sibling reviews. This post-validation signal does not replace or weaken Build,
+  block and cancels sibling reviews. Each successful runtime lane curates its own capsule before
+  the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing
+  successful lanes or preventing their concurrent AI review. Authored loader/version exclusions
+  remain explicit N/A records and survive lock refreshes. This post-validation signal does not
+  replace or weaken Build,
   Packaged E2E, or the independent 1.20.1 semantic certification gate.
 - Pages wake and deploy events share one coalescing lock. A parallel release-attestation burst
   retains only the running publication member and the newest pending survivor; the survivor
@@ -164,8 +172,8 @@ immutable workflow and governance activation contract.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
   named seven-day exceptions are automatic-sync packaged evidence/input bundles needed by delayed
   compatibility review, compatibility plans/evidence/capsules/reports/block markers, queued visual
-  review capsules, semantic certificates, and rolling exact-policy visual verdict caches. Three
-  90-day current-state artifacts remain: the
+  review capsules, and rolling exact-policy visual verdict caches. Four 90-day current-state
+  artifacts remain: the semantic certificate, the
   SHA-bound Pages cache, the matrix-derived lossless
   Fabric 1.20.1 anchor handoff, and the immutable `release-<release-id>` bundle. The release bundle
   spans protected environment
