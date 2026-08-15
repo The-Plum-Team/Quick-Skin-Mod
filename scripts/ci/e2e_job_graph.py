@@ -105,8 +105,11 @@ VERSION_SPECIFIC_CONTROLLER_PATHS = (
 CONTROLLER_SKEW_EXIT_CODE = 78
 MAX_ADVISORY_CONTROLLER_PATHS = 100
 ADVISORY_CONTROLLER_PREFIXES = (
+    ".github/actions/",
     ".github/workflows/",
+    "e2e/",
     "scripts/ci/",
+    "scripts/release/tests/",
 )
 
 
@@ -254,7 +257,7 @@ def validate_advisory_controller_skew(
     protected_sha: str,
     head_sha: str,
 ) -> tuple[str, ...]:
-    """Allow a skipped advisory review only for a bounded CI-only pull request."""
+    """Allow a skipped advisory review only for a bounded automation-only pull request."""
 
     changed_raw = _git(
         repository,
@@ -296,7 +299,7 @@ def validate_advisory_controller_skew(
             unsafe.append(path)
     if unsafe:
         raise JobGraphError(
-            "controller skew is mixed with non-CI paths: "
+            "controller skew is mixed with non-automation paths: "
             + ", ".join(repr(path) for path in unsafe)
         )
     return changed
