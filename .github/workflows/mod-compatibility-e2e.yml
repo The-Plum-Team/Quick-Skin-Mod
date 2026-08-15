@@ -267,6 +267,7 @@ jobs:
         shell: bash
         env:
           BASE_MATRIX_KIND: ${{ needs.admit.outputs.base_matrix_kind }}
+          GH_TOKEN: ${{ github.token }}
           SOURCE_BRANCH: ${{ needs.admit.outputs.source_branch }}
           SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
           SOURCE_SHA: ${{ needs.admit.outputs.source_sha }}
