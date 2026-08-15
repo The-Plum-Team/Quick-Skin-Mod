@@ -187,6 +187,12 @@ MAX_EVIDENCE_CRASH_REPORT_BYTES = 16 * 1024 * 1024
 PROCESS_GRACEFUL_STOP_SECONDS = 15
 PROCESS_FORCE_STOP_SECONDS = 15
 PROCESS_GROUP_POLL_SECONDS = 0.1
+REPLAYMOD_LOGIN_STALL_SECONDS = 12
+REPLAYMOD_CONNECT_LOG_MARKER = "Connecting to "
+REPLAYMOD_LOGIN_PROGRESS_MARKERS = (
+    "Multiplayer Recording is disabled",
+    "[QS-E2E] joined world;",
+)
 
 
 @dataclass(frozen=True)
@@ -194,6 +200,15 @@ class RuntimeDependency:
     path: Path
     sha256: str
     filename: str
+
+
+@dataclass
+class ReplayModLoginDiagnostic:
+    """One-shot state for a live ReplayMod login-stall thread dump."""
+
+    connecting_seen_at: float | None = None
+    dump_requested: bool = False
+    login_progressed: bool = False
 
 
 class PackagedRuntimeSession:
@@ -1265,7 +1280,11 @@ def wait_for_log(process: subprocess.Popen[bytes], log: Path, text: str, timeout
 
 
 def wait_for_marker(
-    process: subprocess.Popen[bytes], game_dir: Path, role: str, timeout: int = 600
+    process: subprocess.Popen[bytes],
+    game_dir: Path,
+    role: str,
+    timeout: int = 600,
+    on_poll: Callable[[], None] | None = None,
 ) -> str:
     marker = game_dir / "e2e-report" / "done.marker"
     deadline = time.monotonic() + timeout
@@ -1275,8 +1294,77 @@ def wait_for_marker(
             return value
         if process.poll() is not None:
             raise RuntimeFailure(f"{role} exited before writing {marker}")
+        if on_poll is not None:
+            on_poll()
         time.sleep(2)
     raise RuntimeFailure(f"timed out waiting for {role} marker {marker}")
+
+
+def maybe_capture_replaymod_login_stall(
+    process: subprocess.Popen[bytes],
+    log: Path,
+    state: ReplayModLoginDiagnostic,
+    *,
+    server_process: subprocess.Popen[bytes] | None = None,
+    server_log: Path | None = None,
+    now: float | None = None,
+) -> None:
+    """Request one live JVM thread dump when ReplayMod stalls inside multiplayer login.
+
+    The vanilla timeout tears the login handler down after 30 seconds, so a post-failure dump only
+    shows idle processes. ReplayMod 1.20.1 is a Fabric-only lane whose client and server launcher
+    processes are the JVMs themselves. SIGQUIT therefore records both sides' Java stacks in their
+    already bounded logs without terminating or otherwise changing the attempted login.
+    """
+
+    if state.dump_requested or state.login_progressed or process.poll() is not None:
+        return
+    content = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+    if any(marker in content for marker in REPLAYMOD_LOGIN_PROGRESS_MARKERS):
+        state.login_progressed = True
+        return
+    if REPLAYMOD_CONNECT_LOG_MARKER not in content:
+        return
+
+    observed_at = time.monotonic() if now is None else now
+    if state.connecting_seen_at is None:
+        state.connecting_seen_at = observed_at
+        return
+    if observed_at - state.connecting_seen_at < REPLAYMOD_LOGIN_STALL_SECONDS:
+        return
+
+    # Mark first so an unsupported signal or a process exiting during the probe cannot create a
+    # signal storm on every two-second poll.
+    state.dump_requested = True
+    if os.name == "nt":
+        print(
+            "ReplayMod login is stalled, but live JVM thread dumps are unavailable on Windows.",
+            flush=True,
+        )
+        return
+    targets = [("client", process, log)]
+    if server_process is not None and server_log is not None:
+        targets.append(("server", server_process, server_log))
+    for target, target_process, target_log in targets:
+        if target_process.poll() is not None:
+            print(
+                f"Could not request ReplayMod {target} thread dump: process exited.",
+                flush=True,
+            )
+            continue
+        try:
+            target_process.send_signal(signal.SIGQUIT)
+        except OSError as exc:
+            print(
+                f"Could not request ReplayMod {target} thread dump: {exc}",
+                flush=True,
+            )
+            continue
+        print(
+            f"ReplayMod login made no progress for {REPLAYMOD_LOGIN_STALL_SECONDS}s; "
+            f"requested a live {target} JVM thread dump in {target_log}.",
+            flush=True,
+        )
 
 
 def marker_value(game_dir: Path, role: str) -> str | None:
@@ -2189,6 +2277,7 @@ def run_packaged_row(
         client_handles: dict[str, BinaryIO] = {}
         client_logs: dict[str, Path] = {}
         client_deadlines: dict[str, float] = {}
+        replaymod_login_diagnostics: dict[str, ReplayModLoginDiagnostic] = {}
         transient_retry_used = False
 
         def launch_client(role: str) -> None:
@@ -2211,9 +2300,26 @@ def run_packaged_row(
             client_handles[role] = handle
             client_logs[role] = client_log
             client_deadlines[role] = time.monotonic() + 600
+            if (
+                compatibility_lane is not None
+                and compatibility_lane.mod.id == "replaymod"
+            ):
+                replaymod_login_diagnostics[role] = ReplayModLoginDiagnostic()
             processes.append(process)
             handles.append(handle)
             runtime_logs.append(client_log)
+
+        def capture_replaymod_login_stall(role: str) -> None:
+            diagnostic = replaymod_login_diagnostics.get(role)
+            if diagnostic is None:
+                return
+            maybe_capture_replaymod_login_stall(
+                client_processes[role],
+                client_logs[role],
+                diagnostic,
+                server_process=server_process,
+                server_log=server_log,
+            )
 
         def retry_transient_connection(role: str, marker: str) -> str | None:
             nonlocal transient_retry_used
@@ -2249,7 +2355,10 @@ def run_packaged_row(
         def await_role(role: str) -> str:
             while True:
                 marker = wait_for_marker(
-                    client_processes[role], client_directories[role], role
+                    client_processes[role],
+                    client_directories[role],
+                    role,
+                    on_poll=lambda: capture_replaymod_login_stall(role),
                 )
                 resolved = retry_transient_connection(role, marker)
                 if resolved is not None:
@@ -2281,6 +2390,7 @@ def run_packaged_row(
                     raise RuntimeFailure(
                         f"{role} exited before server marker {text!r}; see {server_log}"
                     )
+                capture_replaymod_login_stall(role)
                 if time.monotonic() >= deadline:
                     raise RuntimeFailure(
                         f"timed out waiting for server marker {text!r}; see {server_log}"
@@ -2305,6 +2415,7 @@ def run_packaged_row(
                             f"{role} exited before writing "
                             f"{client_directories[role] / 'e2e-report' / 'done.marker'}"
                         )
+                    capture_replaymod_login_stall(role)
                     if now >= client_deadlines[role]:
                         raise RuntimeFailure(
                             f"timed out waiting for {role} marker "
