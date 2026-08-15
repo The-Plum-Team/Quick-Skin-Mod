@@ -478,11 +478,11 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
         self.assertEqual(["java", "minecraft"], replaymod_launched)
         self.assertEqual("127.0.0.1:25566", replaymod_options["quickPlayMultiplayer"])
         self.assertIn(
-            "-Dio.netty.noKeySetOptimization=true",
+            "-Dquickskin.e2e.repairMissingConnectionRead=true",
             replaymod_options["jvmArguments"],
         )
         self.assertNotIn(
-            "-Dio.netty.noKeySetOptimization=true",
+            "-Dquickskin.e2e.repairMissingConnectionRead=true",
             compatibility_options["jvmArguments"],
         )
         self.assertEqual(

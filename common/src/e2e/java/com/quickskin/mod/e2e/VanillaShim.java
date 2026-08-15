@@ -330,9 +330,7 @@ public final class VanillaShim {
         try {
             Channel channel = liveConnectionChannel(sc);
             if (channel == null) return "channel=<unavailable>";
-            return "noKeySetOptimization="
-                    + System.getProperty("io.netty.noKeySetOptimization", "<unset>")
-                    + "; channelType=" + channel.getClass().getName()
+            return "channelType=" + channel.getClass().getName()
                     + "; channelActive=" + channel.isActive()
                     + "; open=" + channel.isOpen()
                     + "; registered=" + channel.isRegistered()
@@ -342,6 +340,46 @@ public final class VanillaShim {
                     + "; pipeline=" + channel.pipeline().names();
         } catch (Throwable t) {
             return "channel=<diagnostic-failed:" + t.getClass().getSimpleName() + ">";
+        }
+    }
+
+    /**
+     * Repairs the one invalid NIO state observed in ReplayMod's 1.20.1 startup path: auto-read is
+     * enabled on an active channel, but its selection key has no OP_READ interest. Calling read()
+     * on the channel's own event loop restores the missing interest without reconnecting, replacing
+     * handlers, or manufacturing any protocol traffic.
+     */
+    public static boolean repairMissingConnectionRead(Screen sc) {
+        if (!isConnectScreen(sc)) return false;
+        try {
+            Channel channel = liveConnectionChannel(sc);
+            if (channel == null || !channel.isActive() || !channel.config().isAutoRead()) {
+                return false;
+            }
+            SelectionKey key = nioSelectionKey(channel);
+            if (key == null || !key.isValid()
+                    || (key.interestOps() & SelectionKey.OP_READ) != 0) {
+                return false;
+            }
+            channel.eventLoop().execute(() -> {
+                if (!channel.isActive() || !channel.config().isAutoRead()) return;
+                try {
+                    SelectionKey currentKey = nioSelectionKey(channel);
+                    if (currentKey == null || !currentKey.isValid()
+                            || (currentKey.interestOps() & SelectionKey.OP_READ) != 0) {
+                        return;
+                    }
+                    E2ELog.info("connection read repair before -> " + nioReadDiagnostic(channel));
+                    channel.read();
+                    E2ELog.info("connection read repair after -> " + nioReadDiagnostic(channel));
+                } catch (Throwable t) {
+                    E2ELog.warn("connection read repair failed on event loop: " + t);
+                }
+            });
+            return true;
+        } catch (Throwable t) {
+            E2ELog.warn("connection read repair inspection failed: " + t);
+            return false;
         }
     }
 
@@ -361,16 +399,12 @@ public final class VanillaShim {
 
     private static String nioReadDiagnostic(Channel channel) {
         try {
-            SelectionKey key = null;
+            SelectionKey key = nioSelectionKey(channel);
             String readPending = "unavailable";
             for (Class<?> type = channel.getClass(); type != null; type = type.getSuperclass()) {
                 for (Field field : type.getDeclaredFields()) {
                     if (Modifier.isStatic(field.getModifiers())) continue;
-                    if (SelectionKey.class.isAssignableFrom(field.getType())) {
-                        field.setAccessible(true);
-                        Object value = field.get(channel);
-                        if (value instanceof SelectionKey selectionKey) key = selectionKey;
-                    } else if (field.getType() == boolean.class
+                    if (field.getType() == boolean.class
                             && field.getName().equals("readPending")) {
                         field.setAccessible(true);
                         readPending = Boolean.toString(field.getBoolean(channel));
@@ -385,6 +419,21 @@ public final class VanillaShim {
         } catch (Throwable t) {
             return "unavailable:" + t.getClass().getSimpleName();
         }
+    }
+
+    private static SelectionKey nioSelectionKey(Channel channel) throws IllegalAccessException {
+        for (Class<?> type = channel.getClass(); type != null; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers())
+                        || !SelectionKey.class.isAssignableFrom(field.getType())) {
+                    continue;
+                }
+                field.setAccessible(true);
+                Object value = field.get(channel);
+                if (value instanceof SelectionKey key) return key;
+            }
+        }
+        return null;
     }
 
     private static Channel nestedChannel(Object owner) throws IllegalAccessException {

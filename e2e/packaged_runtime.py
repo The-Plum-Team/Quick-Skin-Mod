@@ -1147,10 +1147,11 @@ def client_command(
             f"-Dquickskin.e2e.compatibility={compatibility_mod}"
         )
     if compatibility_mod == "replaymod" and row["runtime_version"] == "1.20.1":
-        # Probe whether Netty's selected-key optimization is dropping readiness notifications on
-        # the affected Linux runner. QuickPlay and every protocol byte remain production-equivalent.
+        # ReplayMod can expose an old-Netty startup race where an active auto-read NIO channel has
+        # no OP_READ interest. The harness repairs only that invalid state; QuickPlay and every
+        # protocol byte remain production-equivalent.
         options["jvmArguments"].append(
-            "-Dio.netty.noKeySetOptimization=true"
+            "-Dquickskin.e2e.repairMissingConnectionRead=true"
         )
     return minecraft_launcher_lib.command.get_minecraft_command(
         version_id, str(install_dir), options
