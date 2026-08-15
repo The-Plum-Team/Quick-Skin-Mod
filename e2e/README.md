@@ -169,6 +169,13 @@ use broad entropy/color and pairwise-change invariants rather than golden images
 Minecraft-version rendering differences are allowed. Every result records the literal fields
 `artifact_node`, `runtime_version`, `loader`, `scenario`, `jar_sha256`, and `port`.
 
+CI lets the shared Xvfb server reset after the last Minecraft client in each scenario exits, so
+optional-mod graphics state cannot accumulate across the lane. In an optional-mod lane only, at
+most one client per scenario whose authenticated harness report contains exactly one pre-world
+vanilla `connection_timeout` failure may be relaunched once. The first attempt's bounded log,
+report, marker, and screenshot remain in the uploaded diagnostics. A repeated timeout, any other
+disconnect reason, an assertion failure, malformed identity, or extra failed step remains fatal.
+
 The remote propagation captures pin the disposable subject's current and interpolated head/body
 rotations and hold the observer at a numerically asserted rear vantage. Their passed runtime
 evidence records all three rotations and the observer/forward-vector cosine. This makes cape
