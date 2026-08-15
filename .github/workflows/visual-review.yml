@@ -484,7 +484,7 @@ jobs:
           if [[ "$job_graph_status" -eq 78 ]]; then
             printf 'review_skipped=true\n' >> "$GITHUB_OUTPUT"
             printf '%s\n' \
-              'CI-only E2E controller skew; deferring visual validation to the protected post-merge generation' \
+              'Automation-only E2E controller skew; deferring visual validation to the protected post-merge generation' \
               | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
