@@ -24,7 +24,7 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' ||
        github.event.workflow_run.conclusion == 'failure')
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 75
     permissions:
       actions: read
       contents: read
@@ -46,12 +46,17 @@ jobs:
         id: owner
         shell: bash
         env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          owner="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          owner="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
           implementation_sha="$(jq -er \
             '.head_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
             <<< "$owner")"
@@ -83,11 +88,15 @@ jobs:
         id: matrix
         shell: bash
         env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           IMPLEMENTATION_SHA: ${{ steps.owner.outputs.implementation_sha }}
           SOURCE_RUN_ID: ${{ steps.owner.outputs.source_run_id }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           plan="$RUNNER_TEMP/compatibility-plan/mod-compatibility-plan.json"
           test -f "$plan" -a ! -L "$plan"
           jq -e \
@@ -139,10 +148,11 @@ jobs:
             "$(jq -er .compatibility_contract_sha256 "$plan")" ]]
           target_branch="$(jq -er .target_branch "$plan")"
           target_sha="$(jq -er .target_sha "$plan")"
-          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/$target_branch" \
+          [[ "$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/$target_branch" \
             --jq .commit.sha)" == "$target_sha" ]]
 
-          artifacts="$(gh api \
+          artifacts="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
           matrix="$(jq -c \
             --argjson artifacts "$artifacts" \
@@ -207,17 +217,21 @@ jobs:
           ARTIFACT_ID: ${{ matrix.artifact_id }}
           ARTIFACT_NAME: ${{ matrix.artifact_name }}
           ARTIFACT_SIZE: ${{ matrix.artifact_size }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ matrix.source_run_id }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
           (( ARTIFACT_SIZE <= 536870912 ))
           [[ "$ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           [[ "$ARTIFACT_NAME" == \
             "mod-compatibility-review-input-$SOURCE_RUN_ID-${{ matrix.id }}" ]]
-          metadata="$(gh api \
+          metadata="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
           jq -e \
             --arg digest "$ARTIFACT_DIGEST" \
@@ -229,8 +243,9 @@ jobs:
              .size_in_bytes == $size and .expired == false and
              .workflow_run.id == $run_id' <<< "$metadata" > /dev/null
           archive="$RUNNER_TEMP/mod-compatibility-capsule.zip"
-          gh api -H 'Accept: application/vnd.github+json' \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$archive"
+          github_api_retry_to_file "$archive" \
+            -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip"
           [[ "$(stat -c %s "$archive")" == "$ARTIFACT_SIZE" ]]
           [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
              "$ARTIFACT_DIGEST" ]]
@@ -301,7 +316,7 @@ jobs:
             [[ "$artifact_run_id" =~ ^[1-9][0-9]*$ ]]
             [[ "$artifact_size" =~ ^[1-9][0-9]*$ ]]
             [[ "$artifact_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-            raw_metadata="$(gh api \
+            raw_metadata="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id")"
             jq -e \
               --arg digest "$artifact_digest" \
@@ -312,7 +327,7 @@ jobs:
               '.id == $artifact_id and .name == $name and .digest == $digest and
                .size_in_bytes == $size and .expired == false and
                .workflow_run.id == $run_id' <<< "$raw_metadata" > /dev/null
-            raw_owner="$(gh api \
+            raw_owner="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/runs/$artifact_run_id")"
             if [[ "$kind" == base ]]; then
               [[ "$artifact_name" == "${{ matrix.base_evidence_name }}" ]]
@@ -485,10 +500,14 @@ jobs:
         if: steps.block-artifact.outputs.artifact-id != ''
         shell: bash
         env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api --method POST \
+          source scripts/ci/github_api_retry.sh
+          github_api_retry --method POST \
             "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/cancel"
           exit 1
 
