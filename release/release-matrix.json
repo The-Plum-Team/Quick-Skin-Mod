@@ -25,9 +25,9 @@
       "url": "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.1.0/fabric-installer-1.1.0.jar",
       "sha256": "c20c407d5ca4b119aae97847eb2fbb1d34c92969b647fbbb1de2fd36ca00738e"
     },
-    "neoforge-26.2.0.6-beta": {
-      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/26.2.0.6-beta/neoforge-26.2.0.6-beta-installer.jar",
-      "sha256": "1dd974cd637d972025a7c9b89c775b0544dc73671b85d101d0faf2a98ef71a31"
+    "neoforge-26.2.0.10-beta": {
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/26.2.0.10-beta/neoforge-26.2.0.10-beta-installer.jar",
+      "sha256": "79cc630b86261922cfe7a3ff2df8f6e004baee57b233bb2702eac21cf89b7529"
     }
   },
   "artifacts": [
@@ -100,8 +100,8 @@
       "jar_sha256": "from:artifact-manifest",
       "port": 0,
       "java": 25,
-      "loader_version": "26.2.0.6-beta",
-      "installer": "neoforge-26.2.0.6-beta",
+      "loader_version": "26.2.0.10-beta",
+      "installer": "neoforge-26.2.0.10-beta",
       "architectury": {
         "kind": "maven",
         "version": "21.0.2"
