@@ -46,11 +46,17 @@ DEFAULT_COOLDOWN_MINUTES = 30
 MAX_NAMED_ARTIFACTS = 1_000
 MAX_CAPACITY_FANOUT = 256
 REQUEST_ATTEMPTS = 4
+RATE_LIMIT_REQUEST_ATTEMPTS = 4
+MAX_RATE_LIMIT_WAIT_SECONDS = 300
 RETRYABLE_HTTP_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
 
 
 class QueueError(RuntimeError):
     pass
+
+
+class GitHubRateLimitError(QueueError):
+    """The protected queue is intact, but GitHub temporarily cannot serve it."""
 
 
 @dataclass(frozen=True)
@@ -564,28 +570,62 @@ class GitHubApi:
         self._pulls: dict[int, dict[str, Any]] = {}
 
     @staticmethod
-    def _retryable_http_error(exc: urllib.error.HTTPError) -> bool:
+    def _rate_limited_http_error(
+        exc: urllib.error.HTTPError, detail: str
+    ) -> bool:
+        if exc.code not in {403, 429}:
+            return False
+        return bool(
+            exc.headers.get("X-RateLimit-Remaining", "") == "0"
+            or exc.headers.get("Retry-After", "")
+            or "rate limit" in detail.lower()
+        )
+
+    @classmethod
+    def _retryable_http_error(cls, exc: urllib.error.HTTPError) -> bool:
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")
+        except OSError:
+            detail = ""
         if exc.code in RETRYABLE_HTTP_STATUSES:
             return True
-        if exc.code != 403:
-            return False
-        remaining = exc.headers.get("X-RateLimit-Remaining", "")
-        retry_after = exc.headers.get("Retry-After", "")
-        try:
-            body = exc.read().decode("utf-8", errors="replace").lower()
-        except OSError:
-            body = ""
-        return remaining == "0" or bool(retry_after) or "rate limit" in body
+        return cls._rate_limited_http_error(exc, detail)
 
     @staticmethod
-    def _retry_delay(path: str, attempt: int) -> float:
+    def _retry_delay(
+        path: str,
+        attempt: int,
+    ) -> float:
         # Deterministic sub-second skew prevents a parallel release wave from retrying in lockstep.
         jitter = (sum(path.encode("utf-8")) % 997) / 997
         return min(2**attempt, 30) + jitter
 
+    @staticmethod
+    def _rate_limit_retry_delay(
+        path: str, attempt: int, *, headers: Any
+    ) -> float:
+        # GitHub explicitly requires primary callers to wait until X-RateLimit-Reset and secondary
+        # callers without Retry-After to wait at least one minute. Never cap that declared delay and
+        # accidentally poll the exhausted bucket early.
+        jitter = (sum(path.encode("utf-8")) % 997) / 997
+        delay = max(60, 2**attempt)
+        retry_after = headers.get("Retry-After", "")
+        reset_at = headers.get("X-RateLimit-Reset", "")
+        try:
+            delay = max(delay, int(retry_after))
+        except (TypeError, ValueError):
+            pass
+        try:
+            delay = max(delay, int(reset_at) - int(time.time()) + 2)
+        except (TypeError, ValueError):
+            pass
+        return max(delay, 0) + jitter
+
     def _request(self, path: str, *, missing_ok: bool = False) -> Any:
         last_error: BaseException | None = None
-        for attempt in range(REQUEST_ATTEMPTS):
+        transient_attempts = 0
+        rate_limit_attempts = 0
+        while True:
             request = urllib.request.Request(
                 f"{self.api_url}{path}",
                 headers={
@@ -603,15 +643,43 @@ class GitHubApi:
                 if exc.code == 404 and missing_ok:
                     return None
                 last_error = exc
-                retryable = self._retryable_http_error(exc)
+                try:
+                    detail = exc.read().decode("utf-8", errors="replace")
+                except OSError:
+                    detail = ""
+                rate_limited = self._rate_limited_http_error(exc, detail)
+                retryable = rate_limited or exc.code in RETRYABLE_HTTP_STATUSES
+                if rate_limited:
+                    retry_attempt = rate_limit_attempts
+                    rate_limit_attempts += 1
+                    exhausted = rate_limit_attempts >= RATE_LIMIT_REQUEST_ATTEMPTS
+                    retry_delay = self._rate_limit_retry_delay(
+                        path, retry_attempt, headers=exc.headers
+                    )
+                    if retry_delay > MAX_RATE_LIMIT_WAIT_SECONDS:
+                        raise GitHubRateLimitError(
+                            f"GitHub API rate limit reset is beyond the queue wait bound: {path}"
+                        ) from last_error
+                else:
+                    retry_attempt = transient_attempts
+                    transient_attempts += 1
+                    exhausted = transient_attempts >= REQUEST_ATTEMPTS
+                    retry_delay = self._retry_delay(path, retry_attempt)
             except (urllib.error.URLError, TimeoutError) as exc:
                 last_error = exc
+                rate_limited = False
                 retryable = True
-            if not retryable or attempt + 1 == REQUEST_ATTEMPTS:
+                retry_attempt = transient_attempts
+                transient_attempts += 1
+                exhausted = transient_attempts >= REQUEST_ATTEMPTS
+                retry_delay = self._retry_delay(path, retry_attempt)
+            if exhausted and rate_limited:
+                raise GitHubRateLimitError(
+                    f"GitHub API rate limit exhausted: {path}"
+                ) from last_error
+            if not retryable or exhausted:
                 raise QueueError(f"GitHub API request failed: {path}") from last_error
-            time.sleep(self._retry_delay(path, attempt))
-        else:  # pragma: no cover - the loop either breaks or raises
-            raise QueueError(f"GitHub API request failed: {path}") from last_error
+            time.sleep(retry_delay)
         try:
             return json.loads(payload)
         except json.JSONDecodeError as exc:
@@ -814,6 +882,9 @@ def main(argv: list[str] | None = None) -> int:
             output.write(f"generation_sha={input_generation(artifact)}\n")
             output.write(f"source_run_id={source_run_id}\n")
         return 0
+    except GitHubRateLimitError as exc:
+        print(f"Visual review queue deferred: {exc}", file=sys.stderr)
+        return 75
     except (OSError, QueueError) as exc:
         print(f"Visual review queue error: {exc}", file=sys.stderr)
         return 2
