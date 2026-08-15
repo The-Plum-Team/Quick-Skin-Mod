@@ -93,18 +93,24 @@ jobs:
           jq -e \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             '.schema_version == 1 and .source_run_id == $source_run_id and
+             (.base_matrix_kind == "pr-anchors" or
+              .base_matrix_kind == "native-anchors") and
              (.source_sha | type == "string" and test("^[0-9a-f]{40}$")) and
              (.source_branch | type == "string" and
-              test("^automation/sync/[A-Za-z0-9._/-]+$")) and
+              test("^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$")) and
              (.target_sha | type == "string" and test("^[0-9a-f]{40}$")) and
              (.target_branch | type == "string" and
               test("^[a-z0-9]+(-and-[a-z0-9]+)*-[0-9]+([.][0-9]+)+$")) and
+             (if .base_matrix_kind == "pr-anchors" then
+                (.source_branch | test("^automation/sync/[A-Za-z0-9._/-]+$"))
+              else .source_branch == .target_branch end) and
              .release_branch == .target_branch and
              (.compatibility_contract_sha256 | type == "string" and
               test("^[0-9a-f]{64}$")) and
              (.runnable | type == "array" and length <= 64) and
              (.not_applicable | type == "array" and length <= 64) and
-             (.compatibility_contract_sha256 as $lock |
+             (.base_matrix_kind as $base_matrix_kind |
+              .compatibility_contract_sha256 as $lock |
               all(.runnable[];
                 (.id | type == "string" and test("^[a-z0-9][a-z0-9_-]{0,255}$")) and
                 (.artifact_node | type == "string" and
@@ -118,7 +124,10 @@ jobs:
                 (.compatibility_name | type == "string" and
                   test("^[A-Za-z0-9][A-Za-z0-9 ._+-]{0,127}$")) and
                 (.base_evidence_name | type == "string" and
-                  test("^packaged-e2e-[a-z0-9_-]{1,255}$")) and
+                  test("^packaged-e2e-[a-z0-9_-]{1,255}$") and
+                  (if $base_matrix_kind == "pr-anchors" then
+                     endswith("--pr-behavior")
+                   else endswith("--scheduled-behavior") end)) and
                 .compatibility_contract_sha256 == $lock))' \
             "$plan" > /dev/null
           plan_source_sha="$(jq -er .source_sha "$plan")"
