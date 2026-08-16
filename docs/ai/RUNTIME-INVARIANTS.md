@@ -178,6 +178,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   before closing its log handle or freezing evidence; a kill request or an exited group leader alone
   does not prove that an in-flight log write has quiesced. Runtime installation, game directories,
   and dependency caches never enter the promoted evidence tree.
+- A fresh packaged server must purge every non-player entity through its private console and
+  acknowledge that purge before any client launches. Spawn-disabled properties remain the ongoing
+  policy, but they do not prove that a version created no passive entity while preparing its first
+  superflat chunks; ambient mobs must never enter deterministic screenshot comparisons.
 - Reusable Minecraft installations and downloads belong to `RuntimeStore/v1`, not an evidence
   directory. Recipe identity includes schema, host OS/architecture, Java major, Minecraft and
   loader versions, exact installer hash, launcher-library revision, and normalizer revision.
@@ -244,11 +248,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   source metadata; and emit a source/implementation/candidate/reference-artifact-bound proof. Queue
   selection must authenticate protected owners, survive pending-run replacement, accept a curated
   capsule whose later wake step failed, and cool recent failed attempts without blocking other
-  sources. It must reject closed or superseded pull-request evidence, superseded automatic anchor
-  generations, and an exact automatic or scheduled anchor generation that already owns a
-  successful protected semantic certificate. A certificate is a terminal generation identity
-  here, never a reusable unpaired verdict cache. The review runner accepts only that immutable handoff, never skips an unpaired anchor
-  frame, skips byte-identical paths only in paired comparison mode,
+  sources. The curator must reject a generation that differs from its protected implementation
+  before decoding images, and queue admission must recheck every capsule against the live
+  `master` generation before any model call, including exact wakes. It must also reject closed or
+  superseded pull-request evidence and an exact automatic or scheduled anchor generation that
+  already owns a successful protected semantic certificate. A certificate is a terminal generation
+  identity here, never a reusable unpaired verdict cache. The review runner accepts only that
+  immutable handoff, never skips an unpaired anchor frame, skips byte-identical paths only in paired
+  comparison mode,
   exposes only bounded manifests/images plus each passed capture assertion's bounded printable
   runtime evidence to concurrent loader-grouped Sonnet triage and selective
   concurrent Opus verification with a read-only tool surface, captures each verdict from stdout,
@@ -269,7 +276,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   concurrently. Exact wakes must authenticate through ID-scoped capsule lookup and exact-name
   report, cooldown, and generation-block lookup rather than multiplying a full artifact-inventory
   scan across a parallel release wave; retryable GitHub API failures use bounded backoff and never
-  become an image verdict. Once a normalized report or durable block makes a source ineligible, an explicit
+  become an image verdict. If the exact capsule returns authenticated metadata and then a download
+  404, only that post-guard disappearance is a coalesced settled wake: no model starts, while every
+  other download or validation failure remains visible. Once a normalized report or durable block
+  makes a source ineligible, an explicit
   GitHub installation-rate-limit response may defer input cleanup or the redundant continuation
   wake without turning the completed review red. The normalized report or block must outlive its
   durable input so deferred cleanup can never make reviewed work eligible again; artifact retention
@@ -277,13 +287,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   scheduled/manual sweep never reviews directly: it converts
   one authenticated oldest-entry selection into an exact wake. Pending-run coalescing remains safe
   because queue state is durable and a settled drain dispatches its own continuation. The curator
-  may suppress a replicated non-anchor
+  may suppress a replicated
   automation sync only after authenticating one bot-owned associated PR and its complete
   server-side file list,
-  and only when every current and previous rename path belongs to the visual-review workflows,
-  protected CI tests, or documentation. Missing, oversized, multiple, or runtime-bearing diffs
-  remain eligible for the ordinary review path. The automatic matrix-derived 1.20.1 anchor must
-  never use this suppression, irrespective of its immediate file inventory.
+  and only when every current and previous rename path belongs to the protected nonvisual
+  orchestration, CI tests, or documentation allowlist. Missing, oversized, multiple, malformed, or
+  runtime/visual-bearing diffs remain eligible for the ordinary review path. An ordinary source PR
+  uses a narrower scope that isolates optional-mod compatibility orchestration from ordinary visual
+  review while refusing changes to the visual policy itself. The automatic matrix-derived 1.20.1
+  anchor may skip model admission only when the merge controller separately proves the complete
+  anchor-port diff nonvisual after exact Build and full Packaged E2E; the source-review workflow
+  alone can never release the wave.
 - Optional-mod E2E is a post-validation wave. It may start only for an exact release-branch tree
   whose Build, complete packaged suite, and independent semantic visual review are all clean. Its
   authored unit is `release artifact x optional mod`: every applicable unit first proves that the
@@ -296,7 +310,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   producer is itself token-created and cannot rely on recursive `workflow_run` delivery. The
   reviewer must authenticate the repository, source run id, protected implementation SHA, workflow
   identity, terminal conclusion, and capsule provenance after polling the exact producer to
-  completion.
+  completion. A producer that settles after `master` advances must not dispatch its stale source;
+  direct review admission must require the source implementation to equal the protected current
+  `master`, and every lane must recheck live `master` before capsule download or model admission.
   Compatibility launches must not enable Mixin's global debug injection-count flag because that
   changes third-party optional-injector semantics; the clean packaged suite still enables it to
   enforce Quick Skin's own expectations. External JARs must come from
@@ -309,15 +325,23 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   source-wave marker and cancels remaining review jobs. Raw packaged artifacts are authenticated
   and re-encoded by a secretless curator; a credential-bearing reviewer receives only the bounded,
   metadata-free capsule and its source/target/artifact proof.
-- Every automatic `master` synchronization releases non-anchor version branches only after the
-  protected drainer produces a semantic 1.20.1 certificate. The certificate must cover identical
+- Every automatic `master` synchronization releases non-anchor version branches through exactly
+  one of two authenticated routes. The ordinary route requires the protected drainer to produce a
+  semantic 1.20.1 certificate. The certificate must cover identical
   non-empty Fabric and Forge capture sets, contain no reference, report every frame semantically
   valid with no defect, belong to the exact synchronization merge parent, and bind the current
   exact-tree anchor merge head. The consuming synchronizer must reauthenticate the artifact id,
   digest, size, successful protected owner run, source E2E run, contract hash, Git parents, equal
   source/target trees, current `master`, and current anchor head. Stale or invalid dispatches are
-  no-ops. Immediate-diff classification must never bypass the anchor: a non-runtime tip can include
-  an older uncertified runtime change. The anchor's Packaged E2E policy is therefore always `full`.
+  no-ops. The model-free route requires a bounded nonvisual continuation artifact from the current
+  protected merge handler after the anchor's exact Build and full Packaged E2E succeed. The
+  synchronizer must reauthenticate that artifact and owner, both gate runs, the current `master`
+  second parent on the newest synchronization commit, the bounded two-parent synchronization chain
+  terminating at the exact release base, equal source/target trees, current anchor head, policy
+  digest, and an independently recomputed complete anchor diff whose every path is allowlisted. It
+  must not launch optional-mod compatibility because no runtime generation changed.
+  Immediate-tip classification must never bypass the anchor: a non-runtime tip can include an older
+  uncertified runtime change. The anchor's Packaged E2E policy is therefore always `full`.
   This scheduling gate must never replace or weaken either individual port's required Build or
   Packaged E2E checks.
 - Optimized gallery images are derivatives, not the source proof. Publish separate source and
