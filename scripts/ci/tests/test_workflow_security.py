@@ -871,6 +871,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("git show", enumerate_review)
         self.assertIn("$plan_source_sha:e2e/mod-compatibility-contract.json", enumerate_review)
         self.assertIn("${{ matrix.source_sha }}:e2e/scenario-contract.json", review)
+        self.assertIn('source_contract="$RUNNER_TEMP/source-scenario-contract.json"', review)
+        self.assertIn('--compatibility-scenario-contract "$source_contract"', review)
+        self.assertIn(
+            '--compatibility-artifact-node "${{ matrix.artifact_node }}"', review
+        )
+        self.assertIn('--compatibility-mod "${{ matrix.mod }}"', review)
         self.assertIn("--triage-model claude-sonnet-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
         self.assertIn("mod-compatibility-wave-block", review)
