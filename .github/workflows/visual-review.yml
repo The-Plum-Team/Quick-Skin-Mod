@@ -125,9 +125,65 @@ jobs:
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == $repository' \
             <<< "$source_run" > /dev/null
+
           if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
             [[ "$(jq -r .event <<< "$source_run")" == workflow_dispatch ]]
             [[ "$source_branch" == automation/sync/* ]]
+          fi
+
+          # Ordinary PR evidence can be deterministically irrelevant to this review domain even
+          # though the packaged gate ran fail-closed. Only protected master code, a complete
+          # server-side file inventory, and the narrow source-PR allowlist may suppress the
+          # ordinary visual model. Compatibility-review orchestration is intentionally isolated;
+          # visual prompts, runners, scenarios, product code, and unknown paths remain reviewable.
+          if [[ "$(jq -r .event <<< "$source_run")" == pull_request ]]; then
+            associated_pulls="$(github_api_retry -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20")"
+            source_pr_number="$(jq -er \
+              --arg branch "$source_branch" \
+              --arg repository "$GITHUB_REPOSITORY" \
+              --arg sha "$source_sha" \
+              'select(type == "array" and length <= 20) |
+               [.[] | select(
+                 .head.ref == $branch and .head.sha == $sha and
+                 .head.repo.full_name == $repository and
+                 .base.repo.full_name == $repository)] |
+               if length == 1 then .[0].number else error("ambiguous source PR") end' \
+              <<< "$associated_pulls")"
+            [[ "$source_pr_number" =~ ^[1-9][0-9]*$ ]]
+            source_pr="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/pulls/$source_pr_number")"
+            jq -e \
+              --arg branch "$source_branch" \
+              --arg repository "$GITHUB_REPOSITORY" \
+              --arg sha "$source_sha" \
+              --argjson number "$source_pr_number" \
+              '.number == $number and .state == "open" and .merged == false and
+               .head.ref == $branch and .head.sha == $sha and
+               .head.repo.full_name == $repository and
+               .base.repo.full_name == $repository and
+               (.changed_files | type == "number" and . > 0 and . <= 100)' \
+              <<< "$source_pr" > /dev/null
+            changed_files="$(jq -r .changed_files <<< "$source_pr")"
+            source_pr_files="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/pulls/$source_pr_number/files?per_page=100")"
+            source_pr_files_path="$(mktemp \
+              "$RUNNER_TEMP/visual-review-source-impact.XXXXXX.json")"
+            printf '%s' "$source_pr_files" > "$source_pr_files_path"
+            impact="$(python3 scripts/ci/visual_review_impact.py \
+              --files "$source_pr_files_path" \
+              --changed-files "$changed_files" \
+              --scope source-pr)"
+            [[ "$impact" == review || "$impact" == skip ]]
+            if [[ "$impact" == skip ]]; then
+              printf 'Ignoring source PR %s: its complete diff is outside ordinary visual review\n' \
+                "$source_pr_number"
+              exit 0
+            fi
+          fi
+
+          if [[ "$(jq -r .event <<< "$source_run")" == workflow_dispatch \
+              && "$source_branch" == automation/sync/* ]]; then
             anchor_branch="$(jq -er '
               .unit_test_version as $version |
               select($version == "1.20.1") |
@@ -208,13 +264,13 @@ jobs:
                   printf '%s' "$source_pr_files" > "$source_pr_files_path"
                   impact="$(python3 scripts/ci/visual_review_impact.py \
                     --files "$source_pr_files_path" \
-                    --changed-files "$changed_files")"
+                    --changed-files "$changed_files" \
+                    --scope replicated-port)"
                   [[ "$impact" == review || "$impact" == skip ]]
-                  # Even an infrastructure-only anchor port must run the full semantic review.
-                  # It certifies the complete current master generation, which may contain a
-                  # previously pending runtime change outside this PR's immediate file list.
-                  if [[ "$impact" == skip \
-                      && "$source_pr_base" != "$anchor_branch" ]]; then
+                  # The merge controller independently authenticates Build, full anchor E2E,
+                  # merge topology, and this exact protected classification before it can mint a
+                  # nonvisual continuation. No model queue entry is useful for any such port.
+                  if [[ "$impact" == skip ]]; then
                     printf 'Ignoring infrastructure-only visual review sync PR %s (%s files)\n' \
                       "$source_pr_number" "$changed_files"
                     exit 0

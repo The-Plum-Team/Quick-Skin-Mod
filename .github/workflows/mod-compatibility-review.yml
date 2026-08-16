@@ -96,7 +96,8 @@ jobs:
     if: >-
       github.ref == 'refs/heads/master' &&
       github.event_name == 'repository_dispatch' &&
-      github.event.action == 'mod-compatibility-review-requested'
+      github.event.action == 'mod-compatibility-review-requested' &&
+      github.event.client_payload.source_sha == github.sha
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     permissions:
@@ -154,6 +155,7 @@ jobs:
             '.head_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
             <<< "$owner")"
           [[ "$implementation_sha" == "$SOURCE_SHA" ]]
+          [[ "$implementation_sha" == "$GITHUB_SHA" ]]
           jq -e \
             --arg implementation_sha "$implementation_sha" \
             --arg repository "$GITHUB_REPOSITORY" \
@@ -166,6 +168,9 @@ jobs:
              .head_repository.full_name == $repository' <<< "$owner" > /dev/null
           git fetch --no-tags origin "$implementation_sha"
           git merge-base --is-ancestor "$implementation_sha" "$GITHUB_SHA"
+          current_master="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          [[ "$current_master" == "$GITHUB_SHA" ]]
           printf 'implementation_sha=%s\n' "$implementation_sha" >> "$GITHUB_OUTPUT"
           printf 'source_run_id=%s\n' "$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
 
@@ -522,6 +527,23 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+
+      - name: Revalidate current master before capsule or model admission
+        shell: bash
+        env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_IMPLEMENTATION_SHA: ${{ matrix.implementation_sha }}
+        run: |
+          set -euo pipefail
+          source scripts/ci/github_api_retry.sh
+          [[ "$SOURCE_IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_IMPLEMENTATION_SHA" == "$GITHUB_SHA" ]]
+          current_master="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          [[ "$current_master" == "$GITHUB_SHA" ]]
 
       - name: Install Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
