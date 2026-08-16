@@ -178,6 +178,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   before closing its log handle or freezing evidence; a kill request or an exited group leader alone
   does not prove that an in-flight log write has quiesced. Runtime installation, game directories,
   and dependency caches never enter the promoted evidence tree.
+- A fresh packaged server must purge every non-player entity through its private console and
+  acknowledge that purge before any client launches. Spawn-disabled properties remain the ongoing
+  policy, but they do not prove that a version created no passive entity while preparing its first
+  superflat chunks; ambient mobs must never enter deterministic screenshot comparisons.
 - Reusable Minecraft installations and downloads belong to `RuntimeStore/v1`, not an evidence
   directory. Recipe identity includes schema, host OS/architecture, Java major, Minecraft and
   loader versions, exact installer hash, launcher-library revision, and normalizer revision.
