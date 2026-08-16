@@ -109,6 +109,13 @@ server/client game directories, scenario state, and install logs stay in a scrat
 is separate from both reusable runtime material and public evidence. Scratch is never used for
 evidence discovery or uploaded as a successful run.
 
+After the dedicated server reports that its fresh world is ready, the orchestrator removes every
+non-player entity through the server console and requires a log acknowledgement before it launches
+any client. The spawn-disabled server properties prevent later ambient spawns; the explicit purge
+also covers passive entities created while a game version prepares its initial superflat chunks,
+so a wandering mob cannot contaminate two screenshots that a deterministic comparison treats as
+the same scene.
+
 Only the current invocation's complete, bounded evidence is promoted to `e2e-out/current`. This
 atomic promotion uses guarded same-filesystem renames and an owned last-good sibling, so an
 interrupted or failed promotion restores or preserves the previous complete generation. Consumers
