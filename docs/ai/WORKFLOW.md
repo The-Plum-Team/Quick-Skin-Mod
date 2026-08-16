@@ -57,6 +57,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   validation failure visible. Reject a capsule whose authenticated generation differs from the
   protected curator implementation before image decoding, and recheck every queued capsule against
   the live `master` SHA before model admission, including artifact-scoped exact wakes.
+- Optional-mod review must suppress a producer wake that settles after `master` advances, reject a
+  direct request whose source SHA differs from the protected current implementation, and recheck
+  live `master` independently in every parallel lane before capsule download or model admission.
 - Version-port and repair validation must check out candidate code with credentials disabled.
   For a version port, the complete patch goes only into an alternate index; the protected merge
   controller reconstructs the original merge and copies only recomputed AI-conflict entries from

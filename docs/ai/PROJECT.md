@@ -169,7 +169,10 @@ immutable workflow and governance activation contract.
   is complete; relying on a recursive `workflow_run` would silently lose token-created waves. The
   reviewer shares the repository-wide Claude capacity circuit, records clean lanes independently,
   and keeps the authenticated source plan pending across quota pauses. Scheduled recovery reruns
-  only unfinished lanes and publishes a source completion marker after the full set is clean.
+  only unfinished lanes and publishes a source completion marker after the full set is clean. A
+  producer that settles after `master` advances suppresses its wake; direct review admission binds
+  the source SHA to the protected current implementation, and every lane rechecks live `master`
+  before it downloads a capsule or starts a model.
   Authored loader/version exclusions
   remain explicit N/A records and survive lock refreshes. This post-validation signal does not
   replace or weaken Build,

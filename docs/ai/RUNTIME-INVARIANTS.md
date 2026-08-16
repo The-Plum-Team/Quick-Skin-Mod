@@ -306,7 +306,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   producer is itself token-created and cannot rely on recursive `workflow_run` delivery. The
   reviewer must authenticate the repository, source run id, protected implementation SHA, workflow
   identity, terminal conclusion, and capsule provenance after polling the exact producer to
-  completion.
+  completion. A producer that settles after `master` advances must not dispatch its stale source;
+  direct review admission must require the source implementation to equal the protected current
+  `master`, and every lane must recheck live `master` before capsule download or model admission.
   Compatibility launches must not enable Mixin's global debug injection-count flag because that
   changes third-party optional-injector semantics; the clean packaged suite still enables it to
   enforce Quick Skin's own expectations. External JARs must come from

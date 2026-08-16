@@ -869,7 +869,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("source_run_id:$source_run_id", request_review)
         self.assertIn("source_sha:$source_sha", request_review)
         self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', request_review)
+        self.assertIn("branches/master", request_review)
+        self.assertIn('[[ "$current_master" != "$GITHUB_SHA" ]]', request_review)
+        self.assertIn("skipping its AI wake", request_review)
         self.assertIn("repos/$GITHUB_REPOSITORY/dispatches", request_review)
+        self.assertLess(
+            request_review.index("branches/master"),
+            request_review.index("repos/$GITHUB_REPOSITORY/dispatches"),
+        )
         self.assertIn("github.event.client_payload.source_run_id", review_workflow)
         self.assertIn("mod_compatibility_review_queue.py", recover_review)
         self.assertIn("eligible=true", recover_review)
@@ -877,8 +884,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("repos/$GITHUB_REPOSITORY/dispatches", recover_review)
         self.assertIn("mod-compatibility-review-requested", recover_review)
         self.assertIn('[[ "$SOURCE_REPOSITORY" == "$GITHUB_REPOSITORY" ]]', enumerate_review)
+        self.assertIn(
+            "github.event.client_payload.source_sha == github.sha",
+            enumerate_review,
+        )
         self.assertIn("for attempt in {1..120}", enumerate_review)
         self.assertIn('[[ "$implementation_sha" == "$SOURCE_SHA" ]]', enumerate_review)
+        self.assertIn('[[ "$implementation_sha" == "$GITHUB_SHA" ]]', enumerate_review)
+        self.assertIn('[[ "$current_master" == "$GITHUB_SHA" ]]', enumerate_review)
         self.assertIn('(.conclusion == "success" or .conclusion == "failure")', enumerate_review)
         self.assertIn(
             '(.source_run_id | type == "number" and . > 0)', enumerate_review
@@ -908,6 +921,25 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("name: ${{ steps.probe.outputs.marker_name }}", capacity_probe)
         self.assertIn("ref: ${{ github.sha }}", review)
         self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
+        self.assertIn(
+            "Revalidate current master before capsule or model admission", review
+        )
+        self.assertIn(
+            '[[ "$SOURCE_IMPLEMENTATION_SHA" == "$GITHUB_SHA" ]]', review
+        )
+        self.assertIn('[[ "$current_master" == "$GITHUB_SHA" ]]', review)
+        self.assertLess(
+            review.index(
+                "Revalidate current master before capsule or model admission"
+            ),
+            review.index("Fetch and authenticate only the curated capsule"),
+        )
+        self.assertLess(
+            review.index(
+                "Revalidate current master before capsule or model admission"
+            ),
+            review.index("Install Python"),
+        )
         self.assertIn("strategy:\n      fail-fast: false", review)
         self.assertNotIn("max-parallel", review.split("\n    steps:", 1)[0])
         self.assertIn("needs.enumerate.outputs.pending_count != '0'", review)
@@ -937,7 +969,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("/cancel", review)
         self.assertGreaterEqual(
-            review.count("source scripts/ci/github_api_retry.sh"), 2
+            review.count("source scripts/ci/github_api_retry.sh"), 3
         )
         self.assertIn("github_api_retry_to_file", review)
         self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', review)

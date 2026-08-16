@@ -132,7 +132,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   escalates every non-high-clean result to Opus, and publishes a durable source-wave block before
   cancelling siblings after a confirmed defect. Its authenticated source queue shares the global
   Claude capacity circuit, preserves one completion marker per clean lane, and reschedules only
-  unfinished lanes after a provider pause.
+  unfinished lanes after a provider pause. The producer suppresses a delayed stale wake, the
+  direct consumer requires its source implementation to equal the protected current `master`, and
+  every parallel lane rechecks live `master` before capsule download or model admission.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every later-version candidate with the same semantic
