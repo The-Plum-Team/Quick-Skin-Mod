@@ -51,6 +51,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   `allowed` or `allowed_warning` is capacity-ready even when its optional coarse utilization field
   reports at least 95%; pause only for an explicit rejection or a failed probe classified as a
   transient quota/provider condition. A later rejected review remains fail-closed and retryable.
+  Each optional-mod source must obtain a fresh serialized probe instead of spending a ready marker
+  produced for an earlier source. Its lane matrix stays concurrent, but protected admission must
+  bound the combined nested chunk-call fan-out and apply a short bounded start ramp.
   Upload only bounded normalized status/type/band evidence, never raw provider text or exact
   account-usage details. If a capsule disappears after its exact metadata guard but before its
   download, settle only that coalesced wake without starting a model; keep every other download or
