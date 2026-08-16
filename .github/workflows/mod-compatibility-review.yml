@@ -1,28 +1,27 @@
 name: AI mod compatibility review
 
 # This secret-bearing workflow receives only metadata-free PNG capsules curated by the separate
-# compatibility workflow. Every mod/loader capsule is reviewed concurrently. A durable marker is
-# uploaded before an Opus-confirmed defect cancels the remaining sessions.
+# compatibility workflow. Its protected producer wakes it explicitly because that producer was
+# itself created with GITHUB_TOKEN and cannot reliably recurse through workflow_run. Every
+# mod/loader capsule is reviewed concurrently. A durable marker is uploaded before an
+# Opus-confirmed defect cancels the remaining sessions.
 on:
-  workflow_run:
-    workflows:
-      - Mod compatibility E2E
+  repository_dispatch:
     types:
-      - completed
+      - mod-compatibility-review-requested
 
 permissions: {}
 
 concurrency:
-  group: mod-compatibility-review-${{ github.event.workflow_run.id }}
+  group: >-
+    mod-compatibility-review-${{ github.event.client_payload.source_run_id ||
+    github.run_id }}
   cancel-in-progress: false
 
 jobs:
   enumerate:
     name: Authenticate compatibility capsules
-    if: >-
-      github.ref == 'refs/heads/master' &&
-      (github.event.workflow_run.conclusion == 'success' ||
-       github.event.workflow_run.conclusion == 'failure')
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     permissions:
@@ -50,16 +49,34 @@ jobs:
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
-          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          SOURCE_REPOSITORY: ${{ github.event.client_payload.source_repository }}
+          SOURCE_RUN_ID: ${{ github.event.client_payload.source_run_id }}
+          SOURCE_SHA: ${{ github.event.client_payload.source_sha }}
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
+          [[ "$SOURCE_REPOSITORY" == "$GITHUB_REPOSITORY" ]]
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          owner="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          owner=''
+          for attempt in {1..120}; do
+            if ! owner="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" \
+                2>/dev/null)"; then
+              owner=''
+              sleep 2
+              continue
+            fi
+            if [[ "$(jq -r .status <<< "$owner")" == completed ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test -n "$owner"
           implementation_sha="$(jq -er \
             '.head_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
             <<< "$owner")"
+          [[ "$implementation_sha" == "$SOURCE_SHA" ]]
           jq -e \
             --arg implementation_sha "$implementation_sha" \
             --arg repository "$GITHUB_REPOSITORY" \
