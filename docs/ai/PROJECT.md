@@ -160,7 +160,10 @@ immutable workflow and governance activation contract.
   the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing
   successful lanes or preventing their concurrent AI review. The settled compatibility producer
   explicitly dispatches the protected reviewer and that reviewer polls until the exact source run
-  is complete; relying on a recursive `workflow_run` would silently lose token-created waves.
+  is complete; relying on a recursive `workflow_run` would silently lose token-created waves. The
+  reviewer shares the repository-wide Claude capacity circuit, records clean lanes independently,
+  and keeps the authenticated source plan pending across quota pauses. Scheduled recovery reruns
+  only unfinished lanes and publishes a source completion marker after the full set is clean.
   Authored loader/version exclusions
   remain explicit N/A records and survive lock refreshes. This post-validation signal does not
   replace or weaken Build,
