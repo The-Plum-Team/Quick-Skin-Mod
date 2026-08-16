@@ -143,9 +143,9 @@ installing a content-addressed name is refused instead of silently producing a m
 ignores. Installer hashes and runtime/version facts remain matrix-owned; the staged
 production and harness JAR hashes remain manifest-owned. GitHub-hosted jobs do not upload
 `RuntimeStore`; persistence is useful only on a developer machine or an explicitly managed
-self-hosted runner. NeoForge server installation retries bounded transient Maven failures in a fresh isolated
-directory each time and publishes only a complete tree with its launcher script, so an incomplete
-download can never contaminate the next attempt.
+self-hosted runner. Forge and NeoForge server installation retry bounded transient Maven failures
+in a fresh isolated directory each time and publish only a complete tree with its launcher script,
+so an incomplete download can never contaminate the next attempt.
 
 ## Fail-closed contract
 
