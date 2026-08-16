@@ -925,7 +925,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("claude_capacity_gate.py", capacity_probe)
         self.assertIn("claude_capacity_probe.py", capacity_probe)
         self.assertIn("group: quick-skin-claude-capacity-probe", capacity_probe)
+        self.assertIn(
+            "fresh_ready: ${{ steps.resolve.outputs.fresh_ready }}", capacity_probe
+        )
         self.assertIn("name: ${{ steps.probe.outputs.marker_name }}", capacity_probe)
+        self.assertIn("mod_compatibility_review_queue.py", enumerate_review)
         self.assertIn("ref: ${{ github.sha }}", review)
         self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
         self.assertIn(
@@ -950,7 +954,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("strategy:\n      fail-fast: false", review)
         self.assertNotIn("max-parallel", review.split("\n    steps:", 1)[0])
         self.assertIn("needs.enumerate.outputs.pending_count != '0'", review)
-        self.assertIn("needs.capacity-check.outputs.ready == 'true'", review)
+        self.assertIn("needs.capacity-probe.outputs.fresh_ready == 'true'", review)
+        self.assertNotIn("needs.capacity-check.outputs.ready == 'true'", review)
+        self.assertIn(
+            '--max-parallel-calls "${{ matrix.model_parallelism }}"', review
+        )
+        self.assertIn("--call-spacing-seconds 2", review)
+        self.assertIn(
+            'admission_delay="${{ matrix.model_start_delay_seconds }}"', review
+        )
+        self.assertNotIn("--max-parallel-calls 32", review)
         self.assertIn("--review-identical", review)
         self.assertNotIn("--cache ", review)
         self.assertIn("git show", enumerate_review)
@@ -982,6 +995,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', review)
         self.assertNotIn("gh api", review)
         self.assertIn("REVIEW_RESULT", review_gate)
+        self.assertIn("PROBE_FRESH_READY", review_gate)
+        self.assertIn("CAPACITY_STATE", review_gate)
         self.assertIn("claude-capacity-pause", review_gate)
         self.assertIn("quota_or_rate_limit", review_gate)
         self.assertIn("COMPLETED_COUNT", review_gate)
