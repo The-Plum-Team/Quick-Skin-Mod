@@ -3,7 +3,9 @@ name: Mod compatibility E2E
 # A clean, normalized base visual review requests this second wave. The protected admission job
 # reauthenticates that report, the tested source bytes, and the exact merged release tree before any
 # external mod is downloaded. Preparation fetches each clean baseline once with reset-aware retries;
-# every applicable mod/loader lane then starts in parallel from that authenticated local copy.
+# every applicable mod/loader lane then starts in parallel from that authenticated local copy. The
+# run explicitly wakes its separate AI reviewer because GITHUB_TOKEN-created runs do not emit a
+# reliable recursive workflow_run event.
 on:
   repository_dispatch:
     types:
@@ -667,3 +669,47 @@ jobs:
             printf 'All %s applicable compatibility lanes passed and were curated.\n' \
               "$COUNT" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  request-review:
+    name: Request the independent AI compatibility review
+    needs:
+      - gate
+    if: >-
+      always() &&
+      (needs.gate.result == 'success' || needs.gate.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out the protected notification policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Dispatch the exact settled compatibility source
+        shell: bash
+        env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source scripts/ci/github_api_retry.sh
+          [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          payload="$RUNNER_TEMP/mod-compatibility-review-request.json"
+          jq -n \
+            --arg source_repository "$GITHUB_REPOSITORY" \
+            --arg source_run_id "$GITHUB_RUN_ID" \
+            --arg source_sha "$GITHUB_SHA" \
+            '{event_type:"mod-compatibility-review-requested",
+              client_payload:{source_repository:$source_repository,
+                source_run_id:$source_run_id,source_sha:$source_sha}}' \
+            > "$payload"
+          github_api_retry --method POST \
+            "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" \
+            > /dev/null
