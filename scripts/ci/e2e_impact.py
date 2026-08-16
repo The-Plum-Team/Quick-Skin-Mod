@@ -39,6 +39,7 @@ EXACT_NON_RUNTIME_PATHS = frozenset(
         "scripts/ci/gradle_cache_policy.py",
         "scripts/ci/prune_actions_caches.py",
         "scripts/ci/github_api_retry.sh",
+        "scripts/ci/mod_compatibility_review_queue.py",
         "scripts/ci/visual_review_queue.py",
         "scripts/pages/build_site.py",
         "scripts/pages/rotate_artifacts.py",
@@ -52,6 +53,8 @@ EXACT_NON_RUNTIME_PATHS = frozenset(
 EXACT_NON_RUNTIME_WORKFLOWS = frozenset(
     {
         ".github/workflows/handle-version-port-result.yml",
+        ".github/workflows/mod-compatibility-e2e.yml",
+        ".github/workflows/mod-compatibility-review.yml",
         ".github/workflows/pages.yml",
         ".github/workflows/prune-actions-caches.yml",
         ".github/workflows/refresh-release-status.yml",
