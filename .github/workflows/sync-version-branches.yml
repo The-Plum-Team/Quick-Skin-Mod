@@ -50,6 +50,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Resolve targets from GitHub
@@ -73,6 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
+          [[ "$(git rev-parse --is-shallow-repository)" == false ]]
           reference_identity="$(python3 e2e/visual_review.py \
             --matrix release/release-matrix.json --reference-identity)"
           anchor_branch="$(jq -er .release_branch <<< "$reference_identity")"
