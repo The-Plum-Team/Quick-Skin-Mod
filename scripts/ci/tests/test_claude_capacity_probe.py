@@ -16,6 +16,7 @@ from claude_capacity_probe import (  # noqa: E402
     load_stream,
     probe_command,
     resolve_claude_executable,
+    sanitized_rate_limit_summary,
     write_marker,
 )
 
@@ -62,7 +63,7 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
 
         self.assertEqual(("error", "authentication"), state)
 
-    def test_warning_or_rejected_rate_event_stops_expensive_fan_out(self) -> None:
+    def test_warning_does_not_impersonate_an_exhausted_subscription(self) -> None:
         success = {
             "type": "result",
             "subtype": "success",
@@ -71,13 +72,36 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
         }
 
         self.assertEqual(
-            ("paused", "quota_near_limit"),
+            ("ready", ""),
             classify_probe(
                 0,
                 success,
                 [{"status": "allowed_warning", "rateLimitType": "seven_day"}],
             ),
         )
+        self.assertEqual(
+            ("ready", ""),
+            classify_probe(
+                0,
+                success,
+                [
+                    {
+                        "status": "allowed_warning",
+                        "rateLimitType": "seven_day",
+                        "utilization": 0.53,
+                    }
+                ],
+            ),
+        )
+
+    def test_rejection_or_explicit_95_percent_stops_expensive_fan_out(self) -> None:
+        success = {
+            "type": "result",
+            "subtype": "success",
+            "is_error": False,
+            "structured_output": {"available": True},
+        }
+
         self.assertEqual(
             ("paused", "quota_or_rate_limit"),
             classify_probe(
@@ -88,7 +112,19 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
         )
         self.assertEqual(
             ("paused", "quota_near_limit"),
-            classify_probe(0, success, [{"status": "allowed", "utilization": 0.97}]),
+            classify_probe(
+                0,
+                success,
+                [{"status": "allowed_warning", "utilization": 0.95}],
+            ),
+        )
+        self.assertEqual(
+            ("paused", "quota_near_limit"),
+            classify_probe(
+                0,
+                success,
+                [{"status": "allowed", "utilization": 0.97}],
+            ),
         )
 
     def test_unknown_or_malformed_rate_state_fails_closed(self) -> None:
@@ -108,8 +144,30 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
             classify_probe(0, success, [{"status": "allowed", "utilization": "1"}]),
         )
         self.assertEqual(
-            ("paused", "quota_near_limit"),
+            ("error", "cli_or_api"),
             classify_probe(0, success, [{"status": "allowed", "utilization": 95}]),
+        )
+
+    def test_rate_limit_summary_is_bounded_and_sanitized(self) -> None:
+        self.assertEqual(
+            {
+                "provider_status": "allowed_warning",
+                "rate_limit_types": ["other", "seven_day"],
+                "utilization_band": "below_95_percent",
+            },
+            sanitized_rate_limit_summary(
+                [
+                    {
+                        "status": "allowed_warning",
+                        "rateLimitType": "seven_day",
+                        "utilization": 0.53,
+                    },
+                    {
+                        "status": "allowed",
+                        "rateLimitType": ["provider-authored text must not escape"],
+                    },
+                ]
+            ),
         )
 
     def test_stream_parser_extracts_only_result_and_rate_limit_state(self) -> None:
@@ -211,9 +269,44 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
 
             self.assertEqual(
                 {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "state": "paused",
                     "category": "quota_or_rate_limit",
+                    "rate_limit_summary": {
+                        "provider_status": "not_reported",
+                        "rate_limit_types": [],
+                        "utilization_band": "not_reported",
+                    },
+                },
+                json.loads(marker.read_text(encoding="utf-8")),
+            )
+
+    def test_ready_warning_marker_keeps_only_bounded_decision_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            marker = Path(raw) / "marker.json"
+            write_marker(
+                marker,
+                state="ready",
+                category="",
+                rate_limits=[
+                    {
+                        "status": "allowed_warning",
+                        "rateLimitType": "seven_day",
+                        "utilization": 0.53,
+                        "private": "provider-authored text must not escape",
+                    }
+                ],
+            )
+
+            self.assertEqual(
+                {
+                    "schema_version": 2,
+                    "state": "ready",
+                    "rate_limit_summary": {
+                        "provider_status": "allowed_warning",
+                        "rate_limit_types": ["seven_day"],
+                        "utilization_band": "below_95_percent",
+                    },
                 },
                 json.loads(marker.read_text(encoding="utf-8")),
             )
