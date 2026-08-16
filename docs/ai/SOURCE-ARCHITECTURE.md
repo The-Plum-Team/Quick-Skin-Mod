@@ -179,9 +179,12 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
   the oldest eligible source except that a completed certifiable automatic 1.20.1 anchor preempts
-  advisory work. An exact wake may select only its requested authenticated artifact and queries
-  only that immutable capsule plus its exact report, cooldown, and generation-block names; it does
-  not rescan the repository-wide queue. Transient GitHub API and installation-rate-limit responses
+  advisory work. The curator rejects a capsule whose authenticated generation differs from its
+  protected implementation before image work, while the drain rechecks every capsule against the
+  live `master` SHA immediately before model admission. An exact wake may select only its requested
+  authenticated artifact and queries only that immutable capsule plus its exact report, cooldown,
+  generation-block, and current-generation identities; it does not rescan the repository-wide
+  queue. Transient GitHub API and installation-rate-limit responses
   receive bounded backoff before the durable wake is allowed to fail visibly. Queue state
   lives in Actions artifacts rather than pending workflow runs, so GitHub concurrency coalescing
   cannot lose a review. Exact artifact IDs define drain concurrency groups: duplicate wakes cannot

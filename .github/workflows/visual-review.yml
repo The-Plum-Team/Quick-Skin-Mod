@@ -545,6 +545,13 @@ jobs:
           fi
           [[ "$generation_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'generation_sha=%s\n' "$generation_sha" >> "$GITHUB_OUTPUT"
+          if [[ "$generation_sha" != "$IMPLEMENTATION_SHA" ]]; then
+            printf 'review_skipped=true\n' >> "$GITHUB_OUTPUT"
+            printf '%s\n' \
+              'superseded visual-review generation; skipping curation before any image decode or model wake' \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           if [[ "$review_mode" == reference-comparison ]]; then
           reference_output="$(mktemp "$RUNNER_TEMP/reference-selection.XXXXXX")"
