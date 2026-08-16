@@ -273,7 +273,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   concurrently. Exact wakes must authenticate through ID-scoped capsule lookup and exact-name
   report, cooldown, and generation-block lookup rather than multiplying a full artifact-inventory
   scan across a parallel release wave; retryable GitHub API failures use bounded backoff and never
-  become an image verdict. Once a normalized report or durable block makes a source ineligible, an explicit
+  become an image verdict. If the exact capsule returns authenticated metadata and then a download
+  404, only that post-guard disappearance is a coalesced settled wake: no model starts, while every
+  other download or validation failure remains visible. Once a normalized report or durable block
+  makes a source ineligible, an explicit
   GitHub installation-rate-limit response may defer input cleanup or the redundant continuation
   wake without turning the completed review red. The normalized report or block must outlive its
   durable input so deferred cleanup can never make reviewed work eligible again; artifact retention
