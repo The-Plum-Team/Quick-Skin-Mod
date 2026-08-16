@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "ci"))
 
 from claude_capacity_gate import (  # noqa: E402
+    COMPATIBILITY_REVIEW_WORKFLOW,
     PAUSE_NAME,
     READY_NAME,
     resolve_capacity,
@@ -168,6 +169,21 @@ class ClaudeCapacityGateTest(unittest.TestCase):
         )
 
         self.assertEqual("paused", state.state)
+
+    def test_compatibility_review_can_close_the_shared_circuit(self) -> None:
+        pause = artifact(1, PAUSE_NAME, run_id=10, minutes_ago=1)
+        state = resolve_capacity(
+            FakeApi(
+                [pause],
+                {10: owner(10, workflow=COMPATIBILITY_REVIEW_WORKFLOW)},
+            ),
+            repository=REPOSITORY,
+            implementation_sha=SHA,
+            now=NOW,
+        )
+
+        self.assertEqual("paused", state.state)
+        self.assertFalse(state.probe_required)
 
 
 if __name__ == "__main__":
