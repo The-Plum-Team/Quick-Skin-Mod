@@ -165,4 +165,39 @@ public class MixinAbstractClientPlayer {
             }
         }
     }
+
+    /**
+     * A profile Elytra has priority over the cloak in vanilla's renderer. Mirror the Quick Skin
+     * cape override here so a late profile-texture response cannot replace the selected cape only
+     * on the equipped Elytra.
+     */
+    @Inject(
+            method = "getElytraTextureLocation",
+            at = @At("HEAD"),
+            cancellable = true,
+            require = 1,
+            expect = 1,
+            allow = 1
+    )
+    private void quickskin$getElytraTextureLocation(CallbackInfoReturnable<ResourceLocation> cir) {
+        if (CPMCompatIntegration.shouldDeferToCPM()) return;
+
+        AbstractClientPlayer self = (AbstractClientPlayer) (Object) this;
+        PlayerAppearanceService service = PlayerAppearanceService.getInstance();
+        if (service.hasActiveCape(self.getUUID())) {
+            cir.setReturnValue(service.getCapeLocation(self.getUUID()));
+            return;
+        }
+
+        if (Minecraft.getInstance().level == null) {
+            ClientConfig config = ClientConfig.getInstance();
+            if (!config.activeCapeHash.isEmpty()) {
+                ResourceLocation capeLoc = com.quickskin.mod.client.services.CapeService.getInstance()
+                        .getCapeLocation(null, config.activeCapeHash);
+                if (capeLoc != null) {
+                    cir.setReturnValue(capeLoc);
+                }
+            }
+        }
+    }
 }
