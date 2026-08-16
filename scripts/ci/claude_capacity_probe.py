@@ -23,7 +23,7 @@ from check_visual_review import model_error_category  # noqa: E402
 MAX_OUTPUT_BYTES = 4_194_304
 MAX_EVENT_BYTES = 1_048_576
 MAX_PROBE_SECONDS = 5 * 60
-PAUSE_UTILIZATION = 0.95
+UTILIZATION_BAND_THRESHOLD = 0.95
 KNOWN_RATE_LIMIT_TYPES = frozenset(
     {
         "five_hour",
@@ -40,7 +40,6 @@ TRANSIENT_CATEGORIES = frozenset(
         "cli_or_api",
         "overloaded",
         "quota_or_rate_limit",
-        "quota_near_limit",
         "structured_output_retries_exhausted",
     }
 )
@@ -91,8 +90,6 @@ def classify_probe(
                 return ("error", "cli_or_api")
         if status == "rejected":
             return ("paused", "quota_or_rate_limit")
-        if utilization is not None and utilization >= PAUSE_UTILIZATION:
-            return ("paused", "quota_near_limit")
     if (
         returncode == 0
         and isinstance(envelope, dict)
@@ -156,7 +153,7 @@ def sanitized_rate_limit_summary(
         provider_status = "not_reported"
     if max_utilization is None:
         utilization_band = "not_reported"
-    elif max_utilization >= PAUSE_UTILIZATION:
+    elif max_utilization >= UTILIZATION_BAND_THRESHOLD:
         utilization_band = "at_or_above_95_percent"
     else:
         utilization_band = "below_95_percent"

@@ -94,7 +94,7 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
             ),
         )
 
-    def test_rejection_or_explicit_95_percent_stops_expensive_fan_out(self) -> None:
+    def test_only_rejection_overrides_a_successful_capacity_probe(self) -> None:
         success = {
             "type": "result",
             "subtype": "success",
@@ -111,7 +111,7 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            ("paused", "quota_near_limit"),
+            ("ready", ""),
             classify_probe(
                 0,
                 success,
@@ -119,7 +119,7 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            ("paused", "quota_near_limit"),
+            ("ready", ""),
             classify_probe(
                 0,
                 success,
