@@ -570,6 +570,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual reference did not reach protected", curate)
         self.assertIn("sleep 5", curate)
         self.assertIn("github_api_retry_to_file", review)
+        self.assertIn("capsule_missing: ${{ steps.capsule.outputs.missing }}", review)
+        self.assertIn("id: capsule", review)
+        self.assertIn("curated-review-download", review)
+        self.assertIn("printf 'missing=true\\n'", review)
+        self.assertIn("no model session started", review)
+        self.assertEqual(
+            review.count("steps.capsule.outputs.missing != 'true'"), 6
+        )
         self.assertIn(
             'source "$GITHUB_WORKSPACE/scripts/ci/github_api_retry.sh"', review
         )
@@ -670,6 +678,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("visual-review-metadata", cleanup)
         self.assertIn("visual-review-delete", cleanup)
         self.assertEqual(cleanup.count("(HTTP 404)"), 2)
+        self.assertIn("needs.review.outputs.capsule_missing == 'true'", cleanup)
         self.assertIn("API rate limit exceeded", cleanup)
         self.assertIn("queue cleanup deferred", cleanup)
         self.assertIn("authenticated marker must outlive", drain_workflow)
