@@ -15,9 +15,6 @@ from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any
 
-from scenario_contract import ScenarioContractError, load_contract
-
-
 VERDICT_KEYS = {
     "label",
     "semantic_valid",
@@ -318,6 +315,12 @@ def validate_compatibility_references(
 ) -> None:
     """Bind optional-mod candidate/reference identities to the exact source contract."""
 
+    try:
+        from scenario_contract import ScenarioContractError, load_contract
+    except ImportError as exc:
+        raise ReviewError(
+            "compatibility scenario contract loader is unavailable"
+        ) from exc
     entries, _labels = validate_manifest(manifest, require_paired=True)
     try:
         contract = load_contract(scenario_contract)
