@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 import sys
+import tempfile
 import threading
 import unittest
 from pathlib import Path
@@ -77,6 +80,27 @@ class VisualReviewRunnerTest(unittest.TestCase):
                 "review-input/images/a.png",
             ),
         ]
+
+    def test_minimal_protected_reviewer_bundle_starts_without_contract_loader(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            bundle = Path(temporary)
+            for name in (
+                "check_visual_review.py",
+                "visual_review_cache.py",
+                "visual_review_runner.py",
+            ):
+                shutil.copy2(ROOT / "e2e" / name, bundle / name)
+
+            completed = subprocess.run(
+                [sys.executable, str(bundle / "visual_review_runner.py"), "--help"],
+                cwd=bundle,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
 
     def test_plan_skips_only_byte_identical_pairs_and_bounds_chunks(self) -> None:
         plan = build_review_plan(self.manifest, triage_chunk_size=1)
