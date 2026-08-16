@@ -1942,9 +1942,30 @@ class WorkflowSecurityTest(unittest.TestCase):
         handler = (WORKFLOWS / "handle-version-port-result.yml").read_text(
             encoding="utf-8"
         )
+        sync_workflow = (WORKFLOWS / "sync-version-branches.yml").read_text(
+            encoding="utf-8"
+        )
         merge = job_block("handle-version-port-result.yml", "merge")
         sync = job_block("sync-version-branches.yml", "discover")
         visual = job_block("visual-review.yml", "authenticate")
+
+        checkout_start = sync.index("- name: Check out trusted synchronization code")
+        checkout_end = sync.index("\n      - name:", checkout_start + 1)
+        checkout = sync[checkout_start:checkout_end]
+        self.assertIn("fetch-depth: 0", checkout)
+        self.assertIn(
+            '[[ "$(git rev-parse --is-shallow-repository)" == false ]]', sync
+        )
+        self.assertLess(
+            sync.index('[[ "$(git rev-parse --is-shallow-repository)" == false ]]'),
+            sync.index('git rev-list --parents -n 1'),
+        )
+        self.assertEqual(
+            1,
+            sync_workflow.count(
+                "fetch-depth: 0", 0, sync_workflow.index("  propose:")
+            ),
+        )
 
         for required in (
             "scripts/ci/visual_review_impact.py",
