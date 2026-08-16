@@ -9,7 +9,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "ci"))
 
-from visual_review_impact import infrastructure_only  # noqa: E402
+from visual_review_impact import classify_paths, infrastructure_only  # noqa: E402
 
 
 def pages(*files: dict[str, Any]) -> list[dict[str, Any]]:
@@ -56,6 +56,58 @@ class VisualReviewImpactTest(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertFalse(
                     infrastructure_only(pages(changed(path)), changed_files=1)
+                )
+
+    def test_source_pr_scope_separates_compatibility_from_visual_policy(self) -> None:
+        compatibility = pages(
+            changed(".github/workflows/mod-compatibility-e2e.yml"),
+            changed(".github/workflows/mod-compatibility-review.yml"),
+            changed("scripts/ci/mod_compatibility_review_queue.py"),
+            changed("scripts/ci/tests/test_workflow_security.py"),
+            changed("docs/ai/PROJECT.md"),
+        )
+        self.assertTrue(
+            infrastructure_only(
+                compatibility, changed_files=5, scope="source-pr"
+            )
+        )
+        for path in (
+            ".github/workflows/visual-review.yml",
+            "scripts/ci/visual_review_impact.py",
+            "e2e/visual_review_prompt.md",
+        ):
+            with self.subTest(path=path):
+                self.assertFalse(
+                    infrastructure_only(
+                        pages(changed(path)), changed_files=1, scope="source-pr"
+                    )
+                )
+
+    def test_replicated_port_can_carry_nonvisual_continuation_policy(self) -> None:
+        paths = [
+            ".github/workflows/handle-version-port-result.yml",
+            ".github/workflows/mod-compatibility-review.yml",
+            ".github/workflows/sync-version-branches.yml",
+            ".github/workflows/visual-review.yml",
+            "scripts/ci/visual_nonimpact_certification.py",
+            "scripts/ci/visual_review_impact.py",
+            "scripts/ci/tests/test_visual_review_impact.py",
+            "docs/ai/WORKFLOW.md",
+        ]
+        classification = classify_paths(paths, scope="replicated-port")
+        self.assertFalse(classification.review_required)
+        self.assertEqual(sorted(paths), list(classification.paths))
+        self.assertEqual("replicated-port", classification.manifest()["scope"])
+
+    def test_exact_path_classification_fails_closed(self) -> None:
+        for paths in (
+            [],
+            ["common/src/main/java/com/quickskin/mod/QuickSkin.java"],
+            ["docs/../common/Hidden.java"],
+        ):
+            with self.subTest(paths=paths):
+                self.assertTrue(
+                    classify_paths(paths, scope="replicated-port").review_required
                 )
 
     def test_rename_requires_both_paths_to_be_safe(self) -> None:

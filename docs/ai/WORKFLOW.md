@@ -57,6 +57,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   validation failure visible. Reject a capsule whose authenticated generation differs from the
   protected curator implementation before image decoding, and recheck every queued capsule against
   the live `master` SHA before model admission, including artifact-scoped exact wakes.
+- Optional-mod review must suppress a producer wake that settles after `master` advances, reject a
+  direct request whose source SHA differs from the protected current implementation, and recheck
+  live `master` independently in every parallel lane before capsule download or model admission.
+- Keep deterministic E2E applicability and model applicability separate. The 1.20.1 synchronization
+  anchor always runs exact Build and full packaged E2E, but a complete allowlisted nonvisual port
+  diff may continue without Claude only through the protected nonimpact certificate. Its consumer
+  must reauthenticate the handler artifact, both gate runs, current Git parents/heads and equal
+  trees, then independently recompute the same protected impact manifest. Ordinary source PRs use
+  the narrower compatibility-only scope; unknown paths or changes to visual policy remain model
+  eligible. A nonvisual continuation must not launch optional-mod compatibility.
 - Version-port and repair validation must check out candidate code with credentials disabled.
   For a version port, the complete patch goes only into an alternate index; the protected merge
   controller reconstructs the original merge and copies only recomputed AI-conflict entries from
