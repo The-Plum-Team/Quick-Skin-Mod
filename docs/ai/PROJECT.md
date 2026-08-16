@@ -112,9 +112,9 @@ immutable workflow and governance activation contract.
   reauthenticates that artifact and releases every other discovered version branch. A stale,
   malformed, incomplete, defective, unavailable, or superseded certificate releases nothing.
   Queue admission also treats that exact authenticated certificate as terminal for the same
-  automatic or scheduled anchor generation, and discards superseded anchor generations and closed
-  pull-request evidence before any model call. This is identity-level deduplication, not reuse of
-  an unpaired semantic verdict.
+  automatic or scheduled anchor generation, and discards every capsule whose authenticated
+  `master` generation is no longer current plus closed pull-request evidence before any model
+  call. This is identity-level deduplication, not reuse of an unpaired semantic verdict.
   No immediate-diff exception may fan out directly: a documentation-only tip can contain an older
   runtime change whose certification is still pending or failed. An explicit manual exact target
   remains an operator recovery path.

@@ -548,6 +548,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("--allow-advisory-controller-skew", curate)
         self.assertIn("protected post-merge generation", curate)
+        self.assertIn('generation_sha" != "$IMPLEMENTATION_SHA', curate)
+        self.assertIn("superseded visual-review generation", curate)
+        self.assertIn("before any image decode or model wake", curate)
         self.assertIn(
             "steps.evidence.outputs.review_skipped == 'false'", prepare_workflow
         )

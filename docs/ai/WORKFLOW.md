@@ -54,7 +54,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Upload only bounded normalized status/type/band evidence, never raw provider text or exact
   account-usage details. If a capsule disappears after its exact metadata guard but before its
   download, settle only that coalesced wake without starting a model; keep every other download or
-  validation failure visible.
+  validation failure visible. Reject a capsule whose authenticated generation differs from the
+  protected curator implementation before image decoding, and recheck every queued capsule against
+  the live `master` SHA before model admission, including artifact-scoped exact wakes.
 - Version-port and repair validation must check out candidate code with credentials disabled.
   For a version port, the complete patch goes only into an alternate index; the protected merge
   controller reconstructs the original merge and copies only recomputed AI-conflict entries from
