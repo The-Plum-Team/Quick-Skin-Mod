@@ -133,7 +133,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                     if ",Edit," in block:
                         self.assertIn('"Edit(./**)"', block)
                     self.assertIn('"Write(', block)
-        self.assertEqual(secret_steps, 5)
+        self.assertEqual(secret_steps, 6)
 
     def test_external_actions_are_pinned_to_full_commit_shas(self) -> None:
         definitions = [
@@ -281,8 +281,18 @@ class WorkflowSecurityTest(unittest.TestCase):
             ): "7",
             (
                 "mod-compatibility-review.yml",
+                "Upload the durable clean lane marker",
+                "mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}",
+            ): "7",
+            (
+                "mod-compatibility-review.yml",
                 "Upload the durable confirmed-defect marker",
-                "mod-compatibility-wave-block-${{ matrix.source_run_id }}-${{ matrix.id }}",
+                "mod-compatibility-wave-block-${{ matrix.source_run_id }}",
+            ): "7",
+            (
+                "mod-compatibility-review.yml",
+                "Upload the durable source completion marker",
+                "mod-compatibility-review-complete-${{ needs.enumerate.outputs.source_run_id }}",
             ): "7",
         }
         observed_overrides: set[tuple[str, str, str]] = set()
@@ -730,9 +740,17 @@ class WorkflowSecurityTest(unittest.TestCase):
         runtime = job_block("mod-compatibility-e2e.yml", "compatibility-e2e")
         execution_gate = job_block("mod-compatibility-e2e.yml", "gate")
         request_review = job_block("mod-compatibility-e2e.yml", "request-review")
+        recover_review = job_block("mod-compatibility-review.yml", "recover")
         enumerate_review = job_block("mod-compatibility-review.yml", "enumerate")
+        capacity_check = job_block(
+            "mod-compatibility-review.yml", "capacity-check"
+        )
+        capacity_probe = job_block(
+            "mod-compatibility-review.yml", "capacity-probe"
+        )
         review = job_block("mod-compatibility-review.yml", "review")
         review_gate = job_block("mod-compatibility-review.yml", "gate")
+        review_continue = job_block("mod-compatibility-review.yml", "continue")
         plan_step_start = prepare.index(
             "- name: Reverify the source-bound bundle and resolve every applicable lane"
         )
@@ -825,6 +843,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn(
             "types:\n      - mod-compatibility-review-requested", review_workflow
         )
+        self.assertIn("mod-compatibility-review-sweep-requested", review_workflow)
+        self.assertIn('cron: "17,47 * * * *"', review_workflow)
+        self.assertIn("workflow_dispatch:", review_workflow)
         self.assertNotIn("workflow_run:", review_workflow)
         self.assertIn("needs.gate.result == 'failure'", request_review)
         self.assertIn("contents: write", request_review)
@@ -838,6 +859,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', request_review)
         self.assertIn("repos/$GITHUB_REPOSITORY/dispatches", request_review)
         self.assertIn("github.event.client_payload.source_run_id", review_workflow)
+        self.assertIn("mod_compatibility_review_queue.py", recover_review)
+        self.assertIn("eligible=true", recover_review)
+        self.assertIn("contents: write", recover_review)
+        self.assertIn("repos/$GITHUB_REPOSITORY/dispatches", recover_review)
+        self.assertIn("mod-compatibility-review-requested", recover_review)
         self.assertIn('[[ "$SOURCE_REPOSITORY" == "$GITHUB_REPOSITORY" ]]', enumerate_review)
         self.assertIn("for attempt in {1..120}", enumerate_review)
         self.assertIn('[[ "$implementation_sha" == "$SOURCE_SHA" ]]', enumerate_review)
@@ -854,6 +880,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("source_sha:$.source_sha", enumerate_review)
         self.assertIn('elif ($matches|length) == 0 then empty', enumerate_review)
         self.assertIn('error("duplicate review capsule', enumerate_review)
+        self.assertIn("mod-compatibility-lane-complete-$SOURCE_RUN_ID", enumerate_review)
         self.assertIn("timeout-minutes: 75", enumerate_review)
         self.assertGreaterEqual(
             enumerate_review.count("source scripts/ci/github_api_retry.sh"), 2
@@ -862,10 +889,17 @@ class WorkflowSecurityTest(unittest.TestCase):
             'GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', enumerate_review
         )
         self.assertNotIn("gh api", enumerate_review)
+        self.assertIn("claude_capacity_gate.py", capacity_check)
+        self.assertIn("claude_capacity_gate.py", capacity_probe)
+        self.assertIn("claude_capacity_probe.py", capacity_probe)
+        self.assertIn("group: quick-skin-claude-capacity-probe", capacity_probe)
+        self.assertIn("name: ${{ steps.probe.outputs.marker_name }}", capacity_probe)
         self.assertIn("ref: ${{ github.sha }}", review)
         self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
         self.assertIn("strategy:\n      fail-fast: false", review)
         self.assertNotIn("max-parallel", review.split("\n    steps:", 1)[0])
+        self.assertIn("needs.enumerate.outputs.pending_count != '0'", review)
+        self.assertIn("needs.capacity-check.outputs.ready == 'true'", review)
         self.assertIn("--review-identical", review)
         self.assertNotIn("--cache ", review)
         self.assertIn("git show", enumerate_review)
@@ -880,6 +914,15 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--triage-model claude-sonnet-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
         self.assertIn("mod-compatibility-wave-block", review)
+        self.assertIn(
+            "name: mod-compatibility-wave-block-${{ matrix.source_run_id }}",
+            review,
+        )
+        self.assertIn("mod-compatibility-attempt-${{ matrix.source_run_id }}", review)
+        self.assertIn(
+            "mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}",
+            review,
+        )
         self.assertIn("/cancel", review)
         self.assertGreaterEqual(
             review.count("source scripts/ci/github_api_retry.sh"), 2
@@ -888,6 +931,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', review)
         self.assertNotIn("gh api", review)
         self.assertIn("REVIEW_RESULT", review_gate)
+        self.assertIn("claude-capacity-pause", review_gate)
+        self.assertIn("quota_or_rate_limit", review_gate)
+        self.assertIn("COMPLETED_COUNT", review_gate)
+        self.assertIn("PENDING_COUNT", review_gate)
+        self.assertIn(
+            "mod-compatibility-review-complete-${{ needs.enumerate.outputs.source_run_id }}",
+            review_gate,
+        )
+        self.assertIn("mod-compatibility-review-sweep-requested", review_continue)
+        self.assertIn("needs.gate.outputs.complete == 'true'", review_continue)
         self.assertNotIn("base-evidence", review)
         self.assertNotIn("candidate-evidence", review)
         self.assertEqual(review.count("actions/download-artifact@"), 0)
