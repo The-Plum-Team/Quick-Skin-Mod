@@ -318,9 +318,10 @@ jobs:
             "$(jq -er .manifest_sha256 "$proof")" ]]
           [[ "$(jq length "$manifest")" == "$(jq -er .frame_count "$proof")" ]]
           git fetch --no-tags origin "${{ matrix.source_sha }}"
-          [[ "$(git show \
-              "${{ matrix.source_sha }}:e2e/scenario-contract.json" |
-              sha256sum | cut -d ' ' -f 1)" == \
+          source_contract="$RUNNER_TEMP/source-scenario-contract.json"
+          git show "${{ matrix.source_sha }}:e2e/scenario-contract.json" \
+            > "$source_contract"
+          [[ "$(sha256sum "$source_contract" | cut -d ' ' -f 1)" == \
             "$(jq -er .scenario_contract_sha256 "$proof")" ]]
           [[ "$(git show \
               "${{ matrix.source_sha }}:e2e/mod-compatibility-contract.json" |
@@ -378,6 +379,9 @@ jobs:
             --manifest "$manifest" \
             --input-root "$capsule/review-input" \
             --require-paired \
+            --compatibility-scenario-contract "$source_contract" \
+            --compatibility-artifact-node "${{ matrix.artifact_node }}" \
+            --compatibility-mod "${{ matrix.mod }}" \
             --validate-input-only
           sha256sum "$manifest" > "$RUNNER_TEMP/mod-compatibility-manifest.sha256"
 
