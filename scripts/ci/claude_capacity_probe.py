@@ -23,6 +23,18 @@ from check_visual_review import model_error_category  # noqa: E402
 MAX_OUTPUT_BYTES = 4_194_304
 MAX_EVENT_BYTES = 1_048_576
 MAX_PROBE_SECONDS = 5 * 60
+PAUSE_UTILIZATION = 0.95
+KNOWN_RATE_LIMIT_TYPES = frozenset(
+    {
+        "five_hour",
+        "seven_day",
+        "seven_day_cowork",
+        "seven_day_cowork_opus",
+        "seven_day_fable",
+        "seven_day_opus",
+        "seven_day_sonnet",
+    }
+)
 TRANSIENT_CATEGORIES = frozenset(
     {
         "cli_or_api",
@@ -69,21 +81,17 @@ def classify_probe(
         utilization = info.get("utilization")
         if status not in {"allowed", "allowed_warning", "rejected"}:
             return ("error", "cli_or_api")
-        if utilization is not None and (
-            isinstance(utilization, bool)
-            or not isinstance(utilization, (int, float))
-            or not math.isfinite(utilization)
-            or utilization < 0
-        ):
-            return ("error", "cli_or_api")
+        if utilization is not None:
+            if (
+                isinstance(utilization, bool)
+                or not isinstance(utilization, (int, float))
+                or not math.isfinite(utilization)
+                or not 0 <= utilization <= 1
+            ):
+                return ("error", "cli_or_api")
         if status == "rejected":
             return ("paused", "quota_or_rate_limit")
-        if status == "allowed_warning" or (
-            isinstance(utilization, (int, float))
-            and not isinstance(utilization, bool)
-            and math.isfinite(utilization)
-            and utilization >= 0.95
-        ):
+        if utilization is not None and utilization >= PAUSE_UTILIZATION:
             return ("paused", "quota_near_limit")
     if (
         returncode == 0
@@ -102,6 +110,61 @@ def classify_probe(
     if category in TRANSIENT_CATEGORIES:
         return ("paused", category)
     return ("error", category)
+
+
+def sanitized_rate_limit_summary(
+    rate_limits: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """Reduce private provider events to bounded, non-sensitive decision evidence."""
+
+    statuses: set[str] = set()
+    max_utilization: float | None = None
+    rate_limit_types: set[str] = set()
+    for info in rate_limits or []:
+        status = info.get("status")
+        if status in {"allowed", "allowed_warning", "rejected"}:
+            statuses.add(status)
+        utilization = info.get("utilization")
+        if (
+            isinstance(utilization, (int, float))
+            and not isinstance(utilization, bool)
+            and math.isfinite(utilization)
+            and 0 <= utilization <= 1
+        ):
+            normalized_utilization = float(utilization)
+            max_utilization = (
+                normalized_utilization
+                if max_utilization is None
+                else max(max_utilization, normalized_utilization)
+            )
+        rate_limit_type = info.get("rateLimitType")
+        if rate_limit_type is not None:
+            rate_limit_types.add(
+                rate_limit_type
+                if isinstance(rate_limit_type, str)
+                and rate_limit_type in KNOWN_RATE_LIMIT_TYPES
+                else "other"
+            )
+
+    if "rejected" in statuses:
+        provider_status = "rejected"
+    elif "allowed_warning" in statuses:
+        provider_status = "allowed_warning"
+    elif "allowed" in statuses:
+        provider_status = "allowed"
+    else:
+        provider_status = "not_reported"
+    if max_utilization is None:
+        utilization_band = "not_reported"
+    elif max_utilization >= PAUSE_UTILIZATION:
+        utilization_band = "at_or_above_95_percent"
+    else:
+        utilization_band = "below_95_percent"
+    return {
+        "provider_status": provider_status,
+        "rate_limit_types": sorted(rate_limit_types),
+        "utilization_band": utilization_band,
+    }
 
 
 def probe_command(claude: Path, model: str) -> list[str]:
@@ -188,7 +251,9 @@ def load_stream(path: Path) -> tuple[Any, list[dict[str, Any]]]:
     return (result, rate_limits)
 
 
-def run_probe(claude: Path, model: str, work_root: Path) -> tuple[str, str]:
+def run_probe(
+    claude: Path, model: str, work_root: Path
+) -> tuple[str, str, list[dict[str, Any]]]:
     executable = resolve_claude_executable(claude)
     work_root.mkdir(parents=True, exist_ok=False)
     stdout_path = work_root / "private-result.json"
@@ -210,13 +275,24 @@ def run_probe(claude: Path, model: str, work_root: Path) -> tuple[str, str]:
                 process.wait(timeout=30)
             except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
                 pass
-            return ("paused", "timeout")
+            return ("paused", "timeout", [])
     envelope, rate_limits = load_stream(stdout_path)
-    return classify_probe(returncode, envelope, rate_limits)
+    state, category = classify_probe(returncode, envelope, rate_limits)
+    return (state, category, rate_limits)
 
 
-def write_marker(path: Path, *, state: str, category: str) -> None:
-    marker = {"schema_version": 1, "state": state}
+def write_marker(
+    path: Path,
+    *,
+    state: str,
+    category: str,
+    rate_limits: list[dict[str, Any]] | None = None,
+) -> None:
+    marker = {
+        "schema_version": 2,
+        "state": state,
+        "rate_limit_summary": sanitized_rate_limit_summary(rate_limits),
+    }
     if category:
         marker["category"] = category
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -246,10 +322,17 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if not args.model or len(args.model) > 128:
             raise ProbeError("model identifier is invalid")
-        state, category = run_probe(args.claude, args.model, args.work_root)
+        state, category, rate_limits = run_probe(
+            args.claude, args.model, args.work_root
+        )
         if state == "error":
             raise ProbeError(f"non-transient Claude probe failure ({category})")
-        write_marker(args.marker, state=state, category=category)
+        write_marker(
+            args.marker,
+            state=state,
+            category=category,
+            rate_limits=rate_limits,
+        )
         marker_name = (
             "claude-capacity-ready" if state == "ready" else "claude-capacity-pause"
         )
