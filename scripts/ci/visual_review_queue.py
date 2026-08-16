@@ -306,7 +306,7 @@ def source_is_eligible(
     certified: set[str],
     repository: str,
 ) -> bool:
-    """Reject superseded release anchors and closed PR evidence before model admission."""
+    """Reject superseded generations and closed PR evidence before model admission."""
 
     source_run = api.get_source_run(source_run_id)
     if not isinstance(source_run, dict):
@@ -314,6 +314,9 @@ def source_is_eligible(
     branch = source_run.get("head_branch")
     event = source_run.get("event")
     generation = input_generation(artifact)
+    current_master = api.get_branch_sha("master")
+    if not SHA.fullmatch(current_master) or generation != current_master:
+        return False
     release_anchor = bool(
         isinstance(branch, str)
         and (
@@ -323,9 +326,6 @@ def source_is_eligible(
     )
     if release_anchor:
         if generation in certified:
-            return False
-        current_master = api.get_branch_sha("master")
-        if not SHA.fullmatch(current_master) or generation != current_master:
             return False
 
     # GitHub preserves the pull_request association on completed workflow runs. If it is
