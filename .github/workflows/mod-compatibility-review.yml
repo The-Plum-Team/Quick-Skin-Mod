@@ -1,28 +1,27 @@
 name: AI mod compatibility review
 
 # This secret-bearing workflow receives only metadata-free PNG capsules curated by the separate
-# compatibility workflow. Every mod/loader capsule is reviewed concurrently. A durable marker is
-# uploaded before an Opus-confirmed defect cancels the remaining sessions.
+# compatibility workflow. Its protected producer wakes it explicitly because that producer was
+# itself created with GITHUB_TOKEN and cannot reliably recurse through workflow_run. Every
+# mod/loader capsule is reviewed concurrently. A durable marker is uploaded before an
+# Opus-confirmed defect cancels the remaining sessions.
 on:
-  workflow_run:
-    workflows:
-      - Mod compatibility E2E
+  repository_dispatch:
     types:
-      - completed
+      - mod-compatibility-review-requested
 
 permissions: {}
 
 concurrency:
-  group: mod-compatibility-review-${{ github.event.workflow_run.id }}
+  group: >-
+    mod-compatibility-review-${{ github.event.client_payload.source_run_id ||
+    github.run_id }}
   cancel-in-progress: false
 
 jobs:
   enumerate:
     name: Authenticate compatibility capsules
-    if: >-
-      github.ref == 'refs/heads/master' &&
-      (github.event.workflow_run.conclusion == 'success' ||
-       github.event.workflow_run.conclusion == 'failure')
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     permissions:
@@ -50,16 +49,34 @@ jobs:
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
-          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          SOURCE_REPOSITORY: ${{ github.event.client_payload.source_repository }}
+          SOURCE_RUN_ID: ${{ github.event.client_payload.source_run_id }}
+          SOURCE_SHA: ${{ github.event.client_payload.source_sha }}
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
+          [[ "$SOURCE_REPOSITORY" == "$GITHUB_REPOSITORY" ]]
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          owner="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          owner=''
+          for attempt in {1..120}; do
+            if ! owner="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" \
+                2>/dev/null)"; then
+              owner=''
+              sleep 2
+              continue
+            fi
+            if [[ "$(jq -r .status <<< "$owner")" == completed ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test -n "$owner"
           implementation_sha="$(jq -er \
             '.head_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
             <<< "$owner")"
+          [[ "$implementation_sha" == "$SOURCE_SHA" ]]
           jq -e \
             --arg implementation_sha "$implementation_sha" \
             --arg repository "$GITHUB_REPOSITORY" \
@@ -100,8 +117,8 @@ jobs:
           plan="$RUNNER_TEMP/compatibility-plan/mod-compatibility-plan.json"
           test -f "$plan" -a ! -L "$plan"
           jq -e \
-            --argjson source_run_id "$SOURCE_RUN_ID" \
-            '.schema_version == 1 and .source_run_id == $source_run_id and
+            '.schema_version == 1 and
+             (.source_run_id | type == "number" and . > 0) and
              (.base_matrix_kind == "pr-anchors" or
               .base_matrix_kind == "native-anchors") and
              (.source_sha | type == "string" and test("^[0-9a-f]{40}$")) and
@@ -156,13 +173,15 @@ jobs:
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
           matrix="$(jq -c \
             --argjson artifacts "$artifacts" \
+            --argjson compatibility_run_id "$SOURCE_RUN_ID" \
             --arg implementation_sha "$IMPLEMENTATION_SHA" \
-            --argjson source_run_id "$SOURCE_RUN_ID" \
-            '[.runnable[] as $lane |
-              ("mod-compatibility-review-input-" + ($source_run_id|tostring) + "-" +
+            '. as $plan |
+             [$plan.runnable[] as $lane |
+              ("mod-compatibility-review-input-" +
+                ($compatibility_run_id|tostring) + "-" +
                 $lane.id) as $name |
               [$artifacts.artifacts[] | select(.name == $name and .expired == false and
-                .workflow_run.id == $source_run_id and
+                .workflow_run.id == $compatibility_run_id and
                 (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
                 ((.size_in_bytes | type) == "number" and .size_in_bytes > 0 and
                  .size_in_bytes <= 536870912))] as $matches |
@@ -176,8 +195,10 @@ jobs:
                  base_evidence_name:$lane.base_evidence_name,
                  artifact_id:$artifact.id,artifact_name:$artifact.name,
                  artifact_size:$artifact.size_in_bytes,artifact_digest:$artifact.digest,
-                 source_run_id:$source_run_id,implementation_sha:$implementation_sha,
-                 source_sha:$.source_sha,target_branch:$.target_branch,target_sha:$.target_sha}
+                 source_run_id:$compatibility_run_id,
+                 implementation_sha:$implementation_sha,
+                 source_sha:$plan.source_sha,target_branch:$plan.target_branch,
+                 target_sha:$plan.target_sha}
               end] | {include:.}' "$plan")"
           count="$(jq '.include | length' <<< "$matrix")"
           [[ "$count" =~ ^[0-9]+$ ]]
@@ -297,9 +318,10 @@ jobs:
             "$(jq -er .manifest_sha256 "$proof")" ]]
           [[ "$(jq length "$manifest")" == "$(jq -er .frame_count "$proof")" ]]
           git fetch --no-tags origin "${{ matrix.source_sha }}"
-          [[ "$(git show \
-              "${{ matrix.source_sha }}:e2e/scenario-contract.json" |
-              sha256sum | cut -d ' ' -f 1)" == \
+          source_contract="$RUNNER_TEMP/source-scenario-contract.json"
+          git show "${{ matrix.source_sha }}:e2e/scenario-contract.json" \
+            > "$source_contract"
+          [[ "$(sha256sum "$source_contract" | cut -d ' ' -f 1)" == \
             "$(jq -er .scenario_contract_sha256 "$proof")" ]]
           [[ "$(git show \
               "${{ matrix.source_sha }}:e2e/mod-compatibility-contract.json" |
@@ -357,6 +379,9 @@ jobs:
             --manifest "$manifest" \
             --input-root "$capsule/review-input" \
             --require-paired \
+            --compatibility-scenario-contract "$source_contract" \
+            --compatibility-artifact-node "${{ matrix.artifact_node }}" \
+            --compatibility-mod "${{ matrix.mod }}" \
             --validate-input-only
           sha256sum "$manifest" > "$RUNNER_TEMP/mod-compatibility-manifest.sha256"
 
