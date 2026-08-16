@@ -294,6 +294,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "Upload the durable source completion marker",
                 "mod-compatibility-review-complete-${{ needs.enumerate.outputs.source_run_id }}",
             ): "7",
+            (
+                "handle-version-port-result.yml",
+                "Upload the authenticated nonvisual anchor continuation",
+                "${{ steps.merge.outputs.artifact_name }}",
+            ): "7",
         }
         observed_overrides: set[tuple[str, str, str]] = set()
         for workflow, step_name, block in uploads:
@@ -520,7 +525,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('source_pr_base="$(jq -er .base.ref', authenticate)
         self.assertIn('source_pr_merged="$(jq -er', authenticate)
         self.assertIn('Deferring semantic anchor review until PR', authenticate)
-        self.assertIn('&& "$source_pr_base" != "$anchor_branch"', authenticate)
+        self.assertIn('--scope source-pr', authenticate)
+        self.assertIn('--scope replicated-port', authenticate)
+        self.assertIn('outside ordinary visual review', authenticate)
         self.assertIn('ref: ${{ github.sha }}', authenticate)
         self.assertIn('persist-credentials: false', authenticate)
         self.assertIn('Ignoring infrastructure-only visual review sync PR', authenticate)
@@ -548,6 +555,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("--allow-advisory-controller-skew", curate)
         self.assertIn("protected post-merge generation", curate)
+        self.assertIn('generation_sha" != "$IMPLEMENTATION_SHA', curate)
+        self.assertIn("superseded visual-review generation", curate)
+        self.assertIn("before any image decode or model wake", curate)
         self.assertIn(
             "steps.evidence.outputs.review_skipped == 'false'", prepare_workflow
         )
@@ -866,7 +876,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("source_run_id:$source_run_id", request_review)
         self.assertIn("source_sha:$source_sha", request_review)
         self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', request_review)
+        self.assertIn("branches/master", request_review)
+        self.assertIn('[[ "$current_master" != "$GITHUB_SHA" ]]', request_review)
+        self.assertIn("skipping its AI wake", request_review)
         self.assertIn("repos/$GITHUB_REPOSITORY/dispatches", request_review)
+        self.assertLess(
+            request_review.index("branches/master"),
+            request_review.index("repos/$GITHUB_REPOSITORY/dispatches"),
+        )
         self.assertIn("github.event.client_payload.source_run_id", review_workflow)
         self.assertIn("mod_compatibility_review_queue.py", recover_review)
         self.assertIn("eligible=true", recover_review)
@@ -874,8 +891,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("repos/$GITHUB_REPOSITORY/dispatches", recover_review)
         self.assertIn("mod-compatibility-review-requested", recover_review)
         self.assertIn('[[ "$SOURCE_REPOSITORY" == "$GITHUB_REPOSITORY" ]]', enumerate_review)
+        self.assertIn(
+            "github.event.client_payload.source_sha == github.sha",
+            enumerate_review,
+        )
         self.assertIn("for attempt in {1..120}", enumerate_review)
         self.assertIn('[[ "$implementation_sha" == "$SOURCE_SHA" ]]', enumerate_review)
+        self.assertIn('[[ "$implementation_sha" == "$GITHUB_SHA" ]]', enumerate_review)
+        self.assertIn('[[ "$current_master" == "$GITHUB_SHA" ]]', enumerate_review)
         self.assertIn('(.conclusion == "success" or .conclusion == "failure")', enumerate_review)
         self.assertIn(
             '(.source_run_id | type == "number" and . > 0)', enumerate_review
@@ -905,6 +928,25 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("name: ${{ steps.probe.outputs.marker_name }}", capacity_probe)
         self.assertIn("ref: ${{ github.sha }}", review)
         self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
+        self.assertIn(
+            "Revalidate current master before capsule or model admission", review
+        )
+        self.assertIn(
+            '[[ "$SOURCE_IMPLEMENTATION_SHA" == "$GITHUB_SHA" ]]', review
+        )
+        self.assertIn('[[ "$current_master" == "$GITHUB_SHA" ]]', review)
+        self.assertLess(
+            review.index(
+                "Revalidate current master before capsule or model admission"
+            ),
+            review.index("Fetch and authenticate only the curated capsule"),
+        )
+        self.assertLess(
+            review.index(
+                "Revalidate current master before capsule or model admission"
+            ),
+            review.index("Install Python"),
+        )
         self.assertIn("strategy:\n      fail-fast: false", review)
         self.assertNotIn("max-parallel", review.split("\n    steps:", 1)[0])
         self.assertIn("needs.enumerate.outputs.pending_count != '0'", review)
@@ -934,7 +976,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("/cancel", review)
         self.assertGreaterEqual(
-            review.count("source scripts/ci/github_api_retry.sh"), 2
+            review.count("source scripts/ci/github_api_retry.sh"), 3
         )
         self.assertIn("github_api_retry_to_file", review)
         self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', review)
@@ -1895,6 +1937,79 @@ class WorkflowSecurityTest(unittest.TestCase):
                 self.assertIn("runtime_policy=full", block)
         self.assertIn('["fabric", "forge"]', merge)
         self.assertIn('&& "$target_branch" != "$anchor_branch"', merge)
+
+    def test_nonvisual_anchor_continuation_is_exact_and_model_free(self) -> None:
+        handler = (WORKFLOWS / "handle-version-port-result.yml").read_text(
+            encoding="utf-8"
+        )
+        sync_workflow = (WORKFLOWS / "sync-version-branches.yml").read_text(
+            encoding="utf-8"
+        )
+        merge = job_block("handle-version-port-result.yml", "merge")
+        sync = job_block("sync-version-branches.yml", "discover")
+        visual = job_block("visual-review.yml", "authenticate")
+
+        checkout_start = sync.index("- name: Check out trusted synchronization code")
+        checkout_end = sync.index("\n      - name:", checkout_start + 1)
+        checkout = sync[checkout_start:checkout_end]
+        self.assertIn("fetch-depth: 0", checkout)
+        self.assertIn(
+            '[[ "$(git rev-parse --is-shallow-repository)" == false ]]', sync
+        )
+        self.assertLess(
+            sync.index('[[ "$(git rev-parse --is-shallow-repository)" == false ]]'),
+            sync.index('git rev-list --parents -n 1'),
+        )
+        self.assertEqual(
+            1,
+            sync_workflow.count(
+                "fetch-depth: 0", 0, sync_workflow.index("  propose:")
+            ),
+        )
+
+        for required in (
+            "scripts/ci/visual_review_impact.py",
+            "scripts/ci/visual_nonimpact_certification.py",
+            "--scope replicated-port",
+            '--base "$base_sha"',
+            '--head "$head_sha"',
+            '&& "$chain_complete" == true',
+            '&& "$current_generation_bound" == true',
+            "artifact_name=visual-anchor-nonimpact-%s",
+            "--build-run-id",
+            "--e2e-run-id",
+        ):
+            with self.subTest(boundary="merge", required=required):
+                self.assertIn(required, merge)
+        self.assertLess(
+            merge.index("scripts/ci/visual_review_impact.py"),
+            merge.index("artifact_name=visual-anchor-nonimpact-%s"),
+        )
+        self.assertIn("Upload the authenticated nonvisual anchor continuation", handler)
+        self.assertIn("Release the nonvisual synchronization wave", handler)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", merge)
+
+        for required in (
+            "visual-anchor-nonimpact",
+            ".github/workflows/handle-version-port-result.yml",
+            "scripts/ci/visual_nonimpact_certification.py verify",
+            "scripts/ci/visual_review_impact.py",
+            '--base "$anchor_base_sha"',
+            '--head "$anchor_source_sha"',
+            '"${source_commit[2]}" == "$GITHUB_SHA"',
+            '[[ "$chain_complete" == true ]]',
+            ".github/workflows/build-gate.yml",
+            ".github/workflows/on-demand-e2e.yml",
+            '--exclude "$anchor_branch"',
+        ):
+            with self.subTest(boundary="sync", required=required):
+                self.assertIn(required, sync)
+        self.assertLess(
+            sync.index("visual_nonimpact_certification.py verify"),
+            sync.index('--exclude "$anchor_branch"'),
+        )
+        self.assertIn("--scope source-pr", visual)
+        self.assertIn("Ignoring infrastructure-only visual review sync PR", visual)
 
     def test_version_port_merge_revalidates_the_exact_pr(self) -> None:
         merge = job_block("handle-version-port-result.yml", "merge")
