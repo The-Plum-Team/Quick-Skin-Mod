@@ -29,6 +29,8 @@ from visual_review_queue import (  # noqa: E402
 READY_NAME = "claude-capacity-ready"
 PAUSE_NAME = "claude-capacity-pause"
 MARKER_NAMES = frozenset({READY_NAME, PAUSE_NAME})
+COMPATIBILITY_REVIEW_WORKFLOW = ".github/workflows/mod-compatibility-review.yml"
+COMPATIBILITY_REVIEW_EVENTS = frozenset({"repository_dispatch"})
 DEFAULT_READY_MINUTES = 10
 DEFAULT_PAUSE_MINUTES = 30
 MAX_MARKER_BYTES = 1_048_576
@@ -95,7 +97,7 @@ def resolve_capacity(
             if owner is None:
                 owner = api.get_run(artifact.run_id)
                 run_cache[artifact.run_id] = owner
-            if valid_owner(
+            drain_owner = valid_owner(
                 owner,
                 repository=repository,
                 artifact=artifact,
@@ -103,7 +105,17 @@ def resolve_capacity(
                 events=DRAIN_EVENTS,
                 conclusions=frozenset({"success", "failure"}),
                 allow_in_progress=True,
-            ):
+            )
+            compatibility_owner = valid_owner(
+                owner,
+                repository=repository,
+                artifact=artifact,
+                workflow=COMPATIBILITY_REVIEW_WORKFLOW,
+                events=COMPATIBILITY_REVIEW_EVENTS,
+                conclusions=frozenset({"success", "failure"}),
+                allow_in_progress=True,
+            )
+            if drain_owner or compatibility_owner:
                 candidates.append(artifact)
     if not candidates:
         return CapacityState(state="unknown", probe_required=True)
