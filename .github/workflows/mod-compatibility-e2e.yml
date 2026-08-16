@@ -701,6 +701,14 @@ jobs:
           source scripts/ci/github_api_retry.sh
           [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          current_master="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          [[ "$current_master" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$current_master" != "$GITHUB_SHA" ]]; then
+            printf 'Compatibility source %s is superseded by master %s; skipping its AI wake.\n' \
+              "$GITHUB_SHA" "$current_master" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           payload="$RUNNER_TEMP/mod-compatibility-review-request.json"
           jq -n \
             --arg source_repository "$GITHUB_REPOSITORY" \
