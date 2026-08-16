@@ -27,6 +27,7 @@ from check_visual_review import (  # noqa: E402
     validate,
     validate_input,
     validate_manifest,
+    validate_compatibility_references,
     write_normalized_report,
 )
 from visual_evidence import (  # noqa: E402
@@ -1262,6 +1263,58 @@ class VisualReviewContractTest(unittest.TestCase):
         self.assertEqual(
             [paired], validate_manifest([paired], require_paired=True)[0]
         )
+
+    def test_manifest_accepts_the_scoped_optional_mod_candidate_identity(self) -> None:
+        paired = {
+            **self.manifest[0],
+            "label": "fabric-26.2/cpm/mod-compatibility/client_a/baseline_with_mod",
+            "capture_id": "mod-compatibility.client_a.baseline_with_mod",
+            "kind": "mod-compatibility.client_a.baseline_with_mod",
+            "reference_path": "/tmp/reference.png",
+            "reference_label": "fabric-26.2/phase0-smoke/client_a/baseline",
+        }
+
+        self.assertEqual(
+            [paired], validate_manifest([paired], require_paired=True)[0]
+        )
+        with self.assertRaisesRegex(ReviewError, "label disagrees with capture_id"):
+            validate_manifest(
+                [
+                    {
+                        key: value
+                        for key, value in paired.items()
+                        if key not in {"reference_path", "reference_label"}
+                    }
+                ]
+            )
+        validate_compatibility_references(
+            [paired],
+            scenario_contract=ROOT / "e2e/scenario-contract.json",
+            artifact_node="fabric-26.2",
+            mod_id="cpm",
+        )
+        for label in (
+            "fabric-26.2/cpm/extra/mod-compatibility/client_a/baseline_with_mod",
+            "fabric-26.2//mod-compatibility/client_a/baseline_with_mod",
+            "fabric-26.2/cpm/other/client_a/baseline_with_mod",
+        ):
+            with self.subTest(label=label), self.assertRaisesRegex(
+                ReviewError, "label disagrees with capture_id"
+            ):
+                validate_manifest([{**paired, "label": label}], require_paired=True)
+
+        with self.assertRaisesRegex(ReviewError, "source contract"):
+            validate_compatibility_references(
+                [
+                    {
+                        **paired,
+                        "reference_label": "fabric-26.2/full/client_a/baseline",
+                    }
+                ],
+                scenario_contract=ROOT / "e2e/scenario-contract.json",
+                artifact_node="fabric-26.2",
+                mod_id="cpm",
+            )
 
     def test_manifest_requires_bounded_runtime_evidence(self) -> None:
         missing = {key: value for key, value in self.manifest[0].items()
