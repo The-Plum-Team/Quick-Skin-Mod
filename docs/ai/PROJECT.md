@@ -158,7 +158,10 @@ immutable workflow and governance activation contract.
   and Opus verifies every non-high-clean result. The first confirmed defect records a durable wave
   block and cancels sibling reviews. Each successful runtime lane curates its own capsule before
   the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing
-  successful lanes or preventing their concurrent AI review. Authored loader/version exclusions
+  successful lanes or preventing their concurrent AI review. The settled compatibility producer
+  explicitly dispatches the protected reviewer and that reviewer polls until the exact source run
+  is complete; relying on a recursive `workflow_run` would silently lose token-created waves.
+  Authored loader/version exclusions
   remain explicit N/A records and survive lock refreshes. This post-validation signal does not
   replace or weaken Build,
   Packaged E2E, or the independent 1.20.1 semantic certification gate.
