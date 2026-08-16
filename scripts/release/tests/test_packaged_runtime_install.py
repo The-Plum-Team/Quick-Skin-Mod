@@ -1018,6 +1018,71 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
                 ):
                     packaged_runtime.scan_runtime_logs([log])
 
+    def test_server_world_is_sanitized_and_acknowledged_before_client_launch(self) -> None:
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.stdin = mock.Mock()
+        log = self.root / "server.log"
+
+        with mock.patch.object(packaged_runtime, "wait_for_log") as wait_for_log:
+            packaged_runtime.sanitize_server_world(process, log)
+
+        process.stdin.write.assert_called_once_with(
+            (
+                "\n".join(packaged_runtime.SERVER_WORLD_SANITIZE_COMMANDS) + "\n"
+            ).encode("utf-8")
+        )
+        process.stdin.flush.assert_called_once_with()
+        wait_for_log.assert_called_once_with(
+            process,
+            log,
+            packaged_runtime.SERVER_WORLD_SANITIZED_MARKER,
+            timeout=60,
+        )
+        self.assertEqual(
+            "kill @e[type=!minecraft:player]",
+            packaged_runtime.SERVER_WORLD_SANITIZE_COMMANDS[0],
+        )
+
+    def test_server_process_opens_a_writable_private_console(self) -> None:
+        log = self.root / "server.log"
+        expected_process = mock.Mock()
+
+        with mock.patch.object(
+            packaged_runtime.subprocess, "Popen", return_value=expected_process
+        ) as popen:
+            process, handle = packaged_runtime.start_process(
+                ["server"],
+                self.root,
+                log,
+                {},
+                writable_stdin=True,
+            )
+        try:
+            self.assertIs(expected_process, process)
+            self.assertIs(
+                packaged_runtime.subprocess.PIPE,
+                popen.call_args.kwargs["stdin"],
+            )
+        finally:
+            handle.close()
+
+    def test_server_world_sanitization_fails_without_a_live_console(self) -> None:
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.stdin = None
+
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure, "no writable console input"
+        ):
+            packaged_runtime.sanitize_server_world(process, self.root / "server.log")
+
+        process.poll.return_value = 1
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure, "server exited"
+        ):
+            packaged_runtime.sanitize_server_world(process, self.root / "server.log")
+
     def test_forced_process_stop_waits_for_full_group_before_export(self) -> None:
         process = mock.Mock()
         process.pid = 4242
