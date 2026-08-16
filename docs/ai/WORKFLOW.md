@@ -48,9 +48,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   only its tool-free preflight and marker publication; it must preserve parallel capsule review
   after a fresh ready marker, fail closed on unknown/permanent probe failures, and retain every
   capsule while an authenticated quota-pause marker is live. A successful tool-free call carrying
-  only `allowed_warning` is capacity-ready; pause only for an explicit rejection or a valid reported
-  utilization of at least 95%. Upload only bounded normalized status/type/band evidence, never raw
-  provider text or exact account-usage details.
+  `allowed` or `allowed_warning` is capacity-ready even when its optional coarse utilization field
+  reports at least 95%; pause only for an explicit rejection or a failed probe classified as a
+  transient quota/provider condition. A later rejected review remains fail-closed and retryable.
+  Upload only bounded normalized status/type/band evidence, never raw provider text or exact
+  account-usage details.
 - Version-port and repair validation must check out candidate code with credentials disabled.
   For a version port, the complete patch goes only into an alternate index; the protected merge
   controller reconstructs the original merge and copies only recomputed AI-conflict entries from
