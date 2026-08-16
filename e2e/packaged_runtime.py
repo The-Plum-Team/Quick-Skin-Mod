@@ -193,6 +193,13 @@ REPLAYMOD_LOGIN_PROGRESS_MARKERS = (
     "Multiplayer Recording is disabled",
     "[QS-E2E] joined world;",
 )
+SERVER_WORLD_SANITIZED_MARKER = "QS_E2E_WORLD_SANITIZED"
+SERVER_WORLD_SANITIZE_COMMANDS = (
+    # server.properties prevents later ambient spawns, while this removes passive entities that
+    # some Minecraft generations may create while preparing the initial superflat spawn chunks.
+    "kill @e[type=!minecraft:player]",
+    f"say {SERVER_WORLD_SANITIZED_MARKER}",
+)
 
 
 @dataclass(frozen=True)
@@ -1154,7 +1161,14 @@ def client_command(
     )
 
 
-def start_process(command: list[str], cwd: Path, log_path: Path, env: dict[str, str]) -> tuple[subprocess.Popen[bytes], BinaryIO]:
+def start_process(
+    command: list[str],
+    cwd: Path,
+    log_path: Path,
+    env: dict[str, str],
+    *,
+    writable_stdin: bool = False,
+) -> tuple[subprocess.Popen[bytes], BinaryIO]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     handle = log_path.open("wb")
     kwargs: dict[str, Any] = {"start_new_session": True} if os.name != "nt" else {
@@ -1165,6 +1179,7 @@ def start_process(command: list[str], cwd: Path, log_path: Path, env: dict[str, 
             command,
             cwd=cwd,
             env=env,
+            stdin=subprocess.PIPE if writable_stdin else None,
             stdout=handle,
             stderr=subprocess.STDOUT,
             **kwargs,
@@ -1280,6 +1295,31 @@ def wait_for_log(process: subprocess.Popen[bytes], log: Path, text: str, timeout
             raise RuntimeFailure(f"process exited before {text!r}; see {log}")
         time.sleep(2)
     raise RuntimeFailure(f"timed out waiting for {text!r}; see {log}")
+
+
+def sanitize_server_world(
+    process: subprocess.Popen[bytes], log: Path, *, timeout: int = 60
+) -> None:
+    """Remove ambient entities before any client can capture public evidence.
+
+    The disposable server already disables animal, monster, and NPC spawning in
+    ``server.properties``. A generated passive entity can nevertheless be present in the initial
+    spawn chunks on some game versions. Drive the dedicated-server console directly after startup,
+    then require its acknowledgement before launching a client; a best-effort command would merely
+    move this race into the screenshots.
+    """
+
+    if process.poll() is not None:
+        raise RuntimeFailure("server exited before its world could be sanitized")
+    if process.stdin is None:
+        raise RuntimeFailure("server process has no writable console input")
+    payload = ("\n".join(SERVER_WORLD_SANITIZE_COMMANDS) + "\n").encode("utf-8")
+    try:
+        process.stdin.write(payload)
+        process.stdin.flush()
+    except (BrokenPipeError, OSError, ValueError) as exc:
+        raise RuntimeFailure("could not send the E2E world-sanitization commands") from exc
+    wait_for_log(process, log, SERVER_WORLD_SANITIZED_MARKER, timeout=timeout)
 
 
 def wait_for_marker(
@@ -2270,11 +2310,21 @@ def run_packaged_row(
 
         env = process_env(java)
         server_log = profile / "logs" / "server.log"
-        server_process, server_handle = start_process(server_command, server, server_log, env)
+        server_process, server_handle = start_process(
+            server_command,
+            server,
+            server_log,
+            env,
+            writable_stdin=True,
+        )
         processes.append(server_process)
         handles.append(server_handle)
+        if server_process.stdin is None:  # start_process must honor writable_stdin fail-closed.
+            raise RuntimeFailure("server process has no writable console input")
+        handles.append(server_process.stdin)
         runtime_logs.append(server_log)
         wait_for_log(server_process, server_log, "Done (", timeout=1200)
+        sanitize_server_world(server_process, server_log)
 
         client_processes: dict[str, subprocess.Popen[bytes]] = {}
         client_handles: dict[str, BinaryIO] = {}
