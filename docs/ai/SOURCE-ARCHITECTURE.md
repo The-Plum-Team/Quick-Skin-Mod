@@ -132,7 +132,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   escalates every non-high-clean result to Opus, and publishes a durable source-wave block before
   cancelling siblings after a confirmed defect. Its authenticated source queue shares the global
   Claude capacity circuit, preserves one completion marker per clean lane, and reschedules only
-  unfinished lanes after a provider pause.
+  unfinished lanes after a provider pause. The producer suppresses a delayed stale wake, the
+  direct consumer requires its source implementation to equal the protected current `master`, and
+  every parallel lane rechecks live `master` before capsule download or model admission.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every later-version candidate with the same semantic
@@ -158,6 +160,13 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   report digests to exact Git identities supplied by protected workflow checks. The version
   synchronizer accepts the resulting artifact only from a successful protected drain run, for the
   exact current `master` SHA and exact current merged anchor head.
+- `scripts/ci/visual_nonimpact_certification.py` is the distinct model-free continuation codec.
+  The protected port merge controller may create it only after exact Build and full anchor E2E
+  pass and `scripts/ci/visual_review_impact.py` classifies the complete first-parent-to-port-head
+  diff as nonvisual. The consuming synchronizer authenticates the handler artifact and owner,
+  independently recomputes that exact diff with current protected policy, verifies both gate runs,
+  the current `master` second parent, current anchor head, and equal merged trees, then releases the
+  remaining ports without minting a semantic certificate or starting optional-mod compatibility.
   `scripts/ci/visual_review_queue.py` also authenticates that protected artifact name and owner
   before suppressing a duplicate scheduled or automatic review of the exact generation; it never
   applies this shortcut to an ordinary feature-PR semantic review.
@@ -179,9 +188,12 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
   the oldest eligible source except that a completed certifiable automatic 1.20.1 anchor preempts
-  advisory work. An exact wake may select only its requested authenticated artifact and queries
-  only that immutable capsule plus its exact report, cooldown, and generation-block names; it does
-  not rescan the repository-wide queue. Transient GitHub API and installation-rate-limit responses
+  advisory work. The curator rejects a capsule whose authenticated generation differs from its
+  protected implementation before image work, while the drain rechecks every capsule against the
+  live `master` SHA immediately before model admission. An exact wake may select only its requested
+  authenticated artifact and queries only that immutable capsule plus its exact report, cooldown,
+  generation-block, and current-generation identities; it does not rescan the repository-wide
+  queue. Transient GitHub API and installation-rate-limit responses
   receive bounded backoff before the durable wake is allowed to fail visibly. Queue state
   lives in Actions artifacts rather than pending workflow runs, so GitHub concurrency coalescing
   cannot lose a review. Exact artifact IDs define drain concurrency groups: duplicate wakes cannot
@@ -190,13 +202,16 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   concurrently with its direct wake. Queue selection also authenticates generation-block artifacts
   from failed/in-progress protected drains and skips only inputs carrying the exact blocked master
   generation; the marker's owner still binds it to its exact protected reviewer implementation.
-- `scripts/ci/visual_review_impact.py` is the narrow fail-open cost filter for replicated version
-  ports. Protected automation supplies a complete, bounded GitHub PR file inventory; only the
-  visual-review/Pages orchestration and queue clients, the classifier itself, their tests, and
-  documentation may skip another model review on a non-anchor port. The matrix-derived 1.20.1 port
-  can never use this skip because
-  its semantic review certifies the cumulative current `master` generation. Unknown paths,
-  malformed inventories, and unsafe rename origins remain reviewable.
+- `scripts/ci/visual_review_impact.py` is the narrow fail-closed cost and domain filter. Its
+  `source-pr` scope accepts only optional-mod compatibility orchestration, protected CI tests, and
+  documentation, so those changes never enter the ordinary visual queue. Its broader
+  `replicated-port` scope also recognizes protected visual/Pages/synchronization orchestration that
+  was exercised on the source PR. Protected automation supplies either a complete bounded GitHub
+  PR inventory or an exact no-renames Git diff; current and previous rename paths must both be safe.
+  A non-anchor port may simply skip review. The matrix-derived 1.20.1 port may use the result only
+  through the separately authenticated nonvisual continuation after Build and full Packaged E2E;
+  it never becomes a semantic certificate. Unknown paths, malformed inventories, incomplete Git
+  topology, policy mismatch, and unsafe rename origins remain reviewable.
 - `scripts/ci/github_api_retry.sh` is the protected Pages-side wrapper for read-only GitHub API
   calls after checkout. It keeps response bytes isolated on stdout and retries only classified
   rate-limit, transport, and server failures with bounded run-skewed backoff; provenance and exact
