@@ -729,6 +729,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         prepare = job_block("mod-compatibility-e2e.yml", "prepare")
         runtime = job_block("mod-compatibility-e2e.yml", "compatibility-e2e")
         execution_gate = job_block("mod-compatibility-e2e.yml", "gate")
+        request_review = job_block("mod-compatibility-e2e.yml", "request-review")
         enumerate_review = job_block("mod-compatibility-review.yml", "enumerate")
         review = job_block("mod-compatibility-review.yml", "review")
         review_gate = job_block("mod-compatibility-review.yml", "gate")
@@ -821,11 +822,36 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotRegex(execution_workflow, r"(?m)^  curate:$")
         self.assertNotIn("CURATE_RESULT", execution_gate)
 
-        self.assertIn("workflow_run:", review_workflow)
         self.assertIn(
-            "github.event.workflow_run.conclusion == 'failure'", enumerate_review
+            "types:\n      - mod-compatibility-review-requested", review_workflow
         )
+        self.assertNotIn("workflow_run:", review_workflow)
+        self.assertIn("needs.gate.result == 'failure'", request_review)
+        self.assertIn("contents: write", request_review)
+        self.assertIn("ref: ${{ github.sha }}", request_review)
+        self.assertIn("persist-credentials: false", request_review)
+        self.assertIn("source scripts/ci/github_api_retry.sh", request_review)
+        self.assertIn("mod-compatibility-review-requested", request_review)
+        self.assertIn("source_repository:$source_repository", request_review)
+        self.assertIn("source_run_id:$source_run_id", request_review)
+        self.assertIn("source_sha:$source_sha", request_review)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', request_review)
+        self.assertIn("repos/$GITHUB_REPOSITORY/dispatches", request_review)
+        self.assertIn("github.event.client_payload.source_run_id", review_workflow)
+        self.assertIn('[[ "$SOURCE_REPOSITORY" == "$GITHUB_REPOSITORY" ]]', enumerate_review)
+        self.assertIn("for attempt in {1..120}", enumerate_review)
+        self.assertIn('[[ "$implementation_sha" == "$SOURCE_SHA" ]]', enumerate_review)
         self.assertIn('(.conclusion == "success" or .conclusion == "failure")', enumerate_review)
+        self.assertIn(
+            '(.source_run_id | type == "number" and . > 0)', enumerate_review
+        )
+        self.assertNotIn(".source_run_id == $source_run_id", enumerate_review)
+        self.assertIn('--argjson compatibility_run_id "$SOURCE_RUN_ID"', enumerate_review)
+        self.assertIn(
+            ".workflow_run.id == $compatibility_run_id", enumerate_review
+        )
+        self.assertIn(". as $plan |", enumerate_review)
+        self.assertNotIn("source_sha:$.source_sha", enumerate_review)
         self.assertIn('elif ($matches|length) == 0 then empty', enumerate_review)
         self.assertIn('error("duplicate review capsule', enumerate_review)
         self.assertIn("timeout-minutes: 75", enumerate_review)
@@ -845,6 +871,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("git show", enumerate_review)
         self.assertIn("$plan_source_sha:e2e/mod-compatibility-contract.json", enumerate_review)
         self.assertIn("${{ matrix.source_sha }}:e2e/scenario-contract.json", review)
+        self.assertIn('source_contract="$RUNNER_TEMP/source-scenario-contract.json"', review)
+        self.assertIn('--compatibility-scenario-contract "$source_contract"', review)
+        self.assertIn(
+            '--compatibility-artifact-node "${{ matrix.artifact_node }}"', review
+        )
+        self.assertIn('--compatibility-mod "${{ matrix.mod }}"', review)
         self.assertIn("--triage-model claude-sonnet-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
         self.assertIn("mod-compatibility-wave-block", review)
@@ -896,6 +928,78 @@ class WorkflowSecurityTest(unittest.TestCase):
                 if item["id"] == "skin-layers-3d"
             ),
         )
+
+    def test_mod_compatibility_review_keeps_base_and_wave_run_ids_distinct(
+        self,
+    ) -> None:
+        enumerate_review = job_block("mod-compatibility-review.yml", "enumerate")
+        match = re.search(
+            r'matrix="\$\(jq -c \\\n'
+            r'\s+--argjson artifacts "\$artifacts" \\\n'
+            r'\s+--argjson compatibility_run_id "\$SOURCE_RUN_ID" \\\n'
+            r'\s+--arg implementation_sha "\$IMPLEMENTATION_SHA" \\\n'
+            r"\s+'(?P<program>.*?)' \"\$plan\"\)\"",
+            enumerate_review,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        program = match.group("program")
+        base_run_id = 123
+        compatibility_run_id = 456
+        contract_sha = "c" * 64
+        lane_id = "neoforge-26_2--cpm--mod-compatibility"
+        plan = {
+            "runnable": [
+                {
+                    "id": lane_id,
+                    "artifact_node": "neoforge-26.2",
+                    "runtime_version": "26.2",
+                    "loader": "neoforge",
+                    "compatibility_mod": "cpm",
+                    "compatibility_name": "Customizable Player Models",
+                    "base_evidence_name": "packaged-e2e-neoforge-26_2--pr-behavior",
+                    "compatibility_contract_sha256": contract_sha,
+                }
+            ],
+            "source_run_id": base_run_id,
+            "source_sha": "a" * 40,
+            "target_branch": "fabric-and-neoforge-26.2",
+            "target_sha": "b" * 40,
+        }
+        artifact = {
+            "id": 789,
+            "name": f"mod-compatibility-review-input-{compatibility_run_id}-{lane_id}",
+            "expired": False,
+            "workflow_run": {"id": compatibility_run_id},
+            "digest": "sha256:" + "d" * 64,
+            "size_in_bytes": 1024,
+        }
+
+        selected = subprocess.run(
+            [
+                "jq",
+                "-c",
+                "--argjson",
+                "artifacts",
+                json.dumps({"artifacts": [artifact]}),
+                "--argjson",
+                "compatibility_run_id",
+                str(compatibility_run_id),
+                "--arg",
+                "implementation_sha",
+                "e" * 40,
+                program,
+            ],
+            input=json.dumps(plan),
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertEqual(selected.returncode, 0, selected.stderr)
+        matrix = json.loads(selected.stdout)
+        self.assertEqual(len(matrix["include"]), 1)
+        self.assertEqual(matrix["include"][0]["source_run_id"], compatibility_run_id)
+        self.assertNotEqual(matrix["include"][0]["source_run_id"], base_run_id)
 
     def test_mod_compatibility_artifact_inventory_filter_executes(self) -> None:
         prepare = job_block("mod-compatibility-e2e.yml", "prepare")

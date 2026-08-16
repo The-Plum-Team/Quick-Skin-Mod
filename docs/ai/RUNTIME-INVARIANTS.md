@@ -291,7 +291,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   the compatibility scenario. All applicable units run in parallel; unsupported loader/mod pairs
   and reviewed upstream loader/version exclusions remain explicit `not_applicable` records. Each
   successful unit must curate its capsule in that same matrix job; a failing sibling keeps the
-  runtime gate red but cannot suppress the successful capsule or its later parallel review.
+  runtime gate red but cannot suppress the successful capsule or its later parallel review. The
+  producer must explicitly dispatch that separate reviewer after its gate settles, because the
+  producer is itself token-created and cannot rely on recursive `workflow_run` delivery. The
+  reviewer must authenticate the repository, source run id, protected implementation SHA, workflow
+  identity, terminal conclusion, and capsule provenance after polling the exact producer to
+  completion.
   Compatibility launches must not enable Mixin's global debug injection-count flag because that
   changes third-party optional-injector semantics; the clean packaged suite still enables it to
   enforce Quick Skin's own expectations. External JARs must come from
