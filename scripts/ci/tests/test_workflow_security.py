@@ -294,6 +294,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "Upload the durable source completion marker",
                 "mod-compatibility-review-complete-${{ needs.enumerate.outputs.source_run_id }}",
             ): "7",
+            (
+                "handle-version-port-result.yml",
+                "Upload the authenticated nonvisual anchor continuation",
+                "${{ steps.merge.outputs.artifact_name }}",
+            ): "7",
         }
         observed_overrides: set[tuple[str, str, str]] = set()
         for workflow, step_name, block in uploads:
@@ -520,7 +525,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('source_pr_base="$(jq -er .base.ref', authenticate)
         self.assertIn('source_pr_merged="$(jq -er', authenticate)
         self.assertIn('Deferring semantic anchor review until PR', authenticate)
-        self.assertIn('&& "$source_pr_base" != "$anchor_branch"', authenticate)
+        self.assertIn('--scope source-pr', authenticate)
+        self.assertIn('--scope replicated-port', authenticate)
+        self.assertIn('outside ordinary visual review', authenticate)
         self.assertIn('ref: ${{ github.sha }}', authenticate)
         self.assertIn('persist-credentials: false', authenticate)
         self.assertIn('Ignoring infrastructure-only visual review sync PR', authenticate)
@@ -1930,6 +1937,58 @@ class WorkflowSecurityTest(unittest.TestCase):
                 self.assertIn("runtime_policy=full", block)
         self.assertIn('["fabric", "forge"]', merge)
         self.assertIn('&& "$target_branch" != "$anchor_branch"', merge)
+
+    def test_nonvisual_anchor_continuation_is_exact_and_model_free(self) -> None:
+        handler = (WORKFLOWS / "handle-version-port-result.yml").read_text(
+            encoding="utf-8"
+        )
+        merge = job_block("handle-version-port-result.yml", "merge")
+        sync = job_block("sync-version-branches.yml", "discover")
+        visual = job_block("visual-review.yml", "authenticate")
+
+        for required in (
+            "scripts/ci/visual_review_impact.py",
+            "scripts/ci/visual_nonimpact_certification.py",
+            "--scope replicated-port",
+            '--base "$base_sha"',
+            '--head "$head_sha"',
+            '&& "$chain_complete" == true',
+            '&& "$current_generation_bound" == true',
+            "artifact_name=visual-anchor-nonimpact-%s",
+            "--build-run-id",
+            "--e2e-run-id",
+        ):
+            with self.subTest(boundary="merge", required=required):
+                self.assertIn(required, merge)
+        self.assertLess(
+            merge.index("scripts/ci/visual_review_impact.py"),
+            merge.index("artifact_name=visual-anchor-nonimpact-%s"),
+        )
+        self.assertIn("Upload the authenticated nonvisual anchor continuation", handler)
+        self.assertIn("Release the nonvisual synchronization wave", handler)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", merge)
+
+        for required in (
+            "visual-anchor-nonimpact",
+            ".github/workflows/handle-version-port-result.yml",
+            "scripts/ci/visual_nonimpact_certification.py verify",
+            "scripts/ci/visual_review_impact.py",
+            '--base "$anchor_base_sha"',
+            '--head "$anchor_source_sha"',
+            '"${source_commit[2]}" == "$GITHUB_SHA"',
+            '[[ "$chain_complete" == true ]]',
+            ".github/workflows/build-gate.yml",
+            ".github/workflows/on-demand-e2e.yml",
+            '--exclude "$anchor_branch"',
+        ):
+            with self.subTest(boundary="sync", required=required):
+                self.assertIn(required, sync)
+        self.assertLess(
+            sync.index("visual_nonimpact_certification.py verify"),
+            sync.index('--exclude "$anchor_branch"'),
+        )
+        self.assertIn("--scope source-pr", visual)
+        self.assertIn("Ignoring infrastructure-only visual review sync PR", visual)
 
     def test_version_port_merge_revalidates_the_exact_pr(self) -> None:
         merge = job_block("handle-version-port-result.yml", "merge")
