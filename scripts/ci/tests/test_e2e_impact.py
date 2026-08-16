@@ -24,6 +24,7 @@ class E2EImpactTest(unittest.TestCase):
                 "site/app.js",
                 "scripts/ci/ai_patch_policy.py",
                 "scripts/ci/github_api_retry.sh",
+                "scripts/ci/mod_compatibility_review_queue.py",
                 "scripts/ci/visual_review_queue.py",
                 "scripts/ci/tests/test_ai_patch_policy.py",
                 "scripts/ci/tests/test_visual_review_queue.py",
@@ -59,6 +60,8 @@ class E2EImpactTest(unittest.TestCase):
     def test_non_gate_workflows_can_skip_minecraft_alone_and_with_documentation(self) -> None:
         non_gate_workflows = (
             ".github/workflows/handle-version-port-result.yml",
+            ".github/workflows/mod-compatibility-e2e.yml",
+            ".github/workflows/mod-compatibility-review.yml",
             ".github/workflows/pages.yml",
             ".github/workflows/prune-actions-caches.yml",
             ".github/workflows/refresh-release-status.yml",
