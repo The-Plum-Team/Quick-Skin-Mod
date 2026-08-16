@@ -117,8 +117,8 @@ jobs:
           plan="$RUNNER_TEMP/compatibility-plan/mod-compatibility-plan.json"
           test -f "$plan" -a ! -L "$plan"
           jq -e \
-            --argjson source_run_id "$SOURCE_RUN_ID" \
-            '.schema_version == 1 and .source_run_id == $source_run_id and
+            '.schema_version == 1 and
+             (.source_run_id | type == "number" and . > 0) and
              (.base_matrix_kind == "pr-anchors" or
               .base_matrix_kind == "native-anchors") and
              (.source_sha | type == "string" and test("^[0-9a-f]{40}$")) and
@@ -173,13 +173,15 @@ jobs:
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
           matrix="$(jq -c \
             --argjson artifacts "$artifacts" \
+            --argjson compatibility_run_id "$SOURCE_RUN_ID" \
             --arg implementation_sha "$IMPLEMENTATION_SHA" \
-            --argjson source_run_id "$SOURCE_RUN_ID" \
-            '[.runnable[] as $lane |
-              ("mod-compatibility-review-input-" + ($source_run_id|tostring) + "-" +
+            '. as $plan |
+             [$plan.runnable[] as $lane |
+              ("mod-compatibility-review-input-" +
+                ($compatibility_run_id|tostring) + "-" +
                 $lane.id) as $name |
               [$artifacts.artifacts[] | select(.name == $name and .expired == false and
-                .workflow_run.id == $source_run_id and
+                .workflow_run.id == $compatibility_run_id and
                 (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
                 ((.size_in_bytes | type) == "number" and .size_in_bytes > 0 and
                  .size_in_bytes <= 536870912))] as $matches |
@@ -193,8 +195,10 @@ jobs:
                  base_evidence_name:$lane.base_evidence_name,
                  artifact_id:$artifact.id,artifact_name:$artifact.name,
                  artifact_size:$artifact.size_in_bytes,artifact_digest:$artifact.digest,
-                 source_run_id:$source_run_id,implementation_sha:$implementation_sha,
-                 source_sha:$.source_sha,target_branch:$.target_branch,target_sha:$.target_sha}
+                 source_run_id:$compatibility_run_id,
+                 implementation_sha:$implementation_sha,
+                 source_sha:$plan.source_sha,target_branch:$plan.target_branch,
+                 target_sha:$plan.target_sha}
               end] | {include:.}' "$plan")"
           count="$(jq '.include | length' <<< "$matrix")"
           [[ "$count" =~ ^[0-9]+$ ]]
