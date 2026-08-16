@@ -6,22 +6,97 @@ name: AI mod compatibility review
 # mod/loader capsule is reviewed concurrently. A durable marker is uploaded before an
 # Opus-confirmed defect cancels the remaining sessions.
 on:
+  schedule:
+    - cron: "17,47 * * * *"
   repository_dispatch:
     types:
       - mod-compatibility-review-requested
+      - mod-compatibility-review-sweep-requested
+  workflow_dispatch:
 
 permissions: {}
 
 concurrency:
   group: >-
     mod-compatibility-review-${{ github.event.client_payload.source_run_id ||
-    github.run_id }}
+    'queue-sweep' }}
   cancel-in-progress: false
 
 jobs:
+  recover:
+    name: Recover one pending compatibility review
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      (github.event_name != 'repository_dispatch' ||
+       github.event.action == 'mod-compatibility-review-sweep-requested')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Check out the protected compatibility queue
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Dispatch the oldest authenticated pending source
+        shell: bash
+        env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source scripts/ci/github_api_retry.sh
+          selected="$(mktemp "$RUNNER_TEMP/mod-compatibility-queue.XXXXXX")"
+          selector_status=0
+          if python3 scripts/ci/mod_compatibility_review_queue.py \
+              --repository "$GITHUB_REPOSITORY" \
+              --github-output "$selected"; then
+            selector_status=0
+          else
+            selector_status=$?
+          fi
+          if [[ "$selector_status" -eq 75 ]]; then
+            echo "::warning::GitHub API quota exhausted; compatibility review recovery deferred"
+            exit 0
+          fi
+          [[ "$selector_status" -eq 0 ]]
+          if ! grep -qx 'eligible=true' "$selected"; then
+            printf 'No current compatibility review is pending.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          source_run_id="$(sed -n 's/^source_run_id=//p' "$selected")"
+          source_sha="$(sed -n 's/^source_sha=//p' "$selected")"
+          [[ "$source_run_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
+          payload="$RUNNER_TEMP/mod-compatibility-review-recovery.json"
+          jq -n \
+            --arg source_repository "$GITHUB_REPOSITORY" \
+            --arg source_run_id "$source_run_id" \
+            --arg source_sha "$source_sha" \
+            '{event_type:"mod-compatibility-review-requested",client_payload:{
+              source_repository:$source_repository,source_run_id:$source_run_id,
+              source_sha:$source_sha}}' > "$payload"
+          github_api_retry --method POST \
+            "repos/$GITHUB_REPOSITORY/dispatches" \
+            --input "$payload" > /dev/null
+
   enumerate:
     name: Authenticate compatibility capsules
-    if: github.ref == 'refs/heads/master'
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      github.event_name == 'repository_dispatch' &&
+      github.event.action == 'mod-compatibility-review-requested'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     permissions:
@@ -29,7 +104,9 @@ jobs:
       contents: read
     outputs:
       count: ${{ steps.matrix.outputs.count }}
+      completed_count: ${{ steps.matrix.outputs.completed_count }}
       matrix: ${{ steps.matrix.outputs.matrix }}
+      pending_count: ${{ steps.matrix.outputs.pending_count }}
       source_run_id: ${{ steps.owner.outputs.source_run_id }}
       implementation_sha: ${{ steps.owner.outputs.implementation_sha }}
 
@@ -203,13 +280,233 @@ jobs:
           count="$(jq '.include | length' <<< "$matrix")"
           [[ "$count" =~ ^[0-9]+$ ]]
           (( count <= $(jq '.runnable | length' "$plan") ))
+          pending='{"include":[]}'
+          completed_count=0
+          while IFS= read -r lane; do
+            lane_id="$(jq -er .id <<< "$lane")"
+            completion_name="mod-compatibility-lane-complete-$SOURCE_RUN_ID-$lane_id"
+            completions="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$completion_name&per_page=100")"
+            jq -e --arg name "$completion_name" \
+              '(.artifacts | type == "array" and length <= 100) and
+               all(.artifacts[]; .name == $name)' <<< "$completions" > /dev/null
+            authenticated=0
+            while IFS=$'\t' read -r completion_run_id expired size digest head_sha; do
+              [[ -n "$completion_run_id" && "$expired" == false ]] || continue
+              [[ "$size" =~ ^[1-9][0-9]*$ ]] || continue
+              (( size <= 1048576 )) || continue
+              [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || continue
+              [[ "$head_sha" == "$GITHUB_SHA" ]] || continue
+              completion_owner="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$completion_run_id" \
+                2>/dev/null || true)"
+              if [[ -n "$completion_owner" ]] && jq -e \
+                  --arg implementation_sha "$GITHUB_SHA" \
+                  --arg repository "$GITHUB_REPOSITORY" \
+                  '.status == "completed" and
+                   (.conclusion == "success" or .conclusion == "failure") and
+                   .event == "repository_dispatch" and .head_branch == "master" and
+                   .head_sha == $implementation_sha and
+                   .path == ".github/workflows/mod-compatibility-review.yml" and
+                   .head_repository.full_name == $repository' \
+                  <<< "$completion_owner" > /dev/null; then
+                authenticated=$((authenticated + 1))
+              fi
+            done < <(jq -r --arg name "$completion_name" \
+              '.artifacts[] | select(.name == $name) |
+               [.workflow_run.id, .expired, .size_in_bytes, .digest,
+                .workflow_run.head_sha] | @tsv' <<< "$completions")
+            (( authenticated <= 1 ))
+            if (( authenticated == 1 )); then
+              completed_count=$((completed_count + 1))
+            else
+              pending="$(jq -c --argjson lane "$lane" \
+                '.include += [$lane]' <<< "$pending")"
+            fi
+          done < <(jq -c '.include[]' <<< "$matrix")
+          pending_count="$(jq '.include | length' <<< "$pending")"
+          [[ "$pending_count" =~ ^[0-9]+$ ]]
+          (( completed_count + pending_count == count ))
           printf 'count=%s\n' "$count" >> "$GITHUB_OUTPUT"
-          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+          printf 'completed_count=%s\n' "$completed_count" >> "$GITHUB_OUTPUT"
+          printf 'pending_count=%s\n' "$pending_count" >> "$GITHUB_OUTPUT"
+          printf 'matrix=%s\n' "$pending" >> "$GITHUB_OUTPUT"
+
+  capacity-check:
+    name: Read shared Claude capacity
+    needs: enumerate
+    if: needs.enumerate.outputs.pending_count != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      probe_required: ${{ steps.circuit.outputs.probe_required }}
+      ready: ${{ steps.circuit.outputs.ready }}
+
+    steps:
+      - name: Check out the protected capacity policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Reuse only a fresh authenticated capacity marker
+        id: circuit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/claude_capacity_gate.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --implementation-sha "$GITHUB_SHA" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Report an active subscription pause
+        if: >-
+          steps.circuit.outputs.probe_required == 'false' &&
+          steps.circuit.outputs.ready == 'false'
+        run: |
+          printf 'Claude capacity remains paused; every unfinished compatibility lane remains queued.\n' \
+            >> "$GITHUB_STEP_SUMMARY"
+
+  capacity-probe:
+    name: Probe shared Claude capacity once
+    needs:
+      - enumerate
+      - capacity-check
+    if: >-
+      needs.enumerate.outputs.pending_count != '0' &&
+      needs.capacity-check.outputs.probe_required == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+    concurrency:
+      group: quick-skin-claude-capacity-probe
+      cancel-in-progress: false
+    outputs:
+      ready: ${{ steps.resolve.outputs.ready }}
+
+    steps:
+      - name: Check out the protected capacity probe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Recheck capacity after acquiring the global probe slot
+        id: circuit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/claude_capacity_gate.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --implementation-sha "$GITHUB_SHA" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Install Node for the locked capacity probe
+        if: steps.circuit.outputs.probe_required == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Install locked Claude Code outside the repository
+        if: steps.circuit.outputs.probe_required == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/claude-capacity-cli"
+          cp .github/claude/package.json .github/claude/package-lock.json \
+            "$RUNNER_TEMP/claude-capacity-cli/"
+          (
+            cd "$RUNNER_TEMP/claude-capacity-cli"
+            npm ci --ignore-scripts
+            node node_modules/@anthropic-ai/claude-code/install.cjs
+            node_modules/.bin/claude --version
+          )
+
+      - name: Probe once without tools before parallel review fan-out
+        id: probe
+        if: steps.circuit.outputs.probe_required == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_CODE_SKIP_PROMPT_HISTORY: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLAUDE_CODE_OAUTH_TOKEN"
+          unset GH_TOKEN GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN \
+            ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL \
+            ACTIONS_CACHE_URL ACTIONS_RESULTS_URL
+          python3 scripts/ci/claude_capacity_probe.py \
+            --claude \
+              "$RUNNER_TEMP/claude-capacity-cli/node_modules/.bin/claude" \
+            --model claude-sonnet-5 \
+            --work-root "$RUNNER_TEMP/claude-capacity-probe" \
+            --marker "$RUNNER_TEMP/claude-capacity-marker.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Publish only the sanitized shared capacity marker
+        if: steps.circuit.outputs.probe_required == 'true' && steps.probe.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.probe.outputs.marker_name }}
+          path: ${{ runner.temp }}/claude-capacity-marker.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Resolve whether model sessions may start
+        id: resolve
+        if: always() && steps.circuit.outcome == 'success' && steps.probe.outcome != 'failure'
+        shell: bash
+        env:
+          CACHED_READY: ${{ steps.circuit.outputs.ready }}
+          PROBE_READY: ${{ steps.probe.outputs.ready }}
+          PROBE_REQUIRED: ${{ steps.circuit.outputs.probe_required }}
+        run: |
+          set -euo pipefail
+          [[ "$CACHED_READY" == true || "$CACHED_READY" == false ]]
+          [[ "$PROBE_REQUIRED" == true || "$PROBE_REQUIRED" == false ]]
+          if [[ "$PROBE_REQUIRED" == true ]]; then
+            [[ "$PROBE_READY" == true || "$PROBE_READY" == false ]]
+            ready="$PROBE_READY"
+          else
+            ready="$CACHED_READY"
+          fi
+          printf 'ready=%s\n' "$ready" >> "$GITHUB_OUTPUT"
+          if [[ "$ready" != true ]]; then
+            printf 'Claude capacity is paused; every unfinished compatibility lane remains queued.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   review:
     name: ${{ matrix.artifact_node }} / ${{ matrix.mod_name }}
-    needs: enumerate
-    if: needs.enumerate.outputs.count != '0'
+    needs:
+      - enumerate
+      - capacity-check
+      - capacity-probe
+    if: >-
+      always() &&
+      needs.enumerate.outputs.pending_count != '0' &&
+      needs.capacity-check.result == 'success' &&
+      (needs.capacity-check.outputs.ready == 'true' ||
+       (needs.capacity-probe.result == 'success' &&
+        needs.capacity-probe.outputs.ready == 'true'))
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -479,6 +776,43 @@ jobs:
           (( review_status == 0 ))
           [[ "$state" == complete ]]
 
+      - name: Classify a failed lane without provider text
+        id: failure
+        if: always() && steps.check.outcome != 'success'
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          capsule="$RUNNER_TEMP/mod-compatibility-capsule"
+          mkdir -p "$capsule"
+          failure="$capsule/visual-review-failure.json"
+          if [[ ! -f "$failure" ]]; then
+            jq -n \
+              '{schema_version:1,category:"protected_validation",
+                stage:"compatibility",transient:false}' \
+              > "$failure"
+          fi
+          jq -e \
+            '(keys | sort) == (["category", "schema_version", "stage",
+              "transient"] | sort) and
+             .schema_version == 1 and
+             (.category | type == "string" and test("^[a-z0-9_-]{1,64}$")) and
+             (.stage | type == "string" and test("^[a-z0-9_-]{1,64}$")) and
+             (.transient | type == "boolean")' "$failure" > /dev/null
+          category="$(jq -er .category "$failure")"
+          printf 'category=%s\n' "$category" >> "$GITHUB_OUTPUT"
+          cp -- "$failure" \
+            "$RUNNER_TEMP/mod-compatibility-failure-${{ matrix.id }}.json"
+
+      - name: Upload only the sanitized failed-lane marker
+        if: always() && steps.failure.outputs.category != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mod-compatibility-attempt-${{ matrix.source_run_id }}-${{ matrix.id }}
+          path: ${{ runner.temp }}/mod-compatibility-failure-${{ matrix.id }}.json
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Upload the exact normalized lane report
         if: always() && steps.check.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -489,6 +823,35 @@ jobs:
             ${{ runner.temp }}/mod-compatibility-capsule/review-input/visual-review-manifest.json
             ${{ runner.temp }}/mod-compatibility-capsule/visual-review-report.json
             ${{ runner.temp }}/mod-compatibility-capsule/visual-review-completion.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Create a clean lane completion marker
+        if: >-
+          steps.check.outcome == 'success' &&
+          steps.check.outputs.confirmed_defect == 'false'
+        working-directory: ${{ runner.temp }}/mod-compatibility-capsule
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_sha256="$(sha256sum visual-review-report.json | cut -d ' ' -f 1)"
+          jq -n \
+            --arg lane "${{ matrix.id }}" \
+            --arg report_sha256 "$report_sha256" \
+            --argjson source_run_id "${{ matrix.source_run_id }}" \
+            '{schema_version:1,kind:"quick-skin-mod-compatibility-lane-complete",
+              source_run_id:$source_run_id,lane:$lane,
+              report_sha256:$report_sha256}' \
+            > mod-compatibility-lane-complete.json
+
+      - name: Upload the durable clean lane marker
+        if: >-
+          steps.check.outcome == 'success' &&
+          steps.check.outputs.confirmed_defect == 'false'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}
+          path: ${{ runner.temp }}/mod-compatibility-capsule/mod-compatibility-lane-complete.json
           if-no-files-found: error
           retention-days: 7
 
@@ -516,7 +879,7 @@ jobs:
         if: steps.check.outputs.confirmed_defect == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mod-compatibility-wave-block-${{ matrix.source_run_id }}-${{ matrix.id }}
+          name: mod-compatibility-wave-block-${{ matrix.source_run_id }}
           path: ${{ runner.temp }}/mod-compatibility-capsule/mod-compatibility-wave-block.json
           if-no-files-found: error
           retention-days: 7
@@ -540,26 +903,202 @@ jobs:
     name: AI mod compatibility gate
     needs:
       - enumerate
+      - capacity-check
+      - capacity-probe
       - review
     if: always() && needs.enumerate.result == 'success'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+    outputs:
+      complete: ${{ steps.result.outputs.complete }}
 
     steps:
-      - name: Require every parallel reviewer to finish cleanly
+      - name: Download sanitized failed-lane markers from this attempt
+        if: always() && needs.review.result == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: mod-compatibility-attempt-${{ needs.enumerate.outputs.source_run_id }}-*
+          path: ${{ runner.temp }}/compatibility-attempts
+          merge-multiple: true
+
+      - name: Detect a quota rejection without reading provider output
+        id: failures
+        if: always() && needs.review.result == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'quota_rejected=false\n' >> "$GITHUB_OUTPUT"
+          attempts="$RUNNER_TEMP/compatibility-attempts"
+          [[ ! -e "$attempts" || -d "$attempts" ]]
+          [[ -z "$(find "$attempts" -mindepth 2 -print -quit 2>/dev/null || true)" ]]
+          while IFS= read -r -d '' failure; do
+            name="$(basename "$failure")"
+            [[ -f "$failure" && ! -L "$failure" ]]
+            [[ "$name" =~ ^mod-compatibility-failure-[a-z0-9][a-z0-9_-]{0,255}\.json$ ]]
+            jq -e \
+              '(keys | sort) == (["category", "schema_version", "stage",
+                "transient"] | sort) and
+               .schema_version == 1 and
+               (.category | type == "string" and test("^[a-z0-9_-]{1,64}$")) and
+               (.stage | type == "string" and test("^[a-z0-9_-]{1,64}$")) and
+               (.transient | type == "boolean")' "$failure" > /dev/null
+            if [[ "$(jq -er .category "$failure")" == quota_or_rate_limit ]]; then
+              printf 'quota_rejected=true\n' >> "$GITHUB_OUTPUT"
+            fi
+          done < <(find "$attempts" -mindepth 1 -maxdepth 1 -type f -print0 \
+            2>/dev/null || true)
+
+      - name: Create one sanitized shared pause marker
+        if: always() && steps.failures.outputs.quota_rejected == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n \
+            '{schema_version:1,category:"quota_or_rate_limit",
+              stage:"compatibility",transient:true}' \
+            > "$RUNNER_TEMP/claude-capacity-marker.json"
+
+      - name: Open the shared Claude circuit after a quota rejection
+        if: always() && steps.failures.outputs.quota_rejected == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: claude-capacity-pause
+          path: ${{ runner.temp }}/claude-capacity-marker.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Resolve the durable compatibility review state
+        id: result
+        if: always()
         shell: bash
         env:
+          CACHED_READY: ${{ needs.capacity-check.outputs.ready }}
+          CAPACITY_CHECK_RESULT: ${{ needs.capacity-check.result }}
+          COMPLETED_COUNT: ${{ needs.enumerate.outputs.completed_count }}
           COUNT: ${{ needs.enumerate.outputs.count }}
+          PENDING_COUNT: ${{ needs.enumerate.outputs.pending_count }}
+          PROBE_READY: ${{ needs.capacity-probe.outputs.ready }}
+          PROBE_REQUIRED: ${{ needs.capacity-check.outputs.probe_required }}
+          PROBE_RESULT: ${{ needs.capacity-probe.result }}
           REVIEW_RESULT: ${{ needs.review.result }}
         run: |
           set -euo pipefail
           [[ "$COUNT" =~ ^[0-9]+$ ]]
-          if [[ "$COUNT" == 0 ]]; then
+          [[ "$COMPLETED_COUNT" =~ ^[0-9]+$ ]]
+          [[ "$PENDING_COUNT" =~ ^[0-9]+$ ]]
+          (( COMPLETED_COUNT + PENDING_COUNT == COUNT ))
+          printf 'complete=false\n' >> "$GITHUB_OUTPUT"
+          if (( PENDING_COUNT == 0 )); then
             [[ "$REVIEW_RESULT" == skipped ]]
-            printf 'No applicable compatibility lane required AI review.\n' \
-              >> "$GITHUB_STEP_SUMMARY"
-          else
-            [[ "$REVIEW_RESULT" == success ]]
-            printf 'All %s compatibility lanes passed independent visual review.\n' \
+            printf 'complete=true\n' >> "$GITHUB_OUTPUT"
+            printf 'All %s available compatibility lanes were already reviewed.\n' \
               "$COUNT" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
+
+          [[ "$CAPACITY_CHECK_RESULT" == success ]]
+          [[ "$CACHED_READY" == true || "$CACHED_READY" == false ]]
+          [[ "$PROBE_REQUIRED" == true || "$PROBE_REQUIRED" == false ]]
+          ready=false
+          if [[ "$CACHED_READY" == true ]]; then
+            [[ "$PROBE_REQUIRED" == false ]]
+            ready=true
+          elif [[ "$PROBE_REQUIRED" == true ]]; then
+            [[ "$PROBE_RESULT" == success ]]
+            [[ "$PROBE_READY" == true || "$PROBE_READY" == false ]]
+            ready="$PROBE_READY"
+          else
+            [[ "$PROBE_RESULT" == skipped ]]
+          fi
+          if [[ "$ready" == true ]]; then
+            [[ "$REVIEW_RESULT" == success ]]
+            printf 'complete=true\n' >> "$GITHUB_OUTPUT"
+            printf 'All %s compatibility lanes passed durable independent visual review.\n' \
+              "$COUNT" >> "$GITHUB_STEP_SUMMARY"
+          else
+            [[ "$REVIEW_RESULT" == skipped ]]
+            printf 'Claude capacity is paused; %s unfinished compatibility lanes remain queued.\n' \
+              "$PENDING_COUNT" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Create the authenticated source completion marker
+        if: always() && steps.result.outputs.complete == 'true'
+        shell: bash
+        env:
+          COMPLETED_COUNT: ${{ needs.enumerate.outputs.completed_count }}
+          COUNT: ${{ needs.enumerate.outputs.count }}
+          IMPLEMENTATION_SHA: ${{ needs.enumerate.outputs.implementation_sha }}
+          PENDING_COUNT: ${{ needs.enumerate.outputs.pending_count }}
+          SOURCE_RUN_ID: ${{ needs.enumerate.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$COUNT" =~ ^[0-9]+$ ]]
+          [[ "$COMPLETED_COUNT" =~ ^[0-9]+$ ]]
+          [[ "$PENDING_COUNT" =~ ^[0-9]+$ ]]
+          [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          jq -n \
+            --arg implementation_sha "$IMPLEMENTATION_SHA" \
+            --argjson lane_count "$COUNT" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '{schema_version:1,kind:"quick-skin-mod-compatibility-review-complete",
+              source_run_id:$source_run_id,implementation_sha:$implementation_sha,
+              lane_count:$lane_count}' \
+            > "$RUNNER_TEMP/mod-compatibility-review-complete.json"
+
+      - name: Upload the durable source completion marker
+        if: always() && steps.result.outputs.complete == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mod-compatibility-review-complete-${{ needs.enumerate.outputs.source_run_id }}
+          path: ${{ runner.temp }}/mod-compatibility-review-complete.json
+          if-no-files-found: error
+          retention-days: 7
+
+  continue:
+    name: Wake the next pending compatibility review
+    needs:
+      - enumerate
+      - gate
+    if: >-
+      always() && needs.gate.result == 'success' &&
+      needs.gate.outputs.complete == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Dispatch another independently selected source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/mod-compatibility-review-continuation.json"
+          jq -n \
+            '{event_type:"mod-compatibility-review-sweep-requested"}' \
+            > "$payload"
+          dispatch_error="$RUNNER_TEMP/mod-compatibility-review-continuation.error"
+          for attempt in 1 2 3; do
+            : > "$dispatch_error"
+            if gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+                --input "$payload" 2> "$dispatch_error"; then
+              exit 0
+            fi
+            if grep -Fq 'API rate limit exceeded' "$dispatch_error"; then
+              echo "::warning::GitHub API quota exhausted; compatibility continuation deferred"
+              exit 0
+            fi
+            if grep -Eq 'secondary rate limit|abuse detection|\(HTTP 429\)' \
+                "$dispatch_error" && (( attempt < 3 )); then
+              sleep $((attempt * 5))
+              continue
+            fi
+            cat "$dispatch_error" >&2
+            exit 1
+          done
