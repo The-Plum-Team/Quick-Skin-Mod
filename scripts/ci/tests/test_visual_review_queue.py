@@ -343,6 +343,41 @@ class VisualReviewQueueTest(unittest.TestCase):
             ),
         )
 
+    def test_superseded_non_anchor_generation_is_skipped_for_every_wake(self) -> None:
+        old_generation = "c" * 40
+        superseded = artifact(
+            2,
+            f"visual-review-input-200-{old_generation}",
+            run_id=20,
+            minutes_ago=20,
+        )
+        api = FakeApi(
+            [superseded],
+            {
+                20: owner(20, PREPARE_WORKFLOW),
+                200: {
+                    "status": "completed",
+                    "conclusion": "success",
+                    "event": "workflow_dispatch",
+                    "head_branch": "automation/sync/fabric-and-neoforge-1.21.7/200-1",
+                    "head_sha": "d" * 40,
+                },
+            },
+        )
+
+        self.assertEqual(
+            [],
+            list_pending_candidates(api, repository=REPOSITORY, now=NOW),
+        )
+        self.assertIsNone(
+            select_requested(
+                api,
+                repository=REPOSITORY,
+                requested_artifact_id=superseded.artifact_id,
+                now=NOW,
+            )
+        )
+
     def test_exact_wake_honors_report_cooldown_and_generation_block(self) -> None:
         requested = artifact(
             2, "visual-review-input-200", run_id=20, minutes_ago=10
@@ -518,7 +553,11 @@ class VisualReviewQueueTest(unittest.TestCase):
                 status="in_progress",
             ),
         }
-        api = FakeApi([blocked_input, next_input, block], runs)
+        api = FakeApi(
+            [blocked_input, next_input, block],
+            runs,
+            branch_sha="c" * 40,
+        )
 
         self.assertEqual(
             {SHA},
@@ -597,6 +636,7 @@ class VisualReviewQueueTest(unittest.TestCase):
                     status="in_progress",
                 ),
             },
+            branch_sha=generation,
         )
 
         self.assertEqual(
