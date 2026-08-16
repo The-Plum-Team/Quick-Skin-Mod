@@ -247,4 +247,34 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
             }
         }
     }
+
+    /** Keep PlayerInfo's higher-priority Elytra slot on the same selected Quick Skin cape. */
+    @Inject(
+            method = "getElytraLocation",
+            at = @At("HEAD"),
+            cancellable = true,
+            require = 1,
+            expect = 1,
+            allow = 1
+    )
+    private void quickskin$onGetElytraLocation(CallbackInfoReturnable<ResourceLocation> cir) {
+        if (CPMCompatIntegration.shouldDeferToCPM()) return;
+
+        PlayerAppearanceService service = PlayerAppearanceService.getInstance();
+        if (service.hasActiveCape(this.profile.getId())) {
+            cir.setReturnValue(service.getCapeLocation(this.profile.getId()));
+            return;
+        }
+
+        if (Minecraft.getInstance().level == null) {
+            ClientConfig config = ClientConfig.getInstance();
+            if (!config.activeCapeHash.isEmpty()) {
+                ResourceLocation capeLoc = com.quickskin.mod.client.services.CapeService.getInstance()
+                        .getCapeLocation(null, config.activeCapeHash);
+                if (capeLoc != null) {
+                    cir.setReturnValue(capeLoc);
+                }
+            }
+        }
+    }
 }
