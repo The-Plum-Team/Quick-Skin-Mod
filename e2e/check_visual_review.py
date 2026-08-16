@@ -15,7 +15,6 @@ from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any
 
-
 VERDICT_KEYS = {
     "label",
     "semantic_valid",
@@ -298,6 +297,65 @@ def _text(value: Any, label: str, *, maximum: int) -> str:
     return value.strip()
 
 
+def _label_capture_id(label: str, *, scope_segments: frozenset[int]) -> str | None:
+    """Return the capture suffix from one bounded canonical frame label."""
+
+    parts = label.split("/")
+    if len(parts) - 3 not in scope_segments or not all(parts):
+        return None
+    return ".".join(parts[-3:])
+
+
+def validate_compatibility_references(
+    manifest: Any,
+    *,
+    scenario_contract: Path,
+    artifact_node: str,
+    mod_id: str,
+) -> None:
+    """Bind optional-mod candidate/reference identities to the exact source contract."""
+
+    try:
+        from scenario_contract import ScenarioContractError, load_contract
+    except ImportError as exc:
+        raise ReviewError(
+            "compatibility scenario contract loader is unavailable"
+        ) from exc
+    entries, _labels = validate_manifest(manifest, require_paired=True)
+    try:
+        contract = load_contract(scenario_contract)
+    except (OSError, ScenarioContractError, ValueError) as exc:
+        raise ReviewError(f"compatibility scenario contract is invalid: {exc}") from exc
+    if not artifact_node or "/" in artifact_node or not mod_id or "/" in mod_id:
+        raise ReviewError("compatibility review scope is invalid")
+    for index, item in enumerate(entries):
+        candidate_parts = item["label"].split("/")
+        if candidate_parts[:2] != [artifact_node, mod_id] or len(candidate_parts) != 5:
+            raise ReviewError(
+                f"manifest entry {index}.label disagrees with the compatibility scope"
+            )
+        try:
+            capture = contract.capture_by_id(item["capture_id"])
+        except ScenarioContractError as exc:
+            raise ReviewError(
+                f"manifest entry {index}.capture_id is absent from the source contract"
+            ) from exc
+        expected_reference = (
+            capture.compatibility_reference_capture_id or capture.capture_id
+        )
+        reference_parts = item["reference_label"].split("/")
+        reference_capture_id = _label_capture_id(
+            item["reference_label"], scope_segments=frozenset({1})
+        )
+        if (
+            reference_parts[0] != artifact_node
+            or reference_capture_id != expected_reference
+        ):
+            raise ReviewError(
+                f"manifest entry {index}.reference_label disagrees with the source contract"
+            )
+
+
 def validate_manifest(
     manifest: Any, *, require_paired: bool = False
 ) -> tuple[list[dict[str, Any]], list[str]]:
@@ -320,6 +378,7 @@ def validate_manifest(
             raise ReviewError(
                 f"manifest entry {index} must use the single or paired review schema"
             )
+        paired_entry = keys == frozenset(PAIRED_MANIFEST_KEYS)
         schemas.add(keys)
         label = _text(
             item.get("label"),
@@ -353,10 +412,12 @@ def validate_manifest(
             f"manifest entry {index}.runtime_evidence",
             maximum=MAX_RUNTIME_EVIDENCE_LENGTH,
         )
-        label_parts = label.split("/")
-        if len(label_parts) != 4 or ".".join(label_parts[1:]) != capture_id:
+        label_capture_id = _label_capture_id(
+            label, scope_segments=frozenset({1, 2} if paired_entry else {1})
+        )
+        if label_capture_id != capture_id:
             raise ReviewError(f"manifest entry {index}.label disagrees with capture_id")
-        if set(item) == PAIRED_MANIFEST_KEYS:
+        if paired_entry:
             reference_label = _text(
                 item.get("reference_label"),
                 f"manifest entry {index}.reference_label",
@@ -367,10 +428,21 @@ def validate_manifest(
                 f"manifest entry {index}.reference_path",
                 maximum=MAX_PATH_LENGTH,
             )
+            reference_capture_id = _label_capture_id(
+                reference_label, scope_segments=frozenset({1})
+            )
+            candidate_parts = label.split("/")
             reference_parts = reference_label.split("/")
             if (
-                len(reference_parts) != 4
-                or ".".join(reference_parts[1:]) != capture_id
+                reference_capture_id is None
+                or (
+                    len(candidate_parts) == 4
+                    and reference_capture_id != capture_id
+                )
+                or (
+                    len(candidate_parts) == 5
+                    and reference_parts[0] != candidate_parts[0]
+                )
             ):
                 raise ReviewError(
                     f"manifest entry {index}.reference_label disagrees with capture_id"
@@ -758,9 +830,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--structured-output-envelope", action="store_true")
     parser.add_argument("--normalized-report")
     parser.add_argument("--allow-blocking-partial", action="store_true")
+    parser.add_argument("--compatibility-scenario-contract", type=Path)
+    parser.add_argument("--compatibility-artifact-node")
+    parser.add_argument("--compatibility-mod")
     args = parser.parse_args(argv)
     try:
         manifest = load(Path(args.manifest), "review manifest")
+        compatibility_arguments = (
+            args.compatibility_scenario_contract,
+            args.compatibility_artifact_node,
+            args.compatibility_mod,
+        )
+        if any(value is not None for value in compatibility_arguments):
+            if not all(value is not None for value in compatibility_arguments):
+                raise ReviewError(
+                    "compatibility validation requires its contract, artifact node and mod"
+                )
+            validate_compatibility_references(
+                manifest,
+                scenario_contract=args.compatibility_scenario_contract,
+                artifact_node=args.compatibility_artifact_node,
+                mod_id=args.compatibility_mod,
+            )
         if args.print_output_schema:
             entries, labels = validate_manifest(
                 manifest, require_paired=args.require_paired
