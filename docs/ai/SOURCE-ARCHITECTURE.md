@@ -131,8 +131,10 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   downloads only curated capsules, sends every pair to Sonnet even when pixels are identical,
   escalates every non-high-clean result to Opus, and publishes a durable source-wave block before
   cancelling siblings after a confirmed defect. Its authenticated source queue shares the global
-  Claude capacity circuit, preserves one completion marker per clean lane, and reschedules only
-  unfinished lanes after a provider pause. The producer suppresses a delayed stale wake, the
+  Claude capacity circuit, requires a fresh probe for each source, preserves one completion marker
+  per clean lane, and reschedules only unfinished lanes after a provider pause. Its matrix remains
+  lane-parallel, while protected admission fields bound aggregate nested model calls and ramp their
+  starts. The producer suppresses a delayed stale wake, the
   direct consumer requires its source implementation to equal the protected current `master`, and
   every parallel lane rechecks live `master` before capsule download or model admission.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
