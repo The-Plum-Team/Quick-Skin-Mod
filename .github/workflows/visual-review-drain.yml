@@ -468,6 +468,7 @@ jobs:
       contents: read
     outputs:
       already_reviewed: ${{ steps.guard.outputs.already_reviewed }}
+      capsule_missing: ${{ steps.capsule.outputs.missing }}
       certificate_artifact_id: ${{ steps.anchor-certificate.outputs.artifact-id }}
       certificate_artifact_name: ${{ steps.certify.outputs.artifact_name }}
       certificate_anchor_source_sha: ${{ steps.certify.outputs.anchor_source_sha }}
@@ -742,6 +743,7 @@ jobs:
           python-version: "3.13"
 
       - name: Fetch and verify the exact curated capsule
+        id: capsule
         if: steps.guard.outputs.reviewable == 'true'
         shell: bash
         env:
@@ -760,9 +762,24 @@ jobs:
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
           archive="$RUNNER_TEMP/curated-review-input.zip"
-          github_api_retry_to_file "$archive" \
-            -H 'Accept: application/vnd.github+json' \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip"
+          download_error="$(mktemp "$RUNNER_TEMP/curated-review-download.XXXXXX")"
+          if ! github_api_retry_to_file "$archive" \
+              -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
+              2> "$download_error"; then
+            # The exact capsule can be retired after the guard authenticates it but before the
+            # download starts. This wake is then already settled; every other failure stays red.
+            if grep -Fq '(HTTP 404)' "$download_error"; then
+              printf 'missing=true\n' >> "$GITHUB_OUTPUT"
+              printf 'The authenticated queue capsule disappeared before download; no model session started.\n' \
+                >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            cat "$download_error" >&2
+            exit 1
+          fi
+          rm -f -- "$download_error"
+          printf 'missing=false\n' >> "$GITHUB_OUTPUT"
           [[ "$(stat -c %s "$archive")" == "$ARTIFACT_SIZE" ]]
           [[ "$(sha256sum "$archive" | cut -d ' ' -f 1)" == "$ARTIFACT_DIGEST" ]]
           capsule="$RUNNER_TEMP/visual-review-capsule"
@@ -970,7 +987,9 @@ jobs:
 
       - name: Restore only the authenticated exact-policy verdict cache
         id: verdict-cache
-        if: steps.guard.outputs.reviewable == 'true'
+        if: >-
+          steps.guard.outputs.reviewable == 'true' &&
+          steps.capsule.outputs.missing != 'true'
         continue-on-error: true
         working-directory: ${{ runner.temp }}/visual-review-capsule
         shell: bash
@@ -1126,13 +1145,17 @@ jobs:
           printf 'restored=true\n' >> "$GITHUB_OUTPUT"
 
       - name: Install Node for the locked Claude CLI
-        if: steps.guard.outputs.reviewable == 'true'
+        if: >-
+          steps.guard.outputs.reviewable == 'true' &&
+          steps.capsule.outputs.missing != 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
 
       - name: Install locked Claude Code outside the repository
-        if: steps.guard.outputs.reviewable == 'true'
+        if: >-
+          steps.guard.outputs.reviewable == 'true' &&
+          steps.capsule.outputs.missing != 'true'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/claude-cli"
@@ -1147,7 +1170,9 @@ jobs:
 
       - name: Review bounded chunks with selective escalation
         id: model
-        if: steps.guard.outputs.reviewable == 'true'
+        if: >-
+          steps.guard.outputs.reviewable == 'true' &&
+          steps.capsule.outputs.missing != 'true'
         working-directory: ${{ runner.temp }}/visual-review-capsule
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -1203,7 +1228,9 @@ jobs:
 
       - name: Independently validate the normalized result
         id: check
-        if: steps.guard.outputs.reviewable == 'true'
+        if: >-
+          steps.guard.outputs.reviewable == 'true' &&
+          steps.capsule.outputs.missing != 'true'
         working-directory: ${{ runner.temp }}/visual-review-capsule
         shell: bash
         env:
@@ -1643,7 +1670,9 @@ jobs:
 
       - name: Classify a failed attempt without provider text
         id: classify
-        if: always() && steps.guard.outputs.reviewable == 'true'
+        if: >-
+          always() && steps.guard.outputs.reviewable == 'true' &&
+          steps.capsule.outputs.missing != 'true'
         working-directory: ${{ runner.temp }}
         shell: bash
         run: |
@@ -1756,6 +1785,7 @@ jobs:
       always() && needs.select.outputs.eligible == 'true' &&
       (needs.review.outputs.review_complete == 'true' ||
        needs.review.outputs.already_reviewed == 'true' ||
+       needs.review.outputs.capsule_missing == 'true' ||
        (needs.review.outputs.failure_category != '' &&
         needs.review.outputs.failure_transient == 'false'))
     runs-on: ubuntu-24.04
