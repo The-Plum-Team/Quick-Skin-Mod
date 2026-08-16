@@ -248,11 +248,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   source metadata; and emit a source/implementation/candidate/reference-artifact-bound proof. Queue
   selection must authenticate protected owners, survive pending-run replacement, accept a curated
   capsule whose later wake step failed, and cool recent failed attempts without blocking other
-  sources. It must reject closed or superseded pull-request evidence, superseded automatic anchor
-  generations, and an exact automatic or scheduled anchor generation that already owns a
-  successful protected semantic certificate. A certificate is a terminal generation identity
-  here, never a reusable unpaired verdict cache. The review runner accepts only that immutable handoff, never skips an unpaired anchor
-  frame, skips byte-identical paths only in paired comparison mode,
+  sources. The curator must reject a generation that differs from its protected implementation
+  before decoding images, and queue admission must recheck every capsule against the live
+  `master` generation before any model call, including exact wakes. It must also reject closed or
+  superseded pull-request evidence and an exact automatic or scheduled anchor generation that
+  already owns a successful protected semantic certificate. A certificate is a terminal generation
+  identity here, never a reusable unpaired verdict cache. The review runner accepts only that
+  immutable handoff, never skips an unpaired anchor frame, skips byte-identical paths only in paired
+  comparison mode,
   exposes only bounded manifests/images plus each passed capture assertion's bounded printable
   runtime evidence to concurrent loader-grouped Sonnet triage and selective
   concurrent Opus verification with a read-only tool surface, captures each verdict from stdout,
