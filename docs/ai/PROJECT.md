@@ -147,7 +147,9 @@ immutable workflow and governance activation contract.
   band rather than provider text or exact account usage;
   unpaired anchor semantics are never cached. It keeps provider output private and uploads only the
   protected normalized report or a sanitized retry marker, and deletes a settled queue entry by
-  exact artifact id. Build and
+  exact artifact id. If an authenticated capsule disappears between the final guard and its
+  download, that exact wake settles without starting a model; every other download or validation
+  failure remains visible. Build and
   Packaged E2E remain the required exact-head checks for every individual port, and their
   conclusions never depend on model output. The semantic certificate gates only scheduling of the
   cross-version wave: provider failure or a semantic defect deliberately delays that wave instead
