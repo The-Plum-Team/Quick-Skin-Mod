@@ -698,6 +698,7 @@ jobs:
           persist-credentials: true
 
       - name: Merge after both exact-head gates pass
+        id: merge
         shell: bash
         env:
           HEAD_BRANCH: ${{ github.event.client_payload.head_branch }}
@@ -706,6 +707,7 @@ jobs:
           NOTIFYING_RUNTIME_POLICY: ${{ github.event.client_payload.runtime_policy }}
         run: |
           set -euo pipefail
+          printf 'nonvisual_anchor=false\n' >> "$GITHUB_OUTPUT"
           head_sha="$(git rev-parse HEAD)"
           exact_head_runs() {
             local workflow="$1"
@@ -778,6 +780,10 @@ jobs:
           mkdir -p "$policy_dir"
           git show "$protected_sha:scripts/ci/e2e_impact.py" \
             > "$policy_dir/e2e_impact.py"
+          git show "$protected_sha:scripts/ci/visual_review_impact.py" \
+            > "$policy_dir/visual_review_impact.py"
+          git show "$protected_sha:scripts/ci/visual_nonimpact_certification.py" \
+            > "$policy_dir/visual_nonimpact_certification.py"
           git show "$protected_sha:scripts/release/version_branches.py" \
             > "$policy_dir/version_branches.py"
           git show "$protected_sha:release/release-matrix.json" \
@@ -809,6 +815,12 @@ jobs:
           # Mirror of the on-demand revalidator's topology rule: the head must be a chain of
           # synchronization merges over the exact PR base, one first-parent hop per wave, each
           # hop a two-parent merge whose second parent is protected master content.
+          read -r -a newest_sync_commit <<< "$(git rev-list --parents -n 1 "$head_sha")"
+          current_generation_bound=false
+          if [[ "${#newest_sync_commit[@]}" == 3 \
+              && "${newest_sync_commit[2]}" == "$protected_sha" ]]; then
+            current_generation_bound=true
+          fi
           chain_commit="$head_sha"
           chain_complete=false
           for chain_hop in $(seq 1 32); do
@@ -826,6 +838,21 @@ jobs:
           if [[ "$runtime_required" == false && "$chain_complete" == true \
               && "$target_branch" != "$anchor_branch" ]]; then
             runtime_policy=not-applicable
+          fi
+          visual_impact_manifest="$RUNNER_TEMP/visual-impact-manifest.json"
+          visual_impact="$(python3 "$policy_dir/visual_review_impact.py" \
+            --repository . \
+            --base "$base_sha" \
+            --head "$head_sha" \
+            --scope replicated-port \
+            --manifest-output "$visual_impact_manifest")"
+          [[ "$visual_impact" == review || "$visual_impact" == skip ]]
+          nonvisual_anchor=false
+          if [[ "$target_branch" == "$anchor_branch" \
+              && "$chain_complete" == true \
+              && "$current_generation_bound" == true \
+              && "$visual_impact" == skip ]]; then
+            nonvisual_anchor=true
           fi
           # An executed and passed full suite is strictly stronger evidence than a derived
           # not-applicable, so it supersedes; the opposite direction stays fatal because a
@@ -940,10 +967,30 @@ jobs:
             -f runtime_policy="$runtime_policy"
 
           # The first E2E completion request deliberately defers a synchronization anchor until
-          # this independently gated merge exists. Wake semantic review now with the already
-          # authenticated exact source run; bounded retries make the post-merge handoff resilient
-          # to a transient repository-dispatch failure.
-          if [[ "$target_branch" == "$anchor_branch" ]]; then
+          # this independently gated merge exists. A complete protected nonvisual diff emits a
+          # model-free continuation; every other anchor wakes semantic review with the already
+          # authenticated exact source run.
+          if [[ "$target_branch" == "$anchor_branch" \
+              && "$nonvisual_anchor" == true ]]; then
+            impact_policy_sha256="$(sha256sum \
+              "$policy_dir/visual_review_impact.py" | cut -d ' ' -f 1)"
+            python3 "$policy_dir/visual_nonimpact_certification.py" create \
+              --master-source-sha "$protected_sha" \
+              --anchor-branch "$anchor_branch" \
+              --anchor-source-branch "$HEAD_BRANCH" \
+              --anchor-base-sha "$base_sha" \
+              --anchor-source-sha "$head_sha" \
+              --anchor-target-sha "$target_sha" \
+              --build-run-id "$build_run_id" \
+              --e2e-run-id "$e2e_run_id" \
+              --impact-policy-sha256 "$impact_policy_sha256" \
+              --impact-manifest "$visual_impact_manifest" \
+              --output "$RUNNER_TEMP/visual-anchor-nonimpact.json"
+            printf 'artifact_name=visual-anchor-nonimpact-%s\n' \
+              "$protected_sha" >> "$GITHUB_OUTPUT"
+            printf 'master_source_sha=%s\n' "$protected_sha" >> "$GITHUB_OUTPUT"
+            printf 'nonvisual_anchor=true\n' >> "$GITHUB_OUTPUT"
+          elif [[ "$target_branch" == "$anchor_branch" ]]; then
             review_payload="$RUNNER_TEMP/merged-anchor-visual-review.json"
             jq -n \
               --arg source_branch "$HEAD_BRANCH" \
@@ -976,3 +1023,68 @@ jobs:
           git merge-base --is-ancestor "$head_sha" "$target_sha"
           [[ "$(git rev-parse "${head_sha}^{tree}")" \
             == "$(git rev-parse "${target_sha}^{tree}")" ]]
+
+      - name: Upload the authenticated nonvisual anchor continuation
+        id: nonvisual-handoff
+        if: steps.merge.outputs.nonvisual_anchor == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.merge.outputs.artifact_name }}
+          path: ${{ runner.temp }}/visual-anchor-nonimpact.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Release the nonvisual synchronization wave
+        if: steps.nonvisual-handoff.outputs.artifact-id != ''
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.nonvisual-handoff.outputs.artifact-id }}
+          ARTIFACT_NAME: ${{ steps.merge.outputs.artifact_name }}
+          GH_TOKEN: ${{ github.token }}
+          MASTER_SOURCE_SHA: ${{ steps.merge.outputs.master_source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$ARTIFACT_NAME" == "visual-anchor-nonimpact-$MASTER_SOURCE_SHA" ]]
+          metadata="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
+          artifact_digest="$(jq -er .digest <<< "$metadata")"
+          artifact_size="$(jq -er .size_in_bytes <<< "$metadata")"
+          [[ "$artifact_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$artifact_size" =~ ^[1-9][0-9]*$ ]]
+          (( artifact_size <= 1048576 ))
+          jq -e \
+            --arg digest "$artifact_digest" \
+            --arg name "$ARTIFACT_NAME" \
+            --arg sha "$MASTER_SOURCE_SHA" \
+            --argjson artifact_id "$ARTIFACT_ID" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            --argjson size "$artifact_size" \
+            '.id == $artifact_id and .name == $name and .digest == $digest and
+             .size_in_bytes == $size and .expired == false and
+             .workflow_run.id == $run_id and
+             .workflow_run.head_branch == "master" and
+             .workflow_run.head_sha == $sha' <<< "$metadata" > /dev/null
+          payload="$RUNNER_TEMP/visual-anchor-nonimpact-dispatch.json"
+          jq -n \
+            --arg artifact_digest "$artifact_digest" \
+            --arg artifact_id "$ARTIFACT_ID" \
+            --arg artifact_name "$ARTIFACT_NAME" \
+            --arg artifact_run_id "$GITHUB_RUN_ID" \
+            --arg artifact_size "$artifact_size" \
+            --arg master_source_sha "$MASTER_SOURCE_SHA" \
+            '{event_type:"visual-anchor-nonimpact",client_payload:{
+              artifact_digest:$artifact_digest,artifact_id:$artifact_id,
+              artifact_name:$artifact_name,artifact_run_id:$artifact_run_id,
+              artifact_size:$artifact_size,master_source_sha:$master_source_sha}}' \
+            > "$payload"
+          dispatched=false
+          for attempt in {1..5}; do
+            if timeout 20s gh api --method POST \
+                "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload"; then
+              dispatched=true
+              break
+            fi
+            sleep $((attempt * 2))
+          done
+          [[ "$dispatched" == true ]]

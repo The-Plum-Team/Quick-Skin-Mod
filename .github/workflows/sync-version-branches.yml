@@ -1,8 +1,9 @@
 name: Sync version branches
 
 # Shared changes land on master. Every automatic generation first ports only the matrix-derived
-# Minecraft 1.20.1 anchor. A protected semantic certificate releases the remaining discovered
-# branches. Each target keeps its own matrix authoritative; no workflow stores a version list.
+# Minecraft 1.20.1 anchor. A protected semantic certificate, or an independently revalidated
+# nonvisual continuation after full anchor E2E, releases the remaining discovered branches. Each
+# target keeps its own matrix authoritative; no workflow stores a version list.
 on:
   push:
     branches:
@@ -10,6 +11,7 @@ on:
   repository_dispatch:
     types:
       - visual-anchor-certified
+      - visual-anchor-nonimpact
   workflow_dispatch:
     inputs:
       target:
@@ -48,6 +50,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Resolve targets from GitHub
@@ -71,6 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
+          [[ "$(git rev-parse --is-shallow-repository)" == false ]]
           reference_identity="$(python3 e2e/visual_review.py \
             --matrix release/release-matrix.json --reference-identity)"
           anchor_branch="$(jq -er .release_branch <<< "$reference_identity")"
@@ -88,7 +92,166 @@ jobs:
             value="$(python3 scripts/release/version_branches.py \
               --exclude master --target "$REQUESTED_TARGET")"
           elif [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
-            [[ "$EVENT_ACTION" == visual-anchor-certified ]]
+            if [[ "$EVENT_ACTION" == visual-anchor-nonimpact ]]; then
+              [[ "$PAYLOAD_MASTER_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+              if [[ "$PAYLOAD_MASTER_SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+                printf 'Ignoring stale nonvisual anchor continuation for %s; current master is %s\n' \
+                  "$PAYLOAD_MASTER_SOURCE_SHA" "$GITHUB_SHA"
+                printf 'value=[]\n' >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" \
+                --jq .commit.sha)" == "$GITHUB_SHA" ]]
+              [[ "$PAYLOAD_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+              [[ "$PAYLOAD_ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+              [[ "$PAYLOAD_ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
+              (( PAYLOAD_ARTIFACT_SIZE <= 1048576 ))
+              [[ "$PAYLOAD_ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+              [[ "$PAYLOAD_ARTIFACT_NAME" == \
+                "visual-anchor-nonimpact-$GITHUB_SHA" ]]
+
+              metadata="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts/$PAYLOAD_ARTIFACT_ID")"
+              jq -e \
+                --arg digest "$PAYLOAD_ARTIFACT_DIGEST" \
+                --arg name "$PAYLOAD_ARTIFACT_NAME" \
+                --arg sha "$GITHUB_SHA" \
+                --argjson artifact_id "$PAYLOAD_ARTIFACT_ID" \
+                --argjson run_id "$PAYLOAD_ARTIFACT_RUN_ID" \
+                --argjson size "$PAYLOAD_ARTIFACT_SIZE" \
+                '.id == $artifact_id and .name == $name and .digest == $digest and
+                 .size_in_bytes == $size and .expired == false and
+                 .workflow_run.id == $run_id and
+                 .workflow_run.head_branch == "master" and
+                 .workflow_run.head_sha == $sha' <<< "$metadata" > /dev/null
+              owner=''
+              for attempt in {1..60}; do
+                owner="$(github_api_retry \
+                  "repos/$GITHUB_REPOSITORY/actions/runs/$PAYLOAD_ARTIFACT_RUN_ID")"
+                if [[ "$(jq -r .status <<< "$owner")" == completed ]]; then
+                  break
+                fi
+                sleep 2
+              done
+              jq -e \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg sha "$GITHUB_SHA" \
+                --argjson run_id "$PAYLOAD_ARTIFACT_RUN_ID" \
+                '.id == $run_id and .status == "completed" and
+                 .conclusion == "success" and .event == "repository_dispatch" and
+                 .head_branch == "master" and .head_sha == $sha and
+                 .path == ".github/workflows/handle-version-port-result.yml" and
+                 .head_repository.full_name == $repository' <<< "$owner" > /dev/null
+
+              archive="$RUNNER_TEMP/visual-anchor-nonimpact.zip"
+              github_api_retry_to_file "$archive" \
+                -H 'Accept: application/vnd.github+json' \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts/$PAYLOAD_ARTIFACT_ID/zip"
+              [[ "$(stat -c %s "$archive")" == "$PAYLOAD_ARTIFACT_SIZE" ]]
+              [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
+                "$PAYLOAD_ARTIFACT_DIGEST" ]]
+              extracted="$RUNNER_TEMP/visual-anchor-nonimpact"
+              python3 scripts/ci/bounded_zip.py \
+                "$archive" "$extracted" \
+                --max-archive-bytes 1048576 \
+                --max-entries 1 \
+                --max-total-bytes 1048576 \
+                --max-file-bytes 1048576 \
+                --max-compression-ratio 20 \
+                > "$RUNNER_TEMP/visual-anchor-nonimpact-extraction.json"
+              rm -f -- "$archive"
+              mapfile -d '' continuation_files < <(
+                find "$extracted" -mindepth 1 -maxdepth 1 -print0
+              )
+              [[ "${#continuation_files[@]}" -eq 1 ]]
+              continuation="${continuation_files[0]}"
+              [[ -f "$continuation" && ! -L "$continuation" ]]
+              [[ "$(basename "$continuation")" == visual-anchor-nonimpact.json ]]
+              python3 scripts/ci/visual_nonimpact_certification.py verify \
+                --certificate "$continuation" \
+                --expected-master-sha "$GITHUB_SHA" \
+                --expected-anchor-branch "$anchor_branch" \
+                > "$RUNNER_TEMP/verified-visual-anchor-nonimpact.json"
+
+              anchor_source_branch="$(jq -er .anchor_source_branch "$continuation")"
+              anchor_base_sha="$(jq -er .anchor_base_sha "$continuation")"
+              anchor_source_sha="$(jq -er .anchor_source_sha "$continuation")"
+              anchor_target_sha="$(jq -er .anchor_target_sha "$continuation")"
+              build_run_id="$(jq -er .build_run_id "$continuation")"
+              e2e_run_id="$(jq -er .e2e_run_id "$continuation")"
+              [[ "$(jq -er .impact_policy_sha256 "$continuation")" == \
+                "$(sha256sum scripts/ci/visual_review_impact.py | cut -d ' ' -f 1)" ]]
+              [[ "$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/branches/$anchor_branch" \
+                --jq .commit.sha)" == "$anchor_target_sha" ]]
+              git fetch --no-tags origin \
+                "$anchor_base_sha" "$anchor_source_sha" "$anchor_target_sha"
+              read -r -a source_commit <<< "$(git rev-list --parents -n 1 \
+                "$anchor_source_sha")"
+              [[ "${#source_commit[@]}" -eq 3 ]]
+              [[ "${source_commit[2]}" == "$GITHUB_SHA" ]]
+              chain_commit="$anchor_source_sha"
+              chain_complete=false
+              for chain_hop in $(seq 1 32); do
+                read -r -a chain_parents <<< "$(git rev-list --parents -n 1 \
+                  "$chain_commit")"
+                if [[ "${#chain_parents[@]}" != 3 ]] \
+                    || ! git merge-base --is-ancestor \
+                      "${chain_parents[2]}" "$GITHUB_SHA"; then
+                  break
+                fi
+                chain_commit="${chain_parents[1]}"
+                if [[ "$chain_commit" == "$anchor_base_sha" ]]; then
+                  chain_complete=true
+                  break
+                fi
+              done
+              [[ "$chain_complete" == true ]]
+              read -r -a target_commit <<< "$(git rev-list --parents -n 1 \
+                "$anchor_target_sha")"
+              [[ "${#target_commit[@]}" -eq 3 ]]
+              [[ "${target_commit[1]}" == "$anchor_source_sha" \
+                || "${target_commit[2]}" == "$anchor_source_sha" ]]
+              [[ "$(git rev-parse "$anchor_source_sha^{tree}")" == \
+                "$(git rev-parse "$anchor_target_sha^{tree}")" ]]
+
+              recomputed_impact="$RUNNER_TEMP/recomputed-visual-impact.json"
+              [[ "$(python3 scripts/ci/visual_review_impact.py \
+                --repository . --base "$anchor_base_sha" --head "$anchor_source_sha" \
+                --scope replicated-port --manifest-output "$recomputed_impact")" == skip ]]
+              jq -S . "$recomputed_impact" > "$RUNNER_TEMP/recomputed-impact.sorted.json"
+              jq -S .impact "$continuation" > "$RUNNER_TEMP/certificate-impact.sorted.json"
+              cmp --silent "$RUNNER_TEMP/recomputed-impact.sorted.json" \
+                "$RUNNER_TEMP/certificate-impact.sorted.json"
+
+              build_run="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$build_run_id")"
+              e2e_run="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$e2e_run_id")"
+              jq -e \
+                --arg branch "$anchor_source_branch" \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg sha "$anchor_source_sha" \
+                --argjson run_id "$build_run_id" \
+                '.id == $run_id and .status == "completed" and
+                 .conclusion == "success" and .event == "workflow_dispatch" and
+                 .head_branch == $branch and .head_sha == $sha and
+                 .path == ".github/workflows/build-gate.yml" and
+                 .head_repository.full_name == $repository' <<< "$build_run" > /dev/null
+              jq -e \
+                --arg branch "$anchor_source_branch" \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg sha "$anchor_source_sha" \
+                --argjson run_id "$e2e_run_id" \
+                '.id == $run_id and .status == "completed" and
+                 .conclusion == "success" and .event == "workflow_dispatch" and
+                 .head_branch == $branch and .head_sha == $sha and
+                 .path == ".github/workflows/on-demand-e2e.yml" and
+                 .head_repository.full_name == $repository' <<< "$e2e_run" > /dev/null
+              value="$(python3 scripts/release/version_branches.py \
+                --exclude master --exclude "$anchor_branch" < "$branches")"
+            else
+              [[ "$EVENT_ACTION" == visual-anchor-certified ]]
             [[ "$PAYLOAD_MASTER_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
             # A certificate for an older master generation is expected during rapid updates. It
             # cannot release any work for the new generation and is safely ignored.
@@ -216,6 +379,7 @@ jobs:
                .head_repository.full_name == $repository' <<< "$source_run" > /dev/null
             value="$(python3 scripts/release/version_branches.py \
               --exclude master --exclude "$anchor_branch" < "$branches")"
+            fi
           elif [[ "$GITHUB_EVENT_NAME" == push ]]; then
             # Always certify the complete current master generation. Classifying only the latest
             # push range is unsafe: a documentation-only tip can still contain an older runtime
