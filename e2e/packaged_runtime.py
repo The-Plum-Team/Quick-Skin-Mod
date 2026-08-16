@@ -160,8 +160,8 @@ class RuntimeFailure(RuntimeError):
 
 NEOFORGE_CLIENT_INSTALL_ATTEMPTS = 3
 NEOFORGE_CLIENT_INSTALL_BACKOFF_SECONDS = (5, 15)
-NEOFORGE_SERVER_INSTALL_ATTEMPTS = 3
-NEOFORGE_SERVER_INSTALL_BACKOFF_SECONDS = (5, 15)
+LOADER_SERVER_INSTALL_ATTEMPTS = 3
+LOADER_SERVER_INSTALL_BACKOFF_SECONDS = (5, 15)
 LAUNCHER_LIBRARY_VERSION = "8.0"
 LAUNCHER_LIBRARY_REVISION = "minecraft-launcher-lib==8.0"
 PROFILE_NORMALIZER_REVISION = "normalize-inherited-profile-v1"
@@ -942,59 +942,55 @@ def prepare_server(
 
         if row["loader"] not in {"forge", "neoforge"}:
             raise RuntimeFailure(f"unsupported loader {row['loader']!r}")
-        if row["loader"] == "forge":
-            run_checked(
-                [java, "-jar", str(installer), "--installServer", str(server)],
-                server,
-                log,
-                env,
-            )
-        else:
-            # NeoForge installers download Maven dependencies at install time. A transient
-            # CDN failure must not leave a half-populated server tree for the retry (or for a
-            # later scenario) to consume, so every attempt gets an isolated staging directory.
-            last_error: Exception | None = None
-            for attempt_number in range(1, NEOFORGE_SERVER_INSTALL_ATTEMPTS + 1):
-                attempt = Path(
-                    tempfile.mkdtemp(
-                        prefix=f".neoforge-server-attempt-{attempt_number}-",
-                        dir=server.parent,
-                    )
+        loader = row["loader"]
+        loader_name = "Forge" if loader == "forge" else "NeoForge"
+        install_flag = "--installServer" if loader == "forge" else "--install-server"
+
+        # Both loader installers download Maven dependencies at install time. A transient CDN
+        # failure must not leave a half-populated server tree for the retry (or for a later
+        # scenario) to consume, so every attempt gets an isolated staging directory.
+        last_error: Exception | None = None
+        for attempt_number in range(1, LOADER_SERVER_INSTALL_ATTEMPTS + 1):
+            attempt = Path(
+                tempfile.mkdtemp(
+                    prefix=f".{loader}-server-attempt-{attempt_number}-",
+                    dir=server.parent,
                 )
-                try:
-                    run_checked(
-                        [java, "-jar", str(installer), "--install-server", str(attempt)],
-                        attempt,
-                        log,
-                        env,
-                        append=attempt_number > 1,
+            )
+            try:
+                run_checked(
+                    [java, "-jar", str(installer), install_flag, str(attempt)],
+                    attempt,
+                    log,
+                    env,
+                    append=attempt_number > 1,
+                )
+                expected_script = attempt / ("run.bat" if os.name == "nt" else "run.sh")
+                if not expected_script.is_file():
+                    raise RuntimeFailure(
+                        f"{loader_name} server installer did not create {expected_script}"
                     )
-                    expected_script = attempt / ("run.bat" if os.name == "nt" else "run.sh")
-                    if not expected_script.is_file():
-                        raise RuntimeFailure(
-                            f"NeoForge server installer did not create {expected_script}"
-                        )
-                    if any(server.iterdir()):
-                        raise RuntimeFailure(
-                            f"refusing to replace non-empty server directory {server}"
-                        )
-                    server.rmdir()
-                    os.replace(attempt, server)
-                    last_error = None
-                    break
-                except Exception as exc:
-                    last_error = exc
-                    if attempt_number < NEOFORGE_SERVER_INSTALL_ATTEMPTS:
-                        time.sleep(
-                            NEOFORGE_SERVER_INSTALL_BACKOFF_SECONDS[attempt_number - 1]
-                        )
-                finally:
-                    shutil.rmtree(attempt, ignore_errors=True)
-            if last_error is not None:
-                raise RuntimeFailure(
-                    "NeoForge server installation failed after "
-                    f"{NEOFORGE_SERVER_INSTALL_ATTEMPTS} isolated attempts: {last_error}"
-                ) from last_error
+                if any(server.iterdir()):
+                    raise RuntimeFailure(
+                        f"refusing to replace non-empty server directory {server}"
+                    )
+                server.rmdir()
+                os.replace(attempt, server)
+                last_error = None
+                break
+            except Exception as exc:
+                last_error = exc
+                if attempt_number < LOADER_SERVER_INSTALL_ATTEMPTS:
+                    time.sleep(
+                        LOADER_SERVER_INSTALL_BACKOFF_SECONDS[attempt_number - 1]
+                    )
+            finally:
+                shutil.rmtree(attempt, ignore_errors=True)
+        if last_error is not None:
+            raise RuntimeFailure(
+                f"{loader_name} server installation failed after "
+                f"{LOADER_SERVER_INSTALL_ATTEMPTS} isolated attempts: {last_error}"
+            ) from last_error
     (server / "user_jvm_args.txt").write_text("-Xms512M\n-Xmx1024M\n", encoding="utf-8")
     if os.name == "nt":
         script = server / "run.bat"
