@@ -183,8 +183,12 @@ immutable workflow and governance activation contract.
   explicitly dispatches the protected reviewer and that reviewer polls until the exact source run
   is complete; relying on a recursive `workflow_run` would silently lose token-created waves. The
   reviewer shares the repository-wide Claude capacity circuit, records clean lanes independently,
-  and keeps the authenticated source plan pending across quota pauses. Scheduled recovery reruns
-  only unfinished lanes and publishes a source completion marker after the full set is clean. A
+  and keeps the authenticated source plan pending across quota pauses. Every compatibility source
+  requires its own fresh serialized tool-free probe; a ready marker from the preceding source is
+  not treated as capacity reserved for another wave. All mod lanes still start concurrently, while
+  a protected per-wave call budget and bounded start ramp prevent their internal chunk executors
+  from multiplying into an unbounded provider burst. Scheduled recovery reruns only unfinished
+  lanes and publishes a source completion marker after the full set is clean. A
   producer that settles after `master` advances suppresses its wake; direct review admission binds
   the source SHA to the protected current implementation, and every lane rechecks live `master`
   before it downloads a capsule or starts a model.
