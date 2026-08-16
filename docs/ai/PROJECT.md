@@ -128,10 +128,11 @@ immutable workflow and governance activation contract.
   generic recovery sweeps only redispatch an authenticated exact wake. Before those independent
   drains fan out, one global serialized capacity section reuses only a fresh marker from the exact
   protected workflow. Its single tool-free Sonnet probe either opens a short shared ready window or
-  records a sanitized hard-rejection/explicit-95%-utilization pause; a successful
-  `allowed_warning` alone remains ready because the coarse headless signal may disagree with the
-  subscription usage panel. Paused capsules remain durable and the scheduled sweep probes again
-  later. A fresh ready probe enumerates and redispatches every authenticated
+  records a sanitized hard-rejection/provider-failure pause. A successful `allowed` or
+  `allowed_warning` call remains ready regardless of its optional coarse utilization field because
+  that field may disagree with the subscription usage panel; a later rejected review still fails
+  closed and keeps its capsule durable. Paused capsules remain durable and the scheduled sweep
+  probes again later. A fresh ready probe enumerates and redispatches every authenticated
   pending artifact independently, so coalescing probe contenders never serializes the actual
   reviews. It consumes the bounded headless rate-limit status and optional utilization when
   present, without pretending Claude provides a reliable Pro/Max percentage to headless CI. A
