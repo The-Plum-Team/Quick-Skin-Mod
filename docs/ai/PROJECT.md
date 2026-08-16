@@ -101,7 +101,14 @@ immutable workflow and governance activation contract.
   Never delete the fallback before its replacement succeeds, introduce a second version list,
   publish logs/crash reports, or make Pages a protected release check.
 - Every automatic push to `master` propagates in two waves. The synchronizer first targets only
-  the matrix-derived Minecraft 1.20.1 release branch. Its Fabric and Forge screenshots are curated
+  the matrix-derived Minecraft 1.20.1 release branch and always requires its exact Build plus full
+  Fabric/Forge packaged E2E. A protected classifier evaluates the complete anchor-port diff, not
+  merely the latest `master` push. If every path belongs to the narrow nonvisual orchestration,
+  test, or documentation allowlist, the merge controller emits an exact nonvisual continuation
+  certificate; the synchronizer reauthenticates its owner run, both gate runs, Git parents, equal
+  source/target trees, current branch heads, policy digest, and independently recomputed diff
+  before releasing the remaining ports without Claude or a compatibility wave. Any ambiguity or
+  visual/runtime path follows the semantic route. On that route, Fabric and Forge screenshots are curated
   without any reference image and reviewed independently against every contract expectation, so a
   defect shared by both loaders cannot certify itself. The protected report records semantic
   validity separately from reference similarity. Only a completely clean, loader-complete report
@@ -112,12 +119,14 @@ immutable workflow and governance activation contract.
   reauthenticates that artifact and releases every other discovered version branch. A stale,
   malformed, incomplete, defective, unavailable, or superseded certificate releases nothing.
   Queue admission also treats that exact authenticated certificate as terminal for the same
-  automatic or scheduled anchor generation, and discards superseded anchor generations and closed
-  pull-request evidence before any model call. This is identity-level deduplication, not reuse of
-  an unpaired semantic verdict.
-  No immediate-diff exception may fan out directly: a documentation-only tip can contain an older
-  runtime change whose certification is still pending or failed. An explicit manual exact target
-  remains an operator recovery path.
+  automatic or scheduled anchor generation, and discards every capsule whose authenticated
+  `master` generation is no longer current plus closed pull-request evidence before any model
+  call. This is identity-level deduplication, not reuse of an unpaired semantic verdict.
+  No immediate-tip exception may fan out directly: a documentation-only tip can contain an older
+  runtime change whose certification is still pending or failed. Only the exact anchor merge diff,
+  whose newest synchronization commit has current `master` as its second parent and whose bounded
+  first-parent synchronization chain terminates at the authenticated release base, can prove the
+  whole pending wave nonvisual. An explicit manual exact target remains an operator recovery path.
 - Credential-bearing AI visual judgment pins the exact workflow `github.sha`, authenticates the
   complete protected job graph, and curates raw artifacts on a secretless runner. After the anchor
   is certified, every later-version candidate is paired by semantic `capture_id` with authenticated
@@ -128,8 +137,11 @@ immutable workflow and governance activation contract.
   generic recovery sweeps only redispatch an authenticated exact wake. Before those independent
   drains fan out, one global serialized capacity section reuses only a fresh marker from the exact
   protected workflow. Its single tool-free Sonnet probe either opens a short shared ready window or
-  records a sanitized rejected/near-limit pause; paused capsules remain durable and the scheduled
-  sweep probes again later. A fresh ready probe enumerates and redispatches every authenticated
+  records a sanitized hard-rejection/provider-failure pause. A successful `allowed` or
+  `allowed_warning` call remains ready regardless of its optional coarse utilization field because
+  that field may disagree with the subscription usage panel; a later rejected review still fails
+  closed and keeps its capsule durable. Paused capsules remain durable and the scheduled sweep
+  probes again later. A fresh ready probe enumerates and redispatches every authenticated
   pending artifact independently, so coalescing probe contenders never serializes the actual
   reviews. It consumes the bounded headless rate-limit status and optional utilization when
   present, without pretending Claude provides a reliable Pro/Max percentage to headless CI. A
@@ -140,14 +152,23 @@ immutable workflow and governance activation contract.
   cancels sibling drains and keeps later queue selection from spending more model calls on that
   automatic wave. Each drain also cancels its own outstanding calls on confirmation and reuses paired
   verdicts only under an exact content/expectation/loader/contract/matrix/reviewer/prompt/model
-  policy key;
+  policy key; the capacity marker retains only normalized status, known limit type, and utilization
+  band rather than provider text or exact account usage;
   unpaired anchor semantics are never cached. It keeps provider output private and uploads only the
   protected normalized report or a sanitized retry marker, and deletes a settled queue entry by
-  exact artifact id. Build and
+  exact artifact id. If an authenticated capsule disappears between the final guard and its
+  download, that exact wake settles without starting a model; every other download or validation
+  failure remains visible. Build and
   Packaged E2E remain the required exact-head checks for every individual port, and their
   conclusions never depend on model output. The semantic certificate gates only scheduling of the
   cross-version wave: provider failure or a semantic defect deliberately delays that wave instead
   of blessing an unverified baseline.
+- Ordinary PR review admission has a separate protected source-PR impact scope. A complete
+  server-side inventory containing only optional-mod compatibility orchestration, protected CI
+  tests, or documentation never enters the ordinary visual queue. Changes to product code,
+  scenarios, visual workflows, prompts, runners, classifiers, malformed inventories, or unknown
+  paths remain reviewable. This domain separation prevents one compatibility-policy edit from
+  spending another full ordinary visual review while keeping both deterministic gates fail-closed.
 - A clean semantic review of an exact synchronized release tree starts a separate optional-mod
   compatibility wave. Protected planning derives every `version x loader x mod` lane from the
   release matrix and `e2e/mod-compatibility-contract.json`, including explicit N/A rows. Applicable
@@ -160,7 +181,13 @@ immutable workflow and governance activation contract.
   the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing
   successful lanes or preventing their concurrent AI review. The settled compatibility producer
   explicitly dispatches the protected reviewer and that reviewer polls until the exact source run
-  is complete; relying on a recursive `workflow_run` would silently lose token-created waves.
+  is complete; relying on a recursive `workflow_run` would silently lose token-created waves. The
+  reviewer shares the repository-wide Claude capacity circuit, records clean lanes independently,
+  and keeps the authenticated source plan pending across quota pauses. Scheduled recovery reruns
+  only unfinished lanes and publishes a source completion marker after the full set is clean. A
+  producer that settles after `master` advances suppresses its wake; direct review admission binds
+  the source SHA to the protected current implementation, and every lane rechecks live `master`
+  before it downloads a capsule or starts a model.
   Authored loader/version exclusions
   remain explicit N/A records and survive lock refreshes. This post-validation signal does not
   replace or weaken Build,

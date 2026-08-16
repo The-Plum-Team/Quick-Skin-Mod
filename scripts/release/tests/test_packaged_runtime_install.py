@@ -734,6 +734,110 @@ class PackagedRuntimeDependencyTest(unittest.TestCase):
         self.assertEqual(self.store.path_for_blob(installer_sha), Path(commands[0][0][2]))
         self.assertEqual(self.store.path_for_blob(installer_sha), Path(commands[1][0][2]))
 
+    def test_forge_server_retry_discards_partial_install_before_publish(self) -> None:
+        installer = self.root / "forge-installer.jar"
+        installer.write_bytes(b"forge installer")
+        installer_sha = hashlib.sha256(installer.read_bytes()).hexdigest()
+        matrix = {
+            "installers": {
+                "forge": {
+                    "url": "https://example.invalid/forge-installer.jar",
+                    "sha256": installer_sha,
+                }
+            }
+        }
+        row = {
+            "installer": "forge",
+            "loader": "forge",
+            "runtime_version": "1.20.1",
+            "loader_version": "1.20.1-47.4.9",
+        }
+        attempts: list[Path] = []
+
+        def fetch(store: runtime_store.RuntimeStore, **_kwargs: object) -> Path:
+            return store.admit_blob(installer, installer_sha)
+
+        def run(
+            _command: list[str], cwd: Path, _log: Path, _env: dict[str, str], **_kwargs: object
+        ) -> None:
+            attempts.append(cwd)
+            if len(attempts) == 1:
+                (cwd / "partial-library.jar").write_bytes(b"partial")
+                raise packaged_runtime.RuntimeFailure("Read timed out")
+            (cwd / "run.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+
+        server = self.root / "forge-server"
+        server.mkdir()
+        with mock.patch.object(
+            packaged_runtime, "fetch_verified_blob", side_effect=fetch
+        ), mock.patch.object(
+            packaged_runtime, "run_checked", side_effect=run
+        ) as checked, mock.patch.object(packaged_runtime.time, "sleep") as sleep:
+            command = packaged_runtime.prepare_server(
+                matrix, row, server, self.store, "/fake/java", self.root / "install.log"
+            )
+
+        self.assertEqual(["bash", str(server / "run.sh"), "nogui"], command)
+        self.assertEqual(2, len(attempts))
+        self.assertNotEqual(attempts[0], attempts[1])
+        self.assertFalse((server / "partial-library.jar").exists())
+        self.assertTrue((server / "run.sh").is_file())
+        self.assertEqual(False, checked.call_args_list[0].kwargs["append"])
+        self.assertEqual(True, checked.call_args_list[1].kwargs["append"])
+        sleep.assert_called_once_with(5)
+
+    def test_forge_server_retry_fails_closed_without_partial_tree(self) -> None:
+        installer = self.root / "forge-installer-failing.jar"
+        installer.write_bytes(b"forge installer")
+        installer_sha = hashlib.sha256(installer.read_bytes()).hexdigest()
+        matrix = {
+            "installers": {
+                "forge": {
+                    "url": "https://example.invalid/forge-installer.jar",
+                    "sha256": installer_sha,
+                }
+            }
+        }
+        row = {
+            "installer": "forge",
+            "loader": "forge",
+            "runtime_version": "1.20.1",
+            "loader_version": "1.20.1-47.4.9",
+        }
+
+        def fetch(store: runtime_store.RuntimeStore, **_kwargs: object) -> Path:
+            return store.admit_blob(installer, installer_sha)
+
+        def fail(
+            _command: list[str], cwd: Path, _log: Path, _env: dict[str, str], **_kwargs: object
+        ) -> None:
+            (cwd / "partial-library.jar").write_bytes(b"partial")
+            raise packaged_runtime.RuntimeFailure("Read timed out")
+
+        server = self.root / "forge-server-failing"
+        server.mkdir()
+        with mock.patch.object(
+            packaged_runtime, "fetch_verified_blob", side_effect=fetch
+        ), mock.patch.object(
+            packaged_runtime, "run_checked", side_effect=fail
+        ) as checked, mock.patch.object(packaged_runtime.time, "sleep"):
+            with self.assertRaisesRegex(
+                packaged_runtime.RuntimeFailure,
+                "Forge server installation failed after 3 isolated attempts",
+            ):
+                packaged_runtime.prepare_server(
+                    matrix,
+                    row,
+                    server,
+                    self.store,
+                    "/fake/java",
+                    self.root / "failing-install.log",
+                )
+
+        self.assertEqual(3, checked.call_count)
+        self.assertEqual([], list(server.iterdir()))
+        self.assertEqual([], list(self.root.glob(".forge-server-attempt-*")))
+
     def test_neoforge_server_retry_discards_partial_install_before_publish(self) -> None:
         installer = self.root / "neoforge-installer.jar"
         installer.write_bytes(b"neoforge installer")
@@ -913,6 +1017,71 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
                     packaged_runtime.RuntimeFailure, "fatal runtime log evidence"
                 ):
                     packaged_runtime.scan_runtime_logs([log])
+
+    def test_server_world_is_sanitized_and_acknowledged_before_client_launch(self) -> None:
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.stdin = mock.Mock()
+        log = self.root / "server.log"
+
+        with mock.patch.object(packaged_runtime, "wait_for_log") as wait_for_log:
+            packaged_runtime.sanitize_server_world(process, log)
+
+        process.stdin.write.assert_called_once_with(
+            (
+                "\n".join(packaged_runtime.SERVER_WORLD_SANITIZE_COMMANDS) + "\n"
+            ).encode("utf-8")
+        )
+        process.stdin.flush.assert_called_once_with()
+        wait_for_log.assert_called_once_with(
+            process,
+            log,
+            packaged_runtime.SERVER_WORLD_SANITIZED_MARKER,
+            timeout=60,
+        )
+        self.assertEqual(
+            "kill @e[type=!minecraft:player]",
+            packaged_runtime.SERVER_WORLD_SANITIZE_COMMANDS[0],
+        )
+
+    def test_server_process_opens_a_writable_private_console(self) -> None:
+        log = self.root / "server.log"
+        expected_process = mock.Mock()
+
+        with mock.patch.object(
+            packaged_runtime.subprocess, "Popen", return_value=expected_process
+        ) as popen:
+            process, handle = packaged_runtime.start_process(
+                ["server"],
+                self.root,
+                log,
+                {},
+                writable_stdin=True,
+            )
+        try:
+            self.assertIs(expected_process, process)
+            self.assertIs(
+                packaged_runtime.subprocess.PIPE,
+                popen.call_args.kwargs["stdin"],
+            )
+        finally:
+            handle.close()
+
+    def test_server_world_sanitization_fails_without_a_live_console(self) -> None:
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.stdin = None
+
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure, "no writable console input"
+        ):
+            packaged_runtime.sanitize_server_world(process, self.root / "server.log")
+
+        process.poll.return_value = 1
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure, "server exited"
+        ):
+            packaged_runtime.sanitize_server_world(process, self.root / "server.log")
 
     def test_forced_process_stop_waits_for_full_group_before_export(self) -> None:
         process = mock.Mock()

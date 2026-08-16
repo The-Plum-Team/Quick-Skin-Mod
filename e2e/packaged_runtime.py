@@ -160,8 +160,8 @@ class RuntimeFailure(RuntimeError):
 
 NEOFORGE_CLIENT_INSTALL_ATTEMPTS = 3
 NEOFORGE_CLIENT_INSTALL_BACKOFF_SECONDS = (5, 15)
-NEOFORGE_SERVER_INSTALL_ATTEMPTS = 3
-NEOFORGE_SERVER_INSTALL_BACKOFF_SECONDS = (5, 15)
+LOADER_SERVER_INSTALL_ATTEMPTS = 3
+LOADER_SERVER_INSTALL_BACKOFF_SECONDS = (5, 15)
 LAUNCHER_LIBRARY_VERSION = "8.0"
 LAUNCHER_LIBRARY_REVISION = "minecraft-launcher-lib==8.0"
 PROFILE_NORMALIZER_REVISION = "normalize-inherited-profile-v1"
@@ -192,6 +192,13 @@ REPLAYMOD_CONNECT_LOG_MARKER = "Connecting to "
 REPLAYMOD_LOGIN_PROGRESS_MARKERS = (
     "Multiplayer Recording is disabled",
     "[QS-E2E] joined world;",
+)
+SERVER_WORLD_SANITIZED_MARKER = "QS_E2E_WORLD_SANITIZED"
+SERVER_WORLD_SANITIZE_COMMANDS = (
+    # server.properties prevents later ambient spawns, while this removes passive entities that
+    # some Minecraft generations may create while preparing the initial superflat spawn chunks.
+    "kill @e[type=!minecraft:player]",
+    f"say {SERVER_WORLD_SANITIZED_MARKER}",
 )
 
 
@@ -942,59 +949,55 @@ def prepare_server(
 
         if row["loader"] not in {"forge", "neoforge"}:
             raise RuntimeFailure(f"unsupported loader {row['loader']!r}")
-        if row["loader"] == "forge":
-            run_checked(
-                [java, "-jar", str(installer), "--installServer", str(server)],
-                server,
-                log,
-                env,
-            )
-        else:
-            # NeoForge installers download Maven dependencies at install time. A transient
-            # CDN failure must not leave a half-populated server tree for the retry (or for a
-            # later scenario) to consume, so every attempt gets an isolated staging directory.
-            last_error: Exception | None = None
-            for attempt_number in range(1, NEOFORGE_SERVER_INSTALL_ATTEMPTS + 1):
-                attempt = Path(
-                    tempfile.mkdtemp(
-                        prefix=f".neoforge-server-attempt-{attempt_number}-",
-                        dir=server.parent,
-                    )
+        loader = row["loader"]
+        loader_name = "Forge" if loader == "forge" else "NeoForge"
+        install_flag = "--installServer" if loader == "forge" else "--install-server"
+
+        # Both loader installers download Maven dependencies at install time. A transient CDN
+        # failure must not leave a half-populated server tree for the retry (or for a later
+        # scenario) to consume, so every attempt gets an isolated staging directory.
+        last_error: Exception | None = None
+        for attempt_number in range(1, LOADER_SERVER_INSTALL_ATTEMPTS + 1):
+            attempt = Path(
+                tempfile.mkdtemp(
+                    prefix=f".{loader}-server-attempt-{attempt_number}-",
+                    dir=server.parent,
                 )
-                try:
-                    run_checked(
-                        [java, "-jar", str(installer), "--install-server", str(attempt)],
-                        attempt,
-                        log,
-                        env,
-                        append=attempt_number > 1,
+            )
+            try:
+                run_checked(
+                    [java, "-jar", str(installer), install_flag, str(attempt)],
+                    attempt,
+                    log,
+                    env,
+                    append=attempt_number > 1,
+                )
+                expected_script = attempt / ("run.bat" if os.name == "nt" else "run.sh")
+                if not expected_script.is_file():
+                    raise RuntimeFailure(
+                        f"{loader_name} server installer did not create {expected_script}"
                     )
-                    expected_script = attempt / ("run.bat" if os.name == "nt" else "run.sh")
-                    if not expected_script.is_file():
-                        raise RuntimeFailure(
-                            f"NeoForge server installer did not create {expected_script}"
-                        )
-                    if any(server.iterdir()):
-                        raise RuntimeFailure(
-                            f"refusing to replace non-empty server directory {server}"
-                        )
-                    server.rmdir()
-                    os.replace(attempt, server)
-                    last_error = None
-                    break
-                except Exception as exc:
-                    last_error = exc
-                    if attempt_number < NEOFORGE_SERVER_INSTALL_ATTEMPTS:
-                        time.sleep(
-                            NEOFORGE_SERVER_INSTALL_BACKOFF_SECONDS[attempt_number - 1]
-                        )
-                finally:
-                    shutil.rmtree(attempt, ignore_errors=True)
-            if last_error is not None:
-                raise RuntimeFailure(
-                    "NeoForge server installation failed after "
-                    f"{NEOFORGE_SERVER_INSTALL_ATTEMPTS} isolated attempts: {last_error}"
-                ) from last_error
+                if any(server.iterdir()):
+                    raise RuntimeFailure(
+                        f"refusing to replace non-empty server directory {server}"
+                    )
+                server.rmdir()
+                os.replace(attempt, server)
+                last_error = None
+                break
+            except Exception as exc:
+                last_error = exc
+                if attempt_number < LOADER_SERVER_INSTALL_ATTEMPTS:
+                    time.sleep(
+                        LOADER_SERVER_INSTALL_BACKOFF_SECONDS[attempt_number - 1]
+                    )
+            finally:
+                shutil.rmtree(attempt, ignore_errors=True)
+        if last_error is not None:
+            raise RuntimeFailure(
+                f"{loader_name} server installation failed after "
+                f"{LOADER_SERVER_INSTALL_ATTEMPTS} isolated attempts: {last_error}"
+            ) from last_error
     (server / "user_jvm_args.txt").write_text("-Xms512M\n-Xmx1024M\n", encoding="utf-8")
     if os.name == "nt":
         script = server / "run.bat"
@@ -1158,7 +1161,14 @@ def client_command(
     )
 
 
-def start_process(command: list[str], cwd: Path, log_path: Path, env: dict[str, str]) -> tuple[subprocess.Popen[bytes], BinaryIO]:
+def start_process(
+    command: list[str],
+    cwd: Path,
+    log_path: Path,
+    env: dict[str, str],
+    *,
+    writable_stdin: bool = False,
+) -> tuple[subprocess.Popen[bytes], BinaryIO]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     handle = log_path.open("wb")
     kwargs: dict[str, Any] = {"start_new_session": True} if os.name != "nt" else {
@@ -1169,6 +1179,7 @@ def start_process(command: list[str], cwd: Path, log_path: Path, env: dict[str, 
             command,
             cwd=cwd,
             env=env,
+            stdin=subprocess.PIPE if writable_stdin else None,
             stdout=handle,
             stderr=subprocess.STDOUT,
             **kwargs,
@@ -1284,6 +1295,31 @@ def wait_for_log(process: subprocess.Popen[bytes], log: Path, text: str, timeout
             raise RuntimeFailure(f"process exited before {text!r}; see {log}")
         time.sleep(2)
     raise RuntimeFailure(f"timed out waiting for {text!r}; see {log}")
+
+
+def sanitize_server_world(
+    process: subprocess.Popen[bytes], log: Path, *, timeout: int = 60
+) -> None:
+    """Remove ambient entities before any client can capture public evidence.
+
+    The disposable server already disables animal, monster, and NPC spawning in
+    ``server.properties``. A generated passive entity can nevertheless be present in the initial
+    spawn chunks on some game versions. Drive the dedicated-server console directly after startup,
+    then require its acknowledgement before launching a client; a best-effort command would merely
+    move this race into the screenshots.
+    """
+
+    if process.poll() is not None:
+        raise RuntimeFailure("server exited before its world could be sanitized")
+    if process.stdin is None:
+        raise RuntimeFailure("server process has no writable console input")
+    payload = ("\n".join(SERVER_WORLD_SANITIZE_COMMANDS) + "\n").encode("utf-8")
+    try:
+        process.stdin.write(payload)
+        process.stdin.flush()
+    except (BrokenPipeError, OSError, ValueError) as exc:
+        raise RuntimeFailure("could not send the E2E world-sanitization commands") from exc
+    wait_for_log(process, log, SERVER_WORLD_SANITIZED_MARKER, timeout=timeout)
 
 
 def wait_for_marker(
@@ -2274,11 +2310,21 @@ def run_packaged_row(
 
         env = process_env(java)
         server_log = profile / "logs" / "server.log"
-        server_process, server_handle = start_process(server_command, server, server_log, env)
+        server_process, server_handle = start_process(
+            server_command,
+            server,
+            server_log,
+            env,
+            writable_stdin=True,
+        )
         processes.append(server_process)
         handles.append(server_handle)
+        if server_process.stdin is None:  # start_process must honor writable_stdin fail-closed.
+            raise RuntimeFailure("server process has no writable console input")
+        handles.append(server_process.stdin)
         runtime_logs.append(server_log)
         wait_for_log(server_process, server_log, "Done (", timeout=1200)
+        sanitize_server_world(server_process, server_log)
 
         client_processes: dict[str, subprocess.Popen[bytes]] = {}
         client_handles: dict[str, BinaryIO] = {}

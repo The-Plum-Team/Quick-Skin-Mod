@@ -109,6 +109,13 @@ server/client game directories, scenario state, and install logs stay in a scrat
 is separate from both reusable runtime material and public evidence. Scratch is never used for
 evidence discovery or uploaded as a successful run.
 
+After the dedicated server reports that its fresh world is ready, the orchestrator removes every
+non-player entity through the server console and requires a log acknowledgement before it launches
+any client. The spawn-disabled server properties prevent later ambient spawns; the explicit purge
+also covers passive entities created while a game version prepares its initial superflat chunks,
+so a wandering mob cannot contaminate two screenshots that a deterministic comparison treats as
+the same scene.
+
 Only the current invocation's complete, bounded evidence is promoted to `e2e-out/current`. This
 atomic promotion uses guarded same-filesystem renames and an owned last-good sibling, so an
 interrupted or failed promotion restores or preserves the previous complete generation. Consumers
@@ -143,9 +150,9 @@ installing a content-addressed name is refused instead of silently producing a m
 ignores. Installer hashes and runtime/version facts remain matrix-owned; the staged
 production and harness JAR hashes remain manifest-owned. GitHub-hosted jobs do not upload
 `RuntimeStore`; persistence is useful only on a developer machine or an explicitly managed
-self-hosted runner. NeoForge server installation retries bounded transient Maven failures in a fresh isolated
-directory each time and publishes only a complete tree with its launcher script, so an incomplete
-download can never contaminate the next attempt.
+self-hosted runner. Forge and NeoForge server installation retry bounded transient Maven failures
+in a fresh isolated directory each time and publish only a complete tree with its launcher script,
+so an incomplete download can never contaminate the next attempt.
 
 ## Fail-closed contract
 
@@ -280,11 +287,14 @@ authenticated success marker lets unrelated capsules continue concurrently for t
 marker exists, competing probe jobs coalesce behind one tool-free, low-effort Sonnet call that
 checks whether the subscription can accept work. A fresh success redispatches every authenticated
 pending capsule by exact artifact ID, preserving parallel review even when earlier probe contenders
-were coalesced. A rejected or warning rate-limit event opens a sanitized thirty-minute circuit and
-leaves every capsule in the durable queue. When the headless event includes utilization, 95% also
-pauses the fan-out. Scheduled recovery probes again after the pause. Claude does not reliably expose
-the Pro/Max percentage remaining in headless output, so this is primarily an availability circuit
-rather than an invented quota estimate; neither provider text nor account-usage details are uploaded.
+were coalesced. A rejected rate-limit event opens a sanitized thirty-minute circuit and leaves every
+capsule in the durable queue. A successful `allowed_warning` remains usable because that coarse
+headless signal can disagree with the subscription usage panel; when the event includes an explicit
+utilization value, 95% still pauses the fan-out. Scheduled recovery probes again after the pause.
+Claude does not reliably expose the Pro/Max percentage remaining in headless output, so this is
+primarily an availability circuit rather than an invented quota estimate. The marker retains only
+the normalized provider status, known limit type, and utilization band; neither provider text nor
+exact account-usage details are uploaded.
 
 The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
 over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
