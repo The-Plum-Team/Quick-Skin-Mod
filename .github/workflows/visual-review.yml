@@ -281,53 +281,57 @@ jobs:
           fi
 
           # Duplicate workflow_run and repository_dispatch twins for the same source run exit
-          # here for one API call, before the heavier jobs and artifact validation below.
+          # here before the heavier jobs and artifact validation below. Query only the three
+          # exact names that can belong to this source and protected generation: repository-wide
+          # artifact inventories are both unnecessary and unbounded as release evidence grows.
           report_name="visual-review-$source_run_id"
           input_name="visual-review-input-$source_run_id"
-          artifacts="$(github_api_retry --paginate --slurp \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100")"
-          jq -e \
-            '(type == "array") and
-             ([.[] | (.artifacts | type == "array")] | all) and
-             ([.[].artifacts[]] | length <= 10000)' \
-            <<< "$artifacts" > /dev/null
-          while IFS=$'\t' read -r artifact_name artifact_run_id artifact_expired; do
-            [[ -n "$artifact_run_id" ]] || continue
-            [[ "$artifact_expired" == false ]] || continue
-            expected_workflow=".github/workflows/visual-review.yml"
-            expected_events='["repository_dispatch","workflow_run"]'
-            expected_conclusions='["success","failure"]'
-            if [[ "$artifact_name" == "$report_name" ]]; then
-              expected_workflow=".github/workflows/visual-review-drain.yml"
-              expected_events='["repository_dispatch","schedule","workflow_dispatch"]'
-            else
-              [[ "$artifact_name" == "$input_name" \
-                || "$artifact_name" =~ ^visual-review-input-$source_run_id-[0-9a-f]{40}$ ]]
-            fi
-            owner_run="$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$artifact_run_id" 2>/dev/null || true)"
-            if [[ -n "$owner_run" ]] && jq -e \
-                --arg repository "$GITHUB_REPOSITORY" \
-                --arg workflow "$expected_workflow" \
-                --argjson conclusions "$expected_conclusions" \
-                --argjson events "$expected_events" \
-                '.status == "completed" and
-                 (.conclusion as $conclusion | $conclusions | index($conclusion)) != null and
-                 (.event as $event | $events | index($event)) != null and
-                 .head_branch == "master" and .path == $workflow and
-                 .head_repository.full_name == $repository' \
-                <<< "$owner_run" > /dev/null; then
-              printf 'Visual review is already queued or complete for source run %s\n' \
-                "$source_run_id"
-              exit 0
-            fi
-          done < <(jq -r \
-            --arg input_name "$input_name" \
-            --arg report_name "$report_name" \
-            '.[].artifacts[] |
-             select(.name == $report_name or .name == $input_name or
-               (.name | startswith($input_name + "-"))) |
-             [.name, .workflow_run.id, .expired] | @tsv' <<< "$artifacts")
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          generation_input_name="$input_name-$GITHUB_SHA"
+          for artifact_query_name in \
+              "$report_name" "$input_name" "$generation_input_name"; do
+            artifacts="$(github_api_retry --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$artifact_query_name&per_page=100")"
+            jq -e --arg name "$artifact_query_name" \
+              '(type == "array") and
+               ([.[] | (.artifacts | type == "array")] | all) and
+               ([.[].artifacts[]] | length <= 100) and
+               ([.[].artifacts[] | .name == $name] | all)' \
+              <<< "$artifacts" > /dev/null
+            while IFS=$'\t' read -r artifact_name artifact_run_id artifact_expired; do
+              [[ -n "$artifact_run_id" ]] || continue
+              [[ "$artifact_expired" == false ]] || continue
+              expected_workflow=".github/workflows/visual-review.yml"
+              expected_events='["repository_dispatch","workflow_run"]'
+              expected_conclusions='["success","failure"]'
+              if [[ "$artifact_name" == "$report_name" ]]; then
+                expected_workflow=".github/workflows/visual-review-drain.yml"
+                expected_events='["repository_dispatch","schedule","workflow_dispatch"]'
+              else
+                [[ "$artifact_name" == "$input_name" \
+                  || "$artifact_name" == "$generation_input_name" ]]
+              fi
+              owner_run="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$artifact_run_id" 2>/dev/null || true)"
+              if [[ -n "$owner_run" ]] && jq -e \
+                  --arg repository "$GITHUB_REPOSITORY" \
+                  --arg workflow "$expected_workflow" \
+                  --argjson conclusions "$expected_conclusions" \
+                  --argjson events "$expected_events" \
+                  '.status == "completed" and
+                   (.conclusion as $conclusion | $conclusions | index($conclusion)) != null and
+                   (.event as $event | $events | index($event)) != null and
+                   .head_branch == "master" and .path == $workflow and
+                   .head_repository.full_name == $repository' \
+                  <<< "$owner_run" > /dev/null; then
+                printf 'Visual review is already queued or complete for source run %s\n' \
+                  "$source_run_id"
+                exit 0
+              fi
+            done < <(jq -r --arg name "$artifact_query_name" \
+              '.[].artifacts[] | select(.name == $name) |
+               [.name, .workflow_run.id, .expired] | @tsv' <<< "$artifacts")
+          done
 
           # List endpoints are read as --paginate --slurp page arrays, the same shape every other
           # trusted workflow consumes, then flattened before any count or identity assertion.

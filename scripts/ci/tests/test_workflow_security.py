@@ -532,7 +532,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('persist-credentials: false', authenticate)
         self.assertIn('Ignoring infrastructure-only visual review sync PR', authenticate)
         self.assertIn("visual-review-input-$source_run_id", authenticate)
-        self.assertIn('startswith($input_name + "-")', authenticate)
+        self.assertIn('generation_input_name="$input_name-$GITHUB_SHA"', authenticate)
+        self.assertIn(
+            "actions/artifacts?name=$artifact_query_name&per_page=100",
+            authenticate,
+        )
+        self.assertNotIn("actions/artifacts?per_page=100", authenticate)
         self.assertIn("visual-review-$source_run_id", authenticate)
         self.assertIn("visual-review-drain.yml", authenticate)
         self.assertNotIn("implementation_sha", authenticate)
