@@ -62,6 +62,7 @@ public abstract class MixinAbstractClientPlayer {
         ResourceLocation skinTexture = originalSkin.texture();
         PlayerSkin.Model skinModel = originalSkin.model();
         ResourceLocation capeTexture = originalSkin.capeTexture();
+        ResourceLocation elytraTexture = originalSkin.elytraTexture();
 
         if (hasCustomSkin) {
             ResourceLocation customSkin = service.getSkinLocation(self.getUUID());
@@ -81,10 +82,13 @@ public abstract class MixinAbstractClientPlayer {
             ResourceLocation customCape = service.getCapeLocation(self.getUUID());
             if (customCape != null) {
                 capeTexture = customCape;
+                elytraTexture = customCape;
             } else {
                 // Pending network animations intentionally resolve to null until their bounded
-                // first-frame texture exists. Never publish the stacked atlas to other mods.
+                // first-frame texture exists. Never publish the stacked atlas to other mods or
+                // leave an unrelated profile Elytra beside a pending custom cape.
                 capeTexture = null;
+                elytraTexture = null;
             }
         }
 
@@ -92,7 +96,7 @@ public abstract class MixinAbstractClientPlayer {
             skinTexture,
             originalSkin.textureUrl(),
             capeTexture,
-            originalSkin.elytraTexture(),
+            elytraTexture,
             skinModel,
             originalSkin.secure()
         );
