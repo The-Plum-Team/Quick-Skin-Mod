@@ -40,6 +40,7 @@ EXACT_NON_RUNTIME_PATHS = frozenset(
         "scripts/ci/prune_actions_caches.py",
         "scripts/ci/github_api_retry.sh",
         "scripts/ci/mod_compatibility_review_queue.py",
+        "scripts/ci/mod_compatibility_impact.py",
         "scripts/ci/visual_review_queue.py",
         "scripts/pages/build_site.py",
         "scripts/pages/rotate_artifacts.py",
@@ -75,6 +76,7 @@ EXACT_NON_RUNTIME_TESTS = frozenset(
     {
         "scripts/ci/tests/test_ai_patch_policy.py",
         "scripts/ci/tests/test_gradle_cache_policy.py",
+        "scripts/ci/tests/test_mod_compatibility_impact.py",
         "scripts/ci/tests/test_prune_actions_caches.py",
         "scripts/ci/tests/test_visual_review_impact.py",
         "scripts/ci/tests/test_visual_review_queue.py",

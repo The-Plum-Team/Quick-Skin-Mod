@@ -860,18 +860,34 @@ jobs:
             --argjson image_bytes "$image_bytes" \
             --argjson image_count "$image_count" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
-            '(keys | sort) == (["artifact_inventory", "frame_count", "image_bytes",
+            '. as $proof |
+             (keys | sort) == (["artifact_inventory", "compatibility_impact",
+              "frame_count", "image_bytes",
               "image_count", "implementation_sha", "job_graph", "manifest_sha256",
               "master_source_sha", "matrix_kind", "review_mode",
               "scenario_contract_sha256", "schema_version", "source_branch",
               "source_run_id", "source_sha", "visual_reference"] | sort) and
-             .schema_version == 4 and .source_run_id == $source_run_id and
+             .schema_version == 5 and .source_run_id == $source_run_id and
              .source_branch == $source_branch and .source_sha == $source_sha and
              (.master_source_sha == null or
                (.master_source_sha | type == "string" and test("^[0-9a-f]{40}$"))) and
              .implementation_sha == $implementation_sha and .review_mode == $review_mode and
              (.matrix_kind == "pr-anchors" or .matrix_kind == "native-anchors") and
              .scenario_contract_sha256 == $scenario_contract_sha256 and
+             (.compatibility_impact | type == "object" and
+               (keys | sort) == (["compatibility_required", "impact_paths", "paths",
+                 "schema_version"] | sort) and
+               .schema_version == 1 and
+               (.compatibility_required | type == "boolean") and
+               (.paths | type == "array" and length <= 200 and
+                 . == (sort | unique) and
+                 all(.[]; type == "string" and length > 0 and length <= 512)) and
+               (.impact_paths | type == "array" and length <= 200 and
+                 . == (sort | unique) and
+                 all(.[]; type == "string" and
+                   (. as $path | ($proof.compatibility_impact.paths |
+                     index($path)) != null))) and
+               (if .compatibility_required then true else .impact_paths == [] end)) and
              (.artifact_inventory | type == "array" and length > 0 and length <= 8) and
              ([.artifact_inventory[].id] | length == (unique | length)) and
              ([.artifact_inventory[].name] | length == (unique | length)) and
@@ -1050,17 +1066,41 @@ jobs:
               "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_run_id" \
               2>/dev/null || true)"
             if [[ -n "$candidate_run" ]] && jq -e \
-                --arg workflow_sha "$GITHUB_SHA" \
                 --arg repository "$GITHUB_REPOSITORY" \
                 --argjson run_id "$candidate_run_id" \
                 '.id == $run_id and .status == "completed" and
                  (.conclusion == "success" or .conclusion == "failure") and
                  (.event == "repository_dispatch" or .event == "schedule" or
                   .event == "workflow_dispatch") and
-                 .head_branch == "master" and .head_sha == $workflow_sha and
+                 .head_branch == "master" and
+                 (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
                  .path == ".github/workflows/visual-review-drain.yml" and
                  .head_repository.full_name == $repository' \
                 <<< "$candidate_run" > /dev/null; then
+              cache_owner_sha="$(jq -er .head_sha <<< "$candidate_run")"
+              if ! git -C "$GITHUB_WORKSPACE" cat-file -e \
+                  "$cache_owner_sha^{commit}" 2>/dev/null; then
+                if ! git -C "$GITHUB_WORKSPACE" fetch --no-tags origin \
+                    "$cache_owner_sha"; then
+                  continue
+                fi
+              fi
+              # Historical protected caches may survive an unrelated master merge. Reuse them
+              # only from an ancestor whose cache-producing workflow is byte-identical; the
+              # current codec subsequently revalidates the complete exact policy and every key.
+              if ! git -C "$GITHUB_WORKSPACE" merge-base --is-ancestor \
+                  "$cache_owner_sha" "$GITHUB_SHA"; then
+                continue
+              fi
+              owner_producer="$(git -C "$GITHUB_WORKSPACE" rev-parse \
+                "$cache_owner_sha:.github/workflows/visual-review-drain.yml" \
+                2>/dev/null || true)"
+              current_producer="$(git -C "$GITHUB_WORKSPACE" rev-parse \
+                "$GITHUB_SHA:.github/workflows/visual-review-drain.yml")"
+              if [[ -z "$owner_producer" \
+                  || "$owner_producer" != "$current_producer" ]]; then
+                continue
+              fi
               cache_metadata="$(jq -c --argjson id "$candidate_id" \
                 '[.[].artifacts[] | select(.id == $id)] |
                  if length == 1 then .[0] else empty end' <<< "$artifacts")"
@@ -1721,6 +1761,14 @@ jobs:
             .semantic_valid == true and .defect == false and
             (.matches_reference == null or .matches_reference == true))' \
             "$report" > /dev/null
+          compatibility_required="$(jq -er \
+            '.compatibility_impact.compatibility_required |
+              if . then "true" else "false" end' "$proof")"
+          if [[ "$compatibility_required" != true ]]; then
+            printf 'The authenticated release diff cannot affect product/mod compatibility; compatibility wave skipped.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           source_branch="$(jq -er \
             '.source_branch | select(type == "string" and
               test("^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$"))' "$proof")"

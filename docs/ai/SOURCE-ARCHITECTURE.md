@@ -154,7 +154,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   `e2e/visual_review_cache.py` validates and combines bounded immutable paired-only verdict
   cache shards: a hit binds candidate/reference pixels, expectation, runtime evidence, capture and
   loader identity, scenario contract, release matrix, reviewer code, prompts, models, mode, and
-  chunk policy;
+  chunk policy. Protected ancestor shards survive unrelated `master` merges only when their
+  cache-producing workflow blob is byte-identical; the current codec and policy still validate
+  every entry before use;
   unpaired semantic anchors never consume it. Parallel drains may briefly publish sibling shards;
   a later protected successor combines and retires every authenticated shard it consumed.
 - `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
@@ -204,16 +206,24 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   concurrently with its direct wake. Queue selection also authenticates generation-block artifacts
   from failed/in-progress protected drains and skips only inputs carrying the exact blocked master
   generation; the marker's owner still binds it to its exact protected reviewer implementation.
-- `scripts/ci/visual_review_impact.py` is the narrow fail-closed cost and domain filter. Its
-  `source-pr` scope accepts only optional-mod compatibility orchestration, protected CI tests, and
-  documentation, so those changes never enter the ordinary visual queue. Its broader
-  `replicated-port` scope also recognizes protected visual/Pages/synchronization orchestration that
-  was exercised on the source PR. Protected automation supplies either a complete bounded GitHub
-  PR inventory or an exact no-renames Git diff; current and previous rename paths must both be safe.
-  A non-anchor port may simply skip review. The matrix-derived 1.20.1 port may use the result only
-  through the separately authenticated nonvisual continuation after Build and full Packaged E2E;
-  it never becomes a semantic certificate. Unknown paths, malformed inventories, incomplete Git
-  topology, policy mismatch, and unsafe rename origins remain reviewable.
+- `scripts/ci/visual_review_impact.py` is the narrow fail-closed cost and domain filter. PRs to
+  `master` defer model work to their post-merge anchor; its `source-pr` scope protects direct
+  release-branch PRs, where that automatic second stage is absent. `replicated-port` recognizes
+  protected visual/Pages/synchronization orchestration. `post-anchor-port` additionally recognizes
+  prompts, reviewer code, and Claude admission policy already exercised by the exact certified
+  anchor, but only after the synchronization run is authenticated as a certificate-driven
+  `repository_dispatch`; manual targets remain strict. Protected automation supplies either a
+  complete bounded GitHub PR inventory or an exact no-renames Git diff; current and previous rename
+  paths must both be safe. Product, packaged-E2E, scenario, malformed, incomplete, and unknown
+  paths remain reviewable. The matrix-derived 1.20.1 port may use a nonvisual result only through
+  the separately authenticated continuation after Build and full Packaged E2E; it never becomes a
+  semantic certificate.
+- `scripts/ci/mod_compatibility_impact.py` independently classifies the complete server-side
+  synchronization PR inventory. It binds a normalized manifest into the visual curation proof and
+  permits the optional-mod wave only for product, build, runtime-harness, compatibility-policy, or
+  unknown impact. Review-only workflows/prompts, publication, documentation, and policy tests skip
+  that expensive wave. Renames classify both old and new paths and malformed or incomplete
+  inventories fail closed.
 - `scripts/ci/github_api_retry.sh` is the protected Pages-side wrapper for read-only GitHub API
   calls after checkout. It keeps response bytes isolated on stdout and retries only classified
   rate-limit, transport, and server failures with bounded run-skewed backoff; provenance and exact
