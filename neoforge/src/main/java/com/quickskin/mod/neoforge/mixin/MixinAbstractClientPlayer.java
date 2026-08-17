@@ -65,6 +65,7 @@ public abstract class MixinAbstractClientPlayer {
         Identifier skinTexture = originalSkin.body().texturePath();
         PlayerModelType skinModel = originalSkin.model();
         Identifier capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+        ClientAsset.Texture elytraTexture = originalSkin.elytra();
 
         if (hasCustomSkin) {
             Identifier customSkin = service.getSkinLocation(self.getUUID());
@@ -84,17 +85,23 @@ public abstract class MixinAbstractClientPlayer {
             Identifier customCape = service.getCapeLocation(self.getUUID());
             if (customCape != null) {
                 capeTexture = customCape;
+                // An active Quick Skin cape is authoritative for the profile Elytra input as well.
+                // Vanilla gives that dedicated field priority, so retaining an unrelated profile
+                // Elytra beside a custom cape would replace only the worn wings.
+                elytraTexture = new ClientAsset.ResourceTexture(customCape, customCape);
             } else {
                 // Pending network animations intentionally resolve to null until their bounded
-                // first-frame texture exists. Never publish the stacked atlas to other mods.
+                // first-frame texture exists. Never publish the stacked atlas to other mods, and
+                // clear both inputs together so no stale profile Elytra survives the gap.
                 capeTexture = null;
+                elytraTexture = null;
             }
         }
 
         PlayerSkin customSkin = new PlayerSkin(
             new ClientAsset.ResourceTexture(skinTexture, skinTexture),
             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-            originalSkin.elytra(),
+            elytraTexture,
             skinModel,
             originalSkin.secure()
         );
