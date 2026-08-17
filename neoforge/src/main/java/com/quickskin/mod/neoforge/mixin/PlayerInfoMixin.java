@@ -100,6 +100,7 @@ public abstract class PlayerInfoMixin {
         Identifier skinTexture = original.body().texturePath();
         PlayerModelType skinModel = original.model();
         Identifier capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+        ClientAsset.Texture elytraTexture = original.elytra();
 
         if (hasCustomSkin && currentSkinLocation != null) {
             skinTexture = currentSkinLocation;
@@ -112,17 +113,22 @@ public abstract class PlayerInfoMixin {
         if (hasCustomCape) {
             if (currentCapeLocation != null) {
                 capeTexture = currentCapeLocation;
+                // An active custom cape is authoritative for the profile-Elytra input as well.
+                elytraTexture = new ClientAsset.ResourceTexture(
+                        currentCapeLocation, currentCapeLocation);
             } else {
                 // Pending network animations intentionally resolve to null until their bounded
-                // first-frame texture exists. Never publish the stacked atlas to other mods.
+                // first-frame texture exists. Never publish the stacked atlas to other mods, and
+                // never leave an unrelated Elytra behind while the cape is pending.
                 capeTexture = null;
+                elytraTexture = null;
             }
         }
 
         PlayerSkin customSkin = new PlayerSkin(
             new ClientAsset.ResourceTexture(skinTexture, skinTexture),
             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-            original.elytra(),
+            elytraTexture,
             skinModel,
             original.secure()
         );
@@ -154,6 +160,7 @@ public abstract class PlayerInfoMixin {
         Identifier skinTexture = null;
         PlayerModelType skinModel = (original != null) ? original.model() : PlayerModelType.WIDE;
         Identifier capeTexture = null;
+        ClientAsset.Texture elytraTexture = null;
 
         if (hasSkin) {
             skinTexture = assetManager.getTextureLocation(config.activeSkinHash, TextureQuality.FULL);
@@ -170,6 +177,9 @@ public abstract class PlayerInfoMixin {
         if (hasCape) {
             capeTexture = com.quickskin.mod.client.services.CapeService.getInstance()
                     .getCapeLocation(null, config.activeCapeHash);
+            if (capeTexture != null) {
+                elytraTexture = new ClientAsset.ResourceTexture(capeTexture, capeTexture);
+            }
         }
 
         if (skinTexture == null && capeTexture == null) {
@@ -182,7 +192,7 @@ public abstract class PlayerInfoMixin {
             return new PlayerSkin(
                 skinAsset,
                 capeAsset,
-                original.elytra(),
+                capeTexture != null ? elytraTexture : original.elytra(),
                 skinModel,
                 original.secure()
             );
@@ -192,7 +202,7 @@ public abstract class PlayerInfoMixin {
         return new PlayerSkin(
             skinTexture != null ? new ClientAsset.ResourceTexture(skinTexture, skinTexture) : null,
             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-            null, skinModel, false
+            elytraTexture, skinModel, false
         );
     }
 }
