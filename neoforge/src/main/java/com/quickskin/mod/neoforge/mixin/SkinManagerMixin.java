@@ -156,12 +156,11 @@ public class SkinManagerMixin {
 //?}
                     anyOverride = true;
                 } else {
-                    com.quickskin.mod.common.data.PlayerAppearance appearance = service.getAppearance(uuid);
-                    if (appearance != null && ("__NONE__".equals(appearance.getCapeId()) || appearance.getCapeId().isEmpty())) {
-                        capeTexture = null;
-                        elytraTexture = null;
-                        anyOverride = true;
-                    }
+                    // A pending custom texture must not fall through to unrelated Mojang cape or
+                    // Elytra assets while its bounded first frame is being prepared.
+                    capeTexture = null;
+                    elytraTexture = null;
+                    anyOverride = true;
                 }
             }
 
