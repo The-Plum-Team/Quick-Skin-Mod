@@ -2556,8 +2556,16 @@ public final class FullScenario implements Scenario {
         if (!String.valueOf(resolved).equals(cloak)) {
             return Step.Result.fail("renderer cloak=" + cloak + " expected " + resolved);
         }
+        if (expectElytra) {
+            String profileElytra = VanillaShim.elytraTexture(mc.player);
+            if (!String.valueOf(resolved).equals(profileElytra)) {
+                return Step.Result.fail("renderer elytra=" + profileElytra
+                        + " expected custom cape " + resolved);
+            }
+        }
         return Step.Result.pass(capeId + " resolved to " + resolved
-                + (expectElytra ? " with elytra equipped" : " with an empty chest slot"));
+                + (expectElytra ? " for both cape and elytra with elytra equipped"
+                : " with an empty chest slot"));
     }
 
     private static String vanillaElytraFallbackProblem(
