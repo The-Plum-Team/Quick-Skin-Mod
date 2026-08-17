@@ -41,7 +41,7 @@ SOURCE_PR_SAFE_EXACT_PATHS = frozenset(
         "scripts/ci/mod_compatibility_review_queue.py",
     }
 )
-SAFE_PREFIXES = ("docs/", "scripts/ci/tests/")
+SAFE_PREFIXES = ("docs/", "scripts/ci/tests/", "scripts/release/tests/")
 FILE_STATUSES = frozenset({"added", "modified", "removed", "renamed"})
 
 

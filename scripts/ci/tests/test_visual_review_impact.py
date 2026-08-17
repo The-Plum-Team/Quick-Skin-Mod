@@ -58,6 +58,43 @@ class VisualReviewImpactTest(unittest.TestCase):
                     infrastructure_only(pages(changed(path)), changed_files=1)
                 )
 
+    def test_release_policy_tests_are_nonvisual_in_both_scopes(self) -> None:
+        path = "scripts/release/tests/test_cape_elytra_binding.py"
+        for scope in ("replicated-port", "source-pr"):
+            with self.subTest(scope=scope):
+                self.assertTrue(
+                    infrastructure_only(
+                        pages(changed(path)), changed_files=1, scope=scope
+                    )
+                )
+                self.assertFalse(
+                    classify_paths([path], scope=scope).review_required
+                )
+
+    def test_release_implementation_remains_visual_reviewable(self) -> None:
+        path = "scripts/release/version_port.py"
+        for scope in ("replicated-port", "source-pr"):
+            with self.subTest(scope=scope):
+                self.assertFalse(
+                    infrastructure_only(
+                        pages(changed(path)), changed_files=1, scope=scope
+                    )
+                )
+
+    def test_rename_between_release_test_and_runtime_requires_review(self) -> None:
+        self.assertFalse(
+            infrastructure_only(
+                pages(
+                    changed(
+                        "common/src/main/java/com/quickskin/mod/QuickSkin.java",
+                        status="renamed",
+                        previous="scripts/release/tests/test_quick_skin.py",
+                    )
+                ),
+                changed_files=1,
+            )
+        )
+
     def test_source_pr_scope_separates_compatibility_from_visual_policy(self) -> None:
         compatibility = pages(
             changed(".github/workflows/mod-compatibility-e2e.yml"),
