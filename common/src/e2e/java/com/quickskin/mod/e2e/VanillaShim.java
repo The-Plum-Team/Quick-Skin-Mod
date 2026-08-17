@@ -534,28 +534,9 @@ public final class VanillaShim {
     private static String resolveLoc(AbstractClientPlayer p, String directName, String[] skinAccessors) {
         if (p == null) return null;
         try {
-            // 1.20.1: a direct getter returning a ResourceLocation.
-            String intermediaryName = switch (directName) {
-                case "getSkinTextureLocation" -> "method_3117";
-                case "getElytraTextureLocation" -> "method_3122";
-                default -> "method_3119";
-            };
-            String officialName = switch (directName) {
-                case "getSkinTextureLocation" -> "m_108560_";
-                case "getElytraTextureLocation" -> "m_108563_";
-                default -> "m_108561_";
-            };
-            Method direct = findNoArg(
-                    p.getClass(),
-                    directName,
-                    intermediaryName,
-                    officialName
-            );
-            if (direct != null) {
-                Object r = direct.invoke(p);
-                return (r == null) ? null : r.toString();
-            }
-            // 1.21.x/26.x: getSkin() -> PlayerSkin, then an accessor for the skin/cape component.
+            // 1.21.x/26.x: getSkin() -> PlayerSkin, then the component the renderer consumes.
+            // Some modern runtimes retain a legacy-shaped direct getter that can return null even
+            // while PlayerSkin carries the actual custom texture, so this path must be authoritative.
             Method getSkin = findNoArg(p.getClass(), "getSkin", "method_52814", "method_52810");
             if (getSkin != null) {
                 Object skin = getSkin.invoke(p);
@@ -576,6 +557,28 @@ public final class VanillaShim {
                         return (loc == null) ? null : loc.toString();
                     }
                 }
+            }
+
+            // 1.20.1 fallback: a direct getter returning a ResourceLocation.
+            String intermediaryName = switch (directName) {
+                case "getSkinTextureLocation" -> "method_3117";
+                case "getElytraTextureLocation" -> "method_3122";
+                default -> "method_3119";
+            };
+            String officialName = switch (directName) {
+                case "getSkinTextureLocation" -> "m_108560_";
+                case "getElytraTextureLocation" -> "m_108563_";
+                default -> "m_108561_";
+            };
+            Method direct = findNoArg(
+                    p.getClass(),
+                    directName,
+                    intermediaryName,
+                    officialName
+            );
+            if (direct != null) {
+                Object r = direct.invoke(p);
+                return (r == null) ? null : r.toString();
             }
         } catch (Throwable t) {
             E2ELog.warn("resolveLoc(" + directName + "): " + t);
