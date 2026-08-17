@@ -91,6 +91,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Opaque-fill, import fallback, local/network presentation, and animation processing must share
   the same structural mask; content-addressed source bytes remain immutable when only presentation
   requires normalization.
+- An active Quick Skin cape is authoritative for both the renderer's cape and profile-Elytra
+  texture inputs. Never retain an unrelated Mojang/profile Elytra beside a custom cape: vanilla
+  gives that dedicated field priority and would otherwise replace only the worn wings when the
+  profile response arrives asynchronously. While a custom cape texture is pending, clear both
+  inputs together; removing the cape restores the original/vanilla fallback path.
 
 ## Optional integrations
 
@@ -162,8 +167,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   padding bands, distinguish opaque black from transparency with a checkerboard, and label source
   and output dimensions independently; the aligned checkpoint must identify coloured pixels in
   auxiliary cape/elytra UV faces as valid atlas content rather than padding. Back both views with
-  exact source, transform, dimension-label, preview, applied-atlas, and rendered-route assertions
-  so model interpretation cannot replace the deterministic contract.
+  exact source, transform, dimension-label, preview, applied-atlas, and rendered-route assertions.
+  The equipped route must assert that the profile-Elytra input equals the selected cape location,
+  so an asynchronously arriving profile asset cannot turn visual parity into a timing lottery and
+  model interpretation cannot replace the deterministic contract.
 - Cape-removal evidence must begin from a renderer-confirmed custom-cape elytra, activate the real
   Remove Cape control while leaving the elytra equipped, and then hold the same separated-wing pose.
   Require persisted, service, cloak, and profile-elytra inputs to be empty so the renderer is forced
