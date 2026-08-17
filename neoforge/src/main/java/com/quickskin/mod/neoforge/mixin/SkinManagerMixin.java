@@ -92,14 +92,17 @@ public class SkinManagerMixin {
             ResourceLocation skinTexture = original.texture();
             PlayerSkin.Model skinModel = original.model();
             ResourceLocation capeTexture = original.capeTexture();
+            ResourceLocation elytraTexture = original.elytraTexture();
 //?} else if <1.21.11 {
             ResourceLocation skinTexture = original.body().texturePath();
             PlayerModelType skinModel = original.model();
             ResourceLocation capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+            ClientAsset.Texture elytraTexture = original.elytra();
 //?} else {
             Identifier skinTexture = original.body().texturePath();
             PlayerModelType skinModel = original.model();
             Identifier capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+            ClientAsset.Texture elytraTexture = original.elytra();
 //?}
             boolean anyOverride = false;
 
@@ -155,11 +158,19 @@ public class SkinManagerMixin {
 //?}
                 if (customCape != null) {
                     capeTexture = customCape;
+                    // The custom cape is authoritative for the profile-Elytra input as well; an
+                    // unrelated Mojang Elytra must never survive beside it.
+//? if <1.21.9 {
+                    elytraTexture = customCape;
+//?} else {
+                    elytraTexture = new ClientAsset.ResourceTexture(customCape, customCape);
+//?}
                     anyOverride = true;
                 } else {
                     com.quickskin.mod.common.data.PlayerAppearance appearance = service.getAppearance(uuid);
                     if (appearance != null && ("__NONE__".equals(appearance.getCapeId()) || appearance.getCapeId().isEmpty())) {
                         capeTexture = null;
+                        elytraTexture = null;
                         anyOverride = true;
                     }
                 }
@@ -171,11 +182,11 @@ public class SkinManagerMixin {
                         skinTexture,
                         original.textureUrl(),
                         capeTexture,
-                        original.elytraTexture(),
+                        elytraTexture,
 //?} else {
                         new ClientAsset.ResourceTexture(skinTexture, skinTexture),
                         capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-                        original.elytra(),
+                        elytraTexture,
 //?}
                         skinModel,
                         original.secure()
@@ -200,14 +211,17 @@ public class SkinManagerMixin {
                 ResourceLocation skinTexture = original.texture();
                 PlayerSkin.Model skinModel = original.model();
                 ResourceLocation capeTexture = original.capeTexture();
+                ResourceLocation elytraTexture = original.elytraTexture();
 //?} else if <1.21.11 {
                 ResourceLocation skinTexture = original.body().texturePath();
                 PlayerModelType skinModel = original.model();
                 ResourceLocation capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+                ClientAsset.Texture elytraTexture = original.elytra();
 //?} else {
                 Identifier skinTexture = original.body().texturePath();
                 PlayerModelType skinModel = original.model();
                 Identifier capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+                ClientAsset.Texture elytraTexture = original.elytra();
 //?}
                 boolean anyOverride = false;
 
@@ -245,6 +259,11 @@ public class SkinManagerMixin {
                             .getCapeLocation(null, config.activeCapeHash);
                     if (capeLoc != null) {
                         capeTexture = capeLoc;
+//? if <1.21.9 {
+                        elytraTexture = capeLoc;
+//?} else {
+                        elytraTexture = new ClientAsset.ResourceTexture(capeLoc, capeLoc);
+//?}
                         anyOverride = true;
                     }
                 }
@@ -255,11 +274,11 @@ public class SkinManagerMixin {
                             skinTexture,
                             original.textureUrl(),
                             capeTexture,
-                            original.elytraTexture(),
+                            elytraTexture,
 //?} else {
                             new ClientAsset.ResourceTexture(skinTexture, skinTexture),
                             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-                            original.elytra(),
+                            elytraTexture,
 //?}
                             skinModel,
                             original.secure()
