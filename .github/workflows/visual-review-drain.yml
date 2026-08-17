@@ -1505,12 +1505,14 @@ jobs:
           current_name="${{ steps.publish-verdict-cache.outputs.artifact_name }}"
           [[ "$current_id" =~ ^[1-9][0-9]*$ ]]
           [[ "$current_name" =~ ^visual-review-verdict-cache-[0-9a-f]{64}$ ]]
-          inventory="$(gh api --paginate --slurp \
+          # This is best-effort hygiene for seven-day cache shards. Only inspect the newest
+          # bounded page; walking the repository-wide artifact history makes cleanup slower and
+          # eventually impossible as ordinary E2E evidence grows.
+          inventory="$(gh api \
             "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100")"
           jq -e \
-            '(type == "array") and
-             ([.[] | (.artifacts | type == "array")] | all) and
-             ([.[].artifacts[]] | length <= 10000)' \
+            'type == "object" and (.artifacts | type == "array") and
+             (.artifacts | length <= 100)' \
             <<< "$inventory" > /dev/null
           while IFS=$'\t' read -r stale_id stale_name stale_run_id; do
             [[ "$stale_id" =~ ^[1-9][0-9]*$ ]]
@@ -1536,7 +1538,7 @@ jobs:
             gh api --method DELETE \
               "repos/$GITHUB_REPOSITORY/actions/artifacts/$stale_id"
           done < <(jq -r --arg current_name "$current_name" \
-            '.[].artifacts[] |
+            '.artifacts[] |
              select(.expired == false and .name != $current_name and
                (.name | test("^visual-review-verdict-cache-[0-9a-f]{64}$"))) |
              [.id, .name, .workflow_run.id] | @tsv' <<< "$inventory")
