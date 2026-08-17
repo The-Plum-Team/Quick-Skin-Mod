@@ -69,11 +69,11 @@ list.
 
 ```mermaid
 flowchart TD
-    PR["Pull request to master"] --> PRE["Build gate<br/>Impact-selected packaged E2E"]
+    PR["Pull request to master"] --> PRE["Build gate + full packaged E2E<br/>No PR-side Claude review"]
     PRE --> PRE_OK{"Deterministic checks pass?"}
     PRE_OK -->|No| FIX["Fix the pull request"]
     FIX --> PR
-    PRE_OK -->|Yes| MERGE["Merge into master<br/>No PR-side Claude review"]
+    PRE_OK -->|Yes| MERGE["Merge into master"]
 
     MERGE --> ANCHOR["Sync cumulative generation to the 1.20.1 anchor"]
     ANCHOR --> ANCHOR_E2E["Build + full packaged E2E<br/>Fabric and Forge in parallel"]
@@ -99,7 +99,7 @@ flowchart TD
     NONVIS --> FANOUT["Discover and dispatch all release branches"]
     SEMANTIC --> FANOUT
     FANOUT --> PORTS["Version ports in parallel"]
-    PORTS --> PORT_E2E["Per port: Build + packaged E2E"]
+    PORTS --> PORT_E2E["Per port: Build + packaged E2E<br/>Full or authenticated N/A"]
     PORT_E2E --> PORT_OK{"Port checks clean?"}
     PORT_OK -->|No| REPAIR["Keep the port open for repair"]
     REPAIR --> PORT_E2E
