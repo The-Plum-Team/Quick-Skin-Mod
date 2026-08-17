@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Select one current, authenticated mod-compatibility review source."""
+"""Select a compatibility source or admit its lane matrix to the Claude budget."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -37,6 +38,65 @@ MAX_PLAN_BYTES = 16_777_216
 MAX_MARKER_BYTES = 1_048_576
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 SHA = re.compile(r"^[0-9a-f]{40}$")
+DEFAULT_CALL_BUDGET = 12
+DEFAULT_RAMP_SECONDS = 2
+MAX_PARALLEL_CALLS = 32
+MAX_RAMP_SECONDS = 30
+
+
+class AdmissionError(QueueError):
+    """Raised when an untrusted matrix cannot be admitted safely."""
+
+
+def admit(
+    matrix: Any,
+    *,
+    call_budget: int = DEFAULT_CALL_BUDGET,
+    ramp_seconds: int = DEFAULT_RAMP_SECONDS,
+) -> dict[str, list[dict[str, Any]]]:
+    if (
+        isinstance(call_budget, bool)
+        or not isinstance(call_budget, int)
+        or not 1 <= call_budget <= MAX_PARALLEL_CALLS
+    ):
+        raise AdmissionError("call budget must be between 1 and 32")
+    if (
+        isinstance(ramp_seconds, bool)
+        or not isinstance(ramp_seconds, int)
+        or not 0 <= ramp_seconds <= MAX_RAMP_SECONDS
+    ):
+        raise AdmissionError("ramp spacing must be between 0 and 30 seconds")
+    if not isinstance(matrix, dict) or set(matrix) != {"include"}:
+        raise AdmissionError("matrix must contain only include")
+    lanes = matrix["include"]
+    if not isinstance(lanes, list) or not 1 <= len(lanes) <= call_budget:
+        raise AdmissionError(
+            "lane count must fit the protected concurrent call budget"
+        )
+    if not all(isinstance(lane, dict) for lane in lanes):
+        raise AdmissionError("every matrix lane must be an object")
+    if any(
+        "model_parallelism" in lane or "model_start_delay_seconds" in lane
+        for lane in lanes
+    ):
+        raise AdmissionError("matrix already contains protected admission fields")
+
+    # GitHub still starts every lane concurrently. Only each lane's nested chunk executor is
+    # bounded, preventing lane_count * 32 simultaneous Claude calls. A short deterministic ramp
+    # avoids an exact same-second burst without serializing the compatibility jobs.
+    per_lane = call_budget // len(lanes)
+    return {
+        "include": [
+            {
+                **lane,
+                "model_parallelism": per_lane,
+                "model_start_delay_seconds": min(
+                    index * ramp_seconds, MAX_RAMP_SECONDS
+                ),
+            }
+            for index, lane in enumerate(lanes)
+        ]
+    }
 
 
 @dataclass(frozen=True)
@@ -175,14 +235,36 @@ def list_pending(
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repository", required=True)
-    parser.add_argument("--github-output", type=Path, required=True)
+    parser.add_argument("--repository")
+    parser.add_argument("--github-output", type=Path)
+    parser.add_argument("--admit-matrix", type=Path)
+    parser.add_argument("--call-budget", type=int, default=DEFAULT_CALL_BUDGET)
+    parser.add_argument("--ramp-seconds", type=int, default=DEFAULT_RAMP_SECONDS)
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
+        if args.admit_matrix is not None:
+            if args.repository is not None or args.github_output is not None:
+                raise AdmissionError(
+                    "matrix admission cannot select a repository queue"
+                )
+            with args.admit_matrix.open("r", encoding="utf-8") as source:
+                matrix = json.load(source)
+            admitted = admit(
+                matrix,
+                call_budget=args.call_budget,
+                ramp_seconds=args.ramp_seconds,
+            )
+            json.dump(admitted, sys.stdout, separators=(",", ":"), sort_keys=True)
+            sys.stdout.write("\n")
+            return 0
+        if args.repository is None or args.github_output is None:
+            raise QueueError(
+                "--repository and --github-output are required for queue selection"
+            )
         repository = args.repository.strip()
         if not REPOSITORY.fullmatch(repository):
             raise QueueError("repository must use owner/name form")
@@ -207,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     except GitHubRateLimitError as exc:
         print(f"Mod compatibility review queue deferred: {exc}", file=sys.stderr)
         return 75
-    except (OSError, QueueError) as exc:
+    except (OSError, QueueError, json.JSONDecodeError) as exc:
         print(f"Mod compatibility review queue error: {exc}", file=sys.stderr)
         return 2
 
