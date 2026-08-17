@@ -532,7 +532,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('persist-credentials: false', authenticate)
         self.assertIn('Ignoring infrastructure-only visual review sync PR', authenticate)
         self.assertIn("visual-review-input-$source_run_id", authenticate)
-        self.assertIn('startswith($input_name + "-")', authenticate)
+        self.assertIn('generation_input_name="$input_name-$GITHUB_SHA"', authenticate)
+        self.assertIn(
+            "actions/artifacts?name=$artifact_query_name&per_page=100",
+            authenticate,
+        )
+        self.assertNotIn("actions/artifacts?per_page=100", authenticate)
         self.assertIn("visual-review-$source_run_id", authenticate)
         self.assertIn("visual-review-drain.yml", authenticate)
         self.assertNotIn("implementation_sha", authenticate)
@@ -725,6 +730,17 @@ class WorkflowSecurityTest(unittest.TestCase):
             self.assertIn("Makena", prompt)
             self.assertIn("red top", prompt)
             self.assertIn("yellow or orange top", prompt)
+        for prompt in (
+            triage_prompt,
+            verify_prompt,
+            semantic_prompt,
+            semantic_verify_prompt,
+        ):
+            normalized_prompt = " ".join(prompt.split())
+            self.assertIn("Elytra hides cape", normalized_prompt)
+            self.assertIn("separated, tapered Elytra", normalized_prompt)
+            self.assertIn("opaque full-atlas rectangle", normalized_prompt)
+            self.assertIn("Vanilla elytra after cape removal", normalized_prompt)
         self.assertIn("DEFAULT_TRIAGE_CHUNK_SIZE = 8", runner)
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
         self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
