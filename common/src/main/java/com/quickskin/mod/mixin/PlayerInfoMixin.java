@@ -152,14 +152,17 @@ public abstract class PlayerInfoMixin {
         ResourceLocation skinTexture = original.texture();
         PlayerSkin.Model skinModel = original.model();
         ResourceLocation capeTexture = original.capeTexture();
+        ResourceLocation elytraTexture = original.elytraTexture();
 //?} else if <1.21.11 {
         ResourceLocation skinTexture = original.body().texturePath();
         PlayerModelType skinModel = original.model();
         ResourceLocation capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+        ResourceLocation elytraTexture = original.elytra() != null ? original.elytra().texturePath() : null;
 //?} else {
         Identifier skinTexture = original.body().texturePath();
         PlayerModelType skinModel = original.model();
         Identifier capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+        ClientAsset.Texture elytraTexture = original.elytra();
 //?}
 
         // Override skin texture
@@ -180,10 +183,18 @@ public abstract class PlayerInfoMixin {
         if (hasCustomCape) {
             if (currentCapeLocation != null) {
                 capeTexture = currentCapeLocation;
+//? if <1.21.11 {
+                elytraTexture = currentCapeLocation;
+//?} else {
+                elytraTexture = new ClientAsset.ResourceTexture(
+                        currentCapeLocation, currentCapeLocation);
+//?}
             } else {
                 // An active network animation may deliberately resolve to null while its
-                // bounded first-frame texture is prepared. Never expose the full atlas then.
+                // bounded first-frame texture is prepared. Never expose the full atlas or an
+                // unrelated profile Elytra then.
                 capeTexture = null;
+                elytraTexture = null;
             }
         }
 
@@ -193,11 +204,11 @@ public abstract class PlayerInfoMixin {
             skinTexture,
             original.textureUrl(),
             capeTexture,
-            original.elytraTexture(),
+            elytraTexture,
 //?} else {
             new ClientAsset.ResourceTexture(skinTexture, skinTexture),
             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-            original.elytra(),
+            elytraTexture,
 //?}
             skinModel,
             original.secure()
@@ -236,14 +247,17 @@ public abstract class PlayerInfoMixin {
         ResourceLocation skinTexture = null;
         PlayerSkin.Model skinModel = (original != null) ? original.model() : PlayerSkin.Model.WIDE;
         ResourceLocation capeTexture = null;
+        ResourceLocation elytraTexture = null;
 //?} else if <1.21.11 {
         ResourceLocation skinTexture = null;
         PlayerModelType skinModel = (original != null) ? original.model() : PlayerModelType.WIDE;
         ResourceLocation capeTexture = null;
+        ResourceLocation elytraTexture = null;
 //?} else {
         Identifier skinTexture = null;
         PlayerModelType skinModel = (original != null) ? original.model() : PlayerModelType.WIDE;
         Identifier capeTexture = null;
+        ClientAsset.Texture elytraTexture = null;
 //?}
 
         if (hasSkin) {
@@ -265,6 +279,13 @@ public abstract class PlayerInfoMixin {
         if (hasCape) {
             capeTexture = com.quickskin.mod.client.services.CapeService.getInstance()
                     .getCapeLocation(null, config.activeCapeHash);
+            if (capeTexture != null) {
+//? if <1.21.11 {
+                elytraTexture = capeTexture;
+//?} else {
+                elytraTexture = new ClientAsset.ResourceTexture(capeTexture, capeTexture);
+//?}
+            }
         }
 
         if (skinTexture == null && capeTexture == null) {
@@ -281,11 +302,11 @@ public abstract class PlayerInfoMixin {
                 skinTexture != null ? skinTexture : original.texture(),
                 original.textureUrl(),
                 capeTexture != null ? capeTexture : original.capeTexture(),
-                original.elytraTexture(),
+                capeTexture != null ? elytraTexture : original.elytraTexture(),
 //?} else {
                 skinAsset,
                 capeAsset,
-                original.elytra(),
+                capeTexture != null ? elytraTexture : original.elytra(),
 //?}
                 skinModel,
                 original.secure()
@@ -295,11 +316,11 @@ public abstract class PlayerInfoMixin {
         // Last resort: build with just our textures
         return new PlayerSkin(
 //? if <1.21.9 {
-            skinTexture, null, capeTexture, null, skinModel, false
+            skinTexture, null, capeTexture, elytraTexture, skinModel, false
 //?} else {
             skinTexture != null ? new ClientAsset.ResourceTexture(skinTexture, skinTexture) : null,
             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-            null, skinModel, false
+            elytraTexture, skinModel, false
 //?}
         );
     }
