@@ -77,6 +77,7 @@ public abstract class MixinAbstractClientPlayer {
         //?} else {
         Identifier capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
         //?}
+        ClientAsset.Texture elytraTexture = originalSkin.elytra();
 
         if (hasCustomSkin) {
             //? if <1.21.11 {
@@ -104,17 +105,22 @@ public abstract class MixinAbstractClientPlayer {
             //?}
             if (customCape != null) {
                 capeTexture = customCape;
+                // An active Quick Skin cape owns the profile-Elytra input too. Vanilla gives that
+                // dedicated field priority, so a retained Mojang elytra would replace the worn
+                // wings as soon as the profile response arrives.
+                elytraTexture = new ClientAsset.ResourceTexture(customCape, customCape);
             } else {
                 // Pending network animations intentionally resolve to null until their bounded
                 // first-frame texture exists. Never publish the stacked atlas to other mods.
                 capeTexture = null;
+                elytraTexture = null;
             }
         }
 
         PlayerSkin customSkin = new PlayerSkin(
             new ClientAsset.ResourceTexture(skinTexture, skinTexture),
             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-            originalSkin.elytra(),
+            elytraTexture,
             skinModel,
             originalSkin.secure()
         );
