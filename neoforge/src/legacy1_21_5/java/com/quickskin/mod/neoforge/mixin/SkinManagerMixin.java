@@ -5,7 +5,6 @@ import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.services.CapeService;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
-import com.quickskin.mod.common.data.PlayerAppearance;
 import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
@@ -44,6 +43,7 @@ public class SkinManagerMixin {
             ResourceLocation skinTexture = original.texture();
             PlayerSkin.Model skinModel = original.model();
             ResourceLocation capeTexture = original.capeTexture();
+            ResourceLocation elytraTexture = original.elytraTexture();
             boolean anyOverride = false;
 
             if (hasCustomSkin) {
@@ -71,14 +71,14 @@ public class SkinManagerMixin {
                 ResourceLocation customCape = service.getCapeLocation(uuid);
                 if (customCape != null) {
                     capeTexture = customCape;
+                    elytraTexture = customCape;
                     anyOverride = true;
                 } else {
-                    PlayerAppearance appearance = service.getAppearance(uuid);
-                    if (appearance != null && ("__NONE__".equals(appearance.getCapeId())
-                            || appearance.getCapeId().isEmpty())) {
-                        capeTexture = null;
-                        anyOverride = true;
-                    }
+                    // A pending custom texture must not fall through to unrelated Mojang cape or
+                    // Elytra assets while its bounded first frame is being prepared.
+                    capeTexture = null;
+                    elytraTexture = null;
+                    anyOverride = true;
                 }
             }
 
@@ -87,7 +87,7 @@ public class SkinManagerMixin {
                         skinTexture,
                         original.textureUrl(),
                         capeTexture,
-                        original.elytraTexture(),
+                        elytraTexture,
                         skinModel,
                         original.secure());
             }
@@ -103,6 +103,7 @@ public class SkinManagerMixin {
                 ResourceLocation skinTexture = original.texture();
                 PlayerSkin.Model skinModel = original.model();
                 ResourceLocation capeTexture = original.capeTexture();
+                ResourceLocation elytraTexture = original.elytraTexture();
                 boolean anyOverride = false;
 
                 if (hasSkin) {
@@ -131,6 +132,7 @@ public class SkinManagerMixin {
                             .getCapeLocation(null, config.activeCapeHash);
                     if (capeLocation != null) {
                         capeTexture = capeLocation;
+                        elytraTexture = capeLocation;
                         anyOverride = true;
                     }
                 }
@@ -140,7 +142,7 @@ public class SkinManagerMixin {
                             skinTexture,
                             original.textureUrl(),
                             capeTexture,
-                            original.elytraTexture(),
+                            elytraTexture,
                             skinModel,
                             original.secure());
                 }
