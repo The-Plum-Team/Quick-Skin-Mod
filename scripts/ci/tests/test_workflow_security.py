@@ -730,6 +730,17 @@ class WorkflowSecurityTest(unittest.TestCase):
             self.assertIn("Makena", prompt)
             self.assertIn("red top", prompt)
             self.assertIn("yellow or orange top", prompt)
+        for prompt in (
+            triage_prompt,
+            verify_prompt,
+            semantic_prompt,
+            semantic_verify_prompt,
+        ):
+            normalized_prompt = " ".join(prompt.split())
+            self.assertIn("Elytra hides cape", normalized_prompt)
+            self.assertIn("separated, tapered Elytra", normalized_prompt)
+            self.assertIn("opaque full-atlas rectangle", normalized_prompt)
+            self.assertIn("Vanilla elytra after cape removal", normalized_prompt)
         self.assertIn("DEFAULT_TRIAGE_CHUNK_SIZE = 8", runner)
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
         self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
