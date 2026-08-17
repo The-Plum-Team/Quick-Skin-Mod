@@ -254,6 +254,17 @@ the remaining version ports. The anchor and two-wave decisions are recorded in
 [ADR 0004](../docs/architecture/decisions/0004-anchor-ai-visual-review-to-1-20-1.md) and
 [ADR 0005](../docs/architecture/decisions/0005-certify-1-20-1-before-version-fanout.md).
 
+Pull requests targeting `master` deliberately stop after those deterministic checks: Claude is
+reserved for the cumulative 1.20.1 anchor created if the PR merges, avoiding a pre-merge and
+post-merge review of the same change. Direct release-branch PRs remain fail-closed because they do
+not have that automatic second stage. Once an authenticated semantic anchor releases later ports,
+visual-policy-only diffs do not repeat the same model review on every version; product, scenario,
+packaged-harness, malformed, or unknown diffs still do. A distinct protected compatibility-impact
+manifest prevents clean review-policy, prompt, documentation, or publication changes from
+launching the optional-mod matrix. The one-time `full-validation-baseline.json` marker intentionally
+carries the quota-paused cape/Elytra generation through this transition and is not edited by future
+policy-only work.
+
 That workflow never exposes raw packaged artifacts to the model credential. A secretless curator
 authenticates every artifact and exact matrix row. It imports the exact source commit only as inert
 Git objects—never as a checkout executed by the privileged workflow—then fully decodes the complete
@@ -321,7 +332,10 @@ marked and retired. An independent cleanup job deletes a settled entry by exact 
 final small report remains for seven days so it can release the delayed compatibility wave.
 Exact-policy verdict cache shards remain for seven days;
 parallel drains may briefly publish siblings, and a later protected successor combines and retires
-every authenticated shard it consumed without dropping concurrent verdicts.
+every authenticated shard it consumed without dropping concurrent verdicts. A shard owned by an
+earlier protected `master` commit may be reused across an unrelated merge only when that commit is
+still an ancestor and its cache-producing workflow blob is byte-identical; the current codec still
+revalidates the complete policy and every content-addressed verdict key.
 
 A completely clean synchronized 1.20.1 report creates a 90-day certificate only after the
 bot-owned anchor PR is merged and that exact-tree merge is still the current anchor head. The
