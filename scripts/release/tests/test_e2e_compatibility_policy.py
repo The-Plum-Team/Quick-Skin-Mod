@@ -132,6 +132,17 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             shim,
         )
 
+    def test_texture_adapter_prefers_the_modern_renderer_skin(self) -> None:
+        """A retained legacy getter may be null while modern PlayerSkin drives rendering."""
+
+        shim = SHIM.read_text(encoding="utf-8")
+        resolver = shim[shim.index("private static String resolveLoc(") :]
+        self.assertLess(
+            resolver.index("Method getSkin = findNoArg"),
+            resolver.index("Method direct = findNoArg"),
+            "modern PlayerSkin must be authoritative before the 1.20.1 fallback",
+        )
+
     def test_propagation_observer_baseline_hides_the_already_custom_subject(self) -> None:
         scenario = (
             E2E_JAVA / "scenario" / "PropagationScenario.java"
