@@ -60,6 +60,78 @@ is not launched a second time merely to publish the result.
 [Visual E2E gallery](https://the-plum-team.github.io/Quick-Skin-Mod/e2e/) ·
 [Machine-readable gallery inventory](https://the-plum-team.github.io/Quick-Skin-Mod/e2e/gallery-data.json)
 
+## E2E validation flow
+
+A pull request to `master` runs deterministic checks but never enters the Claude queue. After the
+merge, the cumulative generation is admitted once through the 1.20.1 anchor. The release matrix
+discovers every version and loader shown below; this diagram does not maintain a second version
+list.
+
+```mermaid
+flowchart TD
+    PR["Pull request to master"] --> PRE["Build gate<br/>Impact-selected packaged E2E"]
+    PRE --> PRE_OK{"Deterministic checks pass?"}
+    PRE_OK -->|No| FIX["Fix the pull request"]
+    FIX --> PR
+    PRE_OK -->|Yes| MERGE["Merge into master<br/>No PR-side Claude review"]
+
+    MERGE --> ANCHOR["Sync cumulative generation to the 1.20.1 anchor"]
+    ANCHOR --> ANCHOR_E2E["Build + full packaged E2E<br/>Fabric and Forge in parallel"]
+    ANCHOR_E2E --> ANCHOR_OK{"Anchor checks clean?"}
+    ANCHOR_OK -->|No| STOP["Stop propagation"]
+    ANCHOR_OK -->|Yes| ANCHOR_MERGE["Merge the exact tested 1.20.1 tree<br/>Publish Build/E2E attestations"]
+    ANCHOR_MERGE --> IMPACT{"Complete anchor diff"}
+
+    IMPACT -->|Allowlisted nonvisual| NONVIS["Authenticated nonvisual certificate<br/>No Claude or mod-compatibility wave"]
+    IMPACT -->|Visual, runtime, or unknown| CURATE["Curate authenticated lossless screenshots<br/>Fabric and Forge; no reference image"]
+
+    CURATE --> CAPACITY{"Claude capacity available?"}
+    CAPACITY -->|No| QUEUE["Keep the durable capsule<br/>Retry later"]
+    QUEUE --> CAPACITY
+    CAPACITY -->|Yes| SONNET["Sonnet semantic triage<br/>Loader chunks in parallel"]
+    SONNET --> VERIFY{"Suspicious or uncertain?"}
+    VERIFY -->|Yes| OPUS["Opus verification"]
+    VERIFY -->|No| SEMANTIC["Semantic 1.20.1 certificate"]
+    OPUS --> ANCHOR_DEFECT{"Confirmed defect?"}
+    ANCHOR_DEFECT -->|Yes| BLOCK["Block the generation<br/>Cancel sibling reviews"]
+    ANCHOR_DEFECT -->|No| SEMANTIC
+
+    NONVIS --> FANOUT["Discover and dispatch all release branches"]
+    SEMANTIC --> FANOUT
+    FANOUT --> PORTS["Version ports in parallel"]
+    PORTS --> PORT_E2E["Per port: Build + packaged E2E"]
+    PORT_E2E --> PORT_OK{"Port checks clean?"}
+    PORT_OK -->|No| REPAIR["Keep the port open for repair"]
+    REPAIR --> PORT_E2E
+    PORT_OK -->|Yes| ATTEST["Merge the exact tested tree<br/>Publish Build/E2E attestations"]
+
+    ATTEST --> VISUAL_IMPACT{"Later-version visual review required?"}
+    VISUAL_IMPACT -->|No| VISUAL_OK["Visual stage complete"]
+    VISUAL_IMPACT -->|Yes| PAIR["Pair every capture_id with<br/>lossless 1.20.1 evidence"]
+    PAIR --> CACHE{"Exact verdict cache hit?"}
+    CACHE -->|Yes| VISUAL_OK
+    CACHE -->|No| LATER_AI["Parallel Sonnet review<br/>Selective Opus verification"]
+    LATER_AI --> LATER_DEFECT{"Confirmed defect?"}
+    LATER_DEFECT -->|Yes| BLOCK
+    LATER_DEFECT -->|No| VISUAL_OK
+
+    VISUAL_OK --> COMPAT_IMPACT{"Product or integration impact?"}
+    COMPAT_IMPACT -->|No| DONE["Validated release tree"]
+    COMPAT_IMPACT -->|Yes| MOD_E2E["Optional-mod E2E<br/>Version / loader / mod lanes in parallel"]
+    MOD_E2E --> MOD_AI["Compare modded and clean captures<br/>Sonnet + selective Opus"]
+    MOD_AI --> MOD_OK{"Compatibility clean?"}
+    MOD_OK -->|No| BLOCK
+    MOD_OK -->|Yes| DONE
+
+    ATTEST -.-> PAGES["Advisory evidence:<br/>atomic GitHub Pages gallery"]
+```
+
+Build and Packaged E2E remain the required exact-head gates. Claude adds semantic screenshot
+judgment only when the authenticated impact classifiers require it; a quota pause preserves the
+durable work instead of dropping or approving it. Direct pull requests to a release branch retain
+fail-closed visual admission because they have no guaranteed post-merge anchor. See
+[Packaged-runtime E2E](e2e/README.md) for the evidence and scenario contracts behind each stage.
+
 ## Features
 
 - Change skins and capes from the title screen or pause menu.
