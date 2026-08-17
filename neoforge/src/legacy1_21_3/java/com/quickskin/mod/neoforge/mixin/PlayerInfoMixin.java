@@ -81,6 +81,7 @@ public abstract class PlayerInfoMixin {
         ResourceLocation skinTexture = original.texture();
         PlayerSkin.Model skinModel = original.model();
         ResourceLocation capeTexture = original.capeTexture();
+        ResourceLocation elytraTexture = original.elytraTexture();
 
         if (hasCustomSkin && currentSkinLocation != null) {
             skinTexture = currentSkinLocation;
@@ -93,10 +94,13 @@ public abstract class PlayerInfoMixin {
         if (hasCustomCape) {
             if (currentCapeLocation != null) {
                 capeTexture = currentCapeLocation;
+                elytraTexture = currentCapeLocation;
             } else {
                 // Pending network animations intentionally resolve to null until their bounded
-                // first-frame texture exists. Never publish the stacked atlas to other mods.
+                // first-frame texture exists. Never publish the stacked atlas to other mods or
+                // leave an unrelated profile Elytra beside a pending custom cape.
                 capeTexture = null;
+                elytraTexture = null;
             }
         }
 
@@ -104,7 +108,7 @@ public abstract class PlayerInfoMixin {
             skinTexture,
             original.textureUrl(),
             capeTexture,
-            original.elytraTexture(),
+            elytraTexture,
             skinModel,
             original.secure()
         );
