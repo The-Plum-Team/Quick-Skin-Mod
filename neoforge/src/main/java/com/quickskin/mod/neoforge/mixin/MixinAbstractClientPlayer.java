@@ -76,14 +76,17 @@ public abstract class MixinAbstractClientPlayer {
         ResourceLocation skinTexture = originalSkin.texture();
         PlayerSkin.Model skinModel = originalSkin.model();
         ResourceLocation capeTexture = originalSkin.capeTexture();
+        ResourceLocation elytraTexture = originalSkin.elytraTexture();
         //?} else if <1.21.11 {
         ResourceLocation skinTexture = originalSkin.body().texturePath();
         PlayerModelType skinModel = originalSkin.model();
         ResourceLocation capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+        ResourceLocation elytraTexture = originalSkin.elytra() != null ? originalSkin.elytra().texturePath() : null;
         //?} else {
         Identifier skinTexture = originalSkin.body().texturePath();
         PlayerModelType skinModel = originalSkin.model();
         Identifier capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+        ClientAsset.Texture elytraTexture = originalSkin.elytra();
         //?}
 
         if (hasCustomSkin) {
@@ -116,10 +119,19 @@ public abstract class MixinAbstractClientPlayer {
             //?}
             if (customCape != null) {
                 capeTexture = customCape;
+                // Vanilla gives the dedicated profile-Elytra field priority over the cape, so an
+                // active Quick Skin cape must own both renderer inputs.
+                //? if <1.21.11 {
+                elytraTexture = customCape;
+                //?} else {
+                elytraTexture = new ClientAsset.ResourceTexture(customCape, customCape);
+                //?}
             } else {
                 // Pending network animations intentionally resolve to null until their bounded
-                // first-frame texture exists. Never publish the stacked atlas to other mods.
+                // first-frame texture exists. Never publish the stacked atlas to other mods, and
+                // never leave an unrelated profile Elytra beside the cleared cape.
                 capeTexture = null;
+                elytraTexture = null;
             }
         }
 
@@ -128,11 +140,11 @@ public abstract class MixinAbstractClientPlayer {
             skinTexture,
             originalSkin.textureUrl(),
             capeTexture,
-            originalSkin.elytraTexture(),
+            elytraTexture,
             //?} else {
             new ClientAsset.ResourceTexture(skinTexture, skinTexture),
             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-            originalSkin.elytra(),
+            elytraTexture,
             //?}
             skinModel,
             originalSkin.secure()

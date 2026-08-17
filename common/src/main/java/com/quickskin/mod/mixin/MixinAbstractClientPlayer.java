@@ -74,14 +74,17 @@ public abstract class MixinAbstractClientPlayer {
             ResourceLocation skinTexture = originalSkin.texture();
             PlayerSkin.Model skinModel = originalSkin.model();
             ResourceLocation capeTexture = originalSkin.capeTexture();
+            ResourceLocation elytraTexture = originalSkin.elytraTexture();
 //?} else if <1.21.11 {
             ResourceLocation skinTexture = originalSkin.body().texturePath();
             PlayerModelType skinModel = originalSkin.model();
             ResourceLocation capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+            ResourceLocation elytraTexture = originalSkin.elytra() != null ? originalSkin.elytra().texturePath() : null;
 //?} else {
             Identifier skinTexture = originalSkin.body().texturePath();
             PlayerModelType skinModel = originalSkin.model();
             Identifier capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+            ClientAsset.Texture elytraTexture = originalSkin.elytra();
 //?}
             boolean anyOverride = false;
 
@@ -117,11 +120,18 @@ public abstract class MixinAbstractClientPlayer {
 //?}
                 if (customCape != null) {
                     capeTexture = customCape;
+//? if <1.21.11 {
+                    elytraTexture = customCape;
+//?} else {
+                    elytraTexture = new ClientAsset.ResourceTexture(customCape, customCape);
+//?}
                     anyOverride = true;
                 } else {
                     // An active network animation may deliberately resolve to null while its
-                    // bounded first-frame texture is prepared. Never expose the full atlas then.
+                    // bounded first-frame texture is prepared. Never expose the full atlas or an
+                    // unrelated profile Elytra then.
                     capeTexture = null;
+                    elytraTexture = null;
                     anyOverride = true;
                 }
             }
@@ -132,11 +142,11 @@ public abstract class MixinAbstractClientPlayer {
                         skinTexture,
                         originalSkin.textureUrl(),
                         capeTexture,
-                        originalSkin.elytraTexture(),
+                        elytraTexture,
 //?} else {
                         new ClientAsset.ResourceTexture(skinTexture, skinTexture),
                         capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-                        originalSkin.elytra(),
+                        elytraTexture,
 //?}
                         skinModel,
                         originalSkin.secure()
@@ -156,14 +166,17 @@ public abstract class MixinAbstractClientPlayer {
                 ResourceLocation skinTexture = originalSkin.texture();
                 PlayerSkin.Model skinModel = originalSkin.model();
                 ResourceLocation capeTexture = originalSkin.capeTexture();
+                ResourceLocation elytraTexture = originalSkin.elytraTexture();
 //?} else if <1.21.11 {
                 ResourceLocation skinTexture = originalSkin.body().texturePath();
                 PlayerModelType skinModel = originalSkin.model();
                 ResourceLocation capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+                ResourceLocation elytraTexture = originalSkin.elytra() != null ? originalSkin.elytra().texturePath() : null;
 //?} else {
                 Identifier skinTexture = originalSkin.body().texturePath();
                 PlayerModelType skinModel = originalSkin.model();
                 Identifier capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+                ClientAsset.Texture elytraTexture = originalSkin.elytra();
 //?}
                 boolean anyOverride = false;
 
@@ -201,6 +214,11 @@ public abstract class MixinAbstractClientPlayer {
                             .getCapeLocation(null, config.activeCapeHash);
                     if (capeLoc != null) {
                         capeTexture = capeLoc;
+//? if <1.21.11 {
+                        elytraTexture = capeLoc;
+//?} else {
+                        elytraTexture = new ClientAsset.ResourceTexture(capeLoc, capeLoc);
+//?}
                         anyOverride = true;
                     }
                 }
@@ -211,11 +229,11 @@ public abstract class MixinAbstractClientPlayer {
                             skinTexture,
                             originalSkin.textureUrl(),
                             capeTexture,
-                            originalSkin.elytraTexture(),
+                            elytraTexture,
 //?} else {
                             new ClientAsset.ResourceTexture(skinTexture, skinTexture),
                             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-                            originalSkin.elytra(),
+                            elytraTexture,
 //?}
                             skinModel,
                             originalSkin.secure()
