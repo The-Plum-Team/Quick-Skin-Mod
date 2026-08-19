@@ -120,6 +120,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - A public screenshot is valid only when a successful packaged `result.json` references it and its
   recorded SHA-256 and dimensions match the PNG. Do not infer scenario, role, or step from a
   filename, and do not let sets or duplicate labels collapse two frames into false coverage.
+- Public evidence must be able to show why a capture was admitted. Every published frame carries its
+  contract identity and expectation, the bounded printable message its mandatory assertion emitted,
+  the decoded pixel metrics of both the original PNG and the served derivative, its required
+  comparisons, its packaged lane with the exact tested JAR digest, and both provenance runs. A new
+  published field is a schema change: validate it fail-closed in the same strict frame contract
+  rather than letting a consumer read an unvalidated string.
 - `e2e/scenario-contract.json` is the only authored source for scenario ids, execution profiles,
   orchestration, roles, ordered steps, mandatory assertions, captures, expectations, review tiers,
   probes, and comparisons. Capture ids and all consumer views must be derived. Add or remove a

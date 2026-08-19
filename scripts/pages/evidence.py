@@ -34,6 +34,7 @@ from scenario_contract import ScenarioContract  # noqa: E402
 from version_branches import parse_version_branch  # noqa: E402
 from visual_evidence import (  # noqa: E402
     DEFAULT_CATALOG,
+    MAX_RUNTIME_EVIDENCE_LENGTH,
     SAFE_ID,
     SHA256,
     VisualEvidenceError,
@@ -94,6 +95,7 @@ SOURCE_FRAME_FIELDS = frozenset(
         "capture_order",
         "title",
         "expectation",
+        "runtime_evidence",
         "review_tier",
         "artifact_node",
         "version",
@@ -196,6 +198,21 @@ def _run_id(value: Any, label: str) -> str:
     if not text.isdigit() or int(text) <= 0:
         raise PublicEvidenceError(f"{label} must be a positive Actions run ID")
     return text
+
+
+def _runtime_evidence(value: Any, label: str) -> str:
+    """Accept only the producer's bounded, printable passed-assertion message."""
+
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or len(value) > MAX_RUNTIME_EVIDENCE_LENGTH
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
+        raise PublicEvidenceError(
+            f"{label} must be bounded printable single-line assertion evidence"
+        )
+    return value
 
 
 def _timestamp(value: Any, label: str) -> str:
@@ -751,6 +768,9 @@ def validate_bundle(
             for field in ("capture_id", "title", "expectation", "review_tier")
         ):
             raise PublicEvidenceError(f"public frame disagrees with visual catalog: {frame_id}")
+        _runtime_evidence(
+            frame.get("runtime_evidence"), f"public frame runtime evidence for {frame_id}"
+        )
         capture_order = frame.get("capture_order")
         if (
             isinstance(capture_order, bool)

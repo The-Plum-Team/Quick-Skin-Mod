@@ -1,5 +1,10 @@
 "use strict";
 
+const PERCENT = new Intl.NumberFormat(undefined, {
+  style: "percent",
+  maximumSignificantDigits: 3
+});
+
 function node(tag, className, text) {
   const value = document.createElement(tag);
   if (className) value.className = className;
@@ -17,6 +22,14 @@ function httpsLink(value) {
   const url = new URL(value);
   if (url.protocol !== "https:") throw new Error("Non-HTTPS provenance link rejected");
   return url.href;
+}
+
+function externalLink(href, text) {
+  const link = node("a", "", text);
+  link.href = httpsLink(href);
+  link.target = "_blank";
+  link.rel = "noopener";
+  return link;
 }
 
 function option(select, value, label) {
@@ -43,15 +56,76 @@ function friendlyRole(value) {
   return { client_a: "Client A", client_b: "Client B" }[value] || value;
 }
 
-function captureCard(frame) {
+function friendlyTier(value) {
+  return {
+    key: "key — included in every advisory AI review",
+    all: "all — included when the advisory review covers every capture"
+  }[value] || value;
+}
+
+function percent(value) {
+  return typeof value === "number" && Number.isFinite(value) ? PERCENT.format(value) : "—";
+}
+
+function seconds(value) {
+  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(1)} s` : "—";
+}
+
+function regionLabel(region) {
+  if (!Array.isArray(region) || region.length !== 4) return "the whole frame";
+  const [left, top, right, bottom] = region;
+  return `x ${percent(left)}–${percent(right)}, y ${percent(top)}–${percent(bottom)} of the frame`;
+}
+
+function factList(rows) {
+  const list = node("dl", "fact-list");
+  for (const [term, value, className] of rows) {
+    if (value === undefined || value === null || value === "") continue;
+    const definition = node("dd", className);
+    if (value instanceof Node) definition.append(value);
+    else definition.textContent = String(value);
+    list.append(node("dt", "", term), definition);
+  }
+  return list;
+}
+
+function recordSection(title, lead, ...children) {
+  const section = node("section", "record-section");
+  section.append(node("h3", "", title));
+  if (lead) section.append(node("p", "record-lead", lead));
+  section.append(...children);
+  return section;
+}
+
+function pixelFacts(metrics) {
+  if (!metrics) return factList([["Measurements", "not published for this image"]]);
+  return factList([
+    ["Decoded size", `${metrics.width} × ${metrics.height}`],
+    ["File SHA-256", node("span", "mono", metrics.file_sha256)],
+    ["Pixel SHA-256", node("span", "mono", metrics.pixel_sha256)],
+    ["Luma entropy", metrics.luma_entropy],
+    ["Distinct meaningful colours", metrics.meaningful_colors],
+    ["Near-black pixels", percent(metrics.dark_fraction)],
+    ["Near-white pixels", percent(metrics.light_fraction)]
+  ]);
+}
+
+function comparisonFacts(metrics) {
+  return factList([
+    ["Changed pixels", percent(metrics.changed_fraction)],
+    ["Required minimum", percent(metrics.required_changed_fraction)],
+    ["RMS difference", metrics.rms_difference],
+    ["Measured region", regionLabel(metrics.region)]
+  ]);
+}
+
+function captureCard(frame, open) {
   const figure = node("figure", "capture-card");
-  const imageLink = node("a");
-  imageLink.href = sameOriginPath(frame.image);
-  imageLink.target = "_blank";
-  imageLink.rel = "noopener";
-  imageLink.setAttribute(
+  const trigger = node("button", "capture-open");
+  trigger.type = "button";
+  trigger.setAttribute(
     "aria-label",
-    `Open optimized gallery image for ${frame.title}, Minecraft ${frame.version}, ${frame.loader_name}, ${friendlyRole(frame.role)}; opens in new tab`
+    `Open the validation record for ${frame.title}, Minecraft ${frame.version}, ${frame.loader_name}, ${friendlyRole(frame.role)}`
   );
   const image = document.createElement("img");
   image.src = sameOriginPath(frame.image);
@@ -60,7 +134,8 @@ function captureCard(frame) {
   image.height = frame.height;
   image.loading = "lazy";
   image.decoding = "async";
-  imageLink.append(image);
+  trigger.append(image);
+  trigger.addEventListener("click", () => open(frame));
 
   const caption = document.createElement("figcaption");
   const titleRow = node("div", "capture-title-row");
@@ -73,25 +148,25 @@ function captureCard(frame) {
   const summary = document.createElement("summary");
   summary.textContent = "What this validates";
   details.append(summary, node("p", "", frame.expectation));
+  const record = node("button", "record-button", "Full validation record");
+  record.type = "button";
+  record.addEventListener("click", () => open(frame));
   const provenance = node("div", "provenance-line");
   if (frame.source_run_url === frame.target_run_url) {
-    const run = node("a", "", "tested & publishing run ↗");
-    run.href = httpsLink(frame.target_run_url);
-    provenance.append(run, node("span", "", frame.target_sha.slice(0, 12)));
-  } else {
-    const sourceRun = node("a", "", "tested source run ↗");
-    sourceRun.href = httpsLink(frame.source_run_url);
-    const targetRun = node("a", "", "publishing target run ↗");
-    targetRun.href = httpsLink(frame.target_run_url);
     provenance.append(
-      sourceRun,
+      externalLink(frame.target_run_url, "tested & publishing run ↗"),
+      node("span", "", frame.target_sha.slice(0, 12))
+    );
+  } else {
+    provenance.append(
+      externalLink(frame.source_run_url, "tested source run ↗"),
       node("span", "", frame.source_sha.slice(0, 12)),
-      targetRun,
+      externalLink(frame.target_run_url, "publishing target run ↗"),
       node("span", "", frame.target_sha.slice(0, 12))
     );
   }
-  caption.append(titleRow, metadata, details, provenance);
-  figure.append(imageLink, caption);
+  caption.append(titleRow, metadata, details, record, provenance);
+  figure.append(trigger, caption);
   return figure;
 }
 
@@ -125,6 +200,18 @@ class Gallery {
       })).concat([{ id: "all", label: "All versions", version: null }]);
     this.tabButtons = [];
     this.panels = [];
+    this.dialog = document.querySelector("#capture-dialog");
+    this.openCapture = (frame) => this.showRecord(frame);
+    this.releaseByVersion = new Map(data.releases.map((release) => [release.version, release]));
+    this.laneById = new Map(data.lanes.map((lane) => [lane.lane_id, lane]));
+    this.frameById = new Map(data.frames.map((frame) => [frame.frame_id, frame]));
+    this.comparisonsByFrame = new Map();
+    for (const comparison of data.comparisons) {
+      for (const frameId of [comparison.first_frame_id, comparison.second_frame_id]) {
+        if (!this.comparisonsByFrame.has(frameId)) this.comparisonsByFrame.set(frameId, []);
+        this.comparisonsByFrame.get(frameId).push(comparison);
+      }
+    }
   }
 
   start() {
@@ -133,6 +220,7 @@ class Gallery {
     this.createTabs();
     this.bindFilters();
     this.bindViewSwitch();
+    this.bindDialog();
     this.renderGallery();
     this.renderComparison();
   }
@@ -252,6 +340,15 @@ class Gallery {
     compareButton.addEventListener("click", () => setView(true));
   }
 
+  bindDialog() {
+    this.dialog.addEventListener("click", (event) => {
+      if (event.target === this.dialog) this.dialog.close();
+    });
+    this.dialog.addEventListener("close", () => {
+      document.querySelector("#capture-dialog-body").replaceChildren();
+    });
+  }
+
   filteredFrames() {
     const tab = this.tabs[this.activeTab];
     const loader = document.querySelector("#loader-filter").value;
@@ -276,7 +373,7 @@ class Gallery {
       panel.append(node("div", "empty-state", "No validated captures match these filters."));
     } else {
       const grid = node("div", "capture-grid");
-      for (const frame of frames) grid.append(captureCard(frame));
+      for (const frame of frames) grid.append(captureCard(frame, this.openCapture));
       panel.append(grid);
     }
     document.querySelector("#gallery-status").textContent = `${frames.length} validated capture${frames.length === 1 ? "" : "s"} shown`;
@@ -307,12 +404,220 @@ class Gallery {
         const frame = this.data.frames.find(
           (item) => item.version === release.version && item.loader === loader && item.capture_id === captureId
         );
-        cell.append(frame ? captureCard(frame) : missingCard(label));
+        cell.append(frame ? captureCard(frame, this.openCapture) : missingCard(label));
         grid.append(cell);
         cells += 1;
       }
     }
     document.querySelector("#gallery-status").textContent = `${cells} version/loader cell${cells === 1 ? "" : "s"} aligned by semantic checkpoint`;
+  }
+
+  recordHeader(frame) {
+    const header = node("header", "record-header");
+    const titleRow = node("div", "capture-title-row");
+    const title = node("h2", "", frame.title);
+    title.id = "capture-dialog-title";
+    titleRow.append(title, node("span", "verified-badge", "Gate passed"));
+    const metadata = node("div", "capture-meta");
+    for (const text of [
+      `Minecraft ${frame.version}`,
+      frame.loader_name,
+      friendlyScenario(frame.scenario),
+      friendlyRole(frame.role),
+      `step ${frame.step}`
+    ]) {
+      metadata.append(node("span", "", text));
+    }
+    header.append(titleRow, metadata);
+    return header;
+  }
+
+  recordFigure(frame) {
+    const figure = node("figure", "record-figure");
+    const image = document.createElement("img");
+    image.src = sameOriginPath(frame.image);
+    image.alt = frame.alt;
+    image.width = frame.width;
+    image.height = frame.height;
+    image.decoding = "async";
+    const caption = document.createElement("figcaption");
+    const link = node("a", "", `Open the published ${frame.published_format.toUpperCase()} ↗`);
+    link.href = sameOriginPath(frame.image);
+    link.target = "_blank";
+    link.rel = "noopener";
+    caption.append(link);
+    figure.append(image, caption);
+    return figure;
+  }
+
+  contractSection(frame, release) {
+    const rows = [
+      ["Scenario", `${friendlyScenario(frame.scenario)} (${frame.scenario})`],
+      ["Client role", `${friendlyRole(frame.role)} (${frame.role})`],
+      ["Report step", node("span", "mono", frame.step)],
+      ["Capture id", node("span", "mono", frame.capture_id)],
+      ["Contract order", frame.capture_order],
+      ["Advisory review tier", friendlyTier(frame.review_tier)]
+    ];
+    if (release) {
+      rows.push(["Contract SHA-256", node("span", "mono", release.contract_sha256)]);
+      rows.push([
+        "Contract source",
+        externalLink(release.contract_url, "scenario-contract.json at this commit ↗")
+      ]);
+    }
+    return recordSection(
+      "Checkpoint contract",
+      "The versioned scenario contract is the only authored source for this checkpoint. Its expectation, ordering and review tier are fixed before the run.",
+      node("p", "record-prose", frame.expectation),
+      factList(rows)
+    );
+  }
+
+  assertionSection(frame) {
+    return recordSection(
+      "Deterministic assertion",
+      "The packaged Minecraft client emitted this message when the checkpoint's mandatory assertion passed. A failed, empty or missing assertion stops the run before any screenshot can be published.",
+      node("p", "evidence-quote mono", frame.runtime_evidence)
+    );
+  }
+
+  integritySection(frame) {
+    const columns = node("div", "record-columns");
+    const source = node("div");
+    source.append(
+      node("h4", "", "Original capture (PNG)"),
+      node("p", "record-lead", "Written by the packaged client, decoded and measured by the gate. Its bytes never leave the short-lived run artifact."),
+      pixelFacts(frame.source_pixel_validation)
+    );
+    const published = node("div");
+    published.append(
+      node("h4", "", `Published image (${frame.published_format.toUpperCase()})`),
+      node("p", "record-lead", "Re-decoded and re-measured by protected code before deployment. The file name is the SHA-256 of the exact bytes served to you."),
+      pixelFacts(frame.published_pixel_validation)
+    );
+    columns.append(source, published);
+    return recordSection(
+      "Image integrity",
+      "Both images are decoded and rejected if they are corrupt, implausibly sized or effectively blank.",
+      columns
+    );
+  }
+
+  comparisonSection(frame) {
+    const comparisons = this.comparisonsByFrame.get(frame.frame_id) || [];
+    if (!comparisons.length) {
+      return recordSection(
+        "Pixel comparisons",
+        "This checkpoint is not part of a required pixel-change pair; its proof is the assertion plus the image integrity checks above."
+      );
+    }
+    const children = [];
+    for (const comparison of comparisons) {
+      const first = this.frameById.get(comparison.first_frame_id);
+      const second = this.frameById.get(comparison.second_frame_id);
+      const pair = node("article", "comparison-record");
+      const role = comparison.first_frame_id === frame.frame_id ? "before" : "after";
+      pair.append(
+        node("h4", "", `${first ? first.title : comparison.first_frame_id} → ${second ? second.title : comparison.second_frame_id}`),
+        node("p", "record-lead", `This capture is the ${role} frame of the pair. The run fails unless the measured change reaches the contract minimum.`)
+      );
+      const columns = node("div", "record-columns");
+      const original = node("div");
+      original.append(node("h5", "", "Measured on the original PNGs"), comparisonFacts(comparison.source_pixel_validation));
+      columns.append(original);
+      if (comparison.published_pixel_validation) {
+        const derived = node("div");
+        derived.append(
+          node("h5", "", "Re-measured on the published images"),
+          comparisonFacts(comparison.published_pixel_validation)
+        );
+        columns.append(derived);
+      }
+      pair.append(columns);
+      children.push(pair);
+    }
+    return recordSection(
+      "Pixel comparisons",
+      "Directed comparisons prove the interface actually changed between two checkpoints instead of repeating one frame.",
+      ...children
+    );
+  }
+
+  laneSection(frame) {
+    const lane = this.laneById.get(frame.lane_id);
+    if (!lane) {
+      return recordSection("Packaged lane", "No lane record was published for this capture.");
+    }
+    return recordSection(
+      "Packaged lane",
+      "The capture comes from a real headless Minecraft run of the packaged production JAR, not a development launch.",
+      factList([
+        ["Lane", node("span", "mono", lane.lane_id)],
+        ["Artifact node", node("span", "mono", lane.artifact_node)],
+        ["Loader", `${lane.loader_name} · Minecraft ${lane.version}`],
+        ["Clients in this lane", lane.roles.map(friendlyRole).join(", ")],
+        ["Mod JAR SHA-256", node("span", "mono", lane.jar_sha256)],
+        ["Lane result", lane.status === "pass" ? "pass" : lane.status],
+        ["Lane wall time", seconds(lane.elapsed_s)]
+      ])
+    );
+  }
+
+  provenanceSection(frame) {
+    const rows = [
+      ["Tested run", externalLink(frame.source_run_url, "GitHub Actions run ↗")],
+      ["Tested branch", node("span", "mono", frame.source_branch)],
+      ["Tested commit", node("span", "mono", frame.source_sha)],
+      ["Tested at", frame.source_created_at]
+    ];
+    if (frame.source_run_url !== frame.target_run_url || frame.source_sha !== frame.target_sha) {
+      rows.push(
+        ["Publishing run", externalLink(frame.target_run_url, "GitHub Actions run ↗")],
+        ["Release branch", node("span", "mono", frame.target_branch)],
+        ["Published commit", node("span", "mono", frame.target_sha)],
+        ["Published at", frame.target_created_at]
+      );
+    }
+    return recordSection(
+      "Provenance",
+      "Evidence is only published when its recorded runs and commits still match the current release-branch head.",
+      factList(rows)
+    );
+  }
+
+  rawSection(frame) {
+    const details = document.createElement("details");
+    details.className = "record-raw";
+    const summary = document.createElement("summary");
+    summary.textContent = "Machine-readable record";
+    const payload = {
+      frame,
+      lane: this.laneById.get(frame.lane_id) || null,
+      comparisons: this.comparisonsByFrame.get(frame.frame_id) || []
+    };
+    const block = document.createElement("pre");
+    block.textContent = JSON.stringify(payload, null, 2);
+    details.append(summary, block);
+    return details;
+  }
+
+  showRecord(frame) {
+    const body = document.querySelector("#capture-dialog-body");
+    const release = this.releaseByVersion.get(frame.version);
+    body.replaceChildren(
+      this.recordHeader(frame),
+      this.recordFigure(frame),
+      this.contractSection(frame, release),
+      this.assertionSection(frame),
+      this.integritySection(frame),
+      this.comparisonSection(frame),
+      this.laneSection(frame),
+      this.provenanceSection(frame),
+      this.rawSection(frame)
+    );
+    if (typeof this.dialog.showModal === "function") this.dialog.showModal();
+    else this.dialog.setAttribute("open", "");
   }
 }
 
@@ -322,7 +627,14 @@ async function startGallery() {
     const response = await fetch("gallery-data.json", { credentials: "same-origin" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    if (data.schema_version !== 1 || !Array.isArray(data.frames) || !data.frames.length || !Array.isArray(data.releases)) {
+    if (
+      data.schema_version !== 2
+      || !Array.isArray(data.frames)
+      || !data.frames.length
+      || !Array.isArray(data.releases)
+      || !Array.isArray(data.lanes)
+      || !Array.isArray(data.comparisons)
+    ) {
       throw new Error("Unsupported or empty gallery inventory");
     }
     new Gallery(data).start();

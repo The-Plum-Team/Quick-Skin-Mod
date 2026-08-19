@@ -861,6 +861,18 @@ class PagesSiteTest(unittest.TestCase):
         frame_payload = json.loads(json.dumps(original))
         frame_payload["frames"][0]["pixel_validation"]["private_note"] = "secret"
         cases.append(("frame payload", frame_payload))
+        dropped_evidence = json.loads(json.dumps(original))
+        del dropped_evidence["frames"][0]["runtime_evidence"]
+        cases.append(("missing runtime evidence", dropped_evidence))
+        blank_evidence = json.loads(json.dumps(original))
+        blank_evidence["frames"][0]["runtime_evidence"] = "   "
+        cases.append(("blank runtime evidence", blank_evidence))
+        multiline_evidence = json.loads(json.dumps(original))
+        multiline_evidence["frames"][0]["runtime_evidence"] = "assertion\npassed"
+        cases.append(("multiline runtime evidence", multiline_evidence))
+        unbounded_evidence = json.loads(json.dumps(original))
+        unbounded_evidence["frames"][0]["runtime_evidence"] = "a" * 4097
+        cases.append(("unbounded runtime evidence", unbounded_evidence))
         comparison_payload = json.loads(json.dumps(original))
         comparison_payload["comparisons"][0]["pixel_validation"]["private_note"] = "secret"
         cases.append(("comparison payload", comparison_payload))
@@ -1019,6 +1031,78 @@ class PagesSiteTest(unittest.TestCase):
         self.assertTrue(
             all("published_pixel_validation" in item for item in gallery["comparisons"])
         )
+
+    def test_gallery_publishes_the_complete_per_capture_validation_record(self) -> None:
+        branch = "forge-and-fabric-1.20.1"
+        matrix = self.write_branch(branch, "1.20.1")
+        compact_root = self.root / "compact"
+        compact_bundle(self.evidence_root, compact_root, branch)
+        output = self.root / "record-site"
+
+        build(
+            evidence_root=compact_root,
+            output=output,
+            repository="AkaNebur/Quick-Skin-Mod",
+            matrix_path=matrix,
+            require_compact=True,
+        )
+
+        manifest = json.loads(
+            (compact_root / branch / "manifest.json").read_text(encoding="utf-8")
+        )
+        gallery = json.loads(
+            (output / "e2e" / "gallery-data.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(2, gallery["schema_version"])
+        release = gallery["releases"][0]
+        self.assertEqual(manifest["contract_sha256"], release["contract_sha256"])
+        self.assertIn(manifest["provenance"]["target"]["sha"], release["contract_url"])
+        self.assertEqual(
+            list(manifest["release"]["scenarios"]), release["scenarios"]
+        )
+        lanes = {lane["lane_id"]: lane for lane in gallery["lanes"]}
+        self.assertEqual({lane["lane_id"] for lane in manifest["lanes"]}, set(lanes))
+        published = {frame["frame_id"] for frame in gallery["frames"]}
+        source_frames = {frame["frame_id"]: frame for frame in manifest["frames"]}
+        for frame in gallery["frames"]:
+            source = source_frames[frame["frame_id"]]
+            self.assertEqual(source["runtime_evidence"], frame["runtime_evidence"])
+            self.assertEqual(source["review_tier"], frame["review_tier"])
+            self.assertEqual(
+                source["derivative"]["pixel_validation"],
+                frame["published_pixel_validation"],
+            )
+            self.assertEqual(
+                frame["published_file_sha256"],
+                frame["published_pixel_validation"]["file_sha256"],
+            )
+            lane = lanes[frame["lane_id"]]
+            self.assertEqual(lane["artifact_node"], frame["artifact_node"])
+            self.assertEqual(lane["scenario"], frame["scenario"])
+            self.assertEqual("pass", lane["status"])
+            self.assertRegex(lane["jar_sha256"], r"^[0-9a-f]{64}$")
+        for comparison in gallery["comparisons"]:
+            self.assertIn(comparison["first_frame_id"], published)
+            self.assertIn(comparison["second_frame_id"], published)
+
+    def test_capture_selection_opens_a_record_without_inline_html(self) -> None:
+        page = (ROOT / "site" / "e2e" / "index.html").read_text(encoding="utf-8")
+        script = (ROOT / "site" / "assets" / "gallery.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="capture-dialog"', page)
+        self.assertIn('id="capture-dialog-body"', page)
+        self.assertIn("showModal", script)
+        self.assertNotIn("innerHTML", script)
+        for field in (
+            "runtime_evidence",
+            "source_pixel_validation",
+            "published_pixel_validation",
+            "lane_id",
+            "jar_sha256",
+            "contract_sha256",
+            "contract_url",
+        ):
+            self.assertIn(field, script)
 
     def test_protected_site_mode_rejects_a_raw_handoff(self) -> None:
         branch = "forge-and-fabric-1.20.1"
