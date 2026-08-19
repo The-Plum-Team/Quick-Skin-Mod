@@ -432,6 +432,14 @@ SHA-256, dimensions, passed assertion message, and before/after pixel metrics. T
 contract and runtime evidence must have exact test-enforced coverage. AI review receives that
 bounded assertion message explicitly; all manifest strings remain untrusted review data.
 
+The public gallery publishes the same admission evidence per capture instead of only the image.
+Selecting a capture opens its validation record: contract identity, expectation and advisory review
+tier; the bounded assertion message the packaged client emitted; decoded pixel metrics for both the
+original PNG and the served derivative; every required before/after comparison with its measured
+and minimum change; the packaged lane with its exact production JAR digest and wall time; and the
+tested plus publishing runs, commits and contract hash. `gallery-data.json` carries that record as
+schema version 2, so the page derives it and never restates an unvalidated fact.
+
 `visual_review_workflow.js` is an optional manual Workflow adapter, not the GitHub Actions entry
 point. It consumes the generated manifest and emits the same exact verdict-array contract that CI
 extracts from its structured `reviews` result before passing it to `check_visual_review.py`; keep
