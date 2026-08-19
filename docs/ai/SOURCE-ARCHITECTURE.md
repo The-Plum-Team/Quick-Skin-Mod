@@ -176,7 +176,8 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   applies this shortcut to an ordinary feature-PR semantic review.
 - `scripts/pages/evidence.py` creates and validates a small branch-scoped raw handoff, then
   atomically compacts a validated bundle to protected WebP derivatives. It may copy only contracted
-  screenshots and structured provenance—never runtime logs or arbitrary HTML. The compact schema
+  screenshots, structured provenance, and each capture's bounded printable passed-assertion
+  message—never runtime logs or arbitrary HTML. The compact schema
   preserves separate source and derivative identities, hashes, dimensions, pixel metrics, and
   comparison metrics. Raw PNG bytes normally stop at the one-day E2E handoff; the single
   matrix-derived Fabric 1.20.1 visual anchor is retained losslessly and rotated as current state.
@@ -244,6 +245,10 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `scripts/pages/build_site.py` combines exact compact branch bundles and copies their already
   content-addressed WebP assets while rendering the tracked assets under `site/`. `site/` contains
   presentation code, not a support/version inventory; supported versions always come from
-  validated evidence discovered from release branches.
+  validated evidence discovered from release branches. Its `gallery-data.json` publishes the
+  complete per-capture validation record—contract identity and expectation, the passed assertion
+  message, source and published pixel metrics, the required pixel comparisons, the packaged lane
+  with its JAR digest, and both provenance runs—so the gallery never has to restate a fact the
+  validated bundle does not carry.
 - `_site/`, `public-evidence/`, and downloaded Actions artifacts are generated output. Do not commit
   them or edit them as source.
