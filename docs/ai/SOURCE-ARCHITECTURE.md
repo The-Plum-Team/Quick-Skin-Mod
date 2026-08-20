@@ -177,7 +177,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 - `scripts/pages/evidence.py` creates and validates a small branch-scoped raw handoff, then
   atomically compacts a validated bundle to protected WebP derivatives. It may copy only contracted
   screenshots, structured provenance, and each capture's bounded printable passed-assertion
-  message—never runtime logs or arbitrary HTML. The compact schema
+  message—never runtime logs or arbitrary HTML. That assertion message is validated when present
+  but stays optional in `OPTIONAL_FRAME_FIELDS` until every release branch has republished its
+  evidence, so an older rolling cache still validates. The compact schema
   preserves separate source and derivative identities, hashes, dimensions, pixel metrics, and
   comparison metrics. Raw PNG bytes normally stop at the one-day E2E handoff; the single
   matrix-derived Fabric 1.20.1 visual anchor is retained losslessly and rotated as current state.
