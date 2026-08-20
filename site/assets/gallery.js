@@ -475,9 +475,21 @@ class Gallery {
   }
 
   assertionSection(frame) {
+    const lead = "The packaged Minecraft client emitted this message when the checkpoint's mandatory assertion passed. A failed, empty or missing assertion stops the run before any screenshot can be published.";
+    if (typeof frame.runtime_evidence !== "string" || !frame.runtime_evidence) {
+      return recordSection(
+        "Deterministic assertion",
+        lead,
+        node(
+          "p",
+          "record-lead",
+          "This capture comes from evidence published before the assertion message was carried into the public bundle. The assertion still gated the run; it is not part of this bundle. It appears once this version republishes its evidence."
+        )
+      );
+    }
     return recordSection(
       "Deterministic assertion",
-      "The packaged Minecraft client emitted this message when the checkpoint's mandatory assertion passed. A failed, empty or missing assertion stops the run before any screenshot can be published.",
+      lead,
       node("p", "evidence-quote mono", frame.runtime_evidence)
     );
   }
