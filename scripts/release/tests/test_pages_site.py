@@ -861,9 +861,6 @@ class PagesSiteTest(unittest.TestCase):
         frame_payload = json.loads(json.dumps(original))
         frame_payload["frames"][0]["pixel_validation"]["private_note"] = "secret"
         cases.append(("frame payload", frame_payload))
-        dropped_evidence = json.loads(json.dumps(original))
-        del dropped_evidence["frames"][0]["runtime_evidence"]
-        cases.append(("missing runtime evidence", dropped_evidence))
         blank_evidence = json.loads(json.dumps(original))
         blank_evidence["frames"][0]["runtime_evidence"] = "   "
         cases.append(("blank runtime evidence", blank_evidence))
@@ -1084,6 +1081,55 @@ class PagesSiteTest(unittest.TestCase):
         for comparison in gallery["comparisons"]:
             self.assertIn(comparison["first_frame_id"], published)
             self.assertIn(comparison["second_frame_id"], published)
+
+    def test_evidence_without_runtime_evidence_still_validates_and_publishes(self) -> None:
+        """A bundle created before the assertion message existed must not stall the site.
+
+        Every release branch keeps a rolling cache produced by its own checkout. Requiring the
+        newer field outright rejected each of those caches, and they are only regenerated after a
+        port that can itself be gated on unrelated approvals.
+        """
+
+        branch = "forge-and-fabric-1.20.1"
+        matrix = self.write_branch(branch, "1.20.1")
+        manifest_path = self.evidence_root / branch / "manifest.json"
+        legacy = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for frame in legacy["frames"]:
+            del frame["runtime_evidence"]
+        manifest_path.write_text(json.dumps(legacy), encoding="utf-8")
+
+        validated = validate_bundle(
+            self.evidence_root,
+            branch,
+            expected_repository="AkaNebur/Quick-Skin-Mod",
+            expected_target_sha="2" * 40,
+        )
+        self.assertTrue(validated["frames"])
+        self.assertNotIn("runtime_evidence", validated["frames"][0])
+
+        compact_root = self.root / "legacy-compact"
+        compact_bundle(self.evidence_root, compact_root, branch)
+        compacted = json.loads(
+            (compact_root / branch / "manifest.json").read_text(encoding="utf-8")
+        )
+        self.assertNotIn("runtime_evidence", compacted["frames"][0])
+
+        output = self.root / "legacy-site"
+        build(
+            evidence_root=compact_root,
+            output=output,
+            repository="AkaNebur/Quick-Skin-Mod",
+            matrix_path=matrix,
+            require_compact=True,
+        )
+        gallery = json.loads(
+            (output / "e2e" / "gallery-data.json").read_text(encoding="utf-8")
+        )
+        self.assertTrue(gallery["frames"])
+        for frame in gallery["frames"]:
+            self.assertNotIn("runtime_evidence", frame)
+            self.assertIn("published_pixel_validation", frame)
+            self.assertIn(frame["lane_id"], {lane["lane_id"] for lane in gallery["lanes"]})
 
     def test_capture_selection_opens_a_record_without_inline_html(self) -> None:
         page = (ROOT / "site" / "e2e" / "index.html").read_text(encoding="utf-8")

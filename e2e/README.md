@@ -440,6 +440,11 @@ and minimum change; the packaged lane with its exact production JAR digest and w
 tested plus publishing runs, commits and contract hash. `gallery-data.json` carries that record as
 schema version 2, so the page derives it and never restates an unvalidated fact.
 
+The assertion message is the one part a version may still lack: each release branch publishes from
+a rolling cache built by its own checkout, so evidence created before that field existed validates
+without it and the record says so explicitly. It appears for a version once that branch ports and
+republishes its packaged evidence.
+
 `visual_review_workflow.js` is an optional manual Workflow adapter, not the GitHub Actions entry
 point. It consumes the generated manifest and emits the same exact verdict-array contract that CI
 extracts from its structured `reviews` result before passing it to `check_visual_review.py`; keep
