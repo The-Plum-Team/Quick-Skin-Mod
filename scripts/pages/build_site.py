@@ -213,10 +213,13 @@ def build(
     shutil.copyfile(REPO / "icon.png", output / "assets" / "icon.png")
 
     gallery_frames: list[dict[str, Any]] = []
+    gallery_lanes: list[dict[str, Any]] = []
     gallery_comparisons: list[dict[str, Any]] = []
     release_rows: list[dict[str, Any]] = []
     frame_ids: set[str] = set()
-    rendered_assets: dict[tuple[str, str, str], tuple[Path, int, int, str]] = {}
+    rendered_assets: dict[
+        tuple[str, str, str], tuple[Path, int, int, str, dict[str, Any]]
+    ] = {}
     inspected_sources: dict[Path, dict[str, Any]] = {}
     for manifest in manifests:
         compact = manifest["schema_version"] == COMPACT_SCHEMA_VERSION
@@ -235,6 +238,12 @@ def build(
                 "loader_names": [loader_name(loader) for loader in loaders],
                 "frame_count": len(release_frames),
                 "lane_count": len(manifest["lanes"]),
+                "scenarios": list(release["scenarios"]),
+                "contract_sha256": manifest["contract_sha256"],
+                "contract_url": (
+                    f"https://github.com/{repository}/blob/"
+                    f"{provenance['target']['sha']}/e2e/scenario-contract.json"
+                ),
                 "source_branch": provenance["source"]["branch"],
                 "source_sha": provenance["source"]["sha"],
                 "source_created_at": provenance["source"]["created_at"],
@@ -247,6 +256,24 @@ def build(
                 "branch_url": f"https://github.com/{repository}/tree/{branch}",
             }
         )
+        for lane in manifest["lanes"]:
+            gallery_lanes.append(
+                {
+                    key: lane[key]
+                    for key in (
+                        "lane_id",
+                        "artifact_node",
+                        "version",
+                        "loader",
+                        "scenario",
+                        "jar_sha256",
+                        "status",
+                        "roles",
+                        "elapsed_s",
+                    )
+                }
+                | {"loader_name": loader_name(lane["loader"])}
+            )
         release_source_paths: dict[str, Path] = {}
         for frame in release_frames:
             frame_id = frame["frame_id"]
@@ -289,6 +316,7 @@ def build(
                     rendered_width,
                     rendered_height,
                     rendered_sha256,
+                    rendered_metrics,
                 ) = rendered_assets[render_key]
             else:
                 staged_relative = Path("e2e") / "images" / branch / (
@@ -299,11 +327,27 @@ def build(
                     rendered_width, rendered_height = copy_image(
                         source, staged, derivative
                     )
+                    rendered_metrics = derivative["pixel_validation"]
                 elif optimize:
                     rendered_width, rendered_height = optimize_image(source, staged)
+                    try:
+                        rendered_metrics = inspect_screenshot(
+                            staged, expected_format="WEBP"
+                        )
+                    except RuntimeFailure as exc:
+                        raise SiteBuildError(str(exc)) from exc
                 else:
                     rendered_width, rendered_height = copy_image(source, staged, frame)
+                    rendered_metrics = frame["pixel_validation"]
                 rendered_sha256 = published_digest(staged)
+                if (
+                    rendered_metrics["file_sha256"] != rendered_sha256
+                    or rendered_metrics["width"] != rendered_width
+                    or rendered_metrics["height"] != rendered_height
+                ):
+                    raise SiteBuildError(
+                        f"published image metrics disagree with its bytes for {frame_id}"
+                    )
                 image_relative = Path("e2e") / "images" / branch / (
                     rendered_sha256 + "." + extension
                 )
@@ -322,6 +366,7 @@ def build(
                     rendered_width,
                     rendered_height,
                     rendered_sha256,
+                    rendered_metrics,
                 )
             public_frame = {
                 key: value
@@ -333,6 +378,8 @@ def build(
                     "capture_order",
                     "title",
                     "expectation",
+                    "runtime_evidence",
+                    "review_tier",
                     "artifact_node",
                     "version",
                     "loader",
@@ -343,6 +390,7 @@ def build(
             }
             public_frame.update(
                 {
+                    "lane_id": f"{frame['artifact_node']}/{frame['scenario']}",
                     "loader_name": loader_name(frame["loader"]),
                     "image": image_relative.relative_to("e2e").as_posix(),
                     "width": rendered_width,
@@ -353,6 +401,7 @@ def build(
                     "source_pixel_validation": frame["pixel_validation"],
                     "published_file_sha256": rendered_sha256,
                     "published_format": extension,
+                    "published_pixel_validation": rendered_metrics,
                     "alt": (
                         f"{frame['title']} in Minecraft {frame['version']} on "
                         f"{loader_name(frame['loader'])}, {frame['role'].replace('_', ' ')}. "
@@ -419,6 +468,7 @@ def build(
             item["capture_order"],
         )
     )
+    gallery_lanes.sort(key=lambda item: item["lane_id"])
     gallery_comparisons.sort(key=lambda item: item["comparison_id"])
     project = load_project(matrix_path, repository)
     site_data = {
@@ -429,9 +479,10 @@ def build(
         "repository_url": f"https://github.com/{repository}",
     }
     gallery_data = {
-        "schema_version": 1,
+        "schema_version": 2,
         "project": {"name": project["name"], "repository_url": site_data["repository_url"]},
         "releases": release_rows,
+        "lanes": gallery_lanes,
         "frames": gallery_frames,
         "comparisons": gallery_comparisons,
     }
