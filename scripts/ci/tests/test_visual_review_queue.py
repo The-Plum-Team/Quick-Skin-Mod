@@ -128,6 +128,24 @@ class FakeApi:
 
 
 class VisualReviewQueueTest(unittest.TestCase):
+    def test_recovery_sweep_accepts_a_full_bounded_repository_window(self) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="test-token",
+            api_url="https://api.github.test",
+        )
+        api._request = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "artifacts": [
+                    {"name": f"packaged-e2e-unrelated-{index}"}
+                    for index in range(100)
+                ]
+            }
+        )
+
+        self.assertEqual([], api.list_artifacts())
+        self.assertEqual(100, api._request.call_count)
+
     def test_installation_rate_limit_is_classified_as_retryable(self) -> None:
         error = urllib.error.HTTPError(
             "https://api.github.test",
