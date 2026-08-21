@@ -686,6 +686,14 @@ class GitHubApi:
             raise QueueError("GitHub API returned invalid JSON") from exc
 
     def list_artifacts(self) -> list[Artifact]:
+        """Return the bounded newest repository window used only for recovery sweeps.
+
+        Exact curator wakes use :meth:`get_artifact` plus name-filtered marker lookups and never
+        enter this path. A sweep must remain useful after the repository itself exceeds the
+        defensive scan window, so a full final page means "bounded window complete", not corrupt
+        evidence. Every artifact that is selected from the window is still authenticated below.
+        """
+
         artifacts: list[Artifact] = []
         for page in range(1, 101):
             query = urllib.parse.urlencode({"per_page": 100, "page": page})
@@ -711,7 +719,7 @@ class GitHubApi:
                 raise QueueError(f"artifact inventory exceeds {MAX_ARTIFACTS}")
             if len(batch) < 100:
                 return artifacts
-        raise QueueError(f"artifact inventory exceeds {MAX_ARTIFACTS}")
+        return artifacts
 
     def list_artifacts_named(self, name: str) -> list[Artifact]:
         if not name or len(name) > 255:
