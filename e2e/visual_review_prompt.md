@@ -46,6 +46,13 @@ canvas and `Output: 64x32` identifies the final selected cape resolution. That s
 intentional. Require visible opaque-black padding on all four sides of the centred BMO artwork;
 the checkerboard may show only through transparent source pixels, not through opaque black.
 
+At `Elytra hides cape`, inspect the outer silhouette and alpha cutout directly: there must be two
+separated, tapered Elytra wings with the world visible outside and between them. An opaque
+full-atlas rectangle, square cape canvas, or filled inner UV face is a semantic defect even when
+the custom colour is correct or the reference has the same defect. At `Vanilla elytra after cape
+removal`, the two tapered wings must instead use the ordinary vanilla texture with no custom cape
+panel or colour remaining.
+
 For the slim/classic model checkpoints, angled arms and the inflated plaid jacket layer make total
 sleeve-to-sleeve span an invalid arm-width measurement. Inspect the individual silhouette and the
 candidate/reference relationship; use the passed final renderer-selector evidence, and flag only a
