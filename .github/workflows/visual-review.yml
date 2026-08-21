@@ -41,6 +41,7 @@ jobs:
       pull-requests: read
     outputs:
       artifact_inventory: ${{ steps.source.outputs.artifact_inventory }}
+      compatibility_impact: ${{ steps.source.outputs.compatibility_impact }}
       eligible: ${{ steps.source.outputs.eligible }}
       source_sha: ${{ steps.source.outputs.source_sha }}
       source_run_id: ${{ steps.source.outputs.source_run_id }}
@@ -72,6 +73,7 @@ jobs:
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
           printf 'eligible=false\n' >> "$GITHUB_OUTPUT"
+          compatibility_impact='{"compatibility_required":true,"impact_paths":[],"paths":[],"schema_version":1}'
 
           if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
             [[ "$DISPATCH_REPOSITORY" == "$GITHUB_REPOSITORY" ]]
@@ -131,11 +133,11 @@ jobs:
             [[ "$source_branch" == automation/sync/* ]]
           fi
 
-          # Ordinary PR evidence can be deterministically irrelevant to this review domain even
-          # though the packaged gate ran fail-closed. Only protected master code, a complete
-          # server-side file inventory, and the narrow source-PR allowlist may suppress the
-          # ordinary visual model. Compatibility-review orchestration is intentionally isolated;
-          # visual prompts, runners, scenarios, product code, and unknown paths remain reviewable.
+          # A PR targeting master is a deterministic preview only. If it merges, the protected
+          # synchronizer necessarily exercises the cumulative generation through the 1.20.1
+          # anchor, so reviewing the same source head here would duplicate Claude work. Direct
+          # release-branch PRs have no guaranteed post-merge anchor and retain the narrower
+          # fail-closed source-PR classifier below.
           if [[ "$(jq -r .event <<< "$source_run")" == pull_request ]]; then
             associated_pulls="$(github_api_retry -H 'Accept: application/vnd.github+json' \
               "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20")"
@@ -158,11 +160,22 @@ jobs:
               --arg repository "$GITHUB_REPOSITORY" \
               --arg sha "$source_sha" \
               --argjson number "$source_pr_number" \
-              '.number == $number and .state == "open" and .merged == false and
+              '.number == $number and
+               (.state == "open" or .state == "closed") and
+               (.merged | type == "boolean") and
                .head.ref == $branch and .head.sha == $sha and
                .head.repo.full_name == $repository and
                .base.repo.full_name == $repository and
+               (.base.ref | type == "string" and length > 0) and
                (.changed_files | type == "number" and . > 0 and . <= 100)' \
+              <<< "$source_pr" > /dev/null
+            source_pr_base="$(jq -er .base.ref <<< "$source_pr")"
+            if [[ "$source_pr_base" == master ]]; then
+              printf 'Deferring PR %s semantic review to its protected post-merge anchor generation\n' \
+                "$source_pr_number"
+              exit 0
+            fi
+            jq -e '.state == "open" and .merged == false' \
               <<< "$source_pr" > /dev/null
             changed_files="$(jq -r .changed_files <<< "$source_pr")"
             source_pr_files="$(github_api_retry \
@@ -194,12 +207,11 @@ jobs:
               select(type == "string" and length > 0)
             ' release/release-matrix.json)"
 
-            # A shared visual-review infrastructure change is exercised once on its source PR.
-            # Its generated non-anchor ports still need Build and Packaged E2E, but reviewing the
-            # same unaffected screenshots for every later release branch would spend model
-            # capacity without adding product signal. Skip only an exact, bot-owned non-anchor PR
-            # whose complete server-side file inventory is confined to this orchestration, its
-            # contracts, and documentation. Any ambiguity or renamed runtime path falls through.
+            # Shared visual-review policy is exercised once on the protected post-merge anchor.
+            # Generated later ports still need Build and Packaged E2E, but repeating the same
+            # unaffected screenshots would spend model capacity without product signal. The
+            # broader allowlist is admitted below only for an authenticated certificate-driven
+            # synchronization run. Any ambiguity, manual target, or runtime path stays strict.
             associated_pulls="$(github_api_retry -H 'Accept: application/vnd.github+json' \
               "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20" \
               2>/dev/null || true)"
@@ -262,17 +274,56 @@ jobs:
                   source_pr_files_path="$(mktemp \
                     "$RUNNER_TEMP/visual-review-impact.XXXXXX.json")"
                   printf '%s' "$source_pr_files" > "$source_pr_files_path"
+
+                  compatibility_manifest="$(mktemp \
+                    "$RUNNER_TEMP/mod-compatibility-impact.XXXXXX.json")"
+                  compatibility_result="$(python3 \
+                    scripts/ci/mod_compatibility_impact.py \
+                    --files "$source_pr_files_path" \
+                    --changed-files "$changed_files" \
+                    --manifest-output "$compatibility_manifest")"
+                  [[ "$compatibility_result" == required \
+                    || "$compatibility_result" == skip ]]
+                  compatibility_impact="$(jq -c . "$compatibility_manifest")"
+
+                  visual_scope=replicated-port
+                  # Only a fan-out created by the authenticated post-anchor repository dispatch
+                  # may use the broader policy-only allowlist. Manual recovery targets stay on the
+                  # strict scope because they may not have a semantic anchor certificate.
+                  sync_run_attempt="${source_branch##*/}"
+                  if [[ "$source_pr_base" != "$anchor_branch" \
+                      && "$sync_run_attempt" =~ ^([1-9][0-9]*)-([1-9][0-9]*)$ ]]; then
+                    sync_run_id="${BASH_REMATCH[1]}"
+                    sync_run_attempt_number="${BASH_REMATCH[2]}"
+                    sync_workflow_id="$(github_api_retry \
+                      "repos/$GITHUB_REPOSITORY/actions/workflows/sync-version-branches.yml" \
+                      --jq .id)"
+                    sync_run="$(github_api_retry \
+                      "repos/$GITHUB_REPOSITORY/actions/runs/$sync_run_id" \
+                      2>/dev/null || true)"
+                    if [[ -n "$sync_run" ]] && jq -e \
+                        --arg repository "$GITHUB_REPOSITORY" \
+                        --arg sha "$GITHUB_SHA" \
+                        --argjson attempt "$sync_run_attempt_number" \
+                        --argjson run_id "$sync_run_id" \
+                        --argjson workflow_id "$sync_workflow_id" \
+                        '.id == $run_id and .workflow_id == $workflow_id and
+                         .run_attempt == $attempt and .event == "repository_dispatch" and
+                         .head_branch == "master" and .head_sha == $sha and
+                         .path == ".github/workflows/sync-version-branches.yml" and
+                         .head_repository.full_name == $repository' \
+                        <<< "$sync_run" > /dev/null; then
+                      visual_scope=post-anchor-port
+                    fi
+                  fi
                   impact="$(python3 scripts/ci/visual_review_impact.py \
                     --files "$source_pr_files_path" \
                     --changed-files "$changed_files" \
-                    --scope replicated-port)"
+                    --scope "$visual_scope")"
                   [[ "$impact" == review || "$impact" == skip ]]
-                  # The merge controller independently authenticates Build, full anchor E2E,
-                  # merge topology, and this exact protected classification before it can mint a
-                  # nonvisual continuation. No model queue entry is useful for any such port.
                   if [[ "$impact" == skip ]]; then
-                    printf 'Ignoring infrastructure-only visual review sync PR %s (%s files)\n' \
-                      "$source_pr_number" "$changed_files"
+                    printf 'Ignoring %s-only visual review sync PR %s (%s files)\n' \
+                      "$visual_scope" "$source_pr_number" "$changed_files"
                     exit 0
                   fi
                 fi
@@ -281,53 +332,57 @@ jobs:
           fi
 
           # Duplicate workflow_run and repository_dispatch twins for the same source run exit
-          # here for one API call, before the heavier jobs and artifact validation below.
+          # here before the heavier jobs and artifact validation below. Query only the three
+          # exact names that can belong to this source and protected generation: repository-wide
+          # artifact inventories are both unnecessary and unbounded as release evidence grows.
           report_name="visual-review-$source_run_id"
           input_name="visual-review-input-$source_run_id"
-          artifacts="$(github_api_retry --paginate --slurp \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100")"
-          jq -e \
-            '(type == "array") and
-             ([.[] | (.artifacts | type == "array")] | all) and
-             ([.[].artifacts[]] | length <= 10000)' \
-            <<< "$artifacts" > /dev/null
-          while IFS=$'\t' read -r artifact_name artifact_run_id artifact_expired; do
-            [[ -n "$artifact_run_id" ]] || continue
-            [[ "$artifact_expired" == false ]] || continue
-            expected_workflow=".github/workflows/visual-review.yml"
-            expected_events='["repository_dispatch","workflow_run"]'
-            expected_conclusions='["success","failure"]'
-            if [[ "$artifact_name" == "$report_name" ]]; then
-              expected_workflow=".github/workflows/visual-review-drain.yml"
-              expected_events='["repository_dispatch","schedule","workflow_dispatch"]'
-            else
-              [[ "$artifact_name" == "$input_name" \
-                || "$artifact_name" =~ ^visual-review-input-$source_run_id-[0-9a-f]{40}$ ]]
-            fi
-            owner_run="$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$artifact_run_id" 2>/dev/null || true)"
-            if [[ -n "$owner_run" ]] && jq -e \
-                --arg repository "$GITHUB_REPOSITORY" \
-                --arg workflow "$expected_workflow" \
-                --argjson conclusions "$expected_conclusions" \
-                --argjson events "$expected_events" \
-                '.status == "completed" and
-                 (.conclusion as $conclusion | $conclusions | index($conclusion)) != null and
-                 (.event as $event | $events | index($event)) != null and
-                 .head_branch == "master" and .path == $workflow and
-                 .head_repository.full_name == $repository' \
-                <<< "$owner_run" > /dev/null; then
-              printf 'Visual review is already queued or complete for source run %s\n' \
-                "$source_run_id"
-              exit 0
-            fi
-          done < <(jq -r \
-            --arg input_name "$input_name" \
-            --arg report_name "$report_name" \
-            '.[].artifacts[] |
-             select(.name == $report_name or .name == $input_name or
-               (.name | startswith($input_name + "-"))) |
-             [.name, .workflow_run.id, .expired] | @tsv' <<< "$artifacts")
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          generation_input_name="$input_name-$GITHUB_SHA"
+          for artifact_query_name in \
+              "$report_name" "$input_name" "$generation_input_name"; do
+            artifacts="$(github_api_retry --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$artifact_query_name&per_page=100")"
+            jq -e --arg name "$artifact_query_name" \
+              '(type == "array") and
+               ([.[] | (.artifacts | type == "array")] | all) and
+               ([.[].artifacts[]] | length <= 100) and
+               ([.[].artifacts[] | .name == $name] | all)' \
+              <<< "$artifacts" > /dev/null
+            while IFS=$'\t' read -r artifact_name artifact_run_id artifact_expired; do
+              [[ -n "$artifact_run_id" ]] || continue
+              [[ "$artifact_expired" == false ]] || continue
+              expected_workflow=".github/workflows/visual-review.yml"
+              expected_events='["repository_dispatch","workflow_run"]'
+              expected_conclusions='["success","failure"]'
+              if [[ "$artifact_name" == "$report_name" ]]; then
+                expected_workflow=".github/workflows/visual-review-drain.yml"
+                expected_events='["repository_dispatch","schedule","workflow_dispatch"]'
+              else
+                [[ "$artifact_name" == "$input_name" \
+                  || "$artifact_name" == "$generation_input_name" ]]
+              fi
+              owner_run="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$artifact_run_id" 2>/dev/null || true)"
+              if [[ -n "$owner_run" ]] && jq -e \
+                  --arg repository "$GITHUB_REPOSITORY" \
+                  --arg workflow "$expected_workflow" \
+                  --argjson conclusions "$expected_conclusions" \
+                  --argjson events "$expected_events" \
+                  '.status == "completed" and
+                   (.conclusion as $conclusion | $conclusions | index($conclusion)) != null and
+                   (.event as $event | $events | index($event)) != null and
+                   .head_branch == "master" and .path == $workflow and
+                   .head_repository.full_name == $repository' \
+                  <<< "$owner_run" > /dev/null; then
+                printf 'Visual review is already queued or complete for source run %s\n' \
+                  "$source_run_id"
+                exit 0
+              fi
+            done < <(jq -r --arg name "$artifact_query_name" \
+              '.[].artifacts[] | select(.name == $name) |
+               [.name, .workflow_run.id, .expired] | @tsv' <<< "$artifacts")
+          done
 
           # List endpoints are read as --paginate --slurp page arrays, the same shape every other
           # trusted workflow consumes, then flattened before any count or identity assertion.
@@ -405,6 +460,7 @@ jobs:
 
           [[ "$GITHUB_REF" == refs/heads/master ]]
           printf 'artifact_inventory=%s\n' "$artifact_inventory" >> "$GITHUB_OUTPUT"
+          printf 'compatibility_impact=%s\n' "$compatibility_impact" >> "$GITHUB_OUTPUT"
           printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
           printf 'source_sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
           printf 'source_run_id=%s\n' "$source_run_id" >> "$GITHUB_OUTPUT"
@@ -450,6 +506,7 @@ jobs:
         shell: bash
         env:
           ARTIFACT_INVENTORY: ${{ needs.authenticate.outputs.artifact_inventory }}
+          COMPATIBILITY_IMPACT: ${{ needs.authenticate.outputs.compatibility_impact }}
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
@@ -467,6 +524,20 @@ jobs:
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           jq -e 'type == "array" and length > 0 and length <= 8' \
             <<< "$ARTIFACT_INVENTORY" > /dev/null
+          jq -e '
+            . as $impact |
+            (keys | sort) == (["compatibility_required", "impact_paths", "paths",
+              "schema_version"] | sort) and
+            .schema_version == 1 and
+            (.compatibility_required | type == "boolean") and
+            (.paths | type == "array" and length <= 200 and . == (sort | unique) and
+              all(.[]; type == "string" and length > 0 and length <= 512)) and
+            (.impact_paths | type == "array" and length <= 200 and
+              . == (sort | unique) and
+              all(.[]; type == "string" and
+                (. as $path | ($impact.paths | index($path)) != null))) and
+            (if .compatibility_required then true else .impact_paths == [] end)
+          ' <<< "$COMPATIBILITY_IMPACT" > /dev/null
           printf 'review_skipped=false\n' >> "$GITHUB_OUTPUT"
 
           source_run="$(github_api_retry \
@@ -917,6 +988,7 @@ jobs:
                 evidence_kind:"raw-png", manifest_sha256:$manifest_sha256}')"
           fi
           jq -n \
+            --argjson compatibility_impact "$COMPATIBILITY_IMPACT" \
             --arg implementation_sha "$IMPLEMENTATION_SHA" \
             --arg manifest_sha256 "$manifest_sha256" \
             --arg master_source_sha "$master_source_sha" \
@@ -933,12 +1005,12 @@ jobs:
             --argjson job_graph "$(cat "$RUNNER_TEMP/e2e-job-graph.json")" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             --argjson visual_reference "$visual_reference" \
-            '{schema_version:4, source_run_id:$source_run_id,
+            '{schema_version:5, source_run_id:$source_run_id,
               source_branch:$source_branch, source_sha:$source_sha,
               master_source_sha:($master_source_sha |
                 if length == 40 then . else null end),
               implementation_sha:$implementation_sha, matrix_kind:$matrix_kind,
-              review_mode:$review_mode,
+              review_mode:$review_mode, compatibility_impact:$compatibility_impact,
               scenario_contract_sha256:$scenario_contract_sha256,
               artifact_inventory:$artifact_inventory, job_graph:$job_graph,
               visual_reference:$visual_reference,

@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "baseline": "2026-08-17-cape-elytra-and-optional-mod-compatibility",
+  "purpose": "Carry one complete post-fix visual and optional-mod validation wave into the new admission policy. Future policy-only changes leave this marker unchanged."
+}
