@@ -34,6 +34,7 @@ from scenario_contract import ScenarioContract  # noqa: E402
 from version_branches import parse_version_branch  # noqa: E402
 from visual_evidence import (  # noqa: E402
     DEFAULT_CATALOG,
+    MAX_RUNTIME_EVIDENCE_LENGTH,
     SAFE_ID,
     SHA256,
     VisualEvidenceError,
@@ -107,6 +108,12 @@ SOURCE_FRAME_FIELDS = frozenset(
         "pixel_validation",
     }
 )
+# `runtime_evidence` is published by current producers but stays optional while release branches
+# still carry bundles created before it existed. A bundle produced by this revision always has it;
+# an older cache validates without it and simply publishes no assertion. Requiring it outright
+# would reject every pre-existing `pages-cache-*` and stall the whole site behind unrelated ports.
+# Once every release branch has re-run its packaged suite, fold this into SOURCE_FRAME_FIELDS.
+OPTIONAL_FRAME_FIELDS = frozenset({"runtime_evidence"})
 RAW_FRAME_FIELDS = SOURCE_FRAME_FIELDS | {"asset"}
 COMPACT_FRAME_FIELDS = SOURCE_FRAME_FIELDS | {"derivative"}
 DERIVATIVE_FIELDS = frozenset(
@@ -196,6 +203,21 @@ def _run_id(value: Any, label: str) -> str:
     if not text.isdigit() or int(text) <= 0:
         raise PublicEvidenceError(f"{label} must be a positive Actions run ID")
     return text
+
+
+def _runtime_evidence(value: Any, label: str) -> str:
+    """Accept only the producer's bounded, printable passed-assertion message."""
+
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or len(value) > MAX_RUNTIME_EVIDENCE_LENGTH
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
+        raise PublicEvidenceError(
+            f"{label} must be bounded printable single-line assertion evidence"
+        )
+    return value
 
 
 def _timestamp(value: Any, label: str) -> str:
@@ -410,6 +432,9 @@ def prepare(
         else:
             shutil.copyfile(source, destination)
         public = {key: frame[key] for key in SOURCE_FRAME_FIELDS}
+        public.update(
+            {key: frame[key] for key in OPTIONAL_FRAME_FIELDS if key in frame}
+        )
         public["asset"] = asset
         public_frames.append(public)
 
@@ -723,7 +748,10 @@ def validate_bundle(
         expected_frame_fields = (
             RAW_FRAME_FIELDS if schema_version == RAW_SCHEMA_VERSION else COMPACT_FRAME_FIELDS
         )
-        if not isinstance(frame, dict) or set(frame) != expected_frame_fields:
+        if (
+            not isinstance(frame, dict)
+            or set(frame) - OPTIONAL_FRAME_FIELDS != expected_frame_fields
+        ):
             raise PublicEvidenceError("public frame is invalid or leaks a source path")
         frame_id = _text(frame.get("frame_id"), "frame.frame_id")
         if frame_id in frame_ids:
@@ -751,6 +779,10 @@ def validate_bundle(
             for field in ("capture_id", "title", "expectation", "review_tier")
         ):
             raise PublicEvidenceError(f"public frame disagrees with visual catalog: {frame_id}")
+        if "runtime_evidence" in frame:
+            _runtime_evidence(
+                frame["runtime_evidence"], f"public frame runtime evidence for {frame_id}"
+            )
         capture_order = frame.get("capture_order")
         if (
             isinstance(capture_order, bool)
@@ -1224,6 +1256,9 @@ def compact_bundle(
                     }
                     derivatives[source_asset] = derivative
                 compact_frame = {key: frame[key] for key in SOURCE_FRAME_FIELDS}
+                compact_frame.update(
+                    {key: frame[key] for key in OPTIONAL_FRAME_FIELDS if key in frame}
+                )
                 compact_frame["derivative"] = derivative
                 compact_frames.append(compact_frame)
                 derivative_path_by_frame[frame["frame_id"]] = (

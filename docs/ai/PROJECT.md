@@ -152,7 +152,10 @@ immutable workflow and governance activation contract.
   cancels sibling drains and keeps later queue selection from spending more model calls on that
   automatic wave. Each drain also cancels its own outstanding calls on confirmation and reuses paired
   verdicts only under an exact content/expectation/loader/contract/matrix/reviewer/prompt/model
-  policy key; the capacity marker retains only normalized status, known limit type, and utilization
+  policy key. A cache shard from an earlier protected `master` SHA is eligible only when that SHA
+  remains an ancestor and its cache-producing workflow blob is byte-identical to the current one;
+  the current codec then revalidates every exact key. The capacity marker retains only normalized
+  status, known limit type, and utilization
   band rather than provider text or exact account usage;
   unpaired anchor semantics are never cached. It keeps provider output private and uploads only the
   protected normalized report or a sanitized retry marker, and deletes a settled queue entry by
@@ -163,14 +166,21 @@ immutable workflow and governance activation contract.
   conclusions never depend on model output. The semantic certificate gates only scheduling of the
   cross-version wave: provider failure or a semantic defect deliberately delays that wave instead
   of blessing an unverified baseline.
-- Ordinary PR review admission has a separate protected source-PR impact scope. A complete
-  server-side inventory containing only optional-mod compatibility orchestration, protected CI
-  tests, or documentation never enters the ordinary visual queue. Changes to product code,
-  scenarios, visual workflows, prompts, runners, classifiers, malformed inventories, or unknown
-  paths remain reviewable. This domain separation prevents one compatibility-policy edit from
-  spending another full ordinary visual review while keeping both deterministic gates fail-closed.
+- Ordinary PRs targeting `master` run Build and Packaged E2E as deterministic previews but never
+  enter the Claude queue. A merge necessarily creates the cumulative 1.20.1 synchronization
+  anchor, which is the single semantic admission point for that generation. Direct PRs to release
+  branches have no guaranteed post-merge anchor and retain a protected fail-closed `source-pr`
+  scope. After a certified anchor releases the remaining ports, the protected
+  `post-anchor-port` scope treats visual-review prompts/runners/orchestration as already exercised
+  by that anchor; product, scenario, packaged-E2E, malformed, and unknown paths remain reviewable.
+  That broader scope requires the exact certificate-driven synchronization `repository_dispatch`
+  and never applies to a manual recovery target.
 - A clean semantic review of an exact synchronized release tree starts a separate optional-mod
-  compatibility wave. Protected planning derives every `version x loader x mod` lane from the
+  compatibility wave only when its protected curation proof carries a complete fail-closed
+  product/integration impact manifest. Visual-review workflows, prompts, documentation, and their
+  policy tests cannot request that wave; product, build, runtime-harness, compatibility-policy,
+  malformed, renamed-from-unknown, and unknown paths do. Protected planning derives every
+  `version x loader x mod` lane from the
   release matrix and `e2e/mod-compatibility-contract.json`, including explicit N/A rows. Applicable
   lanes run concurrently, prove that the selected integration activated, and execute both the
   compatibility scenario and the complete base suite with only immutable size/SHA-256/SHA-512
@@ -192,6 +202,9 @@ immutable workflow and governance activation contract.
   producer that settles after `master` advances suppresses its wake; direct review admission binds
   the source SHA to the protected current implementation, and every lane rechecks live `master`
   before it downloads a capsule or starts a model.
+  `e2e/full-validation-baseline.json` is an intentionally runtime-impacting one-time marker for the
+  2026-08-17 cape/Elytra and compatibility rollout. It carries the previously quota-paused full
+  wave across this admission-policy change; normal policy-only changes leave it untouched.
   Authored loader/version exclusions
   remain explicit N/A records and survive lock refreshes. This post-validation signal does not
   replace or weaken Build,
