@@ -32,6 +32,12 @@ At the padded BMO cape checkpoint, `Source: 128x64` is the doubled import canvas
 artwork must be centred with opaque-black padding visible on all four sides. Checkerboard showing
 through transparent source pixels is valid, but it must not replace opaque-black padding.
 
+At `Elytra hides cape`, require two separated, tapered Elytra silhouettes with transparent world
+visible outside and between them. An opaque full-atlas rectangle, square cape canvas, or filled
+inner UV face is a real semantic defect even if the first reviewer or reference accepted it. At
+`Vanilla elytra after cape removal`, require the ordinary vanilla wing texture and no remaining
+custom cape panel or colour.
+
 Set `semantic_valid` from the expectation alone and `matches_reference` from the semantic
 comparison. A false value in either field requires `defect=true` and at least one concrete anomaly;
 both must be true for a clean result. Keep `visible` to one short sentence. Return only the
