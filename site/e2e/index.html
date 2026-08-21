@@ -29,7 +29,7 @@
     <section class="gallery-intro" aria-labelledby="gallery-title">
       <p class="eyebrow">Packaged-runtime evidence</p>
       <h1 id="gallery-title">See what passed.</h1>
-      <p>Browse every validated capture by version, or align the same semantic checkpoint across all supported Minecraft versions and loaders.</p>
+      <p>Browse every validated capture by version, or align the same semantic checkpoint across all supported Minecraft versions and loaders. Select any capture to open its complete validation record: the checkpoint contract, the assertion the packaged client actually passed, the pixel and comparison measurements, the tested JAR digest and the exact runs that produced it.</p>
       <div id="release-summary" class="summary-strip" aria-live="polite"></div>
     </section>
 
@@ -81,6 +81,13 @@
       <noscript><p class="notice">JavaScript is required for filtering and comparison. The evidence inventory remains available as <a href="gallery-data.json">JSON</a>.</p></noscript>
     </section>
 
+    <dialog id="capture-dialog" class="capture-dialog" aria-labelledby="capture-dialog-title">
+      <form method="dialog" class="dialog-dismiss">
+        <button type="submit" class="dialog-close" value="close" aria-label="Close the validation record">Close</button>
+      </form>
+      <div id="capture-dialog-body" class="dialog-body"></div>
+    </dialog>
+
     <section class="section methodology" aria-labelledby="method-title">
       <div>
         <p class="eyebrow">Evidence contract</p>
@@ -88,7 +95,8 @@
       </div>
       <div>
         <p>The required E2E gate validates mod state, screenshot integrity and expected pixel changes. These images let humans compare the resulting UI and rendering across versions.</p>
-        <p>The AI visual review is advisory; it is not presented here as a release gate. Open a card’s source run for the complete GitHub Actions record.</p>
+        <p>Every capture carries the evidence that admitted it: the versioned scenario contract it belongs to, the passed deterministic assertion emitted by the packaged client, the decoded pixel measurements of both the original PNG and the published image, the required pixel change against its paired checkpoint, and the SHA-256 of the exact mod JAR under test. Open a capture to read that record; nothing on this page is published without it.</p>
+        <p>The AI visual review is advisory; it is not presented here as a release gate. Open a capture’s source run for the complete GitHub Actions record.</p>
         <p><a href="gallery-data.json">Download the machine-readable gallery inventory</a></p>
       </div>
     </section>

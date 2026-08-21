@@ -27,6 +27,12 @@ At the padded BMO editor checkpoint, `Source: 128x64` is the imported image and 
 is the final atlas selection. The differing labels are correct; require opaque-black padding on all
 four sides of the centred atlas and allow checkerboard only through transparent source pixels.
 
+At `Elytra hides cape`, independently require two separated, tapered Elytra silhouettes with the
+world visible outside and between them. An opaque full-atlas rectangle, square cape canvas, or
+filled inner UV face remains a semantic defect even if the first reviewer accepted it. At
+`Vanilla elytra after cape removal`, require the ordinary vanilla wing texture with no remaining
+custom cape panel or colour.
+
 For `model_slim` and `model_classic`, FOV 50 intentionally leaves a complete, large rear player in
 frame. Angled arms have gaps from the torso, and the plaid jacket's outer layer inflates the limb
 silhouette; therefore total sleeve-to-sleeve span divided by torso width cannot identify 3- versus
