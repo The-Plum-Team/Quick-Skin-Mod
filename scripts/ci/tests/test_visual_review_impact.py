@@ -60,7 +60,7 @@ class VisualReviewImpactTest(unittest.TestCase):
 
     def test_release_policy_tests_are_nonvisual_in_both_scopes(self) -> None:
         path = "scripts/release/tests/test_cape_elytra_binding.py"
-        for scope in ("replicated-port", "source-pr"):
+        for scope in ("post-anchor-port", "replicated-port", "source-pr"):
             with self.subTest(scope=scope):
                 self.assertTrue(
                     infrastructure_only(
@@ -135,6 +135,38 @@ class VisualReviewImpactTest(unittest.TestCase):
         self.assertFalse(classification.review_required)
         self.assertEqual(sorted(paths), list(classification.paths))
         self.assertEqual("replicated-port", classification.manifest()["scope"])
+
+    def test_post_anchor_port_does_not_repeat_visual_policy_review(self) -> None:
+        paths = [
+            ".github/claude/package-lock.json",
+            ".github/workflows/visual-review.yml",
+            "e2e/check_visual_review.py",
+            "e2e/visual_review.py",
+            "e2e/visual_review_cache.py",
+            "e2e/visual_review_prompt.md",
+            "e2e/visual_review_runner.py",
+            "e2e/visual_review_semantic_prompt.md",
+            "e2e/visual_review_semantic_verify_prompt.md",
+            "e2e/visual_review_verify_prompt.md",
+            "scripts/ci/claude_capacity_gate.py",
+            "scripts/ci/claude_capacity_probe.py",
+            "scripts/ci/tests/test_workflow_security.py",
+            "docs/ai/PROJECT.md",
+        ]
+        classification = classify_paths(paths, scope="post-anchor-port")
+        self.assertFalse(classification.review_required)
+        self.assertEqual(sorted(paths), list(classification.paths))
+
+        for path in (
+            "common/src/main/java/com/quickskin/mod/QuickSkin.java",
+            ".github/workflows/on-demand-e2e.yml",
+            "e2e/scenario-contract.json",
+            "e2e/full-validation-baseline.json",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(
+                    classify_paths([path], scope="post-anchor-port").review_required
+                )
 
     def test_exact_path_classification_fails_closed(self) -> None:
         for paths in (
