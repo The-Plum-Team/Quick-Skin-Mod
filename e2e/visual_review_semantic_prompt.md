@@ -36,6 +36,12 @@ At the padded BMO editor checkpoint, `Source: 128x64` identifies the imported im
 Opaque-black padding must be visible on every side of the centred atlas, while the checkerboard is
 expected only where pixels inside the source are transparent.
 
+At `Elytra hides cape`, inspect the alpha silhouette without relying on another loader: require two
+separated, tapered Elytra wings with the world visible outside and between them. An opaque
+full-atlas rectangle, square cape canvas, or filled inner UV face is a semantic defect even when
+the custom colour is correct. At `Vanilla elytra after cape removal`, require two ordinary vanilla
+wings and reject any remaining custom cape panel or colour.
+
 At `model_slim` and `model_classic`, the player is intentionally shown at FOV 50 with a complete,
 large rear silhouette. The arms are angled away from the torso and the plaid jacket's outer layer
 inflates every limb, so the full sleeve-to-sleeve span divided by torso width is not an arm-width
