@@ -60,7 +60,7 @@ class VisualAnchorCertificationTest(unittest.TestCase):
         self._write("report", self.report)
         manifest_sha = certification._sha256(self.paths["manifest"])
         self.proof = {
-            "schema_version": 4,
+            "schema_version": 5,
             "source_run_id": 123,
             "source_branch": "automation/sync/forge-and-fabric-1.20.1/1-1",
             "source_sha": "2" * 40,
@@ -68,6 +68,12 @@ class VisualAnchorCertificationTest(unittest.TestCase):
             "implementation_sha": "3" * 40,
             "matrix_kind": "pr-anchors",
             "review_mode": "anchor-semantic",
+            "compatibility_impact": {
+                "schema_version": 1,
+                "compatibility_required": False,
+                "paths": ["scripts/ci/visual_anchor_certification.py"],
+                "impact_paths": [],
+            },
             "scenario_contract_sha256": "4" * 64,
             "artifact_inventory": [{"id": 1}],
             "job_graph": {"runtime_policy": "full"},
@@ -139,6 +145,33 @@ class VisualAnchorCertificationTest(unittest.TestCase):
             self.create(manifest=referenced)
         with self.assertRaisesRegex(certification.CertificationError, "identical complete"):
             self.create(manifest=self.manifest[:1], report=self.report[:1])
+
+    def test_compatibility_impact_schema_fails_closed(self) -> None:
+        missing = dict(self.proof)
+        missing.pop("compatibility_impact")
+        with self.assertRaisesRegex(certification.CertificationError, "proof.*schema"):
+            self.create(proof=missing)
+
+        incoherent = {
+            **self.proof,
+            "compatibility_impact": {
+                **self.proof["compatibility_impact"],
+                "compatibility_required": True,
+            },
+        }
+        with self.assertRaisesRegex(certification.CertificationError, "incoherent"):
+            self.create(proof=incoherent)
+
+    def test_required_compatibility_impact_is_certifiable(self) -> None:
+        self.proof["compatibility_impact"] = {
+            "schema_version": 1,
+            "compatibility_required": True,
+            "paths": ["common/src/main/java/com/quickskin/mod/QuickSkin.java"],
+            "impact_paths": ["common/src/main/java/com/quickskin/mod/QuickSkin.java"],
+        }
+        self._write("proof", self.proof)
+
+        self.assertEqual("certified", self.create()["verdict"])
 
     def test_certificate_is_bound_to_exact_master_and_anchor_branch(self) -> None:
         certificate = self.create()
