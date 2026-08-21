@@ -526,13 +526,26 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('source_pr_merged="$(jq -er', authenticate)
         self.assertIn('Deferring semantic anchor review until PR', authenticate)
         self.assertIn('--scope source-pr', authenticate)
-        self.assertIn('--scope replicated-port', authenticate)
+        self.assertIn('visual_scope=replicated-port', authenticate)
+        self.assertIn('visual_scope=post-anchor-port', authenticate)
+        self.assertIn('--scope "$visual_scope"', authenticate)
+        self.assertIn('"$source_pr_base" == master', authenticate)
+        self.assertIn('protected post-merge anchor generation', authenticate)
+        self.assertIn('scripts/ci/mod_compatibility_impact.py', authenticate)
+        self.assertIn('compatibility_impact=', authenticate)
+        self.assertIn('.event == "repository_dispatch"', authenticate)
+        self.assertIn('.path == ".github/workflows/sync-version-branches.yml"', authenticate)
         self.assertIn('outside ordinary visual review', authenticate)
         self.assertIn('ref: ${{ github.sha }}', authenticate)
         self.assertIn('persist-credentials: false', authenticate)
-        self.assertIn('Ignoring infrastructure-only visual review sync PR', authenticate)
+        self.assertIn('Ignoring %s-only visual review sync PR', authenticate)
         self.assertIn("visual-review-input-$source_run_id", authenticate)
-        self.assertIn('startswith($input_name + "-")', authenticate)
+        self.assertIn('generation_input_name="$input_name-$GITHUB_SHA"', authenticate)
+        self.assertIn(
+            "actions/artifacts?name=$artifact_query_name&per_page=100",
+            authenticate,
+        )
+        self.assertNotIn("actions/artifacts?per_page=100", authenticate)
         self.assertIn("visual-review-$source_run_id", authenticate)
         self.assertIn("visual-review-drain.yml", authenticate)
         self.assertNotIn("implementation_sha", authenticate)
@@ -601,7 +614,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--validate-row-json", curate)
         self.assertIn("--curate-output", curate)
         self.assertIn("evidence_kind:\"raw-png\"", curate)
-        self.assertIn("schema_version:4", curate)
+        self.assertIn("schema_version:5", curate)
+        self.assertIn("compatibility_impact:$compatibility_impact", curate)
         self.assertIn("retention-days: 7", curate)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", curate)
         self.assertNotIn("claude-code", curate)
@@ -623,7 +637,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("ref: ${{ needs.select.outputs.implementation_sha }}", review)
         self.assertIn("persist-credentials: false", review)
         self.assertNotIn("actions/download-artifact@", review)
-        self.assertIn("schema_version == 4", review)
+        self.assertIn("schema_version == 5", review)
+        self.assertIn(".compatibility_impact", review)
+        self.assertIn("cannot affect product/mod compatibility", review)
         self.assertIn('evidence_kind == "raw-png"', review)
         self.assertIn("CLAUDE_CODE_OAUTH_TOKEN", review)
         self.assertIn("visual_review_runner.py", review)
@@ -647,6 +663,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--allow-blocking-partial", review)
         self.assertIn("visual-review-verdict-cache-$policy_sha256", review)
         self.assertIn("visual_review_cache.py\" combine", review)
+        self.assertIn('merge-base --is-ancestor \\', review)
+        self.assertIn(
+            '$cache_owner_sha:.github/workflows/visual-review-drain.yml', review
+        )
+        self.assertIn('"$owner_producer" != "$current_producer"', review)
+        self.assertNotIn('.head_sha == $workflow_sha', review)
         self.assertIn("artifact_ids=", review)
         self.assertIn("Retire the consumed exact-policy verdict cache shards", review)
         self.assertIn("--max-entries 1", review)
@@ -725,6 +747,17 @@ class WorkflowSecurityTest(unittest.TestCase):
             self.assertIn("Makena", prompt)
             self.assertIn("red top", prompt)
             self.assertIn("yellow or orange top", prompt)
+        for prompt in (
+            triage_prompt,
+            verify_prompt,
+            semantic_prompt,
+            semantic_verify_prompt,
+        ):
+            normalized_prompt = " ".join(prompt.split())
+            self.assertIn("Elytra hides cape", normalized_prompt)
+            self.assertIn("separated, tapered Elytra", normalized_prompt)
+            self.assertIn("opaque full-atlas rectangle", normalized_prompt)
+            self.assertIn("Vanilla elytra after cape removal", normalized_prompt)
         self.assertIn("DEFAULT_TRIAGE_CHUNK_SIZE = 8", runner)
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
         self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
@@ -2024,7 +2057,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             sync.index('--exclude "$anchor_branch"'),
         )
         self.assertIn("--scope source-pr", visual)
-        self.assertIn("Ignoring infrastructure-only visual review sync PR", visual)
+        self.assertIn("Ignoring %s-only visual review sync PR", visual)
 
     def test_version_port_merge_revalidates_the_exact_pr(self) -> None:
         merge = job_block("handle-version-port-result.yml", "merge")
