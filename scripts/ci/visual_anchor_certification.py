@@ -45,6 +45,7 @@ PROOF_KEYS = {
     "implementation_sha",
     "matrix_kind",
     "review_mode",
+    "compatibility_impact",
     "scenario_contract_sha256",
     "artifact_inventory",
     "job_graph",
@@ -53,6 +54,12 @@ PROOF_KEYS = {
     "frame_count",
     "image_count",
     "image_bytes",
+}
+COMPATIBILITY_IMPACT_KEYS = {
+    "schema_version",
+    "compatibility_required",
+    "paths",
+    "impact_paths",
 }
 CERTIFICATE_KEYS = {
     "schema_version",
@@ -109,6 +116,33 @@ def _require_positive_integer(value: Any, field: str) -> int:
     return value
 
 
+def _validate_compatibility_impact(value: Any) -> None:
+    if not isinstance(value, dict) or set(value) != COMPATIBILITY_IMPACT_KEYS:
+        raise CertificationError("compatibility impact has an unexpected schema")
+    if value.get("schema_version") != 1:
+        raise CertificationError("compatibility impact schema version is unsupported")
+    compatibility_required = value.get("compatibility_required")
+    if not isinstance(compatibility_required, bool):
+        raise CertificationError("compatibility impact decision must be a boolean")
+    paths = value.get("paths")
+    impact_paths = value.get("impact_paths")
+    for field, entries in (("paths", paths), ("impact_paths", impact_paths)):
+        if (
+            not isinstance(entries, list)
+            or len(entries) > 200
+            or any(
+                not isinstance(entry, str) or not entry or len(entry) > 512
+                for entry in entries
+            )
+            or entries != sorted(set(entries))
+        ):
+            raise CertificationError(f"compatibility impact {field} is invalid")
+    if any(path not in paths for path in impact_paths):
+        raise CertificationError("compatibility impact paths are not a subset")
+    if compatibility_required != bool(impact_paths):
+        raise CertificationError("compatibility impact decision is incoherent")
+
+
 def _anchor_capture_sets(manifest: Any) -> dict[str, set[str]]:
     if not isinstance(manifest, list) or not manifest:
         raise CertificationError("semantic anchor manifest must be a non-empty array")
@@ -155,12 +189,13 @@ def create_certificate(
 ) -> dict[str, Any]:
     if not isinstance(proof, dict) or set(proof) != PROOF_KEYS:
         raise CertificationError("curation proof has an unexpected schema")
-    if proof.get("schema_version") != 4:
+    if proof.get("schema_version") != 5:
         raise CertificationError("curation proof schema version is not certifiable")
     if proof.get("review_mode") != "anchor-semantic":
         raise CertificationError("only an anchor-semantic review can be certified")
     if proof.get("visual_reference") is not None:
         raise CertificationError("semantic anchor proof must not contain a visual reference")
+    _validate_compatibility_impact(proof.get("compatibility_impact"))
     source_branch = proof.get("source_branch")
     if not isinstance(source_branch, str) or SYNC_BRANCH.fullmatch(source_branch) is None:
         raise CertificationError("certification requires an automation synchronization source")
