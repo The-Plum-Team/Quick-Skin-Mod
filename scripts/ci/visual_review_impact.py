@@ -13,7 +13,7 @@ from typing import Any
 
 MAX_CHANGED_FILES = 100
 POLICY_VERSION = 1
-SCOPES = frozenset({"replicated-port", "source-pr"})
+SCOPES = frozenset({"post-anchor-port", "replicated-port", "source-pr"})
 REPLICATED_SAFE_EXACT_PATHS = frozenset(
     {
         ".github/workflows/handle-version-port-result.yml",
@@ -26,6 +26,7 @@ REPLICATED_SAFE_EXACT_PATHS = frozenset(
         "scripts/ci/github_api_retry.sh",
         "scripts/ci/e2e_impact.py",
         "scripts/ci/mod_compatibility_review_queue.py",
+        "scripts/ci/mod_compatibility_impact.py",
         "scripts/ci/visual_nonimpact_certification.py",
         "scripts/ci/visual_review_queue.py",
         "scripts/pages/rotate_artifacts.py",
@@ -39,6 +40,26 @@ SOURCE_PR_SAFE_EXACT_PATHS = frozenset(
         ".github/workflows/mod-compatibility-e2e.yml",
         ".github/workflows/mod-compatibility-review.yml",
         "scripts/ci/mod_compatibility_review_queue.py",
+        "scripts/ci/mod_compatibility_impact.py",
+    }
+)
+POST_ANCHOR_SAFE_EXACT_PATHS = REPLICATED_SAFE_EXACT_PATHS | frozenset(
+    {
+        ".github/claude/package-lock.json",
+        ".github/claude/package.json",
+        "e2e/check_visual_review.py",
+        "e2e/visual_review.py",
+        "e2e/visual_review_cache.py",
+        "e2e/visual_review_prompt.md",
+        "e2e/visual_review_runner.py",
+        "e2e/visual_review_semantic_prompt.md",
+        "e2e/visual_review_semantic_verify_prompt.md",
+        "e2e/visual_review_verify_prompt.md",
+        "scripts/ci/bounded_zip.py",
+        "scripts/ci/claude_capacity_gate.py",
+        "scripts/ci/claude_capacity_probe.py",
+        "scripts/ci/e2e_job_graph.py",
+        "scripts/ci/visual_anchor_certification.py",
     }
 )
 SAFE_PREFIXES = ("docs/", "scripts/ci/tests/", "scripts/release/tests/")
@@ -81,11 +102,11 @@ def _safe_path(value: Any, *, scope: str) -> bool:
         return False
     if scope not in SCOPES:
         return False
-    exact_paths = (
-        REPLICATED_SAFE_EXACT_PATHS
-        if scope == "replicated-port"
-        else SOURCE_PR_SAFE_EXACT_PATHS
-    )
+    exact_paths = {
+        "post-anchor-port": POST_ANCHOR_SAFE_EXACT_PATHS,
+        "replicated-port": REPLICATED_SAFE_EXACT_PATHS,
+        "source-pr": SOURCE_PR_SAFE_EXACT_PATHS,
+    }[scope]
     return path in exact_paths or any(
         path.startswith(prefix) for prefix in SAFE_PREFIXES
     )
