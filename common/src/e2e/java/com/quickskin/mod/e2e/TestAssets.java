@@ -57,7 +57,7 @@ public final class TestAssets {
     public static Path makeClassicSkin() throws Exception {
         try (InputStream in = TestAssets.class.getResourceAsStream(BUNDLED_SKIN)) {
             if (in != null) {
-                Path tmp = deterministicFixture("qs_e2e_skin.png");
+                Path tmp = deterministicFixture("qs_e2e_skin_fixture.png");
                 Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
                 E2ELog.info("using bundled real skin " + BUNDLED_SKIN);
                 return tmp;
@@ -82,7 +82,7 @@ public final class TestAssets {
         g.setColor(new Color(0xEE, 0xDD, 0x22));
         g.fillRect(0, 20, 64, 4);
         g.dispose();
-        Path tmp = deterministicFixture("qs_e2e_skin.png");
+        Path tmp = deterministicFixture("qs_e2e_skin_fixture.png");
         ImageIO.write(img, "png", tmp.toFile());
         return tmp;
     }
