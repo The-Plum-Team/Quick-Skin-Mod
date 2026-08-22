@@ -688,20 +688,22 @@ public final class VanillaShim {
      *
      * <p>Secure-chat and social-interaction notices are connection timing artifacts, not Quick
      * Skin evidence. Their APIs keep stable shapes but have renamed accessors across supported
-     * versions, so this boundary resolves both named and intermediary forms and fails closed when
-     * either surface cannot be cleared.</p>
+     * versions and loaders, so this boundary resolves named, intermediary, and SRG forms and fails
+     * closed when either surface cannot be cleared.</p>
      *
      * @return {@code null} on success, otherwise a bounded diagnostic suitable for an E2E report.
      */
     public static String clearTransientOverlays(Minecraft mc) {
         try {
             Method toastAccessor = findNoArg(
-                    mc.getClass(), "getToasts", "getToastManager", "method_1566"
+                    mc.getClass(), "getToasts", "getToastManager", "method_1566", "m_91300_"
             );
             Object toastManager = toastAccessor == null ? null : toastAccessor.invoke(mc);
             Method clearToasts = toastManager == null
                     ? null
-                    : findNoArg(toastManager.getClass(), "clear", "method_2000");
+                    : findNoArg(
+                            toastManager.getClass(), "clear", "method_2000", "m_94919_"
+                    );
             if (clearToasts == null) {
                 return "vanilla toast clear surface is unavailable";
             }
@@ -710,13 +712,14 @@ public final class VanillaShim {
             Object gui = mc.gui;
             Method chatAccessor = gui == null
                     ? null
-                    : findNoArg(gui.getClass(), "getChat", "method_1743");
+                    : findNoArg(gui.getClass(), "getChat", "method_1743", "m_93076_");
             Object chat = chatAccessor == null ? null : chatAccessor.invoke(gui);
             Method clearChat = null;
             if (chat != null) {
                 for (Method method : chat.getClass().getMethods()) {
                     if ((method.getName().equals("clearMessages")
-                            || method.getName().equals("method_1808"))
+                            || method.getName().equals("method_1808")
+                            || method.getName().equals("m_93795_"))
                             && method.getParameterCount() == 1
                             && method.getParameterTypes()[0] == boolean.class) {
                         method.setAccessible(true);
