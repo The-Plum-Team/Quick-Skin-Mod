@@ -43,7 +43,9 @@ For each selected target the workflow:
    no-commit merge and gives its complete original conflict set to a deterministic classifier;
 3. resolves only exact reviewed protected cases: shared guidance/runtime documents use a
    source-preferred three-way merge, the target matrix is retained, and a build script remains
-   deleted only when that loader is inactive in the target matrix;
+   deleted only when that loader is inactive in the target matrix; the exact Minecraft 1.21
+   datapack directory rename is migrated mechanically to singular `function` paths with the
+   target runtime's game-rule identifiers;
 4. fails closed on an unknown protected conflict and invokes Claude only for the remaining
    unprotected paths;
 5. packages a bounded proposal, then applies it only to an alternate index; the credentialless
