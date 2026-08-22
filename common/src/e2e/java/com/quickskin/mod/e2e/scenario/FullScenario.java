@@ -2957,7 +2957,7 @@ public final class FullScenario implements Scenario {
     private void pinRearEvidenceView(Minecraft mc) {
         if (mc.player == null) return;
         float yaw = 180f;
-        mc.player.setDeltaMovement(0, 0, 0);
+        DefaultSkinEvidenceView.pinStandingMotion(mc.player);
         mc.player.setYRot(yaw);
         mc.player.yRotO = yaw;
         mc.player.setYHeadRot(yaw);
