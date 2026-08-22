@@ -14,7 +14,8 @@ from typing import Any, NoReturn
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("scenario-contract.json")
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+REQUIRED_SCREENSHOT_SIZE = (1920, 1080)
 MAX_CONTRACT_BYTES = 1024 * 1024
 IDENTIFIER = re.compile(r"^[a-z][a-z0-9_-]*$")
 REVIEW_TIERS = frozenset({"all", "key"})
@@ -144,7 +145,9 @@ class ScenarioContract:
 
     __slots__ = (
         "schema_version",
+        "screenshot_size",
         "gui_text_reference_size",
+        "review_regions",
         "scenarios",
         "captures",
         "sha256",
@@ -159,12 +162,16 @@ class ScenarioContract:
         self,
         *,
         schema_version: int,
+        screenshot_size: tuple[int, int],
         gui_text_reference_size: tuple[int, int],
+        review_regions: dict[str, tuple[tuple[float, float, float, float], ...]],
         scenarios: tuple[Scenario, ...],
         sha256: str,
     ) -> None:
         self.schema_version = schema_version
+        self.screenshot_size = screenshot_size
         self.gui_text_reference_size = gui_text_reference_size
+        self.review_regions = dict(review_regions)
         self.scenarios = scenarios
         self.captures = tuple(
             step.capture
@@ -274,6 +281,12 @@ class ScenarioContract:
             return self._capture_by_id[value]
         except KeyError as exc:
             raise ScenarioContractError(f"unknown E2E capture {value!r}") from exc
+
+    def review_regions_for(
+        self, value: str
+    ) -> tuple[tuple[float, float, float, float], ...]:
+        self.capture_by_id(value)
+        return self.review_regions[value]
 
 
 def _reject_constant(value: str) -> NoReturn:
@@ -598,13 +611,34 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
     root = _object(
         data,
         "scenario contract",
-        frozenset({"schema_version", "gui_text_reference_size", "scenarios"}),
+        frozenset(
+            {
+                "schema_version",
+                "screenshot_size",
+                "gui_text_reference_size",
+                "review_regions",
+                "scenarios",
+            }
+        ),
     )
     schema = _integer(
-        root["schema_version"], "scenario contract.schema_version", minimum=1, maximum=1
+        root["schema_version"], "scenario contract.schema_version", minimum=2, maximum=2
     )
     if schema != SCHEMA_VERSION:  # pragma: no cover - range check documents the invariant
         raise ScenarioContractError(f"unsupported scenario contract schema {schema}")
+
+    screenshot_raw = _array(root["screenshot_size"], "scenario contract.screenshot_size")
+    if len(screenshot_raw) != 2:
+        raise ScenarioContractError("screenshot_size must contain width and height")
+    screenshot_size = (
+        _integer(screenshot_raw[0], "screenshot_size[0]", minimum=1, maximum=16384),
+        _integer(screenshot_raw[1], "screenshot_size[1]", minimum=1, maximum=16384),
+    )
+    if screenshot_size != REQUIRED_SCREENSHOT_SIZE:
+        raise ScenarioContractError(
+            "packaged E2E and AI review screenshots must remain exactly "
+            f"{REQUIRED_SCREENSHOT_SIZE[0]}x{REQUIRED_SCREENSHOT_SIZE[1]}"
+        )
 
     reference_raw = _array(
         root["gui_text_reference_size"], "scenario contract.gui_text_reference_size"
@@ -832,6 +866,42 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
         for step in role.steps
         if step.capture is not None
     }
+    raw_review_regions = root["review_regions"]
+    if not isinstance(raw_review_regions, dict):
+        raise ScenarioContractError("scenario contract.review_regions must be an object")
+    expected_capture_ids = set(capture_profiles)
+    actual_capture_ids = set(raw_review_regions)
+    if actual_capture_ids != expected_capture_ids:
+        raise ScenarioContractError(
+            "scenario contract.review_regions must cover every capture exactly: "
+            f"missing={sorted(expected_capture_ids - actual_capture_ids)}, "
+            f"unknown={sorted(actual_capture_ids - expected_capture_ids)}"
+        )
+    review_regions: dict[
+        str, tuple[tuple[float, float, float, float], ...]
+    ] = {}
+    for capture_name in capture_profiles:
+        values = _array(
+            raw_review_regions[capture_name],
+            f"scenario contract.review_regions[{capture_name!r}]",
+            nonempty=True,
+        )
+        if len(values) > 8:
+            raise ScenarioContractError(
+                f"scenario contract.review_regions[{capture_name!r}] exceeds eight regions"
+            )
+        regions = tuple(
+            _region(
+                value,
+                f"scenario contract.review_regions[{capture_name!r}][{index}]",
+            )
+            for index, value in enumerate(values)
+        )
+        if len(set(regions)) != len(regions):
+            raise ScenarioContractError(
+                f"scenario contract.review_regions[{capture_name!r}] contains duplicates"
+            )
+        review_regions[capture_name] = regions
     for scenario in scenarios:
         is_compatibility = "compatibility" in scenario.execution_profiles
         for role in scenario.roles:
@@ -875,7 +945,9 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
 
     return ScenarioContract(
         schema_version=schema,
+        screenshot_size=screenshot_size,
         gui_text_reference_size=reference_size,
+        review_regions=review_regions,
         scenarios=tuple(scenarios),
         sha256=raw_sha256,
     )
