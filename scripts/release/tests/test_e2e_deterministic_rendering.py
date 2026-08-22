@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -20,18 +21,7 @@ PLAYER = (
 )
 OPTIONS = ROOT / "e2e/options.txt.template"
 SERVER_PROPERTIES = ROOT / "e2e/server-template/server.properties"
-WORLD_LOAD = (
-    ROOT
-    / "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction"
-)
-WORLD_TICK = (
-    ROOT
-    / "e2e/server-template/datapack/data/qs_e2e/functions/tick.mcfunction"
-)
-WORLD_TICK_TAG = (
-    ROOT
-    / "e2e/server-template/datapack/data/minecraft/tags/functions/tick.json"
-)
+WORLD_DATA = ROOT / "e2e/server-template/datapack/data"
 DEFAULT_SKIN_VIEW = (
     ROOT
     / "common/src/e2e/java/com/quickskin/mod/e2e/DefaultSkinEvidenceView.java"
@@ -44,6 +34,27 @@ FULL_SCENARIO = (
     ROOT
     / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
 )
+
+
+def world_function_paths(data_root: Path) -> tuple[Path, Path, Path, Path]:
+    """Resolve the one coherent function layout allowed by the target pack format."""
+
+    layouts = []
+    for directory in ("functions", "function"):
+        paths = (
+            data_root / "qs_e2e" / directory / "load.mcfunction",
+            data_root / "qs_e2e" / directory / "tick.mcfunction",
+            data_root / "minecraft" / "tags" / directory / "load.json",
+            data_root / "minecraft" / "tags" / directory / "tick.json",
+        )
+        if all(path.is_file() for path in paths):
+            layouts.append(paths)
+    if len(layouts) != 1:
+        raise ValueError(
+            "the E2E datapack must contain exactly one complete singular or plural "
+            "function layout"
+        )
+    return layouts[0]
 
 
 class E2EDeterministicRenderingTest(unittest.TestCase):
@@ -85,16 +96,34 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
 
     def test_disposable_world_uses_a_fixed_spawn(self) -> None:
         properties = SERVER_PROPERTIES.read_text(encoding="utf-8")
-        load_function = WORLD_LOAD.read_text(encoding="utf-8")
+        world_load, world_tick, _world_load_tag, world_tick_tag = world_function_paths(
+            WORLD_DATA
+        )
+        load_function = world_load.read_text(encoding="utf-8")
 
         self.assertIn("level-seed=quickskin-e2e", properties)
         self.assertIn("gamerule spawnRadius 0", load_function)
         self.assertIn("team modify qs_e2e collisionRule never", load_function)
         self.assertIn(
             "team join qs_e2e @a[team=!qs_e2e]",
-            WORLD_TICK.read_text(encoding="utf-8"),
+            world_tick.read_text(encoding="utf-8"),
         )
-        self.assertIn('"qs_e2e:tick"', WORLD_TICK_TAG.read_text(encoding="utf-8"))
+        self.assertIn('"qs_e2e:tick"', world_tick_tag.read_text(encoding="utf-8"))
+
+    def test_world_function_layout_accepts_both_pack_format_spellings(self) -> None:
+        for directory in ("functions", "function"):
+            with self.subTest(directory=directory), tempfile.TemporaryDirectory() as tmp:
+                data_root = Path(tmp)
+                paths = (
+                    data_root / "qs_e2e" / directory / "load.mcfunction",
+                    data_root / "qs_e2e" / directory / "tick.mcfunction",
+                    data_root / "minecraft" / "tags" / directory / "load.json",
+                    data_root / "minecraft" / "tags" / directory / "tick.json",
+                )
+                for path in paths:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("test\n", encoding="utf-8")
+                self.assertEqual(paths, world_function_paths(data_root))
 
     def test_world_player_interpolation_is_pinned_by_the_e2e_harness(self) -> None:
         source = DEFAULT_SKIN_VIEW.read_text(encoding="utf-8")
