@@ -40,6 +40,10 @@ E2E_HARNESS = (
     ROOT
     / "common/src/e2e/java/com/quickskin/mod/e2e/E2EHarness.java"
 )
+FULL_SCENARIO = (
+    ROOT
+    / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
+)
 
 
 class E2EDeterministicRenderingTest(unittest.TestCase):
@@ -102,6 +106,27 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
             "DefaultSkinEvidenceView.pinStandingMotion(mc.player)",
             E2E_HARNESS.read_text(encoding="utf-8"),
         )
+
+    def test_capture_is_dispatched_after_the_counted_render_pass_completes(self) -> None:
+        source = E2E_HARNESS.read_text(encoding="utf-8")
+        rendered_callback = source.split("private void onRenderedFrame()", 1)[1].split(
+            "private void dispatchReadyCapture", 1
+        )[0]
+
+        self.assertIn("renderedFrame++;", rendered_callback)
+        self.assertNotIn("VanillaShim.screenshot", rendered_callback)
+        self.assertIn("private void dispatchReadyCapture(Minecraft mc)", source)
+        self.assertIn("dispatchReadyCapture(mc);", source)
+        self.assertIn("captured completed rendered frame", source)
+
+    def test_hud_preview_targets_the_authored_lower_right_region(self) -> None:
+        source = FULL_SCENARIO.read_text(encoding="utf-8")
+
+        self.assertIn("positionHudOverlayForEvidence(mc, ClientConfig.getInstance())", source)
+        self.assertIn("Math.round(screenWidth * 0.89f)", source)
+        self.assertIn("Math.round(screenHeight * 0.96f)", source)
+        self.assertIn('overlayCachedInt("cachedModelCenterX")', source)
+        self.assertIn("overlayGeometryFailure(mc)", source)
 
 
 if __name__ == "__main__":
