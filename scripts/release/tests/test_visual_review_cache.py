@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -32,7 +33,7 @@ def paired(
     candidate: str = CANDIDATE,
     reference: str = REFERENCE,
     expectation: str = "The cape must have its expected shape.",
-) -> dict[str, str]:
+) -> dict[str, Any]:
     _artifact, scenario, role, step = label.split("/")
     capture_id = f"{scenario}.{role}.{step}"
     return {
@@ -44,6 +45,12 @@ def paired(
         "kind": capture_id,
         "expectation": expectation,
         "runtime_evidence": "renderer-facing assertion passed",
+        "image_size": [1920, 1080],
+        "review_regions": [[0.25, 0.25, 0.75, 0.75]],
+        "candidate_semantic_sha256": candidate,
+        "reference_semantic_sha256": reference,
+        "semantic_changed_fraction": 0.0 if candidate == reference else 0.2,
+        "perceptual_delta": 0.0 if candidate == reference else 0.2,
     }
 
 
@@ -61,7 +68,9 @@ def verdict(label: str, *, defect: bool = False) -> dict[str, object]:
 class VisualReviewCacheTest(unittest.TestCase):
     def test_immutable_shards_combine_newest_first(self) -> None:
         shared = paired("fabric-1.21.1/full/client_a/cape")
-        older_only = paired("forge-1.21.1/full/client_a/cape")
+        older_only = paired(
+            "forge-1.21.1/full/client_a/cape", candidate="d" * 64
+        )
         older = merge_cache(
             None,
             [shared, older_only],
@@ -90,7 +99,7 @@ class VisualReviewCacheTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             files = []
-            for index in range(8):
+            for index in range(9):
                 path = root / f"policy-{index}.txt"
                 path.write_text(f"value-{index}", encoding="utf-8")
                 files.append(path)
@@ -100,12 +109,13 @@ class VisualReviewCacheTest(unittest.TestCase):
                     runner=files[0],
                     checker=files[1],
                     cache_codec=files[2],
-                    scenario_contract=files[3],
-                    release_matrix=files[4],
-                    provider_lock=files[5],
-                    triage_prompt=files[6],
-                    verify_prompt=files[7],
-                    triage_model="claude-sonnet-5",
+                    similarity_codec=files[3],
+                    scenario_contract=files[4],
+                    release_matrix=files[5],
+                    provider_lock=files[6],
+                    triage_prompt=files[7],
+                    verify_prompt=files[8],
+                    triage_model="claude-haiku-4-5",
                     verify_model="claude-opus-5",
                     review_mode="reference-comparison",
                     triage_chunk_size=8,
@@ -113,12 +123,12 @@ class VisualReviewCacheTest(unittest.TestCase):
                 )
 
             first = policy()
-            files[6].write_text("changed prompt", encoding="utf-8")
+            files[3].write_text("changed similarity", encoding="utf-8")
             second = policy()
 
         self.assertNotEqual(first, second)
 
-    def test_cache_hits_require_exact_pixels_expectation_and_artifact(self) -> None:
+    def test_cache_hits_require_exact_regions_expectation_and_runtime_evidence(self) -> None:
         source = paired("fabric-1.21.1/full/client_a/cape")
         cache = merge_cache(
             None,
@@ -144,10 +154,17 @@ class VisualReviewCacheTest(unittest.TestCase):
             [same["label"]],
             list(cached_verdicts([same], cache, review_mode="reference-comparison")),
         )
+        self.assertEqual(
+            [changed_artifact["label"]],
+            list(
+                cached_verdicts(
+                    [changed_artifact], cache, review_mode="reference-comparison"
+                )
+            ),
+        )
         for candidate in (
             changed_pixels,
             changed_expectation,
-            changed_artifact,
             changed_runtime_evidence,
         ):
             with self.subTest(label=candidate["label"], path=candidate["path"]):
@@ -194,9 +211,9 @@ class VisualReviewCacheTest(unittest.TestCase):
         with self.assertRaisesRegex(ReviewError, "invalid or duplicate key"):
             validate_cache(cache, POLICY)
         with self.assertRaisesRegex(ReviewError, "different review policy"):
-            validate_cache({"schema_version": 1, "policy_sha256": POLICY, "entries": []}, "f" * 64)
+            validate_cache({"schema_version": 2, "policy_sha256": POLICY, "entries": []}, "f" * 64)
 
-    def test_key_is_label_independent_but_loader_specific(self) -> None:
+    def test_key_is_label_and_loader_independent_for_identical_semantics(self) -> None:
         first = paired("fabric-1.21.1/full/client_a/cape")
         same_artifact_new_label = {
             **first,
@@ -208,7 +225,7 @@ class VisualReviewCacheTest(unittest.TestCase):
             cache_key(cache_identity(first, "reference-comparison")),
             cache_key(cache_identity(same_artifact_new_label, "reference-comparison")),
         )
-        self.assertNotEqual(
+        self.assertEqual(
             cache_key(cache_identity(first, "reference-comparison")),
             cache_key(cache_identity(forge, "reference-comparison")),
         )

@@ -271,6 +271,8 @@ class ScenarioContractTest(unittest.TestCase):
             for step in steps
         }
         self.assertEqual(expected_ids, set(self.contract.capture_ids))
+        self.assertEqual((1920, 1080), self.contract.screenshot_size)
+        self.assertEqual(expected_ids, set(self.contract.review_regions))
         self.assertEqual(45, len(expected_ids))
         first = self.contract.capture_by_id("full.client_a.baseline")
         self.assertIs(
@@ -286,6 +288,10 @@ class ScenarioContractTest(unittest.TestCase):
         )
         self.assertEqual("Skin menu", skin_menu.title)
         self.assertEqual("key", skin_menu.review_tier)
+        self.assertEqual(
+            ((0.34, 0.09, 0.66, 0.91),),
+            self.contract.review_regions_for("full.client_a.skin_menu_screen"),
+        )
 
         padded_bmo = self.contract.capture_by_id(
             "full.client_a.bmo_padded_source_screen"
@@ -412,6 +418,12 @@ class ScenarioContractTest(unittest.TestCase):
                     "cape_adjust_zoom_in",
                     0.00001,
                     None,
+                ),
+                (
+                    "baseline",
+                    "hud_preview_overlay",
+                    0.05,
+                    (0.82, 0.72, 0.96, 0.99),
                 ),
             ],
             values("full", "client_a"),
@@ -687,13 +699,29 @@ class ScenarioContractTest(unittest.TestCase):
                 "compatibility_reference_capture_id"
             ] = "mod-compatibility.client_a.apply_local_skin_with_mod"
 
+        def missing_review_regions(value: dict[str, Any]) -> None:
+            del value["review_regions"]["full.client_a.baseline"]
+
+        def unknown_review_region(value: dict[str, Any]) -> None:
+            value["review_regions"]["full.client_a.unknown"] = [[0.0, 0.0, 1.0, 1.0]]
+
+        def inverted_review_region(value: dict[str, Any]) -> None:
+            value["review_regions"]["full.client_a.baseline"] = [[0.8, 0.2, 0.1, 0.9]]
+
+        def duplicate_review_region(value: dict[str, Any]) -> None:
+            regions = value["review_regions"]["full.client_a.baseline"]
+            regions.append(copy.deepcopy(regions[0]))
+
         cases = {
             "unknown root field": unknown_root,
             "boolean schema": lambda value: value.__setitem__(
                 "schema_version", True
             ),
             "unsupported schema": lambda value: value.__setitem__(
-                "schema_version", 2
+                "schema_version", 3
+            ),
+            "wrong screenshot size": lambda value: value.__setitem__(
+                "screenshot_size", [1280, 720]
             ),
             "bad reference size": lambda value: value.__setitem__(
                 "gui_text_reference_size", [1600]
@@ -732,6 +760,10 @@ class ScenarioContractTest(unittest.TestCase):
             "missing compatibility reference": missing_compatibility_reference,
             "unknown compatibility reference": unknown_compatibility_reference,
             "compatibility reference outside release": compatibility_reference_is_not_release,
+            "missing review region": missing_review_regions,
+            "unknown review region": unknown_review_region,
+            "inverted review region": inverted_review_region,
+            "duplicate review region": duplicate_review_region,
         }
         for label, mutate in cases.items():
             with self.subTest(label=label):
@@ -739,8 +771,8 @@ class ScenarioContractTest(unittest.TestCase):
 
     def test_malformed_json_encoding_and_symlinks_are_rejected(self) -> None:
         duplicate = self.contract_path.read_text(encoding="utf-8").replace(
-            '"schema_version": 1,',
-            '"schema_version": 1,\n  "schema_version": 1,',
+            '"schema_version": 2,',
+            '"schema_version": 2,\n  "schema_version": 2,',
             1,
         )
         duplicate_path = self.root / "duplicate.json"
@@ -752,7 +784,7 @@ class ScenarioContractTest(unittest.TestCase):
             scenario_contract.load_contract(duplicate_path)
 
         nonfinite = self.contract_path.read_text(encoding="utf-8").replace(
-            '"schema_version": 1',
+            '"schema_version": 2',
             '"schema_version": NaN',
             1,
         )

@@ -22,7 +22,7 @@ import java.util.Set;
 
 /**
  * Generates deterministic test textures at runtime so no binary assets need to be committed and the
- * file-upload flow can be exercised. Skins are written to a temp file and handed to
+ * file-upload flow can be exercised. Skins are written to a deterministic per-run fixture and handed to
  * {@code SkinImporter.importSkin(Path)}; capes are registered headlessly via
  * {@link #registerLocalCape(Path)} (bypassing the interactive {@code CapeAdjustScreen}).
  */
@@ -57,7 +57,7 @@ public final class TestAssets {
     public static Path makeClassicSkin() throws Exception {
         try (InputStream in = TestAssets.class.getResourceAsStream(BUNDLED_SKIN)) {
             if (in != null) {
-                Path tmp = Files.createTempFile("qs_e2e_skin_", ".png");
+                Path tmp = deterministicFixture("qs_e2e_skin_fixture.png");
                 Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
                 E2ELog.info("using bundled real skin " + BUNDLED_SKIN);
                 return tmp;
@@ -82,7 +82,7 @@ public final class TestAssets {
         g.setColor(new Color(0xEE, 0xDD, 0x22));
         g.fillRect(0, 20, 64, 4);
         g.dispose();
-        Path tmp = Files.createTempFile("qs_e2e_skin_", ".png");
+        Path tmp = deterministicFixture("qs_e2e_skin_fixture.png");
         ImageIO.write(img, "png", tmp.toFile());
         return tmp;
     }
@@ -104,7 +104,7 @@ public final class TestAssets {
         g.setColor(new Color(0x11, 0x22, 0xEE));
         g.fillRect(0, 40, 64, 6);
         g.dispose();
-        Path tmp = Files.createTempFile("qs_e2e_external_skin_", ".png");
+        Path tmp = deterministicFixture("qs_e2e_external_skin.png");
         ImageIO.write(img, "png", tmp.toFile());
         return tmp;
     }
@@ -149,9 +149,9 @@ public final class TestAssets {
         return img;
     }
 
-    /** {@link #makeClassicCapeImage()} written to a temp PNG file. */
+    /** {@link #makeClassicCapeImage()} written to its deterministic E2E PNG file. */
     public static Path makeClassicCape() throws Exception {
-        Path tmp = Files.createTempFile("qs_e2e_cape_", ".png");
+        Path tmp = deterministicFixture("qs_e2e_cape.png");
         ImageIO.write(makeClassicCapeImage(), "png", tmp.toFile());
         return tmp;
     }
@@ -210,7 +210,7 @@ public final class TestAssets {
 
     /** {@link #makePaddedBmoCapeSourceImage()} written as the non-standard PNG import source. */
     public static Path makePaddedBmoCapeSource() throws Exception {
-        Path tmp = Files.createTempFile("qs_e2e_bmo_padded_", ".png");
+        Path tmp = deterministicFixture("qs_e2e_bmo_padded.png");
         if (!ImageIO.write(makePaddedBmoCapeSourceImage(), "png", tmp.toFile())) {
             throw new IllegalStateException("no PNG writer for padded BMO cape source");
         }
@@ -298,9 +298,9 @@ public final class TestAssets {
         return img;
     }
 
-    /** {@link #makeContrastCapeImage()} written to a temp PNG file. */
+    /** {@link #makeContrastCapeImage()} written to its deterministic E2E PNG file. */
     public static Path makeContrastCape() throws Exception {
-        Path tmp = Files.createTempFile("qs_e2e_cape_contrast_", ".png");
+        Path tmp = deterministicFixture("qs_e2e_cape_contrast.png");
         ImageIO.write(makeContrastCapeImage(), "png", tmp.toFile());
         return tmp;
     }
@@ -328,7 +328,7 @@ public final class TestAssets {
         g.setColor(new Color(0xEE, 0xDD, 0x22));
         g.fillRect(4, 20, 36, 10);
         g.dispose();
-        Path tmp = Files.createTempFile("qs_e2e_cape_hd_", ".png");
+        Path tmp = deterministicFixture("qs_e2e_cape_hd.png");
         ImageIO.write(img, "png", tmp.toFile());
         return tmp;
     }
@@ -456,7 +456,7 @@ public final class TestAssets {
     public static Path makeGifCape() throws Exception {
         try (InputStream in = TestAssets.class.getResourceAsStream(BUNDLED_CAPE_GIF)) {
             if (in == null) return null;
-            Path tmp = Files.createTempFile("qs_e2e_cape_", ".gif");
+            Path tmp = deterministicFixture("qs_e2e_cape.gif");
             Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
             return tmp;
         }
@@ -576,5 +576,31 @@ public final class TestAssets {
         }
         E2ELog.warn("cape not discovered after reload (file=" + filename + " hash=" + hash + ")");
         return null;
+    }
+
+    /**
+     * Return one stable filename below the disposable packaged-runtime profile.
+     *
+     * <p>The imported filename is product-visible catalog text, so a random temporary suffix makes
+     * otherwise identical screenshots differ. The orchestrator gives every client a fresh game
+     * directory; replacing a bounded named fixture there is deterministic and cannot collide with
+     * another lane.</p>
+     */
+    private static Path deterministicFixture(String filename) throws Exception {
+        if (filename == null || !filename.matches("[a-z0-9_.-]+")) {
+            throw new IllegalArgumentException("unsafe E2E fixture filename: " + filename);
+        }
+        Path runDirectory = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        Path fixtureDirectory = runDirectory.resolve("e2e-fixtures");
+        if (Files.isSymbolicLink(fixtureDirectory)) {
+            throw new IllegalStateException("E2E fixture directory must not be a symbolic link");
+        }
+        Files.createDirectories(fixtureDirectory);
+        Path fixture = fixtureDirectory.resolve(filename).normalize();
+        if (!fixture.getParent().equals(fixtureDirectory)) {
+            throw new IllegalArgumentException("E2E fixture escapes its directory: " + filename);
+        }
+        Files.deleteIfExists(fixture);
+        return fixture;
     }
 }
