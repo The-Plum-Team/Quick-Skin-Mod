@@ -16,7 +16,12 @@ import version_port_conflicts  # noqa: E402
 
 
 class VersionPortConflictsTest(unittest.TestCase):
-    def write_matrix(self, root: Path, loaders: tuple[str, ...]) -> Path:
+    def write_matrix(
+        self,
+        root: Path,
+        loaders: tuple[str, ...],
+        runtime_version: str = "1.21.10",
+    ) -> Path:
         matrix = root / "release-matrix.json"
         matrix.write_text(
             json.dumps(
@@ -30,6 +35,10 @@ class VersionPortConflictsTest(unittest.TestCase):
                         "common": {},
                         **{loader: {} for loader in loaders},
                     },
+                    "runtimes": [
+                        {"loader": loader, "runtime_version": runtime_version}
+                        for loader in loaders
+                    ],
                 }
             ),
             encoding="utf-8",
@@ -48,6 +57,7 @@ class VersionPortConflictsTest(unittest.TestCase):
                 "docs/ai/WORKFLOW.md",
                 "common/src/main/java/com/quickskin/mod/Screen.java",
                 "common/src/legacy1_20_1/resources/quickskin.mixins.json",
+                "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction",
                 "e2e/README.md",
             ),
             {"fabric", "neoforge"},
@@ -65,6 +75,7 @@ class VersionPortConflictsTest(unittest.TestCase):
                 "target_paths": ["release/release-matrix.json"],
                 "delete_paths": [
                     "common/src/legacy1_20_1/resources/quickskin.mixins.json",
+                    "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction",
                     "forge/build.gradle.kts",
                 ],
                 "ai_paths": [
@@ -221,6 +232,7 @@ class VersionPortConflictsTest(unittest.TestCase):
                 profile.active_overlay_roots,
                 frozenset({"common/src/legacy1_21_10"}),
             )
+            self.assertEqual(profile.runtime_version, "1.21.10")
 
             for invalid in (
                 None,
@@ -229,6 +241,33 @@ class VersionPortConflictsTest(unittest.TestCase):
             ):
                 with self.subTest(source_overlays=invalid):
                     payload["source_overlays"] = invalid
+                    matrix.write_text(json.dumps(payload), encoding="utf-8")
+                    with self.assertRaises(
+                        version_port_conflicts.ConflictClassificationError
+                    ):
+                        version_port_conflicts.read_target_matrix_profile(matrix)
+
+            payload["source_overlays"] = {
+                "common": {"1.21.10": "legacy1_21_10"},
+                "fabric": {},
+                "neoforge": {},
+            }
+            invalid_runtimes = (
+                None,
+                [],
+                [{"loader": "fabric", "runtime_version": "1.21.10"}],
+                [
+                    {"loader": "fabric", "runtime_version": "1.21.10"},
+                    {"loader": "neoforge", "runtime_version": "1.21.11"},
+                ],
+                [
+                    {"loader": "fabric", "runtime_version": "latest"},
+                    {"loader": "neoforge", "runtime_version": "latest"},
+                ],
+            )
+            for runtimes in invalid_runtimes:
+                with self.subTest(runtimes=runtimes):
+                    payload["runtimes"] = runtimes
                     matrix.write_text(json.dumps(payload), encoding="utf-8")
                     with self.assertRaises(
                         version_port_conflicts.ConflictClassificationError

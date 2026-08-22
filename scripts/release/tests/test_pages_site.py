@@ -32,11 +32,12 @@ from visual_evidence import load_catalog  # noqa: E402
 
 
 def fixture_png(variant: int) -> bytes:
-    width, height = 640, 360
+    base_width, base_height = 640, 360
+    width, height = 1920, 1080
     rows: list[bytes] = []
-    for y in range(height):
+    for y in range(base_height):
         row = bytearray()
-        for x in range(width):
+        for x in range(base_width):
             if variant == 0:
                 pixel = (
                     (x // 40 * 17) % 256,
@@ -49,8 +50,9 @@ def fixture_png(variant: int) -> bytes:
                     (y // 30 * 23 + 47) % 256,
                     ((x // 40 + y // 30) * 31 + 131) % 256,
                 )
-            row.extend(pixel)
-        rows.append(b"\0" + bytes(row))
+            row.extend(pixel * 3)
+        encoded_row = b"\0" + bytes(row)
+        rows.extend((encoded_row, encoded_row, encoded_row))
 
     def chunk(kind: bytes, data: bytes) -> bytes:
         checksum = zlib.crc32(kind + data) & 0xFFFFFFFF
@@ -68,20 +70,20 @@ def fixture_png(variant: int) -> bytes:
 PNGS = (fixture_png(0), fixture_png(1))
 PIXEL_METRICS = (
     {
-        "width": 640,
-        "height": 360,
+        "width": 1920,
+        "height": 1080,
         "file_sha256": hashlib.sha256(PNGS[0]).hexdigest(),
-        "pixel_sha256": "c29b63f78c2d57d8c516c4eae485128ab8126b305ab13f23fd2a8404c310e6b2",
+        "pixel_sha256": "06300562182f93c7abf129a15ccfa1906edab2776ae28b990979da5a5da1f9c3",
         "luma_entropy": 6.991,
         "meaningful_colors": 32,
         "dark_fraction": 0.0049,
         "light_fraction": 0.0,
     },
     {
-        "width": 640,
-        "height": 360,
+        "width": 1920,
+        "height": 1080,
         "file_sha256": hashlib.sha256(PNGS[1]).hexdigest(),
-        "pixel_sha256": "94adbf8983321a30e282c91b57f45e292dbd6300b63edaaf3ba8d876d2df2540",
+        "pixel_sha256": "c05b5932d66ce3873d4de0b609a495c7dd3a4b18c54c04068b6018f56e1ee6c4",
         "luma_entropy": 7.067,
         "meaningful_colors": 32,
         "dark_fraction": 0.0,
@@ -990,7 +992,7 @@ class PagesSiteTest(unittest.TestCase):
             with Image.open(published) as image:
                 image.load()
                 self.assertEqual("WEBP", image.format)
-                self.assertEqual((640, 360), image.size)
+            self.assertEqual((1600, 900), image.size)
         self.assertFalse(list(output.rglob("*.rendering.*")))
 
     def test_site_builds_directly_from_compact_cache_without_reencoding(self) -> None:

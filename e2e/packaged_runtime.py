@@ -86,6 +86,7 @@ ORCHESTRATION_BY_SCENARIO = {
 }
 
 GUI_TEXT_REFERENCE_SIZE = SCENARIO_CONTRACT.gui_text_reference_size
+SCREENSHOT_SIZE = SCENARIO_CONTRACT.screenshot_size
 GuiTextProbe = tuple[str, tuple[int, int, int, int], int, int]
 REQUIRED_GUI_TEXT_PROBES: dict[
     tuple[str, str, str], tuple[GuiTextProbe, ...]
@@ -1123,11 +1124,9 @@ def client_command(
             # Must fit inside the virtual display the CI workflows start (see the xvfb-run
             # --server-args in on-demand-e2e.yml and release.yml); a window larger than the
             # screen is silently clamped and the evidence stops matching what was asked for.
-            # Pixel comparisons are unaffected by this number: the regions are fractional, so
-            # the same transition measured 0.0723 at 2560x1440 locally and 0.0725 at 1280x720
-            # in CI. It only governs how legible the captured evidence is.
-            "resolutionWidth": "1920",
-            "resolutionHeight": "1080",
+            # The evidence contract admits only this exact size; curation never resizes a frame.
+            "resolutionWidth": str(SCREENSHOT_SIZE[0]),
+            "resolutionHeight": str(SCREENSHOT_SIZE[1]),
             "quickPlayMultiplayer": f"127.0.0.1:{port}",
             "jvmArguments": [
                 "-Xms512M",
@@ -1704,6 +1703,12 @@ def inspect_screenshot_for_step(
     """Apply generic image checks plus any semantic pixel contract owned by this report step."""
 
     metrics = inspect_screenshot(path)
+    if (metrics["width"], metrics["height"]) != SCREENSHOT_SIZE:
+        raise RuntimeFailure(
+            f"packaged E2E screenshots must be exactly {SCREENSHOT_SIZE[0]}x"
+            f"{SCREENSHOT_SIZE[1]}: {path} "
+            f"({metrics['width']}x{metrics['height']})"
+        )
     opaque_stars_probe = OPAQUE_STARS_PROBES.get((scenario, role, step))
     if opaque_stars_probe is not None:
         validate_opaque_stars_background(path, opaque_stars_probe)
