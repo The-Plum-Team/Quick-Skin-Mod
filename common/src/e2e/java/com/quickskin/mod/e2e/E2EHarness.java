@@ -90,19 +90,30 @@ public final class E2EHarness {
     private void onHudRendered() {
         Minecraft mc = Minecraft.getInstance();
         if (VanillaShim.currentScreen(mc) == null) {
-            onRenderedFrame(mc);
+            onRenderedFrame();
         }
     }
 
     private void onScreenRendered(Screen screen) {
         if (screen != null) {
-            onRenderedFrame(Minecraft.getInstance());
+            onRenderedFrame();
         }
     }
 
-    /** Count only fully rendered HUD/screen passes and grab the exact armed frame from that pass. */
-    private void onRenderedFrame(Minecraft mc) {
+    /** Count HUD/screen passes; the next client tick observes them only after composition completes. */
+    private void onRenderedFrame() {
         renderedFrame++;
+    }
+
+    /**
+     * Grab the last completed render pass from the client-post tick.
+     *
+     * <p>The product and harness both listen to Architectury's HUD/screen render events. Listener
+     * order differs between loaders, so grabbing inside our listener can capture before a later
+     * product listener has drawn. Once control reaches the next client tick, every listener from
+     * the counted pass has returned and the main target contains the complete composed frame.</p>
+     */
+    private void dispatchReadyCapture(Minecraft mc) {
         if (state != State.RUN_STEPS
                 || !captureArmed
                 || captureDispatched
@@ -121,7 +132,7 @@ public final class E2EHarness {
         if (captureSucceeded) {
             lastShot = step.screenshot;
             E2ELog.info("step[" + stepIndex + "] " + step.name
-                    + " : captured rendered frame " + renderedFrame);
+                    + " : captured completed rendered frame " + renderedFrame);
         }
     }
 
@@ -151,6 +162,7 @@ public final class E2EHarness {
                 case FLUSH -> tickFlush(mc);
                 case DONE -> { /* idle until the orchestrator tears the JVM down */ }
             }
+            dispatchReadyCapture(mc);
         } catch (Throwable t) {
             E2ELog.error("harness tick crashed", t);
             report.record("harness_crash", "fail", t.toString(), null);

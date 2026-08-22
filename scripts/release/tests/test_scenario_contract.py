@@ -419,6 +419,12 @@ class ScenarioContractTest(unittest.TestCase):
                     0.00001,
                     None,
                 ),
+                (
+                    "baseline",
+                    "hud_preview_overlay",
+                    0.05,
+                    (0.82, 0.72, 0.96, 0.99),
+                ),
             ],
             values("full", "client_a"),
         )

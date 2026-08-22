@@ -746,7 +746,7 @@
               "capture": {
                 "title": "HUD player preview",
                 "review_tier": "key",
-                "expectation": "An in-world view includes a small, distinct player-preview thumbnail in a lower corner.",
+                "expectation": "An in-world view includes a small, distinct player-preview thumbnail in the lower-right corner.",
                 "probes": []
               }
             },
@@ -819,6 +819,17 @@
               "first_step": "cape_adjust_zoom_out",
               "second_step": "cape_adjust_zoom_in",
               "minimum_changed_fraction": 1e-05
+            },
+            {
+              "first_step": "baseline",
+              "second_step": "hud_preview_overlay",
+              "minimum_changed_fraction": 0.05,
+              "region": [
+                0.82,
+                0.72,
+                0.96,
+                0.99
+              ]
             }
           ]
         }
