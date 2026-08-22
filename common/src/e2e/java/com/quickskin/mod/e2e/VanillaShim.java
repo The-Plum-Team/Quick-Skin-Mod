@@ -68,6 +68,8 @@ import java.util.function.Consumer;
  *       {@code onPress(InputWithModifiers)} (26.x).</li>
  *   <li><b>title splash construction</b>: {@code SplashRenderer(String)} vs
  *       {@code SplashRenderer(Component)}, plus its remapped private field on {@code TitleScreen}.</li>
+ *   <li><b>transient overlays</b>: toast/chat access through {@code Minecraft}/{@code Gui}
+ *       (1.20.1..26.1.x) vs {@code Gui.toastManager()}/{@code Gui.hud.getChat()} (26.2).</li>
  * </ul>
  *
  * <p>GL-touching calls (screenshot) must run on the render thread, after at least one full frame.</p>
@@ -766,6 +768,12 @@ public final class VanillaShim {
                     mc.getClass(), "getToasts", "getToastManager", "method_1566", "m_91300_"
             );
             Object toastManager = toastAccessor == null ? null : toastAccessor.invoke(mc);
+            Object gui = mc.gui;
+            if (toastManager == null && gui != null) {
+                // 26.2 is an official-namespace lane and moved this accessor under Gui.
+                Method guiToastAccessor = findNoArg(gui.getClass(), "toastManager");
+                toastManager = guiToastAccessor == null ? null : guiToastAccessor.invoke(gui);
+            }
             Method clearToasts = toastManager == null
                     ? null
                     : findNoArg(
@@ -776,11 +784,15 @@ public final class VanillaShim {
             }
             clearToasts.invoke(toastManager);
 
-            Object gui = mc.gui;
             Method chatAccessor = gui == null
                     ? null
                     : findNoArg(gui.getClass(), "getChat", "method_1743", "m_93076_");
             Object chat = chatAccessor == null ? null : chatAccessor.invoke(gui);
+            if (chat == null && gui != null) {
+                // 26.2 moved ChatComponent under Gui.hud. Resolve the unique field exposing
+                // getChat() structurally, so no version-specific HUD type enters shared source.
+                chat = invokeUniqueNoArgOnFieldValue(gui, "getChat");
+            }
             Method clearChat = null;
             if (chat != null) {
                 for (Method method : chat.getClass().getMethods()) {
@@ -937,5 +949,24 @@ public final class VanillaShim {
             }
         }
         return null;
+    }
+
+    private static Object invokeUniqueNoArgOnFieldValue(Object owner, String... methodNames)
+            throws ReflectiveOperationException {
+        Field matchedField = null;
+        Method matchedAccessor = null;
+        for (Class<?> type = owner.getClass(); type != null; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                Method accessor = findNoArg(field.getType(), methodNames);
+                if (accessor == null) continue;
+                if (matchedField != null) return null;
+                field.setAccessible(true);
+                matchedField = field;
+                matchedAccessor = accessor;
+            }
+        }
+        if (matchedField == null) return null;
+        Object fieldValue = matchedField.get(owner);
+        return fieldValue == null ? null : matchedAccessor.invoke(fieldValue);
     }
 }
