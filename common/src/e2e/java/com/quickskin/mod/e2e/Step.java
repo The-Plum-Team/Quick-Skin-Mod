@@ -7,12 +7,13 @@ import java.util.function.BooleanSupplier;
  *
  * <p>Lifecycle per step: run {@link #action} once -> poll {@link #ready} every tick (but at least
  * {@link #minTicks} ticks after the action so a frame renders with the new state) -> hold the ready
- * state for {@link #settleTicks} ticks -> capture {@link #screenshot} (if set) -> run
+ * state for {@link #settleTicks} ticks -> hold through two complete render callbacks -> capture
+ * {@link #screenshot} (if set) -> run
  * {@link #assertion} -> advance. If {@code ready} never becomes true within {@link #timeoutTicks},
  * the step fails with a timeout.</p>
  *
- * <p>All callbacks run on the client/render thread (the tick listener), so service and GL calls are
- * safe.</p>
+ * <p>Actions and assertions run on the client tick; screenshots dispatch from the matching final
+ * HUD or screen render callback. Both event surfaces execute on the client/render thread.</p>
  */
 public final class Step {
 
