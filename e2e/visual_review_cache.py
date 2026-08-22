@@ -11,7 +11,7 @@ import re
 import stat
 import tempfile
 from collections import OrderedDict
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 from check_visual_review import (
@@ -27,19 +27,18 @@ from check_visual_review import (
 )
 
 
-CACHE_SCHEMA_VERSION = 1
-POLICY_SCHEMA_VERSION = 1
+CACHE_SCHEMA_VERSION = 2
+POLICY_SCHEMA_VERSION = 2
 MAX_CACHE_ENTRIES = 2048
 MAX_POLICY_FILE_BYTES = 1024 * 1024
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
-SHA256_PNG = re.compile(r"^(?P<digest>[0-9a-f]{64})\.png$")
 CACHE_KEYS = {"schema_version", "policy_sha256", "entries"}
 ENTRY_KEYS = {"key", "identity", "verdict"}
 IDENTITY_KEYS = {
     "review_mode",
-    "artifact_node",
-    "candidate_sha256",
-    "reference_sha256",
+    "candidate_semantic_sha256",
+    "reference_semantic_sha256",
+    "review_scope_sha256",
     "capture_id",
     "expectation_sha256",
     "runtime_evidence_sha256",
@@ -102,6 +101,7 @@ def review_policy_sha256(
     runner: Path,
     checker: Path,
     cache_codec: Path,
+    similarity_codec: Path,
     scenario_contract: Path,
     release_matrix: Path,
     provider_lock: Path,
@@ -140,6 +140,9 @@ def review_policy_sha256(
         "runner_sha256": _regular_file_digest(runner, "review runner"),
         "checker_sha256": _regular_file_digest(checker, "review checker"),
         "cache_codec_sha256": _regular_file_digest(cache_codec, "cache codec"),
+        "similarity_codec_sha256": _regular_file_digest(
+            similarity_codec, "similarity codec"
+        ),
         "scenario_contract_sha256": _regular_file_digest(
             scenario_contract, "scenario contract"
         ),
@@ -167,15 +170,6 @@ def _bounded_text(value: Any, label: str, maximum: int) -> str:
     return value.strip()
 
 
-def _image_digest(path: Any, label: str) -> str:
-    if not isinstance(path, str):
-        raise ReviewError(f"{label} is invalid")
-    match = SHA256_PNG.fullmatch(PurePosixPath(path).name)
-    if match is None:
-        raise ReviewError(f"{label} is not content-addressed")
-    return match.group("digest")
-
-
 def cache_identity(item: dict[str, Any], review_mode: str) -> dict[str, str]:
     """Return the label-independent semantic and pixel identity of one frame."""
 
@@ -184,25 +178,28 @@ def cache_identity(item: dict[str, Any], review_mode: str) -> dict[str, str]:
     capture_id = _bounded_text(
         item.get("capture_id"), "cache capture_id", MAX_CAPTURE_ID_LENGTH
     )
-    label = _bounded_text(item.get("label"), "cache label", 512)
-    if "/" not in label:
-        raise ReviewError("cache label has no artifact identity")
-    artifact_node = _bounded_text(
-        label.split("/", 1)[0], "cache artifact node", MAX_CAPTURE_ID_LENGTH
-    )
     expectation = item.get("expectation")
     if not isinstance(expectation, str):
         raise ReviewError("cache expectation is invalid")
     runtime_evidence = item.get("runtime_evidence")
     if not isinstance(runtime_evidence, str):
         raise ReviewError("cache runtime evidence is invalid")
+    candidate_semantic = item.get("candidate_semantic_sha256")
+    reference_semantic = item.get("reference_semantic_sha256")
+    if any(
+        not isinstance(value, str) or SHA256.fullmatch(value) is None
+        for value in (candidate_semantic, reference_semantic)
+    ):
+        raise ReviewError("cache semantic image identity is invalid")
+    review_scope = {
+        "image_size": item.get("image_size"),
+        "review_regions": item.get("review_regions"),
+    }
     return {
         "review_mode": review_mode,
-        "artifact_node": artifact_node,
-        "candidate_sha256": _image_digest(item.get("path"), "candidate path"),
-        "reference_sha256": _image_digest(
-            item.get("reference_path"), "reference path"
-        ),
+        "candidate_semantic_sha256": candidate_semantic,
+        "reference_semantic_sha256": reference_semantic,
+        "review_scope_sha256": _sha256(_canonical_json(review_scope)),
         "capture_id": capture_id,
         "expectation_sha256": _sha256(expectation.encode("utf-8")),
         "runtime_evidence_sha256": _sha256(runtime_evidence.encode("utf-8")),
@@ -219,8 +216,9 @@ def _normalize_identity(value: Any, index: int) -> dict[str, str]:
     if value.get("review_mode") != "reference-comparison":
         raise ReviewError(f"cache entry {index} is not a paired comparison")
     for key in (
-        "candidate_sha256",
-        "reference_sha256",
+        "candidate_semantic_sha256",
+        "reference_semantic_sha256",
+        "review_scope_sha256",
         "expectation_sha256",
         "runtime_evidence_sha256",
     ):
@@ -231,12 +229,7 @@ def _normalize_identity(value: Any, index: int) -> dict[str, str]:
         f"cache entry {index}.capture_id",
         MAX_CAPTURE_ID_LENGTH,
     )
-    artifact_node = _bounded_text(
-        value.get("artifact_node"),
-        f"cache entry {index}.artifact_node",
-        MAX_CAPTURE_ID_LENGTH,
-    )
-    return {**value, "artifact_node": artifact_node, "capture_id": capture_id}
+    return {**value, "capture_id": capture_id}
 
 
 def _normalize_cached_verdict(value: Any, index: int) -> dict[str, Any]:
@@ -336,7 +329,7 @@ def cached_verdicts(
     by_key = {entry["key"]: entry for entry in cache["entries"]}
     hits: dict[str, dict[str, Any]] = {}
     for item in entries:
-        if item["path"] == item.get("reference_path"):
+        if item["candidate_semantic_sha256"] == item.get("reference_semantic_sha256"):
             continue
         identity = cache_identity(item, review_mode)
         cached = by_key.get(cache_key(identity))
@@ -401,7 +394,7 @@ def merge_cache(
         if item is None:
             raise ReviewError(f"cache update verdict {index} has an unknown label")
         normalized = validate([item], [verdict], require_paired=True)[0]
-        if item["path"] == item["reference_path"]:
+        if item["candidate_semantic_sha256"] == item["reference_semantic_sha256"]:
             continue
         identity = cache_identity(item, review_mode)
         key = cache_key(identity)
@@ -454,6 +447,7 @@ def _policy_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--runner", type=Path, required=True)
     parser.add_argument("--checker", type=Path, required=True)
     parser.add_argument("--cache-codec", type=Path, required=True)
+    parser.add_argument("--similarity-codec", type=Path, required=True)
     parser.add_argument("--scenario-contract", type=Path, required=True)
     parser.add_argument("--release-matrix", type=Path, required=True)
     parser.add_argument("--provider-lock", type=Path, required=True)
@@ -499,6 +493,7 @@ def main(argv: list[str] | None = None) -> int:
                     runner=args.runner,
                     checker=args.checker,
                     cache_codec=args.cache_codec,
+                    similarity_codec=args.similarity_codec,
                     scenario_contract=args.scenario_contract,
                     release_matrix=args.release_matrix,
                     provider_lock=args.provider_lock,

@@ -30,6 +30,9 @@ class VisualAnchorCertificationTest(unittest.TestCase):
                 "kind": "full.client_a.baseline",
                 "expectation": "Expected baseline",
                 "runtime_evidence": "baseline assertion passed",
+                "image_size": [1920, 1080],
+                "review_regions": [[0.25, 0.25, 0.75, 0.75]],
+                "candidate_semantic_sha256": "a" * 64,
             },
             {
                 "path": image,
@@ -38,6 +41,9 @@ class VisualAnchorCertificationTest(unittest.TestCase):
                 "kind": "full.client_a.baseline",
                 "expectation": "Expected baseline",
                 "runtime_evidence": "baseline assertion passed",
+                "image_size": [1920, 1080],
+                "review_regions": [[0.25, 0.25, 0.75, 0.75]],
+                "candidate_semantic_sha256": "a" * 64,
             },
         ]
         self.report = [
