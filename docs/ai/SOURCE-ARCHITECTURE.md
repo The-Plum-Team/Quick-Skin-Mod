@@ -88,7 +88,10 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   guidance and runtime documents use a source-preferred three-way merge, the release matrix uses
   the target version, a build script may be deleted only when its loader is inactive in that
   target matrix, and a path below a legacy overlay may be deleted only when that exact overlay root
-  is absent from the target matrix. Unknown protected paths, active-loader build conflicts, and
+  is absent from the target matrix. The one reviewed datapack-layout migration moves the protected
+  `functions` files and tags to 1.21+'s singular `function` paths, rewrites the three renamed game
+  rules from the target matrix's single runtime version, and removes every obsolete plural path.
+  Unknown protected paths, active-loader build conflicts, and
   active-overlay conflicts abort the port; only unprotected residual conflicts may reach AI.
 - `scripts/release/branch_readme.py`, `scripts/release/e2e_readme.py`, and
   `scripts/release/workflow_guidance.py` are the protected renderers for matrix-owned branch
@@ -99,8 +102,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 ## Visual evidence and static-site sources
 
 - `e2e/scenario-contract.json` is the sole packaged-suite control-plane source. It owns execution
-  profiles, scenario orchestration, roles, ordered steps, mandatory assertions, screenshot
-  checkpoints, review metadata, semantic probes, and comparisons. Capture identity is derived as
+  profiles, scenario orchestration, roles, ordered steps, mandatory assertions, the fixed
+  1920x1080 screenshot size, screenshot checkpoints, authored review regions, semantic probes, and
+  comparisons. Capture identity is derived as
   scenario + client role + report step; filenames and ordinals are payload details only.
 - `e2e/scenario_contract.py` is the fail-closed typed Python reader.
   `e2e/generate_contract_java.py` reuses that exact parser when Gradle generates typed Java ids and
@@ -127,8 +131,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   artifact-by-mod runtime matrix, and per-successful-lane secretless curation; one failed matrix
   sibling never suppresses capsules already produced by successful lanes.
   `.github/workflows/mod-compatibility-review.yml` is the separate credential-bearing consumer; it
-  downloads only curated capsules, sends every pair to Sonnet even when pixels are identical,
-  escalates every non-high-clean result to Opus, and publishes a durable source-wave block before
+  downloads only curated capsules, inherits exact authored-region matches, groups exact-equivalent
+  pairs behind one representative, sends every remaining group to Haiku, escalates only a concern
+  or confidence below high to Opus, and publishes a durable source-wave block before
   cancelling siblings after a confirmed defect. Its authenticated source queue shares the global
   Claude capacity circuit, requires a fresh probe for each source, preserves one completion marker
   per clean lane, and reschedules only unfinished lanes after a provider pause. Its matrix remains
@@ -141,19 +146,27 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   identity from protected `master`, and pairs every later-version candidate with the same semantic
   capture from authenticated lossless raw Pages handoff evidence. For a 1.20.1 source it instead
   requires complete, identical Fabric/Forge capture-id sets and exposes each frame without any
-  reference. It atomically re-encodes candidates and any later-version references as metadata-free
-  RGB PNGs. `e2e/check_visual_review.py` validates the all-single or all-paired bounded capsule,
+  reference. It requires both sides to remain exactly 1920x1080 and atomically re-encodes candidates
+  and references as metadata-free RGB PNGs without resizing. `e2e/visual_similarity.py` computes
+  exact decoded-RGB fingerprints for contract-authored regions plus non-authoritative perceptual
+  routing metrics. `e2e/check_visual_review.py` recomputes those values while validating the
+  all-single or all-paired bounded capsule,
   including each capture's exact passed assertion as `runtime_evidence`, keeps `semantic_valid`
   independent from nullable `matches_reference`, and normalizes bounded model output.
-  `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Sonnet
-  triage, runs independent loader-grouped chunks concurrently, pipelines suspicious or uncertain
-  results into concurrent bounded Opus verification, cancels outstanding calls after the first
-  confirmed defect, publishes a protected exact-generation block and cancels sibling drains, skips
-  byte-identical certified comparison pairs, and keeps raw provider output private.
+  `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Haiku
+  triage, inherits exact paired region matches, shares one model verdict across exact-equivalent
+  paired versions, runs independent loader-grouped chunks concurrently, creates deterministic
+  1280x720 model-only copies without altering the authenticated 1920x1080 evidence, and pipelines
+  only concerns or confidence below high into concurrent bounded Opus verification. A clean
+  high-confidence Haiku result is final; perceptual metrics never create or route a verdict. The
+  runner cancels outstanding calls after the first
+  confirmed defect, publishes a protected exact-generation block, cancels sibling drains, and keeps
+  raw provider output private.
   `e2e/visual_review_cache.py` validates and combines bounded immutable paired-only verdict
-  cache shards: a hit binds candidate/reference pixels, expectation, runtime evidence, capture and
-  loader identity, scenario contract, release matrix, reviewer code, prompts, models, mode, and
-  chunk policy. Protected ancestor shards survive unrelated `master` merges only when their
+  cache shards: a hit binds candidate/reference semantic fingerprints, authored region scope,
+  expectation, runtime evidence, capture identity, scenario contract, release matrix, reviewer and
+  similarity code, prompts, models, mode, and chunk policy. Artifact labels and loaders need not
+  match when the entire reusable semantic identity does. Protected ancestor shards survive unrelated `master` merges only when their
   cache-producing workflow blob is byte-identical; the current codec and policy still validate
   every entry before use;
   unpaired semantic anchors never consume it. Parallel drains may briefly publish sibling shards;
