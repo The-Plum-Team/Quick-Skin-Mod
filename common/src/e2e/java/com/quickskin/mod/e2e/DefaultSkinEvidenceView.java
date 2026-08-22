@@ -115,8 +115,10 @@ public final class DefaultSkinEvidenceView {
         player.setDeltaMovement(0, 0, 0);
         player.tickCount = FIXED_RENDER_TICK;
         player.walkAnimation.setSpeed(0.0F);
-        player.walkDist = 0.0F;
-        player.walkDistO = 0.0F;
+        String walkDistanceFailure = VanillaShim.resetWalkDistance(player);
+        if (walkDistanceFailure != null) {
+            throw new IllegalStateException(walkDistanceFailure);
+        }
         player.xo = player.xOld = player.getX();
         player.yo = player.yOld = player.getY();
         player.zo = player.zOld = player.getZ();
