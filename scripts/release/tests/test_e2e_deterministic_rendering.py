@@ -22,6 +22,22 @@ PLAYER = (
 OPTIONS = ROOT / "e2e/options.txt.template"
 SERVER_PROPERTIES = ROOT / "e2e/server-template/server.properties"
 WORLD_DATA = ROOT / "e2e/server-template/datapack/data"
+WORLD_GAMERULE_VARIANTS = (
+    frozenset(
+        {
+            "gamerule doWeatherCycle false",
+            "gamerule doDaylightCycle false",
+            "gamerule spawnRadius 0",
+        }
+    ),
+    frozenset(
+        {
+            "gamerule minecraft:advance_weather false",
+            "gamerule minecraft:advance_time false",
+            "gamerule minecraft:respawn_radius 0",
+        }
+    ),
+)
 DEFAULT_SKIN_VIEW = (
     ROOT
     / "common/src/e2e/java/com/quickskin/mod/e2e/DefaultSkinEvidenceView.java"
@@ -34,6 +50,7 @@ FULL_SCENARIO = (
     ROOT
     / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
 )
+VANILLA_SHIM = ROOT / "common/src/e2e/java/com/quickskin/mod/e2e/VanillaShim.java"
 
 
 def world_function_paths(data_root: Path) -> tuple[Path, Path, Path, Path]:
@@ -55,6 +72,19 @@ def world_function_paths(data_root: Path) -> tuple[Path, Path, Path, Path]:
             "function layout"
         )
     return layouts[0]
+
+
+def world_gamerules(load_function: str) -> frozenset[str]:
+    """Resolve the one complete deterministic gamerule vocabulary in the function."""
+
+    lines = frozenset(line.strip() for line in load_function.splitlines())
+    variants = [rules for rules in WORLD_GAMERULE_VARIANTS if rules <= lines]
+    if len(variants) != 1:
+        raise ValueError(
+            "the E2E load function must contain exactly one complete legacy or "
+            "namespaced gamerule set"
+        )
+    return variants[0]
 
 
 class E2EDeterministicRenderingTest(unittest.TestCase):
@@ -102,7 +132,7 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         load_function = world_load.read_text(encoding="utf-8")
 
         self.assertIn("level-seed=quickskin-e2e", properties)
-        self.assertIn("gamerule spawnRadius 0", load_function)
+        self.assertIn(world_gamerules(load_function), WORLD_GAMERULE_VARIANTS)
         self.assertIn("team modify qs_e2e collisionRule never", load_function)
         self.assertIn(
             "team join qs_e2e @a[team=!qs_e2e]",
@@ -125,11 +155,32 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
                     path.write_text("test\n", encoding="utf-8")
                 self.assertEqual(paths, world_function_paths(data_root))
 
+    def test_world_gamerules_accept_both_version_vocabularies(self) -> None:
+        for rules in WORLD_GAMERULE_VARIANTS:
+            with self.subTest(rules=rules):
+                self.assertEqual(rules, world_gamerules("\n".join(sorted(rules))))
+
     def test_world_player_interpolation_is_pinned_by_the_e2e_harness(self) -> None:
         source = DEFAULT_SKIN_VIEW.read_text(encoding="utf-8")
+        shim = VANILLA_SHIM.read_text(encoding="utf-8")
 
         self.assertIn("player.tickCount = FIXED_RENDER_TICK", source)
         self.assertIn("player.walkAnimation.setSpeed(0.0F)", source)
+        self.assertIn("VanillaShim.resetWalkDistance(player)", source)
+        self.assertNotIn("player.walkDist =", source)
+        self.assertNotIn("player.walkDistO =", source)
+        for mapping_name in (
+            "field_5973",
+            "field_6039",
+            "field_53039",
+            "field_53038",
+            "field_62569",
+            "field_62570",
+            "f_19787_",
+            "f_19867_",
+        ):
+            self.assertIn(f'"{mapping_name}"', shim)
+        self.assertIn('"avatarState", "method_74192"', shim)
         self.assertIn("player.xo = player.xOld = player.getX()", source)
         self.assertIn(
             "DefaultSkinEvidenceView.pinStandingMotion(mc.player)",
