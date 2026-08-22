@@ -88,8 +88,8 @@ flowchart TD
     CURATE --> CAPACITY{"Claude capacity available?"}
     CAPACITY -->|No| QUEUE["Keep the durable capsule<br/>Retry later"]
     QUEUE --> CAPACITY
-    CAPACITY -->|Yes| SONNET["Sonnet semantic triage<br/>Loader chunks in parallel"]
-    SONNET --> VERIFY{"Suspicious or uncertain?"}
+    CAPACITY -->|Yes| HAIKU["Haiku semantic triage<br/>Loader chunks in parallel"]
+    HAIKU --> VERIFY{"Suspicious or uncertain?"}
     VERIFY -->|Yes| OPUS["Opus verification"]
     VERIFY -->|No| SEMANTIC["Semantic 1.20.1 certificate"]
     OPUS --> ANCHOR_DEFECT{"Confirmed defect?"}
@@ -107,10 +107,10 @@ flowchart TD
 
     ATTEST --> VISUAL_IMPACT{"Later-version visual review required?"}
     VISUAL_IMPACT -->|No| VISUAL_OK["Visual stage complete"]
-    VISUAL_IMPACT -->|Yes| PAIR["Pair every capture_id with<br/>lossless 1.20.1 evidence"]
-    PAIR --> CACHE{"Exact verdict cache hit?"}
+    VISUAL_IMPACT -->|Yes| PAIR["Pair every capture_id at 1920x1080<br/>with lossless 1.20.1 evidence"]
+    PAIR --> CACHE{"Exact authored regions<br/>or exact verdict cache hit?"}
     CACHE -->|Yes| VISUAL_OK
-    CACHE -->|No| LATER_AI["Parallel Sonnet review<br/>Selective Opus verification"]
+    CACHE -->|No| LATER_AI["1280x720 parallel Haiku review<br/>Selective Opus verification"]
     LATER_AI --> LATER_DEFECT{"Confirmed defect?"}
     LATER_DEFECT -->|Yes| BLOCK
     LATER_DEFECT -->|No| VISUAL_OK
@@ -118,7 +118,7 @@ flowchart TD
     VISUAL_OK --> COMPAT_IMPACT{"Product or integration impact?"}
     COMPAT_IMPACT -->|No| DONE["Validated release tree"]
     COMPAT_IMPACT -->|Yes| MOD_E2E["Optional-mod E2E<br/>Version / loader / mod lanes in parallel"]
-    MOD_E2E --> MOD_AI["Compare modded and clean captures<br/>Sonnet + selective Opus"]
+    MOD_E2E --> MOD_AI["Compare modded and clean captures<br/>Haiku + selective Opus"]
     MOD_AI --> MOD_OK{"Compatibility clean?"}
     MOD_OK -->|No| BLOCK
     MOD_OK -->|Yes| DONE

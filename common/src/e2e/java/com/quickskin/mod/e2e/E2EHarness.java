@@ -5,7 +5,9 @@ import com.quickskin.mod.e2e.scenario.ModCompatibilityScenario;
 import com.quickskin.mod.e2e.scenario.Phase0Smoke;
 import com.quickskin.mod.e2e.scenario.PropagationLiveScenario;
 import com.quickskin.mod.e2e.scenario.PropagationScenario;
+import com.quickskin.mod.e2e.generated.ScenarioContract;
 import com.quickskin.mod.e2e.generated.ScenarioContract.ScenarioId;
+import dev.architectury.event.events.client.ClientGuiEvent;
 import dev.architectury.event.events.client.ClientTickEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -44,6 +46,12 @@ public final class E2EHarness {
     private int actionTick = 0;
     private int readyTick = -1; // first tick the current step's ready predicate held; -1 = not yet
     private int flushDeadline = 0;
+    private long renderedFrame = 0;
+    private boolean captureArmed = false;
+    private long captureFrame = -1;
+    private boolean captureDispatched = false;
+    private boolean captureSucceeded = false;
+    private static final int CAPTURE_SETTLE_FRAMES = 2;
 
     // Track the last dispatched screenshot so FLUSH can confirm it landed at full size and re-grab a
     // transient undersized capture (a macOS window-resize race, observed as a tiny e.g. 90x110 PNG on
@@ -51,7 +59,6 @@ public final class E2EHarness {
     private String lastShot;
     private int lastShotRegrabTick = 0;
     private int lastShotRetries = 0;
-    private static final int MIN_SHOT_WIDTH = 640; // anything narrower is a broken/transient grab, not a real frame
     private static final int MAX_SHOT_RETRIES = 5;
 
     private static boolean started = false;
@@ -74,6 +81,48 @@ public final class E2EHarness {
         E2ELog.info("activating: version=" + version + " role=" + role + " scenario=" + scenarioId);
         E2EHarness h = new E2EHarness(version, role, scenarioId);
         ClientTickEvent.CLIENT_POST.register(h::onTick);
+        ClientGuiEvent.RENDER_HUD.register((graphics, delta) -> h.onHudRendered());
+        ClientGuiEvent.RENDER_POST.register(
+                (screen, graphics, mouseX, mouseY, delta) -> h.onScreenRendered(screen)
+        );
+    }
+
+    private void onHudRendered() {
+        Minecraft mc = Minecraft.getInstance();
+        if (VanillaShim.currentScreen(mc) == null) {
+            onRenderedFrame(mc);
+        }
+    }
+
+    private void onScreenRendered(Screen screen) {
+        if (screen != null) {
+            onRenderedFrame(Minecraft.getInstance());
+        }
+    }
+
+    /** Count only fully rendered HUD/screen passes and grab the exact armed frame from that pass. */
+    private void onRenderedFrame(Minecraft mc) {
+        renderedFrame++;
+        if (state != State.RUN_STEPS
+                || !captureArmed
+                || captureDispatched
+                || renderedFrame < captureFrame
+                || stepIndex >= steps.size()) {
+            return;
+        }
+        Step step = steps.get(stepIndex);
+        if (step.screenshot == null) {
+            captureArmed = false;
+            return;
+        }
+        captureSucceeded = VanillaShim.screenshot(mc, step.screenshot);
+        captureDispatched = true;
+        captureArmed = false;
+        if (captureSucceeded) {
+            lastShot = step.screenshot;
+            E2ELog.info("step[" + stepIndex + "] " + step.name
+                    + " : captured rendered frame " + renderedFrame);
+        }
     }
 
     private Scenario resolveScenario() {
@@ -195,6 +244,11 @@ public final class E2EHarness {
         }
         Step s = steps.get(stepIndex);
 
+        if (captureDispatched) {
+            completeStep(s, captureSucceeded ? s.screenshot : null, !captureSucceeded);
+            return;
+        }
+
         if (!actionRun) {
             actionRun = true;
             actionTick = tick;
@@ -214,48 +268,75 @@ public final class E2EHarness {
         int waited = tick - actionTick;
         boolean ready = waited >= s.minTicks && (s.ready == null || safe(s.ready));
 
+        if (waited > s.timeoutTicks) {
+            E2ELog.warn("step[" + stepIndex + "] " + s.name + " : TIMEOUT");
+            report.record(s.name, "timeout",
+                    "ready condition or rendered capture frame not reached within "
+                            + s.timeoutTicks + " ticks",
+                    null);
+            advance();
+            return;
+        }
+
         if (!ready) {
             readyTick = -1; // the state flickered; the settle window restarts on the next hold
+            captureArmed = false;
+            captureFrame = -1;
         } else {
+            if (s.screenshot != null
+                    && VanillaShim.currentScreen(mc) == null
+                    && mc.player != null) {
+                DefaultSkinEvidenceView.pinStandingMotion(mc.player);
+            }
             if (readyTick < 0) readyTick = tick;
             // Screenshot.grab reads the last PRESENTED frame, so capturing on the tick the predicate
             // first held would record the frame drawn BEFORE the awaited change. Let the state hold
             // (and keep rendering) so the captured frame actually shows it.
             if (tick - readyTick < s.settleTicks) return;
 
-            String shot = null;
-            boolean screenshotFailed = false;
             if (s.screenshot != null) {
-                if (VanillaShim.screenshot(mc, s.screenshot)) {
-                    shot = s.screenshot;
-                    lastShot = s.screenshot; // remember the most recent grab for FLUSH validation
-                } else {
-                    screenshotFailed = true;
+                if (!captureArmed) {
+                    String overlayFailure = VanillaShim.clearTransientOverlays(mc);
+                    if (overlayFailure != null) {
+                        report.record(s.name, "fail", overlayFailure, null);
+                        advance();
+                        return;
+                    }
+                    captureArmed = true;
+                    captureFrame = renderedFrame + CAPTURE_SETTLE_FRAMES;
+                    E2ELog.info("step[" + stepIndex + "] " + s.name
+                            + " : armed for rendered frame " + captureFrame);
                 }
+                return;
             }
-            Step.Result r;
-            try {
-                r = (s.assertion == null) ? Step.Result.pass("no assertion") : s.assertion.run();
-            } catch (Throwable t) {
-                r = Step.Result.fail("assertion threw: " + t);
-            }
-            if (screenshotFailed) {
-                r = Step.Result.fail("screenshot dispatch failed: " + s.screenshot
-                        + "; assertion=" + r.message());
-            }
-            E2ELog.info("step[" + stepIndex + "] " + s.name + " : "
-                    + (r.pass() ? "PASS" : "FAIL") + " - " + r.message());
-            report.record(s.name, r.pass() ? "pass" : "fail", r.message(), shot);
-            advance();
+            completeStep(s, null, false);
             return;
         }
 
-        if (waited > s.timeoutTicks) {
-            E2ELog.warn("step[" + stepIndex + "] " + s.name + " : TIMEOUT");
-            report.record(s.name, "timeout",
-                    "ready condition not met within " + s.timeoutTicks + " ticks", null);
-            advance();
+    }
+
+    private void completeStep(Step step, String screenshot, boolean screenshotFailed) {
+        Step.Result result;
+        try {
+            result = step.assertion == null
+                    ? Step.Result.pass("no assertion")
+                    : step.assertion.run();
+        } catch (Throwable failure) {
+            result = Step.Result.fail("assertion threw: " + failure);
         }
+        if (screenshotFailed) {
+            result = Step.Result.fail("screenshot dispatch failed: " + step.screenshot
+                    + "; assertion=" + result.message());
+        }
+        E2ELog.info("step[" + stepIndex + "] " + step.name + " : "
+                + (result.pass() ? "PASS" : "FAIL") + " - " + result.message());
+        report.record(
+                step.name,
+                result.pass() ? "pass" : "fail",
+                result.message(),
+                screenshot
+        );
+        advance();
     }
 
     /**
@@ -268,11 +349,15 @@ public final class E2EHarness {
      */
     private void tickFlush(Minecraft mc) {
         if (lastShot != null && lastShotRetries < MAX_SHOT_RETRIES && tick - lastShotRegrabTick >= 20) {
-            int w = pngWidth(screenshotFile(lastShot));
-            if (w < MIN_SHOT_WIDTH) { // -1 (missing/header not written yet) or an undersized transient grab
+            int[] dimensions = pngDimensions(screenshotFile(lastShot));
+            if (!expectedDimensions(dimensions)) {
                 lastShotRetries++;
-                E2ELog.warn("last screenshot " + lastShot + " not full size yet (width=" + w
-                        + "px); re-grabbing (attempt " + lastShotRetries + "/" + MAX_SHOT_RETRIES + ")");
+                E2ELog.warn("last screenshot " + lastShot + " is not "
+                        + ScenarioContract.SCREENSHOT_WIDTH + "x"
+                        + ScenarioContract.SCREENSHOT_HEIGHT + " yet (got "
+                        + dimensions[0] + "x" + dimensions[1]
+                        + "); re-grabbing (attempt " + lastShotRetries + "/"
+                        + MAX_SHOT_RETRIES + ")");
                 VanillaShim.screenshot(mc, lastShot);
                 lastShotRegrabTick = tick;
                 flushDeadline = Math.max(flushDeadline, tick + 40); // let the re-grab flush
@@ -281,12 +366,14 @@ public final class E2EHarness {
         }
         if (tick >= flushDeadline) {
             if (lastShot != null) {
-                int width = pngWidth(screenshotFile(lastShot));
-                if (width < MIN_SHOT_WIDTH) {
+                int[] dimensions = pngDimensions(screenshotFile(lastShot));
+                if (!expectedDimensions(dimensions)) {
                     report.record("screenshot_flush", "fail",
-                            "last screenshot never reached " + MIN_SHOT_WIDTH
-                                    + "px width after " + lastShotRetries + " retries: "
-                                    + lastShot + " (width=" + width + ")",
+                            "last screenshot never reached "
+                                    + ScenarioContract.SCREENSHOT_WIDTH + "x"
+                                    + ScenarioContract.SCREENSHOT_HEIGHT + " after "
+                                    + lastShotRetries + " retries: " + lastShot + " (got "
+                                    + dimensions[0] + "x" + dimensions[1] + ")",
                             lastShot);
                 }
             }
@@ -300,19 +387,22 @@ public final class E2EHarness {
     }
 
     /**
-     * Width (px) from a PNG's IHDR, or -1 if the file is absent or too short to hold a header yet
-     * (treated as "not written"). PNG layout: 8-byte signature, 4-byte IHDR length, the "IHDR" tag,
-     * then a 4-byte big-endian width -- i.e. the width starts at byte offset 16. Reading only the
-     * header is robust even while the async writer is still appending pixel data.
+     * Width and height from a PNG's IHDR, or {@code {-1, -1}} while it is not fully available.
+     * Reading only the fixed header stays robust while the async writer appends pixel data.
      */
-    private static int pngWidth(File f) {
-        if (f == null || !f.isFile() || f.length() < 33) return -1;
+    private static int[] pngDimensions(File f) {
+        if (f == null || !f.isFile() || f.length() < 33) return new int[] {-1, -1};
         try (java.io.DataInputStream in = new java.io.DataInputStream(new java.io.FileInputStream(f))) {
             in.skipBytes(16);
-            return in.readInt();
+            return new int[] {in.readInt(), in.readInt()};
         } catch (Throwable t) {
-            return -1;
+            return new int[] {-1, -1};
         }
+    }
+
+    private static boolean expectedDimensions(int[] dimensions) {
+        return dimensions[0] == ScenarioContract.SCREENSHOT_WIDTH
+                && dimensions[1] == ScenarioContract.SCREENSHOT_HEIGHT;
     }
 
     private static boolean safe(java.util.function.BooleanSupplier ready) {
@@ -323,6 +413,10 @@ public final class E2EHarness {
         stepIndex++;
         actionRun = false;
         readyTick = -1;
+        captureArmed = false;
+        captureFrame = -1;
+        captureDispatched = false;
+        captureSucceeded = false;
     }
 
     private void finish(Minecraft mc) {
