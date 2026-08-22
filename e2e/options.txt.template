@@ -1,5 +1,6 @@
 guiScale:3
 graphicsMode:0
+renderClouds:false
 renderDistance:8
 simulationDistance:8
 fov:0.0

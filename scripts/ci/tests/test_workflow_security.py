@@ -651,14 +651,18 @@ class WorkflowSecurityTest(unittest.TestCase):
             r"(?m)^\s*'[^'\n]*\\$",
             "a backslash inside a multiline single-quoted jq filter is literal",
         )
-        self.assertIn("--triage-model claude-sonnet-5", review)
+        self.assertIn("--model claude-haiku-4-5", capacity_probe)
+        self.assertIn("--triage-model claude-haiku-4-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
+        self.assertNotIn("claude-sonnet-5", review)
         self.assertIn("--triage-chunk-size 8", review)
         self.assertIn("--verify-chunk-size 4", review)
         self.assertIn("--max-parallel-calls 32", review)
         self.assertIn("--call-spacing-seconds 0", review)
         self.assertIn("--model-attempts 3", review)
         self.assertIn("visual_review_cache.py", review)
+        self.assertIn("visual_similarity.py", review)
+        self.assertIn("--similarity-codec", review)
         self.assertIn("--completion-state visual-review-completion.json", review)
         self.assertIn("--allow-blocking-partial", review)
         self.assertIn("visual-review-verdict-cache-$policy_sha256", review)
@@ -762,7 +766,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
         self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
         self.assertIn("ThreadPoolExecutor", runner)
-        self.assertIn("path\"] == item[\"reference_path", runner)
+        self.assertIn(
+            'item["candidate_semantic_sha256"] == item["reference_semantic_sha256"]',
+            runner,
+        )
+        self.assertIn("requires_perceptual_verification", runner)
         self.assertIn("TRIAGE_CONFIDENCE", (
             ROOT / "e2e" / "check_visual_review.py"
         ).read_text(encoding="utf-8"))
@@ -997,7 +1005,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             'admission_delay="${{ matrix.model_start_delay_seconds }}"', review
         )
         self.assertNotIn("--max-parallel-calls 32", review)
-        self.assertIn("--review-identical", review)
+        self.assertNotIn("--review-identical", review)
         self.assertNotIn("--cache ", review)
         self.assertIn("git show", enumerate_review)
         self.assertIn("$plan_source_sha:e2e/mod-compatibility-contract.json", enumerate_review)
@@ -1008,8 +1016,10 @@ class WorkflowSecurityTest(unittest.TestCase):
             '--compatibility-artifact-node "${{ matrix.artifact_node }}"', review
         )
         self.assertIn('--compatibility-mod "${{ matrix.mod }}"', review)
-        self.assertIn("--triage-model claude-sonnet-5", review)
+        self.assertIn("--model claude-haiku-4-5", capacity_probe)
+        self.assertIn("--triage-model claude-haiku-4-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
+        self.assertNotIn("claude-sonnet-5", review)
         self.assertIn("mod-compatibility-wave-block", review)
         self.assertIn(
             "name: mod-compatibility-wave-block-${{ matrix.source_run_id }}",

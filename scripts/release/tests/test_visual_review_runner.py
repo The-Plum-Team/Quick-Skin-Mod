@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,7 @@ from check_visual_review import (  # noqa: E402
 from visual_review_runner import (  # noqa: E402
     SYNTHETIC_COMPARISON_CLEAN_VISIBLE,
     SYNTHETIC_IDENTICAL_VISIBLE,
+    SYNTHETIC_REPRESENTED_VISIBLE,
     SYNTHETIC_SEMANTIC_CLEAN_VISIBLE,
     build_review_plan,
     execute_review,
@@ -35,8 +37,11 @@ def paired(
     reference: str,
     *,
     reference_artifact: str = "fabric-1.20.1",
-) -> dict[str, str]:
+) -> dict[str, Any]:
     _artifact, scenario, role, step = label.split("/")
+    candidate_semantic = hashlib.sha256(candidate.encode()).hexdigest()
+    reference_semantic = hashlib.sha256(reference.encode()).hexdigest()
+    exact = candidate_semantic == reference_semantic
     return {
         "path": candidate,
         "reference_path": reference,
@@ -46,10 +51,16 @@ def paired(
         "kind": f"{scenario}.{role}.{step}",
         "expectation": f"Expected {step}",
         "runtime_evidence": f"assertion passed for {step}",
+        "image_size": [1920, 1080],
+        "review_regions": [[0.25, 0.25, 0.75, 0.75]],
+        "candidate_semantic_sha256": candidate_semantic,
+        "reference_semantic_sha256": reference_semantic,
+        "semantic_changed_fraction": 0.0 if exact else 0.25,
+        "perceptual_delta": 0.0 if exact else 0.25,
     }
 
 
-def unpaired(label: str, candidate: str) -> dict[str, str]:
+def unpaired(label: str, candidate: str) -> dict[str, Any]:
     _artifact, scenario, role, step = label.split("/")
     return {
         "path": candidate,
@@ -58,6 +69,9 @@ def unpaired(label: str, candidate: str) -> dict[str, str]:
         "kind": f"{scenario}.{role}.{step}",
         "expectation": f"Expected {step}",
         "runtime_evidence": f"assertion passed for {step}",
+        "image_size": [1920, 1080],
+        "review_regions": [[0.25, 0.25, 0.75, 0.75]],
+        "candidate_semantic_sha256": hashlib.sha256(candidate.encode()).hexdigest(),
     }
 
 
@@ -86,6 +100,7 @@ class VisualReviewRunnerTest(unittest.TestCase):
             bundle = Path(temporary)
             for name in (
                 "check_visual_review.py",
+                "visual_similarity.py",
                 "visual_review_cache.py",
                 "visual_review_runner.py",
             ):
@@ -102,7 +117,7 @@ class VisualReviewRunnerTest(unittest.TestCase):
 
         self.assertEqual(0, completed.returncode, completed.stderr)
 
-    def test_plan_skips_only_byte_identical_pairs_and_bounds_chunks(self) -> None:
+    def test_plan_skips_only_exact_semantic_regions_and_bounds_chunks(self) -> None:
         plan = build_review_plan(self.manifest, triage_chunk_size=1)
 
         self.assertEqual([self.manifest[0]], plan["identical"])
@@ -110,6 +125,68 @@ class VisualReviewRunnerTest(unittest.TestCase):
         self.assertEqual([[self.manifest[1]], [self.manifest[2]]], plan["triage_chunks"])
         with self.assertRaises(ReviewError):
             build_review_plan(self.manifest, triage_chunk_size=9)
+
+    def test_exact_regions_skip_ai_even_when_png_files_differ(self) -> None:
+        exact = {
+            **self.manifest[1],
+            "reference_semantic_sha256": self.manifest[1][
+                "candidate_semantic_sha256"
+            ],
+            "semantic_changed_fraction": 0.0,
+            "perceptual_delta": 0.0,
+        }
+
+        plan = build_review_plan([exact])
+
+        self.assertNotEqual(exact["path"], exact["reference_path"])
+        self.assertEqual([exact], plan["identical"])
+        self.assertEqual([], plan["semantic"])
+
+    def test_exact_equivalent_versions_share_one_ai_representative(self) -> None:
+        representative = self.manifest[1]
+        follower = {
+            **paired(
+                "neoforge-1.21.1/full/client_a/clean",
+                "review-input/images/d.png",
+                "review-input/images/e.png",
+            ),
+            "candidate_semantic_sha256": representative[
+                "candidate_semantic_sha256"
+            ],
+            "reference_semantic_sha256": representative[
+                "reference_semantic_sha256"
+            ],
+            "semantic_changed_fraction": representative[
+                "semantic_changed_fraction"
+            ],
+            "perceptual_delta": representative["perceptual_delta"],
+        }
+        calls: list[list[str]] = []
+
+        def provider(
+            stage: str,
+            _chunk_index: int,
+            chunk: list[dict[str, Any]],
+            _schema: dict[str, Any],
+        ) -> list[dict[str, Any]]:
+            self.assertEqual("triage", stage)
+            calls.append([item["label"] for item in chunk])
+            return [
+                {
+                    "label": representative["label"],
+                    "decision": "clean",
+                    "confidence": "high",
+                    "anomalies": [],
+                }
+            ]
+
+        verdicts, stats = execute_review([representative, follower], provider)
+
+        self.assertEqual([[representative["label"]]], calls)
+        self.assertEqual(1, stats["triaged"])
+        self.assertEqual(1, stats["represented"])
+        self.assertEqual(SYNTHETIC_REPRESENTED_VISIBLE, verdicts[1]["visible"])
+        self.assertFalse(any(verdict["defect"] for verdict in verdicts))
 
     def test_compatibility_mode_reviews_even_byte_identical_pairs(self) -> None:
         calls: list[list[str]] = []
@@ -318,6 +395,7 @@ class VisualReviewRunnerTest(unittest.TestCase):
                 "paired": 1,
                 "identical": 1,
                 "cached": 0,
+                "represented": 0,
                 "triaged": 2,
                 "triage_chunks": 1,
                 "escalated": 1,
@@ -327,6 +405,90 @@ class VisualReviewRunnerTest(unittest.TestCase):
             },
             stats,
         )
+
+    def test_low_confidence_clean_result_is_verified(self) -> None:
+        manifest = [self.manifest[1]]
+        calls: list[str] = []
+
+        def provider(
+            stage: str,
+            _chunk_index: int,
+            chunk: list[dict[str, Any]],
+            _schema: dict[str, Any],
+        ) -> list[dict[str, Any]]:
+            calls.append(stage)
+            label = chunk[0]["label"]
+            if stage == "triage":
+                return [
+                    {
+                        "label": label,
+                        "decision": "clean",
+                        "confidence": "medium",
+                        "anomalies": [],
+                    }
+                ]
+            self.assertEqual("medium", chunk[0]["first_review"]["confidence"])
+            return [
+                {
+                    "label": label,
+                    "visible": "The candidate remains semantically correct.",
+                    "semantic_valid": True,
+                    "matches_reference": True,
+                    "anomalies": [],
+                    "defect": False,
+                }
+            ]
+
+        verdicts, stats = execute_review(manifest, provider)
+
+        self.assertEqual(["triage", "verify"], calls)
+        self.assertFalse(verdicts[0]["defect"])
+        self.assertEqual(1, stats["escalated"])
+        self.assertEqual(1, stats["verify_chunks"])
+
+    def test_near_nonexact_pair_is_verified_even_after_high_confidence_haiku(self) -> None:
+        manifest = [
+            {
+                **self.manifest[1],
+                "semantic_changed_fraction": 0.005,
+                "perceptual_delta": 0.2,
+            }
+        ]
+        calls: list[str] = []
+
+        def provider(
+            stage: str,
+            _chunk_index: int,
+            chunk: list[dict[str, Any]],
+            _schema: dict[str, Any],
+        ) -> list[dict[str, Any]]:
+            calls.append(stage)
+            label = chunk[0]["label"]
+            if stage == "triage":
+                return [
+                    {
+                        "label": label,
+                        "decision": "clean",
+                        "confidence": "high",
+                        "anomalies": [],
+                    }
+                ]
+            return [
+                {
+                    "label": label,
+                    "visible": "The subtle difference is still semantically valid.",
+                    "semantic_valid": True,
+                    "matches_reference": True,
+                    "anomalies": [],
+                    "defect": False,
+                }
+            ]
+
+        verdicts, stats = execute_review(manifest, provider)
+
+        self.assertEqual(["triage", "verify"], calls)
+        self.assertEqual(1, stats["escalated"])
+        self.assertFalse(verdicts[0]["defect"])
 
     def test_cached_defect_blocks_without_calling_a_model(self) -> None:
         cached = {

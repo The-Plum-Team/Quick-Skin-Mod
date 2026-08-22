@@ -54,7 +54,10 @@ TRANSIENT_MODEL_CATEGORIES = frozenset(
     }
 )
 SYNTHETIC_IDENTICAL_VISIBLE = (
-    "Candidate pixels are identical to the certified 1.20.1 reference."
+    "Every authored semantic-region pixel is identical to the certified reference."
+)
+SYNTHETIC_REPRESENTED_VISIBLE = (
+    "Authored semantic-region pixels are exact-equivalent to an AI-reviewed representative."
 )
 SYNTHETIC_COMPARISON_CLEAN_VISIBLE = (
     "Candidate is semantically valid and matches the certified 1.20.1 reference."
@@ -62,6 +65,8 @@ SYNTHETIC_COMPARISON_CLEAN_VISIBLE = (
 SYNTHETIC_SEMANTIC_CLEAN_VISIBLE = (
     "Candidate independently satisfies its checkpoint expectation."
 )
+AMBIGUOUS_PERCEPTUAL_DELTA = 0.01
+AMBIGUOUS_CHANGED_FRACTION = 0.02
 
 
 class RunnerError(RuntimeError):
@@ -117,31 +122,77 @@ def build_review_plan(
     cached_labels: frozenset[str] = frozenset(),
     review_identical: bool = False,
 ) -> dict[str, Any]:
-    """Split byte-identical pairs from bounded semantic-review chunks."""
+    """Split exact semantic matches and group exact-equivalent paired representatives."""
 
     entries, _labels = validate_manifest(manifest)
     paired = "reference_path" in entries[0]
     # A semantic-only anchor has no reference and every frame reaches the model. Once that anchor
-    # is certified, byte-identical later-version pairs can inherit both its semantics and pixels.
+    # is certified, exact authored-region matches can inherit both its semantics and pixels.
     identical = [
         item
         for item in entries
-        if paired and not review_identical and item["path"] == item["reference_path"]
+        if paired
+        and not review_identical
+        and item["candidate_semantic_sha256"] == item["reference_semantic_sha256"]
     ]
-    semantic = [
+    pending = [
         item
         for item in entries
-        if (not paired or review_identical or item["path"] != item["reference_path"])
+        if (
+            not paired
+            or review_identical
+            or item["candidate_semantic_sha256"] != item["reference_semantic_sha256"]
+        )
         and item["label"] not in cached_labels
     ]
+    semantic: list[dict[str, Any]] = []
+    represented_by_label: dict[str, str] = {}
+    equivalence_groups: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
+    for item in pending:
+        if not paired or review_identical:
+            semantic.append(item)
+            continue
+        equivalence_key = json.dumps(
+            {
+                "capture_id": item["capture_id"],
+                "expectation": item["expectation"],
+                "runtime_evidence": item["runtime_evidence"],
+                "review_regions": item["review_regions"],
+                "candidate_semantic_sha256": item["candidate_semantic_sha256"],
+                "reference_semantic_sha256": item["reference_semantic_sha256"],
+            },
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        equivalence_groups.setdefault(equivalence_key, []).append(item)
+    for group in equivalence_groups.values():
+        representative = group[0]
+        semantic.append(representative)
+        for follower in group[1:]:
+            represented_by_label[follower["label"]] = representative["label"]
     return {
         "paired": paired,
         "identical": identical,
         "semantic": semantic,
+        "represented_by_label": represented_by_label,
         "triage_chunks": (
             _checkpoint_chunks(semantic, triage_chunk_size) if semantic else []
         ),
     }
+
+
+def requires_perceptual_verification(item: dict[str, Any]) -> bool:
+    """Route near-but-nonexact pairs to Opus; never turn similarity into a pass."""
+
+    if "reference_path" not in item:
+        return False
+    if item["candidate_semantic_sha256"] == item["reference_semantic_sha256"]:
+        return False
+    return (
+        item["perceptual_delta"] <= AMBIGUOUS_PERCEPTUAL_DELTA
+        or item["semantic_changed_fraction"] <= AMBIGUOUS_CHANGED_FRACTION
+    )
 
 
 def execute_review(
@@ -211,6 +262,7 @@ def execute_review(
             "paired": int(paired),
             "identical": len(plan["identical"]),
             "cached": len(normalized_cache_hits),
+            "represented": len(plan["represented_by_label"]),
             "triaged": 0,
             "triage_chunks": 0,
             "escalated": 0,
@@ -293,6 +345,7 @@ def execute_review(
                         if (
                             triage["decision"] == "clean"
                             and triage["confidence"] == "high"
+                            and not requires_perceptual_verification(item)
                         ):
                             final_by_label[item["label"]] = {
                                 "label": item["label"],
@@ -357,12 +410,26 @@ def execute_review(
             "paired": int(paired),
             "identical": len(plan["identical"]),
             "cached": len(normalized_cache_hits),
+            "represented": len(plan["represented_by_label"]),
             "triaged": len(triage_by_label),
             "triage_chunks": len(plan["triage_chunks"]),
             "escalated": escalated_count,
             "verify_chunks": verify_chunks_count,
             "reviewed": len(ordered_defects),
             "stopped_early": 1,
+        }
+
+    for follower_label, representative_label in plan["represented_by_label"].items():
+        representative = final_by_label.get(representative_label)
+        if representative is None:
+            raise ReviewError(
+                "review runner did not produce representative verdict "
+                f"{representative_label!r} for {follower_label!r}"
+            )
+        final_by_label[follower_label] = {
+            **representative,
+            "label": follower_label,
+            "visible": SYNTHETIC_REPRESENTED_VISIBLE,
         }
 
     missing = [label for label in labels if label not in final_by_label]
@@ -378,6 +445,7 @@ def execute_review(
         "paired": int(paired),
         "identical": len(plan["identical"]),
         "cached": len(normalized_cache_hits),
+        "represented": len(plan["represented_by_label"]),
         "triaged": len(plan["semantic"]),
         "triage_chunks": len(plan["triage_chunks"]),
         "escalated": escalated_count,
@@ -683,7 +751,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--review-identical",
         action="store_true",
-        help="send byte-identical pairs through semantic review instead of inheriting a pass",
+        help="send exact authored-region matches through review instead of inheriting a pass",
     )
     parser.add_argument("--triage-chunk-size", type=int, default=DEFAULT_TRIAGE_CHUNK_SIZE)
     parser.add_argument("--verify-chunk-size", type=int, default=DEFAULT_VERIFY_CHUNK_SIZE)

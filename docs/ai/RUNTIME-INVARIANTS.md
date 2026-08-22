@@ -135,7 +135,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   its absence. Tighten it to mandatory only once every discovered release branch carries it.
 - `e2e/scenario-contract.json` is the only authored source for scenario ids, execution profiles,
   orchestration, roles, ordered steps, mandatory assertions, captures, expectations, review tiers,
-  probes, and comparisons. Capture ids and all consumer views must be derived. Add or remove a
+  exact 1920x1080 screenshot size, authored review regions, probes, and comparisons. Capture ids
+  and all consumer views must be derived. Add or remove a
   semantic checkpoint in the contract and its Java action only; never create another catalog or
   workflow scenario list.
 - The current contract is deliberately a cross-version parity contract: every supported loader and
@@ -147,13 +148,18 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   frames through independent semantic review even when their content-addressed path is shared. It
   must not fall back to filenames, ordinals, review tiers, a latest-version baseline, cross-loader
   agreement, or strict whole-pixel equality. Reject missing anchor coverage, a missing later-version
-  pair, contract skew, aspect-ratio drift, stale reference head, or a mixed paired/unpaired capsule
+  pair, contract skew, any resolution drift, stale reference head, or a mixed paired/unpaired capsule
   before the credential-bearing job starts.
 - Java harness reports, packaged results, raw handoffs, compact caches, and public manifests must
   carry the exact validated contract SHA-256. Reject missing, extra, reordered, hash-mismatched, or
   assertion-free steps and reject a screenshot both when a capture is missing and when a
   non-capture step emits one. Keep independent fixed probe canaries; do not generate calibration
   fixtures from the oracle values under test.
+- Packaged E2E must still generate every contracted functional screenshot. Each capture must be
+  exactly 1920x1080, use deterministic fixture names, clear transient Vanilla overlays, and wait for
+  two complete rendered passes after the ready/settle condition before dispatching the screenshot.
+  CI disables cloud rendering and locks daylight/weather; E2E-only clocks pin authored stars,
+  title panoramas, and preview/player poses without changing ordinary gameplay.
 - Animated-cape evidence must use a valid cape-frame atlas, hold explicitly selected distinct
   frames through screenshot settlement, and compare the rendered cape region by a material pixel
   threshold. A changing logical frame counter alone does not prove that Minecraft sampled the
@@ -264,8 +270,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   execute source-head files in the privileged default-branch workflow;
   for the 1.20.1 anchor, require complete Fabric/Forge coverage and emit only unpaired frames; for
   later versions, authenticate the exact current-head lossless 1.20.1 Pages source and its run
-  provenance; fully decode, dimension-normalize, and canonically re-encode bounded RGB PNGs without
-  source metadata; and emit a source/implementation/candidate/reference-artifact-bound proof. Queue
+  provenance; fully decode and require exact 1920x1080 dimensions, then canonically re-encode
+  bounded RGB PNGs without source metadata or resizing; and emit a
+  source/implementation/candidate/reference-artifact-bound proof. Queue
   selection must authenticate protected owners, survive pending-run replacement, accept a curated
   capsule whose later wake step failed, and cool recent failed attempts without blocking other
   sources. The curator must reject a generation that differs from its protected implementation
@@ -274,19 +281,23 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   superseded pull-request evidence and an exact automatic or scheduled anchor generation that
   already owns a successful protected semantic certificate. A certificate is a terminal generation
   identity here, never a reusable unpaired verdict cache. The review runner accepts only that
-  immutable handoff, never skips an unpaired anchor frame, skips byte-identical paths only in paired
-  comparison mode,
-  exposes only bounded manifests/images plus each passed capture assertion's bounded printable
-  runtime evidence to concurrent loader-grouped Sonnet triage and selective
-  concurrent Opus verification with a read-only tool surface, captures each verdict from stdout,
+  immutable handoff and never skips an unpaired anchor frame. In paired mode, exact decoded RGB
+  fingerprints over the contract-authored regions may inherit the certified reference without a
+  model, and exact-equivalent non-matching pairs may share one AI-reviewed representative. It
+  exposes only bounded manifests/images plus authored regions and each passed capture assertion's
+  bounded printable runtime evidence to concurrent loader-grouped Haiku triage. Every concern,
+  confidence below high, or perceptually subtle non-exact pair reaches selective concurrent Opus
+  verification with a read-only tool surface; perceptual similarity can route but never pass.
+  The runner captures each verdict from stdout,
   and validates exact labels and semantic coherence after every call. A first Opus-confirmed defect
   cancels outstanding work, emits only an explicit fail-closed partial report, publishes a sanitized
   marker bound to the exact protected automatic generation and reauthenticated reviewer
   implementation, and best-effort cancels its sibling
   drains; authenticated queue selection must skip every remaining capsule for that generation. A
   blocked report can never certify an anchor. A paired cache hit must bind exact candidate/reference
-  pixels, expectation, runtime evidence, capture and loader identity, scenario contract, release
-  matrix, protected code, prompts, models, mode, and chunk policy; never cache or reuse unpaired
+  semantic-region fingerprints, review scope, expectation, runtime evidence, capture identity,
+  scenario contract, release matrix, protected code, prompts, models, mode, and chunk policy.
+  Artifact label and loader may differ only when all of that reusable identity is exact; never cache or reuse unpaired
   anchor semantics. It revalidates the
   capsule after the model exits, publishes only a bounded normalized report or sanitized attempt
   marker, never uploads raw provider text, and
@@ -339,9 +350,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   `e2e/mod-compatibility-contract.json` by exact HTTPS URL, filename, byte size, SHA-256, and
   SHA-512. CI never selects a newest upstream version or silently substitutes a dependency.
 - Compatibility visual judgment must compare the complete modded capture product with the clean
-  same-version, same-loader packaged result while still judging every frame semantically. It never
-  treats byte-identical pairs as an automatic pass. Every pair reaches Sonnet; every concern or
-  confidence below high reaches Opus. The first Opus-confirmed defect publishes a durable
+  same-version, same-loader packaged result while still judging every non-exact semantic group.
+  Exact authored-region matches inherit the clean paired result, exact-equivalent pairs share one
+  representative, and every remaining group reaches Haiku. Every concern, confidence below high,
+  or perceptually subtle non-exact pair reaches Opus. The first Opus-confirmed defect publishes a durable
   source-wave marker and cancels remaining review jobs. Raw packaged artifacts are authenticated
   and re-encoded by a secretless curator; a credential-bearing reviewer receives only the bounded,
   metadata-free capsule and its source/target/artifact proof.

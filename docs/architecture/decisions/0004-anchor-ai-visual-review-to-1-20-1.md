@@ -2,7 +2,7 @@
 
 - Status: Superseded in part by ADR 0005
 - Date: 2026-08-09
-- Updated: 2026-08-11
+- Updated: 2026-08-22
 - Scope: advisory packaged-E2E image review across release branches
 
 ADR 0005 supersedes this record's cross-loader anchor-establishment and all-at-once propagation
@@ -46,9 +46,10 @@ frame with the same contract-derived `capture_id`. Later versions use the authen
 Fabric 1.20.1 Pages frame. A 1.20.1 source run is paired across loaders in both directions: Fabric's
 reference is Forge and Forge's reference is Fabric from that same authenticated run. Missing either
 loader fails curation. It selects all captures, including those whose review tier is `all`. Both
-images are fully decoded, their hashes and pixel identities are recomputed, and the candidate is
-normalized to the reference dimensions only when the aspect ratio matches. The model receives only
-content-addressed metadata-free RGB PNG pairs and must inspect both sides of every manifest entry.
+images are fully decoded, must remain exactly 1920x1080, and have their hashes and pixel identities
+recomputed; curation never resizes either side. Protected code derives exact decoded-RGB
+fingerprints for the checkpoint's contract-authored regions. Models receive only bounded,
+content-addressed, metadata-free RGB PNG pairs that were not already proven reusable.
 
 The comparison is semantic, not strict pixel equality. Minecraft-version or loader chrome, camera
 position, lighting, framing, and other expected Vanilla differences may vary. Quick Skin-owned
@@ -61,11 +62,14 @@ the oldest authenticated entry and a repository-wide concurrency group serialize
 Replacing a pending GitHub run cannot discard the capsule, and a sanitized failure marker applies
 a cooldown before retry while allowing other entries to progress.
 
-Before any model call, content-addressed paths eliminate byte-identical candidate/reference pairs
-except the Fabric/Forge 1.20.1 anchor pairs. Anchor parity is not proof of semantic correctness, so
-those pairs always reach the model and are checked against the contract expectation. The remaining
-pairs are triaged in chunks of at most eight by Sonnet. Only a reported concern or a
-non-high-confidence decision is escalated to an independent Opus pass in chunks of at most four.
+Before any model call, exact authored-region fingerprints eliminate paired candidate/reference
+matches. Exact-equivalent non-matching pairs with the same checkpoint semantics share one reviewed
+representative, and an exact paired verdict cache can reuse that result across artifact labels and
+loaders. Unpaired Fabric/Forge 1.20.1 anchor frames always reach the model because loader parity is
+not proof of semantic correctness. The remaining representatives are triaged in chunks of at most
+eight by Haiku. A reported concern, a non-high-confidence decision, or a perceptually subtle
+non-exact pair is escalated to an independent Opus pass in chunks of at most four. Perceptual
+similarity only routes and never produces a passing verdict.
 Each call has bounded retries and pacing. Capture the model's JSON from stdout with a read-only tool
 surface, validate label coverage and semantic coherence after every call, normalize the final
 report with protected code, and never upload provider-authored raw output. This read-only stdout
@@ -87,8 +91,9 @@ write tool; the rest of ADR 0003 remains active.
 
 ## Consequences
 
-Every capture is paired. Identical pixels consume no model capacity outside the 1.20.1 cross-loader
-anchor, and the expensive verifier sees only ambiguous or suspicious pairs. Bounded chunks reduce
+Every contracted functional capture is still produced. Exact relevant pixels consume no model
+capacity outside the unpaired 1.20.1 anchor, equivalent versions share one representative, and the
+expensive verifier sees only ambiguous, suspicious, or subtly non-exact pairs. Bounded chunks reduce
 context dilution and make retry cost proportional to one small chunk instead of the complete
 matrix. In return, subtle cross-version
 regressions have a stable lossless comparison point and omitted review tiers can no longer create

@@ -131,12 +131,13 @@ immutable workflow and governance activation contract.
   complete protected job graph, and curates raw artifacts on a secretless runner. After the anchor
   is certified, every later-version candidate is paired by semantic `capture_id` with authenticated
   current-head lossless Fabric 1.20.1 Pages evidence; the compact WebP cache is never an AI oracle.
-  Only canonical content-addressed RGB PNGs, a bounded manifest, and provenance enter the durable
-  queue; raw E2E ZIPs never share a runner with the credential. Protected drains are locked by
+  Only canonical content-addressed 1920x1080 RGB PNGs, authored checkpoint regions, a bounded
+  manifest, and provenance enter the durable queue; curation never downsizes or normalizes a
+  different resolution, and raw E2E ZIPs never share a runner with the credential. Protected drains are locked by
   exact queue artifact, so different capsules run concurrently while duplicate wakes coalesce;
   generic recovery sweeps only redispatch an authenticated exact wake. Before those independent
   drains fan out, one global serialized capacity section reuses only a fresh marker from the exact
-  protected workflow. Its single tool-free Sonnet probe either opens a short shared ready window or
+  protected workflow. Its single tool-free Haiku probe either opens a short shared ready window or
   records a sanitized hard-rejection/provider-failure pause. A successful `allowed` or
   `allowed_warning` call remains ready regardless of its optional coarse utilization field because
   that field may disagree with the subscription usage panel; a later rejected review still fails
@@ -145,14 +146,19 @@ immutable workflow and governance activation contract.
   pending artifact independently, so coalescing probe contenders never serializes the actual
   reviews. It consumes the bounded headless rate-limit status and optional utilization when
   present, without pretending Claude provides a reliable Pro/Max percentage to headless CI. A
-  certifiable anchor is prioritized before the cross-version wave. Each drain triages independent
-  loader-grouped chunks
-  concurrently with Sonnet and sends suspicious or uncertain frames to concurrent bounded Opus
-  verification. The first Opus-confirmed defect publishes a protected generation-bound marker,
+  certifiable anchor is prioritized before the cross-version wave. Unpaired anchor frames always
+  reach Haiku. For paired evidence, decoded RGB pixels from the authored regions can prove an exact
+  candidate/reference match without a model call; exact-equivalent versions share one AI-reviewed
+  representative. Each drain triages the remaining loader-grouped chunks concurrently with Haiku
+  and sends suspicious, uncertain, or perceptually subtle non-exact frames to concurrent bounded
+  Opus verification. Perceptual similarity only routes and can never synthesize a pass. The first
+  Opus-confirmed defect publishes a protected generation-bound marker,
   cancels sibling drains and keeps later queue selection from spending more model calls on that
-  automatic wave. Each drain also cancels its own outstanding calls on confirmation and reuses paired
-  verdicts only under an exact content/expectation/loader/contract/matrix/reviewer/prompt/model
-  policy key. A cache shard from an earlier protected `master` SHA is eligible only when that SHA
+  automatic wave. Each drain also cancels its own outstanding calls on confirmation and reuses a
+  paired verdict only under exact semantic candidate/reference fingerprints, authored review
+  scope, capture, expectation, runtime evidence, contract, matrix, reviewer, prompt, model, and
+  chunk-policy identity. Artifact labels and loaders may differ when all reusable semantic identity
+  is exact. A cache shard from an earlier protected `master` SHA is eligible only when that SHA
   remains an ancestor and its cache-producing workflow blob is byte-identical to the current one;
   the current codec then revalidates every exact key. The capacity marker retains only normalized
   status, known limit type, and utilization
@@ -185,8 +191,9 @@ immutable workflow and governance activation contract.
   lanes run concurrently, prove that the selected integration activated, and execute both the
   compatibility scenario and the complete base suite with only immutable size/SHA-256/SHA-512
   verified external JARs. Secretless curation pairs the full modded result with the clean
-  same-version/loader result; Sonnet semantically reviews every pair, including identical pixels,
-  and Opus verifies every non-high-clean result. The first confirmed defect records a durable wave
+  same-version/loader result. Exact authored-region matches need no model call, exact-equivalent
+  pairs share one representative, Haiku reviews the remaining pairs, and Opus verifies every
+  non-high-clean or perceptually subtle result. The first confirmed defect records a durable wave
   block and cancels sibling reviews. Each successful runtime lane curates its own capsule before
   the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing
   successful lanes or preventing their concurrent AI review. The settled compatibility producer
