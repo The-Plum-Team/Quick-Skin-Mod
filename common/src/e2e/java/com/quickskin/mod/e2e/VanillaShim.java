@@ -68,6 +68,8 @@ import java.util.function.Consumer;
  *       {@code onPress(InputWithModifiers)} (26.x).</li>
  *   <li><b>title splash construction</b>: {@code SplashRenderer(String)} vs
  *       {@code SplashRenderer(Component)}, plus its remapped private field on {@code TitleScreen}.</li>
+ *   <li><b>transient overlays</b>: toast/chat access through {@code Minecraft}/{@code Gui}
+ *       (1.20.1..26.1.x) vs {@code Gui.toastManager()}/{@code Gui.hud.getChat()} (26.2).</li>
  * </ul>
  *
  * <p>GL-touching calls (screenshot) must run on the render thread, after at least one full frame.</p>
@@ -766,33 +768,40 @@ public final class VanillaShim {
                     mc.getClass(), "getToasts", "getToastManager", "method_1566", "m_91300_"
             );
             Object toastManager = toastAccessor == null ? null : toastAccessor.invoke(mc);
-            Method clearToasts = toastManager == null
-                    ? null
-                    : findNoArg(
-                            toastManager.getClass(), "clear", "method_2000", "m_94919_"
-                    );
-            if (clearToasts == null) {
-                return "vanilla toast clear surface is unavailable";
+            if (toastManager == null) {
+                // 26.2 moved the manager under Gui. Keep this call direct so Loom remaps both the
+                // accessor and clear() for Fabric instead of relying on an intermediary name.
+                mc.gui.toastManager().clear();
+            } else {
+                Method clearToasts = findNoArg(
+                        toastManager.getClass(), "clear", "method_2000", "m_94919_"
+                );
+                if (clearToasts == null) {
+                    return "vanilla toast clear surface is unavailable";
+                }
+                clearToasts.invoke(toastManager);
             }
-            clearToasts.invoke(toastManager);
 
             Object gui = mc.gui;
             Method chatAccessor = gui == null
                     ? null
                     : findNoArg(gui.getClass(), "getChat", "method_1743", "m_93076_");
             Object chat = chatAccessor == null ? null : chatAccessor.invoke(gui);
+            if (chat == null) {
+                // 26.2 split the HUD out of Gui. As above, direct calls preserve loader remapping.
+                mc.gui.hud.getChat().clearMessages(true);
+                return null;
+            }
             Method clearChat = null;
-            if (chat != null) {
-                for (Method method : chat.getClass().getMethods()) {
-                    if ((method.getName().equals("clearMessages")
-                            || method.getName().equals("method_1808")
-                            || method.getName().equals("m_93795_"))
-                            && method.getParameterCount() == 1
-                            && method.getParameterTypes()[0] == boolean.class) {
-                        method.setAccessible(true);
-                        clearChat = method;
-                        break;
-                    }
+            for (Method method : chat.getClass().getMethods()) {
+                if ((method.getName().equals("clearMessages")
+                        || method.getName().equals("method_1808")
+                        || method.getName().equals("m_93795_"))
+                        && method.getParameterCount() == 1
+                        && method.getParameterTypes()[0] == boolean.class) {
+                    method.setAccessible(true);
+                    clearChat = method;
+                    break;
                 }
             }
             if (clearChat == null) {
