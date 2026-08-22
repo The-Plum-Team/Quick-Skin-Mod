@@ -156,6 +156,11 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
         extra["scenario"] = "contract-only-extra"
         extra["execution_profiles"] = ["pr", "release"]
         contract_payload["scenarios"].append(extra)
+        for capture_id, regions in list(contract_payload["review_regions"].items()):
+            if capture_id.startswith("phase0-smoke."):
+                contract_payload["review_regions"][
+                    capture_id.replace("phase0-smoke.", "contract-only-extra.", 1)
+                ] = copy.deepcopy(regions)
 
         with tempfile.TemporaryDirectory() as temporary:
             contract_path = Path(temporary) / "scenario-contract.json"
