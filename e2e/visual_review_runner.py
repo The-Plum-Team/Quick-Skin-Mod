@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import hashlib
+import io
 import json
 import os
 import signal
+import stat
 import subprocess
 import sys
 import threading
@@ -43,6 +46,8 @@ DEFAULT_RETRY_DELAYS = (30.0, 60.0, 120.0)
 MAX_MODEL_SECONDS = 15 * 60
 DEFAULT_MAX_PARALLEL_CALLS = 16
 MAX_PARALLEL_CALLS = 32
+SOURCE_IMAGE_SIZE = (1920, 1080)
+MODEL_IMAGE_SIZE = (1280, 720)
 TRANSIENT_MODEL_CATEGORIES = frozenset(
     {
         "cli_or_api",
@@ -54,7 +59,10 @@ TRANSIENT_MODEL_CATEGORIES = frozenset(
     }
 )
 SYNTHETIC_IDENTICAL_VISIBLE = (
-    "Candidate pixels are identical to the certified 1.20.1 reference."
+    "Every authored semantic-region pixel is identical to the certified reference."
+)
+SYNTHETIC_REPRESENTED_VISIBLE = (
+    "Authored semantic-region pixels are exact-equivalent to an AI-reviewed representative."
 )
 SYNTHETIC_COMPARISON_CLEAN_VISIBLE = (
     "Candidate is semantically valid and matches the certified 1.20.1 reference."
@@ -79,6 +87,47 @@ class ReviewCancelled(RuntimeError):
 ReviewProvider = Callable[
     [str, int, list[dict[str, Any]], dict[str, Any]], list[dict[str, Any]]
 ]
+
+
+def _resize_model_png(source: Path) -> tuple[str, bytes]:
+    """Return one deterministic 720p RGB copy without changing authenticated evidence."""
+
+    try:
+        from PIL import Image, UnidentifiedImageError
+    except ImportError as exc:  # pragma: no cover - protected jobs install the locked decoder
+        raise RunnerError(
+            "image_decoder_unavailable", "model_images", transient=False
+        ) from exc
+    try:
+        metadata = source.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or source.is_symlink()
+            or metadata.st_size <= 0
+        ):
+            raise ValueError("source image is not a regular file")
+        payload = source.read_bytes()
+        if len(payload) != metadata.st_size:
+            raise ValueError("source image changed while reading")
+        with Image.open(io.BytesIO(payload)) as image:
+            if image.format != "PNG" or getattr(image, "n_frames", 1) != 1:
+                raise ValueError("source image is not a static PNG")
+            image.load()
+            rendered = image.convert("RGB")
+            if rendered.size != SOURCE_IMAGE_SIZE:
+                raise ValueError(
+                    "source image must be exactly "
+                    f"{SOURCE_IMAGE_SIZE[0]}x{SOURCE_IMAGE_SIZE[1]}"
+                )
+            rendered = rendered.resize(MODEL_IMAGE_SIZE, Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            rendered.save(output, format="PNG", optimize=False, compress_level=9)
+    except RunnerError:
+        raise
+    except (OSError, UnidentifiedImageError, ValueError) as exc:
+        raise RunnerError("invalid_model_image", "model_images", transient=False) from exc
+    resized = output.getvalue()
+    return hashlib.sha256(resized).hexdigest(), resized
 
 
 def _chunks(items: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]:
@@ -117,27 +166,60 @@ def build_review_plan(
     cached_labels: frozenset[str] = frozenset(),
     review_identical: bool = False,
 ) -> dict[str, Any]:
-    """Split byte-identical pairs from bounded semantic-review chunks."""
+    """Split exact semantic matches and group exact-equivalent paired representatives."""
 
     entries, _labels = validate_manifest(manifest)
     paired = "reference_path" in entries[0]
     # A semantic-only anchor has no reference and every frame reaches the model. Once that anchor
-    # is certified, byte-identical later-version pairs can inherit both its semantics and pixels.
+    # is certified, exact authored-region matches can inherit both its semantics and pixels.
     identical = [
         item
         for item in entries
-        if paired and not review_identical and item["path"] == item["reference_path"]
+        if paired
+        and not review_identical
+        and item["candidate_semantic_sha256"] == item["reference_semantic_sha256"]
     ]
-    semantic = [
+    pending = [
         item
         for item in entries
-        if (not paired or review_identical or item["path"] != item["reference_path"])
+        if (
+            not paired
+            or review_identical
+            or item["candidate_semantic_sha256"] != item["reference_semantic_sha256"]
+        )
         and item["label"] not in cached_labels
     ]
+    semantic: list[dict[str, Any]] = []
+    represented_by_label: dict[str, str] = {}
+    equivalence_groups: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
+    for item in pending:
+        if not paired or review_identical:
+            semantic.append(item)
+            continue
+        equivalence_key = json.dumps(
+            {
+                "capture_id": item["capture_id"],
+                "expectation": item["expectation"],
+                "runtime_evidence": item["runtime_evidence"],
+                "review_regions": item["review_regions"],
+                "candidate_semantic_sha256": item["candidate_semantic_sha256"],
+                "reference_semantic_sha256": item["reference_semantic_sha256"],
+            },
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        equivalence_groups.setdefault(equivalence_key, []).append(item)
+    for group in equivalence_groups.values():
+        representative = group[0]
+        semantic.append(representative)
+        for follower in group[1:]:
+            represented_by_label[follower["label"]] = representative["label"]
     return {
         "paired": paired,
         "identical": identical,
         "semantic": semantic,
+        "represented_by_label": represented_by_label,
         "triage_chunks": (
             _checkpoint_chunks(semantic, triage_chunk_size) if semantic else []
         ),
@@ -211,6 +293,7 @@ def execute_review(
             "paired": int(paired),
             "identical": len(plan["identical"]),
             "cached": len(normalized_cache_hits),
+            "represented": len(plan["represented_by_label"]),
             "triaged": 0,
             "triage_chunks": 0,
             "escalated": 0,
@@ -357,12 +440,26 @@ def execute_review(
             "paired": int(paired),
             "identical": len(plan["identical"]),
             "cached": len(normalized_cache_hits),
+            "represented": len(plan["represented_by_label"]),
             "triaged": len(triage_by_label),
             "triage_chunks": len(plan["triage_chunks"]),
             "escalated": escalated_count,
             "verify_chunks": verify_chunks_count,
             "reviewed": len(ordered_defects),
             "stopped_early": 1,
+        }
+
+    for follower_label, representative_label in plan["represented_by_label"].items():
+        representative = final_by_label.get(representative_label)
+        if representative is None:
+            raise ReviewError(
+                "review runner did not produce representative verdict "
+                f"{representative_label!r} for {follower_label!r}"
+            )
+        final_by_label[follower_label] = {
+            **representative,
+            "label": follower_label,
+            "visible": SYNTHETIC_REPRESENTED_VISIBLE,
         }
 
     missing = [label for label in labels if label not in final_by_label]
@@ -378,6 +475,7 @@ def execute_review(
         "paired": int(paired),
         "identical": len(plan["identical"]),
         "cached": len(normalized_cache_hits),
+        "represented": len(plan["represented_by_label"]),
         "triaged": len(plan["semantic"]),
         "triage_chunks": len(plan["triage_chunks"]),
         "escalated": escalated_count,
@@ -437,6 +535,9 @@ class ClaudeProvider:
         self.attempts = attempts
         self.call_spacing_seconds = call_spacing_seconds
         self.last_call_started: float | None = None
+        self.source_images = capsule / "review-input" / "images"
+        self.model_images = work_root / "model-images"
+        self._model_paths: dict[str, str] = {}
         self._pace_lock = threading.Lock()
         self._artifact_lock = threading.Lock()
         self._process_lock = threading.Lock()
@@ -452,6 +553,64 @@ class ClaudeProvider:
                 os.killpg(process.pid, signal.SIGKILL)
             except (OSError, ProcessLookupError):
                 continue
+
+    def _stage_model_path(self, raw_path: str) -> str:
+        cached = self._model_paths.get(raw_path)
+        if cached is not None:
+            return cached
+        try:
+            source_root = self.source_images.resolve(strict=True)
+            unresolved = self.capsule / raw_path
+            if unresolved.is_symlink():
+                raise OSError("source image is a symbolic link")
+            source = unresolved.resolve(strict=True)
+        except OSError as exc:
+            raise RunnerError(
+                "invalid_model_image", "model_images", transient=False
+            ) from exc
+        if source.parent != source_root:
+            raise RunnerError("invalid_model_image", "model_images", transient=False)
+
+        digest, payload = _resize_model_png(source)
+        self.model_images.mkdir(mode=0o700, parents=True, exist_ok=True)
+        destination = self.model_images / f"{digest}.png"
+        if destination.exists() or destination.is_symlink():
+            try:
+                if destination.is_symlink() or destination.read_bytes() != payload:
+                    raise OSError("model image digest collision")
+            except OSError as exc:
+                raise RunnerError(
+                    "invalid_model_image", "model_images", transient=False
+                ) from exc
+        else:
+            try:
+                with destination.open("xb") as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.chmod(destination, 0o644)
+            except OSError as exc:
+                raise RunnerError(
+                    "invalid_model_image", "model_images", transient=False
+                ) from exc
+        relative = destination.relative_to(self.capsule).as_posix()
+        self._model_paths[raw_path] = relative
+        return relative
+
+    def _prepare_model_manifest(
+        self, manifest: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        prepared: list[dict[str, Any]] = []
+        for item in manifest:
+            rewritten = dict(item)
+            rewritten["path"] = self._stage_model_path(item["path"])
+            if "reference_path" in item:
+                rewritten["reference_path"] = self._stage_model_path(
+                    item["reference_path"]
+                )
+            rewritten["image_size"] = list(MODEL_IMAGE_SIZE)
+            prepared.append(rewritten)
+        return prepared
 
     def _pace(self) -> None:
         if self.call_spacing_seconds <= 0:
@@ -486,8 +645,12 @@ class ClaudeProvider:
         chunk_name = f"{stage}-{chunk_index:03d}"
         manifest_path = self.work_root / "chunks" / f"{chunk_name}.json"
         with self._artifact_lock:
-            _write_json_new(manifest_path, manifest)
+            model_manifest = self._prepare_model_manifest(manifest)
+            _write_json_new(manifest_path, model_manifest)
         manifest_relative = manifest_path.relative_to(self.capsule).as_posix()
+        model_images_relative = self.model_images.relative_to(
+            self.capsule
+        ).as_posix()
         image_instruction = (
             "open the candidate and reference images for every entry"
             if self.paired
@@ -534,7 +697,7 @@ class ClaudeProvider:
                 "Read",
                 "--allowedTools",
                 f"Read(./{manifest_relative})",
-                "Read(./review-input/images/**)",
+                f"Read(./{model_images_relative}/**)",
                 "--permission-mode",
                 "dontAsk",
             ]
@@ -683,7 +846,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--review-identical",
         action="store_true",
-        help="send byte-identical pairs through semantic review instead of inheriting a pass",
+        help="send exact authored-region matches through review instead of inheriting a pass",
     )
     parser.add_argument("--triage-chunk-size", type=int, default=DEFAULT_TRIAGE_CHUNK_SIZE)
     parser.add_argument("--verify-chunk-size", type=int, default=DEFAULT_VERIFY_CHUNK_SIZE)
