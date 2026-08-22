@@ -307,7 +307,7 @@ def write_marker(
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--claude", type=Path, required=True)
-    parser.add_argument("--model", default="claude-sonnet-5")
+    parser.add_argument("--model", default="claude-haiku-4-5")
     parser.add_argument("--work-root", type=Path, required=True)
     parser.add_argument("--marker", type=Path, required=True)
     parser.add_argument("--github-output", type=Path, required=True)
