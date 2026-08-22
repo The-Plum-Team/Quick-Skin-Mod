@@ -23,7 +23,7 @@ This `fabric-and-neoforge-1.21.9` release branch exercises the following exact p
 | `fabric-1.21.9` | `1.21.9` | Fabric | `21` | `5` |
 | `neoforge-1.21.9` | `1.21.9` | NeoForge | `21` | `5` |
 
-Scenario contract SHA-256: `824ab573c1ccfbfd7b0a6cc8815d665fb195d195f5ccb4e0f9bf9bf74a7ac673`
+Scenario contract SHA-256: `8581638b7c171285b1fb9559ad973be8b8af2d68aab5f59549a009843649ee36`
 Contract totals: `52` ordered steps, `45` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -97,6 +97,14 @@ account skin or Minecraft's earlier generic fallback frame. Visual review still 
 vanilla default skin variant across versions; that tolerance does not apply to checkpoints whose
 expectation names a Quick Skin custom skin or cape.
 
+Every contracted screenshot remains part of functional E2E evidence and is captured at exactly
+1920x1080. The client disables clouds, the server fixes its seed and spawn while locking daylight
+and clear weather, imported test assets use stable filenames, and the harness clears transient
+Vanilla chat/toast notices before waiting for two complete render passes and grabbing that rendered
+frame. E2E-only render clocks
+pin the starred backdrop, title panorama, and preview animation; these controls are inactive during
+ordinary gameplay.
+
 For a matrix Java major `<major>`, executable resolution checks
 `QUICKSKIN_JAVA_<major>`, the matching `JAVA_HOME_<major>_X64` variables, a matching `JAVA_HOME`,
 and finally `PATH`. Gradle toolchain downloads may satisfy that lookup, but the matrix remains the
@@ -157,14 +165,14 @@ so an incomplete download can never contaminate the next attempt.
 ## Fail-closed contract
 
 [`scenario-contract.json`](scenario-contract.json) is the only authored control plane for scenario
-ids, execution profiles, orchestration, roles, exact ordered steps, assertions, captures, probes,
-and comparisons. Its canonical SHA-256 is bound into harness reports, packaged results, and public
+ids, execution profiles, orchestration, roles, exact ordered steps, assertions, captures, the fixed
+1920x1080 screenshot size, authored review regions, probes, and comparisons. Its canonical SHA-256 is bound into harness reports, packaged results, and public
 evidence. Missing, extra, reordered, or hash-mismatched contract data fails closed. Every exact role
 step must produce a screenshot if and only if that step declares `capture`; both a missing required
 capture and an unexpected screenshot are errors.
 
 A row also fails for a missing or changed package, missing/invalid report, failed or
-corrupt/undersized/effectively blank screenshot, a washed-out OPAQUE_STARS skin-menu background, a
+corrupt/non-1920x1080/effectively blank screenshot, a washed-out OPAQUE_STARS skin-menu background, a
 missing required skin-menu, cape-menu, cape-editor, or settings label, a visually unchanged
 apply/animation pair, compatibility/error screen, crash report, or fatal
 mixin/access-widener/linkage/`@ExpectPlatform` log evidence. The background check measures
@@ -268,8 +276,8 @@ policy-only work.
 That workflow never exposes raw packaged artifacts to the model credential. A secretless curator
 authenticates every artifact and exact matrix row. It imports the exact source commit only as inert
 Git objects—never as a checkout executed by the privileged workflow—then fully decodes the complete
-scenario product, requires one production JAR, and re-encodes every captured frame as a bounded
-metadata-free RGB PNG
+scenario product, requires one production JAR, requires every image to remain exactly 1920x1080,
+and re-encodes every captured frame as a bounded metadata-free RGB PNG without resizing
 named by its served-byte SHA-256. Each curated manifest row also carries the bounded message from
 that capture's required passed assertion as `runtime_evidence`; this gives the reviewer exact
 renderer/state evidence where pixels are intrinsically ambiguous without allowing it to excuse a
@@ -279,7 +287,7 @@ independently against its expectation. This prevents a shared renderer, state, o
 from becoming correct merely because both loaders agree. For each semantic `capture_id`, a
 later-version candidate is paired with the authenticated current-head Fabric 1.20.1 frame selected
 only from the protected lossless Pages handoff; the compact WebP cache is never an AI oracle.
-Candidate and reference are normalized to the same dimensions without changing aspect ratio. The
+Candidate and reference must already have the same contracted dimensions. The
 reference is semantic rather than a strict whole-pixel golden image: legitimate Vanilla, loader,
 camera, lighting, and framing differences remain acceptable. Missing anchor-loader coverage or a
 missing later-version reference fails curation.
@@ -295,7 +303,7 @@ reviews.
 
 Before any exact drains fan out, they cross one repository-wide capacity section. A fresh
 authenticated success marker lets unrelated capsules continue concurrently for ten minutes. If no
-marker exists, competing probe jobs coalesce behind one tool-free, low-effort Sonnet call that
+marker exists, competing probe jobs coalesce behind one tool-free, low-effort Haiku call that
 checks whether the subscription can accept work. A fresh success redispatches every authenticated
 pending capsule by exact artifact ID, preserving parallel review even when earlier probe contenders
 were coalesced. A rejected rate-limit event opens a sanitized thirty-minute circuit and leaves every
@@ -307,17 +315,23 @@ primarily an availability circuit rather than an invented quota estimate. The ma
 the normalized provider status, known limit type, and utilization band; neither provider text nor
 exact account-usage details are uploaded.
 
-The runner sends every unpaired 1.20.1 frame to Sonnet and gives certifiable anchor entries priority
-over advisory queue work. In later paired reviews it may mark a content-addressed byte-identical
-candidate/reference pair clean without a model call. It may also reuse a protected verdict only
-when candidate and reference PNG digests, expectation, passed runtime evidence, capture identity,
-loader artifact, scenario contract, release matrix, prompts, reviewer/checker/cache code, models,
-mode, and chunk policy all match exactly;
-unpaired anchor semantics are never cached. Sonnet triages the remaining frames in loader-sibling
-chunks of at most eight. All independent chunks run concurrently, and each concern or confidence
-below high is independently rechecked by Opus in concurrent chunks of at most four as soon as its
-Sonnet result is available. Provider throttling is handled by bounded retries rather than serial
-launch pacing. Once any Opus chunk confirms a defect, outstanding calls are cancelled and the
+The runner sends every unpaired 1.20.1 frame to Haiku and gives certifiable anchor entries priority
+over advisory queue work. Curation fingerprints decoded RGB pixels inside every contract-authored
+review region. In later paired reviews an exact candidate/reference region match inherits the
+certified result without a model call, while exact-equivalent non-matching pairs across versions or
+loaders share one AI-reviewed representative. A protected verdict is reusable only when both
+semantic fingerprints, review scope, expectation, passed runtime evidence, capture identity,
+scenario contract, release matrix, prompts, reviewer/checker/cache/similarity code, models, mode,
+and chunk policy match exactly; artifact labels and loaders may differ because they are not visual
+identity. Unpaired anchor semantics are never cached. Haiku triages the remaining representative
+frames in chunks of at most eight. All independent chunks run concurrently. Only a Haiku concern
+or confidence below high is independently rechecked by Opus in concurrent chunks of at most four
+as soon as its Haiku result is available; a clean high-confidence Haiku verdict is final.
+Perceptual similarity is model context only and can never produce a pass or force an escalation.
+The authenticated evidence remains 1920x1080 for exact comparison and caching, while the runner
+creates deterministic 1280x720 copies only for chunks that actually reach a model. Provider
+throttling is handled by bounded retries rather than serial launch pacing. Once any Opus chunk
+confirms a defect, outstanding calls are cancelled and the
 explicit blocking-partial result cannot certify or release anything. For an automatic version
 wave, the protected drain then publishes a sanitized marker bound to that exact master generation,
 best-effort cancels sibling drains, and makes later authenticated queue selection skip its remaining
@@ -409,14 +423,15 @@ python3 e2e/mod_compatibility.py --validate
 
 Each deterministic lane that passes immediately authenticates its full modded result and the clean
 same-version/loader result from the exact source run and source profile, pairs every contracted
-capture, and re-encodes only bounded,
-metadata-free PNGs. A failing sibling keeps the runtime wave red but cannot erase or suppress these
+capture, and re-encodes only bounded, metadata-free 1920x1080 PNGs without resizing. A failing
+sibling keeps the runtime wave red but cannot erase or suppress these
 successful capsules. Compatibility launches omit Mixin's global debug injection-count flag because
 it changes optional third-party mixin behavior; the clean packaged suite retains that stricter
 Quick Skin injector check. The credential-bearing review workflow receives only the successful
-curated capsules, never raw packaged artifacts, and reviews them concurrently. Sonnet reviews every
-pair semantically—even byte-identical pairs—and Opus confirms every concern or confidence below
-high. A first Opus-confirmed defect creates a durable source-wave block and cancels the remaining
+curated capsules, never raw packaged artifacts, and reviews them concurrently. Exact authored-region
+matches need no AI call, exact-equivalent pairs share one representative, Haiku reviews the
+remaining groups from deterministic 1280x720 copies, and Opus confirms only a Haiku concern or
+confidence below high. A first Opus-confirmed defect creates a durable source-wave block and cancels the remaining
 compatibility review jobs.
 
 ## Public visual evidence
