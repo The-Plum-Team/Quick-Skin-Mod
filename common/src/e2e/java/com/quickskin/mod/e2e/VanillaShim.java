@@ -56,6 +56,9 @@ import java.util.function.Consumer;
  *       evolving player-skin record described above.</li>
  *   <li><b>player name</b>: {@code GameProfile.getName()} (authlib class) vs {@code name()} (authlib
  *       record, 26.x).</li>
+ *   <li><b>client walk distance</b>: public fields on {@code Entity} (1.20.1/1.21.1), then on
+ *       {@code AbstractClientPlayer} (1.21.2..1.21.8), then private fields on
+ *       {@code ClientAvatarState} reached through {@code avatarState()} (1.21.9/26.x).</li>
  *   <li><b>main render target</b> (for screenshots): {@code Minecraft.getMainRenderTarget()} vs
  *       {@code mc.gameRenderer.mainRenderTarget()} (26.x).</li>
  *   <li><b>Screenshot.grab</b>: classic Fabric exposes intermediary class/method names at runtime,
@@ -246,6 +249,70 @@ public final class VanillaShim {
             E2ELog.warn("setFieldOfView: " + t);
             return false;
         }
+    }
+
+    /**
+     * Zero both previous and current client walk distances across their versioned owners.
+     *
+     * <p>The values feed cape interpolation independently of {@code walkAnimation}. Returning a
+     * diagnostic instead of silently continuing keeps visual evidence fail-closed when mappings
+     * drift again.</p>
+     *
+     * @return {@code null} on success, otherwise a bounded diagnostic.
+     */
+    public static String resetWalkDistance(Object player) {
+        if (player == null) return "walk-distance reset requires a player";
+        try {
+            if (zeroWalkDistanceFields(player)) return null;
+
+            Method avatarState = findNoArg(
+                    player.getClass(), "avatarState", "method_74192"
+            );
+            Object state = avatarState == null ? null : avatarState.invoke(player);
+            if (state != null && zeroWalkDistanceFields(state)) return null;
+            return "walk-distance fields were not found on the player or avatar state";
+        } catch (Throwable failure) {
+            return "could not reset walk distance: "
+                    + failure.getClass().getSimpleName() + ": " + failure.getMessage();
+        }
+    }
+
+    private static boolean zeroWalkDistanceFields(Object target)
+            throws ReflectiveOperationException {
+        Field current = findField(
+                target.getClass(),
+                "walkDist", "field_5973", "field_53039", "field_62569", "f_19787_"
+        );
+        Field previous = findField(
+                target.getClass(),
+                "walkDistO", "field_6039", "field_53038", "field_62570", "f_19867_"
+        );
+        if (current == null && previous == null) return false;
+        if (current == null || previous == null
+                || current.getType() != float.class || previous.getType() != float.class) {
+            throw new NoSuchFieldException("walk-distance field pair is incomplete");
+        }
+        current.setFloat(target, 0.0F);
+        previous.setFloat(target, 0.0F);
+        if (current.getFloat(target) != 0.0F || previous.getFloat(target) != 0.0F) {
+            throw new IllegalStateException("walk-distance fields rejected zero values");
+        }
+        return true;
+    }
+
+    private static Field findField(Class<?> type, String... names) {
+        for (Class<?> current = type; current != null; current = current.getSuperclass()) {
+            for (String name : names) {
+                try {
+                    Field field = current.getDeclaredField(name);
+                    field.setAccessible(true);
+                    return field;
+                } catch (NoSuchFieldException ignored) {
+                    // Try the next mapping name or superclass.
+                }
+            }
+        }
+        return null;
     }
 
     /**
