@@ -89,7 +89,10 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   guidance and runtime documents use a source-preferred three-way merge, the release matrix uses
   the target version, a build script may be deleted only when its loader is inactive in that
   target matrix, and a path below a legacy overlay may be deleted only when that exact overlay root
-  is absent from the target matrix. Unknown protected paths, active-loader build conflicts, and
+  is absent from the target matrix. The one reviewed datapack-layout migration moves the protected
+  `functions` files and tags to 1.21+'s singular `function` paths, rewrites the three renamed game
+  rules from the target matrix's single runtime version, and removes every obsolete plural path.
+  Unknown protected paths, active-loader build conflicts, and
   active-overlay conflicts abort the port; only unprotected residual conflicts may reach AI.
 - `scripts/release/branch_readme.py`, `scripts/release/e2e_readme.py`, and
   `scripts/release/workflow_guidance.py` are the protected renderers for matrix-owned branch

@@ -392,7 +392,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   protected paths may use only their reviewed mechanical resolution: source-preferred three-way
   merge for shared guidance/runtime documents, target retention for the release matrix, deletion
   of a build script whose loader is absent from that target matrix, or deletion below a legacy
-  overlay root absent from that target matrix. Any unknown protected conflict, active-loader build
+  overlay root absent from that target matrix. The exact 1.20-to-1.21 datapack directory rename is
+  the only protected path migration: it must move both functions and tags to the singular layout,
+  select legacy or namespaced game-rule identifiers from one authenticated target runtime, and
+  leave no plural path. Any unknown protected conflict, active-loader build
   conflict, or active-overlay conflict fails closed. Recompute the partition from the original
   paths and target matrix in every downstream trust boundary; never let AI receive a protected path.
 - Treat a proposed version-port patch as untrusted even after policy validation. Apply it first to
