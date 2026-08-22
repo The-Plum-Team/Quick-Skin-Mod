@@ -143,6 +143,7 @@ class VisualReviewImpactTest(unittest.TestCase):
             "e2e/check_visual_review.py",
             "e2e/visual_review.py",
             "e2e/visual_review_cache.py",
+            "e2e/visual_similarity.py",
             "e2e/visual_review_prompt.md",
             "e2e/visual_review_runner.py",
             "e2e/visual_review_semantic_prompt.md",
