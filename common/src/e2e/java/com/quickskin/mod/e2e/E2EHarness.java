@@ -283,6 +283,11 @@ public final class E2EHarness {
             captureArmed = false;
             captureFrame = -1;
         } else {
+            if (s.screenshot != null
+                    && VanillaShim.currentScreen(mc) == null
+                    && mc.player != null) {
+                DefaultSkinEvidenceView.pinStandingMotion(mc.player);
+            }
             if (readyTick < 0) readyTick = tick;
             // Screenshot.grab reads the last PRESENTED frame, so capturing on the tick the predicate
             // first held would record the frame drawn BEFORE the awaited change. Let the state hold

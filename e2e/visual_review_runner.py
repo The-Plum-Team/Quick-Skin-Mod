@@ -65,8 +65,6 @@ SYNTHETIC_COMPARISON_CLEAN_VISIBLE = (
 SYNTHETIC_SEMANTIC_CLEAN_VISIBLE = (
     "Candidate independently satisfies its checkpoint expectation."
 )
-AMBIGUOUS_PERCEPTUAL_DELTA = 0.01
-AMBIGUOUS_CHANGED_FRACTION = 0.02
 
 
 class RunnerError(RuntimeError):
@@ -180,19 +178,6 @@ def build_review_plan(
             _checkpoint_chunks(semantic, triage_chunk_size) if semantic else []
         ),
     }
-
-
-def requires_perceptual_verification(item: dict[str, Any]) -> bool:
-    """Route near-but-nonexact pairs to Opus; never turn similarity into a pass."""
-
-    if "reference_path" not in item:
-        return False
-    if item["candidate_semantic_sha256"] == item["reference_semantic_sha256"]:
-        return False
-    return (
-        item["perceptual_delta"] <= AMBIGUOUS_PERCEPTUAL_DELTA
-        or item["semantic_changed_fraction"] <= AMBIGUOUS_CHANGED_FRACTION
-    )
 
 
 def execute_review(
@@ -345,7 +330,6 @@ def execute_review(
                         if (
                             triage["decision"] == "clean"
                             and triage["confidence"] == "high"
-                            and not requires_perceptual_verification(item)
                         ):
                             final_by_label[item["label"]] = {
                                 "label": item["label"],

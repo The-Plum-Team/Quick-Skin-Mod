@@ -446,7 +446,7 @@ class VisualReviewRunnerTest(unittest.TestCase):
         self.assertEqual(1, stats["escalated"])
         self.assertEqual(1, stats["verify_chunks"])
 
-    def test_near_nonexact_pair_is_verified_even_after_high_confidence_haiku(self) -> None:
+    def test_high_confidence_haiku_clears_a_near_nonexact_pair(self) -> None:
         manifest = [
             {
                 **self.manifest[1],
@@ -473,21 +473,13 @@ class VisualReviewRunnerTest(unittest.TestCase):
                         "anomalies": [],
                     }
                 ]
-            return [
-                {
-                    "label": label,
-                    "visible": "The subtle difference is still semantically valid.",
-                    "semantic_valid": True,
-                    "matches_reference": True,
-                    "anomalies": [],
-                    "defect": False,
-                }
-            ]
+            self.fail("high-confidence clean Haiku triage must not call Opus")
 
         verdicts, stats = execute_review(manifest, provider)
 
-        self.assertEqual(["triage", "verify"], calls)
-        self.assertEqual(1, stats["escalated"])
+        self.assertEqual(["triage"], calls)
+        self.assertEqual(0, stats["escalated"])
+        self.assertEqual(0, stats["verify_chunks"])
         self.assertFalse(verdicts[0]["defect"])
 
     def test_cached_defect_blocks_without_calling_a_model(self) -> None:

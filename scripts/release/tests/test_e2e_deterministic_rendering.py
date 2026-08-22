@@ -24,6 +24,22 @@ WORLD_LOAD = (
     ROOT
     / "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction"
 )
+WORLD_TICK = (
+    ROOT
+    / "e2e/server-template/datapack/data/qs_e2e/functions/tick.mcfunction"
+)
+WORLD_TICK_TAG = (
+    ROOT
+    / "e2e/server-template/datapack/data/minecraft/tags/functions/tick.json"
+)
+DEFAULT_SKIN_VIEW = (
+    ROOT
+    / "common/src/e2e/java/com/quickskin/mod/e2e/DefaultSkinEvidenceView.java"
+)
+E2E_HARNESS = (
+    ROOT
+    / "common/src/e2e/java/com/quickskin/mod/e2e/E2EHarness.java"
+)
 
 
 class E2EDeterministicRenderingTest(unittest.TestCase):
@@ -69,6 +85,23 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
 
         self.assertIn("level-seed=quickskin-e2e", properties)
         self.assertIn("gamerule spawnRadius 0", load_function)
+        self.assertIn("team modify qs_e2e collisionRule never", load_function)
+        self.assertIn(
+            "team join qs_e2e @a[team=!qs_e2e]",
+            WORLD_TICK.read_text(encoding="utf-8"),
+        )
+        self.assertIn('"qs_e2e:tick"', WORLD_TICK_TAG.read_text(encoding="utf-8"))
+
+    def test_world_player_interpolation_is_pinned_by_the_e2e_harness(self) -> None:
+        source = DEFAULT_SKIN_VIEW.read_text(encoding="utf-8")
+
+        self.assertIn("player.tickCount = FIXED_RENDER_TICK", source)
+        self.assertIn("player.walkAnimation.setSpeed(0.0F)", source)
+        self.assertIn("player.xo = player.xOld = player.getX()", source)
+        self.assertIn(
+            "DefaultSkinEvidenceView.pinStandingMotion(mc.player)",
+            E2E_HARNESS.read_text(encoding="utf-8"),
+        )
 
 
 if __name__ == "__main__":

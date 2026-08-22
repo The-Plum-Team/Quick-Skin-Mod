@@ -770,7 +770,12 @@ class WorkflowSecurityTest(unittest.TestCase):
             'item["candidate_semantic_sha256"] == item["reference_semantic_sha256"]',
             runner,
         )
-        self.assertIn("requires_perceptual_verification", runner)
+        self.assertIn('triage["decision"] == "clean"', runner)
+        self.assertIn('triage["confidence"] == "high"', runner)
+        self.assertNotIn("requires_perceptual_verification", runner)
+        self.assertIn(
+            "too ambiguous to clear confidently", " ".join(triage_prompt.split())
+        )
         self.assertIn("TRIAGE_CONFIDENCE", (
             ROOT / "e2e" / "check_visual_review.py"
         ).read_text(encoding="utf-8"))
