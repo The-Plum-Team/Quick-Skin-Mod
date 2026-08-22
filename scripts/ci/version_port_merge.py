@@ -32,6 +32,8 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from ai_patch_policy import PolicyError, normalize_path
 from version_port_conflicts import (
+    DATAPACK_FUNCTION_MIGRATION_CONFLICTS,
+    DATAPACK_FUNCTION_MIGRATION_TRIGGER,
     MAX_MATRIX_BYTES,
     ConflictClassification,
     ConflictClassificationError,
@@ -55,6 +57,33 @@ MAX_AI_BLOBS_BYTES = 2 * 1024 * 1024
 BOT_NAME = "github-actions[bot]"
 BOT_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
 CONFLICT_MARKERS = (b"<<<<<<< ", b"||||||| ", b">>>>>>> ")
+DATAPACK_FUNCTION_RENAMES = (
+    (
+        DATAPACK_FUNCTION_MIGRATION_TRIGGER,
+        "e2e/server-template/datapack/data/qs_e2e/function/load.mcfunction",
+    ),
+    (
+        "e2e/server-template/datapack/data/qs_e2e/functions/tick.mcfunction",
+        "e2e/server-template/datapack/data/qs_e2e/function/tick.mcfunction",
+    ),
+    (
+        "e2e/server-template/datapack/data/minecraft/tags/functions/load.json",
+        "e2e/server-template/datapack/data/minecraft/tags/function/load.json",
+    ),
+    (
+        "e2e/server-template/datapack/data/minecraft/tags/functions/tick.json",
+        "e2e/server-template/datapack/data/minecraft/tags/function/tick.json",
+    ),
+)
+DATAPACK_PLURAL_PREFIXES = (
+    "e2e/server-template/datapack/data/qs_e2e/functions/",
+    "e2e/server-template/datapack/data/minecraft/tags/functions/",
+)
+NAMESPACED_GAME_RULES = {
+    b"gamerule doWeatherCycle false\n": b"gamerule minecraft:advance_weather false\n",
+    b"gamerule doDaylightCycle false\n": b"gamerule minecraft:advance_time false\n",
+    b"gamerule spawnRadius 0\n": b"gamerule minecraft:respawn_radius 0\n",
+}
 
 
 class VersionPortMergeError(ValueError):
@@ -567,6 +596,252 @@ def _resolve_delete_path(
     }
 
 
+def _clear_datapack_migration_conflict(
+    repository: Path,
+    path: str,
+    stages: Mapping[int, IndexEntry],
+) -> dict[str, Any]:
+    if not stages or not set(stages).issubset({1, 2, 3}):
+        raise VersionPortMergeError(
+            f"datapack migration conflict {path!r} has invalid stages"
+        )
+    _run_git(
+        repository,
+        "rm",
+        "--force",
+        "--",
+        _literal_pathspec(path),
+    )
+    return {
+        "path": path,
+        "policy": "clear-renamed-datapack-conflict",
+        "stages": _stages_payload(stages),
+        "result": None,
+    }
+
+
+def _uses_namespaced_game_rules(runtime_version: str) -> bool:
+    try:
+        components = tuple(int(value) for value in runtime_version.split("."))
+    except ValueError as exc:
+        raise VersionPortMergeError(
+            f"target runtime version {runtime_version!r} is invalid"
+        ) from exc
+    if len(components) == 3 and components[:2] == (1, 21):
+        return components[2] >= 11
+    if len(components) in {2, 3} and components[0] >= 26:
+        return True
+    raise VersionPortMergeError(
+        "renamed datapack function layout has unsupported target runtime "
+        f"{runtime_version!r}"
+    )
+
+
+def _rewrite_datapack_load_game_rules(
+    payload: bytes, runtime_version: str
+) -> bytes:
+    _validate_text_blob(payload, "source datapack load function", markers=True)
+    if not payload.endswith(b"\n") or b"\r" in payload:
+        raise VersionPortMergeError(
+            "source datapack load function must use final LF line endings"
+        )
+    lines = payload.splitlines(keepends=True)
+    for legacy in NAMESPACED_GAME_RULES:
+        if lines.count(legacy) != 1:
+            raise VersionPortMergeError(
+                "source datapack load function does not contain the exact "
+                f"expected command {legacy.decode('ascii').strip()!r}"
+            )
+    if not _uses_namespaced_game_rules(runtime_version):
+        return payload
+    return b"".join(NAMESPACED_GAME_RULES.get(line, line) for line in lines)
+
+
+def _migrate_datapack_function_layout(
+    repository: Path,
+    work_head: str,
+    source: str,
+    profile: TargetMatrixProfile,
+    oid_length: int,
+    temporary: Path,
+) -> list[dict[str, Any]]:
+    """Move the trusted 1.20 function pack into the singular 1.21+ layout.
+
+    Minecraft 1.21 renamed both ``functions`` directories to ``function``.
+    Git consequently sees the protected load function as modify/delete while
+    independently adding new plural tick files.  Reproduce that one known
+    migration without exposing E2E policy files to the conflict-solving model.
+    """
+
+    source_entries: dict[str, IndexEntry] = {}
+    target_entries: dict[str, IndexEntry | None] = {}
+    target_old_entries: dict[str, IndexEntry | None] = {}
+    for old_path, new_path in DATAPACK_FUNCTION_RENAMES:
+        source_entry = _tree_entry(repository, source, old_path, oid_length)
+        if source_entry is None:
+            raise VersionPortMergeError(
+                f"datapack migration source path {old_path!r} is absent"
+            )
+        target_old_entry = _tree_entry(
+            repository, work_head, old_path, oid_length
+        )
+        if (
+            old_path != DATAPACK_FUNCTION_RENAMES[2][0]
+            and target_old_entry is not None
+        ):
+            raise VersionPortMergeError(
+                f"datapack migration target still contains plural path {old_path!r}"
+            )
+        source_entries[old_path] = source_entry
+        target_old_entries[old_path] = target_old_entry
+        target_entries[new_path] = _tree_entry(
+            repository, work_head, new_path, oid_length
+        )
+
+    load_target = target_entries[DATAPACK_FUNCTION_RENAMES[0][1]]
+    load_tag_target = target_entries[DATAPACK_FUNCTION_RENAMES[2][1]]
+    if load_target is None or load_tag_target is None:
+        raise VersionPortMergeError(
+            "datapack migration target lacks its singular load function or tag"
+        )
+    load_tag_source = source_entries[DATAPACK_FUNCTION_RENAMES[2][0]]
+    source_load_tag_payload = _read_blob(
+        repository,
+        load_tag_source.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="source datapack load tag",
+    )
+    target_load_tag_payload = _read_blob(
+        repository,
+        load_tag_target.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="target datapack load tag",
+    )
+    if source_load_tag_payload != target_load_tag_payload:
+        raise VersionPortMergeError(
+            "datapack migration load tags are not exact equivalents"
+        )
+    old_load_tag_target = target_old_entries[DATAPACK_FUNCTION_RENAMES[2][0]]
+    if old_load_tag_target is not None:
+        old_target_payload = _read_blob(
+            repository,
+            old_load_tag_target.oid,
+            limit=MAX_PROTECTED_BLOB_BYTES,
+            label="target plural datapack load tag",
+        )
+        if old_target_payload != source_load_tag_payload:
+            raise VersionPortMergeError(
+                "target plural datapack load tag is not the exact source equivalent"
+            )
+
+    before = _snapshot_index(repository, oid_length)
+    before_by_path = _entries_by_path(before.entries)
+    expected_old_stage_zero = {
+        DATAPACK_FUNCTION_RENAMES[0][0],
+        DATAPACK_FUNCTION_RENAMES[1][0],
+        DATAPACK_FUNCTION_RENAMES[2][0],
+        DATAPACK_FUNCTION_RENAMES[3][0],
+    }
+    plural_paths = {
+        entry.path
+        for entry in before.entries
+        if entry.stage == 0
+        and any(entry.path.startswith(prefix) for prefix in DATAPACK_PLURAL_PREFIXES)
+    }
+    if not plural_paths.issubset(expected_old_stage_zero):
+        raise VersionPortMergeError(
+            "datapack migration found unexpected plural function paths: "
+            f"{sorted(plural_paths)!r}"
+        )
+    for old_path in plural_paths:
+        entries = before_by_path.get(old_path, ())
+        source_entry = source_entries[old_path]
+        if entries != (source_entry,):
+            raise VersionPortMergeError(
+                f"merged datapack path {old_path!r} is not the exact source blob"
+            )
+
+    results: list[dict[str, Any]] = []
+    for ordinal, (old_path, new_path) in enumerate(DATAPACK_FUNCTION_RENAMES):
+        source_entry = source_entries[old_path]
+        target_entry = target_entries[new_path]
+        if old_path == DATAPACK_FUNCTION_RENAMES[0][0]:
+            source_payload = _read_blob(
+                repository,
+                source_entry.oid,
+                limit=MAX_PROTECTED_BLOB_BYTES,
+                label="source datapack load function",
+            )
+            result_payload = _rewrite_datapack_load_game_rules(
+                source_payload, profile.runtime_version
+            )
+            result_file = temporary / f"migrated-datapack-{ordinal}"
+            result_file.write_bytes(result_payload)
+            result_oid = _hash_blob_file(repository, result_file, oid_length)
+            assert target_entry is not None
+            result_entry = IndexEntry(new_path, 0, target_entry.mode, result_oid)
+            _install_index_entry(repository, result_entry)
+        elif old_path == DATAPACK_FUNCTION_RENAMES[2][0]:
+            assert target_entry is not None
+            result_entry = target_entry
+        else:
+            result_entry = IndexEntry(
+                new_path, 0, source_entry.mode, source_entry.oid
+            )
+            _install_index_entry(repository, result_entry)
+
+        if old_path in plural_paths:
+            _run_git(
+                repository,
+                "rm",
+                "--force",
+                "--",
+                _literal_pathspec(old_path),
+            )
+        results.append(
+            {
+                "path": new_path,
+                "policy": "migrate-datapack-function-layout",
+                "source_path": old_path,
+                "source": source_entry.object_payload(),
+                "target": (
+                    target_entry.object_payload() if target_entry is not None else None
+                ),
+                "result": result_entry.object_payload(),
+            }
+        )
+
+    after = _snapshot_index(repository, oid_length)
+    remaining_plural = sorted(
+        {
+            entry.path
+            for entry in after.entries
+            if any(
+                entry.path.startswith(prefix) for prefix in DATAPACK_PLURAL_PREFIXES
+            )
+        }
+    )
+    if remaining_plural:
+        raise VersionPortMergeError(
+            f"datapack migration left plural paths {remaining_plural!r}"
+        )
+    return results
+
+
+def _needs_datapack_function_migration(
+    repository: Path,
+    work_head: str,
+    source: str,
+    oid_length: int,
+) -> bool:
+    old_load, new_load = DATAPACK_FUNCTION_RENAMES[0]
+    return (
+        _tree_entry(repository, source, old_load, oid_length) is not None
+        and _tree_entry(repository, work_head, old_load, oid_length) is None
+        and _tree_entry(repository, work_head, new_load, oid_length) is not None
+    )
+
+
 def _read_regular_file(path: Path, *, limit: int, label: str) -> bytes:
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
@@ -1018,6 +1293,20 @@ def reproduce_merge(
                     )
                     protected_resolutions.append(resolution)
                 for path in classification.delete_paths:
+                    if path in DATAPACK_FUNCTION_MIGRATION_CONFLICTS:
+                        protected_resolutions.append(
+                            _clear_datapack_migration_conflict(
+                                repository,
+                                path,
+                                _stage_map(grouped, path),
+                            )
+                        )
+                        continue
+                    policy = (
+                        "delete-inactive-overlay"
+                        if is_inactive_overlay_path(path, active_overlay_roots)
+                        else "delete-inactive-loader"
+                    )
                     protected_resolutions.append(
                         _resolve_delete_path(
                             repository,
@@ -1025,13 +1314,23 @@ def reproduce_merge(
                             path,
                             _stage_map(grouped, path),
                             oid_length,
-                            (
-                                "delete-inactive-overlay"
-                                if is_inactive_overlay_path(path, active_overlay_roots)
-                                else "delete-inactive-loader"
-                            ),
+                            policy,
                         )
                     )
+
+            if _needs_datapack_function_migration(
+                repository, work_head, source, oid_length
+            ):
+                protected_resolutions.extend(
+                    _migrate_datapack_function_layout(
+                        repository,
+                        work_head,
+                        source,
+                        target_profile,
+                        oid_length,
+                        temporary,
+                    )
+                )
 
             mechanical = _snapshot_index(repository, oid_length)
             remaining = _unmerged_paths(mechanical)
