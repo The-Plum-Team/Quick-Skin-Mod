@@ -98,6 +98,22 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("expectedModel.equals(VanillaShim.playerModel(mc.player))", scenario)
         self.assertIn("restoreModelEvidenceView(mc);", scenario)
 
+    def test_transient_overlay_adapter_pins_forge_srg_names(self) -> None:
+        """Forge 1.20.1 executes remapped classes whose reflection names stay in SRG form."""
+
+        shim = SHIM.read_text(encoding="utf-8")
+        self.assertIn("public static String clearTransientOverlays", shim)
+        for alias in ("m_91300_", "m_94919_", "m_93076_", "m_93795_"):
+            with self.subTest(alias=alias):
+                self.assertIn(f'"{alias}"', shim)
+
+    def test_transient_overlay_adapter_supports_the_26_2_gui_split(self) -> None:
+        """26.2 moved toast and chat ownership without exposing stable cross-version types."""
+
+        shim = SHIM.read_text(encoding="utf-8")
+        self.assertIn('findNoArg(gui.getClass(), "toastManager")', shim)
+        self.assertIn('invokeUniqueNoArgOnFieldValue(gui, "getChat")', shim)
+
     def test_visual_review_receives_passed_runtime_assertion_evidence(self) -> None:
         evidence = (ROOT / "e2e/visual_evidence.py").read_text(encoding="utf-8")
         review = (ROOT / "e2e/visual_review.py").read_text(encoding="utf-8")
