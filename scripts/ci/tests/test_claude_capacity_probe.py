@@ -14,6 +14,7 @@ from claude_capacity_probe import (  # noqa: E402
     ProbeError,
     classify_probe,
     load_stream,
+    parse_args,
     probe_command,
     resolve_claude_executable,
     sanitized_rate_limit_summary,
@@ -22,6 +23,22 @@ from claude_capacity_probe import (  # noqa: E402
 
 
 class ClaudeCapacityProbeTest(unittest.TestCase):
+    def test_default_probe_targets_haiku(self) -> None:
+        args = parse_args(
+            [
+                "--claude",
+                "/opt/claude",
+                "--work-root",
+                "/tmp/probe-work",
+                "--marker",
+                "/tmp/probe-marker.json",
+                "--github-output",
+                "/tmp/github-output",
+            ]
+        )
+
+        self.assertEqual("claude-haiku-4-5", args.model)
+
     def test_success_requires_the_exact_structured_acknowledgement(self) -> None:
         envelope = {
             "type": "result",
@@ -214,7 +231,7 @@ class ClaudeCapacityProbeTest(unittest.TestCase):
             self.assertEqual((None, []), load_stream(output))
 
     def test_probe_has_no_tools_sessions_or_repository_customization(self) -> None:
-        command = probe_command(Path("/opt/claude"), "claude-sonnet-5")
+        command = probe_command(Path("/opt/claude"), "claude-haiku-4-5")
 
         self.assertIn("--safe-mode", command)
         self.assertIn("--no-session-persistence", command)
