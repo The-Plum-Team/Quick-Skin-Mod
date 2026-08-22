@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import stat
@@ -14,6 +15,8 @@ import tempfile
 from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any
+
+from visual_similarity import SimilarityError, analyze_png_payloads, normalize_regions
 
 VERDICT_KEYS = {
     "label",
@@ -33,8 +36,18 @@ MANIFEST_KEYS = {
     "kind",
     "expectation",
     "runtime_evidence",
+    "image_size",
+    "review_regions",
+    "candidate_semantic_sha256",
 }
-PAIRED_MANIFEST_KEYS = MANIFEST_KEYS | {"reference_path", "reference_label"}
+PAIRED_MANIFEST_KEYS = MANIFEST_KEYS | {
+    "reference_path",
+    "reference_label",
+    "reference_semantic_sha256",
+    "semantic_changed_fraction",
+    "perceptual_delta",
+}
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SHA256_PNG = re.compile(r"^(?P<digest>[0-9a-f]{64})\.png$")
 MAX_REVIEW_FRAMES = 512
 MAX_REVIEW_IMAGE_BYTES = 32 * 1024 * 1024
@@ -49,6 +62,7 @@ MAX_VISIBLE_LENGTH = 2048
 MAX_ANOMALY_LENGTH = 1024
 MAX_ANOMALIES = 16
 SAFE_MODEL_DETAIL = re.compile(r"^[a-z0-9_-]{1,64}$")
+REVIEW_IMAGE_SIZE = (1920, 1080)
 
 
 class ReviewError(ValueError):
@@ -356,6 +370,56 @@ def validate_compatibility_references(
             )
 
 
+def _validate_semantic_metadata(
+    item: dict[str, Any], index: int, *, paired: bool
+) -> None:
+    image_size = item.get("image_size")
+    if (
+        not isinstance(image_size, list)
+        or image_size != list(REVIEW_IMAGE_SIZE)
+        or any(isinstance(value, bool) for value in image_size)
+    ):
+        raise ReviewError(
+            f"manifest entry {index}.image_size must be exactly "
+            f"{REVIEW_IMAGE_SIZE[0]}x{REVIEW_IMAGE_SIZE[1]}"
+        )
+    try:
+        normalized_regions = normalize_regions(item.get("review_regions"))
+    except SimilarityError as exc:
+        raise ReviewError(f"manifest entry {index} has invalid review_regions: {exc}") from exc
+    if item["review_regions"] != [list(region) for region in normalized_regions]:
+        raise ReviewError(
+            f"manifest entry {index}.review_regions must use canonical finite numbers"
+        )
+    candidate_digest = item.get("candidate_semantic_sha256")
+    if not isinstance(candidate_digest, str) or SHA256.fullmatch(candidate_digest) is None:
+        raise ReviewError(
+            f"manifest entry {index}.candidate_semantic_sha256 is invalid"
+        )
+    if not paired:
+        return
+    reference_digest = item.get("reference_semantic_sha256")
+    if not isinstance(reference_digest, str) or SHA256.fullmatch(reference_digest) is None:
+        raise ReviewError(
+            f"manifest entry {index}.reference_semantic_sha256 is invalid"
+        )
+    metrics: dict[str, float] = {}
+    for field in ("semantic_changed_fraction", "perceptual_delta"):
+        value = item.get(field)
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or not 0.0 <= value <= 1.0
+        ):
+            raise ReviewError(f"manifest entry {index}.{field} is invalid")
+        metrics[field] = float(value)
+    if candidate_digest == reference_digest and any(metrics.values()):
+        raise ReviewError(
+            f"manifest entry {index} exact semantic match has non-zero differences"
+        )
+
+
 def validate_manifest(
     manifest: Any, *, require_paired: bool = False
 ) -> tuple[list[dict[str, Any]], list[str]]:
@@ -380,6 +444,7 @@ def validate_manifest(
             )
         paired_entry = keys == frozenset(PAIRED_MANIFEST_KEYS)
         schemas.add(keys)
+        _validate_semantic_metadata(item, index, paired=paired_entry)
         label = _text(
             item.get("label"),
             f"manifest entry {index}.label",
@@ -456,12 +521,27 @@ def validate_manifest(
     return manifest, labels
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+def _read_image_payload(path: Path, metadata: os.stat_result) -> bytes:
+    descriptor = -1
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_dev != metadata.st_dev
+            or opened.st_ino != metadata.st_ino
+            or opened.st_size != metadata.st_size
+        ):
+            raise OSError("file changed while opening")
+        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+            descriptor = -1
+            payload = handle.read(MAX_REVIEW_IMAGE_BYTES + 1)
+        if len(payload) != metadata.st_size:
+            raise OSError("file changed while reading")
+        return payload
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 def validate_input(
@@ -495,6 +575,7 @@ def validate_input(
         raise ReviewError("curated review images must be a real directory")
 
     expected_images: set[str] = set()
+    resolved_paths: dict[tuple[int, str], Path] = {}
     for index, item in enumerate(entries):
         path_fields = ("path", "reference_path") if "reference_path" in item else ("path",)
         for field in path_fields:
@@ -514,8 +595,10 @@ def validate_input(
                     f"manifest entry {index}.{field} is not content-addressed"
                 )
             expected_images.add(path.name)
+            resolved_paths[(index, field)] = images / path.name
 
     observed_images: set[str] = set()
+    image_payloads: dict[str, bytes] = {}
     total_bytes = 0
     try:
         image_paths = list(images.iterdir())
@@ -543,18 +626,65 @@ def validate_input(
         if total_bytes > MAX_REVIEW_TOTAL_BYTES:
             raise ReviewError("curated review images exceed the total byte limit")
         try:
-            actual_digest = _sha256(image)
+            payload = _read_image_payload(image, metadata)
         except OSError as exc:
-            raise ReviewError(f"cannot hash curated image {image}: {exc}") from exc
+            raise ReviewError(f"cannot read curated image {image}: {exc}") from exc
+        actual_digest = hashlib.sha256(payload).hexdigest()
         if actual_digest != match.group("digest"):
             raise ReviewError(f"curated image digest disagrees with its name: {image}")
         observed_images.add(image.name)
+        image_payloads[image.name] = payload
     if observed_images != expected_images:
         raise ReviewError(
             "curated image inventory disagrees with the manifest: "
             f"missing={sorted(expected_images - observed_images)}, "
             f"extra={sorted(observed_images - expected_images)}"
         )
+    analyses: dict[tuple[str, str | None, str], dict[str, Any]] = {}
+    for index, item in enumerate(entries):
+        candidate = resolved_paths[(index, "path")]
+        reference = resolved_paths.get((index, "reference_path"))
+        regions_key = json.dumps(
+            item["review_regions"],
+            ensure_ascii=True,
+            separators=(",", ":"),
+        )
+        analysis_key = (
+            candidate.name,
+            reference.name if reference is not None else None,
+            regions_key,
+        )
+        analysis = analyses.get(analysis_key)
+        if analysis is None:
+            try:
+                analysis = analyze_png_payloads(
+                    image_payloads[candidate.name],
+                    image_payloads[reference.name] if reference is not None else None,
+                    item["review_regions"],
+                    REVIEW_IMAGE_SIZE,
+                )
+            except SimilarityError as exc:
+                raise ReviewError(
+                    f"manifest entry {index} semantic image analysis failed: {exc}"
+                ) from exc
+            analyses[analysis_key] = analysis
+        semantic_fields = {
+            "image_size",
+            "review_regions",
+            "candidate_semantic_sha256",
+        }
+        if reference is not None:
+            semantic_fields.update(
+                {
+                    "reference_semantic_sha256",
+                    "semantic_changed_fraction",
+                    "perceptual_delta",
+                }
+            )
+        if any(item.get(field) != analysis.get(field) for field in semantic_fields):
+            raise ReviewError(
+                f"manifest entry {index} semantic fingerprints disagree with its images"
+            )
     return len(entries)
 
 
