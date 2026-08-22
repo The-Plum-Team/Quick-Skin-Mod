@@ -19,6 +19,11 @@ PLAYER = (
     / "common/src/main/java/com/quickskin/mod/client/rendering/PlayerModelRenderer.java"
 )
 OPTIONS = ROOT / "e2e/options.txt.template"
+SERVER_PROPERTIES = ROOT / "e2e/server-template/server.properties"
+WORLD_LOAD = (
+    ROOT
+    / "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction"
+)
 
 
 class E2EDeterministicRenderingTest(unittest.TestCase):
@@ -57,6 +62,13 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         self.assertIn("? E2E_FIXED_ANIMATION_TIME_MS", source)
         self.assertIn(": System.currentTimeMillis()", source)
         self.assertIn("DETERMINISTIC_E2E_RENDER ? 1.0f : 0.15f", source)
+
+    def test_disposable_world_uses_a_fixed_spawn(self) -> None:
+        properties = SERVER_PROPERTIES.read_text(encoding="utf-8")
+        load_function = WORLD_LOAD.read_text(encoding="utf-8")
+
+        self.assertIn("level-seed=quickskin-e2e", properties)
+        self.assertIn("gamerule spawnRadius 0", load_function)
 
 
 if __name__ == "__main__":

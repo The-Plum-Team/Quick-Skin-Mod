@@ -98,9 +98,10 @@ vanilla default skin variant across versions; that tolerance does not apply to c
 expectation names a Quick Skin custom skin or cape.
 
 Every contracted screenshot remains part of functional E2E evidence and is captured at exactly
-1920x1080. The client disables clouds, the server locks daylight and clear weather, imported test
-assets use stable filenames, and the harness clears transient Vanilla chat/toast notices before
-waiting for two complete render passes and grabbing that rendered frame. E2E-only render clocks
+1920x1080. The client disables clouds, the server fixes its seed and spawn while locking daylight
+and clear weather, imported test assets use stable filenames, and the harness clears transient
+Vanilla chat/toast notices before waiting for two complete render passes and grabbing that rendered
+frame. E2E-only render clocks
 pin the starred backdrop, title panorama, and preview animation; these controls are inactive during
 ordinary gameplay.
 
