@@ -53,6 +53,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "common/src/e2e",
     "e2e/check_visual_review.py",
     "e2e/visual_review_cache.py",
+    "e2e/visual_similarity.py",
     "e2e/ci_summary.py",
     "e2e/dependency_integrity.py",
     "e2e/generate_contract_java.py",

@@ -429,8 +429,14 @@ public final class PropagationLiveScenario implements Scenario {
             float yaw = (float) Math.toDegrees(Math.atan2(-ax, az));
             float pitch = (float) (-Math.toDegrees(Math.atan2(ayTorso, ah < 0.01 ? 0.01 : ah)));
             mc.player.setYRot(yaw);
+            mc.player.yRotO = yaw;
             mc.player.setXRot(pitch);
+            mc.player.xRotO = pitch;
             mc.player.setYHeadRot(yaw);
+            mc.player.yHeadRotO = yaw;
+            mc.player.setYBodyRot(yaw);
+            mc.player.yBodyRotO = yaw;
+            DefaultSkinEvidenceView.pinStandingMotion(mc.player);
         } catch (Throwable ignored) {
         }
     }
