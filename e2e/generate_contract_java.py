@@ -43,6 +43,8 @@ def render_java(contract: ScenarioContract) -> str:
         "/** Generated from e2e/scenario-contract.json; never edit generated output. */",
         "public final class ScenarioContract {",
         f"    public static final String SHA256 = {_java_string(contract.sha256)};",
+        f"    public static final int SCREENSHOT_WIDTH = {contract.screenshot_size[0]};",
+        f"    public static final int SCREENSHOT_HEIGHT = {contract.screenshot_size[1]};",
         "",
         "    public enum ScenarioId {",
     ]

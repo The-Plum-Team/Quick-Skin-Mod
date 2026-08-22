@@ -34,6 +34,7 @@ from visual_evidence import (
     collect_evidence,
     load_catalog,
 )
+from visual_similarity import SimilarityError, analyze_png_payloads
 
 
 MAX_REVIEW_FRAMES = 512
@@ -51,8 +52,17 @@ PUBLIC_MANIFEST_FIELDS = (
     "kind",
     "expectation",
     "runtime_evidence",
+    "image_size",
+    "review_regions",
+    "candidate_semantic_sha256",
 )
-PUBLIC_REFERENCE_FIELDS = ("reference_path", "reference_label")
+PUBLIC_REFERENCE_FIELDS = (
+    "reference_path",
+    "reference_label",
+    "reference_semantic_sha256",
+    "semantic_changed_fraction",
+    "perceptual_delta",
+)
 MAX_REFERENCE_MANIFEST_BYTES = 10 * 1024 * 1024
 MAX_SINGLE_IMAGE_BYTES = 32 * 1024 * 1024
 VISUAL_REFERENCE_VERSION = "1.20.1"
@@ -145,6 +155,8 @@ def build_manifest(
             "_verified_pixel_sha256": frame["pixel_validation"]["pixel_sha256"],
             "_verified_width": frame["width"],
             "_verified_height": frame["height"],
+            "_review_regions": frame["review_regions"],
+            "_expected_size": catalog.contract.screenshot_size,
         }
         if reference_frames is not None:
             published_reference = reference_frames.get(frame["capture_id"])
@@ -195,18 +207,34 @@ def build_manifest(
     return manifest
 
 
-def public_manifest(manifest: list[dict[str, object]]) -> list[dict[str, str]]:
+def public_manifest(manifest: list[dict[str, object]]) -> list[dict[str, object]]:
     """Discard curator-only snapshot identities before exposing review instructions."""
 
-    public: list[dict[str, str]] = []
+    public: list[dict[str, object]] = []
     for index, item in enumerate(manifest):
         fields = list(PUBLIC_MANIFEST_FIELDS)
         has_reference = any(field in item for field in PUBLIC_REFERENCE_FIELDS)
         if has_reference:
             fields.extend(PUBLIC_REFERENCE_FIELDS)
-        if any(not isinstance(item.get(field), str) for field in fields):
+        string_fields = {
+            "path",
+            "label",
+            "capture_id",
+            "kind",
+            "expectation",
+            "runtime_evidence",
+            "candidate_semantic_sha256",
+            "reference_path",
+            "reference_label",
+            "reference_semantic_sha256",
+        }
+        if any(
+            field not in item
+            or (field in string_fields and not isinstance(item[field], str))
+            for field in fields
+        ):
             raise VisualEvidenceError(f"visual review manifest entry {index} is invalid")
-        public.append({field: str(item[field]) for field in fields})
+        public.append({field: item[field] for field in fields})
     return public
 
 
@@ -459,8 +487,7 @@ def load_reference_frames(
             or not isinstance(width, int)
             or isinstance(height, bool)
             or not isinstance(height, int)
-            or width < 640
-            or height < 360
+            or (width, height) != catalog.contract.screenshot_size
             or metrics.get("width") != width
             or metrics.get("height") != height
         ):
@@ -550,40 +577,6 @@ def _canonicalize_verified_reference(
     return dimensions, hashlib.sha256(canonical).hexdigest(), canonical
 
 
-def _resize_canonical_png(
-    payload: bytes,
-    source_dimensions: tuple[int, int],
-    target_dimensions: tuple[int, int],
-) -> tuple[str, bytes]:
-    if source_dimensions == target_dimensions:
-        return hashlib.sha256(payload).hexdigest(), payload
-    if (
-        source_dimensions[0] * target_dimensions[1]
-        != source_dimensions[1] * target_dimensions[0]
-    ):
-        raise VisualEvidenceError(
-            "candidate and 1.20.1 reference screenshots use different aspect ratios"
-        )
-    try:
-        from PIL import Image, UnidentifiedImageError
-
-        with Image.open(io.BytesIO(payload)) as image:
-            if image.format != "PNG" or getattr(image, "n_frames", 1) != 1:
-                raise ValueError("candidate canonical image is not a static PNG")
-            image.load()
-            rendered = image.convert("RGB").resize(
-                target_dimensions, Image.Resampling.LANCZOS
-            )
-            output = io.BytesIO()
-            rendered.save(output, format="PNG", optimize=False, compress_level=9)
-    except ImportError as exc:  # pragma: no cover - CI installs the locked decoder
-        raise VisualEvidenceError("Pillow is required to normalize review screenshots") from exc
-    except (OSError, UnidentifiedImageError, ValueError) as exc:
-        raise VisualEvidenceError(f"cannot normalize candidate screenshot: {exc}") from exc
-    normalized = output.getvalue()
-    return hashlib.sha256(normalized).hexdigest(), normalized
-
-
 def validate_expected_row(
     e2e_root: Path,
     catalog_path: Path,
@@ -651,7 +644,7 @@ def validate_expected_row(
 
 def curate_manifest(
     manifest: list[dict[str, object]], output_root: Path
-) -> list[dict[str, str]]:
+) -> list[dict[str, object]]:
     """Atomically retain only reviewed PNGs and rewrite paths for a fresh runner."""
 
     if not manifest or len(manifest) > MAX_REVIEW_FRAMES:
@@ -676,7 +669,7 @@ def curate_manifest(
     except OSError as exc:
         raise VisualEvidenceError(f"cannot create curated review staging: {exc}") from exc
 
-    curated: list[dict[str, str]] = []
+    curated: list[dict[str, object]] = []
     total_bytes = 0
     total_pixels = 0
     copied: dict[str, Path] = {}
@@ -741,16 +734,25 @@ def curate_manifest(
                 item.get("_verified_width"),
                 item.get("_verified_height"),
             )
+            expected_size = item.get("_expected_size")
             if (
                 source_digest != item.get("_verified_file_sha256")
                 or pixel_digest != item.get("_verified_pixel_sha256")
                 or dimensions != expected_dimensions
+                or not isinstance(expected_size, (list, tuple))
+                or len(expected_size) != 2
+                or any(
+                    isinstance(value, bool) or not isinstance(value, int)
+                    for value in expected_size
+                )
+                or dimensions != tuple(expected_size)
             ):
                 raise VisualEvidenceError(
                     f"review frame changed after evidence validation: {source}"
                 )
 
             reference_asset: Path | None = None
+            reference_payload: bytes | None = None
             reference_value = item.get("reference_path")
             if reference_value is not None:
                 if not isinstance(reference_value, str):
@@ -779,10 +781,11 @@ def curate_manifest(
                 reference_dimensions, reference_digest, reference_payload = (
                     reference_snapshot
                 )
-                digest, payload = _resize_canonical_png(
-                    payload, dimensions, reference_dimensions
-                )
-                dimensions = reference_dimensions
+                if reference_dimensions != dimensions:
+                    raise VisualEvidenceError(
+                        "candidate and reference screenshots must both remain exactly "
+                        f"{dimensions[0]}x{dimensions[1]}"
+                    )
                 account_pixels(reference_dimensions)
                 reference_asset = retain(
                     reference_digest,
@@ -792,7 +795,18 @@ def curate_manifest(
 
             account_pixels(dimensions)
             asset = retain(digest, payload, source)
-            rewritten = public_manifest([item])[0]
+            try:
+                similarity = analyze_png_payloads(
+                    payload,
+                    reference_payload,
+                    item.get("_review_regions"),
+                    dimensions,
+                )
+            except SimilarityError as exc:
+                raise VisualEvidenceError(
+                    f"cannot analyze semantic regions for review frame {index}: {exc}"
+                ) from exc
+            rewritten = public_manifest([{**item, **similarity}])[0]
             rewritten["path"] = f"{destination.name}/images/{digest}.png"
             if reference_asset is not None:
                 rewritten["reference_path"] = (
@@ -965,7 +979,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.curate_output is not None:
             manifest = curate_manifest(manifest, args.curate_output)
         else:
-            manifest = public_manifest(manifest)
+            raise VisualEvidenceError(
+                "review manifests must use --curate-output so 1920x1080 semantic "
+                "fingerprints are validated before model admission"
+            )
     except VisualEvidenceError as exc:
         parser.error(str(exc))
     json.dump(manifest, sys.stdout, indent=2, ensure_ascii=False)
