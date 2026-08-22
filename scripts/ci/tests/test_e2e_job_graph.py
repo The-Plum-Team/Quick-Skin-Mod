@@ -38,6 +38,7 @@ class E2EJobGraphTest(unittest.TestCase):
         self.assertIn("e2e/scenario-contract.json", protected)
         self.assertIn("e2e/visual_review_runner.py", protected)
         self.assertIn("e2e/visual_review_cache.py", protected)
+        self.assertIn("e2e/visual_similarity.py", protected)
         self.assertIn("e2e/visual_review_semantic_prompt.md", protected)
         self.assertIn("scripts/ci/visual_anchor_certification.py", protected)
         self.assertIn("scripts/release/artifact_manifest.py", protected)

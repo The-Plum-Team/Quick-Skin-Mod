@@ -56,6 +56,9 @@ import java.util.function.Consumer;
  *       evolving player-skin record described above.</li>
  *   <li><b>player name</b>: {@code GameProfile.getName()} (authlib class) vs {@code name()} (authlib
  *       record, 26.x).</li>
+ *   <li><b>client walk distance</b>: public fields on {@code Entity} (1.20.1/1.21.1), then on
+ *       {@code AbstractClientPlayer} (1.21.2..1.21.8), then private fields on
+ *       {@code ClientAvatarState} reached through {@code avatarState()} (1.21.9/26.x).</li>
  *   <li><b>main render target</b> (for screenshots): {@code Minecraft.getMainRenderTarget()} vs
  *       {@code mc.gameRenderer.mainRenderTarget()} (26.x).</li>
  *   <li><b>Screenshot.grab</b>: classic Fabric exposes intermediary class/method names at runtime,
@@ -246,6 +249,70 @@ public final class VanillaShim {
             E2ELog.warn("setFieldOfView: " + t);
             return false;
         }
+    }
+
+    /**
+     * Zero both previous and current client walk distances across their versioned owners.
+     *
+     * <p>The values feed cape interpolation independently of {@code walkAnimation}. Returning a
+     * diagnostic instead of silently continuing keeps visual evidence fail-closed when mappings
+     * drift again.</p>
+     *
+     * @return {@code null} on success, otherwise a bounded diagnostic.
+     */
+    public static String resetWalkDistance(Object player) {
+        if (player == null) return "walk-distance reset requires a player";
+        try {
+            if (zeroWalkDistanceFields(player)) return null;
+
+            Method avatarState = findNoArg(
+                    player.getClass(), "avatarState", "method_74192"
+            );
+            Object state = avatarState == null ? null : avatarState.invoke(player);
+            if (state != null && zeroWalkDistanceFields(state)) return null;
+            return "walk-distance fields were not found on the player or avatar state";
+        } catch (Throwable failure) {
+            return "could not reset walk distance: "
+                    + failure.getClass().getSimpleName() + ": " + failure.getMessage();
+        }
+    }
+
+    private static boolean zeroWalkDistanceFields(Object target)
+            throws ReflectiveOperationException {
+        Field current = findField(
+                target.getClass(),
+                "walkDist", "field_5973", "field_53039", "field_62569", "f_19787_"
+        );
+        Field previous = findField(
+                target.getClass(),
+                "walkDistO", "field_6039", "field_53038", "field_62570", "f_19867_"
+        );
+        if (current == null && previous == null) return false;
+        if (current == null || previous == null
+                || current.getType() != float.class || previous.getType() != float.class) {
+            throw new NoSuchFieldException("walk-distance field pair is incomplete");
+        }
+        current.setFloat(target, 0.0F);
+        previous.setFloat(target, 0.0F);
+        if (current.getFloat(target) != 0.0F || previous.getFloat(target) != 0.0F) {
+            throw new IllegalStateException("walk-distance fields rejected zero values");
+        }
+        return true;
+    }
+
+    private static Field findField(Class<?> type, String... names) {
+        for (Class<?> current = type; current != null; current = current.getSuperclass()) {
+            for (String name : names) {
+                try {
+                    Field field = current.getDeclaredField(name);
+                    field.setAccessible(true);
+                    return field;
+                } catch (NoSuchFieldException ignored) {
+                    // Try the next mapping name or superclass.
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -680,6 +747,62 @@ public final class VanillaShim {
         } catch (Throwable failure) {
             return "could not install deterministic title splash: "
                     + failure.getClass().getSimpleName() + ": " + failure.getMessage();
+        }
+    }
+
+    /**
+     * Remove vanilla's transient chat and toast overlays before a contract screenshot.
+     *
+     * <p>Secure-chat and social-interaction notices are connection timing artifacts, not Quick
+     * Skin evidence. Their APIs keep stable shapes but have renamed accessors across supported
+     * versions and loaders, so this boundary resolves named, intermediary, and SRG forms and fails
+     * closed when either surface cannot be cleared.</p>
+     *
+     * @return {@code null} on success, otherwise a bounded diagnostic suitable for an E2E report.
+     */
+    public static String clearTransientOverlays(Minecraft mc) {
+        try {
+            Method toastAccessor = findNoArg(
+                    mc.getClass(), "getToasts", "getToastManager", "method_1566", "m_91300_"
+            );
+            Object toastManager = toastAccessor == null ? null : toastAccessor.invoke(mc);
+            Method clearToasts = toastManager == null
+                    ? null
+                    : findNoArg(
+                            toastManager.getClass(), "clear", "method_2000", "m_94919_"
+                    );
+            if (clearToasts == null) {
+                return "vanilla toast clear surface is unavailable";
+            }
+            clearToasts.invoke(toastManager);
+
+            Object gui = mc.gui;
+            Method chatAccessor = gui == null
+                    ? null
+                    : findNoArg(gui.getClass(), "getChat", "method_1743", "m_93076_");
+            Object chat = chatAccessor == null ? null : chatAccessor.invoke(gui);
+            Method clearChat = null;
+            if (chat != null) {
+                for (Method method : chat.getClass().getMethods()) {
+                    if ((method.getName().equals("clearMessages")
+                            || method.getName().equals("method_1808")
+                            || method.getName().equals("m_93795_"))
+                            && method.getParameterCount() == 1
+                            && method.getParameterTypes()[0] == boolean.class) {
+                        method.setAccessible(true);
+                        clearChat = method;
+                        break;
+                    }
+                }
+            }
+            if (clearChat == null) {
+                return "vanilla chat clear surface is unavailable";
+            }
+            clearChat.invoke(chat, true);
+            return null;
+        } catch (Throwable failure) {
+            return "could not clear vanilla transient overlays: "
+                    + failure.getClass().getSimpleName();
         }
     }
 
