@@ -49,8 +49,8 @@ from visual_review import (  # noqa: E402
 )
 
 
-PNG_WIDTH = 640
-PNG_HEIGHT = 360
+PNG_WIDTH = 1920
+PNG_HEIGHT = 1080
 _png_buffer = io.BytesIO()
 Image.new("RGB", (PNG_WIDTH, PNG_HEIGHT), (12, 34, 56)).save(
     _png_buffer,
@@ -126,8 +126,13 @@ class VisualEvidenceTest(unittest.TestCase):
         self.catalog_path.write_text(
             json.dumps(
                 {
-                    "schema_version": 1,
+                    "schema_version": 2,
+                    "screenshot_size": [PNG_WIDTH, PNG_HEIGHT],
                     "gui_text_reference_size": [1600, 900],
+                    "review_regions": {
+                        f"{scenario}.{role}.{step}": [[0.25, 0.25, 0.75, 0.75]]
+                        for scenario, role, step in captures
+                    },
                     "scenarios": scenarios,
                 }
             )
@@ -217,7 +222,7 @@ class VisualEvidenceTest(unittest.TestCase):
         self,
         capture_id: str,
         *,
-        dimensions: tuple[int, int] = (800, 450),
+        dimensions: tuple[int, int] = (PNG_WIDTH, PNG_HEIGHT),
         color: tuple[int, int, int] = (80, 60, 40),
     ) -> Path:
         catalog = load_catalog(self.catalog_path)
@@ -295,7 +300,7 @@ class VisualEvidenceTest(unittest.TestCase):
         self,
         capture_id: str,
         *,
-        dimensions: tuple[int, int] = (800, 450),
+        dimensions: tuple[int, int] = (PNG_WIDTH, PNG_HEIGHT),
         color: tuple[int, int, int] = (80, 60, 40),
     ) -> tuple[Path, str]:
         catalog = load_catalog(self.catalog_path)
@@ -598,6 +603,9 @@ class VisualEvidenceTest(unittest.TestCase):
             "kind": "phase0-smoke.client_a.baseline",
             "expectation": "Expected baseline",
             "runtime_evidence": "assertion passed",
+            "image_size": [PNG_WIDTH, PNG_HEIGHT],
+            "review_regions": [[0.25, 0.25, 0.75, 0.75]],
+            "candidate_semantic_sha256": "a" * 64,
         }
         manifest = [
             {
@@ -818,7 +826,7 @@ class VisualEvidenceTest(unittest.TestCase):
         self.assertNotIn(marker, served.read_bytes())
         self.assertEqual(PNG_PIXEL_SHA256, validate_png_snapshot(served)[2])
 
-    def test_curator_enforces_minimum_dimensions_and_aggregate_pixels(self) -> None:
+    def test_curator_enforces_exact_dimensions_and_aggregate_pixels(self) -> None:
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
         result_path = self.write_result("phase0-smoke")
         manifest = build_manifest(
@@ -852,14 +860,13 @@ class VisualEvidenceTest(unittest.TestCase):
         metrics["file_sha256"] = hashlib.sha256(small).hexdigest()
         metrics["pixel_sha256"] = hashlib.sha256(bytes((12, 34, 56)) * 32 * 32).hexdigest()
         result_path.write_text(json.dumps(result), encoding="utf-8")
-        small_manifest = build_manifest(
-            self.e2e_root,
-            self.catalog_path,
-            include_all=False,
-            combos=None,
-        )
-        with self.assertRaisesRegex(VisualEvidenceError, "smaller than 640x360"):
-            curate_manifest(small_manifest, self.root / "small-review-input")
+        with self.assertRaisesRegex(VisualEvidenceError, "must be exactly 1920x1080"):
+            build_manifest(
+                self.e2e_root,
+                self.catalog_path,
+                include_all=False,
+                combos=None,
+            )
 
     def test_expected_row_binds_identity_scenarios_and_one_production_jar(self) -> None:
         self.write_catalog(
@@ -1093,6 +1100,9 @@ class VisualReviewContractTest(unittest.TestCase):
                 "kind": "scenario.client.step",
                 "expectation": "Expected player",
                 "runtime_evidence": "assertion passed",
+                "image_size": [PNG_WIDTH, PNG_HEIGHT],
+                "review_regions": [[0.25, 0.25, 0.75, 0.75]],
+                "candidate_semantic_sha256": "a" * 64,
             }
         ]
         self.clean = [
@@ -1254,6 +1264,9 @@ class VisualReviewContractTest(unittest.TestCase):
             "label": "other/scenario/client/step",
             "reference_path": "/tmp/reference.png",
             "reference_label": "reference/scenario/client/step",
+            "reference_semantic_sha256": "b" * 64,
+            "semantic_changed_fraction": 0.25,
+            "perceptual_delta": 0.25,
         }
 
         with self.assertRaisesRegex(ReviewError, "cannot mix"):
@@ -1272,6 +1285,9 @@ class VisualReviewContractTest(unittest.TestCase):
             "kind": "mod-compatibility.client_a.baseline_with_mod",
             "reference_path": "/tmp/reference.png",
             "reference_label": "fabric-26.2/phase0-smoke/client_a/baseline",
+            "reference_semantic_sha256": "b" * 64,
+            "semantic_changed_fraction": 0.25,
+            "perceptual_delta": 0.25,
         }
 
         self.assertEqual(
@@ -1283,7 +1299,14 @@ class VisualReviewContractTest(unittest.TestCase):
                     {
                         key: value
                         for key, value in paired.items()
-                        if key not in {"reference_path", "reference_label"}
+                        if key
+                        not in {
+                            "reference_path",
+                            "reference_label",
+                            "reference_semantic_sha256",
+                            "semantic_changed_fraction",
+                            "perceptual_delta",
+                        }
                     }
                 ]
             )
