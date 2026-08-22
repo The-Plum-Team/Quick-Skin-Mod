@@ -57,7 +57,9 @@ immutable workflow and governance activation contract.
   are mechanical. For a conflicted merge, protected code partitions the original conflict set
   before any model runs: exact shared guidance/runtime documents use a source-preferred three-way
   merge, the target matrix remains authoritative, an inactive loader build file remains absent,
-  and files below an overlay root not activated by that target matrix remain absent. Unknown
+  files below an overlay root not activated by that target matrix remain absent, and the exact
+  protected 1.20 `functions` datapack layout is migrated to the 1.21+ singular `function` layout
+  with game-rule identifiers selected from the target runtime. Unknown
   protected conflicts fail closed; Claude receives only the remaining unprotected paths and may
   make one bounded repair after a failed gate. AI jobs have read-only GitHub
   permissions, check out without persisted credentials, and emit only bounded patch artifacts. A

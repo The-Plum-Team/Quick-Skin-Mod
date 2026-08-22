@@ -39,6 +39,18 @@ KNOWN_LOADERS = frozenset({"fabric", "forge", "neoforge"})
 LOADER_BUILD_PATHS = {
     f"{loader}/build.gradle.kts": loader for loader in sorted(KNOWN_LOADERS)
 }
+DATAPACK_FUNCTION_MIGRATION_TRIGGER = (
+    "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction"
+)
+DATAPACK_FUNCTION_MIGRATION_CONFLICTS = frozenset(
+    {
+        DATAPACK_FUNCTION_MIGRATION_TRIGGER,
+        "e2e/server-template/datapack/data/qs_e2e/functions/tick.mcfunction",
+        "e2e/server-template/datapack/data/qs_e2e/function/tick.mcfunction",
+        "e2e/server-template/datapack/data/minecraft/tags/functions/tick.json",
+        "e2e/server-template/datapack/data/minecraft/tags/function/tick.json",
+    }
+)
 
 
 class ConflictClassificationError(ValueError):
@@ -68,6 +80,7 @@ class ConflictClassification:
 class TargetMatrixProfile:
     active_loaders: frozenset[str]
     active_overlay_roots: frozenset[str]
+    runtime_version: str
 
 
 def _read_bounded_regular_utf8(path: Path, *, limit: int, label: str) -> str:
@@ -231,7 +244,46 @@ def read_target_matrix_profile(matrix_path: Path) -> TargetMatrixProfile:
                 )
             module_roots.add(overlay)
             roots.add(f"{module}/src/{overlay}")
-    return TargetMatrixProfile(active_loaders, frozenset(roots))
+
+    runtimes = matrix.get("runtimes")
+    if not isinstance(runtimes, list) or not runtimes:
+        raise ConflictClassificationError(
+            "release matrix runtimes must be a non-empty array"
+        )
+    runtime_versions: set[str] = set()
+    runtime_loaders: set[str] = set()
+    for index, runtime in enumerate(runtimes):
+        if not isinstance(runtime, dict):
+            raise ConflictClassificationError(
+                f"release matrix runtime {index} must be an object"
+            )
+        loader = runtime.get("loader")
+        if loader not in active_loaders:
+            raise ConflictClassificationError(
+                f"release matrix runtime {index} has inactive loader {loader!r}"
+            )
+        version = runtime.get("runtime_version")
+        if not isinstance(version, str) or not re.fullmatch(
+            r"[0-9]+(?:\.[0-9]+){1,2}", version
+        ):
+            raise ConflictClassificationError(
+                f"release matrix runtime {index} has invalid runtime_version"
+            )
+        runtime_loaders.add(loader)
+        runtime_versions.add(version)
+    if runtime_loaders != active_loaders:
+        raise ConflictClassificationError(
+            "release matrix runtimes must cover every active loader"
+        )
+    if len(runtime_versions) != 1:
+        raise ConflictClassificationError(
+            "release matrix runtimes must share one runtime_version"
+        )
+    return TargetMatrixProfile(
+        active_loaders,
+        frozenset(roots),
+        next(iter(runtime_versions)),
+    )
 
 
 def _overlay_root(path: str) -> str | None:
@@ -310,6 +362,9 @@ def classify_conflicts(
             continue
         if path in TARGET_PATHS:
             target_paths.append(path)
+            continue
+        if path in DATAPACK_FUNCTION_MIGRATION_CONFLICTS:
+            delete_paths.append(path)
             continue
         loader = LOADER_BUILD_PATHS.get(path)
         if loader is not None:
