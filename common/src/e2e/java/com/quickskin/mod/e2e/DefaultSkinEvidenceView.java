@@ -21,6 +21,7 @@ public final class DefaultSkinEvidenceView {
 
     /** Third-person-back normally places the camera about four blocks behind the player. */
     private static final double REMOTE_BEHIND_CAMERA_CLEARANCE = 8.0;
+    private static final int FIXED_RENDER_TICK = 120;
 
     private DefaultSkinEvidenceView() {}
 
@@ -98,7 +99,7 @@ public final class DefaultSkinEvidenceView {
      * does not change production rendering.</p>
      */
     public static void pinStandingPose(Player player, float yaw) {
-        player.setDeltaMovement(0, 0, 0);
+        pinStandingMotion(player);
         player.setYRot(yaw);
         player.yRotO = yaw;
         player.setYHeadRot(yaw);
@@ -107,6 +108,18 @@ public final class DefaultSkinEvidenceView {
         player.yBodyRotO = yaw;
         player.setXRot(0f);
         player.xRotO = 0f;
+    }
+
+    /** Remove render interpolation left by spawn, walking, or the previous E2E checkpoint. */
+    public static void pinStandingMotion(Player player) {
+        player.setDeltaMovement(0, 0, 0);
+        player.tickCount = FIXED_RENDER_TICK;
+        player.walkAnimation.setSpeed(0.0F);
+        player.walkDist = 0.0F;
+        player.walkDistO = 0.0F;
+        player.xo = player.xOld = player.getX();
+        player.yo = player.yOld = player.getY();
+        player.zo = player.zOld = player.getZ();
     }
 
     /**

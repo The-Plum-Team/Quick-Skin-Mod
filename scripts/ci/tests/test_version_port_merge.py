@@ -133,6 +133,7 @@ class VersionPortMergeTest(unittest.TestCase):
         description: str,
         loaders: tuple[str, ...] = ("fabric", "neoforge"),
         common_overlay: str | None = None,
+        runtime_version: str = "1.20.1",
     ) -> str:
         common_routes = (
             {"1.20.1": common_overlay} if common_overlay is not None else {}
@@ -149,6 +150,10 @@ class VersionPortMergeTest(unittest.TestCase):
                     "common": common_routes,
                     **{loader: {} for loader in loaders},
                 },
+                "runtimes": [
+                    {"loader": loader, "runtime_version": runtime_version}
+                    for loader in loaders
+                ],
             },
             indent=2,
         ) + "\n"
@@ -332,6 +337,185 @@ class VersionPortMergeTest(unittest.TestCase):
         self.assertEqual(evidence["protected_resolutions"], [])
         self.assertFalse((self.repository / "clean-source.txt").exists())
         self.assert_clean_target()
+
+    def test_renamed_datapack_layout_is_migrated_with_versioned_game_rules(
+        self,
+    ) -> None:
+        plural_load = (
+            "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction"
+        )
+        singular_load = (
+            "e2e/server-template/datapack/data/qs_e2e/function/load.mcfunction"
+        )
+        plural_tick = (
+            "e2e/server-template/datapack/data/qs_e2e/functions/tick.mcfunction"
+        )
+        singular_tick = (
+            "e2e/server-template/datapack/data/qs_e2e/function/tick.mcfunction"
+        )
+        plural_load_tag = (
+            "e2e/server-template/datapack/data/minecraft/tags/functions/load.json"
+        )
+        singular_load_tag = (
+            "e2e/server-template/datapack/data/minecraft/tags/function/load.json"
+        )
+        plural_tick_tag = (
+            "e2e/server-template/datapack/data/minecraft/tags/functions/tick.json"
+        )
+        singular_tick_tag = (
+            "e2e/server-template/datapack/data/minecraft/tags/function/tick.json"
+        )
+        base_load = (
+            "# Starts screenshots in clear daylight.\n"
+            "weather clear\n"
+            "time set day\n"
+        )
+        source_load = (
+            "# Starts screenshots in a fixed location and daylight.\n"
+            "weather clear\n"
+            "gamerule doWeatherCycle false\n"
+            "gamerule doDaylightCycle false\n"
+            "gamerule spawnRadius 0\n"
+            "team add qs_e2e\n"
+            "team modify qs_e2e collisionRule never\n"
+            "time set day\n"
+        )
+        target_load = (
+            "# Uses the singular function directory.\n"
+            "# Cross-version placeholder before deterministic migration.\n"
+            "weather clear\n"
+            "time set day\n"
+        )
+        load_tag = '{"values":["qs_e2e:load"]}\n'
+        tick_function = "team join qs_e2e @a[team=!qs_e2e]\n"
+        tick_tag = '{"values":["qs_e2e:tick"]}\n'
+
+        self.git("switch", "--create", "datapack-base", self.base)
+        self.write(plural_load, base_load)
+        self.write(plural_load_tag, load_tag)
+        self.git("add", "--all")
+        self.commit("add base datapack")
+        datapack_base = self.sha("HEAD")
+
+        self.git("switch", "--create", "datapack-source", datapack_base)
+        self.write(plural_load, source_load)
+        self.write(plural_tick, tick_function)
+        self.write(plural_tick_tag, tick_tag)
+        self.git("add", "--all")
+        self.commit("make source datapack deterministic")
+        datapack_source = self.sha("HEAD")
+
+        cases = (
+            (
+                "1.21.10",
+                (
+                    "gamerule doWeatherCycle false",
+                    "gamerule doDaylightCycle false",
+                    "gamerule spawnRadius 0",
+                ),
+            ),
+            (
+                "1.21.11",
+                (
+                    "gamerule minecraft:advance_weather false",
+                    "gamerule minecraft:advance_time false",
+                    "gamerule minecraft:respawn_radius 0",
+                ),
+            ),
+            (
+                "26.1",
+                (
+                    "gamerule minecraft:advance_weather false",
+                    "gamerule minecraft:advance_time false",
+                    "gamerule minecraft:respawn_radius 0",
+                ),
+            ),
+        )
+        for runtime_version, expected_rules in cases:
+            with self.subTest(runtime_version=runtime_version):
+                branch_suffix = runtime_version.replace(".", "-")
+                self.git(
+                    "switch",
+                    "--create",
+                    f"datapack-target-{branch_suffix}",
+                    datapack_base,
+                )
+                self.git("rm", plural_load, plural_load_tag)
+                self.write(singular_load, target_load)
+                self.write(singular_load_tag, load_tag)
+                self.write(
+                    "release/release-matrix.json",
+                    self.matrix(
+                        f"target {runtime_version}",
+                        runtime_version=runtime_version,
+                    ),
+                )
+                self.git("add", "--all")
+                self.commit(f"rename datapack for {runtime_version}")
+                datapack_target = self.sha("HEAD")
+
+                evidence = version_port_merge.reproduce_merge(
+                    self.repository,
+                    datapack_target,
+                    datapack_source,
+                    mode="prepare",
+                )
+                self.assertEqual(evidence["ai_conflicts"], [])
+                self.assertIn(plural_load, evidence["conflicts"])
+                self.assertIn(
+                    "clear-renamed-datapack-conflict",
+                    [item["policy"] for item in evidence["protected_resolutions"]],
+                )
+                migrated = [
+                    item
+                    for item in evidence["protected_resolutions"]
+                    if item["policy"] == "migrate-datapack-function-layout"
+                ]
+                self.assertEqual(len(migrated), 4)
+                self.assertEqual(
+                    (self.repository / singular_load).read_text(encoding="utf-8"),
+                    source_load
+                    if runtime_version == "1.21.10"
+                    else source_load
+                    .replace(
+                        "gamerule doWeatherCycle false",
+                        "gamerule minecraft:advance_weather false",
+                    )
+                    .replace(
+                        "gamerule doDaylightCycle false",
+                        "gamerule minecraft:advance_time false",
+                    )
+                    .replace(
+                        "gamerule spawnRadius 0",
+                        "gamerule minecraft:respawn_radius 0",
+                    ),
+                )
+                for rule in expected_rules:
+                    self.assertIn(
+                        rule,
+                        (self.repository / singular_load).read_text(encoding="utf-8"),
+                    )
+                self.assertEqual(
+                    (self.repository / singular_tick).read_text(encoding="utf-8"),
+                    tick_function,
+                )
+                self.assertEqual(
+                    (self.repository / singular_tick_tag).read_text(encoding="utf-8"),
+                    tick_tag,
+                )
+                self.assertEqual(
+                    (self.repository / singular_load_tag).read_text(encoding="utf-8"),
+                    load_tag,
+                )
+                for old_path in (
+                    plural_load,
+                    plural_tick,
+                    plural_load_tag,
+                    plural_tick_tag,
+                ):
+                    self.assertFalse((self.repository / old_path).exists())
+                self.git("merge", "--abort")
+                self.assert_clean_at(datapack_target)
 
     def test_source_ancestor_is_rejected_without_leaving_merge_state(self) -> None:
         with self.assertRaisesRegex(

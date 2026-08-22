@@ -80,6 +80,17 @@ import java.util.Locale;
 @Environment(EnvType.CLIENT)
 public class PlayerModelRenderer {
 
+    private static final boolean DETERMINISTIC_E2E_RENDER =
+            Boolean.getBoolean("quickskin.e2e.enabled");
+    private static final int E2E_FIXED_PREVIEW_TICK = 120;
+    private static final long E2E_FIXED_ANIMATION_TIME_MS = 6_000L;
+
+    private static long animationTimeMillis() {
+        return DETERMINISTIC_E2E_RENDER
+                ? E2E_FIXED_ANIMATION_TIME_MS
+                : System.currentTimeMillis();
+    }
+
 //? if <1.21 {
     private static PlayerModel<?>  classicModel;
     private static PlayerModel<?> slimModel;
@@ -595,6 +606,7 @@ public class PlayerModelRenderer {
         float originalXRot = playerToRender.getXRot();
         float originalYHeadRot = playerToRender.yHeadRot;
         float originalYBodyRot = playerToRender.yBodyRot;
+        int originalTickCount = playerToRender.tickCount;
 
         // Set rotation for preview using the yRotation parameter
         // Convert yRotation to match InventoryScreen orientation (180 + yRotation)
@@ -606,7 +618,9 @@ public class PlayerModelRenderer {
 
         // Set tickCount for idle animation ONLY when on title screen (no world)
         // When in-game, the entity already has its own natural tickCount from the game loop
-        if (mc.level == null) {
+        if (DETERMINISTIC_E2E_RENDER) {
+            playerToRender.tickCount = E2E_FIXED_PREVIEW_TICK;
+        } else if (mc.level == null) {
 //? if <1.21 {
             // Title screen: manually set tickCount to enable animation
             playerToRender.tickCount = mc.gui.getGuiTicks();
@@ -855,12 +869,18 @@ public class PlayerModelRenderer {
         playerToRender.setXRot(originalXRot);
         playerToRender.yHeadRot = originalYHeadRot;
         playerToRender.yBodyRot = originalYBodyRot;
+        if (DETERMINISTIC_E2E_RENDER) {
+            playerToRender.tickCount = originalTickCount;
+        }
 //?} else {
             // Restore original rotation after rendering
             playerToRender.setYRot(originalYRot);
             playerToRender.setXRot(originalXRot);
             playerToRender.yHeadRot = originalYHeadRot;
             playerToRender.yBodyRot = originalYBodyRot;
+            if (DETERMINISTIC_E2E_RENDER) {
+                playerToRender.tickCount = originalTickCount;
+            }
         } finally {
             // Previously managed shadow state here, but methods not available in 1.21
         }
@@ -1450,7 +1470,7 @@ public class PlayerModelRenderer {
         float xOffset = -capeWidth / 2.0f; // Center the cape
 
         // Add subtle swing animation
-        float capeSwing = (float) Math.sin(System.currentTimeMillis() / 1000.0) * 0.1f;
+        float capeSwing = (float) Math.sin(animationTimeMillis() / 1000.0) * 0.1f;
         poseStack.mulPose(Axis.XP.rotationDegrees(capeSwing * 10.0f));
 
         // Get render type and vertex consumer
@@ -1632,7 +1652,7 @@ public class PlayerModelRenderer {
         float xOffset = -capeWidth / 2.0f; // Center the cape
 
         // Add subtle swing animation
-        float capeSwing = (float) Math.sin(System.currentTimeMillis() / 1000.0) * 0.1f;
+        float capeSwing = (float) Math.sin(animationTimeMillis() / 1000.0) * 0.1f;
         poseStack.mulPose(Axis.XP.rotationDegrees(capeSwing * 10.0f));
 
         // Get render type and vertex consumer
@@ -1811,7 +1831,7 @@ public class PlayerModelRenderer {
         float xOffset = -capeWidth / 2.0f; // Center the cape
 
         // Add subtle swing animation
-        float capeSwing = (float) Math.sin(System.currentTimeMillis() / 1000.0) * 0.1f;
+        float capeSwing = (float) Math.sin(animationTimeMillis() / 1000.0) * 0.1f;
         poseStack.mulPose(Axis.XP.rotationDegrees(capeSwing * 10.0f));
 
         // Get render type and vertex consumer
@@ -1895,8 +1915,9 @@ public class PlayerModelRenderer {
         }
 
         // CHECK: Should we update animation this frame? (30 FPS instead of 60+)
-        long now = System.currentTimeMillis();
-        boolean shouldUpdate = (now - lastAnimationUpdate) >= ANIMATION_UPDATE_INTERVAL_MS;
+        long now = animationTimeMillis();
+        boolean shouldUpdate = DETERMINISTIC_E2E_RENDER
+                || (now - lastAnimationUpdate) >= ANIMATION_UPDATE_INTERVAL_MS;
 
         if (!shouldUpdate) {
 //? if <1.21.9 {
@@ -1924,19 +1945,25 @@ public class PlayerModelRenderer {
             return; // EXIT EARLY - saves 40-60% CPU time
         }
 
-        lastAnimationUpdate = now;
+        if (!DETERMINISTIC_E2E_RENDER) {
+            lastAnimationUpdate = now;
+        }
 
         // Get elapsed time using Minecraft's tick counter
 //? if <26.2 {
-        int tickCount = mc != null ? mc.gui.getGuiTicks() : 0;
+        int tickCount = DETERMINISTIC_E2E_RENDER
+                ? E2E_FIXED_PREVIEW_TICK
+                : mc != null ? mc.gui.getGuiTicks() : 0;
 //?} else {
-        int tickCount = mc != null ? mc.gui.hud.getGuiTicks() : 0;
+        int tickCount = DETERMINISTIC_E2E_RENDER
+                ? E2E_FIXED_PREVIEW_TICK
+                : mc != null ? mc.gui.hud.getGuiTicks() : 0;
 //?}
         float elapsedTime = tickCount / 20.0f; // Convert ticks to seconds
         float t = elapsedTime * 0.8f; // Slower, more relaxed pace
 
         // Lerp factor for smooth transitions
-        float lerpFactor = 0.15f;
+        float lerpFactor = DETERMINISTIC_E2E_RENDER ? 1.0f : 0.15f;
 
         // Apply animation based on type
         switch (animation.toLowerCase(Locale.ROOT)) {

@@ -102,6 +102,8 @@ public final class FullScenario implements Scenario {
     /** A close but unclipped view makes the one-texture-pixel arm-width delta inspectable. */
     private static final int MODEL_EVIDENCE_FOV = 50;
     private volatile Integer modelEvidenceOriginalFov;
+    /** The HUD evidence offset is derived once from the first production-rendered geometry. */
+    private boolean hudOverlayPositioned;
 
     private volatile String skinHash;        // set by step 2, reused by model + HUD steps
     private volatile String externalSkinHash; // set by the external-drop step (no import call)
@@ -1453,18 +1455,21 @@ public final class FullScenario implements Scenario {
                     ClientConfig c = ClientConfig.getInstance();
                     c.showSkinPreviewOverlay = true;
                     c.enablePlayerPreviewCustomization = false;
-                    // Small thumbnail pushed to the lower-left so it reads as a distinct HUD preview
-                    // beside the centered 3rd-person world player rather than overlapping it.
+                    // Keep the thumbnail in the authored lower-right evidence region on every era.
+                    // The legacy HUD starts at the hotbar while modern HUDs start at a corner, so
+                    // derive offsets from their respective production bases instead of hard-coding
+                    // a loader/version-specific coordinate.
                     c.sizeModelPreviewPercentageHudOverlay = 15;
-                    c.positionOffsetXHudOverlay = -150;
-                    c.positionOffsetYHudOverlay = -10;
+                    c.positionOffsetXHudOverlay = 0;
+                    c.positionOffsetYHudOverlay = 0;
+                    hudOverlayPositioned = false;
                     c.hudOverlayRotation = 20.0f;
                     if (skinHash != null) setActiveSkinHash(c, skinHash); // show the custom skin in the overlay
                     c.save();
                     overlayForceResolve(); // null lastCheckedSkinHash so render() re-resolves the skin
                 })
                 .minTicks(30) // several RENDER_HUD frames so the overlay draws + caches its state
-                .ready(this::overlayRendered)
+                .ready(() -> hudOverlayReady(mc))
                 .timeoutTicks(200)
                 .screenshot(prefix + "full_11_hud_overlay" + suffix)
                 .assertion(() -> {
@@ -1472,8 +1477,12 @@ public final class FullScenario implements Scenario {
                         return Step.Result.fail("showSkinPreviewOverlay not set");
                     if (!overlayRendered())
                         return Step.Result.fail("SkinPreviewOverlay.render did not run (cachedScale==0)");
+                    String geometryFailure = overlayGeometryFailure(mc);
+                    if (geometryFailure != null)
+                        return Step.Result.fail(geometryFailure);
                     Object loc = overlayCachedSkinLocation();
-                    return Step.Result.pass("HUD overlay rendered; cachedSkinLocation=" + loc);
+                    return Step.Result.pass("HUD overlay rendered in lower-right evidence region; "
+                            + overlayGeometryDescription(mc) + "; cachedSkinLocation=" + loc);
                 }));
 
         // 12. Title screen: the preview stays in front of the vanilla splash ----------------------
@@ -2957,7 +2966,7 @@ public final class FullScenario implements Scenario {
     private void pinRearEvidenceView(Minecraft mc) {
         if (mc.player == null) return;
         float yaw = 180f;
-        mc.player.setDeltaMovement(0, 0, 0);
+        DefaultSkinEvidenceView.pinStandingMotion(mc.player);
         mc.player.setYRot(yaw);
         mc.player.yRotO = yaw;
         mc.player.setYHeadRot(yaw);
@@ -3088,16 +3097,92 @@ public final class FullScenario implements Scenario {
         }
     }
 
-    /** True once {@code SkinPreviewOverlay.render} has executed at least once (cachedScale set). */
-    private boolean overlayRendered() {
+    /** Wait for production geometry, then move its centre into the stable authored review region. */
+    private boolean hudOverlayReady(Minecraft mc) {
+        if (!overlayRendered()) return false;
+        if (!hudOverlayPositioned) {
+            if (!positionHudOverlayForEvidence(mc, ClientConfig.getInstance())) return false;
+            return false; // require a later render pass to publish the corrected cached geometry
+        }
+        return overlayGeometryFailure(mc) == null;
+    }
+
+    private boolean positionHudOverlayForEvidence(Minecraft mc, ClientConfig config) {
+        int screenWidth = mc.getWindow().getGuiScaledWidth();
+        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int targetCenterX = Math.round(screenWidth * 0.89f);
+        int targetCenterY = Math.round(screenHeight * 0.96f);
+        int currentCenterX = overlayCachedInt("cachedModelCenterX");
+        int currentCenterY = overlayCachedInt("cachedModelCenterY");
+        if (currentCenterX == Integer.MIN_VALUE || currentCenterY == Integer.MIN_VALUE) {
+            return false;
+        }
+        config.positionOffsetXHudOverlay += targetCenterX
+                - currentCenterX;
+        config.positionOffsetYHudOverlay += targetCenterY
+                - currentCenterY;
+        config.save();
+        hudOverlayPositioned = true;
+        return true;
+    }
+
+    /** Return a fail-closed explanation when the renderer cached geometry outside its target. */
+    private String overlayGeometryFailure(Minecraft mc) {
+        int centerX = overlayCachedInt("cachedModelCenterX");
+        int centerY = overlayCachedInt("cachedModelCenterY");
+        float scale = overlayCachedScale();
+        int screenWidth = mc.getWindow().getGuiScaledWidth();
+        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int modelHeight = (int)(scale * 2.0f);
+        int modelWidth = (int)(modelHeight * 0.6f);
+        int left = centerX - modelWidth / 2;
+        int right = centerX + modelWidth / 2;
+        int top = centerY - modelHeight;
+        float normalizedX = centerX / (float)screenWidth;
+        float normalizedY = centerY / (float)screenHeight;
+        if (normalizedX < 0.86f || normalizedX > 0.92f
+                || normalizedY < 0.93f || normalizedY > 0.99f) {
+            return "HUD overlay centre outside lower-right evidence target: "
+                    + overlayGeometryDescription(mc);
+        }
+        if (left < 0 || right > screenWidth || top < 0 || centerY > screenHeight) {
+            return "HUD overlay bounds clipped outside the GUI: " + overlayGeometryDescription(mc);
+        }
+        return null;
+    }
+
+    private String overlayGeometryDescription(Minecraft mc) {
+        return "center=(" + overlayCachedInt("cachedModelCenterX") + ","
+                + overlayCachedInt("cachedModelCenterY") + ")/"
+                + mc.getWindow().getGuiScaledWidth() + "x"
+                + mc.getWindow().getGuiScaledHeight() + ", scale=" + overlayCachedScale();
+    }
+
+    private int overlayCachedInt(String fieldName) {
+        try {
+            Field f = Class.forName("com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay")
+                    .getDeclaredField(fieldName);
+            f.setAccessible(true);
+            return f.getInt(null);
+        } catch (Throwable t) {
+            return Integer.MIN_VALUE;
+        }
+    }
+
+    private float overlayCachedScale() {
         try {
             Field f = Class.forName("com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay")
                     .getDeclaredField("cachedScale");
             f.setAccessible(true);
-            return f.getFloat(null) > 0f;
+            return f.getFloat(null);
         } catch (Throwable t) {
-            return false;
+            return Float.NaN;
         }
+    }
+
+    /** True once {@code SkinPreviewOverlay.render} has executed at least once (cachedScale set). */
+    private boolean overlayRendered() {
+        return overlayCachedScale() > 0f;
     }
 
     private Object overlayCachedSkinLocation() {
