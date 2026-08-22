@@ -50,6 +50,7 @@ FULL_SCENARIO = (
     ROOT
     / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
 )
+VANILLA_SHIM = ROOT / "common/src/e2e/java/com/quickskin/mod/e2e/VanillaShim.java"
 
 
 def world_function_paths(data_root: Path) -> tuple[Path, Path, Path, Path]:
@@ -161,9 +162,25 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
 
     def test_world_player_interpolation_is_pinned_by_the_e2e_harness(self) -> None:
         source = DEFAULT_SKIN_VIEW.read_text(encoding="utf-8")
+        shim = VANILLA_SHIM.read_text(encoding="utf-8")
 
         self.assertIn("player.tickCount = FIXED_RENDER_TICK", source)
         self.assertIn("player.walkAnimation.setSpeed(0.0F)", source)
+        self.assertIn("VanillaShim.resetWalkDistance(player)", source)
+        self.assertNotIn("player.walkDist =", source)
+        self.assertNotIn("player.walkDistO =", source)
+        for mapping_name in (
+            "field_5973",
+            "field_6039",
+            "field_53039",
+            "field_53038",
+            "field_62569",
+            "field_62570",
+            "f_19787_",
+            "f_19867_",
+        ):
+            self.assertIn(f'"{mapping_name}"', shim)
+        self.assertIn('"avatarState", "method_74192"', shim)
         self.assertIn("player.xo = player.xOld = player.getX()", source)
         self.assertIn(
             "DefaultSkinEvidenceView.pinStandingMotion(mc.player)",
