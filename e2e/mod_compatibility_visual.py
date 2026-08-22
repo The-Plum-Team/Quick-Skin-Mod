@@ -132,7 +132,7 @@ def curate(
     target_sha: str,
     compatibility_run_id: int,
     implementation_sha: str,
-) -> list[dict[str, str]]:
+) -> list[dict[str, object]]:
     if inventory["base"]["run_id"] != source_run_id:
         raise CompatibilityVisualError("base artifact run disagrees with source_run_id")
     if inventory["candidate"]["run_id"] != compatibility_run_id:
@@ -237,6 +237,8 @@ def curate(
                 "_verified_pixel_sha256": frame["pixel_validation"]["pixel_sha256"],
                 "_verified_width": frame["width"],
                 "_verified_height": frame["height"],
+                "_review_regions": frame["review_regions"],
+                "_expected_size": catalog.contract.screenshot_size,
                 "reference_path": reference["source_path"],
                 "reference_label": reference["frame_id"],
                 "_reference_verified_file_sha256": reference["file_sha256"],

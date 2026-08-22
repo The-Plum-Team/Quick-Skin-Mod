@@ -59,6 +59,7 @@ class PackagedRuntimeVisualContractTest(unittest.TestCase):
                 draw.line((200, y, right, y), fill=(255, 255, 255), width=2)
             for y, right in ((194, 276), (199, 288), (204, 270)):
                 draw.line((230, y, right, y), fill=(255, 255, 255), width=2)
+        image = image.resize(packaged_runtime.SCREENSHOT_SIZE, Image.Resampling.NEAREST)
         path = self.root / name
         image.save(path, format="PNG")
         return path
@@ -99,7 +100,10 @@ class PackagedRuntimeVisualContractTest(unittest.TestCase):
             path, "full", "client_a", "skin_menu_screen"
         )
 
-        self.assertEqual((640, 360), (metrics["width"], metrics["height"]))
+        self.assertEqual(
+            packaged_runtime.SCREENSHOT_SIZE,
+            (metrics["width"], metrics["height"]),
+        )
 
     def test_radial_wash_fails_even_though_generic_integrity_passes(self) -> None:
         path = self.write_skin_menu("radial-wash.png", washed_out=True)
