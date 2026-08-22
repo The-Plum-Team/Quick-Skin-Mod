@@ -44,6 +44,10 @@ import net.minecraft.resources.Identifier;
 //?}
 
 public class BackgroundRenderer {
+    private static final boolean DETERMINISTIC_E2E_RENDER =
+        Boolean.getBoolean("quickskin.e2e.enabled");
+    private static final int E2E_FIXED_GUI_TICK = 120;
+
     //? if <1.21 {
     private static final ResourceLocation VIGNETTE_LOCATION =
         new ResourceLocation("textures/misc/vignette.png");
@@ -160,7 +164,9 @@ public class BackgroundRenderer {
         //?} else {
         int tickCount = minecraft != null && minecraft.gui != null ? minecraft.gui.hud.getGuiTicks() : 0;
         //?}
-        double smoothTime = (tickCount + partialTick) / 20.0;
+        double smoothTime = DETERMINISTIC_E2E_RENDER
+            ? E2E_FIXED_GUI_TICK / 20.0
+            : (tickCount + partialTick) / 20.0;
         double offsetX = (smoothTime * pixelsPerSecond) % tileSize;
 
         //? if <1.21.9 {
@@ -248,11 +254,12 @@ public class BackgroundRenderer {
 
             // Sync panorama time with global time source (same as TitleScreen via mixin)
             PanoramaTimeSync.syncPanoramaRenderer(panoramaRenderer);
+            float panoramaPartialTick = DETERMINISTIC_E2E_RENDER ? 0.0F : partialTick;
 
             //? if <1.21 {
-            GuiCompat.renderPanorama(panoramaRenderer, partialTick);
+            GuiCompat.renderPanorama(panoramaRenderer, panoramaPartialTick);
             //?} else if <1.21.9 {
-            panoramaRenderer.render(graphics, screen.width, screen.height, 1.0F, partialTick);
+            panoramaRenderer.render(graphics, screen.width, screen.height, 1.0F, panoramaPartialTick);
             //?} else if <1.21.11 {
             panoramaRenderer.render(graphics, screen.width, screen.height, true);
             //?} else {

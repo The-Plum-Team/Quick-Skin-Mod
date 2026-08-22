@@ -119,7 +119,8 @@ class WorkflowSecurityTest(unittest.TestCase):
                         self.assertIn('"dontAsk"', runner)
                         self.assertIn('"--tools"', runner)
                         self.assertIn('"Read"', runner)
-                        self.assertIn("Read(./review-input/images/**)", runner)
+                        self.assertIn("Read(./{model_images_relative}/**)", runner)
+                        self.assertNotIn("Read(./review-input/images/**)", runner)
                         self.assertNotIn('"Bash"', runner)
                         continue
                     self.assertIn("--safe-mode", block)
@@ -651,14 +652,21 @@ class WorkflowSecurityTest(unittest.TestCase):
             r"(?m)^\s*'[^'\n]*\\$",
             "a backslash inside a multiline single-quoted jq filter is literal",
         )
-        self.assertIn("--triage-model claude-sonnet-5", review)
+        self.assertIn("--model claude-haiku-4-5", capacity_probe)
+        self.assertIn("--triage-model claude-haiku-4-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
+        self.assertNotIn("claude-sonnet-5", review)
         self.assertIn("--triage-chunk-size 8", review)
         self.assertIn("--verify-chunk-size 4", review)
         self.assertIn("--max-parallel-calls 32", review)
         self.assertIn("--call-spacing-seconds 0", review)
         self.assertIn("--model-attempts 3", review)
+        self.assertIn("Install hash-locked image decoder", review)
+        self.assertIn("--only-binary=:all: --require-hashes", review)
+        self.assertIn("--requirement scripts/pages/requirements.txt", review)
         self.assertIn("visual_review_cache.py", review)
+        self.assertIn("visual_similarity.py", review)
+        self.assertIn("--similarity-codec", review)
         self.assertIn("--completion-state visual-review-completion.json", review)
         self.assertIn("--allow-blocking-partial", review)
         self.assertIn("visual-review-verdict-cache-$policy_sha256", review)
@@ -754,6 +762,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             semantic_verify_prompt,
         ):
             normalized_prompt = " ".join(prompt.split())
+            self.assertIn("1280x720", normalized_prompt)
             self.assertIn("Elytra hides cape", normalized_prompt)
             self.assertIn("separated, tapered Elytra", normalized_prompt)
             self.assertIn("opaque full-atlas rectangle", normalized_prompt)
@@ -761,8 +770,21 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("DEFAULT_TRIAGE_CHUNK_SIZE = 8", runner)
         self.assertIn("DEFAULT_VERIFY_CHUNK_SIZE = 4", runner)
         self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
+        self.assertIn("MODEL_IMAGE_SIZE = (1280, 720)", runner)
+        self.assertIn("Image.Resampling.LANCZOS", runner)
+        self.assertIn('f"Read(./{model_images_relative}/**)"', runner)
+        self.assertNotIn('"Read(./review-input/images/**)"', runner)
         self.assertIn("ThreadPoolExecutor", runner)
-        self.assertIn("path\"] == item[\"reference_path", runner)
+        self.assertIn(
+            'item["candidate_semantic_sha256"] == item["reference_semantic_sha256"]',
+            runner,
+        )
+        self.assertIn('triage["decision"] == "clean"', runner)
+        self.assertIn('triage["confidence"] == "high"', runner)
+        self.assertNotIn("requires_perceptual_verification", runner)
+        self.assertIn(
+            "too ambiguous to clear confidently", " ".join(triage_prompt.split())
+        )
         self.assertIn("TRIAGE_CONFIDENCE", (
             ROOT / "e2e" / "check_visual_review.py"
         ).read_text(encoding="utf-8"))
@@ -997,7 +1019,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             'admission_delay="${{ matrix.model_start_delay_seconds }}"', review
         )
         self.assertNotIn("--max-parallel-calls 32", review)
-        self.assertIn("--review-identical", review)
+        self.assertNotIn("--review-identical", review)
         self.assertNotIn("--cache ", review)
         self.assertIn("git show", enumerate_review)
         self.assertIn("$plan_source_sha:e2e/mod-compatibility-contract.json", enumerate_review)
@@ -1008,8 +1030,13 @@ class WorkflowSecurityTest(unittest.TestCase):
             '--compatibility-artifact-node "${{ matrix.artifact_node }}"', review
         )
         self.assertIn('--compatibility-mod "${{ matrix.mod }}"', review)
-        self.assertIn("--triage-model claude-sonnet-5", review)
+        self.assertIn("--model claude-haiku-4-5", capacity_probe)
+        self.assertIn("--triage-model claude-haiku-4-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
+        self.assertNotIn("claude-sonnet-5", review)
+        self.assertIn("Install hash-locked image decoder", review)
+        self.assertIn("--only-binary=:all: --require-hashes", review)
+        self.assertIn("--requirement scripts/pages/requirements.txt", review)
         self.assertIn("mod-compatibility-wave-block", review)
         self.assertIn(
             "name: mod-compatibility-wave-block-${{ matrix.source_run_id }}",
