@@ -130,8 +130,8 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   sibling never suppresses capsules already produced by successful lanes.
   `.github/workflows/mod-compatibility-review.yml` is the separate credential-bearing consumer; it
   downloads only curated capsules, inherits exact authored-region matches, groups exact-equivalent
-  pairs behind one representative, sends every remaining group to Haiku, escalates every
-  non-high-clean or perceptually subtle non-exact result to Opus, and publishes a durable source-wave block before
+  pairs behind one representative, sends every remaining group to Haiku, escalates only a concern
+  or confidence below high to Opus, and publishes a durable source-wave block before
   cancelling siblings after a confirmed defect. Its authenticated source queue shares the global
   Claude capacity circuit, requires a fresh probe for each source, preserves one completion marker
   per clean lane, and reschedules only unfinished lanes after a provider pause. Its matrix remains
@@ -153,9 +153,11 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   independent from nullable `matches_reference`, and normalizes bounded model output.
   `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Haiku
   triage, inherits exact paired region matches, shares one model verdict across exact-equivalent
-  paired versions, runs independent loader-grouped chunks concurrently, and pipelines suspicious,
-  uncertain, or perceptually subtle non-exact results into concurrent bounded Opus verification.
-  Perceptual metrics never create a verdict. The runner cancels outstanding calls after the first
+  paired versions, runs independent loader-grouped chunks concurrently, creates deterministic
+  1280x720 model-only copies without altering the authenticated 1920x1080 evidence, and pipelines
+  only concerns or confidence below high into concurrent bounded Opus verification. A clean
+  high-confidence Haiku result is final; perceptual metrics never create or route a verdict. The
+  runner cancels outstanding calls after the first
   confirmed defect, publishes a protected exact-generation block, cancels sibling drains, and keeps
   raw provider output private.
   `e2e/visual_review_cache.py` validates and combines bounded immutable paired-only verdict

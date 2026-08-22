@@ -285,9 +285,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   fingerprints over the contract-authored regions may inherit the certified reference without a
   model, and exact-equivalent non-matching pairs may share one AI-reviewed representative. It
   exposes only bounded manifests/images plus authored regions and each passed capture assertion's
-  bounded printable runtime evidence to concurrent loader-grouped Haiku triage. Every concern,
-  confidence below high, or perceptually subtle non-exact pair reaches selective concurrent Opus
-  verification with a read-only tool surface; perceptual similarity can route but never pass.
+  bounded printable runtime evidence to concurrent loader-grouped Haiku triage. Authenticated
+  evidence and exact identities stay at 1920x1080; model-visible copies are deterministic
+  1280x720 PNGs. Only a concern or confidence below high reaches selective concurrent Opus
+  verification with a read-only tool surface; a clean high-confidence Haiku decision is final and
+  perceptual similarity can neither route nor pass.
   The runner captures each verdict from stdout,
   and validates exact labels and semantic coherence after every call. A first Opus-confirmed defect
   cancels outstanding work, emits only an explicit fail-closed partial report, publishes a sanitized
@@ -352,8 +354,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Compatibility visual judgment must compare the complete modded capture product with the clean
   same-version, same-loader packaged result while still judging every non-exact semantic group.
   Exact authored-region matches inherit the clean paired result, exact-equivalent pairs share one
-  representative, and every remaining group reaches Haiku. Every concern, confidence below high,
-  or perceptually subtle non-exact pair reaches Opus. The first Opus-confirmed defect publishes a durable
+  representative, and every remaining group reaches Haiku. Only a concern or confidence below high
+  reaches Opus. The first Opus-confirmed defect publishes a durable
   source-wave marker and cancels remaining review jobs. Raw packaged artifacts are authenticated
   and re-encoded by a secretless curator; a credential-bearing reviewer receives only the bounded,
   metadata-free capsule and its source/target/artifact proof.

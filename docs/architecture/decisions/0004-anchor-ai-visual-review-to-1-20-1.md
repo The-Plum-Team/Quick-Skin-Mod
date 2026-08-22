@@ -66,10 +66,11 @@ Before any model call, exact authored-region fingerprints eliminate paired candi
 matches. Exact-equivalent non-matching pairs with the same checkpoint semantics share one reviewed
 representative, and an exact paired verdict cache can reuse that result across artifact labels and
 loaders. Unpaired Fabric/Forge 1.20.1 anchor frames always reach the model because loader parity is
-not proof of semantic correctness. The remaining representatives are triaged in chunks of at most
-eight by Haiku. A reported concern, a non-high-confidence decision, or a perceptually subtle
-non-exact pair is escalated to an independent Opus pass in chunks of at most four. Perceptual
-similarity only routes and never produces a passing verdict.
+not proof of semantic correctness. The remaining representatives are triaged from deterministic
+1280x720 copies in chunks of at most eight by Haiku. Only a reported concern or a decision below
+high confidence is escalated to an independent Opus pass in chunks of at most four; a clean
+high-confidence Haiku result is final. Perceptual similarity is model context only and never
+produces a passing verdict or forces escalation.
 Each call has bounded retries and pacing. Capture the model's JSON from stdout with a read-only tool
 surface, validate label coverage and semantic coherence after every call, normalize the final
 report with protected code, and never upload provider-authored raw output. This read-only stdout

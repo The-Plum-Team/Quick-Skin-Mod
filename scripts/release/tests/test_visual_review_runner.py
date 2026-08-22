@@ -22,10 +22,13 @@ from check_visual_review import (  # noqa: E402
     validate_triage,
 )
 from visual_review_runner import (  # noqa: E402
+    MODEL_IMAGE_SIZE,
+    SOURCE_IMAGE_SIZE,
     SYNTHETIC_COMPARISON_CLEAN_VISIBLE,
     SYNTHETIC_IDENTICAL_VISIBLE,
     SYNTHETIC_REPRESENTED_VISIBLE,
     SYNTHETIC_SEMANTIC_CLEAN_VISIBLE,
+    ClaudeProvider,
     build_review_plan,
     execute_review,
 )
@@ -116,6 +119,54 @@ class VisualReviewRunnerTest(unittest.TestCase):
             )
 
         self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_provider_stages_only_deterministic_720p_model_copies(self) -> None:
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as temporary:
+            capsule = Path(temporary)
+            source_images = capsule / "review-input" / "images"
+            source_images.mkdir(parents=True)
+            source = source_images / "candidate.png"
+            Image.new("RGB", SOURCE_IMAGE_SIZE, (17, 61, 113)).save(source)
+            source_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+            work_root = capsule / "review-work"
+            work_root.mkdir()
+            provider = ClaudeProvider(
+                capsule=capsule,
+                work_root=work_root,
+                claude=Path(sys.executable),
+                triage_prompt="triage",
+                verify_prompt="verify",
+                triage_model="haiku",
+                verify_model="opus",
+                paired=False,
+                attempts=1,
+                call_spacing_seconds=0,
+            )
+            original = unpaired(
+                "fabric-1.20.1/full/client_a/clean",
+                "review-input/images/candidate.png",
+            )
+
+            prepared = provider._prepare_model_manifest([original])
+            repeated = provider._prepare_model_manifest([original])
+            model_path = capsule / prepared[0]["path"]
+
+            self.assertEqual(list(MODEL_IMAGE_SIZE), prepared[0]["image_size"])
+            self.assertEqual([1920, 1080], original["image_size"])
+            self.assertEqual(prepared, repeated)
+            self.assertEqual(
+                source_sha256, hashlib.sha256(source.read_bytes()).hexdigest()
+            )
+            self.assertEqual(1, len(list(provider.model_images.glob("*.png"))))
+            self.assertEqual(
+                model_path.stem,
+                hashlib.sha256(model_path.read_bytes()).hexdigest(),
+            )
+            with Image.open(model_path) as image:
+                self.assertEqual(MODEL_IMAGE_SIZE, image.size)
+                self.assertEqual("RGB", image.mode)
 
     def test_plan_skips_only_exact_semantic_regions_and_bounds_chunks(self) -> None:
         plan = build_review_plan(self.manifest, triage_chunk_size=1)

@@ -150,8 +150,9 @@ immutable workflow and governance activation contract.
   reach Haiku. For paired evidence, decoded RGB pixels from the authored regions can prove an exact
   candidate/reference match without a model call; exact-equivalent versions share one AI-reviewed
   representative. Each drain triages the remaining loader-grouped chunks concurrently with Haiku
-  and sends suspicious, uncertain, or perceptually subtle non-exact frames to concurrent bounded
-  Opus verification. Perceptual similarity only routes and can never synthesize a pass. The first
+  from deterministic 1280x720 copies and sends only concerns or confidence below high to concurrent
+  bounded Opus verification. A clean high-confidence Haiku decision is final. Perceptual
+  similarity is model context only and can never synthesize a pass or force escalation. The first
   Opus-confirmed defect publishes a protected generation-bound marker,
   cancels sibling drains and keeps later queue selection from spending more model calls on that
   automatic wave. Each drain also cancels its own outstanding calls on confirmation and reuses a
@@ -192,8 +193,8 @@ immutable workflow and governance activation contract.
   compatibility scenario and the complete base suite with only immutable size/SHA-256/SHA-512
   verified external JARs. Secretless curation pairs the full modded result with the clean
   same-version/loader result. Exact authored-region matches need no model call, exact-equivalent
-  pairs share one representative, Haiku reviews the remaining pairs, and Opus verifies every
-  non-high-clean or perceptually subtle result. The first confirmed defect records a durable wave
+  pairs share one representative, Haiku reviews the remaining pairs, and Opus verifies only a
+  concern or confidence below high. The first confirmed defect records a durable wave
   block and cancels sibling reviews. Each successful runtime lane curates its own capsule before
   the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing
   successful lanes or preventing their concurrent AI review. The settled compatibility producer

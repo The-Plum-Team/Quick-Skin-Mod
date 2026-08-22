@@ -324,11 +324,14 @@ semantic fingerprints, review scope, expectation, passed runtime evidence, captu
 scenario contract, release matrix, prompts, reviewer/checker/cache/similarity code, models, mode,
 and chunk policy match exactly; artifact labels and loaders may differ because they are not visual
 identity. Unpaired anchor semantics are never cached. Haiku triages the remaining representative
-frames in chunks of at most eight. All independent chunks run concurrently. Every concern,
-confidence below high, or perceptually subtle non-exact pair is independently rechecked by Opus in
-concurrent chunks of at most four as soon as its Haiku result is available. Perceptual similarity
-only routes to Opus and can never produce a pass. Provider throttling is handled by bounded retries rather than serial
-launch pacing. Once any Opus chunk confirms a defect, outstanding calls are cancelled and the
+frames in chunks of at most eight. All independent chunks run concurrently. Only a Haiku concern
+or confidence below high is independently rechecked by Opus in concurrent chunks of at most four
+as soon as its Haiku result is available; a clean high-confidence Haiku verdict is final.
+Perceptual similarity is model context only and can never produce a pass or force an escalation.
+The authenticated evidence remains 1920x1080 for exact comparison and caching, while the runner
+creates deterministic 1280x720 copies only for chunks that actually reach a model. Provider
+throttling is handled by bounded retries rather than serial launch pacing. Once any Opus chunk
+confirms a defect, outstanding calls are cancelled and the
 explicit blocking-partial result cannot certify or release anything. For an automatic version
 wave, the protected drain then publishes a sanitized marker bound to that exact master generation,
 best-effort cancels sibling drains, and makes later authenticated queue selection skip its remaining
@@ -427,8 +430,8 @@ it changes optional third-party mixin behavior; the clean packaged suite retains
 Quick Skin injector check. The credential-bearing review workflow receives only the successful
 curated capsules, never raw packaged artifacts, and reviews them concurrently. Exact authored-region
 matches need no AI call, exact-equivalent pairs share one representative, Haiku reviews the
-remaining groups, and Opus confirms every concern, confidence below high, or perceptually subtle
-non-exact result. A first Opus-confirmed defect creates a durable source-wave block and cancels the remaining
+remaining groups from deterministic 1280x720 copies, and Opus confirms only a Haiku concern or
+confidence below high. A first Opus-confirmed defect creates a durable source-wave block and cancels the remaining
 compatibility review jobs.
 
 ## Public visual evidence

@@ -110,7 +110,7 @@ flowchart TD
     VISUAL_IMPACT -->|Yes| PAIR["Pair every capture_id at 1920x1080<br/>with lossless 1.20.1 evidence"]
     PAIR --> CACHE{"Exact authored regions<br/>or exact verdict cache hit?"}
     CACHE -->|Yes| VISUAL_OK
-    CACHE -->|No| LATER_AI["Parallel Haiku review<br/>Selective Opus verification"]
+    CACHE -->|No| LATER_AI["1280x720 parallel Haiku review<br/>Selective Opus verification"]
     LATER_AI --> LATER_DEFECT{"Confirmed defect?"}
     LATER_DEFECT -->|Yes| BLOCK
     LATER_DEFECT -->|No| VISUAL_OK
