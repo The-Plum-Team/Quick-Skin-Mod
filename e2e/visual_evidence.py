@@ -99,9 +99,9 @@ class VisualEvidenceError(ValueError):
 
 @dataclass(frozen=True)
 class Catalog:
-    captures: tuple[dict[str, str], ...]
-    by_id: dict[str, dict[str, str]]
-    by_key: dict[tuple[str, str, str], dict[str, str]]
+    captures: tuple[dict[str, Any], ...]
+    by_id: dict[str, dict[str, Any]]
+    by_key: dict[tuple[str, str, str], dict[str, Any]]
     contract: ScenarioContract
 
     @property
@@ -172,6 +172,7 @@ def load_catalog(path: Path = DEFAULT_CATALOG) -> Catalog:
             "title": item.title,
             "review_tier": item.review_tier,
             "expectation": item.expectation,
+            "review_regions": contract.review_regions_for(item.capture_id),
         }
         for item in contract.captures
     )
@@ -873,6 +874,13 @@ def collect_evidence(
                         f"screenshot dimensions disagree for {lane_id}/{role}/{step}: "
                         f"{actual_dimensions} != {(width, height)}"
                     )
+                if actual_dimensions != catalog.contract.screenshot_size:
+                    raise VisualEvidenceError(
+                        f"screenshot dimensions must be exactly "
+                        f"{catalog.contract.screenshot_size[0]}x"
+                        f"{catalog.contract.screenshot_size[1]} for "
+                        f"{lane_id}/{role}/{step}: got {actual_dimensions}"
+                    )
                 if actual_sha256 != file_sha256:
                     raise VisualEvidenceError(
                         f"screenshot digest disagrees for {lane_id}/{role}/{step}"
@@ -897,6 +905,7 @@ def collect_evidence(
                         "expectation": capture["expectation"],
                         "runtime_evidence": step_record["message"].strip(),
                         "review_tier": capture["review_tier"],
+                        "review_regions": capture["review_regions"],
                         "artifact_node": artifact_node,
                         "version": version,
                         "loader": loader,
