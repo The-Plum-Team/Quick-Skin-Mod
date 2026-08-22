@@ -768,40 +768,43 @@ public final class VanillaShim {
                     mc.getClass(), "getToasts", "getToastManager", "method_1566", "m_91300_"
             );
             Object toastManager = toastAccessor == null ? null : toastAccessor.invoke(mc);
-            if (toastManager == null) {
-                // 26.2 moved the manager under Gui. Keep this call direct so Loom remaps both the
-                // accessor and clear() for Fabric instead of relying on an intermediary name.
-                mc.gui.toastManager().clear();
-            } else {
-                Method clearToasts = findNoArg(
-                        toastManager.getClass(), "clear", "method_2000", "m_94919_"
-                );
-                if (clearToasts == null) {
-                    return "vanilla toast clear surface is unavailable";
-                }
-                clearToasts.invoke(toastManager);
-            }
-
             Object gui = mc.gui;
+            if (toastManager == null && gui != null) {
+                // 26.2 is an official-namespace lane and moved this accessor under Gui.
+                Method guiToastAccessor = findNoArg(gui.getClass(), "toastManager");
+                toastManager = guiToastAccessor == null ? null : guiToastAccessor.invoke(gui);
+            }
+            Method clearToasts = toastManager == null
+                    ? null
+                    : findNoArg(
+                            toastManager.getClass(), "clear", "method_2000", "m_94919_"
+                    );
+            if (clearToasts == null) {
+                return "vanilla toast clear surface is unavailable";
+            }
+            clearToasts.invoke(toastManager);
+
             Method chatAccessor = gui == null
                     ? null
                     : findNoArg(gui.getClass(), "getChat", "method_1743", "m_93076_");
             Object chat = chatAccessor == null ? null : chatAccessor.invoke(gui);
-            if (chat == null) {
-                // 26.2 split the HUD out of Gui. As above, direct calls preserve loader remapping.
-                mc.gui.hud.getChat().clearMessages(true);
-                return null;
+            if (chat == null && gui != null) {
+                // 26.2 moved ChatComponent under Gui.hud. Resolve the unique field exposing
+                // getChat() structurally, so no version-specific HUD type enters shared source.
+                chat = invokeUniqueNoArgOnFieldValue(gui, "getChat");
             }
             Method clearChat = null;
-            for (Method method : chat.getClass().getMethods()) {
-                if ((method.getName().equals("clearMessages")
-                        || method.getName().equals("method_1808")
-                        || method.getName().equals("m_93795_"))
-                        && method.getParameterCount() == 1
-                        && method.getParameterTypes()[0] == boolean.class) {
-                    method.setAccessible(true);
-                    clearChat = method;
-                    break;
+            if (chat != null) {
+                for (Method method : chat.getClass().getMethods()) {
+                    if ((method.getName().equals("clearMessages")
+                            || method.getName().equals("method_1808")
+                            || method.getName().equals("m_93795_"))
+                            && method.getParameterCount() == 1
+                            && method.getParameterTypes()[0] == boolean.class) {
+                        method.setAccessible(true);
+                        clearChat = method;
+                        break;
+                    }
                 }
             }
             if (clearChat == null) {
@@ -946,5 +949,24 @@ public final class VanillaShim {
             }
         }
         return null;
+    }
+
+    private static Object invokeUniqueNoArgOnFieldValue(Object owner, String... methodNames)
+            throws ReflectiveOperationException {
+        Field matchedField = null;
+        Method matchedAccessor = null;
+        for (Class<?> type = owner.getClass(); type != null; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                Method accessor = findNoArg(field.getType(), methodNames);
+                if (accessor == null) continue;
+                if (matchedField != null) return null;
+                field.setAccessible(true);
+                matchedField = field;
+                matchedAccessor = accessor;
+            }
+        }
+        if (matchedField == null) return null;
+        Object fieldValue = matchedField.get(owner);
+        return fieldValue == null ? null : matchedAccessor.invoke(fieldValue);
     }
 }
