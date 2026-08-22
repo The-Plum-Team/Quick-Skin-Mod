@@ -52,6 +52,8 @@ class GenerateContractJavaTest(unittest.TestCase):
         source = output.read_text(encoding="utf-8")
         expected_hash = hashlib.sha256(self.contract_path.read_bytes()).hexdigest()
         self.assertIn(f'public static final String SHA256 = "{expected_hash}";', source)
+        self.assertIn("public static final int SCREENSHOT_WIDTH = 1920;", source)
+        self.assertIn("public static final int SCREENSHOT_HEIGHT = 1080;", source)
         self.assertIn("public enum ScenarioId {", source)
         self.assertIn('PHASE0_SMOKE("phase0-smoke")', source)
         self.assertIn('PROPAGATION_LIVE("propagation-live")', source)
