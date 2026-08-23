@@ -232,15 +232,30 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             '"customnpcs".equals(type.getNamespace())',
             "CustomNPCsIntegration.detectSkinConflict",
             "EssentialCompatIntegration.findBottomEssentialWidget",
-            "ReplayModHelper.getInterceptedPacketCount",
+            "ReplayModBridge.getInterceptedPacketCount",
             "startReplay(finalizedReplayPath)",
         ):
             with self.subTest(proof=required_feature_proof):
                 self.assertIn(required_feature_proof, feature)
 
         self.assertIn("com.unascribed.ears.common.EarsFeaturesWriterV1", assets)
+        self.assertIn("rendererFeatures(rendererClass, playerRenderer)", feature)
+        self.assertIn("rendererLookupArgument", feature)
+        self.assertIn("expectedType.isInstance(candidate)", feature)
         self.assertIn("com.tom.cpm.shared.editor.Exporter", assets)
         self.assertIn("summon customnpcs:customnpc", runtime)
+        self.assertIn(
+            '"com.quickskin.mod.client.compat.ReplayModHelper"', feature
+        )
+
+    def test_essential_raw_screenshot_supports_both_gpu_readback_eras(self) -> None:
+        """Essential needs a silent framebuffer copy before and after 1.21.5's async API."""
+
+        shim = SHIM.read_text(encoding="utf-8")
+        self.assertIn("return writeRawScreenshot(image, gameDir, name);", shim)
+        self.assertIn("Consumer<Object> writer = captured ->", shim)
+        self.assertIn("for (int parameterCount : new int[] {2, 3})", shim)
+        self.assertIn("closeRawScreenshot(captured);", shim)
 
     def test_string_class_lookups_declare_an_intermediary_fallback(self) -> None:
         """Fabric serves intermediary names at runtime; a Mojang name alone resolves only on Forge."""
