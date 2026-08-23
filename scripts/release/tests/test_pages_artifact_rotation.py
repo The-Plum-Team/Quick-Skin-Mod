@@ -18,19 +18,27 @@ from rotate_artifacts import (  # noqa: E402
     ApiError,
     Artifact,
     BranchGeneration,
+    CompatibilityGeneration,
     GitHubApi,
     RotationError,
     load_generations,
+    load_compatibility_generations,
     retire_pages_run_transients,
     rotate_branch,
     rotate_generations,
+    rotate_compatibility_branch,
     select_consumed_handoffs,
     select_old_handoffs,
     select_old_caches,
+    select_old_compatibility_caches,
+    select_old_compatibility_handoffs,
     select_pages_run_transients,
 )
 import select_artifact  # noqa: E402
 from select_artifact import PROBE_NO_EVIDENCE_EXIT, select_source  # noqa: E402
+from select_compatibility_artifact import (  # noqa: E402
+    select_source as select_compatibility_source,
+)
 
 
 TARGET_SHA = "a" * 40
@@ -195,6 +203,21 @@ class PagesArtifactRotationTest(unittest.TestCase):
             target_run_id=800,
             keep=self.keep,
         )
+        self.compatibility_keep = artifact(
+            210,
+            f"pages-mod-compatibility-cache-{BRANCH}",
+            "2026-08-03T12:10:00Z",
+            run_id=900,
+            head_branch="master",
+            head_sha=PAGES_SHA,
+        )
+        self.compatibility_generation = CompatibilityGeneration(
+            branch=BRANCH,
+            coverage_sha=TARGET_SHA,
+            compatibility_run_id=810,
+            publication_run_id=820,
+            keep=self.compatibility_keep,
+        )
 
     def test_cache_selector_keeps_current_newer_foreign_and_expired_artifacts(self) -> None:
         expected_name = f"pages-cache-{BRANCH}"
@@ -295,7 +318,9 @@ class PagesArtifactRotationTest(unittest.TestCase):
                         trigger_artifacts=[mismatched],
                     )
 
-                (evidence_root / "unexpected.txt").write_text("not evidence", encoding="utf-8")
+                (evidence_root / "unexpected.txt").write_text(
+                    "not evidence", encoding="utf-8"
+                )
                 with self.assertRaises(RotationError):
                     load_generations(
                         evidence_root=evidence_root,
@@ -304,6 +329,152 @@ class PagesArtifactRotationTest(unittest.TestCase):
                         pages_run_sha=PAGES_SHA,
                         trigger_artifacts=[self.keep],
                     )
+
+    def test_compatibility_generation_is_bound_to_manifest_coverage_sha(self) -> None:
+        manifest = {
+            "provenance": {
+                "coverage_sha": TARGET_SHA,
+                "compatibility_run_id": 810,
+                "publication_run_id": 820,
+            }
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence_root = Path(temporary)
+            (evidence_root / BRANCH).mkdir()
+            with patch(
+                "rotate_artifacts.validate_compatibility_bundle",
+                return_value=manifest,
+            ):
+                generations = load_compatibility_generations(
+                    evidence_root=evidence_root,
+                    repository=REPOSITORY,
+                    pages_run_id=900,
+                    pages_run_sha=PAGES_SHA,
+                    trigger_artifacts=[self.compatibility_keep],
+                )
+        self.assertEqual(generations, [self.compatibility_generation])
+
+    def test_compatibility_rotation_retires_only_older_authenticated_artifacts(self) -> None:
+        cache_name = f"pages-mod-compatibility-cache-{BRANCH}"
+        handoff_name = f"pages-mod-compatibility-{BRANCH}"
+        old_cache = artifact(
+            101,
+            cache_name,
+            "2026-08-03T10:00:00Z",
+            run_id=700,
+            head_branch="master",
+            head_sha=OLD_PAGES_SHA,
+        )
+        old_handoff = artifact(
+            102,
+            handoff_name,
+            "2026-08-03T11:00:00Z",
+            run_id=820,
+            head_branch="master",
+            head_sha=OLD_PAGES_SHA,
+        )
+        newer_handoff = artifact(
+            301,
+            handoff_name,
+            "2026-08-03T13:00:00Z",
+            run_id=821,
+            head_branch="master",
+            head_sha=PAGES_SHA,
+        )
+        self.assertEqual(
+            select_old_compatibility_caches(
+                [old_cache, self.compatibility_keep],
+                branch=BRANCH,
+                keep=self.compatibility_keep,
+            ),
+            [old_cache],
+        )
+        self.assertEqual(
+            select_old_compatibility_handoffs(
+                [old_handoff, newer_handoff],
+                branch=BRANCH,
+                keep=self.compatibility_keep,
+            ),
+            [old_handoff],
+        )
+        api = FakeApi(
+            keep=self.compatibility_keep,
+            inventories={
+                cache_name: [old_cache, self.compatibility_keep],
+                handoff_name: [old_handoff, newer_handoff],
+            },
+            runs={
+                700: run(
+                    700,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_dispatch",
+                    branch="master",
+                    sha=OLD_PAGES_SHA,
+                    conclusion="failure",
+                ),
+                820: run(
+                    820,
+                    workflow=".github/workflows/mod-compatibility-review.yml",
+                    event="workflow_dispatch",
+                    branch="master",
+                    sha=OLD_PAGES_SHA,
+                ),
+                900: run(
+                    900,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_dispatch",
+                    branch="master",
+                    sha=PAGES_SHA,
+                ),
+            },
+        )
+        deleted = rotate_compatibility_branch(
+            api,
+            self.compatibility_generation,
+            repository=REPOSITORY,
+            pages_run_id=900,
+            pages_run_sha=PAGES_SHA,
+            delete_delay_seconds=0,
+        )
+        self.assertEqual(deleted, [101, 102])
+        self.assertEqual(api.deleted, [101, 102])
+
+    def test_compatibility_selector_prefers_newest_authenticated_generation(self) -> None:
+        handoff = artifact(
+            400,
+            f"pages-mod-compatibility-{BRANCH}",
+            "2026-08-03T12:20:00Z",
+            run_id=920,
+            head_branch="master",
+            head_sha=PAGES_SHA,
+        )
+        api = FakeApi(
+            keep=self.compatibility_keep,
+            inventories={
+                handoff.name: [handoff],
+                self.compatibility_keep.name: [self.compatibility_keep],
+            },
+            runs={
+                900: run(
+                    900,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_dispatch",
+                    branch="master",
+                    sha=PAGES_SHA,
+                ),
+                920: run(
+                    920,
+                    workflow=".github/workflows/mod-compatibility-review.yml",
+                    event="workflow_dispatch",
+                    branch="master",
+                    sha=PAGES_SHA,
+                ),
+            },
+        )
+        self.assertEqual(
+            select_compatibility_source(api, repository=REPOSITORY, branch=BRANCH),
+            handoff,
+        )
 
     def test_handoff_selector_deletes_only_the_consumed_exact_run(self) -> None:
         expected_name = f"pages-e2e-{BRANCH}"
