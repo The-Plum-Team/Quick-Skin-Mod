@@ -15,6 +15,12 @@ public final class ModCompatibilityScenario implements Scenario {
     private volatile CompatibilityProbe.Result probe =
             new CompatibilityProbe.Result(false, "probe not executed");
 
+    /** Run the selected driver's bounded startup protection before player/level become available. */
+    public static void prepareBeforeWorldJoin() {
+        String modId = System.getProperty("quickskin.e2e.compatibility", "").trim();
+        ModCompatibilityFeature.prepareBeforeWorldJoin(modId);
+    }
+
     @Override
     public ScenarioId id() {
         return ScenarioId.MOD_COMPATIBILITY;
