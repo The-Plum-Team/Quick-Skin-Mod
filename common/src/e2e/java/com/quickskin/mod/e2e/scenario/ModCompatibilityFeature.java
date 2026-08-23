@@ -798,6 +798,16 @@ interface ModCompatibilityFeature {
                     return null;
                 }
             }
+            try {
+                Object location = example.getClass()
+                        .getConstructor(String.class, String.class)
+                        .newInstance(namespace, path);
+                if (location != null) return location;
+            } catch (NoSuchMethodException ignored) {
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "CustomNPCs foreign texture fixture failed: " + concise(exception);
+                return null;
+            }
             failure = "CustomNPCs conflict probe found no texture factory on "
                     + example.getClass().getName();
             return null;
@@ -889,7 +899,9 @@ interface ModCompatibilityFeature {
         private void pinCursorAwayFromEssentialWidgets() {
             try {
                 Object window = minecraft.getWindow();
-                for (String accessor : new String[] {"getWindow", "handle"}) {
+                for (String accessor : new String[] {
+                        "getWindow", "handle", "method_4490", "m_85439_"
+                }) {
                     try {
                         Object value = window.getClass().getMethod(accessor).invoke(window);
                         if (value instanceof Number number) {
