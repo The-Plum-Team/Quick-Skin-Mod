@@ -1,6 +1,9 @@
 package com.quickskin.mod.client.rendering;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.client.services.LocalAssetManager;
+import com.quickskin.mod.common.data.TextureQuality;
 //? if <26.2 {
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -39,6 +42,7 @@ import net.minecraft.world.entity.player.Player;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -848,7 +852,11 @@ public final class SkinLayers3DIntegration {
                     return NativeImage.read(stream);
                 }
             }
-            AbstractTexture texture = minecraft.getTextureManager().getTexture(skinLocation);
+        } catch (Exception | LinkageError ignored) {
+        }
+        try {
+            AbstractTexture texture = Minecraft.getInstance()
+                    .getTextureManager().getTexture(skinLocation);
             if (texture instanceof DynamicTexture dynamicTexture) {
                 NativeImage pixels = dynamicTexture.getPixels();
                 if (pixels != null) {
@@ -863,7 +871,35 @@ public final class SkinLayers3DIntegration {
             }
         } catch (Exception | LinkageError ignored) {
         }
-        return null;
+        // A texture-manager miss must not bypass Quick Skin's authoritative local asset store.
+        return getQuickSkinLocalTexture(skinLocation);
+    }
+
+//? if <1.21.11 {
+    private static NativeImage getQuickSkinLocalTexture(ResourceLocation skinLocation) {
+//?} else {
+    private static NativeImage getQuickSkinLocalTexture(Identifier skinLocation) {
+//?}
+        if (skinLocation == null
+                || !QuickSkin.MOD_ID.equals(skinLocation.getNamespace())) {
+            return null;
+        }
+        String path = skinLocation.getPath();
+        String prefix = "local/";
+        String suffix = "_" + TextureQuality.FULL.name().toLowerCase(java.util.Locale.ROOT);
+        if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
+            return null;
+        }
+        String hash = path.substring(prefix.length(), path.length() - suffix.length());
+        byte[] png = LocalAssetManager.getInstance().loadTexture(hash, TextureQuality.FULL);
+        if (png == null || png.length == 0) {
+            return null;
+        }
+        try {
+            return NativeImage.read(new ByteArrayInputStream(png));
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static File findTextureBackingFile(Object texture) {

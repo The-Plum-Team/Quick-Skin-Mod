@@ -855,9 +855,9 @@
               "id": "baseline_with_mod",
               "assertion_required": true,
               "capture": {
-                "title": "Compatibility baseline",
+                "title": "Optional-mod control",
                 "review_tier": "all",
-                "expectation": "With the named compatibility mod loaded, a stable third-person flat-world view shows the complete local player with an intact UUID-selected vanilla default skin and no rendering corruption.",
+                "expectation": "The named optional mod's control scene matches the exact feature-specific visual expectation locked in the mod compatibility contract, with its asserted third-party integration active and no unrelated rendering corruption.",
                 "compatibility_reference_capture_id": "phase0-smoke.client_a.baseline",
                 "probes": []
               }
@@ -866,9 +866,9 @@
               "id": "apply_local_skin_with_mod",
               "assertion_required": true,
               "capture": {
-                "title": "Compatibility local skin",
+                "title": "Quick Skin integration active",
                 "review_tier": "all",
-                "expectation": "With the named compatibility mod loaded, a normal first-person world view shows the custom skin's dark charcoal-and-gray plaid sleeve and brown hand without missing geometry, texture corruption, or interference from the other mod.",
+                "expectation": "The paired scene matches the exact feature-specific visual expectation locked for the named optional mod and visibly demonstrates Quick Skin interacting with that feature, not merely co-launching beside it.",
                 "compatibility_reference_capture_id": "phase0-smoke.client_a.apply_local_skin",
                 "probes": []
               }
