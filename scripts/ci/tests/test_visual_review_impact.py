@@ -37,14 +37,36 @@ class VisualReviewImpactTest(unittest.TestCase):
             changed("scripts/ci/github_api_retry.sh", status="added"),
             changed("scripts/ci/e2e_impact.py"),
             changed("scripts/ci/visual_review_queue.py"),
+            changed("scripts/pages/build_site.py"),
+            changed("scripts/pages/collect_compatibility.py", status="added"),
+            changed("scripts/pages/compatibility_evidence.py", status="added"),
             changed("scripts/pages/rotate_artifacts.py"),
             changed("scripts/pages/select_artifact.py"),
+            changed("scripts/pages/select_compatibility_artifact.py", status="added"),
             changed("scripts/release/tests/test_pages_artifact_rotation.py"),
             changed("scripts/ci/visual_review_impact.py"),
             changed("scripts/ci/tests/test_visual_review_impact.py", status="added"),
+            changed("site/assets/gallery.js"),
+            changed("e2e/README.md"),
             changed("docs/ai/PROJECT.md"),
         )
-        self.assertTrue(infrastructure_only(inventory, changed_files=12))
+        self.assertTrue(infrastructure_only(inventory, changed_files=18))
+
+    def test_compatibility_publication_does_not_repeat_game_review(self) -> None:
+        paths = [
+            "scripts/pages/build_site.py",
+            "scripts/pages/collect_compatibility.py",
+            "scripts/pages/compatibility_evidence.py",
+            "scripts/pages/rotate_artifacts.py",
+            "scripts/pages/select_compatibility_artifact.py",
+            "site/assets/gallery.js",
+            "e2e/README.md",
+        ]
+        for scope in ("replicated-port", "post-anchor-port"):
+            with self.subTest(scope=scope):
+                classification = classify_paths(paths, scope=scope)
+                self.assertFalse(classification.review_required)
+                self.assertEqual(sorted(paths), list(classification.paths))
 
     def test_runtime_or_unknown_path_requires_review(self) -> None:
         for path in (
