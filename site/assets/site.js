@@ -65,7 +65,7 @@ async function start() {
     destinations.append(
       linkCard(
         "Verified E2E",
-        "Browse and compare packaged-Minecraft screenshots across every supported version.",
+        "Browse packaged-Minecraft screenshots across every supported version, including paired optional-mod compatibility evidence.",
         data.gallery_url
       )
     );
