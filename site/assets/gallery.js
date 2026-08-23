@@ -189,6 +189,115 @@ function notApplicableCard(label, loader) {
   return card;
 }
 
+function compatibilityShot(record, label, alt) {
+  const figure = node("figure", "compatibility-shot");
+  const image = document.createElement("img");
+  image.src = sameOriginPath(record.image);
+  image.alt = alt;
+  image.width = record.width;
+  image.height = record.height;
+  image.loading = "lazy";
+  image.decoding = "async";
+  const caption = document.createElement("figcaption");
+  caption.append(node("strong", "", label));
+  const imageLink = node("a", "", "Open image ↗");
+  imageLink.href = sameOriginPath(record.image);
+  imageLink.target = "_blank";
+  imageLink.rel = "noopener";
+  caption.append(imageLink);
+  figure.append(image, caption);
+  return figure;
+}
+
+function compatibilityCheckpoint(frame, lane) {
+  const checkpoint = node("article", "compatibility-checkpoint");
+  const heading = node("div", "compatibility-checkpoint-heading");
+  heading.append(node("h4", "", frame.title));
+  const badges = node("div", "compatibility-badges");
+  badges.append(
+    node("span", "verified-badge", "Runtime passed"),
+    node("span", "verified-badge", "AI clean")
+  );
+  heading.append(badges);
+
+  const pair = node("div", "compatibility-pair");
+  pair.append(
+    compatibilityShot(
+      frame.reference,
+      "Clean reference",
+      `${frame.title} clean E2E reference for Minecraft ${lane.version}, ${lane.loader_name}`
+    ),
+    compatibilityShot(
+      frame.candidate,
+      `${lane.mod_name} installed`,
+      `${frame.title} with ${lane.mod_name} ${lane.mod_version} installed on Minecraft ${lane.version}, ${lane.loader_name}`
+    )
+  );
+
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "Validation details";
+  details.append(
+    summary,
+    node("p", "record-prose", frame.expectation),
+    factList([
+      ["Deterministic assertion", node("span", "mono", frame.runtime_evidence)],
+      ["Semantic pixels changed", percent(frame.semantic_changed_fraction)],
+      ["Perceptual delta", percent(frame.perceptual_delta)],
+      ["Candidate semantic SHA-256", node("span", "mono", frame.candidate_semantic_sha256)],
+      ["Reference semantic SHA-256", node("span", "mono", frame.reference_semantic_sha256)]
+    ])
+  );
+  checkpoint.append(heading, pair, details);
+  return checkpoint;
+}
+
+function compatibilityLaneCard(lane) {
+  const card = node("section", "compatibility-lane");
+  const header = node("header", "compatibility-lane-heading");
+  const title = node("div");
+  title.append(
+    node("p", "eyebrow", `Minecraft ${lane.version} · ${lane.loader_name}`),
+    node("h3", "", `${lane.mod_name} ${lane.mod_version}`)
+  );
+  const reviewed = node(
+    "span",
+    "review-count",
+    `${lane.reviewed_frame_count}/${lane.reviewed_frame_count} reviewed frames clean`
+  );
+  header.append(title, reviewed);
+
+  const metadata = node("div", "capture-meta");
+  for (const value of [lane.artifact_node, lane.mod_version_id, lane.lane_id]) {
+    metadata.append(node("span", "mono", value));
+  }
+  const checkpoints = node("div", "compatibility-checkpoints");
+  for (const frame of lane.frames) checkpoints.append(compatibilityCheckpoint(frame, lane));
+
+  const proof = document.createElement("details");
+  proof.className = "compatibility-proof";
+  const proofSummary = document.createElement("summary");
+  proofSummary.textContent = "Authenticated review identity";
+  proof.append(
+    proofSummary,
+    factList([
+      ["Review manifest SHA-256", node("span", "mono", lane.review_manifest_sha256)],
+      ["Curation proof SHA-256", node("span", "mono", lane.curation_proof_sha256)],
+      ["Normalized report SHA-256", node("span", "mono", lane.review_report_sha256)]
+    ])
+  );
+
+  const provenance = node("div", "compatibility-provenance");
+  provenance.append(
+    externalLink(lane.base_run_url, "clean reference run ↗"),
+    externalLink(lane.compatibility_run_url, "compatibility runtime run ↗"),
+    externalLink(lane.review_run_url, "complete AI review ↗"),
+    externalLink(lane.publication_run_url, "publication run ↗")
+  );
+  card.append(header, metadata, checkpoints, proof, provenance);
+  return card;
+}
+
 class Gallery {
   constructor(data) {
     this.data = data;
@@ -217,12 +326,14 @@ class Gallery {
   start() {
     this.renderSummary();
     this.populateFilters();
+    this.populateCompatibilityFilters();
     this.createTabs();
     this.bindFilters();
     this.bindViewSwitch();
     this.bindDialog();
-    this.renderGallery();
     this.renderComparison();
+    this.renderCompatibility();
+    this.renderGallery();
   }
 
   renderSummary() {
@@ -230,6 +341,13 @@ class Gallery {
     const total = this.data.frames.length;
     summary.append(node("span", "summary-item", `${this.data.releases.length} Minecraft versions`));
     summary.append(node("span", "summary-item", `${total} validated captures`));
+    summary.append(
+      node(
+        "span",
+        "summary-item",
+        `${this.data.compatibility.lanes.length} published mod-compatibility lane${this.data.compatibility.lanes.length === 1 ? "" : "s"}`
+      )
+    );
     for (const release of this.data.releases) {
       const item = node("span", "summary-item");
       const strong = document.createElement("strong");
@@ -260,6 +378,26 @@ class Gallery {
     const compare = document.querySelector("#capture-compare");
     for (const [captureId, label] of [...captures].sort((left, right) => left[1].localeCompare(right[1]))) {
       option(compare, captureId, label);
+    }
+  }
+
+  populateCompatibilityFilters() {
+    const evidence = this.data.compatibility;
+    const rows = evidence.lanes.concat(evidence.not_applicable);
+    const versionSelect = document.querySelector("#compatibility-version");
+    for (const version of unique(rows.map((row) => row.version))) {
+      option(versionSelect, version, `Minecraft ${version}`);
+    }
+    const loaderSelect = document.querySelector("#compatibility-loader");
+    for (const loader of unique(rows.map((row) => row.loader))) {
+      const row = rows.find((item) => item.loader === loader);
+      option(loaderSelect, loader, row.loader_name || loader);
+    }
+    const mods = new Map();
+    for (const row of rows) mods.set(row.mod, row.mod_name);
+    const modSelect = document.querySelector("#compatibility-mod");
+    for (const [mod, name] of [...mods].sort((left, right) => left[1].localeCompare(right[1]))) {
+      option(modSelect, mod, name);
     }
   }
 
@@ -322,22 +460,33 @@ class Gallery {
     document.querySelector("#capture-search").addEventListener("input", () => this.renderGallery());
     document.querySelector("#capture-compare").addEventListener("change", () => this.renderComparison());
     document.querySelector("#compare-loader").addEventListener("change", () => this.renderComparison());
+    document.querySelector("#compatibility-filters").addEventListener("submit", (event) => event.preventDefault());
+    for (const selector of ["#compatibility-version", "#compatibility-loader", "#compatibility-mod"]) {
+      document.querySelector(selector).addEventListener("change", () => this.renderCompatibility());
+    }
   }
 
   bindViewSwitch() {
     const galleryButton = document.querySelector("#gallery-view-button");
     const compareButton = document.querySelector("#compare-view-button");
-    const setView = (comparison) => {
-      document.querySelector("#gallery-view").hidden = comparison;
-      document.querySelector("#compare-view").hidden = !comparison;
-      galleryButton.classList.toggle("is-active", !comparison);
-      compareButton.classList.toggle("is-active", comparison);
-      galleryButton.setAttribute("aria-pressed", comparison ? "false" : "true");
-      compareButton.setAttribute("aria-pressed", comparison ? "true" : "false");
-      if (comparison) this.renderComparison(); else this.renderGallery();
+    const compatibilityButton = document.querySelector("#compatibility-view-button");
+    const views = {
+      gallery: [galleryButton, document.querySelector("#gallery-view"), () => this.renderGallery()],
+      compare: [compareButton, document.querySelector("#compare-view"), () => this.renderComparison()],
+      compatibility: [compatibilityButton, document.querySelector("#compatibility-view"), () => this.renderCompatibility()]
     };
-    galleryButton.addEventListener("click", () => setView(false));
-    compareButton.addEventListener("click", () => setView(true));
+    const setView = (selected) => {
+      for (const [name, [button, view]] of Object.entries(views)) {
+        const active = name === selected;
+        view.hidden = !active;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      }
+      views[selected][2]();
+    };
+    galleryButton.addEventListener("click", () => setView("gallery"));
+    compareButton.addEventListener("click", () => setView("compare"));
+    compatibilityButton.addEventListener("click", () => setView("compatibility"));
   }
 
   bindDialog() {
@@ -410,6 +559,55 @@ class Gallery {
       }
     }
     document.querySelector("#gallery-status").textContent = `${cells} version/loader cell${cells === 1 ? "" : "s"} aligned by semantic checkpoint`;
+  }
+
+  compatibilityMatches(row) {
+    const version = document.querySelector("#compatibility-version").value;
+    const loader = document.querySelector("#compatibility-loader").value;
+    const mod = document.querySelector("#compatibility-mod").value;
+    return (version === "all" || row.version === version)
+      && (loader === "all" || row.loader === loader)
+      && (mod === "all" || row.mod === mod);
+  }
+
+  renderCompatibility() {
+    const grid = document.querySelector("#compatibility-grid");
+    const na = document.querySelector("#compatibility-not-applicable");
+    grid.replaceChildren();
+    na.replaceChildren();
+    const lanes = this.data.compatibility.lanes.filter((lane) => this.compatibilityMatches(lane));
+    const notApplicable = this.data.compatibility.not_applicable.filter((row) => this.compatibilityMatches(row));
+    if (!lanes.length) {
+      grid.append(
+        node(
+          "div",
+          "empty-state",
+          this.data.compatibility.available
+            ? "No published compatibility lane matches these filters."
+            : "No compact mod-compatibility evidence has been published yet."
+        )
+      );
+    } else {
+      for (const lane of lanes) grid.append(compatibilityLaneCard(lane));
+    }
+    if (notApplicable.length) {
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = `${notApplicable.length} explicitly not-applicable combination${notApplicable.length === 1 ? "" : "s"}`;
+      const list = node("ul", "compatibility-na-list");
+      for (const row of notApplicable) {
+        list.append(
+          node(
+            "li",
+            "",
+            `Minecraft ${row.version} · ${row.loader_name} · ${row.mod_name}: ${row.reason}`
+          )
+        );
+      }
+      details.append(summary, list);
+      na.append(details);
+    }
+    document.querySelector("#gallery-status").textContent = `${lanes.length} published compatibility lane${lanes.length === 1 ? "" : "s"} shown`;
   }
 
   recordHeader(frame) {
@@ -640,12 +838,17 @@ async function startGallery() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (
-      data.schema_version !== 2
+      data.schema_version !== 3
       || !Array.isArray(data.frames)
       || !data.frames.length
       || !Array.isArray(data.releases)
       || !Array.isArray(data.lanes)
       || !Array.isArray(data.comparisons)
+      || !data.compatibility
+      || typeof data.compatibility.available !== "boolean"
+      || !Array.isArray(data.compatibility.releases)
+      || !Array.isArray(data.compatibility.lanes)
+      || !Array.isArray(data.compatibility.not_applicable)
     ) {
       throw new Error("Unsupported or empty gallery inventory");
     }
