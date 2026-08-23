@@ -434,6 +434,14 @@ remaining groups from deterministic 1280x720 copies, and Opus confirms only a Ha
 confidence below high. A first Opus-confirmed defect creates a durable source-wave block and cancels the remaining
 compatibility review jobs.
 
+Once every applicable lane is complete and clean, the protected reviewer can publish the wave
+without another model call. It reauthenticates the source plan, every full capsule, all normalized
+reports and lane-complete records, then retains only the two `mod-compatibility` checkpoints per lane.
+Each public checkpoint is a paired clean reference and modded candidate, encoded as a
+content-addressed 1280x720 WebP. The manifest still records the full reviewed-frame count and exact
+mod version; raw model explanations, anomaly strings, and the other reviewed images are not public.
+`workflow_dispatch` operation `publish` is the recovery path for an already-complete source run.
+
 ## Public visual evidence
 
 The architectural rationale, evaluated alternatives, and external precedents are recorded in
@@ -452,8 +460,9 @@ Selecting a capture opens its validation record: contract identity, expectation 
 tier; the bounded assertion message the packaged client emitted; decoded pixel metrics for both the
 original PNG and the served derivative; every required before/after comparison with its measured
 and minimum change; the packaged lane with its exact production JAR digest and wall time; and the
-tested plus publishing runs, commits and contract hash. `gallery-data.json` carries that record as
-schema version 2, so the page derives it and never restates an unvalidated fact.
+tested plus publishing runs, commits and contract hash. `gallery-data.json` carries ordinary and
+optional-mod records as schema version 3, so the page derives them and never restates an
+unvalidated fact.
 
 The assertion message is the one part a version may still lack: each release branch publishes from
 a rolling cache built by its own checkout, so evidence created before that field existed validates
@@ -482,6 +491,14 @@ rechecks all heads, converts each raw bundle to an exact-schema WebP derivative 
 `collected-pages-*` fan-in, and publishes the complete site as one atomic GitHub Pages artifact. A
 missing, stale, or invalid version aborts the new deployment, preserving the previous site.
 
+Compatibility publication is optional alongside that required ordinary fan-in. Pages selects the
+newest authenticated `pages-mod-compatibility-<branch>` handoff or rolling
+`pages-mod-compatibility-cache-<branch>`, validates its exact schema, contracts, images and clean
+lane/N/A product, and carries it to a newer branch head only across a protected complete diff that
+cannot affect compatibility. The gallery exposes it under **Mod compatibility**, showing each
+clean/modded pair, the full review count, deterministic assertion and separate runtime, review and
+publication runs. Absence of such evidence does not claim that a mod is incompatible.
+
 After a successful deployment, the controller explicitly self-dispatches `operation=rotate`. The
 protected rotation authenticates its completed/successful owner and operates on exact artifact IDs,
 retaining one validated compact `pages-cache-*` bundle for each exact release head. This atomic,
@@ -489,7 +506,9 @@ generation-safe rotation admits the replacement before deleting superseded exact
 rotation cannot delete a newer cache. For the matrix-derived 1.20.1 anchor it also retains the exact
 current raw handoff, revalidates it before every deletion, and deletes only older raw generations.
 Original PNG bytes never enter the durable compact cache. Monthly validation can refresh compact
-caches without relaunching Minecraft. Pages and per-port AI reports are not protected release
+caches without relaunching Minecraft. The same rotation retains one validated compatibility cache
+per covered release branch and retires older compatibility caches and consumed handoffs only after
+the replacement deploys successfully. Pages and per-port AI reports are not protected release
 checks; the clean semantic anchor certificate is instead a fail-closed prerequisite for scheduling
 the second synchronization wave.
 
