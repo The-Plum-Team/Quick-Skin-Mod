@@ -17,6 +17,12 @@ sys.path.insert(0, str(ROOT / "scripts" / "pages"))
 sys.path.insert(0, str(ROOT / "scripts" / "release"))
 
 from build_site import SiteBuildError, build  # noqa: E402
+from compatibility_evidence import (  # noqa: E402
+    CompatibilityEvidenceError,
+    _expected_plan as expected_compatibility_plan,
+    carry_forward as carry_compatibility_forward,
+    validate_bundle as validate_compatibility_bundle,
+)
 import evidence as evidence_module  # noqa: E402
 from evidence import (  # noqa: E402
     MAX_MANIFEST_BYTES,
@@ -27,6 +33,8 @@ from evidence import (  # noqa: E402
     validate_bundle,
 )
 import packaged_runtime  # noqa: E402
+from mod_compatibility import load_contract as load_compatibility_contract  # noqa: E402
+from scenario_contract import load_contract as load_scenario_contract  # noqa: E402
 from version_branches import parse_version_branch  # noqa: E402
 from visual_evidence import load_catalog  # noqa: E402
 
@@ -371,6 +379,134 @@ class PagesSiteTest(unittest.TestCase):
             target_created_at="2026-08-02T13:00:00Z",
         )
         return matrix
+
+    def write_compatibility_bundle(self, branch: str) -> Path:
+        from PIL import Image
+
+        parsed = parse_version_branch(branch)
+        assert parsed is not None
+        compatibility_contract = load_compatibility_contract()
+        scenario_contract = load_scenario_contract()
+        runnable, not_applicable = expected_compatibility_plan(
+            branch, compatibility_contract
+        )
+        compatibility_root = self.root / "compatibility"
+        bundle = compatibility_root / branch
+        images = bundle / "images"
+        images.mkdir(parents=True)
+        source_png = self.root / "compatibility-source.png"
+        source_png.write_bytes(PNGS[0])
+        rendering = self.root / "compatibility-rendering.webp"
+        with Image.open(source_png) as image:
+            image.convert("RGB").resize((1280, 720), Image.Resampling.LANCZOS).save(
+                rendering, "WEBP", quality=80, method=6, exact=True
+            )
+        derivative_metrics = packaged_runtime.inspect_screenshot(
+            rendering, expected_format="WEBP"
+        )
+        derivative_digest = derivative_metrics["file_sha256"]
+        asset = images / f"{derivative_digest}.webp"
+        asset.write_bytes(rendering.read_bytes())
+        image_record = {
+            "source": {
+                "file_sha256": PIXEL_METRICS[0]["file_sha256"],
+                "width": 1920,
+                "height": 1080,
+                "pixel_validation": PIXEL_METRICS[0],
+            },
+            "derivative": {
+                "asset": f"images/{derivative_digest}.webp",
+                "format": "webp",
+                "file_sha256": derivative_digest,
+                "width": 1280,
+                "height": 720,
+                "pixel_validation": derivative_metrics,
+            },
+        }
+        captures = [
+            capture
+            for capture in scenario_contract.captures
+            if capture.scenario == "mod-compatibility"
+        ]
+        lanes = []
+        for lane_id, lane in sorted(runnable.items()):
+            frames = []
+            for capture in captures:
+                frames.append(
+                    {
+                        "capture_id": capture.capture_id,
+                        "reference_capture_id": capture.compatibility_reference_capture_id,
+                        "title": capture.title,
+                        "expectation": f"{capture.expectation} with {lane.mod.name}",
+                        "runtime_evidence": "compatibility assertion passed",
+                        "review_regions": [[0.0, 0.0, 1.0, 1.0]],
+                        "candidate_semantic_sha256": "a" * 64,
+                        "reference_semantic_sha256": "b" * 64,
+                        "semantic_changed_fraction": 0.01,
+                        "perceptual_delta": 0.02,
+                        "semantic_valid": True,
+                        "matches_reference": True,
+                        "defect": False,
+                        "candidate": image_record,
+                        "reference": image_record,
+                    }
+                )
+            lanes.append(
+                {
+                    "lane_id": lane_id,
+                    "artifact_node": lane.artifact_node,
+                    "version": lane.runtime_version,
+                    "loader": lane.loader,
+                    "mod": lane.mod.id,
+                    "mod_name": lane.mod.name,
+                    "mod_version": lane.artifact.version_number,
+                    "mod_version_id": lane.artifact.version_id,
+                    "review_run_id": 3000 + len(lanes),
+                    "reviewed_frame_count": len(scenario_contract.captures),
+                    "review_manifest_sha256": "c" * 64,
+                    "curation_proof_sha256": "d" * 64,
+                    "review_report_sha256": "e" * 64,
+                    "frames": frames,
+                }
+            )
+        manifest = {
+            "schema_version": 1,
+            "kind": "quick-skin-public-mod-compatibility",
+            "repository": "AkaNebur/Quick-Skin-Mod",
+            "contracts": {
+                "scenario_sha256": scenario_contract.sha256,
+                "compatibility_sha256": compatibility_contract.sha256,
+            },
+            "release": {
+                "branch": branch,
+                "version": parsed.version,
+                "loaders": list(parsed.loaders),
+            },
+            "provenance": {
+                "implementation_sha": "1" * 40,
+                "base_run_id": 100,
+                "source_sha": "2" * 40,
+                "target_sha": "3" * 40,
+                "compatibility_run_id": 200,
+                "publication_run_id": 300,
+                "coverage_sha": "2" * 40,
+            },
+            "lanes": lanes,
+            "not_applicable": sorted(
+                not_applicable.values(),
+                key=lambda item: (item["version"], item["loader"], item["mod"]),
+            ),
+        }
+        (bundle / "manifest.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        validate_compatibility_bundle(
+            compatibility_root,
+            branch,
+            expected_repository="AkaNebur/Quick-Skin-Mod",
+            only_branch=True,
+        )
+        return compatibility_root
 
     def test_prepare_deduplicates_images_and_keeps_all_validated_captures(self) -> None:
         branch = "forge-and-fabric-1.20.1"
@@ -1052,7 +1188,11 @@ class PagesSiteTest(unittest.TestCase):
         gallery = json.loads(
             (output / "e2e" / "gallery-data.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(2, gallery["schema_version"])
+        self.assertEqual(3, gallery["schema_version"])
+        self.assertEqual(
+            {"available": False, "lanes": [], "not_applicable": [], "releases": []},
+            gallery["compatibility"],
+        )
         release = gallery["releases"][0]
         self.assertEqual(manifest["contract_sha256"], release["contract_sha256"])
         self.assertIn(manifest["provenance"]["target"]["sha"], release["contract_url"])
@@ -1083,6 +1223,100 @@ class PagesSiteTest(unittest.TestCase):
         for comparison in gallery["comparisons"]:
             self.assertIn(comparison["first_frame_id"], published)
             self.assertIn(comparison["second_frame_id"], published)
+
+    def test_gallery_publishes_compact_paired_mod_compatibility_evidence(self) -> None:
+        branch = "fabric-and-neoforge-1.21.1"
+        matrix = self.write_branch(branch, "1.21.1")
+        compatibility_root = self.write_compatibility_bundle(branch)
+        output = self.root / "compatibility-site"
+
+        summary = build(
+            evidence_root=self.evidence_root,
+            compatibility_root=compatibility_root,
+            output=output,
+            repository="AkaNebur/Quick-Skin-Mod",
+            matrix_path=matrix,
+            optimize=False,
+        )
+
+        gallery = json.loads(
+            (output / "e2e" / "gallery-data.json").read_text(encoding="utf-8")
+        )
+        compatibility = gallery["compatibility"]
+        self.assertTrue(compatibility["available"])
+        self.assertEqual(summary["compatibility_lanes"], len(compatibility["lanes"]))
+        self.assertGreater(summary["compatibility_lanes"], 0)
+        self.assertEqual(1, summary["compatibility_images"])
+        self.assertTrue(compatibility["not_applicable"])
+        for lane in compatibility["lanes"]:
+            self.assertEqual(2, len(lane["frames"]))
+            self.assertGreater(lane["reviewed_frame_count"], len(lane["frames"]))
+            self.assertRegex(lane["mod_version_id"], r"^[A-Za-z0-9_-]+$")
+            for frame in lane["frames"]:
+                self.assertTrue(frame["semantic_valid"])
+                self.assertTrue(frame["matches_reference"])
+                self.assertFalse(frame["defect"])
+                for side in ("candidate", "reference"):
+                    image = output / "e2e" / frame[side]["image"]
+                    self.assertTrue(image.is_file())
+                    self.assertEqual(
+                        frame[side]["published_file_sha256"],
+                        hashlib.sha256(image.read_bytes()).hexdigest(),
+                    )
+        page = (output / "e2e" / "index.html").read_text(encoding="utf-8")
+        script = (output / "assets" / "gallery.js").read_text(encoding="utf-8")
+        self.assertIn('id="compatibility-view"', page)
+        self.assertIn("Runtime passed", script)
+        self.assertIn("AI clean", script)
+        self.assertNotIn("innerHTML", script)
+
+        manifest_path = compatibility_root / branch / "manifest.json"
+        stale = json.loads(manifest_path.read_text(encoding="utf-8"))
+        stale["provenance"]["coverage_sha"] = "5" * 40
+        manifest_path.write_text(json.dumps(stale), encoding="utf-8")
+        with self.assertRaises(SiteBuildError):
+            build(
+                evidence_root=self.evidence_root,
+                compatibility_root=compatibility_root,
+                output=self.root / "stale-compatibility-site",
+                repository="AkaNebur/Quick-Skin-Mod",
+                matrix_path=matrix,
+                optimize=False,
+            )
+
+    def test_compatibility_bundle_rejects_payload_and_carries_only_coverage(self) -> None:
+        branch = "fabric-and-neoforge-1.21.1"
+        compatibility_root = self.write_compatibility_bundle(branch)
+        manifest_path = compatibility_root / branch / "manifest.json"
+        original = json.loads(manifest_path.read_text(encoding="utf-8"))
+        poisoned = json.loads(json.dumps(original))
+        poisoned["lanes"][0]["frames"][0]["provider_explanation"] = "untrusted"
+        manifest_path.write_text(json.dumps(poisoned), encoding="utf-8")
+        with self.assertRaises(CompatibilityEvidenceError):
+            validate_compatibility_bundle(compatibility_root, branch)
+
+        manifest_path.write_text(json.dumps(original), encoding="utf-8")
+        linked_root = self.root / "linked-compatibility"
+        linked_root.symlink_to(compatibility_root, target_is_directory=True)
+        with self.assertRaises(CompatibilityEvidenceError):
+            validate_compatibility_bundle(linked_root, branch)
+
+        carried_root = self.root / "carried-compatibility"
+        destination = carry_compatibility_forward(
+            evidence_root=compatibility_root,
+            output_root=carried_root,
+            branch=branch,
+            coverage_sha="4" * 40,
+            expected_repository="AkaNebur/Quick-Skin-Mod",
+            scenario_contract_path=ROOT / "e2e" / "scenario-contract.json",
+            compatibility_contract_path=ROOT / "e2e" / "mod-compatibility-contract.json",
+        )
+        carried = json.loads((destination / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual("4" * 40, carried["provenance"]["coverage_sha"])
+        self.assertEqual(
+            original | {"provenance": original["provenance"] | {"coverage_sha": "4" * 40}},
+            carried,
+        )
 
     def test_evidence_without_runtime_evidence_still_validates_and_publishes(self) -> None:
         """A bundle created before the assertion message existed must not stall the site.
