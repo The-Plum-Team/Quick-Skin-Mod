@@ -126,6 +126,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   comparisons, its packaged lane with the exact tested JAR digest, and both provenance runs. A new
   published field is a schema change: validate it fail-closed in the same strict frame contract
   rather than letting a consumer read an unvalidated string.
+- Public optional-mod evidence is admitted only from a complete clean compatibility source wave.
+  Authenticate and validate the full runnable/N/A plan, every full paired review manifest and
+  normalized report, every clean lane marker, and the source completion marker before selecting a
+  public subset. Publish exactly the two `mod-compatibility` checkpoints per applicable lane, each
+  as its clean reference plus modded candidate, with deterministic assertion, exact mod version,
+  semantic fingerprints, source/derivative proof, clean verdict booleans, and run provenance.
+  Never publish provider-authored explanations or anomaly text. The compact subset does not weaken
+  the full review: `reviewed_frame_count` must still prove that every frame in the lane was clean.
 - Adding a published field must not invalidate evidence that already exists. Each release branch
   keeps one rolling cache built by its own checkout, and those caches are regenerated only when
   that branch ports and re-runs its packaged suite—which can itself wait on unrelated approvals.
@@ -241,7 +249,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   jittered backoff and remain distinguishable from authenticated evidence absence.
 - Retention is current-state, not longitudinal history. Keep exactly one durable Pages cache per
   release branch and exactly one lossless raw handoff for the matrix-derived Fabric 1.20.1 visual
-  anchor. Treat raw packaged-E2E uploads, every other `pages-e2e-<branch>`, Pages fan-in, and the
+  anchor. Keep at most one durable mod-compatibility Pages cache for each branch that has published
+  evidence. Treat raw packaged-E2E uploads, every other `pages-e2e-<branch>`, compatibility
+  handoffs, Pages fan-in, and the
   deploy artifact as short-lived handoffs. Rotation happens in a separate protected workflow after
   the owning Pages run is `completed/success`; it must recheck run provenance, the release head,
   replacement artifact identity, and every deletion ID before retiring the exact ordinary consumed
@@ -254,6 +264,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   or rotation must
   preserve the previous usable cache and raw anchor, and a delayed rotation must never delete a
   concurrent newer generation.
+- Compatibility evidence may be rebound from its tested target to a current descendant only when
+  both commits are authenticated ancestors and the protected complete-diff classifier returns
+  non-impacting. A product, runtime, loader, harness, contract, lock, workflow, classifier, mixed,
+  malformed, or unknown change invalidates that carry-forward and requires a new compatibility
+  wave. Publication-only review workflow changes are explicitly non-impacting so generating the
+  compact bundle cannot recursively schedule the expensive matrix.
 - Discovery records one protected `master` SHA for the Pages run. Every collection and render job
   checks out that exact implementation revision; an advancing `master` may affect only a later run.
 - Treat downloaded artifacts and their JSON as untrusted. Require the exact curated tree, exact

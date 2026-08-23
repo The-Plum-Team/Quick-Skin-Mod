@@ -24,6 +24,10 @@ from evidence import (  # noqa: E402
     sha256_file,
     validate_bundle,
 )
+from compatibility_evidence import (  # noqa: E402
+    CompatibilityEvidenceError,
+    validate_bundle as validate_compatibility_bundle,
+)
 from packaged_runtime import (  # noqa: E402
     RuntimeFailure,
     compare_screenshots,
@@ -157,6 +161,7 @@ def published_digest(path: Path) -> str:
 def build(
     *,
     evidence_root: Path,
+    compatibility_root: Path | None = None,
     output: Path,
     repository: str,
     matrix_path: Path = DEFAULT_MATRIX,
@@ -207,6 +212,52 @@ def build(
     release_rank = {
         manifest["release"]["version"]: index for index, manifest in enumerate(manifests)
     }
+    ordinary_head_by_branch = {
+        manifest["release"]["branch"]: manifest["provenance"]["target"]["sha"]
+        for manifest in manifests
+    }
+
+    compatibility_manifests: list[dict[str, Any]] = []
+    compatibility_source_root: Path | None = None
+    if compatibility_root is not None:
+        if compatibility_root.is_symlink():
+            raise SiteBuildError("compatibility evidence root cannot be a symlink")
+        compatibility_source_root = compatibility_root.resolve()
+        if not compatibility_source_root.is_dir():
+            raise SiteBuildError(
+                f"compatibility evidence root does not exist: {compatibility_source_root}"
+            )
+        compatibility_entries = sorted(compatibility_source_root.iterdir())
+        if any(not path.is_dir() for path in compatibility_entries):
+            raise SiteBuildError(
+                "compatibility evidence root may contain only release-branch directories"
+            )
+        compatibility_names = {path.name for path in compatibility_entries}
+        if not compatibility_names <= candidate_names:
+            raise SiteBuildError(
+                "compatibility evidence claims an undiscovered release branch: "
+                f"{sorted(compatibility_names - candidate_names)}"
+            )
+        for candidate in compatibility_entries:
+            try:
+                compatibility_manifest = validate_compatibility_bundle(
+                    compatibility_source_root,
+                    candidate.name,
+                    expected_repository=repository,
+                )
+            except CompatibilityEvidenceError as exc:
+                raise SiteBuildError(str(exc)) from exc
+            if compatibility_manifest["provenance"]["coverage_sha"] != (
+                ordinary_head_by_branch[candidate.name]
+            ):
+                raise SiteBuildError(
+                    f"compatibility evidence is not bound to the ordinary evidence head: "
+                    f"{candidate.name}"
+                )
+            compatibility_manifests.append(compatibility_manifest)
+        compatibility_manifests.sort(
+            key=lambda item: version_key(item["release"]["version"]), reverse=True
+        )
 
     shutil.copytree(SITE_SOURCE, output)
     (output / ".nojekyll").write_text("", encoding="utf-8")
@@ -215,6 +266,9 @@ def build(
     gallery_frames: list[dict[str, Any]] = []
     gallery_lanes: list[dict[str, Any]] = []
     gallery_comparisons: list[dict[str, Any]] = []
+    compatibility_releases: list[dict[str, Any]] = []
+    compatibility_lanes: list[dict[str, Any]] = []
+    compatibility_not_applicable: list[dict[str, Any]] = []
     release_rows: list[dict[str, Any]] = []
     frame_ids: set[str] = set()
     rendered_assets: dict[
@@ -461,6 +515,170 @@ def build(
                 )
             )
 
+    compatibility_assets: dict[str, tuple[Path, dict[str, Any]]] = {}
+    if compatibility_source_root is not None:
+        for manifest in compatibility_manifests:
+            release = manifest["release"]
+            branch = release["branch"]
+            provenance = manifest["provenance"]
+            compatibility_releases.append(
+                {
+                    "version": release["version"],
+                    "branch": branch,
+                    "loaders": list(release["loaders"]),
+                    "loader_names": [loader_name(item) for item in release["loaders"]],
+                    "lane_count": len(manifest["lanes"]),
+                    "not_applicable_count": len(manifest["not_applicable"]),
+                    "scenario_contract_sha256": manifest["contracts"][
+                        "scenario_sha256"
+                    ],
+                    "compatibility_contract_sha256": manifest["contracts"][
+                        "compatibility_sha256"
+                    ],
+                    "contract_url": (
+                        f"https://github.com/{repository}/blob/"
+                        f"{provenance['target_sha']}/e2e/mod-compatibility-contract.json"
+                    ),
+                    "target_sha": provenance["target_sha"],
+                    "coverage_sha": provenance["coverage_sha"],
+                    "compatibility_run_url": (
+                        f"https://github.com/{repository}/actions/runs/"
+                        f"{provenance['compatibility_run_id']}"
+                    ),
+                    "publication_run_url": (
+                        f"https://github.com/{repository}/actions/runs/"
+                        f"{provenance['publication_run_id']}"
+                    ),
+                }
+            )
+            release_urls = {
+                "base_run_url": (
+                    f"https://github.com/{repository}/actions/runs/"
+                    f"{provenance['base_run_id']}"
+                ),
+                "compatibility_run_url": (
+                    f"https://github.com/{repository}/actions/runs/"
+                    f"{provenance['compatibility_run_id']}"
+                ),
+                "publication_run_url": (
+                    f"https://github.com/{repository}/actions/runs/"
+                    f"{provenance['publication_run_id']}"
+                ),
+            }
+            for lane in manifest["lanes"]:
+                public_frames: list[dict[str, Any]] = []
+                for frame in lane["frames"]:
+                    public_sides: dict[str, Any] = {}
+                    for side in ("reference", "candidate"):
+                        record = frame[side]
+                        derivative = record["derivative"]
+                        source = (
+                            compatibility_source_root / branch / derivative["asset"]
+                        )
+                        digest = derivative["file_sha256"]
+                        cached = compatibility_assets.get(digest)
+                        if cached is None:
+                            try:
+                                reinspected = inspect_screenshot(
+                                    source, expected_format="WEBP"
+                                )
+                            except RuntimeFailure as exc:
+                                raise SiteBuildError(str(exc)) from exc
+                            if reinspected != derivative["pixel_validation"]:
+                                raise SiteBuildError(
+                                    f"compatibility derivative reinspection disagrees: {digest}"
+                                )
+                            relative = (
+                                Path("e2e")
+                                / "compatibility"
+                                / "images"
+                                / f"{digest}.webp"
+                            )
+                            destination = output / relative
+                            destination.parent.mkdir(parents=True, exist_ok=True)
+                            if destination.exists():
+                                if published_digest(destination) != digest:
+                                    raise SiteBuildError(
+                                        f"compatibility image digest collision: {destination}"
+                                    )
+                            else:
+                                shutil.copyfile(source, destination)
+                            cached = (relative, reinspected)
+                            compatibility_assets[digest] = cached
+                        relative, published_metrics = cached
+                        public_sides[side] = {
+                            "image": relative.relative_to("e2e").as_posix(),
+                            "width": derivative["width"],
+                            "height": derivative["height"],
+                            "source_file_sha256": record["source"]["file_sha256"],
+                            "source_pixel_validation": record["source"][
+                                "pixel_validation"
+                            ],
+                            "published_file_sha256": digest,
+                            "published_format": "webp",
+                            "published_pixel_validation": published_metrics,
+                        }
+                    public_frames.append(
+                        {
+                            key: frame[key]
+                            for key in (
+                                "capture_id",
+                                "reference_capture_id",
+                                "title",
+                                "expectation",
+                                "runtime_evidence",
+                                "review_regions",
+                                "candidate_semantic_sha256",
+                                "reference_semantic_sha256",
+                                "semantic_changed_fraction",
+                                "perceptual_delta",
+                                "semantic_valid",
+                                "matches_reference",
+                                "defect",
+                            )
+                        }
+                        | public_sides
+                    )
+                compatibility_lanes.append(
+                    {
+                        key: lane[key]
+                        for key in (
+                            "lane_id",
+                            "artifact_node",
+                            "version",
+                            "loader",
+                            "mod",
+                            "mod_name",
+                            "mod_version",
+                            "mod_version_id",
+                            "review_run_id",
+                            "reviewed_frame_count",
+                            "review_manifest_sha256",
+                            "curation_proof_sha256",
+                            "review_report_sha256",
+                        )
+                    }
+                    | {
+                        "loader_name": loader_name(lane["loader"]),
+                        "review_run_url": (
+                            f"https://github.com/{repository}/actions/runs/"
+                            f"{lane['review_run_id']}"
+                        ),
+                        "target_sha": provenance["target_sha"],
+                        "coverage_sha": provenance["coverage_sha"],
+                        "frames": public_frames,
+                    }
+                    | release_urls
+                )
+            for row in manifest["not_applicable"]:
+                compatibility_not_applicable.append(
+                    dict(row)
+                    | {
+                        "branch": branch,
+                        "loader_name": loader_name(row["loader"]),
+                    }
+                )
+
     gallery_frames.sort(
         key=lambda item: (
             release_rank[item["version"]],
@@ -479,12 +697,32 @@ def build(
         "repository_url": f"https://github.com/{repository}",
     }
     gallery_data = {
-        "schema_version": 2,
+        "schema_version": 3,
         "project": {"name": project["name"], "repository_url": site_data["repository_url"]},
         "releases": release_rows,
         "lanes": gallery_lanes,
         "frames": gallery_frames,
         "comparisons": gallery_comparisons,
+        "compatibility": {
+            "available": bool(compatibility_manifests),
+            "releases": compatibility_releases,
+            "lanes": sorted(
+                compatibility_lanes,
+                key=lambda item: (
+                    release_rank[item["version"]],
+                    item["loader_name"],
+                    item["mod_name"],
+                ),
+            ),
+            "not_applicable": sorted(
+                compatibility_not_applicable,
+                key=lambda item: (
+                    release_rank[item["version"]],
+                    item["loader_name"],
+                    item["mod_name"],
+                ),
+            ),
+        },
     }
     (output / "site-data.json").write_text(
         json.dumps(site_data, indent=2, sort_keys=True, allow_nan=False) + "\n",
@@ -500,6 +738,8 @@ def build(
     return {
         "versions": len(release_rows),
         "frames": len(gallery_frames),
+        "compatibility_lanes": len(compatibility_lanes),
+        "compatibility_images": len(compatibility_assets),
         "bytes": total_size,
         "output": str(output),
     }
@@ -508,6 +748,7 @@ def build(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence-root", type=Path, required=True)
+    parser.add_argument("--compatibility-root", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
@@ -546,6 +787,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         summary = build(
             evidence_root=args.evidence_root,
+            compatibility_root=args.compatibility_root,
             output=args.output,
             repository=args.repository,
             matrix_path=args.matrix,
