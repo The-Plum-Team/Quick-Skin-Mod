@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Helper class for Replay Mod compatibility.
@@ -21,6 +22,7 @@ public class ReplayModHelper {
 
     private static final String CAMERA_ENTITY_CLASS = "com.replaymod.replay.camera.CameraEntity";
     private static final AtomicBoolean skinAppliedInReplay = new AtomicBoolean(false);
+    private static final AtomicInteger interceptedPacketCount = new AtomicInteger();
 
     /** Returns whether the ReplayMod client API needed by this bridge is installed. */
     public static boolean isAvailable() {
@@ -139,6 +141,12 @@ public class ReplayModHelper {
         skinAppliedInReplay.set(false);
     }
 
+    /** Resets the observable state before opening a new replay file. */
+    public static void resetReplayEvidenceState() {
+        skinAppliedInReplay.set(false);
+        interceptedPacketCount.set(0);
+    }
+
     /**
      * Checks if skins have been applied in the current replay.
      */
@@ -151,6 +159,16 @@ public class ReplayModHelper {
      */
     public static void markSkinApplied() {
         skinAppliedInReplay.set(true);
+    }
+
+    /** Records that a Quick Skin payload was handled through ReplayMod's fake connection. */
+    public static void markQuickSkinPacketIntercepted() {
+        interceptedPacketCount.incrementAndGet();
+    }
+
+    /** Number of Quick Skin payloads observed during the current replay playback. */
+    public static int getInterceptedPacketCount() {
+        return interceptedPacketCount.get();
     }
 
     /**
