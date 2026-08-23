@@ -444,7 +444,10 @@ Quick Skin injector check. The credential-bearing review workflow receives only 
 curated capsules, never raw packaged artifacts, and reviews them concurrently. Exact authored-region
 matches need no AI call, exact-equivalent pairs share one representative, Haiku reviews the
 remaining groups from deterministic 1280x720 copies, and Opus confirms only a Haiku concern or
-confidence below high. A first Opus-confirmed defect creates a durable source-wave block and cancels the remaining
+confidence below high. Clean paired verdicts also enter the protected exact-policy cache, so a
+later compatibility wave can reuse the previous decision only when both semantic-region images,
+the authored scope and expectation, passed runtime evidence, contracts, prompts, models, and
+reviewer implementation still match exactly. A first Opus-confirmed defect creates a durable source-wave block and cancels the remaining
 compatibility review jobs.
 
 Once every applicable lane is complete and clean, the protected reviewer can publish the wave
