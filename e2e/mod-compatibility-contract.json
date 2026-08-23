@@ -1014,8 +1014,8 @@
         "P7dR8mSH"
       ],
       "evidence": {
-        "baseline_with_mod": "Quick Skin's skin menu is open and intact, and its complete player preview shows subdued dark-gray raised meshes on the hat, jacket, sleeves, and trousers. The meshes must be coherent and visibly less saturated than the paired fixture.",
-        "apply_local_skin_with_mod": "The paired Quick Skin menu remains intact while its complete player preview visibly shows bright cyan, magenta, lime, and orange checker pixels raised into 3D hat, jacket, sleeve, and trouser meshes. The outer layer must look volumetric rather than like a flat recolour."
+        "baseline_with_mod": "Quick Skin's skin menu is open and intact. Its complete player preview keeps the ordinary plaid base skin, head, torso, both arms, and both legs visible between separated subdued dark-gray voxels raised from the hat, jacket, sleeves, and trousers. The meshes must be coherent and visibly less saturated than the paired fixture.",
+        "apply_local_skin_with_mod": "The paired Quick Skin menu remains intact. Its complete player preview keeps the ordinary plaid base skin and all four limbs visible between separated bright cyan, magenta, lime, and orange voxels raised from the hat, jacket, sleeves, and trousers. The transparent gaps and visible voxel depth must distinguish the outer layer from a flat recolour."
       },
       "excluded_lanes": [
         {
