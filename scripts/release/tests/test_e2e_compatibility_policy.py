@@ -204,6 +204,12 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             harness.index("ModCompatibilityScenario.prepareBeforeWorldJoin();"),
             harness.index("if (mc.player != null && mc.level != null)"),
         )
+        wait_world = harness[
+            harness.index("private void tickWaitWorld(Minecraft mc)") : harness.index(
+                "// Diagnostic: log each screen transition"
+            )
+        ]
+        self.assertNotIn("ScenarioId.MOD_COMPATIBILITY", wait_world)
         self.assertIn("ModCompatibilityFeature.prepareBeforeWorldJoin(modId);", scenario)
         self.assertIn("protectStartupRecordingBeforeWorldJoin", feature)
         for mod_id in (
