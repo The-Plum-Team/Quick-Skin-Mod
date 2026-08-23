@@ -358,6 +358,27 @@ interface ModCompatibilityFeature {
                 return Step.Result.fail("Quick Skin did not retain parsed Ears features");
             }
             try {
+                Class<?> rendererClass;
+                try {
+                    rendererClass = Class.forName("com.unascribed.ears.EarsLayerRenderer");
+                } catch (ClassNotFoundException ignored) {
+                    rendererClass = Class.forName("com.unascribed.ears.EarsMod");
+                }
+                Object rendererFeatures = rendererClass
+                        .getMethod("getEarsFeatures", AbstractClientPlayer.class)
+                        .invoke(null, minecraft.player);
+                if (EarsCompatIntegration.isDisabledResult(rendererFeatures)) {
+                    return Step.Result.fail("Ears renderer lookup did not receive Quick Skin features");
+                }
+                if (!"true".equals(publicField(rendererFeatures, "enabled"))
+                        || !"TALL".equals(publicField(rendererFeatures, "earMode"))
+                        || !"BACK".equals(publicField(rendererFeatures, "tailMode"))) {
+                    return Step.Result.fail("Ears renderer lookup returned the wrong features: "
+                            + rendererFeatures);
+                }
+                if (!earsRendererLayerAttached()) {
+                    return Step.Result.fail("Ears did not attach its feature renderer to the player");
+                }
                 Class<?> featuresClass = Class.forName(
                         "com.unascribed.ears.api.features.EarsFeatures");
                 Object publicStorage = featuresClass.getMethod("getById", UUID.class)
@@ -371,7 +392,40 @@ interface ModCompatibilityFeature {
             return activeSkinAssertion("Quick Skin imported Ears-authored magic pixels, parsed "
                     + publicField(detectedFeatures, "earMode") + " ears and a "
                     + publicField(detectedFeatures, "tailMode")
-                    + " tail, and published them to Ears' renderer");
+                    + " tail, attached Ears' feature layer, and published them to its renderer");
+        }
+
+        private boolean earsRendererLayerAttached() {
+            Object playerRenderer = minecraft.getEntityRenderDispatcher()
+                    .getRenderer(minecraft.player);
+            for (Class<?> type = playerRenderer.getClass(); type != null; type = type.getSuperclass()) {
+                for (Field field : type.getDeclaredFields()) {
+                    boolean directLayer = isEarsRendererClass(field.getType());
+                    if (!directLayer && !Iterable.class.isAssignableFrom(field.getType())) continue;
+                    try {
+                        if (!field.trySetAccessible()) continue;
+                        Object value = field.get(playerRenderer);
+                        if (isEarsRenderer(value)) return true;
+                        if (value instanceof Iterable<?> candidates) {
+                            for (Object candidate : candidates) {
+                                if (isEarsRenderer(candidate)) return true;
+                            }
+                        }
+                    } catch (IllegalAccessException ignored) {
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static boolean isEarsRenderer(Object value) {
+            return value != null && isEarsRendererClass(value.getClass());
+        }
+
+        private static boolean isEarsRendererClass(Class<?> type) {
+            String name = type.getName();
+            return "com.unascribed.ears.EarsFeatureRenderer".equals(name)
+                    || "com.unascribed.ears.EarsLayerRenderer".equals(name);
         }
 
         private static String publicField(Object value, String name) {
