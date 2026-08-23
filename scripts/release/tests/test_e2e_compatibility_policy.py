@@ -186,6 +186,95 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
                 text = (E2E_JAVA / "scenario" / name).read_text(encoding="utf-8")
                 self.assertIn("DefaultSkinEvidenceView.enterFirstPerson(mc);", text)
 
+    def test_optional_mod_scenario_drives_real_feature_workflows(self) -> None:
+        harness = (E2E_JAVA / "E2EHarness.java").read_text(encoding="utf-8")
+        scenario = (
+            E2E_JAVA / "scenario" / "ModCompatibilityScenario.java"
+        ).read_text(encoding="utf-8")
+        feature = (
+            E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+        assets = (E2E_JAVA / "TestAssets.java").read_text(encoding="utf-8")
+        runtime = (ROOT / "e2e/packaged_runtime.py").read_text(encoding="utf-8")
+
+        self.assertIn("feature::prepareBaseline", scenario)
+        self.assertIn("feature::applyQuickSkinFeature", scenario)
+        self.assertIn("ModCompatibilityScenario.prepareBeforeWorldJoin();", harness)
+        self.assertLess(
+            harness.index("ModCompatibilityScenario.prepareBeforeWorldJoin();"),
+            harness.index("if (mc.player != null && mc.level != null)"),
+        )
+        wait_world = harness[
+            harness.index("private void tickWaitWorld(Minecraft mc)") : harness.index(
+                "// Diagnostic: log each screen transition"
+            )
+        ]
+        self.assertNotIn("ScenarioId.MOD_COMPATIBILITY", wait_world)
+        self.assertIn("ModCompatibilityFeature.prepareBeforeWorldJoin(modId);", scenario)
+        self.assertIn("protectStartupRecordingBeforeWorldJoin", feature)
+        for mod_id in (
+            "cpm",
+            "ears",
+            "skin-layers-3d",
+            "customnpcs",
+            "essential",
+            "replaymod",
+        ):
+            with self.subTest(mod_id=mod_id):
+                self.assertIn(f'case "{mod_id}"', feature)
+
+        for required_feature_proof in (
+            "CPMCompatIntegration.parseCpmModelInfo",
+            "CPMCompatIntegration.isLocalPlayerWearingCpmModel",
+            "EarsCompatIntegration.getFeatures",
+            "meshCacheContains",
+            "manualRenderObserved",
+            '"customnpcs".equals(type.getNamespace())',
+            "EssentialCompatIntegration.findBottomEssentialWidget",
+            "ReplayModBridge.getInterceptedPacketCount",
+            "startReplay(finalizedReplayPath)",
+        ):
+            with self.subTest(proof=required_feature_proof):
+                self.assertIn(required_feature_proof, feature)
+
+        for custom_npcs_bridge_proof in (
+            '"detectSkinConflict".equals(method.getName())',
+            "parameters[0] != UUID.class",
+            "!parameters[1].isInstance(location)",
+            "method.getReturnType() != boolean.class",
+            ".getConstructor(String.class, String.class)",
+        ):
+            with self.subTest(custom_npcs_bridge_proof=custom_npcs_bridge_proof):
+                self.assertIn(custom_npcs_bridge_proof, feature)
+
+        for window_handle_accessor in (
+            '"getWindow"',
+            '"handle"',
+            '"method_4490"',
+            '"m_85439_"',
+        ):
+            with self.subTest(window_handle_accessor=window_handle_accessor):
+                self.assertIn(window_handle_accessor, feature)
+
+        self.assertIn("com.unascribed.ears.common.EarsFeaturesWriterV1", assets)
+        self.assertIn("rendererFeatures(rendererClass, playerRenderer)", feature)
+        self.assertIn("rendererLookupArgument", feature)
+        self.assertIn("expectedType.isInstance(candidate)", feature)
+        self.assertIn("com.tom.cpm.shared.editor.Exporter", assets)
+        self.assertIn("summon customnpcs:customnpc", runtime)
+        self.assertIn(
+            '"com.quickskin.mod.client.compat.ReplayModHelper"', feature
+        )
+
+    def test_essential_raw_screenshot_supports_both_gpu_readback_eras(self) -> None:
+        """Essential needs a silent framebuffer copy before and after 1.21.5's async API."""
+
+        shim = SHIM.read_text(encoding="utf-8")
+        self.assertIn("return writeRawScreenshot(image, gameDir, name);", shim)
+        self.assertIn("Consumer<Object> writer = captured ->", shim)
+        self.assertIn("for (int parameterCount : new int[] {2, 3})", shim)
+        self.assertIn("closeRawScreenshot(captured);", shim)
+
     def test_string_class_lookups_declare_an_intermediary_fallback(self) -> None:
         """Fabric serves intermediary names at runtime; a Mojang name alone resolves only on Forge."""
 
