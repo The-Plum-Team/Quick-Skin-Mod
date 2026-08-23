@@ -33,6 +33,7 @@ class ModCompatibilityImpactTest(unittest.TestCase):
         paths = [
             ".github/workflows/visual-review.yml",
             ".github/workflows/visual-review-drain.yml",
+            ".github/workflows/mod-compatibility-review.yml",
             "e2e/visual_review_prompt.md",
             "e2e/visual_review_runner.py",
             "scripts/ci/mod_compatibility_impact.py",

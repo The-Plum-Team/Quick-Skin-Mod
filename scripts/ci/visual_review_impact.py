@@ -29,10 +29,15 @@ REPLICATED_SAFE_EXACT_PATHS = frozenset(
         "scripts/ci/mod_compatibility_impact.py",
         "scripts/ci/visual_nonimpact_certification.py",
         "scripts/ci/visual_review_queue.py",
+        "scripts/pages/build_site.py",
         "scripts/pages/rotate_artifacts.py",
+        "scripts/pages/collect_compatibility.py",
+        "scripts/pages/compatibility_evidence.py",
         "scripts/pages/select_artifact.py",
+        "scripts/pages/select_compatibility_artifact.py",
         "scripts/release/tests/test_pages_artifact_rotation.py",
         "scripts/ci/visual_review_impact.py",
+        "e2e/README.md",
     }
 )
 SOURCE_PR_SAFE_EXACT_PATHS = frozenset(
@@ -63,7 +68,7 @@ POST_ANCHOR_SAFE_EXACT_PATHS = REPLICATED_SAFE_EXACT_PATHS | frozenset(
         "scripts/ci/visual_anchor_certification.py",
     }
 )
-SAFE_PREFIXES = ("docs/", "scripts/ci/tests/", "scripts/release/tests/")
+SAFE_PREFIXES = ("docs/", "scripts/ci/tests/", "scripts/release/tests/", "site/")
 FILE_STATUSES = frozenset({"added", "modified", "removed", "renamed"})
 
 

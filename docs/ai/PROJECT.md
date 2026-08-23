@@ -102,6 +102,14 @@ immutable workflow and governance activation contract.
   retire older caches plus the consumed handoff.
   Never delete the fallback before its replacement succeeds, introduce a second version list,
   publish logs/crash reports, or make Pages a protected release check.
+- A completely clean optional-mod wave may separately produce one
+  `pages-mod-compatibility-<branch>` handoff. Its protected publisher reauthenticates the complete
+  runtime plan and all normalized AI reports, then exposes only the two compatibility-specific
+  clean/modded image pairs per applicable mod/loader lane as 1280x720 WebPs. Pages discovers this
+  evidence opportunistically: a missing compatibility bundle must not block ordinary evidence,
+  while a present bundle is strict, current-state evidence and may cross only a protected
+  compatibility-nonimpacting release-branch diff. Manual recovery republishes an already-clean wave
+  without another model call.
 - Every automatic push to `master` propagates in two waves. The synchronizer first targets only
   the matrix-derived Minecraft 1.20.1 release branch and always requires its exact Build plus full
   Fabric/Forge packaged E2E. A protected classifier evaluates the complete anchor-port diff, not
@@ -229,15 +237,17 @@ immutable workflow and governance activation contract.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
   named seven-day exceptions are automatic-sync packaged evidence/input bundles needed by delayed
   compatibility review, compatibility plans/evidence/capsules/reports/block markers, queued visual
-  review capsules, and rolling exact-policy visual verdict caches. Four 90-day current-state
-  artifacts remain: the semantic certificate, the
+  review capsules, compatibility Pages handoffs, and rolling exact-policy visual verdict caches.
+  Five 90-day current-state artifact classes remain: the semantic certificate, the
   SHA-bound Pages cache, the matrix-derived lossless
-  Fabric 1.20.1 anchor handoff, and the immutable `release-<release-id>` bundle. The release bundle
+  Fabric 1.20.1 anchor handoff, the per-covered-branch mod-compatibility Pages cache, and the
+  immutable `release-<release-id>` bundle. The release bundle
   spans protected environment
   approvals and provides bounded recovery for an interrupted publication. After a successful Pages
   replacement, protected rotation deletes by exact artifact ID the superseded cache, ordinary
-  consumed `pages-e2e-<branch>` handoffs, older lossless anchor generations, Pages fan-in artifacts,
-  and the deploy artifact while preserving the current lossless anchor. Ordinary raw packaged-E2E
+  consumed `pages-e2e-<branch>` and compatibility handoffs, older lossless anchor generations,
+  Pages fan-in artifacts, and the deploy artifact while preserving the current lossless anchor.
+  Ordinary raw packaged-E2E
   proof retains its one-day window because a concurrent branch attestation may still consume it;
   an automatic synchronization source retains seven days for the post-semantic compatibility wave.
   A completed or terminally invalid AI queue entry is deleted immediately, while a transiently
