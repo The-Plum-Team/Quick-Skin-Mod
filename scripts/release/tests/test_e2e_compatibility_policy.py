@@ -242,6 +242,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             "parameters[0] != UUID.class",
             "!parameters[1].isInstance(location)",
             "method.getReturnType() != boolean.class",
+            ".getConstructor(String.class, String.class)",
         ):
             with self.subTest(custom_npcs_bridge_proof=custom_npcs_bridge_proof):
                 self.assertIn(custom_npcs_bridge_proof, feature)

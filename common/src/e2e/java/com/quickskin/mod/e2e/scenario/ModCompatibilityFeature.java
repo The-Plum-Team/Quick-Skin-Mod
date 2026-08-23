@@ -798,6 +798,16 @@ interface ModCompatibilityFeature {
                     return null;
                 }
             }
+            try {
+                Object location = example.getClass()
+                        .getConstructor(String.class, String.class)
+                        .newInstance(namespace, path);
+                if (location != null) return location;
+            } catch (NoSuchMethodException ignored) {
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "CustomNPCs foreign texture fixture failed: " + concise(exception);
+                return null;
+            }
             failure = "CustomNPCs conflict probe found no texture factory on "
                     + example.getClass().getName();
             return null;
