@@ -23,7 +23,7 @@ This `fabric-and-neoforge-1.21.2` release branch exercises the following exact p
 | `fabric-1.21.2` | `1.21.2` | Fabric | `21` | `5` |
 | `neoforge-1.21.2` | `1.21.2` | NeoForge | `21` | `5` |
 
-Scenario contract SHA-256: `8581638b7c171285b1fb9559ad973be8b8af2d68aab5f59549a009843649ee36`
+Scenario contract SHA-256: `0092a56d84919a4df662379e16ef8b7cacd9a24e04fe5ff973e21e9c40f657ee`
 Contract totals: `52` ordered steps, `45` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -381,18 +381,31 @@ the lock updater preserves those authored exclusions.
 Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, and ReplayMod. Player Armor Stands
 is intentionally absent and unsupported. A runtime may install only the exact URL, filename, byte
 size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth for `latest`.
-The ReplayMod lane seeds ReplayMod's supported `recordServer=false` client setting: the mod and
-Quick Skin bridge remain loaded, while its unrelated replay writer cannot turn the disposable
-multiplayer probe into a recording/recovery failure before the rendering assertions begin.
+The two stable compatibility capture IDs select a different real workflow for each locked mod:
+
+- CPM exports a genuine `.cpmmodel` through CPM's editor API, imports and renders its two coloured
+  horn cubes, then selects a normal Quick Skin skin and proves CPM model mode was cleared.
+- Ears compares an ordinary Quick Skin control with a skin authored through Ears' own feature
+  writer, then requires parsed tall ears and a rear tail in Ears' public renderer storage.
+- 3D Skin Layers compares subdued and saturated outer-layer fixtures inside Quick Skin's menu and
+  requires the third-party mesh cache and manual preview renderer to process both textures.
+- CustomNPCs summons a real server-owned `customnpcs:*` entity and keeps it visible beside the
+  local player while Quick Skin changes only the player's renderer-facing texture.
+- Essential keeps ownership of its title player model, requires exactly one Quick Skin action and
+  no duplicate Quick Skin preview, then verifies Essential retained the selected appearance.
+- ReplayMod records the real multiplayer Quick Skin exchange, closes the recording, opens the
+  resulting `.mcpr`, and requires a recorded Quick Skin payload to traverse the production bridge
+  before capturing the recorded player in playback.
+
+ReplayMod's E2E-only startup guard prevents Quick Play from racing its initial
+abandoned-recording scan and moving the live temporary file.
 On Fabric 1.20.1, ReplayMod can expose an old-Netty Quick Play race in which an active auto-read
 channel loses its NIO `OP_READ` interest while login data is already waiting. The E2E-only harness
 detects exactly that invalid state, restores the interest, and wakes the selector a bounded maximum
 of five times. It does not reconnect, replace handlers, alter server compression, or fabricate any
 protocol traffic; repeated login failure remains fatal after the existing single clean retry.
-Essential's title-screen checkpoint follows its production integration contract: Essential owns
-the menu player model, Quick Skin suppresses the duplicate preview, preserves its action icon and
-registers the selected appearance for Essential's renderer. Its compatibility-review expectation
-describes that intentional alternative instead of requiring the clean splash-overlap layout.
+Essential's compatibility-review expectation describes its intentional alternative layout instead
+of requiring the clean splash-overlap layout.
 Inspect the current branch plan without launching Minecraft:
 
 ```bash

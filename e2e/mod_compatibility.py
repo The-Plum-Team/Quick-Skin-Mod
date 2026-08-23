@@ -30,7 +30,7 @@ from matrix import gha_matrix, load_matrix, read_mod_version  # noqa: E402
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("mod-compatibility-contract.json")
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MAX_CONTRACT_BYTES = 2 * 1024 * 1024
 MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
 MAX_FILES_PER_ARTIFACT = 4
@@ -84,6 +84,12 @@ class ExcludedLane:
 
 
 @dataclass(frozen=True)
+class CompatibilityEvidence:
+    baseline_with_mod: str
+    apply_local_skin_with_mod: str
+
+
+@dataclass(frozen=True)
 class CompatibilityMod:
     id: str
     name: str
@@ -92,6 +98,7 @@ class CompatibilityMod:
     loaders: tuple[str, ...]
     allowed_version_types: tuple[str, ...]
     provided_dependencies: tuple[str, ...]
+    evidence: CompatibilityEvidence
     supported_game_versions: tuple[str, ...] | None
     excluded_lanes: tuple[ExcludedLane, ...]
     artifacts: tuple[LockedArtifact, ...]
@@ -185,6 +192,19 @@ def _exact_keys(value: Any, expected: set[str], label: str) -> dict[str, Any]:
 def _string(value: Any, label: str, pattern: re.Pattern[str] = SAFE_VALUE) -> str:
     if not isinstance(value, str) or pattern.fullmatch(value) is None:
         raise CompatibilityContractError(f"{label} is invalid: {value!r}")
+    return value
+
+
+def _evidence_text(value: Any, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 2048
+        or value != value.strip()
+        or any(ord(character) < 32 or ord(character) > 126 for character in value)
+    ):
+        raise CompatibilityContractError(
+            f"{label} must be bounded printable ASCII text"
+        )
     return value
 
 
@@ -296,6 +316,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             "loaders",
             "allowed_version_types",
             "provided_dependencies",
+            "evidence",
             "supported_game_versions",
             "excluded_lanes",
             "artifacts",
@@ -316,6 +337,21 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
     )
     if not set(version_types) <= VERSION_TYPES:
         raise CompatibilityContractError(f"{label}.allowed_version_types is unsupported")
+    evidence_value = _exact_keys(
+        item["evidence"],
+        {"baseline_with_mod", "apply_local_skin_with_mod"},
+        f"{label}.evidence",
+    )
+    evidence = CompatibilityEvidence(
+        baseline_with_mod=_evidence_text(
+            evidence_value["baseline_with_mod"],
+            f"{label}.evidence.baseline_with_mod",
+        ),
+        apply_local_skin_with_mod=_evidence_text(
+            evidence_value["apply_local_skin_with_mod"],
+            f"{label}.evidence.apply_local_skin_with_mod",
+        ),
+    )
     supported = item["supported_game_versions"]
     supported_versions = (
         None
@@ -410,6 +446,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             pattern=MODRINTH_ID,
             allow_empty=True,
         ),
+        evidence=evidence,
         supported_game_versions=supported_versions,
         excluded_lanes=tuple(excluded_lanes),
         artifacts=artifacts,
