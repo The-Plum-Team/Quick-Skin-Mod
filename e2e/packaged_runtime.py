@@ -201,6 +201,14 @@ SERVER_WORLD_SANITIZE_COMMANDS = (
     "kill @e[type=!minecraft:player]",
     f"say {SERVER_WORLD_SANITIZED_MARKER}",
 )
+CUSTOM_NPC_READY_MARKER = "QS_E2E_CUSTOM_NPC_READY"
+CUSTOM_NPC_FIXTURE_COMMANDS = (
+    "execute at Alice run summon customnpcs:customnpc ~3 ~ ~3 "
+    "{CustomName:'{\"text\":\"Quick Skin NPC\"}',CustomNameVisible:1b,"
+    "NoAI:1b,Invulnerable:1b,PersistenceRequired:1b,Silent:1b}",
+    "execute if entity @e[type=customnpcs:customnpc,limit=1] "
+    f"run say {CUSTOM_NPC_READY_MARKER}",
+)
 
 
 @dataclass(frozen=True)
@@ -1056,11 +1064,9 @@ def write_compatibility_client_config(
 ) -> Path | None:
     """Seed only the third-party settings needed for a deterministic compatibility probe.
 
-    ReplayMod records every multiplayer connection by default. Recording is unrelated to the
-    Quick Skin rendering bridge exercised by this lane, and a replay writer/recovery failure in a
-    disposable profile would be an upstream false failure. Use ReplayMod's own supported setting
-    to leave the integration loaded while preventing that unrelated recorder from owning the test
-    connection.
+    The ReplayMod lane records the actual Quick Skin multiplayer exchange and then opens that
+    recording. Pin the supported recording settings so the disposable profile neither depends on
+    upstream defaults nor opens an interactive rename/post-processing dialog during playback.
     """
 
     if compatibility_mod != "replaymod":
@@ -1074,7 +1080,22 @@ def write_compatibility_client_config(
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         json.dumps(
-            {"recording": {"recordServer": False}},
+            {
+                "advanced": {
+                    # ReplayMod relativizes replay files against this folder when naming its
+                    # cache. Absolute, normalized paths prevent macOS's /var -> /private/var
+                    # alias from becoming a huge percent-encoded ../../ cache filename.
+                    "cachePath": str((game_dir / ".replay_cache").resolve()),
+                    "recordingPath": str((game_dir / "replay_recordings").resolve()),
+                },
+                "recording": {
+                    "autoPostProcess": False,
+                    "autoStartRecording": True,
+                    "indicator": True,
+                    "recordServer": True,
+                    "renameDialog": False,
+                }
+            },
             indent=2,
             sort_keys=True,
         )
@@ -1319,6 +1340,24 @@ def sanitize_server_world(
     except (BrokenPipeError, OSError, ValueError) as exc:
         raise RuntimeFailure("could not send the E2E world-sanitization commands") from exc
     wait_for_log(process, log, SERVER_WORLD_SANITIZED_MARKER, timeout=timeout)
+
+
+def prepare_custom_npc_fixture(
+    process: subprocess.Popen[bytes], log: Path, *, timeout: int = 60
+) -> None:
+    """Summon and verify one real CustomNPCs entity after Alice joins the server."""
+
+    if process.poll() is not None:
+        raise RuntimeFailure("server exited before the CustomNPC fixture could be created")
+    if process.stdin is None:
+        raise RuntimeFailure("server process has no writable console input")
+    payload = ("\n".join(CUSTOM_NPC_FIXTURE_COMMANDS) + "\n").encode("utf-8")
+    try:
+        process.stdin.write(payload)
+        process.stdin.flush()
+    except (BrokenPipeError, OSError, ValueError) as exc:
+        raise RuntimeFailure("could not send the CustomNPC fixture commands") from exc
+    wait_for_log(process, log, CUSTOM_NPC_READY_MARKER, timeout=timeout)
 
 
 def wait_for_marker(
@@ -2485,8 +2524,15 @@ def run_packaged_row(
 
         markers: dict[str, str] = {}
         if orchestration.mode == "single-client":
-            launch_client(roles[0])
-            markers[roles[0]] = await_role(roles[0])
+            role = roles[0]
+            launch_client(role)
+            if (
+                compatibility_lane is not None
+                and compatibility_lane.mod.id == "customnpcs"
+            ):
+                await_server_join(role, "Alice joined the game", 180)
+                prepare_custom_npc_fixture(server_process, server_log)
+            markers[role] = await_role(role)
         elif orchestration.mode == "sequential-two-client":
             for role in orchestration.role_order:
                 launch_client(role)
