@@ -40,6 +40,15 @@ public final class DefaultSkinEvidenceView {
             mc.options.keyShift.setDown(false);
             mc.player.setShiftKeyDown(false);
 
+            // The first compatibility scenario can start while the client has a player object but
+            // the flat-world chunk below it is still absent. Pinning motion at that point freezes
+            // the disposable player over unloaded air and produces a semantically empty sky frame.
+            // Let vanilla finish placing the player before the deterministic pose takes ownership.
+            if (mc.level == null
+                    || mc.level.getBlockState(mc.player.blockPosition().below()).isAir()) {
+                return false;
+            }
+
             if (!requireRemoteBehind) {
                 pinPlayer(mc, 180f);
                 return true;
