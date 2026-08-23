@@ -2,6 +2,7 @@ package com.quickskin.mod.client.services;
 
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.compat.CustomNPCsIntegration;
+import com.quickskin.mod.client.compat.ReplayModHelper;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
 import com.quickskin.mod.common.data.PlayerAppearance;
 import com.quickskin.mod.common.data.PlayerAppearanceRepository;
@@ -371,6 +372,9 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
         applyingNetworkUpdate = true;
         try {
             applyLook(playerId, skinId, capeId, model);
+            // ReplayMod replays this exact authoritative payload against its camera entity, so the
+            // optional integration observes the recorded subject here. No-op without ReplayMod.
+            ReplayModHelper.noteNetworkAppearance(playerId);
         } finally {
             applyingNetworkUpdate = previous;
         }
