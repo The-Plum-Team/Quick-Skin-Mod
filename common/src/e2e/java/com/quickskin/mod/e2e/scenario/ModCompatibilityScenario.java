@@ -1,6 +1,7 @@
 package com.quickskin.mod.e2e.scenario;
 
 import com.quickskin.mod.e2e.CompatibilityProbe;
+import com.quickskin.mod.e2e.E2ELog;
 import com.quickskin.mod.e2e.Scenario;
 import com.quickskin.mod.e2e.Step;
 import com.quickskin.mod.e2e.generated.ScenarioContract.ScenarioId;
