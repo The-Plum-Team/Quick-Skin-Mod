@@ -493,7 +493,8 @@ footer p {
 }
 
 .filter-bar,
-.compare-controls {
+.compare-controls,
+.compatibility-controls {
   display: grid;
   grid-template-columns: repeat(3, minmax(140px, 0.55fr)) minmax(220px, 1.35fr);
   gap: 0.85rem;
@@ -658,6 +659,10 @@ input[type="search"] {
   grid-template-columns: minmax(240px, 2fr) minmax(160px, 0.8fr);
 }
 
+.compatibility-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .compare-note {
   color: var(--muted);
   font-size: 0.86rem;
@@ -665,6 +670,138 @@ input[type="search"] {
 
 .comparison-grid {
   grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+}
+
+.compatibility-grid,
+.compatibility-checkpoints {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.compatibility-lane {
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.compatibility-lane + .compatibility-lane {
+  margin-top: 1rem;
+}
+
+.compatibility-lane-heading,
+.compatibility-checkpoint-heading,
+.compatibility-shot figcaption,
+.compatibility-provenance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.compatibility-lane-heading {
+  align-items: flex-start;
+}
+
+.compatibility-lane-heading h3,
+.compatibility-checkpoint-heading h4 {
+  margin-bottom: 0;
+}
+
+.review-count {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgb(119 227 155 / 45%);
+  border-radius: 999px;
+  color: var(--green);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.compatibility-checkpoint {
+  min-width: 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.compatibility-checkpoint-heading {
+  margin-bottom: 0.8rem;
+}
+
+.compatibility-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.compatibility-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.compatibility-shot {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #080b09;
+}
+
+.compatibility-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+}
+
+.compatibility-shot figcaption {
+  padding: 0.65rem 0.8rem;
+  background: var(--surface-raised);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.compatibility-shot figcaption strong {
+  color: var(--text);
+}
+
+.compatibility-checkpoint details,
+.compatibility-proof,
+.compatibility-na details {
+  margin-top: 0.8rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.compatibility-checkpoint summary,
+.compatibility-proof summary,
+.compatibility-na summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.compatibility-provenance {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.compatibility-na {
+  margin-top: 1rem;
+}
+
+.compatibility-na-list {
+  margin-bottom: 0;
 }
 
 .compare-column-label {
@@ -925,7 +1062,9 @@ input[type="search"] {
   .principles,
   .methodology,
   .filter-bar,
-  .compare-controls {
+  .compare-controls,
+  .compatibility-controls,
+  .compatibility-pair {
     grid-template-columns: 1fr;
   }
 
@@ -955,6 +1094,18 @@ input[type="search"] {
   .view-switch,
   .view-button {
     width: 100%;
+  }
+
+  .view-switch {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .compatibility-lane-heading,
+  .compatibility-checkpoint-heading,
+  .compatibility-shot figcaption {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   footer {
