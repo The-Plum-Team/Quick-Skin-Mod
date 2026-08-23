@@ -29,7 +29,6 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 
 import java.lang.reflect.Field;
@@ -487,8 +486,8 @@ interface ModCompatibilityFeature {
     }
 
     final class SkinLayersFeature extends BaseFeature {
-        private volatile ResourceLocation flatLocation;
-        private volatile ResourceLocation raisedLocation;
+        private volatile Object flatLocation;
+        private volatile Object raisedLocation;
         private volatile boolean disconnectRequested;
         private volatile int previewReadinessPolls;
 
@@ -563,7 +562,7 @@ interface ModCompatibilityFeature {
                     + "bright raised hat, jacket, sleeves and trouser overlays at " + raisedLocation);
         }
 
-        private boolean menuPreviewReady(ResourceLocation expectedLocation) {
+        private boolean menuPreviewReady(Object expectedLocation) {
             Screen current = VanillaShim.currentScreen(minecraft);
             boolean screenReady = current instanceof PlayerSkinMenuScreen;
             boolean scaleReady = VanillaShim.guiScale(minecraft)
@@ -572,7 +571,7 @@ interface ModCompatibilityFeature {
             boolean renderReady = manualRenderObserved();
             PlayerWidget widget = screenReady
                     ? previewWidget((PlayerSkinMenuScreen) current) : null;
-            ResourceLocation widgetTexture = widget == null ? null : previewTexture(widget);
+            Object widgetTexture = widget == null ? null : previewTexture(widget);
             if (++previewReadinessPolls == 1 || previewReadinessPolls % 100 == 0) {
                 E2ELog.info("3D preview readiness: screen="
                         + (current == null ? "<none>" : current.getClass().getName())
@@ -618,26 +617,24 @@ interface ModCompatibilityFeature {
             }
         }
 
-        private ResourceLocation previewTexture(PlayerWidget widget) {
+        private Object previewTexture(PlayerWidget widget) {
             try {
                 Field previewData = PlayerWidget.class.getDeclaredField("previewData");
                 previewData.setAccessible(true);
                 Object data = previewData.get(widget);
-                Object location = data.getClass().getMethod("getSkinLocation").invoke(data);
-                return location instanceof ResourceLocation resourceLocation
-                        ? resourceLocation : null;
+                return data.getClass().getMethod("getSkinLocation").invoke(data);
             } catch (ReflectiveOperationException | RuntimeException exception) {
                 failure = "could not inspect Quick Skin preview texture: " + concise(exception);
                 return null;
             }
         }
 
-        private static String localTextureDimensions(ResourceLocation expectedLocation) {
+        private static String localTextureDimensions(Object expectedLocation) {
             if (expectedLocation == null) return "<null>";
             Object image = null;
             try {
                 Method loader = SkinLayers3DIntegration.class.getDeclaredMethod(
-                        "getQuickSkinLocalTexture", ResourceLocation.class);
+                        "getQuickSkinLocalTexture", expectedLocation.getClass());
                 loader.setAccessible(true);
                 image = loader.invoke(null, expectedLocation);
                 return image instanceof NativeImage nativeImage
@@ -655,7 +652,7 @@ interface ModCompatibilityFeature {
             }
         }
 
-        private static boolean meshCacheContains(ResourceLocation expectedLocation) {
+        private static boolean meshCacheContains(Object expectedLocation) {
             if (expectedLocation == null) return false;
             try {
                 Field cacheField = SkinLayers3DIntegration.class.getDeclaredField("MESH_CACHE");
@@ -673,15 +670,20 @@ interface ModCompatibilityFeature {
         }
 
         private static boolean manualRenderObserved() {
-            try {
-                Field field = SkinLayers3DIntegration.class
-                        .getDeclaredField("immediateRenderSuccessLogged");
-                field.setAccessible(true);
-                return field.get(null) instanceof java.util.concurrent.atomic.AtomicBoolean observed
-                        && observed.get();
-            } catch (ReflectiveOperationException | RuntimeException ignored) {
-                return false;
+            for (String fieldName : new String[] {
+                    "immediateRenderSuccessLogged", "deferredAttachmentSuccessLogged"}) {
+                try {
+                    Field field = SkinLayers3DIntegration.class.getDeclaredField(fieldName);
+                    field.setAccessible(true);
+                    if (field.get(null)
+                            instanceof java.util.concurrent.atomic.AtomicBoolean observed
+                            && observed.get()) {
+                        return true;
+                    }
+                } catch (ReflectiveOperationException | RuntimeException ignored) {
+                }
             }
+            return false;
         }
     }
 
@@ -710,7 +712,7 @@ interface ModCompatibilityFeature {
             if (npc == null) {
                 return Step.Result.fail("dedicated server supplied no real CustomNPC entity");
             }
-            ResourceLocation type = BuiltInRegistries.ENTITY_TYPE.getKey(npc.getType());
+            var type = BuiltInRegistries.ENTITY_TYPE.getKey(npc.getType());
             return Step.Result.pass("real server-owned " + type + " entity is rendered beside "
                     + "Quick Skin's untouched local player");
         }
@@ -736,24 +738,75 @@ interface ModCompatibilityFeature {
             if (failure != null) return Step.Result.fail(failure);
             npc = findCustomNpc();
             if (npc == null) return Step.Result.fail("CustomNPC disappeared after skin apply");
-            ResourceLocation actual = appearances.getSkinLocation(playerId);
-            if (CustomNPCsIntegration.detectSkinConflict(playerId, actual)) {
+            var actual = appearances.getSkinLocation(playerId);
+            Boolean activeConflict = detectsSkinConflict(actual);
+            if (activeConflict == null) return Step.Result.fail(failure);
+            if (activeConflict) {
                 return Step.Result.fail("CustomNPCs integration rejected Quick Skin's active texture");
             }
-            ResourceLocation foreign = ResourceLocation.tryBuild(
-                    "minecraft", "textures/entity/player/wide/steve.png");
-            if (!CustomNPCsIntegration.detectSkinConflict(playerId, foreign)) {
+            Object foreign = locationLike(
+                    actual, "minecraft", "textures/entity/player/wide/steve.png");
+            if (foreign == null) return Step.Result.fail(failure);
+            Boolean foreignConflict = detectsSkinConflict(foreign);
+            if (foreignConflict == null) return Step.Result.fail(failure);
+            if (!foreignConflict) {
                 return Step.Result.fail("CustomNPCs conflict tracker did not retain the applied skin");
             }
-            ResourceLocation type = BuiltInRegistries.ENTITY_TYPE.getKey(npc.getType());
+            var type = BuiltInRegistries.ENTITY_TYPE.getKey(npc.getType());
             return activeSkinAssertion("real " + type + " content remains rendered while the "
                     + "CustomNPCs bridge retains Quick Skin's renderer-facing texture");
+        }
+
+        private Boolean detectsSkinConflict(Object location) {
+            if (location == null) {
+                failure = "CustomNPCs conflict probe received no renderer texture";
+                return null;
+            }
+            try {
+                for (Method method : CustomNPCsIntegration.class.getMethods()) {
+                    Class<?>[] parameters = method.getParameterTypes();
+                    if (!"detectSkinConflict".equals(method.getName())
+                            || parameters.length != 2
+                            || parameters[0] != UUID.class
+                            || !parameters[1].isInstance(location)
+                            || method.getReturnType() != boolean.class) {
+                        continue;
+                    }
+                    return (Boolean) method.invoke(null, playerId, location);
+                }
+                failure = "CustomNPCs conflict probe found no compatible texture signature";
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "CustomNPCs conflict probe failed: " + concise(exception);
+            }
+            return null;
+        }
+
+        private Object locationLike(Object example, String namespace, String path) {
+            if (example == null) {
+                failure = "CustomNPCs conflict probe cannot derive a foreign texture type";
+                return null;
+            }
+            for (String factory : new String[] {"tryBuild", "fromNamespaceAndPath"}) {
+                try {
+                    Object location = example.getClass()
+                            .getMethod(factory, String.class, String.class)
+                            .invoke(null, namespace, path);
+                    if (location != null) return location;
+                } catch (NoSuchMethodException ignored) {
+                } catch (ReflectiveOperationException | RuntimeException exception) {
+                    failure = "CustomNPCs foreign texture fixture failed: " + concise(exception);
+                    return null;
+                }
+            }
+            failure = "CustomNPCs conflict probe found no texture factory on "
+                    + example.getClass().getName();
+            return null;
         }
 
         private Entity findCustomNpc() {
             if (minecraft.level == null) return null;
             for (Entity entity : minecraft.level.entitiesForRendering()) {
-                ResourceLocation type = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+                var type = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
                 if (type != null && "customnpcs".equals(type.getNamespace())) return entity;
             }
             return null;
@@ -789,11 +842,12 @@ interface ModCompatibilityFeature {
         @Override
         public boolean baselineReady() {
             pinCursorAwayFromEssentialWidgets();
-            return essentialTitleFailure(false) == null;
+            return failure == null && essentialTitleFailure(false) == null;
         }
 
         @Override
         public Step.Result assertBaseline() {
+            if (failure != null) return Step.Result.fail(failure);
             String problem = essentialTitleFailure(false);
             return problem == null
                     ? Step.Result.pass("Essential owns the title player model; Quick Skin suppresses "
@@ -833,8 +887,23 @@ interface ModCompatibilityFeature {
         }
 
         private void pinCursorAwayFromEssentialWidgets() {
-            org.lwjgl.glfw.GLFW.glfwSetCursorPos(
-                    minecraft.getWindow().getWindow(), 1.0, 1.0);
+            try {
+                Object window = minecraft.getWindow();
+                for (String accessor : new String[] {"getWindow", "handle"}) {
+                    try {
+                        Object value = window.getClass().getMethod(accessor).invoke(window);
+                        if (value instanceof Number number) {
+                            org.lwjgl.glfw.GLFW.glfwSetCursorPos(
+                                    number.longValue(), 1.0, 1.0);
+                            return;
+                        }
+                    } catch (NoSuchMethodException ignored) {
+                    }
+                }
+                failure = "Essential cursor probe found no native window handle";
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "Essential cursor probe failed: " + concise(exception);
+            }
         }
 
         private String essentialTitleFailure(boolean requireSkin) {
