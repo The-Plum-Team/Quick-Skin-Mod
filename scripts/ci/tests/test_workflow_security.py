@@ -296,6 +296,16 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "mod-compatibility-review-complete-${{ needs.enumerate.outputs.source_run_id }}",
             ): "7",
             (
+                "mod-compatibility-review.yml",
+                "Upload the compact public compatibility handoff",
+                "${{ steps.collect.outputs.artifact_name }}",
+            ): "7",
+            (
+                "pages.yml",
+                "Roll the protected compatibility cache forward",
+                "${{ steps.cache.outputs.name }}",
+            ): "90",
+            (
                 "handle-version-port-result.yml",
                 "Upload the authenticated nonvisual anchor continuation",
                 "${{ steps.merge.outputs.artifact_name }}",
@@ -1343,6 +1353,66 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--require-hashes", build)
         self.assertIn("scripts/pages/requirements.txt", build)
 
+    def test_mod_compatibility_pages_publication_reuses_only_complete_clean_reports(self) -> None:
+        review_workflow = (
+            WORKFLOWS / "mod-compatibility-review.yml"
+        ).read_text(encoding="utf-8")
+        pages_workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
+        request = job_block("mod-compatibility-review.yml", "request-publication")
+        publish = job_block("mod-compatibility-review.yml", "publish-evidence")
+        wake = job_block("pages.yml", "wake-compatibility")
+        collect = job_block("pages.yml", "collect-compatibility")
+        build = job_block("pages.yml", "build")
+        refresh = job_block("pages.yml", "refresh-compatibility-cache")
+
+        self.assertIn("operation:", review_workflow)
+        self.assertIn("- publish", review_workflow)
+        self.assertIn("mod-compatibility-publication-requested", review_workflow)
+        self.assertIn("needs.gate.outputs.complete == 'true'", request)
+        self.assertIn("needs.enumerate.outputs.source_run_id", request)
+        self.assertIn("mod-compatibility-publication-requested", request)
+        self.assertIn("repos/$GITHUB_REPOSITORY/dispatches", request)
+        self.assertIn("inputs.source_run_id", publish)
+        self.assertIn("github.event.client_payload.source_run_id", publish)
+        self.assertIn("github.event.action == 'mod-compatibility-publication-requested'", publish)
+        self.assertIn("actions: read", publish)
+        self.assertIn("contents: write", publish)
+        self.assertIn("ref: ${{ github.sha }}", publish)
+        self.assertIn("fetch-depth: 0", publish)
+        self.assertIn("persist-credentials: false", publish)
+        self.assertIn("scripts/pages/collect_compatibility.py", publish)
+        self.assertIn("--source-run-id", publish)
+        self.assertIn("--publication-run-id", publish)
+        self.assertNotIn("visual_review_runner.py", publish)
+        self.assertNotIn("ANTHROPIC", publish)
+        self.assertIn("pages-mod-compatibility-$BRANCH", publish)
+        self.assertIn("pages-compatibility-evidence-ready", publish)
+        self.assertIn('^[0-9a-f]{64}$', publish)
+        self.assertIn('"sha256:$ARTIFACT_DIGEST"', publish)
+
+        self.assertIn("pages-compatibility-evidence-ready", pages_workflow)
+        authenticate = wake.index("Authenticate the exact compatibility handoff")
+        checkout = wake.index("Check out the exact protected dispatcher")
+        self.assertLess(authenticate, checkout)
+        self.assertIn("protected_gh_api_retry", wake)
+        self.assertIn("mod-compatibility-review.yml", wake)
+        self.assertIn(".digest == $digest", wake)
+        self.assertIn(".workflow_run.id == $run_id", wake)
+        self.assertIn("gh workflow run pages.yml --ref master", wake)
+
+        self.assertIn("scripts/pages/select_compatibility_artifact.py", collect)
+        self.assertIn("digest-mismatch: error", collect)
+        self.assertIn("scripts/pages/compatibility_evidence.py validate", collect)
+        self.assertIn("git merge-base --is-ancestor", collect)
+        self.assertIn("scripts/ci/mod_compatibility_impact.py", collect)
+        self.assertIn("scripts/pages/compatibility_evidence.py carry-forward", collect)
+        self.assertIn("collected-compatibility-${{ matrix.branch }}", collect)
+        self.assertIn("--compatibility-root public-compatibility", build)
+        self.assertIn("pattern: collected-compatibility-*", build)
+        self.assertIn("pattern: collected-compatibility-${{ matrix.branch }}", refresh)
+        self.assertIn("pages-mod-compatibility-cache-%s", refresh)
+        self.assertIn("retention-days: 90", refresh)
+
     def test_pages_evidence_rotation_is_post_success_bounded_and_exact(self) -> None:
         workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
         request = job_block("pages.yml", "request-rotation")
@@ -1384,11 +1454,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("ref: ${{ github.sha }}", rotate)
         self.assertIn("persist-credentials: false", rotate)
         self.assertIn("pattern: pages-cache-*", rotate)
+        self.assertIn("pattern: pages-mod-compatibility-cache-*", rotate)
         self.assertIn("run-id: ${{ steps.owner.outputs.pages_run_id }}", rotate)
         self.assertIn("digest-mismatch: error", rotate)
         self.assertIn("scripts/pages/rotate_artifacts.py", rotate)
         self.assertIn("--pages-run-id", rotate)
         self.assertIn("--pages-run-sha", rotate)
+        self.assertIn("--compatibility-evidence-root", rotate)
         self.assertIn("steps.owner.outputs.pages_run_sha", rotate)
 
         self.assertIn("actions: read", handoff)
@@ -1409,6 +1481,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("select_old_handoffs(", rotator)
         self.assertIn("lossless visual reference changed", rotator)
         self.assertIn("retire_pages_run_transients(", rotator)
+        self.assertIn("rotate_compatibility_generations(", rotator)
+        self.assertIn("pages-mod-compatibility-cache-", rotator)
         self.assertIn("api.get_artifact(artifact.artifact_id)", rotator)
         self.assertIn("api.delete_artifact(artifact.artifact_id)", rotator)
 
