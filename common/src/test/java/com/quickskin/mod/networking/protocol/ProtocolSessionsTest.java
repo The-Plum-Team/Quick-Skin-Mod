@@ -165,4 +165,28 @@ class ProtocolSessionsTest {
                 sessions.serverProfile(playerId, replacementConnection).mode());
         assertEquals(1, sessions.serverSessionCount());
     }
+
+    @Test
+    void replaySchemaEvidenceCreatesOneExactBoundedClientProfile() {
+        UUID playerId = UUID.randomUUID();
+        Object replayConnection = new Object();
+
+        assertTrue(sessions.admitReplayClientSession(
+                playerId, replayConnection, true).negotiated());
+        assertTrue(sessions.clientProfile(replayConnection).negotiated());
+        assertEquals(
+                ProtocolProfile.Mode.LOCAL_ONLY,
+                sessions.clientProfile(new Object()).mode());
+        assertEquals(
+                ProtocolProfile.Mode.INCOMPATIBLE,
+                sessions.admitReplayClientSession(
+                        playerId, replayConnection, false).mode());
+        assertEquals(
+                ProtocolProfile.Mode.INCOMPATIBLE,
+                sessions.admitReplayClientSession(
+                        UUID.randomUUID(), replayConnection, true).mode());
+        assertTrue(sessions.clientProfile(replayConnection).negotiated());
+
+        sessions.clearClientSession(playerId, replayConnection);
+    }
 }

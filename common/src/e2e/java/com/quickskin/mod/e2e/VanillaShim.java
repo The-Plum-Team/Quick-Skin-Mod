@@ -828,6 +828,13 @@ public final class VanillaShim {
             File gameDir = new File(System.getProperty("user.dir"));
             Object fb = mainRenderTarget(mc);
             if (fb == null) { E2ELog.warn("main render target unavailable"); return false; }
+            // Essential observes vanilla's grab(...) entry point and opens its recent-screenshot
+            // tray on the title screen. Capture that compatibility lane from the same framebuffer
+            // through vanilla's lower-level image copy so the test itself does not alter the UI it
+            // is trying to prove.
+            if ("essential".equals(System.getProperty("quickskin.e2e.compatibility"))) {
+                return rawScreenshot(screenshot, gameDir, name, fb);
+            }
             Consumer<Object> noop = msg -> {};
 
             for (Method m : screenshot.getDeclaredMethods()) {
@@ -853,6 +860,106 @@ public final class VanillaShim {
         } catch (Throwable t) {
             E2ELog.warn("screenshot failed: " + t);
             return false;
+        }
+    }
+
+    private static boolean rawScreenshot(
+            Class<?> screenshot, File gameDir, String name, Object framebuffer) {
+        Object image = null;
+        try {
+            // Through 1.21.4 the low-level copy returns NativeImage synchronously.
+            for (Method method : screenshot.getDeclaredMethods()) {
+                Class<?>[] parameters = method.getParameterTypes();
+                if (Modifier.isStatic(method.getModifiers())
+                        && parameters.length == 1
+                        && parameters[0].isInstance(framebuffer)
+                        && method.getReturnType() != void.class) {
+                    method.setAccessible(true);
+                    image = method.invoke(null, framebuffer);
+                    if (image == null) {
+                        E2ELog.warn("raw Screenshot.takeScreenshot returned no image");
+                        return false;
+                    }
+                    return writeRawScreenshot(image, gameDir, name);
+                }
+            }
+
+            // 1.21.5+ performs the GPU readback asynchronously and supplies NativeImage to a
+            // callback. 1.21.6 also adds an overload with an integer downscale argument; prefer the
+            // two-argument shape when present, then use a factor of one for the newer shape.
+            for (int parameterCount : new int[] {2, 3}) {
+                for (Method method : screenshot.getDeclaredMethods()) {
+                    Class<?>[] parameters = method.getParameterTypes();
+                    boolean matchingShape = parameters.length == parameterCount
+                            && parameters[0].isInstance(framebuffer)
+                            && parameters[parameters.length - 1] == Consumer.class
+                            && method.getReturnType() == void.class
+                            && (parameterCount == 2 || parameters[1] == int.class);
+                    if (!Modifier.isStatic(method.getModifiers()) || !matchingShape) continue;
+                    Consumer<Object> writer = captured -> {
+                        try {
+                            if (captured == null || !writeRawScreenshot(captured, gameDir, name)) {
+                                E2ELog.warn("raw Screenshot.takeScreenshot callback wrote no image");
+                            }
+                        } finally {
+                            closeRawScreenshot(captured);
+                        }
+                    };
+                    method.setAccessible(true);
+                    if (parameterCount == 2) {
+                        method.invoke(null, framebuffer, writer);
+                    } else {
+                        method.invoke(null, framebuffer, 1, writer);
+                    }
+                    return true;
+                }
+            }
+            E2ELog.warn("raw Screenshot.takeScreenshot signature not found");
+            return false;
+        } catch (Throwable failure) {
+            E2ELog.warn("raw screenshot failed: " + failure);
+            return false;
+        } finally {
+            closeRawScreenshot(image);
+        }
+    }
+
+    private static boolean writeRawScreenshot(Object image, File gameDir, String name) {
+        try {
+            File screenshotDirectory = new File(gameDir, "screenshots");
+            if (!screenshotDirectory.isDirectory() && !screenshotDirectory.mkdirs()) {
+                E2ELog.warn("could not create raw screenshot directory " + screenshotDirectory);
+                return false;
+            }
+            File output = new File(screenshotDirectory, name);
+            Method pathWriter = null;
+            for (Method method : image.getClass().getMethods()) {
+                Class<?>[] parameters = method.getParameterTypes();
+                if (parameters.length != 1 || method.getReturnType() != void.class) continue;
+                if (parameters[0] == File.class) {
+                    method.invoke(image, output);
+                    return true;
+                }
+                if (parameters[0] == java.nio.file.Path.class) pathWriter = method;
+            }
+            if (pathWriter != null) {
+                pathWriter.invoke(image, output.toPath());
+                return true;
+            }
+            E2ELog.warn("raw NativeImage writer signature not found");
+            return false;
+        } catch (Throwable failure) {
+            E2ELog.warn("raw screenshot write failed: " + failure);
+            return false;
+        }
+    }
+
+    private static void closeRawScreenshot(Object image) {
+        if (image instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception ignored) {
+            }
         }
     }
 

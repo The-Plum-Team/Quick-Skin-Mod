@@ -509,7 +509,7 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
             json.loads(config_path.read_text(encoding="utf-8")),
         )
 
-    def test_replaymod_compatibility_config_disables_unrelated_recording(self) -> None:
+    def test_replaymod_compatibility_config_enables_deterministic_recording(self) -> None:
         game_dir = self.root / "replaymod-game"
 
         config_path = packaged_runtime.write_compatibility_client_config(
@@ -519,7 +519,19 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
         self.assertEqual(game_dir / "config" / "replaymod.json", config_path)
         assert config_path is not None
         self.assertEqual(
-            {"recording": {"recordServer": False}},
+            {
+                "advanced": {
+                    "cachePath": str((game_dir / ".replay_cache").resolve()),
+                    "recordingPath": str((game_dir / "replay_recordings").resolve()),
+                },
+                "recording": {
+                    "autoPostProcess": False,
+                    "autoStartRecording": True,
+                    "indicator": True,
+                    "recordServer": True,
+                    "renameDialog": False,
+                }
+            },
             json.loads(config_path.read_text(encoding="utf-8")),
         )
         with self.assertRaisesRegex(
@@ -1066,6 +1078,36 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
             )
         finally:
             handle.close()
+
+    def test_custom_npc_fixture_is_created_and_acknowledged_after_join(self) -> None:
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.stdin = mock.Mock()
+        log = self.root / "server.log"
+
+        with mock.patch.object(packaged_runtime, "wait_for_log") as wait_for_log:
+            packaged_runtime.prepare_custom_npc_fixture(process, log)
+
+        process.stdin.write.assert_called_once_with(
+            (
+                "\n".join(packaged_runtime.CUSTOM_NPC_FIXTURE_COMMANDS) + "\n"
+            ).encode("utf-8")
+        )
+        process.stdin.flush.assert_called_once_with()
+        wait_for_log.assert_called_once_with(
+            process,
+            log,
+            packaged_runtime.CUSTOM_NPC_READY_MARKER,
+            timeout=60,
+        )
+        self.assertIn(
+            "summon customnpcs:customnpc",
+            packaged_runtime.CUSTOM_NPC_FIXTURE_COMMANDS[0],
+        )
+        self.assertIn(
+            "if entity @e[type=customnpcs:customnpc,limit=1]",
+            packaged_runtime.CUSTOM_NPC_FIXTURE_COMMANDS[1],
+        )
 
     def test_server_world_sanitization_fails_without_a_live_console(self) -> None:
         process = mock.Mock()

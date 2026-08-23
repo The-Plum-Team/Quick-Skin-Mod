@@ -14,10 +14,14 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -107,6 +111,297 @@ public final class TestAssets {
         Path tmp = deterministicFixture("qs_e2e_external_skin.png");
         ImageIO.write(img, "png", tmp.toFile());
         return tmp;
+    }
+
+    /**
+     * A normal skin whose six second-layer UV islands are transparent. It is a featureless Ears
+     * control and can also serve as a 3D Skin Layers control with no overlay voxels to extrude.
+     */
+    public static Path makeFlatOverlaySkin() throws Exception {
+        BufferedImage image = bundledSkinCopy();
+        clearModernSkinOverlay(image);
+        Path fixture = deterministicFixture("qs_e2e_flat_overlay_skin.png");
+        ImageIO.write(image, "png", fixture.toFile());
+        return fixture;
+    }
+
+    /**
+     * A deliberately subdued but non-empty second layer on all six body parts. It is the control
+     * for 3D Skin Layers: every mesh must exist, while the dark gray voxels remain visually easy
+     * to distinguish from the saturated paired fixture.
+     */
+    public static Path makeSubtleOverlaySkin() throws Exception {
+        BufferedImage image = bundledSkinCopy();
+        clearModernSkinOverlay(image);
+        Graphics2D graphics = image.createGraphics();
+        graphics.setComposite(AlphaComposite.Src);
+        paintChecker(graphics, 40, 8, 8, 8, 0xFF30343B, 0xFF4A505A);
+        paintChecker(graphics, 20, 36, 8, 12, 0xFF30343B, 0xFF4A505A);
+        paintChecker(graphics, 44, 36, 4, 12, 0xFF30343B, 0xFF4A505A);
+        paintChecker(graphics, 52, 52, 4, 12, 0xFF30343B, 0xFF4A505A);
+        paintChecker(graphics, 4, 36, 4, 12, 0xFF30343B, 0xFF4A505A);
+        paintChecker(graphics, 4, 52, 4, 12, 0xFF30343B, 0xFF4A505A);
+        graphics.dispose();
+        Path fixture = deterministicFixture("qs_e2e_subtle_overlay_skin.png");
+        ImageIO.write(image, "png", fixture.toFile());
+        return fixture;
+    }
+
+    /**
+     * The same control skin with loud, sparse pixels on every visible second-layer face. A correct
+     * 3D Skin Layers bridge turns these pixels into visibly raised voxels in Quick Skin's own menu
+     * preview; a flat fallback remains easy to distinguish in the paired capture.
+     */
+    public static Path makeRaisedOverlaySkin() throws Exception {
+        BufferedImage image = bundledSkinCopy();
+        clearModernSkinOverlay(image);
+        Graphics2D graphics = image.createGraphics();
+        graphics.setComposite(AlphaComposite.Src);
+        paintChecker(graphics, 40, 8, 8, 8, 0xFF00E5FF, 0xFFFF2BD6);   // hat front
+        paintChecker(graphics, 20, 36, 8, 12, 0xFF7CFF00, 0xFFFF7A00); // jacket front
+        paintChecker(graphics, 44, 36, 4, 12, 0xFF00E5FF, 0xFFFF2BD6); // right sleeve
+        paintChecker(graphics, 52, 52, 4, 12, 0xFF7CFF00, 0xFFFF7A00); // left sleeve
+        paintChecker(graphics, 4, 36, 4, 12, 0xFFFF2BD6, 0xFF00E5FF);  // right trousers
+        paintChecker(graphics, 4, 52, 4, 12, 0xFFFF7A00, 0xFF7CFF00);  // left trousers
+        graphics.dispose();
+        Path fixture = deterministicFixture("qs_e2e_raised_overlay_skin.png");
+        ImageIO.write(image, "png", fixture.toFile());
+        return fixture;
+    }
+
+    /**
+     * Build a real Ears v1 skin with Ears' own public builder and writer from the installed JAR.
+     * Reflection keeps the optional mod out of the harness compile classpath while still making
+     * upstream code author the magic pixels that Quick Skin later parses.
+     */
+    public static Path makeEarsSkin() throws Exception {
+        BufferedImage image = bundledSkinCopy();
+        Graphics2D graphics = image.createGraphics();
+        graphics.setComposite(AlphaComposite.Src);
+        // Saturated landmarks make the skin and every feature face legible at the fixed rear
+        // E2E camera. Ears' TALL front faces sample 24..39,0..7, their rear faces sample
+        // 56..63,28..43, and a one-segment BACK tail samples 56..63,16..27. Painting only the
+        // vanilla head/torso leaves the rear-facing feature UVs transparent and creates a false
+        // runtime pass with no visible geometry.
+        paintChecker(graphics, 0, 0, 32, 16, 0xFF00D9FF, 0xFFFF30C8);
+        paintChecker(graphics, 16, 16, 24, 16, 0xFFFFA000, 0xFF5CFF3A);
+        paintChecker(graphics, 24, 0, 16, 8, 0xFFFFF200, 0xFFFF3B30);
+        paintChecker(graphics, 56, 28, 8, 16, 0xFFFFF200, 0xFFFF3B30);
+        paintChecker(graphics, 56, 16, 8, 12, 0xFF9D4EDD, 0xFF00F5D4);
+        graphics.dispose();
+
+        ClassLoader loader = TestAssets.class.getClassLoader();
+        Class<?> featuresClass = Class.forName(
+                "com.unascribed.ears.api.features.EarsFeatures", true, loader);
+        Object builder = featuresClass.getMethod("builder").invoke(null);
+        invokeEnumBuilder(builder, "earMode",
+                "com.unascribed.ears.api.features.EarsFeatures$EarMode", "TALL");
+        invokeEnumBuilder(builder, "earAnchor",
+                "com.unascribed.ears.api.features.EarsFeatures$EarAnchor", "CENTER");
+        invokeEnumBuilder(builder, "tailMode",
+                "com.unascribed.ears.api.features.EarsFeatures$TailMode", "BACK");
+        invokeEnumBuilder(builder, "wingMode",
+                "com.unascribed.ears.api.features.EarsFeatures$WingMode", "NONE");
+        builder.getClass().getMethod("tailSegments", int.class).invoke(builder, 1);
+        builder.getClass().getMethod("tailBend0", float.class).invoke(builder, 35.0f);
+        Object features = builder.getClass().getMethod("build").invoke(builder);
+
+        int[] pixels = image.getRGB(0, 0, 64, 64, null, 0, 64);
+        Class<?> rawImageClass = Class.forName(
+                "com.unascribed.ears.common.RawEarsImage", true, loader);
+        Object rawImage = rawImageClass
+                .getConstructor(int[].class, int.class, int.class, boolean.class)
+                .newInstance(pixels, 64, 64, false);
+        Class<?> writableImageClass = Class.forName(
+                "com.unascribed.ears.common.WritableEarsImage", true, loader);
+        Class<?> writerClass = Class.forName(
+                "com.unascribed.ears.common.EarsFeaturesWriterV1", true, loader);
+        writerClass.getMethod("write", featuresClass, writableImageClass)
+                .invoke(null, features, rawImage);
+        image.setRGB(0, 0, 64, 64, pixels, 0, 64);
+        requireOpaqueRegion(image, 24, 0, 16, 8, "TALL ear front");
+        requireOpaqueRegion(image, 56, 28, 8, 16, "TALL ear back");
+        requireOpaqueRegion(image, 56, 16, 8, 12, "BACK tail");
+
+        Path fixture = deterministicFixture("qs_e2e_ears_skin.png");
+        ImageIO.write(image, "png", fixture.toFile());
+        return fixture;
+    }
+
+    /**
+     * Export a genuine standalone CPM model through the editor/exporter API supplied by the exact
+     * installed CPM version. Two oversized recoloured head cubes make model selection visually
+     * undeniable while the outer file still exercises Quick Skin's normal .cpmmodel importer.
+     */
+    public static Path makeCpmModel() throws Exception {
+        ClassLoader loader = TestAssets.class.getClassLoader();
+        Class<?> uiClass = Class.forName("com.tom.cpl.gui.UI", true, loader);
+        Object ui = Proxy.newProxyInstance(loader, new Class<?>[]{uiClass}, cpmUiHandler());
+        Class<?> editorClass = Class.forName("com.tom.cpm.shared.editor.Editor", true, loader);
+        Object editor = editorClass.getConstructor().newInstance();
+        editorClass.getMethod("setUI", uiClass).invoke(editor, ui);
+        editorClass.getMethod("loadDefaultPlayerModel").invoke(editor);
+
+        @SuppressWarnings("unchecked")
+        List<Object> roots = (List<Object>) editorClass.getField("elements").get(editor);
+        Object head = roots.stream()
+                .filter(root -> {
+                    try {
+                        Object typeData = root.getClass().getField("typeData").get(root);
+                        return typeData instanceof Enum<?> value && "HEAD".equals(value.name());
+                    } catch (ReflectiveOperationException ignored) {
+                        return false;
+                    }
+                })
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("CPM editor exposed no HEAD root"));
+        addCpmCube(editorClass, editor, head, "E2E cyan horn",
+                -4.0f, -13.0f, -1.5f, 3.0f, 6.0f, 3.0f, 0x00E5FF);
+        addCpmCube(editorClass, editor, head, "E2E magenta horn",
+                1.0f, -13.0f, -1.5f, 3.0f, 6.0f, 3.0f, 0xFF2BD6);
+
+        Class<?> descriptionClass = Class.forName(
+                "com.tom.cpm.shared.editor.util.ModelDescription", true, loader);
+        Object description = descriptionClass.getConstructor().newInstance();
+        descriptionClass.getField("name").set(description, "Quick Skin E2E horns");
+        descriptionClass.getField("desc").set(
+                description, "Generated by the compatibility scenario through CPM's exporter");
+        Path fixture = deterministicFixture("qs_e2e_horns.cpmmodel");
+        Class<?> exporterClass = Class.forName(
+                "com.tom.cpm.shared.editor.Exporter", true, loader);
+        exporterClass.getMethod(
+                        "exportModel", editorClass, uiClass, java.io.File.class,
+                        descriptionClass, boolean.class)
+                .invoke(null, editor, ui, fixture.toFile(), description, false);
+        if (!Files.isRegularFile(fixture) || Files.size(fixture) < 16) {
+            throw new IllegalStateException("CPM exporter did not create a model file");
+        }
+        try (InputStream input = Files.newInputStream(fixture)) {
+            if (input.read() != 0x53) {
+                throw new IllegalStateException("CPM exporter wrote an invalid model header");
+            }
+        }
+        return fixture;
+    }
+
+    private static BufferedImage bundledSkinCopy() throws Exception {
+        BufferedImage source = ImageIO.read(makeClassicSkin().toFile());
+        if (source == null || source.getWidth() != 64 || source.getHeight() != 64) {
+            throw new IllegalStateException("E2E skin fixture must be a 64x64 PNG");
+        }
+        return toArgb(source);
+    }
+
+    private static void clearModernSkinOverlay(BufferedImage image) {
+        Graphics2D graphics = image.createGraphics();
+        graphics.setComposite(AlphaComposite.Clear);
+        graphics.fillRect(32, 0, 32, 16);  // head overlay
+        graphics.fillRect(0, 32, 56, 16);  // right leg, body and right arm overlays
+        graphics.fillRect(0, 48, 16, 16);  // left leg overlay
+        graphics.fillRect(48, 48, 16, 16); // left arm overlay
+        graphics.dispose();
+    }
+
+    private static void paintChecker(
+            Graphics2D graphics, int x, int y, int width, int height, int first, int second) {
+        for (int row = 0; row < height; row++) {
+            for (int column = 0; column < width; column++) {
+                graphics.setColor(new Color(((row + column) & 1) == 0 ? first : second, true));
+                graphics.fillRect(x + column, y + row, 1, 1);
+            }
+        }
+    }
+
+    private static void requireOpaqueRegion(
+            BufferedImage image, int x, int y, int width, int height, String label) {
+        for (int row = 0; row < height; row++) {
+            for (int column = 0; column < width; column++) {
+                if (((image.getRGB(x + column, y + row) >>> 24) & 0xFF) != 0xFF) {
+                    throw new IllegalStateException(label + " contains transparent feature pixels");
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void invokeEnumBuilder(
+            Object builder, String methodName, String enumClassName, String valueName)
+            throws Exception {
+        Class<?> enumClass = Class.forName(enumClassName, true, TestAssets.class.getClassLoader());
+        Object value = Enum.valueOf((Class<? extends Enum>) enumClass.asSubclass(Enum.class), valueName);
+        builder.getClass().getMethod(methodName, enumClass).invoke(builder, value);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void addCpmCube(
+            Class<?> editorClass,
+            Object editor,
+            Object parent,
+            String name,
+            float offsetX,
+            float offsetY,
+            float offsetZ,
+            float sizeX,
+            float sizeY,
+            float sizeZ,
+            int rgb
+    ) throws Exception {
+        ClassLoader loader = TestAssets.class.getClassLoader();
+        Class<?> elementClass = Class.forName(
+                "com.tom.cpm.shared.editor.elements.ModelElement", true, loader);
+        Class<?> vectorClass = Class.forName("com.tom.cpl.math.Vec3f", true, loader);
+        Object child = elementClass.getConstructor(editorClass).newInstance(editor);
+        elementClass.getField("name").set(child, name);
+        elementClass.getField("parent").set(child, parent);
+        elementClass.getField("texture").setBoolean(child, false);
+        elementClass.getField("rgb").setInt(child, rgb);
+        elementClass.getField("offset").set(
+                child, vectorClass.getConstructor(float.class, float.class, float.class)
+                        .newInstance(offsetX, offsetY, offsetZ));
+        elementClass.getField("pos").set(
+                child, vectorClass.getConstructor(float.class, float.class, float.class)
+                        .newInstance(0.0f, 0.0f, 0.0f));
+        elementClass.getField("size").set(
+                child, vectorClass.getConstructor(float.class, float.class, float.class)
+                        .newInstance(sizeX, sizeY, sizeZ));
+        elementClass.getField("rotation").set(
+                child, vectorClass.getConstructor(float.class, float.class, float.class)
+                        .newInstance(0.0f, 0.0f, 0.0f));
+        elementClass.getField("scale").set(
+                child, vectorClass.getConstructor(float.class, float.class, float.class)
+                        .newInstance(1.0f, 1.0f, 1.0f));
+        elementClass.getField("meshScale").set(
+                child, vectorClass.getConstructor(float.class, float.class, float.class)
+                        .newInstance(1.0f, 1.0f, 1.0f));
+        List<Object> children = (List<Object>) parent.getClass().getField("children").get(parent);
+        children.add(child);
+    }
+
+    private static InvocationHandler cpmUiHandler() {
+        return (proxy, method, args) -> {
+            if (method.getDeclaringClass() == Object.class) {
+                return switch (method.getName()) {
+                    case "toString" -> "QuickSkinE2ECpmUI";
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == (args == null ? null : args[0]);
+                    default -> null;
+                };
+            }
+            if ("i18nFormat".equals(method.getName())) {
+                return args != null && args.length > 0 ? String.valueOf(args[0]) : "";
+            }
+            if ("executeLater".equals(method.getName())
+                    && args != null && args.length == 1 && args[0] instanceof Runnable runnable) {
+                runnable.run();
+                return null;
+            }
+            if ("onGuiException".equals(method.getName())) {
+                Throwable failure = args != null && args.length > 1 && args[1] instanceof Throwable t
+                        ? t : new IllegalStateException("CPM exporter reported an unknown failure");
+                throw new IllegalStateException("CPM exporter reported a GUI exception", failure);
+            }
+            return null;
+        };
     }
 
     /**
