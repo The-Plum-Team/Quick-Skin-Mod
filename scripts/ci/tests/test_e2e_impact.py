@@ -26,8 +26,12 @@ class E2EImpactTest(unittest.TestCase):
                 "scripts/ci/github_api_retry.sh",
                 "scripts/ci/mod_compatibility_review_queue.py",
                 "scripts/ci/visual_review_queue.py",
+                "scripts/pages/collect_compatibility.py",
+                "scripts/pages/compatibility_evidence.py",
+                "scripts/pages/select_compatibility_artifact.py",
                 "scripts/ci/tests/test_ai_patch_policy.py",
                 "scripts/ci/tests/test_visual_review_queue.py",
+                "scripts/release/tests/test_pages_compatibility.py",
             ]
         )
         self.assertFalse(result.runtime_required)
