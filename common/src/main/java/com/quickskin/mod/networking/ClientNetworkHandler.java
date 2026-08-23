@@ -793,11 +793,19 @@ public class ClientNetworkHandler {
     }
 
     private static Object packetConnectionIdentity(NetworkManager.PacketContext context) {
+        if (context instanceof ExplicitConnectionPacketContext explicit) {
+            return explicit.connectionIdentity();
+        }
         Object player = context != null ? context.getPlayer() : null;
         if (player instanceof net.minecraft.client.player.LocalPlayer localPlayer) {
             return localPlayer.connection;
         }
         return null;
+    }
+
+    /** Packet context used only by compatibility bridges that own an exact fake connection. */
+    public interface ExplicitConnectionPacketContext extends NetworkManager.PacketContext {
+        Object connectionIdentity();
     }
 
     public static boolean isCurrentConnection(Object expectedConnection) {
