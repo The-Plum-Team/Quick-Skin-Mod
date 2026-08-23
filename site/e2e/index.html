@@ -29,7 +29,7 @@
     <section class="gallery-intro" aria-labelledby="gallery-title">
       <p class="eyebrow">Packaged-runtime evidence</p>
       <h1 id="gallery-title">See what passed.</h1>
-      <p>Browse every validated capture by version, or align the same semantic checkpoint across all supported Minecraft versions and loaders. Select any capture to open its complete validation record: the checkpoint contract, the assertion the packaged client actually passed, the pixel and comparison measurements, the tested JAR digest and the exact runs that produced it.</p>
+      <p>Browse every validated capture by version, align the same semantic checkpoint across supported Minecraft versions and loaders, or inspect paired evidence from the optional-mod compatibility runs. Select any regular capture to open its complete validation record: the checkpoint contract, the assertion the packaged client actually passed, the pixel and comparison measurements, the tested JAR digest and the exact runs that produced it.</p>
       <div id="release-summary" class="summary-strip" aria-live="polite"></div>
     </section>
 
@@ -42,6 +42,7 @@
         <div class="view-switch" aria-label="Choose gallery view">
           <button id="gallery-view-button" class="view-button is-active" type="button" aria-pressed="true">Gallery</button>
           <button id="compare-view-button" class="view-button" type="button" aria-pressed="false">Compare versions</button>
+          <button id="compatibility-view-button" class="view-button" type="button" aria-pressed="false">Mod compatibility</button>
         </div>
       </div>
 
@@ -77,6 +78,23 @@
         <div id="comparison-grid" class="comparison-grid"></div>
       </div>
 
+      <div id="compatibility-view" hidden>
+        <p class="compare-note">Each row pairs the clean E2E reference with the same checkpoint from a packaged client running the named optional mod. The full lane is still checked; this page keeps the two compatibility-specific checkpoints so the evidence remains useful and compact.</p>
+        <form id="compatibility-filters" class="compatibility-controls" aria-label="Filter mod compatibility evidence">
+          <label>Minecraft version
+            <select id="compatibility-version"><option value="all">All versions</option></select>
+          </label>
+          <label>Loader
+            <select id="compatibility-loader"><option value="all">All loaders</option></select>
+          </label>
+          <label>Optional mod
+            <select id="compatibility-mod"><option value="all">All tested mods</option></select>
+          </label>
+        </form>
+        <div id="compatibility-grid" class="compatibility-grid"></div>
+        <div id="compatibility-not-applicable" class="compatibility-na"></div>
+      </div>
+
       <p id="gallery-status" class="status-line" role="status">Loading validated evidence…</p>
       <noscript><p class="notice">JavaScript is required for filtering and comparison. The evidence inventory remains available as <a href="gallery-data.json">JSON</a>.</p></noscript>
     </section>
@@ -96,7 +114,7 @@
       <div>
         <p>The required E2E gate validates mod state, screenshot integrity and expected pixel changes. These images let humans compare the resulting UI and rendering across versions.</p>
         <p>Every capture carries the evidence that admitted it: the versioned scenario contract it belongs to, the passed deterministic assertion emitted by the packaged client, the decoded pixel measurements of both the original PNG and the published image, the required pixel change against its paired checkpoint, and the SHA-256 of the exact mod JAR under test. Open a capture to read that record; nothing on this page is published without it.</p>
-        <p>The AI visual review is advisory; it is not presented here as a release gate. Open a capture’s source run for the complete GitHub Actions record.</p>
+        <p>The AI visual review remains advisory for normal release evidence. Optional-mod comparisons are published only after the complete compatibility lane passes its deterministic runtime assertions and every reviewed frame receives a clean visual verdict; the two pairs shown here are a compact subset of that completed review. Absence of compatibility evidence is not a claim of incompatibility.</p>
         <p><a href="gallery-data.json">Download the machine-readable gallery inventory</a></p>
       </div>
     </section>
