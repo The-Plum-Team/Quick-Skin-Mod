@@ -175,6 +175,13 @@ public final class E2EHarness {
             worldWaitDeadline = tick + 20 * 90; // 90s budget (heavier loaders + a possible warnings screen)
             E2ELog.info("waiting for world join (up to 90s)...");
         }
+        if (ScenarioId.MOD_COMPATIBILITY.externalId().equals(scenarioId)) {
+            // ReplayMod starts recording on the Netty login path and may run its abandoned-file
+            // scan before Minecraft publishes player/level. Give the selected compatibility
+            // driver a pre-world tick so it can protect that live recording before the ordinary
+            // scenario object can exist.
+            ModCompatibilityScenario.prepareBeforeWorldJoin();
+        }
         // Diagnostic: log each screen transition so a stuck client (title vs loading vs error) is visible.
         Screen sc = VanillaShim.currentScreen(mc);
         String screen = VanillaShim.screenDiagnostic(sc);
