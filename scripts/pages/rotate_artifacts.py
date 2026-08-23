@@ -22,6 +22,10 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "release"))
 
 from evidence import PublicEvidenceError, validate_bundle  # noqa: E402
+from compatibility_evidence import (  # noqa: E402
+    CompatibilityEvidenceError,
+    validate_bundle as validate_compatibility_bundle,
+)
 from version_branches import parse_version_branch  # noqa: E402
 
 
@@ -29,7 +33,11 @@ REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 PAGES_WORKFLOW = ".github/workflows/pages.yml"
 E2E_WORKFLOW = ".github/workflows/on-demand-e2e.yml"
+COMPATIBILITY_REVIEW_WORKFLOW = ".github/workflows/mod-compatibility-review.yml"
 PAGES_EVENTS = frozenset({"schedule", "workflow_dispatch", "workflow_run"})
+COMPATIBILITY_REVIEW_EVENTS = frozenset(
+    {"repository_dispatch", "schedule", "workflow_dispatch"}
+)
 REQUEST_ATTEMPTS = 4
 RETRYABLE_HTTP_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
 
@@ -85,6 +93,15 @@ class BranchGeneration:
     branch: str
     target_sha: str
     target_run_id: int
+    keep: Artifact
+
+
+@dataclass(frozen=True)
+class CompatibilityGeneration:
+    branch: str
+    coverage_sha: str
+    compatibility_run_id: int
+    publication_run_id: int
     keep: Artifact
 
 
@@ -209,10 +226,46 @@ def select_old_handoffs(
     )
 
 
+def select_old_compatibility_caches(
+    artifacts: list[Artifact], *, branch: str, keep: Artifact
+) -> list[Artifact]:
+    expected_name = f"pages-mod-compatibility-cache-{branch}"
+    return sorted(
+        (
+            artifact
+            for artifact in artifacts
+            if artifact.name == expected_name
+            and not artifact.expired
+            and artifact.artifact_id != keep.artifact_id
+            and artifact.head_branch == "master"
+            and artifact.order < keep.order
+        ),
+        key=lambda artifact: artifact.order,
+    )
+
+
+def select_old_compatibility_handoffs(
+    artifacts: list[Artifact], *, branch: str, keep: Artifact
+) -> list[Artifact]:
+    expected_name = f"pages-mod-compatibility-{branch}"
+    return sorted(
+        (
+            artifact
+            for artifact in artifacts
+            if artifact.name == expected_name
+            and not artifact.expired
+            and artifact.head_branch == "master"
+            and artifact.order < keep.order
+        ),
+        key=lambda artifact: artifact.order,
+    )
+
+
 def select_pages_run_transients(
     artifacts: list[Artifact],
     *,
     generations: list[BranchGeneration],
+    compatibility_generations: list[CompatibilityGeneration] | None = None,
     pages_run_id: int,
     pages_run_sha: str,
 ) -> list[Artifact]:
@@ -221,6 +274,10 @@ def select_pages_run_transients(
     expected_names = {"github-pages"}
     expected_names.update(
         f"collected-pages-{generation.branch}" for generation in generations
+    )
+    expected_names.update(
+        f"collected-compatibility-{generation.branch}"
+        for generation in (compatibility_generations or [])
     )
     return sorted(
         (
@@ -425,6 +482,36 @@ def _validate_keep(
     )
 
 
+def _validate_compatibility_keep(
+    api: ArtifactApi,
+    generation: CompatibilityGeneration,
+    *,
+    repository: str,
+    pages_run_id: int,
+    pages_run_sha: str,
+) -> None:
+    if api.get_branch_sha(generation.branch) != generation.coverage_sha:
+        raise RotationError(
+            f"release head changed while rotating compatibility evidence for "
+            f"{generation.branch}"
+        )
+    keep = api.get_artifact(generation.keep.artifact_id)
+    if keep != generation.keep or keep.expired:
+        raise RotationError(
+            f"replacement compatibility cache changed while rotating {generation.branch}"
+        )
+    owner = api.get_run(pages_run_id)
+    _validate_run(
+        owner,
+        repository=repository,
+        workflow=PAGES_WORKFLOW,
+        branch="master",
+        sha=pages_run_sha,
+        events=PAGES_EVENTS,
+        require_success=True,
+    )
+
+
 def _delete_exact_artifact(api: ArtifactApi, artifact: Artifact) -> bool:
     """Delete one immutable snapshot entry, treating a concurrent 404 as success."""
 
@@ -548,6 +635,64 @@ def rotate_branch(
     return deleted
 
 
+def rotate_compatibility_branch(
+    api: ArtifactApi,
+    generation: CompatibilityGeneration,
+    *,
+    repository: str,
+    pages_run_id: int,
+    pages_run_sha: str,
+    delete_delay_seconds: float,
+) -> list[int]:
+    if api.get_branch_sha(generation.branch) != generation.coverage_sha:
+        print(f"head changed; compatibility rotation skipped for {generation.branch}")
+        return []
+
+    cache_name = f"pages-mod-compatibility-cache-{generation.branch}"
+    handoff_name = f"pages-mod-compatibility-{generation.branch}"
+    old_caches = select_old_compatibility_caches(
+        api.list_artifacts(cache_name), branch=generation.branch, keep=generation.keep
+    )
+    old_handoffs = select_old_compatibility_handoffs(
+        api.list_artifacts(handoff_name), branch=generation.branch, keep=generation.keep
+    )
+    for artifact in old_caches:
+        _validate_run(
+            api.get_run(artifact.run_id),
+            repository=repository,
+            workflow=PAGES_WORKFLOW,
+            branch="master",
+            sha=artifact.head_sha,
+            events=PAGES_EVENTS,
+            require_success=False,
+        )
+    for artifact in old_handoffs:
+        _validate_run(
+            api.get_run(artifact.run_id),
+            repository=repository,
+            workflow=COMPATIBILITY_REVIEW_WORKFLOW,
+            branch="master",
+            sha=artifact.head_sha,
+            events=COMPATIBILITY_REVIEW_EVENTS,
+            require_success=True,
+        )
+
+    deleted: list[int] = []
+    for artifact in (*old_caches, *old_handoffs):
+        _validate_compatibility_keep(
+            api,
+            generation,
+            repository=repository,
+            pages_run_id=pages_run_id,
+            pages_run_sha=pages_run_sha,
+        )
+        if _delete_exact_artifact(api, artifact):
+            deleted.append(artifact.artifact_id)
+        if delete_delay_seconds:
+            time.sleep(delete_delay_seconds)
+    return deleted
+
+
 def rotate_generations(
     api: ArtifactApi,
     generations: list[BranchGeneration],
@@ -586,10 +731,42 @@ def rotate_generations(
     return summary, deferred
 
 
+def rotate_compatibility_generations(
+    api: ArtifactApi,
+    generations: list[CompatibilityGeneration],
+    *,
+    repository: str,
+    pages_run_id: int,
+    pages_run_sha: str,
+    delete_delay_seconds: float,
+) -> tuple[dict[str, list[int]], list[str]]:
+    summary: dict[str, list[int]] = {}
+    deferred: list[str] = []
+    for generation in generations:
+        try:
+            summary[generation.branch] = rotate_compatibility_branch(
+                api,
+                generation,
+                repository=repository,
+                pages_run_id=pages_run_id,
+                pages_run_sha=pages_run_sha,
+                delete_delay_seconds=delete_delay_seconds,
+            )
+        except RotationError as exc:
+            print(
+                f"Pages compatibility rotation deferred for {generation.branch}: {exc}",
+                file=sys.stderr,
+            )
+            summary[generation.branch] = []
+            deferred.append(generation.branch)
+    return summary, deferred
+
+
 def retire_pages_run_transients(
     api: ArtifactApi,
     *,
     generations: list[BranchGeneration],
+    compatibility_generations: list[CompatibilityGeneration] | None = None,
     trigger_artifacts: list[Artifact],
     repository: str,
     pages_run_id: int,
@@ -599,6 +776,7 @@ def retire_pages_run_transients(
     transients = select_pages_run_transients(
         trigger_artifacts,
         generations=generations,
+        compatibility_generations=compatibility_generations,
         pages_run_id=pages_run_id,
         pages_run_sha=pages_run_sha,
     )
@@ -606,6 +784,14 @@ def retire_pages_run_transients(
     for artifact in transients:
         for generation in generations:
             _validate_keep(
+                api,
+                generation,
+                repository=repository,
+                pages_run_id=pages_run_id,
+                pages_run_sha=pages_run_sha,
+            )
+        for generation in compatibility_generations or []:
+            _validate_compatibility_keep(
                 api,
                 generation,
                 repository=repository,
@@ -694,9 +880,98 @@ def load_generations(
     return generations
 
 
+def load_compatibility_generations(
+    *,
+    evidence_root: Path,
+    repository: str,
+    pages_run_id: int,
+    pages_run_sha: str,
+    trigger_artifacts: list[Artifact],
+) -> list[CompatibilityGeneration]:
+    try:
+        evidence_root.mkdir(parents=True, exist_ok=True)
+        entries = list(evidence_root.iterdir())
+        exact_root = all(
+            not path.is_symlink()
+            and path.is_dir()
+            and parse_version_branch(path.name) is not None
+            for path in entries
+        )
+    except OSError as exc:
+        raise RotationError(
+            f"cannot inspect compatibility cache generation: {exc}"
+        ) from exc
+    if not exact_root:
+        raise RotationError(
+            "compatibility cache generation must contain only release-branch directories"
+        )
+
+    generations: list[CompatibilityGeneration] = []
+    for branch in sorted(path.name for path in entries):
+        try:
+            manifest = validate_compatibility_bundle(
+                evidence_root,
+                branch,
+                expected_repository=repository,
+            )
+        except CompatibilityEvidenceError as exc:
+            raise RotationError(str(exc)) from exc
+        provenance = manifest["provenance"]
+        coverage_sha = _commit(
+            provenance.get("coverage_sha"), "compatibility provenance.coverage_sha"
+        )
+        compatibility_run_id = _positive_int(
+            provenance.get("compatibility_run_id"),
+            "compatibility provenance.compatibility_run_id",
+        )
+        publication_run_id = _positive_int(
+            provenance.get("publication_run_id"),
+            "compatibility provenance.publication_run_id",
+        )
+        expected_name = f"pages-mod-compatibility-cache-{branch}"
+        matching = [
+            artifact
+            for artifact in trigger_artifacts
+            if artifact.name == expected_name
+            and not artifact.expired
+            and artifact.run_id == pages_run_id
+            and artifact.head_branch == "master"
+            and artifact.head_sha == pages_run_sha
+        ]
+        if len(matching) != 1:
+            raise RotationError(
+                f"Pages run must own exactly one current compatibility cache for "
+                f"{branch}: {len(matching)}"
+            )
+        generations.append(
+            CompatibilityGeneration(
+                branch=branch,
+                coverage_sha=coverage_sha,
+                compatibility_run_id=compatibility_run_id,
+                publication_run_id=publication_run_id,
+                keep=matching[0],
+            )
+        )
+
+    expected_names = {generation.keep.name for generation in generations}
+    actual_names = {
+        artifact.name
+        for artifact in trigger_artifacts
+        if artifact.name.startswith("pages-mod-compatibility-cache-")
+        and not artifact.expired
+    }
+    if actual_names != expected_names:
+        raise RotationError(
+            "Pages run compatibility cache inventory disagrees with downloaded evidence: "
+            f"expected={sorted(expected_names)}, actual={sorted(actual_names)}"
+        )
+    return generations
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence-root", type=Path, required=True)
+    parser.add_argument("--compatibility-evidence-root", type=Path)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--pages-run-id", required=True)
     parser.add_argument("--pages-run-sha", required=True)
@@ -750,6 +1025,17 @@ def main(argv: list[str] | None = None) -> int:
             pages_run_sha=pages_run_sha,
             trigger_artifacts=trigger_artifacts,
         )
+        compatibility_generations = (
+            load_compatibility_generations(
+                evidence_root=args.compatibility_evidence_root.resolve(),
+                repository=repository,
+                pages_run_id=pages_run_id,
+                pages_run_sha=pages_run_sha,
+                trigger_artifacts=trigger_artifacts,
+            )
+            if args.compatibility_evidence_root is not None
+            else []
+        )
         summary, deferred = rotate_generations(
             api,
             generations,
@@ -759,10 +1045,21 @@ def main(argv: list[str] | None = None) -> int:
             delete_delay_seconds=args.delete_delay_seconds,
             preserve_handoff_branch=preserve_raw_branch,
         )
+        compatibility_summary, compatibility_deferred = (
+            rotate_compatibility_generations(
+                api,
+                compatibility_generations,
+                repository=repository,
+                pages_run_id=pages_run_id,
+                pages_run_sha=pages_run_sha,
+                delete_delay_seconds=args.delete_delay_seconds,
+            )
+        )
         try:
             pages_run_deleted = retire_pages_run_transients(
                 api,
                 generations=generations,
+                compatibility_generations=compatibility_generations,
                 trigger_artifacts=trigger_artifacts,
                 repository=repository,
                 pages_run_id=pages_run_id,
@@ -779,13 +1076,15 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "deferred_branches": deferred,
                     "deleted_artifact_ids": summary,
+                    "compatibility_deferred_branches": compatibility_deferred,
+                    "deleted_compatibility_artifact_ids": compatibility_summary,
                     "deleted_pages_run_artifact_ids": pages_run_deleted,
                 },
                 sort_keys=True,
             )
         )
         return 0
-    except (RotationError, PublicEvidenceError) as exc:
+    except (CompatibilityEvidenceError, RotationError, PublicEvidenceError) as exc:
         print(f"Pages evidence rotation error: {exc}", file=sys.stderr)
         return 2
 
