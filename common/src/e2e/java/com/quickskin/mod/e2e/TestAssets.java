@@ -178,9 +178,16 @@ public final class TestAssets {
         BufferedImage image = bundledSkinCopy();
         Graphics2D graphics = image.createGraphics();
         graphics.setComposite(AlphaComposite.Src);
-        // Saturated landmarks make the generated ears and tail legible at the fixed E2E distance.
+        // Saturated landmarks make the skin and every feature face legible at the fixed rear
+        // E2E camera. Ears' TALL front faces sample 24..39,0..7, their rear faces sample
+        // 56..63,28..43, and a one-segment BACK tail samples 56..63,16..27. Painting only the
+        // vanilla head/torso leaves the rear-facing feature UVs transparent and creates a false
+        // runtime pass with no visible geometry.
         paintChecker(graphics, 0, 0, 32, 16, 0xFF00D9FF, 0xFFFF30C8);
         paintChecker(graphics, 16, 16, 24, 16, 0xFFFFA000, 0xFF5CFF3A);
+        paintChecker(graphics, 24, 0, 16, 8, 0xFFFFF200, 0xFFFF3B30);
+        paintChecker(graphics, 56, 28, 8, 16, 0xFFFFF200, 0xFFFF3B30);
+        paintChecker(graphics, 56, 16, 8, 12, 0xFF9D4EDD, 0xFF00F5D4);
         graphics.dispose();
 
         ClassLoader loader = TestAssets.class.getClassLoader();
@@ -212,6 +219,9 @@ public final class TestAssets {
         writerClass.getMethod("write", featuresClass, writableImageClass)
                 .invoke(null, features, rawImage);
         image.setRGB(0, 0, 64, 64, pixels, 0, 64);
+        requireOpaqueRegion(image, 24, 0, 16, 8, "TALL ear front");
+        requireOpaqueRegion(image, 56, 28, 8, 16, "TALL ear back");
+        requireOpaqueRegion(image, 56, 16, 8, 12, "BACK tail");
 
         Path fixture = deterministicFixture("qs_e2e_ears_skin.png");
         ImageIO.write(image, "png", fixture.toFile());
@@ -298,6 +308,17 @@ public final class TestAssets {
             for (int column = 0; column < width; column++) {
                 graphics.setColor(new Color(((row + column) & 1) == 0 ? first : second, true));
                 graphics.fillRect(x + column, y + row, 1, 1);
+            }
+        }
+    }
+
+    private static void requireOpaqueRegion(
+            BufferedImage image, int x, int y, int width, int height, String label) {
+        for (int row = 0; row < height; row++) {
+            for (int column = 0; column < width; column++) {
+                if (((image.getRGB(x + column, y + row) >>> 24) & 0xFF) != 0xFF) {
+                    throw new IllegalStateException(label + " contains transparent feature pixels");
+                }
             }
         }
     }
