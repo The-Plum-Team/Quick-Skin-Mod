@@ -6,7 +6,6 @@ import com.quickskin.mod.client.compat.CpmModelWorkflow;
 import com.quickskin.mod.client.compat.CustomNPCsIntegration;
 import com.quickskin.mod.client.compat.EarsCompatIntegration;
 import com.quickskin.mod.client.compat.EssentialCompatIntegration;
-import com.quickskin.mod.client.compat.ReplayModHelper;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.client.gui.util.GuiScaleManager;
 import com.quickskin.mod.client.gui.util.SkinImporter;
@@ -982,7 +981,7 @@ interface ModCompatibilityFeature {
                     if (++stableReplaySizePolls < 12) return false;
                     cleanupStartupScanProtection();
                     VanillaShim.setScreen(minecraft, null);
-                    ReplayModHelper.resetReplayEvidenceState();
+                    ReplayModBridge.resetReplayEvidenceState();
                     E2ELog.info("starting finalized ReplayMod recording "
                             + finalizedReplayPath.getFileName() + " (" + size + " bytes)");
                     startReplay(finalizedReplayPath);
@@ -991,31 +990,31 @@ interface ModCompatibilityFeature {
                 }
 
                 replayPolls++;
-                if (!ReplayModHelper.isInReplay()) return false;
+                if (!ReplayModBridge.isInReplay()) return false;
                 if (!replayModeLogged) {
                     replayModeLogged = true;
                     E2ELog.info("ReplayMod playback entered CameraEntity mode");
                 }
                 if (!watcherStarted) {
-                    ReplayModHelper.startReplayPlayerWatcher();
+                    ReplayModBridge.startReplayPlayerWatcher();
                     watcherStarted = true;
                 }
-                replayTarget = ReplayModHelper.getTargetPlayerUUID();
-                replayPlayer = ReplayModHelper.getPlayerByUUID(replayTarget);
+                replayTarget = ReplayModBridge.getTargetPlayerUUID();
+                replayPlayer = ReplayModBridge.getPlayerByUUID(replayTarget);
                 if (replayPolls == 1 || replayPolls % 20 == 0) {
                     PlayerAppearance observed = replayTarget == null
                             ? null : appearances.getAppearance(replayTarget);
                     E2ELog.info("ReplayMod readiness: target=" + replayTarget
                             + ", player=" + (replayPlayer != null)
-                            + ", intercepted=" + ReplayModHelper.getInterceptedPacketCount()
-                            + ", applied=" + ReplayModHelper.hasSkinBeenApplied()
+                            + ", intercepted=" + ReplayModBridge.getInterceptedPacketCount()
+                            + ", applied=" + ReplayModBridge.hasSkinBeenApplied()
                             + ", skin=" + (observed == null ? null : observed.getSkinId()));
                 }
                 if (replayPlayer == null) return false;
                 PlayerAppearance replayAppearance = appearances.getAppearance(replayTarget);
                 String expected = "local_skin:" + skinHash;
-                if (!ReplayModHelper.hasSkinBeenApplied()
-                        || ReplayModHelper.getInterceptedPacketCount() <= 0
+                if (!ReplayModBridge.hasSkinBeenApplied()
+                        || ReplayModBridge.getInterceptedPacketCount() <= 0
                         || replayAppearance == null
                         || !expected.equals(replayAppearance.getSkinId())
                         || appearances.getSkinLocation(replayTarget) == null
@@ -1041,13 +1040,13 @@ interface ModCompatibilityFeature {
         @Override
         public Step.Result assertQuickSkinFeature() {
             if (failure != null) return Step.Result.fail(failure);
-            if (!ReplayModHelper.isInReplay() || replayPlayer == null || replayTarget == null) {
+            if (!ReplayModBridge.isInReplay() || replayPlayer == null || replayTarget == null) {
                 return Step.Result.fail("ReplayMod playback has no recorded player target");
             }
-            if (!ReplayModHelper.hasSkinBeenApplied()) {
+            if (!ReplayModBridge.hasSkinBeenApplied()) {
                 return Step.Result.fail("ReplayMod watcher did not apply the saved Quick Skin look");
             }
-            int intercepted = ReplayModHelper.getInterceptedPacketCount();
+            int intercepted = ReplayModBridge.getInterceptedPacketCount();
             if (intercepted <= 0) {
                 return Step.Result.fail("no recorded Quick Skin payload traversed the replay mixin");
             }
@@ -1236,6 +1235,59 @@ interface ModCompatibilityFeature {
             }
             if (spectate == null) throw new NoSuchMethodException("ReplayHandler.spectateEntity");
             spectate.invoke(handler, player);
+        }
+
+        /**
+         * ReplayMod is an explicit 1.20.1 compatibility lane, while this shared E2E source must
+         * still compile for versions where the production bridge is intentionally absent. Resolve
+         * the real bridge only when that lane runs; its public methods remain the tested surface.
+         */
+        private static final class ReplayModBridge {
+            private static final String CLASS_NAME =
+                    "com.quickskin.mod.client.compat.ReplayModHelper";
+
+            private ReplayModBridge() {}
+
+            static void resetReplayEvidenceState() {
+                invoke("resetReplayEvidenceState", new Class<?>[0]);
+            }
+
+            static boolean isInReplay() {
+                return Boolean.TRUE.equals(invoke("isInReplay", new Class<?>[0]));
+            }
+
+            static void startReplayPlayerWatcher() {
+                invoke("startReplayPlayerWatcher", new Class<?>[0]);
+            }
+
+            static UUID getTargetPlayerUUID() {
+                Object value = invoke("getTargetPlayerUUID", new Class<?>[0]);
+                return value instanceof UUID uuid ? uuid : null;
+            }
+
+            static AbstractClientPlayer getPlayerByUUID(UUID uuid) {
+                Object value = invoke("getPlayerByUUID", new Class<?>[] {UUID.class}, uuid);
+                return value instanceof AbstractClientPlayer player ? player : null;
+            }
+
+            static int getInterceptedPacketCount() {
+                Object value = invoke("getInterceptedPacketCount", new Class<?>[0]);
+                return value instanceof Number number ? number.intValue() : 0;
+            }
+
+            static boolean hasSkinBeenApplied() {
+                return Boolean.TRUE.equals(invoke("hasSkinBeenApplied", new Class<?>[0]));
+            }
+
+            private static Object invoke(String name, Class<?>[] parameterTypes, Object... args) {
+                try {
+                    Class<?> bridge = Class.forName(CLASS_NAME);
+                    return bridge.getMethod(name, parameterTypes).invoke(null, args);
+                } catch (ReflectiveOperationException | LinkageError exception) {
+                    throw new IllegalStateException("ReplayMod bridge method is unavailable: "
+                            + name, exception);
+                }
+            }
         }
 
     }

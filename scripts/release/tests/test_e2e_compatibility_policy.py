@@ -232,7 +232,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             '"customnpcs".equals(type.getNamespace())',
             "CustomNPCsIntegration.detectSkinConflict",
             "EssentialCompatIntegration.findBottomEssentialWidget",
-            "ReplayModHelper.getInterceptedPacketCount",
+            "ReplayModBridge.getInterceptedPacketCount",
             "startReplay(finalizedReplayPath)",
         ):
             with self.subTest(proof=required_feature_proof):
@@ -244,6 +244,9 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("expectedType.isInstance(candidate)", feature)
         self.assertIn("com.tom.cpm.shared.editor.Exporter", assets)
         self.assertIn("summon customnpcs:customnpc", runtime)
+        self.assertIn(
+            '"com.quickskin.mod.client.compat.ReplayModHelper"', feature
+        )
 
     def test_essential_raw_screenshot_supports_both_gpu_readback_eras(self) -> None:
         """Essential needs a silent framebuffer copy before and after 1.21.5's async API."""
