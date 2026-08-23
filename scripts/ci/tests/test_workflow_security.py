@@ -282,6 +282,11 @@ class WorkflowSecurityTest(unittest.TestCase):
             ): "7",
             (
                 "mod-compatibility-review.yml",
+                "Upload the protected compatibility verdict cache",
+                "${{ steps.publish-verdict-cache.outputs.artifact_name }}",
+            ): "7",
+            (
+                "mod-compatibility-review.yml",
                 "Upload the durable clean lane marker",
                 "mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}",
             ): "7",
@@ -1030,7 +1035,25 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertNotIn("--max-parallel-calls 32", review)
         self.assertNotIn("--review-identical", review)
-        self.assertNotIn("--cache ", review)
+        self.assertIn("Restore authenticated compatibility verdict cache shards", review)
+        self.assertIn("--cache visual-review-verdict-cache.input.json", review)
+        self.assertIn("--cache-policy-sha256", review)
+        self.assertIn("e2e/mod-compatibility-contract.json", review)
+        self.assertIn("release/release-matrix.json", review)
+        self.assertIn(
+            "mod-compatibility-verdict-cache-$policy_sha256-${{ matrix.id }}",
+            review,
+        )
+        self.assertIn('merge-base --is-ancestor \\', review)
+        self.assertIn(
+            '$cache_owner_sha:.github/workflows/mod-compatibility-review.yml',
+            review,
+        )
+        self.assertIn("Publish the protected compatibility verdict cache", review)
+        self.assertIn("Upload the protected compatibility verdict cache", review)
+        self.assertIn("Retire consumed compatibility verdict cache shards", review)
+        self.assertIn("steps.verdict-cache-artifact.outputs.artifact-id", review)
+        self.assertIn("--max-entries 1", review)
         self.assertIn("git show", enumerate_review)
         self.assertIn("$plan_source_sha:e2e/mod-compatibility-contract.json", enumerate_review)
         self.assertIn("${{ matrix.source_sha }}:e2e/scenario-contract.json", review)
