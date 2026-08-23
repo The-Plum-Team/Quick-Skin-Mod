@@ -135,12 +135,12 @@ public final class TestAssets {
         clearModernSkinOverlay(image);
         Graphics2D graphics = image.createGraphics();
         graphics.setComposite(AlphaComposite.Src);
-        paintChecker(graphics, 40, 8, 8, 8, 0xFF30343B, 0xFF4A505A);
-        paintChecker(graphics, 20, 36, 8, 12, 0xFF30343B, 0xFF4A505A);
-        paintChecker(graphics, 44, 36, 4, 12, 0xFF30343B, 0xFF4A505A);
-        paintChecker(graphics, 52, 52, 4, 12, 0xFF30343B, 0xFF4A505A);
-        paintChecker(graphics, 4, 36, 4, 12, 0xFF30343B, 0xFF4A505A);
-        paintChecker(graphics, 4, 52, 4, 12, 0xFF30343B, 0xFF4A505A);
+        paintSparseChecker(graphics, 40, 8, 8, 8, 0xFF30343B, 0xFF4A505A);
+        paintSparseChecker(graphics, 20, 36, 8, 12, 0xFF30343B, 0xFF4A505A);
+        paintSparseChecker(graphics, 44, 36, 4, 12, 0xFF30343B, 0xFF4A505A);
+        paintSparseChecker(graphics, 52, 52, 4, 12, 0xFF30343B, 0xFF4A505A);
+        paintSparseChecker(graphics, 4, 36, 4, 12, 0xFF30343B, 0xFF4A505A);
+        paintSparseChecker(graphics, 4, 52, 4, 12, 0xFF30343B, 0xFF4A505A);
         graphics.dispose();
         Path fixture = deterministicFixture("qs_e2e_subtle_overlay_skin.png");
         ImageIO.write(image, "png", fixture.toFile());
@@ -157,12 +157,12 @@ public final class TestAssets {
         clearModernSkinOverlay(image);
         Graphics2D graphics = image.createGraphics();
         graphics.setComposite(AlphaComposite.Src);
-        paintChecker(graphics, 40, 8, 8, 8, 0xFF00E5FF, 0xFFFF2BD6);   // hat front
-        paintChecker(graphics, 20, 36, 8, 12, 0xFF7CFF00, 0xFFFF7A00); // jacket front
-        paintChecker(graphics, 44, 36, 4, 12, 0xFF00E5FF, 0xFFFF2BD6); // right sleeve
-        paintChecker(graphics, 52, 52, 4, 12, 0xFF7CFF00, 0xFFFF7A00); // left sleeve
-        paintChecker(graphics, 4, 36, 4, 12, 0xFFFF2BD6, 0xFF00E5FF);  // right trousers
-        paintChecker(graphics, 4, 52, 4, 12, 0xFFFF7A00, 0xFF7CFF00);  // left trousers
+        paintSparseChecker(graphics, 40, 8, 8, 8, 0xFF00E5FF, 0xFFFF2BD6);   // hat front
+        paintSparseChecker(graphics, 20, 36, 8, 12, 0xFF7CFF00, 0xFFFF7A00); // jacket front
+        paintSparseChecker(graphics, 44, 36, 4, 12, 0xFF00E5FF, 0xFFFF2BD6); // right sleeve
+        paintSparseChecker(graphics, 52, 52, 4, 12, 0xFF7CFF00, 0xFFFF7A00); // left sleeve
+        paintSparseChecker(graphics, 4, 36, 4, 12, 0xFFFF2BD6, 0xFF00E5FF);  // right trousers
+        paintSparseChecker(graphics, 4, 52, 4, 12, 0xFFFF7A00, 0xFF7CFF00);  // left trousers
         graphics.dispose();
         Path fixture = deterministicFixture("qs_e2e_raised_overlay_skin.png");
         ImageIO.write(image, "png", fixture.toFile());
@@ -307,6 +307,24 @@ public final class TestAssets {
         for (int row = 0; row < height; row++) {
             for (int column = 0; column < width; column++) {
                 graphics.setColor(new Color(((row + column) & 1) == 0 ? first : second, true));
+                graphics.fillRect(x + column, y + row, 1, 1);
+            }
+        }
+    }
+
+    /**
+     * Paint isolated opaque overlay pixels with transparent gaps between them. A fully opaque
+     * checker hides the ordinary skin beneath the outer layer and can look like a broken texture
+     * even when 3D Skin Layers rendered it correctly. The gaps keep the intact base model visible
+     * while the two colours still make the raised voxels unmistakable.
+     */
+    private static void paintSparseChecker(
+            Graphics2D graphics, int x, int y, int width, int height, int first, int second) {
+        for (int row = 0; row < height; row++) {
+            for (int column = 0; column < width; column++) {
+                int phase = (row + column) & 3;
+                int colour = phase == 0 ? first : phase == 2 ? second : 0x00000000;
+                graphics.setColor(new Color(colour, true));
                 graphics.fillRect(x + column, y + row, 1, 1);
             }
         }
