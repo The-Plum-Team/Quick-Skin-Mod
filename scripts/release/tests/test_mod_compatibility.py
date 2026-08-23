@@ -260,6 +260,32 @@ class ModCompatibilityContractTest(unittest.TestCase):
             ):
                 mod_compatibility.load_contract(path)
 
+    def test_contract_requires_exact_bounded_feature_evidence(self) -> None:
+        missing = copy.deepcopy(self.payload)
+        del missing["mods"][0]["evidence"]["baseline_with_mod"]
+
+        extra = copy.deepcopy(self.payload)
+        extra["mods"][0]["evidence"]["unexpected"] = "not allowed"
+
+        malformed = copy.deepcopy(self.payload)
+        malformed["mods"][0]["evidence"]["apply_local_skin_with_mod"] = (
+            "multiline\ntext"
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for label, mutation in (
+                ("missing", missing),
+                ("extra", extra),
+                ("malformed", malformed),
+            ):
+                with self.subTest(label=label):
+                    path = self.write_contract(root, mutation)
+                    with self.assertRaises(
+                        mod_compatibility.CompatibilityContractError
+                    ):
+                        mod_compatibility.load_contract(path)
+
     def test_explicit_updater_selects_newest_allowed_release_and_rejects_unknown_deps(
         self,
     ) -> None:
@@ -396,6 +422,10 @@ class ModCompatibilityContractTest(unittest.TestCase):
             loaders=("fabric",),
             allowed_version_types=("release",),
             provided_dependencies=(),
+            evidence=mod_compatibility.CompatibilityEvidence(
+                baseline_with_mod="Visible control",
+                apply_local_skin_with_mod="Visible integration",
+            ),
             supported_game_versions=None,
             excluded_lanes=(),
             artifacts=(artifact,),
@@ -523,6 +553,33 @@ class ModCompatibilityContractTest(unittest.TestCase):
         self.assertIn("suppress its duplicate PlayerWidget", expectation)
         self.assertIn("Quick Skin action icon", expectation)
         self.assertIn("need not overlap the vanilla splash", expectation)
+
+    def test_compatibility_curation_uses_locked_feature_expectations(self) -> None:
+        compatibility_mod = mod_compatibility.load_contract(
+            self.contract_path
+        ).mod("replaymod")
+
+        baseline = mod_compatibility_visual._compatibility_expectation(
+            compatibility_mod,
+            "replaymod",
+            {
+                "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_BASELINE_CAPTURE,
+                "expectation": "generic baseline",
+            },
+        )
+        applied = mod_compatibility_visual._compatibility_expectation(
+            compatibility_mod,
+            "replaymod",
+            {
+                "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_APPLIED_CAPTURE,
+                "expectation": "generic applied",
+            },
+        )
+
+        self.assertEqual(compatibility_mod.evidence.baseline_with_mod, baseline)
+        self.assertEqual(compatibility_mod.evidence.apply_local_skin_with_mod, applied)
+        self.assertIn("recording indicator", baseline)
+        self.assertIn("recorded Quick Skin payload", applied)
 
 
 if __name__ == "__main__":
