@@ -899,7 +899,9 @@ interface ModCompatibilityFeature {
         private void pinCursorAwayFromEssentialWidgets() {
             try {
                 Object window = minecraft.getWindow();
-                for (String accessor : new String[] {"getWindow", "handle"}) {
+                for (String accessor : new String[] {
+                        "getWindow", "handle", "method_4490", "m_85439_"
+                }) {
                     try {
                         Object value = window.getClass().getMethod(accessor).invoke(window);
                         if (value instanceof Number number) {

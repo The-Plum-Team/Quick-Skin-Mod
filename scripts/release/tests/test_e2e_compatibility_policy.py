@@ -247,6 +247,15 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             with self.subTest(custom_npcs_bridge_proof=custom_npcs_bridge_proof):
                 self.assertIn(custom_npcs_bridge_proof, feature)
 
+        for window_handle_accessor in (
+            '"getWindow"',
+            '"handle"',
+            '"method_4490"',
+            '"m_85439_"',
+        ):
+            with self.subTest(window_handle_accessor=window_handle_accessor):
+                self.assertIn(window_handle_accessor, feature)
+
         self.assertIn("com.unascribed.ears.common.EarsFeaturesWriterV1", assets)
         self.assertIn("rendererFeatures(rendererClass, playerRenderer)", feature)
         self.assertIn("rendererLookupArgument", feature)
