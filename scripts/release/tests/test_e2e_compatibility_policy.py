@@ -230,13 +230,31 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             "meshCacheContains",
             "manualRenderObserved",
             '"customnpcs".equals(type.getNamespace())',
-            "CustomNPCsIntegration.detectSkinConflict",
             "EssentialCompatIntegration.findBottomEssentialWidget",
             "ReplayModBridge.getInterceptedPacketCount",
             "startReplay(finalizedReplayPath)",
         ):
             with self.subTest(proof=required_feature_proof):
                 self.assertIn(required_feature_proof, feature)
+
+        for custom_npcs_bridge_proof in (
+            '"detectSkinConflict".equals(method.getName())',
+            "parameters[0] != UUID.class",
+            "!parameters[1].isInstance(location)",
+            "method.getReturnType() != boolean.class",
+            ".getConstructor(String.class, String.class)",
+        ):
+            with self.subTest(custom_npcs_bridge_proof=custom_npcs_bridge_proof):
+                self.assertIn(custom_npcs_bridge_proof, feature)
+
+        for window_handle_accessor in (
+            '"getWindow"',
+            '"handle"',
+            '"method_4490"',
+            '"m_85439_"',
+        ):
+            with self.subTest(window_handle_accessor=window_handle_accessor):
+                self.assertIn(window_handle_accessor, feature)
 
         self.assertIn("com.unascribed.ears.common.EarsFeaturesWriterV1", assets)
         self.assertIn("rendererFeatures(rendererClass, playerRenderer)", feature)
