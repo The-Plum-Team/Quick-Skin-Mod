@@ -364,9 +364,9 @@ interface ModCompatibilityFeature {
                 } catch (ClassNotFoundException ignored) {
                     rendererClass = Class.forName("com.unascribed.ears.EarsMod");
                 }
-                Object rendererFeatures = rendererClass
-                        .getMethod("getEarsFeatures", AbstractClientPlayer.class)
-                        .invoke(null, minecraft.player);
+                Object playerRenderer = minecraft.getEntityRenderDispatcher()
+                        .getRenderer(minecraft.player);
+                Object rendererFeatures = rendererFeatures(rendererClass, playerRenderer);
                 if (EarsCompatIntegration.isDisabledResult(rendererFeatures)) {
                     return Step.Result.fail("Ears renderer lookup did not receive Quick Skin features");
                 }
@@ -376,7 +376,7 @@ interface ModCompatibilityFeature {
                     return Step.Result.fail("Ears renderer lookup returned the wrong features: "
                             + rendererFeatures);
                 }
-                if (!earsRendererLayerAttached()) {
+                if (!earsRendererLayerAttached(playerRenderer)) {
                     return Step.Result.fail("Ears did not attach its feature renderer to the player");
                 }
                 Class<?> featuresClass = Class.forName(
@@ -395,9 +395,59 @@ interface ModCompatibilityFeature {
                     + " tail, attached Ears' feature layer, and published them to its renderer");
         }
 
-        private boolean earsRendererLayerAttached() {
-            Object playerRenderer = minecraft.getEntityRenderDispatcher()
-                    .getRenderer(minecraft.player);
+        /**
+         * Exercise the same public lookup the installed Ears renderer calls. Ears accepted the
+         * player entity through 1.21.1, then moved the lookup to PlayerRenderState. Build that state
+         * through the live player renderer so this remains a renderer-path assertion rather than a
+         * version-specific storage check.
+         */
+        private Object rendererFeatures(Class<?> earsRenderer, Object playerRenderer)
+                throws ReflectiveOperationException {
+            Method incompatibleLookup = null;
+            for (Method method : earsRenderer.getMethods()) {
+                if (!"getEarsFeatures".equals(method.getName())
+                        || !java.lang.reflect.Modifier.isStatic(method.getModifiers())
+                        || method.getParameterCount() != 1) {
+                    continue;
+                }
+                incompatibleLookup = method;
+                Object argument = rendererLookupArgument(
+                        method.getParameterTypes()[0], playerRenderer);
+                if (argument == null) continue;
+                method.setAccessible(true);
+                return method.invoke(null, argument);
+            }
+            String parameter = incompatibleLookup == null
+                    ? "missing getEarsFeatures"
+                    : incompatibleLookup.getParameterTypes()[0].getName();
+            throw new NoSuchMethodException("no renderer argument available for "
+                    + earsRenderer.getName() + ".getEarsFeatures(" + parameter + ")");
+        }
+
+        private Object rendererLookupArgument(Class<?> expectedType, Object playerRenderer)
+                throws ReflectiveOperationException {
+            if (expectedType.isInstance(minecraft.player)) return minecraft.player;
+
+            // 1.21.2+ exposes EntityRenderer.createRenderState(entity, partialTick). Its erased
+            // return type is EntityRenderState, so validate the returned instance instead of the
+            // declared type. The method name is deliberately irrelevant on intermediary Fabric.
+            for (Method method : playerRenderer.getClass().getMethods()) {
+                Class<?>[] parameters = method.getParameterTypes();
+                if (java.lang.reflect.Modifier.isStatic(method.getModifiers())
+                        || parameters.length != 2
+                        || !parameters[0].isInstance(minecraft.player)
+                        || parameters[1] != float.class
+                        || method.getReturnType() == void.class
+                        || method.getReturnType().isPrimitive()) {
+                    continue;
+                }
+                Object candidate = method.invoke(playerRenderer, minecraft.player, 0.0f);
+                if (expectedType.isInstance(candidate)) return candidate;
+            }
+            return null;
+        }
+
+        private boolean earsRendererLayerAttached(Object playerRenderer) {
             for (Class<?> type = playerRenderer.getClass(); type != null; type = type.getSuperclass()) {
                 for (Field field : type.getDeclaredFields()) {
                     boolean directLayer = isEarsRendererClass(field.getType());
