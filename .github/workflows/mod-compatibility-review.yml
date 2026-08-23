@@ -570,6 +570,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Revalidate current master before capsule or model admission
@@ -754,6 +755,167 @@ jobs:
             --validate-input-only
           sha256sum "$manifest" > "$RUNNER_TEMP/mod-compatibility-manifest.sha256"
 
+      - name: Restore authenticated compatibility verdict cache shards
+        id: verdict-cache
+        continue-on-error: true
+        working-directory: ${{ runner.temp }}/mod-compatibility-capsule
+        shell: bash
+        env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source "$GITHUB_WORKSPACE/scripts/ci/github_api_retry.sh"
+          printf 'restored=false\n' >> "$GITHUB_OUTPUT"
+          printf 'artifact_ids=\n' >> "$GITHUB_OUTPUT"
+          policy_sha256="$(python3 \
+            "$GITHUB_WORKSPACE/e2e/visual_review_cache.py" policy \
+            --runner "$GITHUB_WORKSPACE/e2e/visual_review_runner.py" \
+            --checker "$GITHUB_WORKSPACE/e2e/check_visual_review.py" \
+            --cache-codec "$GITHUB_WORKSPACE/e2e/visual_review_cache.py" \
+            --similarity-codec "$GITHUB_WORKSPACE/e2e/visual_similarity.py" \
+            --scenario-contract \
+              "$GITHUB_WORKSPACE/e2e/mod-compatibility-contract.json" \
+            --release-matrix "$GITHUB_WORKSPACE/release/release-matrix.json" \
+            --provider-lock "$GITHUB_WORKSPACE/.github/claude/package-lock.json" \
+            --triage-prompt \
+              "$GITHUB_WORKSPACE/e2e/mod_compatibility_review_prompt.md" \
+            --verify-prompt \
+              "$GITHUB_WORKSPACE/e2e/mod_compatibility_review_verify_prompt.md" \
+            --triage-model claude-haiku-4-5 \
+            --verify-model claude-opus-5 \
+            --review-mode reference-comparison \
+            --triage-chunk-size 8 \
+            --verify-chunk-size 4)"
+          [[ "$policy_sha256" =~ ^[0-9a-f]{64}$ ]]
+          printf 'policy_sha256=%s\n' "$policy_sha256" >> "$GITHUB_OUTPUT"
+          cache_name="mod-compatibility-verdict-cache-$policy_sha256-${{ matrix.id }}"
+          if ! artifacts="$(github_api_retry --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$cache_name&per_page=100")"; then
+            exit 0
+          fi
+          if ! jq -e \
+            '(type == "array") and
+             ([.[] | (.artifacts | type == "array")] | all) and
+             ([.[].artifacts[]] | length <= 100)' \
+              <<< "$artifacts" > /dev/null; then
+            exit 0
+          fi
+          cache_arguments=()
+          cache_ids=()
+          while IFS=$'\t' read -r candidate_id candidate_run_id; do
+            [[ "$candidate_id" =~ ^[1-9][0-9]*$ ]]
+            [[ "$candidate_run_id" =~ ^[1-9][0-9]*$ ]]
+            candidate_run="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_run_id" \
+              2>/dev/null || true)"
+            if [[ -z "$candidate_run" ]] || ! jq -e \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --argjson run_id "$candidate_run_id" \
+                '.id == $run_id and .status == "completed" and
+                 (.conclusion == "success" or .conclusion == "failure") and
+                 (.event == "repository_dispatch" or .event == "schedule" or
+                  .event == "workflow_dispatch") and
+                 .head_branch == "master" and
+                 (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
+                 .path == ".github/workflows/mod-compatibility-review.yml" and
+                 .head_repository.full_name == $repository' \
+                <<< "$candidate_run" > /dev/null; then
+              continue
+            fi
+            cache_owner_sha="$(jq -er .head_sha <<< "$candidate_run")"
+            if ! git -C "$GITHUB_WORKSPACE" cat-file -e \
+                "$cache_owner_sha^{commit}" 2>/dev/null; then
+              if ! git -C "$GITHUB_WORKSPACE" fetch --no-tags origin \
+                  "$cache_owner_sha"; then
+                continue
+              fi
+            fi
+            if ! git -C "$GITHUB_WORKSPACE" merge-base --is-ancestor \
+                "$cache_owner_sha" "$GITHUB_SHA"; then
+              continue
+            fi
+            owner_producer="$(git -C "$GITHUB_WORKSPACE" rev-parse \
+              "$cache_owner_sha:.github/workflows/mod-compatibility-review.yml" \
+              2>/dev/null || true)"
+            current_producer="$(git -C "$GITHUB_WORKSPACE" rev-parse \
+              "$GITHUB_SHA:.github/workflows/mod-compatibility-review.yml")"
+            if [[ -z "$owner_producer" \
+                || "$owner_producer" != "$current_producer" ]]; then
+              continue
+            fi
+            cache_metadata="$(jq -c --argjson id "$candidate_id" \
+              '[.[].artifacts[] | select(.id == $id)] |
+               if length == 1 then .[0] else empty end' <<< "$artifacts")"
+            if [[ -z "$cache_metadata" ]]; then
+              continue
+            fi
+            if ! cache_size="$(jq -er .size_in_bytes <<< "$cache_metadata")" || \
+                ! cache_digest="$(jq -er \
+                  '.digest | select(type == "string" and
+                    test("^sha256:[0-9a-f]{64}$"))' <<< "$cache_metadata")"; then
+              continue
+            fi
+            cache_archive="$RUNNER_TEMP/mod-compatibility-verdict-cache-$candidate_id.zip"
+            if ! github_api_retry_to_file "$cache_archive" \
+                -H 'Accept: application/vnd.github+json' \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts/$candidate_id/zip"; then
+              continue
+            fi
+            if [[ "$(stat -c %s "$cache_archive")" != "$cache_size" ]] || \
+                [[ "sha256:$(sha256sum "$cache_archive" | cut -d ' ' -f 1)" != \
+                  "$cache_digest" ]]; then
+              rm -f -- "$cache_archive"
+              continue
+            fi
+            cache_root="$RUNNER_TEMP/restored-mod-compatibility-cache-$candidate_id"
+            if ! python3 "$GITHUB_WORKSPACE/scripts/ci/bounded_zip.py" \
+                "$cache_archive" "$cache_root" \
+                --max-archive-bytes 4194304 \
+                --max-entries 1 \
+                --max-total-bytes 4194304 \
+                --max-file-bytes 4194304 \
+                --max-compression-ratio 200 > /dev/null; then
+              rm -f -- "$cache_archive"
+              continue
+            fi
+            rm -f -- "$cache_archive"
+            restored="$cache_root/visual-review-verdict-cache.json"
+            normalized="$RUNNER_TEMP/mod-compatibility-verdict-cache-$candidate_id.json"
+            if [[ ! -f "$restored" || -L "$restored" ]] || \
+                ! python3 "$GITHUB_WORKSPACE/e2e/visual_review_cache.py" validate \
+                  --cache "$restored" \
+                  --policy-sha256 "$policy_sha256" \
+                  --normalized-output "$normalized"; then
+              continue
+            fi
+            cache_arguments+=(--cache "$normalized")
+            cache_ids+=("$candidate_id")
+            if (( ${#cache_ids[@]} == 32 )); then
+              break
+            fi
+          done < <(jq -r --arg name "$cache_name" \
+            '[.[].artifacts[] |
+              select(.name == $name and .expired == false and
+                (.size_in_bytes | type == "number" and . > 0 and . <= 4194304) and
+                (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
+                (.id | type == "number" and . > 0) and
+                (.workflow_run.id | type == "number" and . > 0))] |
+             sort_by(.created_at, .id) | reverse | .[] |
+             [.id, .workflow_run.id] | @tsv' <<< "$artifacts" || true)
+          if (( ${#cache_ids[@]} == 0 )); then
+            exit 0
+          fi
+          python3 "$GITHUB_WORKSPACE/e2e/visual_review_cache.py" combine \
+            "${cache_arguments[@]}" \
+            --policy-sha256 "$policy_sha256" \
+            --output visual-review-verdict-cache.input.json
+          cache_id_list="$(IFS=,; printf '%s' "${cache_ids[*]}")"
+          [[ "$cache_id_list" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]]
+          printf 'artifact_ids=%s\n' "$cache_id_list" >> "$GITHUB_OUTPUT"
+          printf 'restored=true\n' >> "$GITHUB_OUTPUT"
+
       - name: Install Node for the locked Claude CLI
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -790,6 +952,14 @@ jobs:
           if (( admission_delay > 0 )); then
             sleep "$admission_delay"
           fi
+          cache_arguments=()
+          if [[ "${{ steps.verdict-cache.outputs.restored }}" == true ]]; then
+            cache_arguments=(
+              --cache visual-review-verdict-cache.input.json
+              --cache-policy-sha256 \
+                "${{ steps.verdict-cache.outputs.policy_sha256 }}"
+            )
+          fi
           model_status=0
           python3 "$GITHUB_WORKSPACE/e2e/visual_review_runner.py" \
             --capsule . \
@@ -806,6 +976,7 @@ jobs:
             --max-parallel-calls "${{ matrix.model_parallelism }}" \
             --model-attempts 3 \
             --call-spacing-seconds 2 \
+            "${cache_arguments[@]}" \
             --output visual-review-report.staged.json \
             --completion-state visual-review-completion.json \
             --failure-report visual-review-failure.json \
@@ -851,6 +1022,81 @@ jobs:
           fi
           (( review_status == 0 ))
           [[ "$state" == complete ]]
+
+      - name: Publish the protected compatibility verdict cache
+        id: publish-verdict-cache
+        if: >-
+          always() && steps.check.outcome == 'success' &&
+          steps.model.outputs.model_status == '0' &&
+          steps.verdict-cache.outputs.policy_sha256 != ''
+        working-directory: ${{ runner.temp }}/mod-compatibility-capsule
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          update_arguments=()
+          if [[ -f visual-review-verdict-cache.input.json ]]; then
+            update_arguments=(--existing-cache visual-review-verdict-cache.input.json)
+          fi
+          python3 "$GITHUB_WORKSPACE/e2e/visual_review_cache.py" update \
+            "${update_arguments[@]}" \
+            --manifest review-input/visual-review-manifest.json \
+            --report visual-review-report.json \
+            --policy-sha256 "${{ steps.verdict-cache.outputs.policy_sha256 }}" \
+            --output visual-review-verdict-cache.json
+          printf 'artifact_name=mod-compatibility-verdict-cache-%s-%s\n' \
+            "${{ steps.verdict-cache.outputs.policy_sha256 }}" \
+            "${{ matrix.id }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the protected compatibility verdict cache
+        id: verdict-cache-artifact
+        if: always() && steps.publish-verdict-cache.outputs.artifact_name != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.publish-verdict-cache.outputs.artifact_name }}
+          path: ${{ runner.temp }}/mod-compatibility-capsule/visual-review-verdict-cache.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retire consumed compatibility verdict cache shards
+        if: >-
+          always() && steps.verdict-cache.outputs.restored == 'true' &&
+          steps.verdict-cache-artifact.outputs.artifact-id != ''
+        continue-on-error: true
+        shell: bash
+        env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source scripts/ci/github_api_retry.sh
+          old_id_list="${{ steps.verdict-cache.outputs.artifact_ids }}"
+          new_id="${{ steps.verdict-cache-artifact.outputs.artifact-id }}"
+          cache_name="${{ steps.publish-verdict-cache.outputs.artifact_name }}"
+          expected_cache_name="mod-compatibility-verdict-cache-${{ steps.verdict-cache.outputs.policy_sha256 }}-${{ matrix.id }}"
+          [[ "$old_id_list" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]]
+          [[ "$new_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$cache_name" == "$expected_cache_name" ]]
+          IFS=, read -r -a old_ids <<< "$old_id_list"
+          for old_id in "${old_ids[@]}"; do
+            [[ "$old_id" =~ ^[1-9][0-9]*$ ]]
+            [[ "$old_id" != "$new_id" ]]
+            metadata="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$old_id" \
+              2>/dev/null || true)"
+            if [[ -z "$metadata" ]]; then
+              continue
+            fi
+            jq -e \
+              --arg name "$cache_name" \
+              --argjson artifact_id "$old_id" \
+              '.id == $artifact_id and .name == $name and .expired == false' \
+              <<< "$metadata" > /dev/null
+            github_api_retry --method DELETE \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$old_id" > /dev/null
+          done
 
       - name: Classify a failed lane without provider text
         id: failure
