@@ -187,6 +187,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
                 self.assertIn("DefaultSkinEvidenceView.enterFirstPerson(mc);", text)
 
     def test_optional_mod_scenario_drives_real_feature_workflows(self) -> None:
+        harness = (E2E_JAVA / "E2EHarness.java").read_text(encoding="utf-8")
         scenario = (
             E2E_JAVA / "scenario" / "ModCompatibilityScenario.java"
         ).read_text(encoding="utf-8")
@@ -198,6 +199,13 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
 
         self.assertIn("feature::prepareBaseline", scenario)
         self.assertIn("feature::applyQuickSkinFeature", scenario)
+        self.assertIn("ModCompatibilityScenario.prepareBeforeWorldJoin();", harness)
+        self.assertLess(
+            harness.index("ModCompatibilityScenario.prepareBeforeWorldJoin();"),
+            harness.index("if (mc.player != null && mc.level != null)"),
+        )
+        self.assertIn("ModCompatibilityFeature.prepareBeforeWorldJoin(modId);", scenario)
+        self.assertIn("protectStartupRecordingBeforeWorldJoin", feature)
         for mod_id in (
             "cpm",
             "ears",
