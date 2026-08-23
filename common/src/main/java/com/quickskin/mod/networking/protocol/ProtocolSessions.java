@@ -69,6 +69,36 @@ public final class ProtocolSessions {
                 ? session.profile : ProtocolProfile.localOnly("no-exact-client-session");
     }
 
+    /**
+     * Restores the recorded wire mode for ReplayMod's exact fake connection.
+     *
+     * <p>Replay files contain only the server-bound half of the exchange, so the original client
+     * hello is unavailable during playback. The first recorded Quick Skin data packet is explicit
+     * schema evidence. It may establish one locally bounded profile, but it cannot switch schemas
+     * on an already classified replay connection.</p>
+    */
+    public synchronized ProtocolProfile admitReplayClientSession(
+            UUID playerId, Object connection, boolean v2) {
+        if (playerId == null || connection == null) {
+            return ProtocolProfile.incompatible("invalid-replay-session");
+        }
+        ProtocolProfile requested = v2
+                ? ProtocolNegotiator.negotiate(
+                        QuickSkinProtocol.POLICY, QuickSkinProtocol.POLICY.offer())
+                : ProtocolProfile.legacy("recorded-legacy-packet");
+        ClientSession existing = clientSession;
+        if (existing != null && existing.connection == connection) {
+            if (!existing.playerId.equals(playerId)) {
+                return ProtocolProfile.incompatible("replay-player-switch");
+            }
+            return existing.profile.mode() == requested.mode()
+                    ? existing.profile
+                    : ProtocolProfile.incompatible("replay-schema-switch");
+        }
+        clientSession = new ClientSession(playerId, connection, 0L, requested);
+        return requested;
+    }
+
     public synchronized void clearClientSession(UUID playerId, Object connection) {
         ClientSession session = clientSession;
         if (session == null || session.connection != connection
