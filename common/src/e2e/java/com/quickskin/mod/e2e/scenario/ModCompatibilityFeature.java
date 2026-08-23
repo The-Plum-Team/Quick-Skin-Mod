@@ -85,6 +85,12 @@ interface ModCompatibilityFeature {
         return 600;
     }
 
+    static void prepareBeforeWorldJoin(String modId) {
+        if ("replaymod".equals(modId)) {
+            ReplayModFeature.protectStartupRecordingBeforeWorldJoin();
+        }
+    }
+
     static ModCompatibilityFeature create(String modId, Minecraft minecraft) {
         return switch (modId) {
             case "cpm" -> new CpmFeature(minecraft);
@@ -763,6 +769,10 @@ interface ModCompatibilityFeature {
         // ReplayMod freezes Minecraft's global timer at EOF. Keep enough recorded tail for the
         // applied screenshot, Retina re-grabs, and the harness screenshot-flush window.
         private static final long MIN_RECORDING_DURATION_MS = 15_000L;
+        private static final Object STARTUP_SCAN_LOCK = new Object();
+        private static volatile Path protectedStartupScanPlaceholder;
+        private static volatile Path protectedStartupScanMarker;
+        private static volatile String startupScanProtectionFailure;
 
         private volatile Object packetListener;
         private volatile Path replayPath;
@@ -979,6 +989,12 @@ interface ModCompatibilityFeature {
             }
         }
 
+        static void protectStartupRecordingBeforeWorldJoin() {
+            Object listener = currentPacketListener();
+            Path outputPath = listener == null ? null : reflectedPath(listener, "outputPath");
+            protectStartupRecording(outputPath);
+        }
+
         /**
          * Quick Play can join while ReplayMod's post-startup scan is still pending. ReplayMod then
          * mistakes its own live {@code recording/*.mcpr.tmp} directory for an abandoned recording
@@ -987,34 +1003,53 @@ interface ModCompatibilityFeature {
          * disposable E2E profile and is cleaned before playback if the scan already ran.
          */
         private void protectActiveRecordingFromStartupScan() {
-            if (failure != null || replayPath == null || startupScanPlaceholder != null) return;
-            Path recordingFolder = replayPath.getParent();
-            if (recordingFolder == null || recordingFolder.getParent() == null
-                    || !"recording".equals(String.valueOf(recordingFolder.getFileName()))) {
-                return;
-            }
-            Path activeTemporary = replayPath.resolveSibling(
-                    replayPath.getFileName() + ".tmp");
-            if (!Files.isDirectory(activeTemporary)) return;
-
-            Path replayFolder = recordingFolder.getParent();
-            Path placeholder = replayFolder.resolve(activeTemporary.getFileName());
-            Path marker = replayFolder.resolve(replayPath.getFileName() + ".no_recover");
-            if (Files.exists(placeholder) || Files.exists(marker)) return;
-            try {
-                Files.createDirectories(placeholder);
-                Files.createFile(marker);
-                startupScanPlaceholder = placeholder;
-                startupScanMarker = marker;
-                E2ELog.info("protected active ReplayMod recording from its startup scan");
-            } catch (Exception exception) {
-                try {
-                    Files.deleteIfExists(marker);
-                    Files.deleteIfExists(placeholder);
-                } catch (Exception ignored) {
+            if (failure != null || replayPath == null) return;
+            protectStartupRecording(replayPath);
+            synchronized (STARTUP_SCAN_LOCK) {
+                startupScanPlaceholder = protectedStartupScanPlaceholder;
+                startupScanMarker = protectedStartupScanMarker;
+                if (failure == null && startupScanProtectionFailure != null) {
+                    failure = startupScanProtectionFailure;
                 }
-                failure = "could not protect ReplayMod's active recording: "
-                        + concise(exception);
+            }
+        }
+
+        private static void protectStartupRecording(Path outputPath) {
+            if (outputPath == null) return;
+            synchronized (STARTUP_SCAN_LOCK) {
+                if (protectedStartupScanPlaceholder != null
+                        || startupScanProtectionFailure != null) {
+                    return;
+                }
+                Path recordingFolder = outputPath.getParent();
+                if (recordingFolder == null || recordingFolder.getParent() == null
+                        || !"recording".equals(String.valueOf(recordingFolder.getFileName()))) {
+                    return;
+                }
+                Path activeTemporary = outputPath.resolveSibling(
+                        outputPath.getFileName() + ".tmp");
+                if (!Files.isDirectory(activeTemporary)) return;
+
+                Path replayFolder = recordingFolder.getParent();
+                Path placeholder = replayFolder.resolve(activeTemporary.getFileName());
+                Path marker = replayFolder.resolve(outputPath.getFileName() + ".no_recover");
+                if (Files.exists(placeholder) || Files.exists(marker)) return;
+                try {
+                    Files.createDirectories(placeholder);
+                    Files.createFile(marker);
+                    protectedStartupScanPlaceholder = placeholder;
+                    protectedStartupScanMarker = marker;
+                    E2ELog.info("protected active ReplayMod recording from its startup scan");
+                } catch (Exception exception) {
+                    try {
+                        Files.deleteIfExists(marker);
+                        Files.deleteIfExists(placeholder);
+                    } catch (Exception ignored) {
+                    }
+                    startupScanProtectionFailure =
+                            "could not protect ReplayMod's active recording: "
+                                    + concise(exception);
+                }
             }
         }
 
@@ -1028,11 +1063,21 @@ interface ModCompatibilityFeature {
         }
 
         private void cleanupStartupScanProtection() {
-            try {
-                if (startupScanMarker != null) Files.deleteIfExists(startupScanMarker);
-                if (startupScanPlaceholder != null) Files.deleteIfExists(startupScanPlaceholder);
-            } catch (Exception exception) {
-                E2ELog.warn("could not clean ReplayMod startup-scan guard: " + concise(exception));
+            synchronized (STARTUP_SCAN_LOCK) {
+                try {
+                    if (startupScanMarker != null) Files.deleteIfExists(startupScanMarker);
+                    if (startupScanPlaceholder != null) {
+                        Files.deleteIfExists(startupScanPlaceholder);
+                    }
+                    if (startupScanMarker != null
+                            && startupScanMarker.equals(protectedStartupScanMarker)) {
+                        protectedStartupScanMarker = null;
+                        protectedStartupScanPlaceholder = null;
+                    }
+                } catch (Exception exception) {
+                    E2ELog.warn("could not clean ReplayMod startup-scan guard: "
+                            + concise(exception));
+                }
             }
         }
 
