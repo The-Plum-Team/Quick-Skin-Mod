@@ -25,6 +25,7 @@ SAFE_EXACT_PATHS = frozenset(
     {
         ".github/pull_request_template.md",
         ".github/workflows/handle-version-port-result.yml",
+        ".github/workflows/mod-compatibility-review.yml",
         ".github/workflows/pages.yml",
         ".github/workflows/prune-actions-caches.yml",
         ".github/workflows/refresh-release-status.yml",
