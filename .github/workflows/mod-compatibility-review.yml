@@ -12,13 +12,28 @@ on:
     types:
       - mod-compatibility-review-requested
       - mod-compatibility-review-sweep-requested
+      - mod-compatibility-publication-requested
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Recover the queue or republish one already-clean source without model calls
+        required: true
+        default: recover
+        type: choice
+        options:
+          - recover
+          - publish
+      source_run_id:
+        description: Exact completed compatibility source run for publish recovery
+        required: false
+        type: string
 
 permissions: {}
 
 concurrency:
   group: >-
     mod-compatibility-review-${{ github.event.client_payload.source_run_id ||
+    inputs.source_run_id ||
     'queue-sweep' }}
   cancel-in-progress: false
 
@@ -28,7 +43,8 @@ jobs:
     if: >-
       github.ref == 'refs/heads/master' &&
       (github.event_name != 'repository_dispatch' ||
-       github.event.action == 'mod-compatibility-review-sweep-requested')
+       github.event.action == 'mod-compatibility-review-sweep-requested') &&
+      (github.event_name != 'workflow_dispatch' || inputs.operation == 'recover')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -1123,6 +1139,145 @@ jobs:
           path: ${{ runner.temp }}/mod-compatibility-review-complete.json
           if-no-files-found: error
           retention-days: 7
+
+  request-publication:
+    name: Request post-success compatibility publication
+    needs:
+      - enumerate
+      - gate
+    if: >-
+      always() && needs.gate.result == 'success' &&
+      needs.gate.outputs.complete == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Dispatch the completed source into a fresh protected publisher
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ needs.enumerate.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          payload="$RUNNER_TEMP/mod-compatibility-publication-request.json"
+          jq -n \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '{event_type:"mod-compatibility-publication-requested",client_payload:{
+              source_run_id:$source_run_id}}' > "$payload"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+            --input "$payload" > /dev/null
+
+  publish-evidence:
+    name: Publish compact compatibility evidence
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      ((github.event_name == 'repository_dispatch' &&
+        github.event.action == 'mod-compatibility-publication-requested') ||
+       (github.event_name == 'workflow_dispatch' && inputs.operation == 'publish'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Check out the protected compatibility publisher
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install the hash-locked evidence decoder and encoder
+        run: >-
+          python -m pip install
+          --only-binary=:all:
+          --require-hashes
+          --requirement scripts/pages/requirements.txt
+
+      - name: Authenticate, compact and bind the complete clean wave
+        id: collect
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_SOURCE_RUN_ID: >-
+            ${{ github.event_name == 'repository_dispatch' &&
+            github.event.client_payload.source_run_id || inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          source scripts/ci/github_api_retry.sh
+          [[ "$GITHUB_REF" == refs/heads/master ]]
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$REQUESTED_SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" \
+             --jq .commit.sha)" == \
+             "$GITHUB_SHA" ]]
+          python3 scripts/pages/collect_compatibility.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --source-run-id "$REQUESTED_SOURCE_RUN_ID" \
+            --current-implementation-sha "$GITHUB_SHA" \
+            --publication-run-id "$GITHUB_RUN_ID" \
+            --output public-compatibility \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Upload the compact public compatibility handoff
+        id: artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.collect.outputs.artifact_name }}
+          path: public-compatibility/
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 7
+
+      - name: Wake the protected Pages publisher
+        shell: bash
+        env:
+          ARTIFACT_DIGEST: ${{ steps.artifact.outputs.artifact-digest }}
+          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
+          ARTIFACT_NAME: ${{ steps.collect.outputs.artifact_name }}
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+          BRANCH: ${{ steps.collect.outputs.branch }}
+          COMPATIBILITY_RUN_ID: ${{ steps.collect.outputs.compatibility_run_id }}
+          COVERAGE_SHA: ${{ steps.collect.outputs.coverage_sha }}
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.collect.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          source scripts/ci/github_api_retry.sh
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$ARTIFACT_NAME" == "pages-mod-compatibility-$BRANCH" ]]
+          [[ "$ARTIFACT_URL" == \
+             "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts/$ARTIFACT_ID" ]]
+          payload="$RUNNER_TEMP/pages-compatibility-evidence-ready.json"
+          jq -n \
+            --arg artifact_digest "sha256:$ARTIFACT_DIGEST" \
+            --arg artifact_name "$ARTIFACT_NAME" \
+            --arg branch "$BRANCH" \
+            --arg coverage_sha "$COVERAGE_SHA" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg target_sha "$TARGET_SHA" \
+            --argjson artifact_id "$ARTIFACT_ID" \
+            --argjson compatibility_run_id "$COMPATIBILITY_RUN_ID" \
+            --argjson publication_run_id "$GITHUB_RUN_ID" \
+            '{event_type:"pages-compatibility-evidence-ready",client_payload:{
+              repository:$repository,publication_run_id:$publication_run_id,
+              publication_sha:env.GITHUB_SHA,artifact_id:$artifact_id,
+              artifact_name:$artifact_name,artifact_digest:$artifact_digest,
+              compatibility_run_id:$compatibility_run_id,branch:$branch,
+              target_sha:$target_sha,coverage_sha:$coverage_sha}}' > "$payload"
+          github_api_retry --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+            --input "$payload" > /dev/null
 
   continue:
     name: Wake the next pending compatibility review
