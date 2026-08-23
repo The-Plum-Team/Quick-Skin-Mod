@@ -186,6 +186,56 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
                 text = (E2E_JAVA / "scenario" / name).read_text(encoding="utf-8")
                 self.assertIn("DefaultSkinEvidenceView.enterFirstPerson(mc);", text)
 
+    def test_optional_mod_scenario_drives_real_feature_workflows(self) -> None:
+        harness = (E2E_JAVA / "E2EHarness.java").read_text(encoding="utf-8")
+        scenario = (
+            E2E_JAVA / "scenario" / "ModCompatibilityScenario.java"
+        ).read_text(encoding="utf-8")
+        feature = (
+            E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+        assets = (E2E_JAVA / "TestAssets.java").read_text(encoding="utf-8")
+        runtime = (ROOT / "e2e/packaged_runtime.py").read_text(encoding="utf-8")
+
+        self.assertIn("feature::prepareBaseline", scenario)
+        self.assertIn("feature::applyQuickSkinFeature", scenario)
+        self.assertIn("ModCompatibilityScenario.prepareBeforeWorldJoin();", harness)
+        self.assertLess(
+            harness.index("ModCompatibilityScenario.prepareBeforeWorldJoin();"),
+            harness.index("if (mc.player != null && mc.level != null)"),
+        )
+        self.assertIn("ModCompatibilityFeature.prepareBeforeWorldJoin(modId);", scenario)
+        self.assertIn("protectStartupRecordingBeforeWorldJoin", feature)
+        for mod_id in (
+            "cpm",
+            "ears",
+            "skin-layers-3d",
+            "customnpcs",
+            "essential",
+            "replaymod",
+        ):
+            with self.subTest(mod_id=mod_id):
+                self.assertIn(f'case "{mod_id}"', feature)
+
+        for required_feature_proof in (
+            "CPMCompatIntegration.parseCpmModelInfo",
+            "CPMCompatIntegration.isLocalPlayerWearingCpmModel",
+            "EarsCompatIntegration.getFeatures",
+            "meshCacheContains",
+            "manualRenderObserved",
+            '"customnpcs".equals(type.getNamespace())',
+            "CustomNPCsIntegration.detectSkinConflict",
+            "EssentialCompatIntegration.findBottomEssentialWidget",
+            "ReplayModHelper.getInterceptedPacketCount",
+            "startReplay(finalizedReplayPath)",
+        ):
+            with self.subTest(proof=required_feature_proof):
+                self.assertIn(required_feature_proof, feature)
+
+        self.assertIn("com.unascribed.ears.common.EarsFeaturesWriterV1", assets)
+        self.assertIn("com.tom.cpm.shared.editor.Exporter", assets)
+        self.assertIn("summon customnpcs:customnpc", runtime)
+
     def test_string_class_lookups_declare_an_intermediary_fallback(self) -> None:
         """Fabric serves intermediary names at runtime; a Mojang name alone resolves only on Forge."""
 

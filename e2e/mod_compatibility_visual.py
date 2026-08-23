@@ -15,6 +15,7 @@ from typing import Any
 from mod_compatibility import (
     DEFAULT_CONTRACT as DEFAULT_COMPATIBILITY_CONTRACT,
     CompatibilityContractError,
+    CompatibilityMod,
     load_contract as load_compatibility_contract,
     resolve_lane,
 )
@@ -45,10 +46,31 @@ COMPATIBILITY_EXPECTATION_OVERRIDES = {
         "splash or match the clean title-screen layout."
     ),
 }
+MOD_COMPATIBILITY_BASELINE_CAPTURE = (
+    "mod-compatibility.client_a.baseline_with_mod"
+)
+MOD_COMPATIBILITY_APPLIED_CAPTURE = (
+    "mod-compatibility.client_a.apply_local_skin_with_mod"
+)
 
 
 class CompatibilityVisualError(ValueError):
     pass
+
+
+def _compatibility_expectation(
+    compatibility_mod: CompatibilityMod,
+    mod_id: str,
+    frame: dict[str, Any],
+) -> str:
+    capture_id = frame["capture_id"]
+    if capture_id == MOD_COMPATIBILITY_BASELINE_CAPTURE:
+        return compatibility_mod.evidence.baseline_with_mod
+    if capture_id == MOD_COMPATIBILITY_APPLIED_CAPTURE:
+        return compatibility_mod.evidence.apply_local_skin_with_mod
+    return COMPATIBILITY_EXPECTATION_OVERRIDES.get(
+        (mod_id, capture_id), frame["expectation"]
+    )
 
 
 def _artifact_record(value: Any, label: str) -> dict[str, Any]:
@@ -219,9 +241,7 @@ def curate(
             )
         if (reference["version"], reference["loader"]) != (version, loader):
             raise CompatibilityVisualError("compatibility reference is not the same runtime lane")
-        expectation = COMPATIBILITY_EXPECTATION_OVERRIDES.get(
-            (mod_id, frame["capture_id"]), frame["expectation"]
-        )
+        expectation = _compatibility_expectation(lane.mod, mod_id, frame)
         private_manifest.append(
             {
                 "path": frame["source_path"],
