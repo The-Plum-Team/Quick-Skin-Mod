@@ -66,6 +66,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
         self.assertNotIn("player-armor-stands", {item.id for item in contract.mods})
         self.assertEqual(104, sum(len(item.artifacts) for item in contract.mods))
         cpm = contract.mod("cpm")
+        self.assertIsNotNone(cpm.multiplayer)
         self.assertEqual(
             (("1.21.2", "neoforge"),),
             tuple(
@@ -81,6 +82,14 @@ class ModCompatibilityContractTest(unittest.TestCase):
             )
         )
         skin_layers = contract.mod("skin-layers-3d")
+        self.assertIsNotNone(contract.mod("ears").multiplayer)
+        self.assertTrue(
+            all(
+                item.multiplayer is None
+                for item in contract.mods
+                if item.id not in {"cpm", "ears"}
+            )
+        )
         self.assertEqual(
             (("1.21.9", "neoforge"),),
             tuple(
@@ -161,9 +170,13 @@ class ModCompatibilityContractTest(unittest.TestCase):
         for lane in plan["runnable"]:
             scenarios = lane["scenarios"].split(",")
             self.assertEqual("mod-compatibility", scenarios[0])
+            base_index = 1
+            if lane["compatibility_mod"] in {"cpm", "ears"}:
+                self.assertEqual("mod-compatibility-remote", scenarios[1])
+                base_index = 2
             self.assertEqual(
                 ["phase0-smoke", "propagation", "propagation-live", "full"],
-                scenarios[1:],
+                scenarios[base_index:],
             )
             self.assertTrue(lane["base_evidence_name"].startswith("packaged-e2e-"))
             self.assertTrue(lane["base_evidence_name"].endswith("--release-behavior"))
@@ -280,6 +293,16 @@ class ModCompatibilityContractTest(unittest.TestCase):
             "apply_local_skin_with_mod"
         ] = [[0.8, 0.2, 0.1, 0.9]]
 
+        missing_multiplayer = copy.deepcopy(self.payload)
+        del missing_multiplayer["mods"][0]["multiplayer"]["evidence"][
+            "baseline_with_mod"
+        ]
+
+        malformed_multiplayer_regions = copy.deepcopy(self.payload)
+        malformed_multiplayer_regions["mods"][0]["multiplayer"]["review_regions"][
+            "apply_local_skin_with_mod"
+        ] = [[0.8, 0.2, 0.1, 0.9]]
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             for label, mutation in (
@@ -288,6 +311,8 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 ("malformed", malformed),
                 ("missing regions", missing_regions),
                 ("malformed regions", malformed_regions),
+                ("missing multiplayer evidence", missing_multiplayer),
+                ("malformed multiplayer regions", malformed_multiplayer_regions),
             ):
                 with self.subTest(label=label):
                     path = self.write_contract(root, mutation)
@@ -440,6 +465,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 baseline_with_mod=((0.25, 0.25, 0.75, 0.75),),
                 apply_local_skin_with_mod=((0.25, 0.25, 0.75, 0.75),),
             ),
+            multiplayer=None,
             supported_game_versions=None,
             excluded_lanes=(),
             artifacts=(artifact,),
@@ -583,6 +609,29 @@ class ModCompatibilityContractTest(unittest.TestCase):
         self.assertIn("recording indicator", baseline)
         self.assertIn("recorded Quick Skin payload", applied)
 
+        ears = mod_compatibility.load_contract(self.contract_path).mod("ears")
+        assert ears.multiplayer is not None
+        remote_baseline = mod_compatibility_visual._compatibility_expectation(
+            ears,
+            {
+                "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_REMOTE_BASELINE_CAPTURE,
+                "expectation": "generic remote baseline",
+            },
+        )
+        remote_applied = mod_compatibility_visual._compatibility_expectation(
+            ears,
+            {
+                "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_REMOTE_APPLIED_CAPTURE,
+                "expectation": "generic remote applied",
+            },
+        )
+        self.assertEqual(ears.multiplayer.evidence.baseline_with_mod, remote_baseline)
+        self.assertEqual(
+            ears.multiplayer.evidence.apply_local_skin_with_mod,
+            remote_applied,
+        )
+        self.assertIn("remote Alice", remote_applied)
+
     def test_compatibility_curation_uses_mod_specific_review_regions(self) -> None:
         contract = mod_compatibility.load_contract(self.contract_path)
         generic_baseline = ((0.42, 0.34, 0.58, 0.86),)
@@ -615,6 +664,19 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 )
                 self.assertNotEqual(generic_applied, applied)
 
+                if compatibility_mod.multiplayer is not None:
+                    remote = mod_compatibility_visual._compatibility_review_regions(
+                        compatibility_mod,
+                        {
+                            "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_REMOTE_APPLIED_CAPTURE,
+                            "review_regions": generic_applied,
+                        },
+                    )
+                    self.assertEqual(
+                        compatibility_mod.multiplayer.review_regions.apply_local_skin_with_mod,
+                        remote,
+                    )
+
         replaymod = contract.mod("replaymod")
         self.assertEqual(2, len(replaymod.review_regions.baseline_with_mod))
         self.assertEqual(2, len(replaymod.review_regions.apply_local_skin_with_mod))
@@ -632,17 +694,33 @@ class ModCompatibilityContractTest(unittest.TestCase):
             {"capture_id": capture.capture_id}
             for capture in scenario_contract.captures
         ]
+        contract = mod_compatibility.load_contract(self.contract_path)
         selected = mod_compatibility_visual._select_compatibility_frames(
             all_frames,
             scenario_contract=scenario_contract,
+            compatibility_mod=contract.mod("cpm"),
         )
 
         self.assertEqual(
             [
                 "mod-compatibility.client_a.baseline_with_mod",
                 "mod-compatibility.client_a.apply_local_skin_with_mod",
+                "mod-compatibility-remote.client_b.observe_remote_baseline",
+                "mod-compatibility-remote.client_b.observe_remote_applied",
             ],
             [frame["capture_id"] for frame in selected],
+        )
+        local_only = mod_compatibility_visual._select_compatibility_frames(
+            all_frames,
+            scenario_contract=scenario_contract,
+            compatibility_mod=contract.mod("replaymod"),
+        )
+        self.assertEqual(
+            [
+                "mod-compatibility.client_a.baseline_with_mod",
+                "mod-compatibility.client_a.apply_local_skin_with_mod",
+            ],
+            [frame["capture_id"] for frame in local_only],
         )
         with self.assertRaisesRegex(
             mod_compatibility_visual.CompatibilityVisualError,
@@ -655,6 +733,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
                     if frame["capture_id"] != selected[-1]["capture_id"]
                 ],
                 scenario_contract=scenario_contract,
+                compatibility_mod=contract.mod("cpm"),
             )
         with self.assertRaisesRegex(
             mod_compatibility_visual.CompatibilityVisualError,
@@ -663,6 +742,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
             mod_compatibility_visual._select_compatibility_frames(
                 all_frames + [selected[-1]],
                 scenario_contract=scenario_contract,
+                compatibility_mod=contract.mod("cpm"),
             )
 
 
