@@ -32,12 +32,9 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.contains("EarsModMixin")) {
             return classFileExists("com/unascribed/ears/EarsMod.class");
         }
-        if (mixinClassName.contains("CpmRenderDepthMixin")) {
-            return classFileExists("com/tom/cpm/client/ClientBase.class");
-        }
-        if (mixinClassName.contains("CpmSubmitCollectorMixin")) {
-            return classFileExists("com/tom/cpm/client/CPMOrderedSubmitNodeCollector.class");
-        }
+        // CPM targets are @Pseudo and live in this optional, fail-open config. Do not resource-gate
+        // them here: on current Fabric the plugin is queried before CPM's collector resource is
+        // visible, even though Mixin can resolve and transform that target later in startup.
         return true;
     }
 

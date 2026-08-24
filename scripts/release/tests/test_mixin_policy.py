@@ -218,7 +218,7 @@ class MixinPolicyTest(unittest.TestCase):
                 self.assertIs(config["required"], False)
                 self.assertEqual(config["injectors"]["defaultRequire"], 0)
 
-    def test_configured_optional_mixins_exist_and_are_resource_gated(self) -> None:
+    def test_configured_optional_mixins_exist(self) -> None:
         configs = self.configs_named("quickskin.mixins.json") + self.configs_named(
             "quickskin-ears.mixins.json"
         )
@@ -227,24 +227,6 @@ class MixinPolicyTest(unittest.TestCase):
             config = json.loads(path.read_text(encoding="utf-8"))
             configured.update(name.rsplit(".", 1)[-1] for name in config.get("client", []))
             configured.update(name.rsplit(".", 1)[-1] for name in config.get("mixins", []))
-
-        plugin = (
-            ROOT
-            / "common"
-            / "src"
-            / "main"
-            / "java"
-            / "com"
-            / "quickskin"
-            / "mod"
-            / "mixin"
-            / "compat"
-            / "EarsMixinPlugin.java"
-        ).read_text(encoding="utf-8")
-        self.assertIn('"CpmRenderDepthMixin"', plugin)
-        self.assertIn('"CpmSubmitCollectorMixin"', plugin)
-        self.assertIn('"com/tom/cpm/client/ClientBase.class"', plugin)
-        self.assertIn('"com/tom/cpm/client/CPMOrderedSubmitNodeCollector.class"', plugin)
 
         source_classes = {source.stem for source in self.mixin_sources()}
         self.assertTrue(configured <= source_classes)
