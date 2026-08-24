@@ -1043,6 +1043,7 @@ jobs:
             --manifest review-input/visual-review-manifest.json \
             --report visual-review-report.json \
             --policy-sha256 "${{ steps.verdict-cache.outputs.policy_sha256 }}" \
+            --review-mode reference-comparison \
             --output visual-review-verdict-cache.json
           printf 'artifact_name=mod-compatibility-verdict-cache-%s-%s\n' \
             "${{ steps.verdict-cache.outputs.policy_sha256 }}" \
