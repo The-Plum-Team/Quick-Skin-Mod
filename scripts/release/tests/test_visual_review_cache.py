@@ -25,6 +25,7 @@ from visual_review_cache import (  # noqa: E402
 POLICY = "a" * 64
 CANDIDATE = "b" * 64
 REFERENCE = "c" * 64
+ANCHOR_IMAGE = "e" * 64
 
 
 def paired(
@@ -54,12 +55,45 @@ def paired(
     }
 
 
+def unpaired(
+    label: str,
+    *,
+    candidate: str = CANDIDATE,
+    image: str = ANCHOR_IMAGE,
+    expectation: str = "The cape must have its expected shape.",
+) -> dict[str, Any]:
+    _artifact, scenario, role, step = label.split("/")
+    capture_id = f"{scenario}.{role}.{step}"
+    return {
+        "path": f"review-input/images/{image}.png",
+        "label": label,
+        "capture_id": capture_id,
+        "kind": capture_id,
+        "expectation": expectation,
+        "runtime_evidence": "renderer-facing assertion passed",
+        "image_size": [1920, 1080],
+        "review_regions": [[0.25, 0.25, 0.75, 0.75]],
+        "candidate_semantic_sha256": candidate,
+    }
+
+
 def verdict(label: str, *, defect: bool = False) -> dict[str, object]:
     return {
         "label": label,
         "visible": "The expected cape is visible.",
         "semantic_valid": not defect,
         "matches_reference": not defect,
+        "anomalies": ["The cape shape is wrong."] if defect else [],
+        "defect": defect,
+    }
+
+
+def anchor_verdict(label: str, *, defect: bool = False) -> dict[str, object]:
+    return {
+        "label": label,
+        "visible": "The expected cape is visible.",
+        "semantic_valid": not defect,
+        "matches_reference": None,
         "anomalies": ["The cape shape is wrong."] if defect else [],
         "defect": defect,
     }
@@ -175,26 +209,58 @@ class VisualReviewCacheTest(unittest.TestCase):
                     ),
                 )
 
-    def test_anchor_semantic_mode_never_uses_or_updates_cache(self) -> None:
-        source = paired("fabric-1.21.1/full/client_a/cape")
+    def test_anchor_cache_requires_exact_lane_pixels_and_semantics(self) -> None:
+        source = unpaired("fabric-1.20.1/full/client_a/cape")
         cache = merge_cache(
             None,
             [source],
-            [verdict(source["label"])],
+            [anchor_verdict(source["label"])],
             policy_sha256=POLICY,
-            review_mode="reference-comparison",
+            review_mode="anchor-semantic",
         )
 
         self.assertEqual(
-            {}, cached_verdicts([source], cache, review_mode="anchor-semantic")
+            [source["label"]],
+            list(cached_verdicts([source], cache, review_mode="anchor-semantic")),
         )
-        with self.assertRaisesRegex(ReviewError, "only paired comparison"):
+        changed_lane = unpaired("forge-1.20.1/full/client_a/cape")
+        changed_full_image = unpaired(
+            source["label"], image="f" * 64
+        )
+        changed_semantic_region = unpaired(
+            source["label"], candidate="d" * 64
+        )
+        changed_expectation = unpaired(
+            source["label"], expectation="A different authored expectation."
+        )
+        changed_runtime_evidence = {
+            **source,
+            "runtime_evidence": "a different renderer-facing assertion",
+        }
+        for candidate in (
+            changed_lane,
+            changed_full_image,
+            changed_semantic_region,
+            changed_expectation,
+            changed_runtime_evidence,
+        ):
+            with self.subTest(label=candidate["label"], path=candidate["path"]):
+                self.assertEqual(
+                    {},
+                    cached_verdicts(
+                        [candidate], cache, review_mode="anchor-semantic"
+                    ),
+                )
+
+    def test_cache_rejects_a_manifest_from_another_review_mode(self) -> None:
+        source = unpaired("fabric-1.20.1/full/client_a/cape")
+        with self.assertRaisesRegex(ReviewError, "does not match the manifest"):
             merge_cache(
                 None,
                 [source],
-                [verdict(source["label"])],
+                [anchor_verdict(source["label"])],
                 policy_sha256=POLICY,
-                review_mode="anchor-semantic",
+                review_mode="reference-comparison",
             )
 
     def test_tampered_cache_key_and_policy_fail_closed(self) -> None:
@@ -211,7 +277,10 @@ class VisualReviewCacheTest(unittest.TestCase):
         with self.assertRaisesRegex(ReviewError, "invalid or duplicate key"):
             validate_cache(cache, POLICY)
         with self.assertRaisesRegex(ReviewError, "different review policy"):
-            validate_cache({"schema_version": 2, "policy_sha256": POLICY, "entries": []}, "f" * 64)
+            validate_cache(
+                {"schema_version": 3, "policy_sha256": POLICY, "entries": []},
+                "f" * 64,
+            )
 
     def test_key_is_label_and_loader_independent_for_identical_semantics(self) -> None:
         first = paired("fabric-1.21.1/full/client_a/cape")
