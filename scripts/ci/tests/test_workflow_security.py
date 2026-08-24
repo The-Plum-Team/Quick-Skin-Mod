@@ -686,6 +686,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--allow-blocking-partial", review)
         self.assertIn("visual-review-verdict-cache-$policy_sha256", review)
         self.assertIn("visual_review_cache.py\" combine", review)
+        self.assertNotIn(
+            'if [[ "$review_mode" != reference-comparison ]]', review
+        )
+        self.assertGreaterEqual(review.count("visual_review_semantic_prompt.md"), 2)
+        self.assertIn('--review-mode "$review_mode"', review)
         self.assertIn('merge-base --is-ancestor \\', review)
         self.assertIn(
             '$cache_owner_sha:.github/workflows/visual-review-drain.yml', review
