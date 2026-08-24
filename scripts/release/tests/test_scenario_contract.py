@@ -77,6 +77,18 @@ EXPECTED_STEPS = {
         "baseline_with_mod",
         "apply_local_skin_with_mod",
     ),
+    ("mod-compatibility-remote", "client_a"): (
+        "integration_active",
+        "prepare_remote_baseline",
+        "await_observer_baseline",
+        "apply_remote_change",
+    ),
+    ("mod-compatibility-remote", "client_b"): (
+        "integration_active",
+        "confirm_self",
+        "observe_remote_baseline",
+        "observe_remote_applied",
+    ),
 }
 
 EXPECTED_CAPTURES = {
@@ -97,6 +109,11 @@ EXPECTED_CAPTURES = {
     ("mod-compatibility", "client_a"): (
         "baseline_with_mod",
         "apply_local_skin_with_mod",
+    ),
+    ("mod-compatibility-remote", "client_a"): (),
+    ("mod-compatibility-remote", "client_b"): (
+        "observe_remote_baseline",
+        "observe_remote_applied",
     ),
 }
 
@@ -151,6 +168,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "propagation-live",
                 "full",
                 "mod-compatibility",
+                "mod-compatibility-remote",
             ),
             self.contract.scenario_ids,
         )
@@ -173,12 +191,17 @@ class ScenarioContractTest(unittest.TestCase):
             self.contract.scenarios_for_profile("compatibility"),
         )
         self.assertEqual(
+            ("mod-compatibility-remote",),
+            self.contract.scenarios_for_profile("compatibility-remote"),
+        )
+        self.assertEqual(
             {
                 "phase0-smoke": ("client_a",),
                 "propagation": ("client_a", "client_b"),
                 "propagation-live": ("client_a", "client_b"),
                 "full": ("client_a",),
                 "mod-compatibility": ("client_a",),
+                "mod-compatibility-remote": ("client_a", "client_b"),
             },
             {
                 scenario: self.contract.expected_roles(scenario)
@@ -221,6 +244,17 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual(300, live.start_after.timeout_seconds)
         self.assertEqual("Alice joined the game", live.server_log_marker)
         self.assertEqual(300, live.server_log_timeout_seconds)
+        compatibility_remote = self.contract.orchestration_for(
+            "mod-compatibility-remote"
+        )
+        self.assertEqual("concurrent-two-client", compatibility_remote.mode)
+        self.assertIsNotNone(compatibility_remote.start_after)
+        assert compatibility_remote.start_after is not None
+        self.assertEqual("client_a", compatibility_remote.start_after.role)
+        self.assertEqual(
+            "Alice joined the game",
+            compatibility_remote.start_after.server_log_marker,
+        )
 
     def test_steps_are_the_only_authored_source_of_capture_truth(self) -> None:
         self.assertNotIn("captures", self.payload)
@@ -248,7 +282,7 @@ class ScenarioContractTest(unittest.TestCase):
                                 "expectation",
                                 "probes",
                             }
-                            if scenario["scenario"] == "mod-compatibility":
+                            if scenario["scenario"].startswith("mod-compatibility"):
                                 capture_fields.add("compatibility_reference_capture_id")
                             self.assertEqual(capture_fields, set(step["capture"]))
                             self.assertNotIn("capture_id", step["capture"])
@@ -261,7 +295,7 @@ class ScenarioContractTest(unittest.TestCase):
             for role in scenario["roles"]
             for step in role["steps"]
         )
-        self.assertEqual(45, authored_capture_count)
+        self.assertEqual(47, authored_capture_count)
         self.assertEqual(authored_capture_count, len(self.contract.captures))
 
     def test_capture_metadata_and_ids_are_derived_from_steps(self) -> None:
@@ -273,7 +307,7 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual(expected_ids, set(self.contract.capture_ids))
         self.assertEqual((1920, 1080), self.contract.screenshot_size)
         self.assertEqual(expected_ids, set(self.contract.review_regions))
-        self.assertEqual(45, len(expected_ids))
+        self.assertEqual(47, len(expected_ids))
         first = self.contract.capture_by_id("full.client_a.baseline")
         self.assertIs(
             first,
@@ -378,6 +412,21 @@ class ScenarioContractTest(unittest.TestCase):
                 )
             ],
             values("propagation-live", "client_b"),
+        )
+        self.assertEqual(
+            [
+                (
+                    "observe_remote_baseline",
+                    "observe_remote_applied",
+                    0.005,
+                    (0.3, 0.05, 0.7, 0.95),
+                )
+            ],
+            values("mod-compatibility-remote", "client_b"),
+        )
+        self.assertEqual(
+            [],
+            values("mod-compatibility-remote", "client_a"),
         )
         self.assertEqual(
             [
