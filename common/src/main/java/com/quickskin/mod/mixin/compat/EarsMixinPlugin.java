@@ -4,6 +4,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -12,6 +13,8 @@ import java.util.Set;
  * mixin transformer has had a chance to process them.
  */
 public class EarsMixinPlugin implements IMixinConfigPlugin {
+    private static final List<String> CPM_RENDER_MIXINS = List.of("CpmRenderDepthMixin");
+    private static final String CPM_SUBMIT_COLLECTOR_MIXIN = "CpmSubmitCollectorMixin";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -35,7 +38,15 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // CPM targets are @Pseudo and live in this optional, fail-open config. Do not resource-gate
         // them here: on current Fabric the plugin is queried before CPM's collector resource is
         // visible, even though Mixin can resolve and transform that target later in startup.
-        return true;
+        if (CPM_RENDER_MIXINS.stream().anyMatch(name -> mixinNamed(mixinClassName, name))
+                || mixinNamed(mixinClassName, CPM_SUBMIT_COLLECTOR_MIXIN)) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean mixinNamed(String mixinClassName, String simpleName) {
+        return mixinClassName.equals(simpleName) || mixinClassName.endsWith("." + simpleName);
     }
 
     private static boolean classFileExists(String classFilePath) {
@@ -47,7 +58,7 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
     }
 
     @Override
-    public java.util.List<String> getMixins() {
+    public List<String> getMixins() {
         return null;
     }
 
