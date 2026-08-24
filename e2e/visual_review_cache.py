@@ -11,7 +11,7 @@ import re
 import stat
 import tempfile
 from collections import OrderedDict
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from check_visual_review import (
@@ -19,6 +19,7 @@ from check_visual_review import (
     MAX_ANOMALY_LENGTH,
     MAX_CAPTURE_ID_LENGTH,
     MAX_JSON_BYTES,
+    MAX_LABEL_LENGTH,
     MAX_VISIBLE_LENGTH,
     ReviewError,
     load,
@@ -27,7 +28,7 @@ from check_visual_review import (
 )
 
 
-CACHE_SCHEMA_VERSION = 2
+CACHE_SCHEMA_VERSION = 3
 POLICY_SCHEMA_VERSION = 2
 MAX_CACHE_ENTRIES = 2048
 MAX_POLICY_FILE_BYTES = 1024 * 1024
@@ -38,6 +39,8 @@ IDENTITY_KEYS = {
     "review_mode",
     "candidate_semantic_sha256",
     "reference_semantic_sha256",
+    "anchor_image_sha256",
+    "anchor_label_sha256",
     "review_scope_sha256",
     "capture_id",
     "expectation_sha256",
@@ -170,11 +173,25 @@ def _bounded_text(value: Any, label: str, maximum: int) -> str:
     return value.strip()
 
 
-def cache_identity(item: dict[str, Any], review_mode: str) -> dict[str, str]:
-    """Return the label-independent semantic and pixel identity of one frame."""
+def _manifest_image_sha256(item: dict[str, Any]) -> str:
+    path = item.get("path")
+    if not isinstance(path, str):
+        raise ReviewError("cache image path is invalid")
+    name = PurePosixPath(path).name
+    match = re.fullmatch(r"([0-9a-f]{64})\.png", name)
+    if match is None:
+        raise ReviewError("cache image path is not content-addressed")
+    return match.group(1)
 
-    if review_mode != "reference-comparison" or "reference_path" not in item:
-        raise ReviewError("only paired comparison verdicts are cacheable")
+
+def cache_identity(item: dict[str, Any], review_mode: str) -> dict[str, Any]:
+    """Return the exact reusable semantic and pixel identity of one frame."""
+
+    if review_mode not in {"anchor-semantic", "reference-comparison"}:
+        raise ReviewError("cache review mode is invalid")
+    paired = "reference_path" in item
+    if paired != (review_mode == "reference-comparison"):
+        raise ReviewError("cache review mode does not match the manifest")
     capture_id = _bounded_text(
         item.get("capture_id"), "cache capture_id", MAX_CAPTURE_ID_LENGTH
     )
@@ -185,12 +202,26 @@ def cache_identity(item: dict[str, Any], review_mode: str) -> dict[str, str]:
     if not isinstance(runtime_evidence, str):
         raise ReviewError("cache runtime evidence is invalid")
     candidate_semantic = item.get("candidate_semantic_sha256")
-    reference_semantic = item.get("reference_semantic_sha256")
-    if any(
-        not isinstance(value, str) or SHA256.fullmatch(value) is None
-        for value in (candidate_semantic, reference_semantic)
+    if (
+        not isinstance(candidate_semantic, str)
+        or SHA256.fullmatch(candidate_semantic) is None
     ):
         raise ReviewError("cache semantic image identity is invalid")
+    reference_semantic = item.get("reference_semantic_sha256")
+    if paired:
+        if (
+            not isinstance(reference_semantic, str)
+            or SHA256.fullmatch(reference_semantic) is None
+        ):
+            raise ReviewError("cache reference semantic image identity is invalid")
+        anchor_image_sha256 = None
+        anchor_label_sha256 = None
+    else:
+        if reference_semantic is not None:
+            raise ReviewError("semantic anchor cache unexpectedly has a reference")
+        label = _bounded_text(item.get("label"), "cache label", MAX_LABEL_LENGTH)
+        anchor_image_sha256 = _manifest_image_sha256(item)
+        anchor_label_sha256 = _sha256(label.encode("utf-8"))
     review_scope = {
         "image_size": item.get("image_size"),
         "review_regions": item.get("review_regions"),
@@ -199,6 +230,8 @@ def cache_identity(item: dict[str, Any], review_mode: str) -> dict[str, str]:
         "review_mode": review_mode,
         "candidate_semantic_sha256": candidate_semantic,
         "reference_semantic_sha256": reference_semantic,
+        "anchor_image_sha256": anchor_image_sha256,
+        "anchor_label_sha256": anchor_label_sha256,
         "review_scope_sha256": _sha256(_canonical_json(review_scope)),
         "capture_id": capture_id,
         "expectation_sha256": _sha256(expectation.encode("utf-8")),
@@ -206,24 +239,40 @@ def cache_identity(item: dict[str, Any], review_mode: str) -> dict[str, str]:
     }
 
 
-def cache_key(identity: dict[str, str]) -> str:
+def cache_key(identity: dict[str, Any]) -> str:
     return _sha256(_canonical_json(identity))
 
 
-def _normalize_identity(value: Any, index: int) -> dict[str, str]:
+def _normalize_identity(value: Any, index: int) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != IDENTITY_KEYS:
         raise ReviewError(f"cache entry {index}.identity has an invalid schema")
-    if value.get("review_mode") != "reference-comparison":
-        raise ReviewError(f"cache entry {index} is not a paired comparison")
+    review_mode = value.get("review_mode")
+    if review_mode not in {"anchor-semantic", "reference-comparison"}:
+        raise ReviewError(f"cache entry {index} has an invalid review mode")
     for key in (
         "candidate_semantic_sha256",
-        "reference_semantic_sha256",
         "review_scope_sha256",
         "expectation_sha256",
         "runtime_evidence_sha256",
     ):
         if not isinstance(value.get(key), str) or SHA256.fullmatch(value[key]) is None:
             raise ReviewError(f"cache entry {index}.{key} is invalid")
+    if review_mode == "reference-comparison":
+        if (
+            not isinstance(value.get("reference_semantic_sha256"), str)
+            or SHA256.fullmatch(value["reference_semantic_sha256"]) is None
+            or value.get("anchor_image_sha256") is not None
+            or value.get("anchor_label_sha256") is not None
+        ):
+            raise ReviewError(f"cache entry {index} has invalid paired identity")
+    elif (
+        value.get("reference_semantic_sha256") is not None
+        or not isinstance(value.get("anchor_image_sha256"), str)
+        or SHA256.fullmatch(value["anchor_image_sha256"]) is None
+        or not isinstance(value.get("anchor_label_sha256"), str)
+        or SHA256.fullmatch(value["anchor_label_sha256"]) is None
+    ):
+        raise ReviewError(f"cache entry {index} has invalid anchor identity")
     capture_id = _bounded_text(
         value.get("capture_id"),
         f"cache entry {index}.capture_id",
@@ -232,7 +281,9 @@ def _normalize_identity(value: Any, index: int) -> dict[str, str]:
     return {**value, "capture_id": capture_id}
 
 
-def _normalize_cached_verdict(value: Any, index: int) -> dict[str, Any]:
+def _normalize_cached_verdict(
+    value: Any, index: int, *, review_mode: str
+) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != CACHED_VERDICT_KEYS:
         raise ReviewError(f"cache entry {index}.verdict has an invalid schema")
     semantic_valid = value.get("semantic_valid")
@@ -240,8 +291,11 @@ def _normalize_cached_verdict(value: Any, index: int) -> dict[str, Any]:
     defect = value.get("defect")
     if not isinstance(semantic_valid, bool) or not isinstance(defect, bool):
         raise ReviewError(f"cache entry {index} has invalid verdict booleans")
-    if not isinstance(matches_reference, bool):
-        raise ReviewError(f"cache entry {index} must judge its reference")
+    if review_mode == "reference-comparison":
+        if not isinstance(matches_reference, bool):
+            raise ReviewError(f"cache entry {index} must judge its reference")
+    elif matches_reference is not None:
+        raise ReviewError(f"cache entry {index} anchor must not judge a reference")
     visible = _bounded_text(
         value.get("visible"), f"cache entry {index}.visible", MAX_VISIBLE_LENGTH
     )
@@ -256,7 +310,9 @@ def _normalize_cached_verdict(value: Any, index: int) -> dict[str, Any]:
         )
         for anomaly_index, anomaly in enumerate(anomalies)
     ]
-    expected_defect = not semantic_valid or not matches_reference
+    expected_defect = not semantic_valid or (
+        review_mode == "reference-comparison" and not matches_reference
+    )
     if defect != expected_defect:
         raise ReviewError(f"cache entry {index} has an incoherent defect verdict")
     if defect and not normalized_anomalies:
@@ -284,6 +340,7 @@ def validate_cache(value: Any, expected_policy: str) -> dict[str, Any]:
         raise ReviewError("visual review cache exceeds its entry bound")
     normalized_entries: list[dict[str, Any]] = []
     seen: set[str] = set()
+    review_modes: set[str] = set()
     for index, entry in enumerate(raw_entries):
         if not isinstance(entry, dict) or set(entry) != ENTRY_KEYS:
             raise ReviewError(f"cache entry {index} has an invalid schema")
@@ -297,13 +354,20 @@ def validate_cache(value: Any, expected_policy: str) -> dict[str, Any]:
         ):
             raise ReviewError(f"cache entry {index} has an invalid or duplicate key")
         seen.add(key)
+        review_modes.add(identity["review_mode"])
         normalized_entries.append(
             {
                 "key": key,
                 "identity": identity,
-                "verdict": _normalize_cached_verdict(entry.get("verdict"), index),
+                "verdict": _normalize_cached_verdict(
+                    entry.get("verdict"),
+                    index,
+                    review_mode=identity["review_mode"],
+                ),
             }
         )
+    if len(review_modes) > 1:
+        raise ReviewError("visual review cache mixes review modes")
     return {
         "schema_version": CACHE_SCHEMA_VERSION,
         "policy_sha256": expected_policy,
@@ -324,12 +388,19 @@ def cached_verdicts(
     """Return current-label verdicts whose entire semantic/pixel key is unchanged."""
 
     entries, _labels = validate_manifest(manifest)
-    if cache is None or review_mode != "reference-comparison":
+    if cache is None:
         return {}
+    cache_modes = {entry["identity"]["review_mode"] for entry in cache["entries"]}
+    if cache_modes and cache_modes != {review_mode}:
+        raise ReviewError("visual review cache belongs to a different review mode")
     by_key = {entry["key"]: entry for entry in cache["entries"]}
     hits: dict[str, dict[str, Any]] = {}
     for item in entries:
-        if item["candidate_semantic_sha256"] == item.get("reference_semantic_sha256"):
+        if (
+            review_mode == "reference-comparison"
+            and item["candidate_semantic_sha256"]
+            == item.get("reference_semantic_sha256")
+        ):
             continue
         identity = cache_identity(item, review_mode)
         cached = by_key.get(cache_key(identity))
@@ -337,7 +408,9 @@ def cached_verdicts(
             continue
         verdict = {"label": item["label"], **cached["verdict"]}
         hits[item["label"]] = validate(
-            [item], [verdict], require_paired=True
+            [item],
+            [verdict],
+            require_paired=review_mode == "reference-comparison",
         )[0]
     return hits
 
@@ -375,11 +448,14 @@ def merge_cache(
     policy_sha256: str,
     review_mode: str,
 ) -> dict[str, Any]:
-    """Append current normalized paired verdicts and retain a bounded recent set."""
+    """Append current normalized verdicts and retain a bounded recent set."""
 
     entries, labels = validate_manifest(manifest)
-    if review_mode != "reference-comparison" or "reference_path" not in entries[0]:
-        raise ReviewError("only paired comparison reports can update the verdict cache")
+    if review_mode not in {"anchor-semantic", "reference-comparison"}:
+        raise ReviewError("cache update review mode is invalid")
+    paired = "reference_path" in entries[0]
+    if paired != (review_mode == "reference-comparison"):
+        raise ReviewError("cache update review mode does not match the manifest")
     if not isinstance(verdicts, list):
         raise ReviewError("cache update verdicts must be an array")
     manifest_by_label = dict(zip(labels, entries, strict=True))
@@ -387,14 +463,20 @@ def merge_cache(
     if existing is not None:
         normalized_existing = validate_cache(existing, policy_sha256)
         for entry in normalized_existing["entries"]:
+            if entry["identity"]["review_mode"] != review_mode:
+                raise ReviewError("existing cache belongs to a different review mode")
             ordered[entry["key"]] = entry
     for index, verdict in enumerate(verdicts):
         label = verdict.get("label") if isinstance(verdict, dict) else None
         item = manifest_by_label.get(label) if isinstance(label, str) else None
         if item is None:
             raise ReviewError(f"cache update verdict {index} has an unknown label")
-        normalized = validate([item], [verdict], require_paired=True)[0]
-        if item["candidate_semantic_sha256"] == item["reference_semantic_sha256"]:
+        normalized = validate([item], [verdict], require_paired=paired)[0]
+        if (
+            paired
+            and item["candidate_semantic_sha256"]
+            == item["reference_semantic_sha256"]
+        ):
             continue
         identity = cache_identity(item, review_mode)
         key = cache_key(identity)
@@ -484,6 +566,11 @@ def main(argv: list[str] | None = None) -> int:
     update_parser.add_argument("--manifest", type=Path, required=True)
     update_parser.add_argument("--report", type=Path, required=True)
     update_parser.add_argument("--policy-sha256", required=True)
+    update_parser.add_argument(
+        "--review-mode",
+        required=True,
+        choices=("anchor-semantic", "reference-comparison"),
+    )
     update_parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
@@ -531,7 +618,7 @@ def main(argv: list[str] | None = None) -> int:
             load(args.manifest, "cache update manifest"),
             load(args.report, "cache update report"),
             policy_sha256=args.policy_sha256,
-            review_mode="reference-comparison",
+            review_mode=args.review_mode,
         )
         write_cache(args.output, updated)
         print(f"Published {len(updated['entries'])} exact-policy visual verdicts")
