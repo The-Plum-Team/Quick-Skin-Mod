@@ -79,7 +79,7 @@
       </div>
 
       <div id="compatibility-view" hidden>
-        <p class="compare-note">Each row pairs the clean E2E reference with the same checkpoint from a packaged client running the named optional mod. The full lane is still checked; this page keeps the two compatibility-specific checkpoints so the evidence remains useful and compact.</p>
+        <p class="compare-note">Each row pairs the clean E2E reference with the same checkpoint from a packaged client running the named optional mod. The full lane is still checked; this page keeps two local checkpoints and, for contracted integrations, two remote-observer checkpoints so the evidence remains useful and compact.</p>
         <form id="compatibility-filters" class="compatibility-controls" aria-label="Filter mod compatibility evidence">
           <label>Minecraft version
             <select id="compatibility-version"><option value="all">All versions</option></select>
@@ -114,7 +114,7 @@
       <div>
         <p>The required E2E gate validates mod state, screenshot integrity and expected pixel changes. These images let humans compare the resulting UI and rendering across versions.</p>
         <p>Every capture carries the evidence that admitted it: the versioned scenario contract it belongs to, the passed deterministic assertion emitted by the packaged client, the decoded pixel measurements of both the original PNG and the published image, the required pixel change against its paired checkpoint, and the SHA-256 of the exact mod JAR under test. Open a capture to read that record; nothing on this page is published without it.</p>
-        <p>The AI visual review remains advisory for normal release evidence. Optional-mod comparisons are published only after the complete compatibility lane passes its deterministic runtime assertions and every reviewed frame receives a clean visual verdict; the two pairs shown here are a compact subset of that completed review. Absence of compatibility evidence is not a claim of incompatibility.</p>
+        <p>The AI visual review remains advisory for normal release evidence. Optional-mod comparisons are published only after the complete compatibility lane passes its deterministic runtime assertions and every reviewed frame receives a clean visual verdict; each lane shows its two local pairs and, where contracted, two multiplayer pairs. Absence of compatibility evidence is not a claim of incompatibility.</p>
         <p><a href="gallery-data.json">Download the machine-readable gallery inventory</a></p>
       </div>
     </section>
