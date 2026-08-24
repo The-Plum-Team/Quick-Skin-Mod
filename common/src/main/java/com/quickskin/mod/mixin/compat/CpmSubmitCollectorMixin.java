@@ -9,8 +9,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Drops only CPM's already-extracted player submission while its model-to-skin transition crosses
- * a frame boundary. CPM's 26.1 Fabric collector otherwise dereferences render types discarded by
- * that transition; the following frame submits the ordinary player with the selected skin.
+ * a frame boundary. CPM's modern Fabric collectors otherwise dereference render types discarded
+ * by that transition; the following frame submits the ordinary player with the selected skin.
  */
 @Pseudo
 @Mixin(targets = "com.tom.cpm.client.CPMOrderedSubmitNodeCollector", remap = false)
