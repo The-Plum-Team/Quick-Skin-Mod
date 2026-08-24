@@ -61,7 +61,7 @@ public final class CpmCapabilities {
         }
 
         public boolean usesDeferredRendering() {
-            return renderPipeline == RenderPipeline.DEFERRED_COLLECTOR;
+            return renderPipeline != RenderPipeline.IMMEDIATE;
         }
     }
 
