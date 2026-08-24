@@ -129,15 +129,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Public optional-mod evidence is admitted only from a complete clean compatibility source wave.
   Authenticate and validate the full runnable/N/A plan, every exact compatibility-profile paired
   review manifest and normalized report, every clean lane marker, and the source completion marker
-  before publishing. Publish exactly the two `mod-compatibility` checkpoints per applicable lane,
-  each as its clean reference plus modded candidate, with deterministic assertion, exact mod
-  version, semantic fingerprints, source/derivative proof, clean verdict booleans, and run
-  provenance.
-  Never publish provider-authored explanations or anomaly text. `reviewed_frame_count` must equal
-  that exact two-checkpoint model product; the authenticated runtime result, not repeated model
-  review of ordinary screenshots, proves the complete base suite. Public compatibility schema v2
-  encodes that count; continue accepting schema v1's complete-scenario count until every rolling
-  branch cache has been regenerated.
+  before publishing. Publish exactly the two local `mod-compatibility` checkpoints and, only when
+  the mod contract opts in, the two `mod-compatibility-remote` observer checkpoints per applicable
+  lane. Each remains its clean reference plus modded candidate, with deterministic assertion,
+  exact mod version, semantic fingerprints, source/derivative proof, clean verdict booleans, and
+  run provenance. Never publish provider-authored explanations or anomaly text.
+  `reviewed_frame_count` must equal that exact mod-selective two- or four-checkpoint model product;
+  the authenticated runtime result, not repeated model review of ordinary screenshots, proves the
+  complete base suite. Public compatibility schema v3 encodes that count; continue accepting
+  schema v2's local-only count and schema v1's complete-scenario count until every rolling branch
+  cache has been regenerated.
 - Adding a published field must not invalidate evidence that already exists. Each release branch
   keeps one rolling cache built by its own checkout, and those caches are regenerated only when
   that branch ports and re-runs its packaged suite—which can itself wait on unrelated approvals.
@@ -362,7 +363,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   whose Build, complete packaged suite, and independent semantic visual review are all clean. Its
   authored unit is `release artifact x optional mod`: every applicable unit first proves that the
   named Quick Skin integration is active, then runs the complete ordinary scenario profile plus
-  the compatibility scenario. All applicable units run in parallel; unsupported loader/mod pairs
+  the local compatibility scenario and any remote-observer scenario explicitly selected by that
+  mod's contract. All applicable units run in parallel; unsupported loader/mod pairs
   and reviewed upstream loader/version exclusions remain explicit `not_applicable` records. Each
   successful unit must curate its capsule in that same matrix job; a failing sibling keeps the
   runtime gate red but cannot suppress the successful capsule or its later parallel review. The
