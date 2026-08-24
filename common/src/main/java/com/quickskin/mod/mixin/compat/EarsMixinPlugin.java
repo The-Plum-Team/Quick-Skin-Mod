@@ -15,6 +15,7 @@ import java.util.Set;
 public class EarsMixinPlugin implements IMixinConfigPlugin {
     private static final List<String> CPM_RENDER_MIXINS = List.of("CpmRenderDepthMixin");
     private static final String CPM_SUBMIT_COLLECTOR_MIXIN = "CpmSubmitCollectorMixin";
+    private static final String REPLAY_MOD_COMPAT_MIXIN = "ReplayModCompatMixin";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -40,6 +41,12 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // visible, even though Mixin can resolve and transform that target later in startup.
         if (CPM_RENDER_MIXINS.stream().anyMatch(name -> mixinNamed(mixinClassName, name))
                 || mixinNamed(mixinClassName, CPM_SUBMIT_COLLECTOR_MIXIN)) {
+            return true;
+        }
+        // The ReplayMod bridge targets a vanilla packet and contains no references to ReplayMod
+        // classes. It is therefore safe to transform unconditionally; its handler no-ops unless
+        // the active connection is ReplayMod's fake playback connection.
+        if (mixinNamed(mixinClassName, REPLAY_MOD_COMPAT_MIXIN)) {
             return true;
         }
         return false;
