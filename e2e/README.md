@@ -381,7 +381,9 @@ the lock updater preserves those authored exclusions.
 Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, and ReplayMod. Player Armor Stands
 is intentionally absent and unsupported. A runtime may install only the exact URL, filename, byte
 size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth for `latest`.
-The two stable compatibility capture IDs select a different real workflow for each locked mod:
+The contract also owns each mod's two feature-specific expectations and normalized review regions,
+so caching and AI focus on the rendered integration rather than a generic part of the frame. The
+two stable compatibility capture IDs select a different real workflow for each locked mod:
 
 - CPM exports a genuine `.cpmmodel` through CPM's editor API, imports and renders its two coloured
   horn cubes, then selects a normal Quick Skin skin and proves CPM model mode was cleared.
