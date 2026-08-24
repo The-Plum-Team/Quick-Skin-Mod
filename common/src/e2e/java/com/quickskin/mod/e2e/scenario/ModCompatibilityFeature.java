@@ -1047,10 +1047,10 @@ interface ModCompatibilityFeature {
                 return;
             }
             try {
-                importAndApply(TestAssets.makeDistinctSkin());
-                E2ELog.info("applied distinct ReplayMod fixture; waiting for recorded server echo");
+                importAndApply(TestAssets.makeReplayAcknowledgedSkin());
+                E2ELog.info("applied hash-distinct plaid ReplayMod fixture; waiting for recorded server echo");
             } catch (Exception exception) {
-                failure = "ReplayMod distinct skin fixture failed: " + concise(exception);
+                failure = "ReplayMod acknowledged skin fixture failed: " + concise(exception);
                 E2ELog.error(failure, exception);
             }
         }

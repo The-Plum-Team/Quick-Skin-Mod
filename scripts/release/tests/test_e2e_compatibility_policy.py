@@ -308,7 +308,10 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn(
             '"com.quickskin.mod.client.compat.ReplayModHelper"', feature
         )
-        self.assertIn("TestAssets.makeDistinctSkin()", feature)
+        self.assertIn("TestAssets.makeReplayAcknowledgedSkin()", feature)
+        self.assertIn("public static Path makeReplayAcknowledgedSkin()", assets)
+        self.assertIn("image.setRGB(0, 0, marker)", assets)
+        self.assertIn("outside every player-model UV island", assets)
         self.assertIn("MIN_ACKNOWLEDGED_RECORDING_TAIL_MS = 12_000L", feature)
         self.assertIn("MAX_ACKNOWLEDGED_RECORDING_TAIL_POLLS = 20 * 20", feature)
         self.assertIn("recordedDurationMs - acknowledgedPayloadTimestampMs", feature)
@@ -321,7 +324,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertNotIn("LIVE_SYNC_REASSERT_POLL", feature)
         self.assertNotIn("reasserted distinct ReplayMod fixture", feature)
         self.assertLess(
-            feature.index("applied distinct ReplayMod fixture"),
+            feature.index("applied hash-distinct plaid ReplayMod fixture"),
             feature.index("isLatestAppearanceAcknowledged"),
         )
         self.assertLess(
