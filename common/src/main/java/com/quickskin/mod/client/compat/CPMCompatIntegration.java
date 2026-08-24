@@ -82,6 +82,8 @@ public final class CPMCompatIntegration {
     private static final AtomicBoolean cacheInvalidationQueued = new AtomicBoolean();
     private static final AtomicBoolean cacheSchedulingFailedLogged = new AtomicBoolean();
     private static final AtomicBoolean skinModeResetQueued = new AtomicBoolean();
+    private static final AtomicBoolean skinModeResetApplied = new AtomicBoolean();
+    private static final AtomicBoolean staleSubmissionDroppedLogged = new AtomicBoolean();
     private static final AtomicBoolean deferredResetLogged = new AtomicBoolean();
     private static volatile boolean localModelProbeDisabled;
     private static volatile boolean cacheInvalidationDisabled;
@@ -308,6 +310,35 @@ public final class CPMCompatIntegration {
         return isAvailable() && skinModeResetQueued.get();
     }
 
+    /**
+     * Returns whether CPM's extracted player submission belongs to the model that was just reset.
+     * The optional collector mixin drops that one stale submission; the ordinary player is
+     * extracted again on the following frame with Quick Skin's selected texture.
+     */
+    public static boolean shouldSuppressStaleSubmission() {
+        boolean suppress = isAvailable()
+                && skinModeResetQueued.get()
+                && skinModeResetApplied.get();
+        if (suppress && staleSubmissionDroppedLogged.compareAndSet(false, true)) {
+            CPMLOG.info("Discarded CPM's stale extracted player submission during skin-mode reset");
+        }
+        return suppress;
+    }
+
+    /**
+     * Releases the transition only after the frame containing CPM's reset has finished. Calling
+     * this from HUD/screen post-render keeps the suppression flag alive through every model part
+     * submitted in that frame, rather than clearing it inside CPM's pre-render task.
+     */
+    public static void onRenderedFrameBoundary() {
+        if (!skinModeResetQueued.get() || !skinModeResetApplied.get()
+                || cacheInvalidationQueued.get()) {
+            return;
+        }
+        skinModeResetApplied.set(false);
+        skinModeResetQueued.set(false);
+    }
+
     private static boolean isCPMScreenOpen() {
         try {
             //? if <26.2 {
@@ -488,10 +519,11 @@ public final class CPMCompatIntegration {
         if (!skinModeResetQueued.compareAndSet(false, true)) {
             return true;
         }
+        skinModeResetApplied.set(false);
         Runnable reset = () -> {
-            try {
-                performSkinModeReset();
-            } finally {
+            if (performSkinModeReset()) {
+                skinModeResetApplied.set(true);
+            } else {
                 skinModeResetQueued.set(false);
             }
         };
@@ -502,11 +534,16 @@ public final class CPMCompatIntegration {
             }
             return true;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            skinModeResetQueued.set(false);
             if (cacheSchedulingFailedLogged.compareAndSet(false, true)) {
                 CPMLOG.warn("CPM next-frame skin-mode reset is unavailable; resetting immediately", e);
             }
-            return performSkinModeReset();
+            boolean resetApplied = performSkinModeReset();
+            if (resetApplied) {
+                skinModeResetApplied.set(true);
+            } else {
+                skinModeResetQueued.set(false);
+            }
+            return resetApplied;
         }
     }
 

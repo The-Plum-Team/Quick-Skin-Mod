@@ -26,7 +26,7 @@ public abstract class CpmSubmitCollectorMixin {
             remap = false
     )
     private void quickskin$skipStaleExtractedModel(CallbackInfo ci) {
-        if (CPMCompatIntegration.isSkinModeResetInProgress()) {
+        if (CPMCompatIntegration.shouldSuppressStaleSubmission()) {
             ci.cancel();
         }
     }

@@ -313,6 +313,15 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("executeNextFrameMethod.invoke(minecraftClientAccess, reset)", integration)
         self.assertIn('if (!notifyServerIfInstalled("resetToSkinMode"))', integration)
         self.assertIn("isCPMScreenOpen() || skinModeResetQueued.get()", integration)
+        self.assertIn("skinModeResetApplied.set(true)", integration)
+        self.assertIn("shouldSuppressStaleSubmission()", integration)
+        self.assertIn("onRenderedFrameBoundary()", integration)
+        client_events = (ROOT / "common/src/main/java/com/quickskin/mod/event/ClientEvents.java").read_text(
+            encoding="utf-8"
+        )
+        self.assertGreaterEqual(
+            client_events.count("CPMCompatIntegration.onRenderedFrameBoundary();"), 2
+        )
         force_refresh = integration[
             integration.index("public static void forceReRegisterSkins") :
             integration.index("/** Clears CPM's selectedModel key")
