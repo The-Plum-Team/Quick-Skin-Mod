@@ -296,6 +296,14 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn(
             '"com.quickskin.mod.client.compat.ReplayModHelper"', feature
         )
+        self.assertIn("TestAssets.makeDistinctSkin()", feature)
+        self.assertIn("LIVE_SYNC_REASSERT_POLL", feature)
+        self.assertIn("LIVE_SYNC_SETTLE_POLLS", feature)
+        self.assertIn("reasserted distinct ReplayMod fixture", feature)
+        self.assertLess(
+            feature.index("applied distinct ReplayMod fixture"),
+            feature.index("ReplayMod recording close requested"),
+        )
 
     def test_cpm_cache_refresh_waits_for_the_extracted_frame_boundary(self) -> None:
         """A skin/model transition must not invalidate CPM's active extracted frame."""
