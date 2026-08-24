@@ -651,6 +651,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--max-entries 520", review)
         self.assertIn("visual-review-capsule", review)
         self.assertIn("ref: ${{ needs.select.outputs.implementation_sha }}", review)
+        self.assertIn("fetch-depth: 0", review)
         self.assertIn("persist-credentials: false", review)
         self.assertNotIn("actions/download-artifact@", review)
         self.assertIn("schema_version == 5", review)
@@ -692,8 +693,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertGreaterEqual(review.count("visual_review_semantic_prompt.md"), 2)
         self.assertIn('--review-mode "$review_mode"', review)
         self.assertIn('merge-base --is-ancestor \\', review)
+        self.assertIn("producer_digest()", review)
+        self.assertIn('reviewer_checkout && $0 == "          fetch-depth: 0"', review)
+        self.assertIn("owner_producer=.*rev-parse", review)
+        self.assertIn('current_producer=.*producer_digest', review)
+        self.assertIn("comparison_count != 1", review)
         self.assertIn(
-            '$cache_owner_sha:.github/workflows/visual-review-drain.yml', review
+            '$producer_sha:.github/workflows/visual-review-drain.yml', review
         )
         self.assertIn('"$owner_producer" != "$current_producer"', review)
         self.assertNotIn('.head_sha == $workflow_sha', review)
@@ -852,6 +858,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         plan_step = prepare[
             plan_step_start : plan_step_end if plan_step_end >= 0 else len(prepare)
         ]
+        publish_cache_start = review.index(
+            "- name: Publish the protected compatibility verdict cache"
+        )
+        publish_cache_end = review.find("\n      - name:", publish_cache_start + 1)
+        if publish_cache_end < 0:
+            publish_cache_end = len(review)
+        publish_cache = review[publish_cache_start:publish_cache_end]
 
         self.assertIn("types:\n      - mod-compatibility-requested", execution_workflow)
         self.assertIn("permissions: {}", execution_workflow)
@@ -1055,6 +1068,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             review,
         )
         self.assertIn("Publish the protected compatibility verdict cache", review)
+        self.assertIn("--review-mode reference-comparison", publish_cache)
         self.assertIn("Upload the protected compatibility verdict cache", review)
         self.assertIn("Retire consumed compatibility verdict cache shards", review)
         self.assertIn("steps.verdict-cache-artifact.outputs.artifact-id", review)
