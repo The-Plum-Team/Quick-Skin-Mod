@@ -858,6 +858,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         plan_step = prepare[
             plan_step_start : plan_step_end if plan_step_end >= 0 else len(prepare)
         ]
+        publish_cache_start = review.index(
+            "- name: Publish the protected compatibility verdict cache"
+        )
+        publish_cache_end = review.find("\n      - name:", publish_cache_start + 1)
+        if publish_cache_end < 0:
+            publish_cache_end = len(review)
+        publish_cache = review[publish_cache_start:publish_cache_end]
 
         self.assertIn("types:\n      - mod-compatibility-requested", execution_workflow)
         self.assertIn("permissions: {}", execution_workflow)
@@ -1061,6 +1068,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             review,
         )
         self.assertIn("Publish the protected compatibility verdict cache", review)
+        self.assertIn("--review-mode reference-comparison", publish_cache)
         self.assertIn("Upload the protected compatibility verdict cache", review)
         self.assertIn("Retire consumed compatibility verdict cache shards", review)
         self.assertIn("steps.verdict-cache-artifact.outputs.artifact-id", review)
