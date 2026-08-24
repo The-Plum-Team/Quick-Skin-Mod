@@ -686,6 +686,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--allow-blocking-partial", review)
         self.assertIn("visual-review-verdict-cache-$policy_sha256", review)
         self.assertIn("visual_review_cache.py\" combine", review)
+        self.assertNotIn(
+            'if [[ "$review_mode" != reference-comparison ]]', review
+        )
+        self.assertGreaterEqual(review.count("visual_review_semantic_prompt.md"), 2)
+        self.assertIn('--review-mode "$review_mode"', review)
         self.assertIn('merge-base --is-ancestor \\', review)
         self.assertIn(
             '$cache_owner_sha:.github/workflows/visual-review-drain.yml', review
@@ -1426,6 +1431,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("scripts/pages/select_compatibility_artifact.py", collect)
         self.assertIn("digest-mismatch: error", collect)
         self.assertIn("scripts/pages/compatibility_evidence.py validate", collect)
+        self.assertIn("validation_status=0", collect)
+        self.assertIn('[[ "$validation_status" -eq 3 ]]', collect)
+        self.assertIn('exit "$validation_status"', collect)
         self.assertIn("git merge-base --is-ancestor", collect)
         self.assertIn("scripts/ci/mod_compatibility_impact.py", collect)
         self.assertIn("scripts/pages/compatibility_evidence.py carry-forward", collect)
