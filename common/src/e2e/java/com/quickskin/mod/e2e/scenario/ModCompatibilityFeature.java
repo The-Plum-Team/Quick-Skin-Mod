@@ -962,7 +962,9 @@ interface ModCompatibilityFeature {
         // ReplayMod freezes Minecraft's global timer at EOF. Keep enough recorded tail for the
         // applied screenshot, Retina re-grabs, and the harness screenshot-flush window.
         private static final long MIN_RECORDING_DURATION_MS = 15_000L;
-        private static final int ACKNOWLEDGED_RECORDING_TAIL_POLLS = 20;
+        private static final long MIN_ACKNOWLEDGED_RECORDING_TAIL_MS = 12_000L;
+        private static final int MAX_ACKNOWLEDGED_RECORDING_TAIL_POLLS = 20 * 20;
+        private static final long MISSING_RECORDED_PAYLOAD_GRACE_MS = 3_000L;
         private static final Object STARTUP_SCAN_LOCK = new Object();
         private static volatile Path protectedStartupScanPlaceholder;
         private static volatile Path protectedStartupScanMarker;
@@ -982,6 +984,7 @@ interface ModCompatibilityFeature {
         private volatile boolean replayModeLogged;
         private volatile boolean recordedPayloadLogged;
         private volatile boolean serverEchoAcknowledged;
+        private volatile long acknowledgedPayloadTimestampMs = -1L;
         private volatile int acknowledgedRecordingTailPolls;
         private volatile int replayPolls;
         private volatile UUID replayTarget;
@@ -1044,17 +1047,18 @@ interface ModCompatibilityFeature {
                 return;
             }
             try {
-                importAndApply(TestAssets.makeDistinctSkin());
-                E2ELog.info("applied distinct ReplayMod fixture; waiting for recorded server echo");
+                importAndApply(TestAssets.makeReplayAcknowledgedSkin());
+                E2ELog.info("applied hash-distinct plaid ReplayMod fixture; waiting for recorded server echo");
             } catch (Exception exception) {
-                failure = "ReplayMod distinct skin fixture failed: " + concise(exception);
+                failure = "ReplayMod acknowledged skin fixture failed: " + concise(exception);
                 E2ELog.error(failure, exception);
             }
         }
 
         @Override
         public boolean quickSkinFeatureReady() {
-            if (failure != null || replayPath == null) return false;
+            if (failure != null) return true;
+            if (replayPath == null) return false;
             try {
                 if (!disconnectRequested) {
                     if (!activeSkinReady()) return false;
@@ -1069,15 +1073,34 @@ interface ModCompatibilityFeature {
                             return false;
                         }
                         serverEchoAcknowledged = true;
-                        E2ELog.info("received exact Quick Skin server echo; retaining recorded tail");
+                        acknowledgedPayloadTimestampMs =
+                                reflectedLong(packetListener, "getCurrentDuration");
+                        if (acknowledgedPayloadTimestampMs < 0L) {
+                            failure = "could not locate the recorded server-echo timestamp";
+                            return true;
+                        }
+                        E2ELog.info("received exact Quick Skin server echo at recording timestamp "
+                                + acknowledgedPayloadTimestampMs
+                                + "ms; retaining at least 12s of recorded packets");
                     }
-                    if (++acknowledgedRecordingTailPolls
-                            < ACKNOWLEDGED_RECORDING_TAIL_POLLS) {
+                    long recordedDurationMs =
+                            reflectedLong(packetListener, "getCurrentDuration");
+                    if (recordedDurationMs < acknowledgedPayloadTimestampMs
+                            + MIN_ACKNOWLEDGED_RECORDING_TAIL_MS) {
+                        if (++acknowledgedRecordingTailPolls
+                                >= MAX_ACKNOWLEDGED_RECORDING_TAIL_POLLS) {
+                            failure = "ReplayMod did not retain "
+                                    + MIN_ACKNOWLEDGED_RECORDING_TAIL_MS
+                                    + "ms of recorded packets after the exact server echo";
+                            return true;
+                        }
                         return false;
                     }
                     disconnectRequested = true;
                     E2ELog.info("ReplayMod recording close requested for "
-                            + replayPath.getFileName());
+                            + replayPath.getFileName() + " with "
+                            + (recordedDurationMs - acknowledgedPayloadTimestampMs)
+                            + "ms recorded tail");
                     minecraft.getConnection().getConnection().disconnect(
                             Component.literal("Quick Skin E2E: finalize replay"));
                     return false;
@@ -1123,14 +1146,31 @@ interface ModCompatibilityFeature {
                 }
                 replayTarget = ReplayModBridge.getTargetPlayerUUID();
                 replayPlayer = ReplayModBridge.getPlayerByUUID(replayTarget);
+                long playbackTimestampMs = currentReplayTimestamp();
+                if (playbackTimestampMs < 0L) {
+                    failure = "could not read ReplayMod's playback timestamp";
+                    return true;
+                }
                 if (replayPolls == 1 || replayPolls % 20 == 0) {
                     PlayerAppearance observed = replayTarget == null
                             ? null : appearances.getAppearance(replayTarget);
-                    E2ELog.info("ReplayMod readiness: target=" + replayTarget
+                    E2ELog.info("ReplayMod readiness: playback=" + playbackTimestampMs
+                            + "ms, recordedEcho=" + acknowledgedPayloadTimestampMs
+                            + "ms, target=" + replayTarget
                             + ", player=" + (replayPlayer != null)
                             + ", intercepted=" + ReplayModBridge.getInterceptedPacketCount()
                             + ", applied=" + ReplayModBridge.hasSkinBeenApplied()
                             + ", skin=" + (observed == null ? null : observed.getSkinId()));
+                }
+                if (ReplayModBridge.getInterceptedPacketCount() <= 0
+                        && acknowledgedPayloadTimestampMs >= 0L
+                        && playbackTimestampMs >= acknowledgedPayloadTimestampMs
+                        + MISSING_RECORDED_PAYLOAD_GRACE_MS) {
+                    failure = "ReplayMod played " + MISSING_RECORDED_PAYLOAD_GRACE_MS
+                            + "ms beyond the recorded server echo without traversing the "
+                            + "Quick Skin replay mixin";
+                    E2ELog.warn(failure);
+                    return true;
                 }
                 if (replayPlayer == null) return false;
                 PlayerAppearance replayAppearance = appearances.getAppearance(replayTarget);
@@ -1334,6 +1374,15 @@ interface ModCompatibilityFeature {
             Class<?> replay = Class.forName("com.replaymod.replay.ReplayModReplay");
             Object instance = replay.getField("instance").get(null);
             return instance == null ? null : replay.getMethod("getReplayHandler").invoke(instance);
+        }
+
+        private static long currentReplayTimestamp() throws ReflectiveOperationException {
+            Object handler = replayHandler();
+            if (handler == null) return -1L;
+            Object sender = handler.getClass().getMethod("getReplaySender").invoke(handler);
+            if (sender == null) return -1L;
+            Object timestamp = sender.getClass().getMethod("currentTimeStamp").invoke(sender);
+            return timestamp instanceof Number number ? number.longValue() : -1L;
         }
 
         private static void startReplay(Path path) throws ReflectiveOperationException {
