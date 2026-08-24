@@ -734,6 +734,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select.outputs.implementation_sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Python
@@ -1103,11 +1104,56 @@ jobs:
                   "$cache_owner_sha" "$GITHUB_SHA"; then
                 continue
               fi
-              owner_producer="$(git -C "$GITHUB_WORKSPACE" rev-parse \
-                "$cache_owner_sha:.github/workflows/visual-review-drain.yml" \
-                2>/dev/null || true)"
-              current_producer="$(git -C "$GITHUB_WORKSPACE" rev-parse \
-                "$GITHUB_SHA:.github/workflows/visual-review-drain.yml")"
+              producer_digest() {
+                local producer_sha="$1"
+                # Ignore only the history depth and this comparison mechanism itself. Every
+                # cache-producing step and protected review input must remain byte-identical.
+                git -C "$GITHUB_WORKSPACE" show \
+                    "$producer_sha:.github/workflows/visual-review-drain.yml" \
+                  | awk '
+                      $0 == "      - name: Check out the exact protected reviewer" {
+                        reviewer_checkout = 1
+                        reviewer_checkout_count += 1
+                      }
+                      reviewer_checkout && $0 == "          fetch-depth: 0" { next }
+                      reviewer_checkout && $0 == "          persist-credentials: false" {
+                        reviewer_checkout = 0
+                      }
+                      $0 ~ /^              owner_producer=.*rev-parse/ {
+                        print "              CACHE_PRODUCER_COMPARISON"
+                        legacy_comparison = 1
+                        comparison_count += 1
+                        next
+                      }
+                      legacy_comparison {
+                        if ($0 ~ /^                "\$GITHUB_SHA:.*visual-review-drain.yml/) {
+                          legacy_comparison = 0
+                        }
+                        next
+                      }
+                      $0 == "              producer_digest() {" {
+                        print "              CACHE_PRODUCER_COMPARISON"
+                        current_comparison = 1
+                        comparison_count += 1
+                        next
+                      }
+                      current_comparison {
+                        if ($0 ~ /^              current_producer=.*producer_digest/) {
+                          current_comparison = 0
+                        }
+                        next
+                      }
+                      { print }
+                      END {
+                        if (reviewer_checkout || legacy_comparison || current_comparison ||
+                            reviewer_checkout_count != 1 || comparison_count != 1) {
+                          exit 64
+                        }
+                      }
+                    ' | sha256sum | cut -d ' ' -f 1
+              }
+              owner_producer="$(producer_digest "$cache_owner_sha" 2>/dev/null || true)"
+              current_producer="$(producer_digest "$GITHUB_SHA")"
               if [[ -z "$owner_producer" \
                   || "$owner_producer" != "$current_producer" ]]; then
                 continue
