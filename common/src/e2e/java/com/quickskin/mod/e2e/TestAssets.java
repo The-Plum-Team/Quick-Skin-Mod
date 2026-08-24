@@ -190,15 +190,23 @@ public final class TestAssets {
      */
     public static Path makeEarsSkin() throws Exception {
         BufferedImage image = bundledSkinCopy();
+        // The bundled skin has opaque jacket, sleeve and trouser overlays. Keeping those pixels
+        // makes a correctly applied Ears fixture look half-updated because the old outer layer
+        // hides the new limb bases. Start from transparent overlays so every authored base island
+        // is visible and the screenshot proves one coherent skin transition.
+        clearModernSkinOverlay(image);
         Graphics2D graphics = image.createGraphics();
         graphics.setComposite(AlphaComposite.Src);
-        // Saturated landmarks make the skin and every feature face legible at the fixed rear
-        // E2E camera. Ears' TALL front faces sample 24..39,0..7, their rear faces sample
-        // 56..63,28..43, and a one-segment BACK tail samples 56..63,16..27. Painting only the
-        // vanilla head/torso leaves the rear-facing feature UVs transparent and creates a false
-        // runtime pass with no visible geometry.
+        // Saturated landmarks cover every vanilla base island as well as every feature face. This
+        // makes stale or partially applied skins visually undeniable at the fixed rear E2E camera.
         paintChecker(graphics, 0, 0, 32, 16, 0xFF00D9FF, 0xFFFF30C8);
         paintChecker(graphics, 16, 16, 24, 16, 0xFFFFA000, 0xFF5CFF3A);
+        paintChecker(graphics, 40, 16, 16, 16, 0xFF2D6BFF, 0xFFFF30C8); // right arm
+        paintChecker(graphics, 32, 48, 16, 16, 0xFF2D6BFF, 0xFFFF30C8); // left arm
+        paintChecker(graphics, 0, 16, 16, 16, 0xFF7CFF00, 0xFFFF7A00); // right leg
+        paintChecker(graphics, 16, 48, 16, 16, 0xFF7CFF00, 0xFFFF7A00); // left leg
+        // Ears' TALL front faces sample 24..39,0..7, their rear faces sample 56..63,28..43,
+        // and a one-segment BACK tail samples 56..63,16..27.
         paintChecker(graphics, 24, 0, 16, 8, 0xFFFFF200, 0xFFFF3B30);
         paintChecker(graphics, 56, 28, 8, 16, 0xFFFFF200, 0xFFFF3B30);
         paintChecker(graphics, 56, 16, 8, 12, 0xFF9D4EDD, 0xFF00F5D4);
