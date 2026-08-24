@@ -6,7 +6,9 @@
   "plugin": "com.quickskin.mod.mixin.compat.EarsMixinPlugin",
   "client": [
     "EarsLayerRendererMixin",
-    "EarsModMixin"
+    "EarsModMixin",
+    "CpmRenderDepthMixin",
+    "CpmSubmitCollectorMixin"
   ],
   "injectors": {
     "defaultRequire": 0
