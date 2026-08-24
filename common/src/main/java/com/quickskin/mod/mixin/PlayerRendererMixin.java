@@ -2,6 +2,7 @@ package com.quickskin.mod.mixin;
 
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
+import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
@@ -63,6 +64,8 @@ public class PlayerRendererMixin {
 //?} else {
     private void quickskin$overrideTextureLocation(AvatarRenderState renderState, CallbackInfoReturnable<Identifier> cir) {
 //?}
+        if (CPMCompatIntegration.shouldDeferToCPM()) return;
+
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
         if (service == null) return;
 
