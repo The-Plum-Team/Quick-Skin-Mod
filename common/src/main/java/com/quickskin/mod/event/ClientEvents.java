@@ -114,6 +114,8 @@ public class ClientEvents {
             // the own-skin bootstrap from the first tick that runs. It disarms itself once started.
             ensurePlayerOwnSkinExists();
 
+            com.quickskin.mod.client.compat.CPMCompatIntegration
+                    .prepareForBackgroundModelLoading();
             // This also ensures the singleton instance is created.
             com.quickskin.mod.client.storage.NetworkTextureCache.getInstance()
                     .tickWorkingSet();
