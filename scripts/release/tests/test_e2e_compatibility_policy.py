@@ -350,6 +350,32 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             feature.index("ReplayMod recording close requested"),
         )
 
+    def test_remote_optional_mod_scenario_asserts_the_second_client_renderer(self) -> None:
+        remote = (
+            E2E_JAVA / "scenario" / "ModCompatibilityRemoteScenario.java"
+        ).read_text(encoding="utf-8")
+        harness = (E2E_JAVA / "E2EHarness.java").read_text(encoding="utf-8")
+
+        self.assertIn("MOD_COMPATIBILITY_REMOTE", harness)
+        self.assertEqual(2, remote.count(".screenshot("))
+        self.assertIn('"client_b".equals(role)', remote)
+        self.assertIn('Step.of("prepare_remote_baseline")', remote)
+        self.assertIn('Step.of("await_observer_baseline")', remote)
+        self.assertIn('Step.of("observe_remote_baseline")', remote)
+        self.assertIn('Step.of("observe_remote_applied")', remote)
+        self.assertIn('syncAppearance(observerId, "", "", "slim")', remote)
+        self.assertIn("NetworkTextureCache.getInstance().hasTexture", remote)
+        self.assertIn('"quickskin:network/skin/" + hash', remote)
+        self.assertIn('getMethod("getGP_UUID", Object.class)', remote)
+        self.assertIn('getMethod("getLoadedPlayer", Object.class)', remote)
+        self.assertIn('getMethod("getModelDefinition")', remote)
+        self.assertIn('getMethod("doRender")', remote)
+        self.assertIn('getMethod("getError")', remote)
+        self.assertIn('getMethod("getById", UUID.class)', remote)
+        self.assertIn('"TALL".equals(publicField(value, "earMode"))', remote)
+        self.assertIn('"BACK".equals(publicField(value, "tailMode"))', remote)
+        self.assertIn("DefaultSkinEvidenceView.checkRearView", remote)
+
     def test_cpm_cache_refresh_waits_for_the_extracted_frame_boundary(self) -> None:
         """A skin/model transition must not invalidate CPM's active extracted frame."""
 
