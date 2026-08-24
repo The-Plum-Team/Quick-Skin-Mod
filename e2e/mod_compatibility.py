@@ -32,7 +32,7 @@ from matrix import gha_matrix, load_matrix, read_mod_version  # noqa: E402
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("mod-compatibility-contract.json")
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 MAX_CONTRACT_BYTES = 2 * 1024 * 1024
 MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
 MAX_FILES_PER_ARTIFACT = 4
@@ -98,6 +98,12 @@ class CompatibilityReviewRegions:
 
 
 @dataclass(frozen=True)
+class CompatibilityMultiplayer:
+    evidence: CompatibilityEvidence
+    review_regions: CompatibilityReviewRegions
+
+
+@dataclass(frozen=True)
 class CompatibilityMod:
     id: str
     name: str
@@ -108,6 +114,7 @@ class CompatibilityMod:
     provided_dependencies: tuple[str, ...]
     evidence: CompatibilityEvidence
     review_regions: CompatibilityReviewRegions
+    multiplayer: CompatibilityMultiplayer | None
     supported_game_versions: tuple[str, ...] | None
     excluded_lanes: tuple[ExcludedLane, ...]
     artifacts: tuple[LockedArtifact, ...]
@@ -327,6 +334,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             "provided_dependencies",
             "evidence",
             "review_regions",
+            "multiplayer",
             "supported_game_versions",
             "excluded_lanes",
             "artifacts",
@@ -380,6 +388,51 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
         raise CompatibilityContractError(
             f"{label}.review_regions is invalid: {exc}"
         ) from exc
+    multiplayer_value = item["multiplayer"]
+    multiplayer: CompatibilityMultiplayer | None
+    if multiplayer_value is None:
+        multiplayer = None
+    else:
+        multiplayer_item = _exact_keys(
+            multiplayer_value,
+            {"evidence", "review_regions"},
+            f"{label}.multiplayer",
+        )
+        multiplayer_evidence_value = _exact_keys(
+            multiplayer_item["evidence"],
+            {"baseline_with_mod", "apply_local_skin_with_mod"},
+            f"{label}.multiplayer.evidence",
+        )
+        multiplayer_review_regions_value = _exact_keys(
+            multiplayer_item["review_regions"],
+            {"baseline_with_mod", "apply_local_skin_with_mod"},
+            f"{label}.multiplayer.review_regions",
+        )
+        try:
+            multiplayer = CompatibilityMultiplayer(
+                evidence=CompatibilityEvidence(
+                    baseline_with_mod=_evidence_text(
+                        multiplayer_evidence_value["baseline_with_mod"],
+                        f"{label}.multiplayer.evidence.baseline_with_mod",
+                    ),
+                    apply_local_skin_with_mod=_evidence_text(
+                        multiplayer_evidence_value["apply_local_skin_with_mod"],
+                        f"{label}.multiplayer.evidence.apply_local_skin_with_mod",
+                    ),
+                ),
+                review_regions=CompatibilityReviewRegions(
+                    baseline_with_mod=normalize_regions(
+                        multiplayer_review_regions_value["baseline_with_mod"]
+                    ),
+                    apply_local_skin_with_mod=normalize_regions(
+                        multiplayer_review_regions_value["apply_local_skin_with_mod"]
+                    ),
+                ),
+            )
+        except SimilarityError as exc:
+            raise CompatibilityContractError(
+                f"{label}.multiplayer.review_regions is invalid: {exc}"
+            ) from exc
     supported = item["supported_game_versions"]
     supported_versions = (
         None
@@ -476,6 +529,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
         ),
         evidence=evidence,
         review_regions=review_regions,
+        multiplayer=multiplayer,
         supported_game_versions=supported_versions,
         excluded_lanes=tuple(excluded_lanes),
         artifacts=artifacts,
@@ -662,7 +716,13 @@ def build_plan(
                     "compatibility_version": lane.artifact.version_number,
                     "compatibility_version_id": lane.artifact.version_id,
                     "compatibility_contract_sha256": contract.sha256,
-                    "scenarios": "mod-compatibility," + row["scenarios"],
+                    "scenarios": ",".join(
+                        (
+                            "mod-compatibility",
+                            *(("mod-compatibility-remote",) if mod.multiplayer else ()),
+                            row["scenarios"],
+                        )
+                    ),
                 }
             )
     return {
