@@ -382,8 +382,9 @@ interface ModCompatibilityFeature {
             } catch (ReflectiveOperationException exception) {
                 return Step.Result.fail("could not inspect Ears public storage: " + concise(exception));
             }
-            return activeSkinAssertion("Quick Skin imported Ears-authored magic pixels, parsed "
-                    + publicField(detectedFeatures, "earMode") + " ears and a "
+            return activeSkinAssertion("Quick Skin rendered one complete saturated Ears skin "
+                    + "across head, torso, both arms, and both legs; its authored magic pixels "
+                    + "parsed " + publicField(detectedFeatures, "earMode") + " ears and a "
                     + publicField(detectedFeatures, "tailMode")
                     + " tail, attached Ears' feature layer, and published them to its renderer");
         }
