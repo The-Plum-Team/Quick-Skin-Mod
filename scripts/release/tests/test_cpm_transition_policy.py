@@ -40,12 +40,14 @@ class CpmTransitionPolicyTest(unittest.TestCase):
             {"CpmRenderDepthMixin", "CpmSubmitCollectorMixin"} <= configured
         )
 
-    def test_optional_plugin_fails_closed_for_unknown_mixin_names(self) -> None:
+    def test_optional_plugin_enables_safe_replay_bridge_and_fails_closed_for_unknown_names(self) -> None:
         plugin = (
             MIXIN_ROOT / "compat" / "EarsMixinPlugin.java"
         ).read_text(encoding="utf-8")
         self.assertIn('List.of("CpmRenderDepthMixin")', plugin)
         self.assertIn('"CpmSubmitCollectorMixin"', plugin)
+        self.assertIn('"ReplayModCompatMixin"', plugin)
+        self.assertIn("mixinNamed(mixinClassName, REPLAY_MOD_COMPAT_MIXIN)", plugin)
         self.assertIn("return false;", plugin)
 
 
