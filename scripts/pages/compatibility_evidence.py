@@ -48,7 +48,8 @@ from visual_evidence import (  # noqa: E402
 )
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+LEGACY_SCHEMA_VERSION = 1
 KIND = "quick-skin-public-mod-compatibility"
 MANIFEST_NAME = "manifest.json"
 SOURCE_SCENARIO = "mod-compatibility"
@@ -176,6 +177,10 @@ COMPLETION_FIELDS = frozenset(
 
 class CompatibilityEvidenceError(ValueError):
     """Raised when compatibility evidence cannot be published safely."""
+
+
+class CompatibilityContractDriftError(CompatibilityEvidenceError):
+    """Raised when a selected bundle binds superseded contracts."""
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -887,9 +892,9 @@ def build_bundle(
                 raise CompatibilityEvidenceError(str(exc)) from exc
             if validated_frame_count != proof["frame_count"]:
                 raise CompatibilityEvidenceError(f"lane {lane_id} frame count drifted")
-            if validated_frame_count != len(scenario_contract.captures):
+            if validated_frame_count != len(expected_capture_ids):
                 raise CompatibilityEvidenceError(
-                    f"lane {lane_id} does not cover the complete scenario contract"
+                    f"lane {lane_id} does not cover the exact compatibility checkpoints"
                 )
             completion_state = read_json(
                 report_completion_path, "visual review completion", maximum_bytes=1024 * 1024
@@ -927,17 +932,12 @@ def build_bundle(
                 metadata.get("review_run_id"), f"lane {lane_id} review_run_id"
             )
             verdict_by_label = {verdict["label"]: verdict for verdict in verdicts}
-            selected_entries = [
-                entry
-                for entry in manifest
-                if entry["capture_id"] in PUBLIC_CAPTURE_IDS
-            ]
-            if [entry["capture_id"] for entry in selected_entries] != expected_capture_ids:
+            if [entry["capture_id"] for entry in manifest] != expected_capture_ids:
                 raise CompatibilityEvidenceError(
                     f"lane {lane_id} compatibility capture product is incomplete"
                 )
             public_frames: list[dict[str, Any]] = []
-            for entry in selected_entries:
+            for entry in manifest:
                 verdict = verdict_by_label[entry["label"]]
                 capture = scenario_contract.capture_by_id(entry["capture_id"])
                 reference_capture_id = capture.compatibility_reference_capture_id
@@ -1150,7 +1150,12 @@ def validate_bundle(
             )
     manifest = read_json(bundle / MANIFEST_NAME, "compatibility manifest")
     manifest = _exact_object(manifest, MANIFEST_FIELDS, "compatibility manifest")
-    if manifest.get("schema_version") != SCHEMA_VERSION or manifest.get("kind") != KIND:
+    schema_version = manifest.get("schema_version")
+    if (
+        type(schema_version) is not int
+        or schema_version not in {LEGACY_SCHEMA_VERSION, SCHEMA_VERSION}
+        or manifest.get("kind") != KIND
+    ):
         raise CompatibilityEvidenceError("compatibility manifest identity is invalid")
     repository = _text(manifest.get("repository"), "manifest.repository", maximum=256)
     if REPOSITORY.fullmatch(repository) is None:
@@ -1167,11 +1172,18 @@ def validate_bundle(
     contracts = _exact_object(
         manifest.get("contracts"), CONTRACT_FIELDS, "manifest.contracts"
     )
+    _sha256(contracts.get("scenario_sha256"), "manifest.contracts.scenario_sha256")
+    _sha256(
+        contracts.get("compatibility_sha256"),
+        "manifest.contracts.compatibility_sha256",
+    )
     if contracts != {
         "scenario_sha256": scenario_contract.sha256,
         "compatibility_sha256": compatibility_contract.sha256,
     }:
-        raise CompatibilityEvidenceError("compatibility contract identity drifted")
+        raise CompatibilityContractDriftError(
+            "compatibility contract identity drifted"
+        )
     release = _exact_object(manifest.get("release"), RELEASE_FIELDS, "manifest.release")
     if (
         release.get("branch") != branch
@@ -1246,7 +1258,12 @@ def validate_bundle(
         reviewed = _positive_int(
             lane.get("reviewed_frame_count"), f"lane {lane_id}.reviewed_frame_count"
         )
-        if reviewed != len(scenario_contract.captures):
+        expected_reviewed = (
+            len(expected_capture_ids)
+            if schema_version == SCHEMA_VERSION
+            else len(scenario_contract.captures)
+        )
+        if reviewed != expected_reviewed:
             raise CompatibilityEvidenceError(f"lane {lane_id} review count is invalid")
         frames = lane.get("frames")
         if not isinstance(frames, list) or [
@@ -1515,6 +1532,9 @@ def main(argv: list[str] | None = None) -> int:
             result = f"validated compatibility evidence for {args.branch}"
         print(result)
         return 0
+    except CompatibilityContractDriftError as exc:
+        print(f"compatibility evidence unavailable: {exc}", file=sys.stderr)
+        return 3
     except (
         CompatibilityEvidenceError,
         CompatibilityContractError,
