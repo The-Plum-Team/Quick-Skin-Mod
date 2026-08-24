@@ -312,6 +312,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("return scheduleSkinModeReset();", integration)
         self.assertIn("executeNextFrameMethod.invoke(minecraftClientAccess, reset)", integration)
         self.assertIn('if (!notifyServerIfInstalled("resetToSkinMode"))', integration)
+        self.assertIn("isCPMScreenOpen() || skinModeResetQueued.get()", integration)
         force_refresh = integration[
             integration.index("public static void forceReRegisterSkins") :
             integration.index("/** Clears CPM's selectedModel key")

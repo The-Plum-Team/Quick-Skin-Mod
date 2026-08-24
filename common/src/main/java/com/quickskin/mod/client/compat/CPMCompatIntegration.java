@@ -294,9 +294,13 @@ public final class CPMCompatIntegration {
         }
     }
 
-    /** QuickSkin defers its appearance overrides only while a CPM-owned screen is open. */
+    /**
+     * QuickSkin defers appearance overrides while CPM owns the UI or while an extracted model is
+     * crossing the model-to-skin frame boundary. The latter keeps the old model paired with its
+     * old texture until CPM can replace both together on the next frame.
+     */
     public static boolean shouldDeferToCPM() {
-        return isAvailable() && isCPMScreenOpen();
+        return isAvailable() && (isCPMScreenOpen() || skinModeResetQueued.get());
     }
 
     private static boolean isCPMScreenOpen() {
