@@ -544,16 +544,6 @@ class ModCompatibilityContractTest(unittest.TestCase):
             ):
                 mod_compatibility_visual._load_inventory(inventory)
 
-    def test_essential_title_screen_has_an_explicit_compatibility_expectation(self) -> None:
-        expectation = mod_compatibility_visual.COMPATIBILITY_EXPECTATION_OVERRIDES[
-            ("essential", "full.client_a.title_screen_splash_order")
-        ]
-
-        self.assertIn("Essential intentionally owns", expectation)
-        self.assertIn("suppress its duplicate PlayerWidget", expectation)
-        self.assertIn("Quick Skin action icon", expectation)
-        self.assertIn("need not overlap the vanilla splash", expectation)
-
     def test_compatibility_curation_uses_locked_feature_expectations(self) -> None:
         compatibility_mod = mod_compatibility.load_contract(
             self.contract_path
@@ -561,7 +551,6 @@ class ModCompatibilityContractTest(unittest.TestCase):
 
         baseline = mod_compatibility_visual._compatibility_expectation(
             compatibility_mod,
-            "replaymod",
             {
                 "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_BASELINE_CAPTURE,
                 "expectation": "generic baseline",
@@ -569,7 +558,6 @@ class ModCompatibilityContractTest(unittest.TestCase):
         )
         applied = mod_compatibility_visual._compatibility_expectation(
             compatibility_mod,
-            "replaymod",
             {
                 "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_APPLIED_CAPTURE,
                 "expectation": "generic applied",
@@ -580,6 +568,47 @@ class ModCompatibilityContractTest(unittest.TestCase):
         self.assertEqual(compatibility_mod.evidence.apply_local_skin_with_mod, applied)
         self.assertIn("recording indicator", baseline)
         self.assertIn("recorded Quick Skin payload", applied)
+
+    def test_compatibility_curation_selects_only_the_feature_profile(self) -> None:
+        scenario_contract = visual_evidence.load_catalog(
+            ROOT / "e2e" / "scenario-contract.json"
+        ).contract
+        all_frames = [
+            {"capture_id": capture.capture_id}
+            for capture in scenario_contract.captures
+        ]
+        selected = mod_compatibility_visual._select_compatibility_frames(
+            all_frames,
+            scenario_contract=scenario_contract,
+        )
+
+        self.assertEqual(
+            [
+                "mod-compatibility.client_a.baseline_with_mod",
+                "mod-compatibility.client_a.apply_local_skin_with_mod",
+            ],
+            [frame["capture_id"] for frame in selected],
+        )
+        with self.assertRaisesRegex(
+            mod_compatibility_visual.CompatibilityVisualError,
+            "coverage is incomplete",
+        ):
+            mod_compatibility_visual._select_compatibility_frames(
+                [
+                    frame
+                    for frame in all_frames
+                    if frame["capture_id"] != selected[-1]["capture_id"]
+                ],
+                scenario_contract=scenario_contract,
+            )
+        with self.assertRaisesRegex(
+            mod_compatibility_visual.CompatibilityVisualError,
+            "coverage is incomplete",
+        ):
+            mod_compatibility_visual._select_compatibility_frames(
+                all_frames + [selected[-1]],
+                scenario_contract=scenario_contract,
+            )
 
 
 if __name__ == "__main__":
