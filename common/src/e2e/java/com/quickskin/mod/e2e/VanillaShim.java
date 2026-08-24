@@ -61,6 +61,9 @@ import java.util.function.Consumer;
  *       {@code ClientAvatarState} reached through {@code avatarState()} (1.21.9/26.x).</li>
  *   <li><b>main render target</b> (for screenshots): {@code Minecraft.getMainRenderTarget()} vs
  *       {@code mc.gameRenderer.mainRenderTarget()} (26.x).</li>
+ *   <li><b>terrain render readiness</b>: the player section must be compiled (and visible where
+ *       supported) and the chunk/section render dispatcher must have drained before a semantic
+ *       checkpoint may capture it.</li>
  *   <li><b>Screenshot.grab</b>: classic Fabric exposes intermediary class/method names at runtime,
  *       and an {@code int downscale} param was inserted in 1.21.6; both mappings and shapes are
  *       handled.</li>
@@ -75,6 +78,8 @@ import java.util.function.Consumer;
  * <p>GL-touching calls (screenshot) must run on the render thread, after at least one full frame.</p>
  */
 public final class VanillaShim {
+
+    private static volatile boolean terrainReadinessWarningEmitted;
 
     private VanillaShim() {}
 
@@ -138,6 +143,46 @@ public final class VanillaShim {
             E2ELog.warn("currentScreen: " + t);
         }
         return null;
+    }
+
+    /**
+     * Whether the terrain around {@code blockPos} has reached renderer truth, rather than merely
+     * existing in the logical client level.
+     *
+     * <p>Forge can expose the flat-world block state before llvmpipe has compiled and uploaded its
+     * render section. Capturing in that interval produces a sky-and-hotbar frame even though the
+     * player and block are both present. The section predicate rejects the initial placeholder;
+     * the dispatcher predicate then waits until outstanding terrain work has drained. Both methods
+     * keep stable Fabric intermediary ids while their Mojang names changed in newer releases.</p>
+     *
+     * @param blockPos a vanilla {@code BlockPos}; kept as {@link Object} so renamed vanilla types
+     *                 never escape this compatibility adapter
+     */
+    public static boolean isTerrainRenderReady(Minecraft mc, Object blockPos) {
+        if (mc == null || mc.levelRenderer == null || blockPos == null) return false;
+        try {
+            Object renderer = mc.levelRenderer;
+            Method sectionReady = findOneArg(
+                    renderer.getClass(), blockPos,
+                    "isSectionCompiled", "isSectionCompiledAndVisible",
+                    "method_40050", "m_202430_"
+            );
+            Method dispatcherReady = findNoArg(
+                    renderer.getClass(),
+                    "hasRenderedAllChunks", "hasRenderedAllSections",
+                    "method_3281", "m_109825_"
+            );
+            if (sectionReady == null || dispatcherReady == null) {
+                warnTerrainReadinessOnce("renderer readiness methods not found on "
+                        + renderer.getClass().getName());
+                return false;
+            }
+            return Boolean.TRUE.equals(sectionReady.invoke(renderer, blockPos))
+                    && Boolean.TRUE.equals(dispatcherReady.invoke(renderer));
+        } catch (Throwable t) {
+            warnTerrainReadinessOnce("renderer readiness check failed: " + t);
+            return false;
+        }
     }
 
     /** This player's profile name. {@code GameProfile.getName()} (class) vs {@code name()} (record, 26.x). */
@@ -1056,6 +1101,30 @@ public final class VanillaShim {
             }
         }
         return null;
+    }
+
+    private static Method findOneArg(Class<?> c, Object argument, String... names) {
+        for (Method m : c.getMethods()) {
+            if (m.getParameterCount() != 1
+                    || (m.getReturnType() != boolean.class
+                    && m.getReturnType() != Boolean.class)
+                    || !m.getParameterTypes()[0].isInstance(argument)) {
+                continue;
+            }
+            for (String name : names) {
+                if (m.getName().equals(name)) {
+                    m.setAccessible(true);
+                    return m;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void warnTerrainReadinessOnce(String message) {
+        if (terrainReadinessWarningEmitted) return;
+        terrainReadinessWarningEmitted = true;
+        E2ELog.warn(message);
     }
 
     private static Object invokeUniqueNoArgOnFieldValue(Object owner, String... methodNames)
