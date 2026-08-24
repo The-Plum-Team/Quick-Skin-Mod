@@ -120,11 +120,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
 
                 // Force CPM to switch to skin mode and re-read skin data.
                 CPMCompatIntegration.forceReRegisterSkins(playerId);
-                // Associate Ears features with this player (if Ears is available)
-                if (com.quickskin.mod.client.compat.EarsCompatIntegration.isAvailable()) {
-                    String username = getPlayerUsername(playerId);
-                    com.quickskin.mod.client.compat.EarsCompatIntegration.associateWithPlayer(skinLocation, playerId, username);
-                }
+                associateEarsFeatures(playerId, skinLocation);
             }
         } else if (model != null) {
             // Model-only updates should not require re-selecting the current skin.
@@ -306,11 +302,27 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
                 // Trigger async transparency analysis for the skin texture
                 com.quickskin.mod.common.util.TextureAlphaDetector.analyzeTextureAsync(location);
 
+                // Network appearances normally arrive before their texture bytes. Ears metadata is
+                // parsed only when those bytes are registered, so associate it at this late
+                // resolution point as well as on the immediate local-asset path.
+                associateEarsFeatures(playerId, location);
+
                 return location;
             }
         }
 
         return null;
+    }
+
+    //? if <1.21.11 {
+    private void associateEarsFeatures(UUID playerId, ResourceLocation skinLocation) {
+    //?} else {
+    private void associateEarsFeatures(UUID playerId, Identifier skinLocation) {
+    //?}
+        if (!com.quickskin.mod.client.compat.EarsCompatIntegration.isAvailable()) return;
+        String username = getPlayerUsername(playerId);
+        com.quickskin.mod.client.compat.EarsCompatIntegration
+                .associateWithPlayer(skinLocation, playerId, username);
     }
 
     @Nullable
