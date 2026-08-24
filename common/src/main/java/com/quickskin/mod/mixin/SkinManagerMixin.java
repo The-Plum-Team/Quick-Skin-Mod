@@ -1,10 +1,7 @@
 package com.quickskin.mod.mixin;
 
 import com.mojang.authlib.GameProfile;
-//? if <1.21.9 {
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
-//?} else {
-//?}
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.TextureQuality;
@@ -65,6 +62,7 @@ public class SkinManagerMixin {
     @Unique
     private static PlayerSkin quickskin$applyOverrides(PlayerSkin original, UUID uuid) {
         if (original == null || uuid == null) return original;
+        if (CPMCompatIntegration.shouldDeferToCPM()) return original;
 
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
         if (service == null) return original;
