@@ -703,6 +703,9 @@ public class ClientEvents {
                 com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay.render(guiGraphics, tickDelta.getGameTimeDeltaPartialTick(false));
                 //?}
             }
+            if (getCurrentScreen(Minecraft.getInstance()) == null) {
+                com.quickskin.mod.client.compat.CPMCompatIntegration.onRenderedFrameBoundary();
+            }
         });
 
         /*
@@ -738,11 +741,11 @@ public class ClientEvents {
         //?} else {
         ClientGuiEvent.RENDER_POST.register((screen, graphics, mouseX, mouseY, delta) -> {
             PlayerWidget widget = playerWidget;
-            if (widget == null || !widget.hasDeferredPreview()) {
-                return;
+            if (widget != null && widget.hasDeferredPreview()) {
+                graphics.nextStratum();
+                widget.submitDeferredPreview(graphics);
             }
-            graphics.nextStratum();
-            widget.submitDeferredPreview(graphics);
+            com.quickskin.mod.client.compat.CPMCompatIntegration.onRenderedFrameBoundary();
         });
         //?}
     }

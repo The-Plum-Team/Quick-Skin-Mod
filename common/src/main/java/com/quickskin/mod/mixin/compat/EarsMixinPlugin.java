@@ -1,11 +1,9 @@
 package com.quickskin.mod.mixin.compat;
 
 import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -34,6 +32,9 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.contains("EarsModMixin")) {
             return classFileExists("com/unascribed/ears/EarsMod.class");
         }
+        // CPM targets are @Pseudo and live in this optional, fail-open config. Do not resource-gate
+        // them here: on current Fabric the plugin is queried before CPM's collector resource is
+        // visible, even though Mixin can resolve and transform that target later in startup.
         return true;
     }
 
@@ -46,11 +47,7 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
     }
 
     @Override
-    public List<String> getMixins() {
-        if (MixinEnvironment.getCurrentEnvironment().getSide() == MixinEnvironment.Side.CLIENT
-                && classFileExists("com/tom/cpm/client/ClientBase.class")) {
-            return List.of("CpmRenderDepthMixin");
-        }
+    public java.util.List<String> getMixins() {
         return null;
     }
 
