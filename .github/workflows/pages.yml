@@ -712,11 +712,20 @@ jobs:
           set -euo pipefail
           printf 'publishable=false\n' >> "$GITHUB_OUTPUT"
           source scripts/ci/github_api_retry.sh
+          validation_status=0
           python3 scripts/pages/compatibility_evidence.py validate \
             --evidence-root selected-compatibility \
             --branch "$BRANCH" \
             --only-branch \
-            --repository "$GITHUB_REPOSITORY"
+            --repository "$GITHUB_REPOSITORY" || validation_status=$?
+          if [[ "$validation_status" -eq 3 ]]; then
+            printf 'Compatibility evidence for %s uses a superseded contract; omitting it.\n' \
+              "$BRANCH"
+            exit 0
+          fi
+          if [[ "$validation_status" -ne 0 ]]; then
+            exit "$validation_status"
+          fi
           manifest="selected-compatibility/$BRANCH/manifest.json"
           coverage_sha="$(jq -er .provenance.coverage_sha "$manifest")"
           target_sha="$(jq -er .provenance.target_sha "$manifest")"
