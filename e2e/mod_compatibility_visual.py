@@ -61,6 +61,18 @@ def _compatibility_expectation(
     return frame["expectation"]
 
 
+def _compatibility_review_regions(
+    compatibility_mod: CompatibilityMod,
+    frame: dict[str, Any],
+) -> tuple[tuple[float, float, float, float], ...]:
+    capture_id = frame["capture_id"]
+    if capture_id == MOD_COMPATIBILITY_BASELINE_CAPTURE:
+        return compatibility_mod.review_regions.baseline_with_mod
+    if capture_id == MOD_COMPATIBILITY_APPLIED_CAPTURE:
+        return compatibility_mod.review_regions.apply_local_skin_with_mod
+    return tuple(tuple(region) for region in frame["review_regions"])
+
+
 def _select_compatibility_frames(
     candidate_frames: list[dict[str, Any]],
     *,
@@ -265,6 +277,7 @@ def curate(
         if (reference["version"], reference["loader"]) != (version, loader):
             raise CompatibilityVisualError("compatibility reference is not the same runtime lane")
         expectation = _compatibility_expectation(lane.mod, frame)
+        review_regions = _compatibility_review_regions(lane.mod, frame)
         private_manifest.append(
             {
                 "path": frame["source_path"],
@@ -280,7 +293,7 @@ def curate(
                 "_verified_pixel_sha256": frame["pixel_validation"]["pixel_sha256"],
                 "_verified_width": frame["width"],
                 "_verified_height": frame["height"],
-                "_review_regions": frame["review_regions"],
+                "_review_regions": review_regions,
                 "_expected_size": catalog.contract.screenshot_size,
                 "reference_path": reference["source_path"],
                 "reference_label": reference["frame_id"],
