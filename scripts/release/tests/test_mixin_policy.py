@@ -106,6 +106,7 @@ DEGRADABLE_MIXINS = {
 # the integration is absent.
 OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
+    "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
@@ -130,6 +131,10 @@ ALTERNATIVE_HOOKS = {
     (
         "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
         "quickskin$cpmModernPlayerRenderStart",
+    ),
+    (
+        "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
+        "quickskin$skipStaleExtractedModel",
     ),
 }
 
@@ -177,6 +182,10 @@ ALLOW_COUNT_OVERRIDES = {
         "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
         "quickskin$getEarsFeatures",
     ): {2},
+    (
+        "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
+        "quickskin$skipStaleExtractedModel",
+    ): {8},
 }
 
 
