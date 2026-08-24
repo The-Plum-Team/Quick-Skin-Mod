@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "lock_revision": "2026-08-23",
   "artifact_source": {
     "kind": "modrinth-v2",
@@ -30,6 +30,16 @@
       "review_regions": {
         "baseline_with_mod": [[0.4, 0.06, 0.6, 0.92]],
         "apply_local_skin_with_mod": [[0.4, 0.06, 0.6, 0.92]]
+      },
+      "multiplayer": {
+        "evidence": {
+          "baseline_with_mod": "From Bob's fixed rear camera, the complete remote Alice wears the genuine CPM model with two oversized cyan and magenta horn cubes above her head. The model and texture are intact, proving CPM's client-and-server model state reached a second player.",
+          "apply_local_skin_with_mod": "From the same fixed rear camera, remote Alice now wears Quick Skin's dark charcoal-and-gray plaid skin with brown hands and both CPM horns are gone. This proves the CPM reset and normal Quick Skin skin both propagated to the observing client."
+        },
+        "review_regions": {
+          "baseline_with_mod": [[0.32, 0.05, 0.68, 0.95]],
+          "apply_local_skin_with_mod": [[0.32, 0.05, 0.68, 0.95]]
+        }
       },
       "excluded_lanes": [
         {
@@ -668,6 +678,16 @@
         "baseline_with_mod": [[0.4, 0.16, 0.6, 0.92]],
         "apply_local_skin_with_mod": [[0.4, 0.16, 0.6, 0.92]]
       },
+      "multiplayer": {
+        "evidence": {
+          "baseline_with_mod": "From Bob's fixed rear camera, the complete remote Alice wears the ordinary Quick Skin control skin with no Ears ears, tail, wings, snout, or other added geometry. The Ears layer is loaded and the remote texture remains intact.",
+          "apply_local_skin_with_mod": "From the same fixed rear camera, remote Alice wears the Ears-authored Quick Skin skin with tall ear geometry above her head and a rear tail. The saturated cyan, magenta, orange, and green landmarks remain coherent on Alice and the added geometry."
+        },
+        "review_regions": {
+          "baseline_with_mod": [[0.32, 0.05, 0.68, 0.95]],
+          "apply_local_skin_with_mod": [[0.32, 0.05, 0.68, 0.95]]
+        }
+      },
       "excluded_lanes": [],
       "supported_game_versions": null,
       "artifacts": [
@@ -1029,6 +1049,7 @@
         "baseline_with_mod": [[0.55, 0.25, 0.8, 0.85]],
         "apply_local_skin_with_mod": [[0.55, 0.25, 0.8, 0.85]]
       },
+      "multiplayer": null,
       "excluded_lanes": [
         {
           "runtime_version": "1.21.9",
@@ -1620,6 +1641,7 @@
         "baseline_with_mod": [[0.4, 0.28, 0.65, 0.92]],
         "apply_local_skin_with_mod": [[0.4, 0.28, 0.65, 0.92]]
       },
+      "multiplayer": null,
       "excluded_lanes": [],
       "supported_game_versions": null,
       "artifacts": [
@@ -1725,6 +1747,7 @@
         "baseline_with_mod": [[0.1, 0.28, 0.25, 0.76], [0.75, 0.3, 0.9, 0.75]],
         "apply_local_skin_with_mod": [[0.1, 0.28, 0.25, 0.76], [0.75, 0.3, 0.9, 0.75]]
       },
+      "multiplayer": null,
       "excluded_lanes": [],
       "supported_game_versions": null,
       "artifacts": [
@@ -2177,6 +2200,7 @@
         "baseline_with_mod": [[0.0, 0.0, 0.15, 0.12], [0.4, 0.3, 0.6, 0.92]],
         "apply_local_skin_with_mod": [[0.0, 0.0, 1.0, 0.21], [0.4, 0.3, 0.6, 0.92]]
       },
+      "multiplayer": null,
       "excluded_lanes": [],
       "supported_game_versions": [
         "1.20.1"
