@@ -64,6 +64,7 @@ public class SkinManagerMixin {
     @Unique
     private static PlayerSkin quickskin$applyOverrides(PlayerSkin original, UUID uuid) {
         if (original == null || uuid == null) return original;
+        if (CPMCompatIntegration.shouldDeferToCPM()) return original;
 
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
         if (service == null) return original;

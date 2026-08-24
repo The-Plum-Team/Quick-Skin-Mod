@@ -146,6 +146,20 @@ class MixinPolicyTest(unittest.TestCase):
             with self.subTest(source=relative(path)):
                 self.assertIn(policy_id(path), classified)
 
+    def test_cpm_transition_defers_every_renderer_facing_skin_override(self) -> None:
+        for name in (
+            "MixinAbstractClientPlayer.java",
+            "PlayerInfoMixin.java",
+            "PlayerRendererMixin.java",
+            "SkinManagerMixin.java",
+        ):
+            with self.subTest(source=name):
+                source = (CANONICAL_JAVA / "com" / "quickskin" / "mod" / "mixin" / name)
+                self.assertIn(
+                    "CPMCompatIntegration.shouldDeferToCPM()",
+                    source.read_text(encoding="utf-8"),
+                )
+
     def test_every_injector_declares_bounded_counts(self) -> None:
         injector_sources = CRITICAL_MIXINS | DEGRADABLE_MIXINS | OPTIONAL_MIXINS
         for path in self.mixin_sources():
