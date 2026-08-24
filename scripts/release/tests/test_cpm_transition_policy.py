@@ -9,9 +9,80 @@ ROOT = Path(__file__).resolve().parents[3]
 MIXIN_ROOT = (
     ROOT / "common" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "mixin"
 )
+CPM_INTEGRATION = (
+    ROOT
+    / "common"
+    / "src"
+    / "main"
+    / "java"
+    / "com"
+    / "quickskin"
+    / "mod"
+    / "client"
+    / "compat"
+    / "CPMCompatIntegration.java"
+)
+CLIENT_EVENTS = (
+    ROOT
+    / "common"
+    / "src"
+    / "main"
+    / "java"
+    / "com"
+    / "quickskin"
+    / "mod"
+    / "event"
+    / "ClientEvents.java"
+)
 
 
 class CpmTransitionPolicyTest(unittest.TestCase):
+    def test_cpm_safety_config_is_prepared_before_background_model_loading(self) -> None:
+        source = CPM_INTEGRATION.read_text(encoding="utf-8")
+        client_events = CLIENT_EVENTS.read_text(encoding="utf-8")
+        availability = source[
+            source.index("private static void checkAvailability()") : source.index(
+                "private static boolean classFileExists"
+            )
+        ]
+        self.assertIn("initializeConfigReflection();", availability)
+        self.assertIn("prepareForBackgroundModelLoading();", client_events)
+        self.assertLess(
+            client_events.index("prepareForBackgroundModelLoading();"),
+            client_events.index("ClientPlayerEvent.CLIENT_PLAYER_JOIN.register"),
+        )
+        tick_retry = source[
+            source.index("public static void prepareForBackgroundModelLoading()") : source.index(
+                "private static void checkAvailability()"
+            )
+        ]
+        self.assertIn("hasConfigHandles();", tick_retry)
+
+        config_initialization = source[
+            source.index("private static void initializeConfigReflection()") : source.index(
+                "private static void initializeNetworkReflection()"
+            )
+        ]
+        for root in (
+            "globalSettings",
+            "friendSettings",
+            "serverSettings",
+            "safetyProfiles",
+            "friendList",
+            "blockedList",
+        ):
+            with self.subTest(config_root=root):
+                self.assertIn(f'"{root}"', source)
+        self.assertIn("configGetEntryMethod.invoke(configInstance, root)", config_initialization)
+        self.assertIn("backgroundConfigPrepared = true", config_initialization)
+
+        config_readiness = source[
+            source.index("private static boolean hasConfigHandles()") : source.index(
+                "private static void logConfigUnavailable()"
+            )
+        ]
+        self.assertEqual(config_readiness.count("&& backgroundConfigPrepared"), 2)
+
     def test_every_renderer_facing_skin_override_defers_to_cpm(self) -> None:
         for name in (
             "MixinAbstractClientPlayer.java",
