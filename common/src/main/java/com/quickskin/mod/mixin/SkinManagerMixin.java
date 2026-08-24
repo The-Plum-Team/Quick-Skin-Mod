@@ -1,10 +1,7 @@
 package com.quickskin.mod.mixin;
 
 import com.mojang.authlib.GameProfile;
-//? if <1.21.11 {
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
-//?} else {
-//?}
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.TextureQuality;
