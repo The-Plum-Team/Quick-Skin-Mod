@@ -53,7 +53,9 @@
     "full.client_a.hud_preview_overlay": [[0.82, 0.72, 0.96, 0.99]],
     "full.client_a.title_screen_splash_order": [[0.4, 0.04, 0.72, 0.55]],
     "mod-compatibility.client_a.baseline_with_mod": [[0.42, 0.34, 0.58, 0.86]],
-    "mod-compatibility.client_a.apply_local_skin_with_mod": [[0.7, 0.42, 1.0, 0.98]]
+    "mod-compatibility.client_a.apply_local_skin_with_mod": [[0.7, 0.42, 1.0, 0.98]],
+    "mod-compatibility-remote.client_b.observe_remote_baseline": [[0.32, 0.05, 0.68, 0.95]],
+    "mod-compatibility-remote.client_b.observe_remote_applied": [[0.32, 0.05, 0.68, 0.95]]
   },
   "scenarios": [
     {
@@ -879,6 +881,92 @@
               "first_step": "baseline_with_mod",
               "second_step": "apply_local_skin_with_mod",
               "minimum_changed_fraction": 1e-05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "mod-compatibility-remote",
+      "execution_profiles": [
+        "compatibility-remote"
+      ],
+      "orchestration": {
+        "mode": "concurrent-two-client",
+        "start_after": {
+          "role": "client_a",
+          "server_log_marker": "Alice joined the game",
+          "timeout_seconds": 300
+        }
+      },
+      "roles": [
+        {
+          "role": "client_a",
+          "steps": [
+            {
+              "id": "integration_active",
+              "assertion_required": true
+            },
+            {
+              "id": "prepare_remote_baseline",
+              "assertion_required": true
+            },
+            {
+              "id": "await_observer_baseline",
+              "assertion_required": true
+            },
+            {
+              "id": "apply_remote_change",
+              "assertion_required": true
+            }
+          ],
+          "comparisons": []
+        },
+        {
+          "role": "client_b",
+          "steps": [
+            {
+              "id": "integration_active",
+              "assertion_required": true
+            },
+            {
+              "id": "confirm_self",
+              "assertion_required": true
+            },
+            {
+              "id": "observe_remote_baseline",
+              "assertion_required": true,
+              "capture": {
+                "title": "Optional mod observed remotely",
+                "review_tier": "all",
+                "expectation": "Bob's fixed rear camera shows the complete remote Alice in the exact optional-mod baseline scene locked by the compatibility contract. The runtime assertion must prove that the named integration reached Alice on Bob's client.",
+                "compatibility_reference_capture_id": "propagation-live.client_b.observe_before",
+                "probes": []
+              }
+            },
+            {
+              "id": "observe_remote_applied",
+              "assertion_required": true,
+              "capture": {
+                "title": "Remote Quick Skin integration",
+                "review_tier": "all",
+                "expectation": "From the same fixed rear camera, complete remote Alice matches the optional-mod applied scene locked by the compatibility contract. The runtime assertion must prove both Quick Skin's remote texture and the third-party integration transition on Bob's client.",
+                "compatibility_reference_capture_id": "propagation-live.client_b.await_live_change",
+                "probes": []
+              }
+            }
+          ],
+          "comparisons": [
+            {
+              "first_step": "observe_remote_baseline",
+              "second_step": "observe_remote_applied",
+              "minimum_changed_fraction": 0.005,
+              "region": [
+                0.3,
+                0.05,
+                0.7,
+                0.95
+              ]
             }
           ]
         }
