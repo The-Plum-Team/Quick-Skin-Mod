@@ -63,6 +63,7 @@ DEGRADABLE_MIXINS = {
 # the integration is absent.
 OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
+    "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
@@ -81,6 +82,10 @@ ALTERNATIVE_HOOKS = {
     (
         "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
         "quickskin$cpmModernPlayerRenderStart",
+    ),
+    (
+        "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
+        "quickskin$skipStaleExtractedModel",
     ),
 }
 
@@ -107,6 +112,10 @@ ALLOW_COUNT_OVERRIDES = {
         "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
         "quickskin$getEarsFeatures",
     ): {2},
+    (
+        "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
+        "quickskin$skipStaleExtractedModel",
+    ): {8},
 }
 
 
@@ -232,8 +241,9 @@ class MixinPolicyTest(unittest.TestCase):
             / "compat"
             / "EarsMixinPlugin.java"
         ).read_text(encoding="utf-8")
-        self.assertIn('List.of("CpmRenderDepthMixin")', plugin)
-        configured.add("CpmRenderDepthMixin")
+        self.assertIn('"CpmRenderDepthMixin"', plugin)
+        self.assertIn('"CpmSubmitCollectorMixin"', plugin)
+        configured.update({"CpmRenderDepthMixin", "CpmSubmitCollectorMixin"})
 
         source_classes = {source.stem for source in self.mixin_sources()}
         self.assertTrue(configured <= source_classes)
@@ -262,7 +272,7 @@ class MixinPolicyTest(unittest.TestCase):
             optional = json.loads(optional_path.read_text(encoding="utf-8"))
             core_names = {name.rsplit(".", 1)[-1] for name in core["client"]}
             optional_names = {name.rsplit(".", 1)[-1] for name in optional["client"]}
-            dynamic_names = {"CpmRenderDepthMixin"}
+            dynamic_names = {"CpmRenderDepthMixin", "CpmSubmitCollectorMixin"}
             with self.subTest(resources=relative(resource_root)):
                 self.assertTrue(compat_mixins.isdisjoint(core_names))
                 self.assertTrue(compat_mixins <= optional_names | dynamic_names)

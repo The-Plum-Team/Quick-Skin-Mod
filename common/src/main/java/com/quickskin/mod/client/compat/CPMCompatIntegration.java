@@ -303,6 +303,11 @@ public final class CPMCompatIntegration {
         return isAvailable() && (isCPMScreenOpen() || skinModeResetQueued.get());
     }
 
+    /** True only while Fabric's extracted CPM model is crossing into ordinary skin mode. */
+    public static boolean isSkinModeResetInProgress() {
+        return isAvailable() && skinModeResetQueued.get();
+    }
+
     private static boolean isCPMScreenOpen() {
         try {
             //? if <26.2 {

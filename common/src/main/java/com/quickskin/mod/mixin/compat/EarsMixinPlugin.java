@@ -49,6 +49,9 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
     public List<String> getMixins() {
         if (MixinEnvironment.getCurrentEnvironment().getSide() == MixinEnvironment.Side.CLIENT
                 && classFileExists("com/tom/cpm/client/ClientBase.class")) {
+            if (classFileExists("com/tom/cpm/client/CPMOrderedSubmitNodeCollector.class")) {
+                return List.of("CpmRenderDepthMixin", "CpmSubmitCollectorMixin");
+            }
             return List.of("CpmRenderDepthMixin");
         }
         return null;
