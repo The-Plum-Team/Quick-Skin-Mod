@@ -19,7 +19,10 @@ from mod_compatibility import (
     load_contract as load_compatibility_contract,
     resolve_lane,
 )
-from scenario_contract import DEFAULT_CONTRACT as DEFAULT_SCENARIO_CONTRACT
+from scenario_contract import (
+    DEFAULT_CONTRACT as DEFAULT_SCENARIO_CONTRACT,
+    ScenarioContract,
+)
 from visual_evidence import VisualEvidenceError, collect_evidence, load_catalog
 from visual_review import curate_manifest
 
@@ -33,18 +36,6 @@ ARTIFACT_RECORD_FIELDS = {
     "size_in_bytes",
     "digest",
     "run_id",
-}
-COMPATIBILITY_EXPECTATION_OVERRIDES = {
-    (
-        "essential",
-        "full.client_a.title_screen_splash_order",
-    ): (
-        "Essential intentionally owns the title-screen player model, so Quick Skin must suppress "
-        "its duplicate PlayerWidget. The Essential model must visibly retain the selected dark "
-        "charcoal-and-gray plaid Quick Skin skin, the Quick Skin action icon must remain present, "
-        "and the title UI must be intact. This intentional layout need not overlap the vanilla "
-        "splash or match the clean title-screen layout."
-    ),
 }
 MOD_COMPATIBILITY_BASELINE_CAPTURE = (
     "mod-compatibility.client_a.baseline_with_mod"
@@ -60,7 +51,6 @@ class CompatibilityVisualError(ValueError):
 
 def _compatibility_expectation(
     compatibility_mod: CompatibilityMod,
-    mod_id: str,
     frame: dict[str, Any],
 ) -> str:
     capture_id = frame["capture_id"]
@@ -68,9 +58,38 @@ def _compatibility_expectation(
         return compatibility_mod.evidence.baseline_with_mod
     if capture_id == MOD_COMPATIBILITY_APPLIED_CAPTURE:
         return compatibility_mod.evidence.apply_local_skin_with_mod
-    return COMPATIBILITY_EXPECTATION_OVERRIDES.get(
-        (mod_id, capture_id), frame["expectation"]
+    return frame["expectation"]
+
+
+def _select_compatibility_frames(
+    candidate_frames: list[dict[str, Any]],
+    *,
+    scenario_contract: ScenarioContract,
+) -> list[dict[str, Any]]:
+    compatibility_scenarios = frozenset(
+        scenario_contract.scenarios_for_profile("compatibility")
     )
+    expected_capture_ids = tuple(
+        capture.capture_id
+        for capture in scenario_contract.captures
+        if capture.scenario in compatibility_scenarios
+    )
+    if not expected_capture_ids:
+        raise CompatibilityVisualError(
+            "compatibility profile must declare at least one capture"
+        )
+    expected_capture_set = frozenset(expected_capture_ids)
+    selected = [
+        frame
+        for frame in candidate_frames
+        if isinstance(frame.get("capture_id"), str)
+        and frame["capture_id"] in expected_capture_set
+    ]
+    if tuple(frame["capture_id"] for frame in selected) != expected_capture_ids:
+        raise CompatibilityVisualError(
+            "candidate compatibility capture coverage is incomplete or out of order"
+        )
+    return selected
 
 
 def _artifact_record(value: Any, label: str) -> dict[str, Any]:
@@ -217,6 +236,10 @@ def curate(
         raise CompatibilityVisualError(
             "base scenario coverage is not the complete release suite"
         )
+    compatibility_frames = _select_compatibility_frames(
+        candidate_frames,
+        scenario_contract=catalog.contract,
+    )
     base_by_capture: dict[str, dict[str, Any]] = {}
     for frame in base_frames:
         if frame["artifact_node"] != artifact_node:
@@ -229,7 +252,7 @@ def curate(
         base_by_capture[capture_id] = frame
 
     private_manifest: list[dict[str, object]] = []
-    for frame in candidate_frames:
+    for frame in compatibility_frames:
         capture = catalog.contract.capture_by_id(frame["capture_id"])
         reference_capture = (
             capture.compatibility_reference_capture_id or capture.capture_id
@@ -241,7 +264,7 @@ def curate(
             )
         if (reference["version"], reference["loader"]) != (version, loader):
             raise CompatibilityVisualError("compatibility reference is not the same runtime lane")
-        expectation = _compatibility_expectation(lane.mod, mod_id, frame)
+        expectation = _compatibility_expectation(lane.mod, frame)
         private_manifest.append(
             {
                 "path": frame["source_path"],
