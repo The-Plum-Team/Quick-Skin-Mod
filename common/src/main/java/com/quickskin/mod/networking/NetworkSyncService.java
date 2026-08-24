@@ -55,6 +55,7 @@ public class NetworkSyncService {
     private PreparedSync queuedSync;
     private DesiredSync latestDesired;
     private AwaitingAcknowledgement awaitingAcknowledgement;
+    private long latestAcknowledgedSyncToken;
     private long preparingToken;
     private long retryAtMillis;
     private int retryAttempt;
@@ -161,10 +162,26 @@ public class NetworkSyncService {
         synchronized (this) {
             latestDesired = desired;
             awaitingAcknowledgement = null;
+            latestAcknowledgedSyncToken = 0L;
             retryAtMillis = 0L;
             retryAttempt = 0;
         }
         startPreparation(desired);
+    }
+
+    /**
+     * Returns whether the server echoed and authorized the latest exact skin selection for this
+     * live connection. A locally applied texture or an in-flight upload is not acknowledgement.
+     */
+    public synchronized boolean isLatestAppearanceAcknowledged(
+            UUID playerId, String skinId) {
+        DesiredSync desired = latestDesired;
+        return playerId != null && skinId != null && desired != null
+                && desired.token == latestAcknowledgedSyncToken
+                && desired.token == syncSequence.get()
+                && desired.playerId.equals(playerId)
+                && desired.skinId.equals(skinId)
+                && isCurrentConnection(desired.sourceConnection);
     }
 
     private synchronized void startPreparation(DesiredSync desired) {
@@ -662,6 +679,7 @@ public class NetworkSyncService {
         if (awaitingAcknowledgement == awaiting
                 && awaiting.appearanceAcknowledged
                 && awaiting.metadataAcknowledged) {
+            latestAcknowledgedSyncToken = awaiting.token;
             awaitingAcknowledgement = null;
             retryAtMillis = 0L;
             retryAttempt = 0;
@@ -703,6 +721,7 @@ public class NetworkSyncService {
         queuedSync = null;
         latestDesired = null;
         awaitingAcknowledgement = null;
+        latestAcknowledgedSyncToken = 0L;
         preparingToken = 0L;
         retryAtMillis = 0L;
         retryAttempt = 0;
