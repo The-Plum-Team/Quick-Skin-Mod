@@ -1030,11 +1030,13 @@ jobs:
           review_mode="$(jq -er \
             '.review_mode | select(. == "anchor-semantic" or
               . == "reference-comparison")' curation-proof.json)"
-          if [[ "$review_mode" != reference-comparison ]]; then
-            exit 0
+          if [[ "$review_mode" == anchor-semantic ]]; then
+            triage_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_semantic_prompt.md"
+            verify_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_semantic_verify_prompt.md"
+          else
+            triage_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_prompt.md"
+            verify_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_verify_prompt.md"
           fi
-          triage_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_prompt.md"
-          verify_prompt="$RUNNER_TEMP/protected-reviewer/visual_review_verify_prompt.md"
           policy_sha256="$(python3 \
             "$RUNNER_TEMP/protected-reviewer/visual_review_cache.py" policy \
             --runner "$RUNNER_TEMP/protected-reviewer/visual_review_runner.py" \
@@ -1471,7 +1473,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$(jq -er .review_mode curation-proof.json)" == reference-comparison ]]
+          review_mode="$(jq -er \
+            '.review_mode | select(. == "anchor-semantic" or
+              . == "reference-comparison")' curation-proof.json)"
           update_arguments=()
           if [[ -f visual-review-verdict-cache.input.json ]]; then
             update_arguments=(--existing-cache visual-review-verdict-cache.input.json)
@@ -1481,6 +1485,7 @@ jobs:
             --manifest review-input/visual-review-manifest.json \
             --report visual-review-report.json \
             --policy-sha256 "${{ steps.verdict-cache.outputs.policy_sha256 }}" \
+            --review-mode "$review_mode" \
             --output visual-review-verdict-cache.json
           printf 'artifact_name=visual-review-verdict-cache-%s\n' \
             "${{ steps.verdict-cache.outputs.policy_sha256 }}" >> "$GITHUB_OUTPUT"
