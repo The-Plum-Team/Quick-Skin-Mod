@@ -126,8 +126,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   allowed to query Modrinth or select a newest upstream release; it is an explicit maintainer tool,
   never part of an E2E run.
 - `e2e/mod_compatibility_visual.py` authenticates one complete modded result and its clean
-  same-version/loader packaged baseline, pairs every capture by semantic identity, and emits only
-  content-addressed metadata-free images plus an exact source/implementation/contract/artifact
+  same-version/loader packaged baseline, verifies complete release-plus-compatibility scenario
+  coverage, then pairs exactly the compatibility-profile captures by semantic identity. It emits
+  only content-addressed metadata-free images plus an exact source/implementation/contract/artifact
   proof. `.github/workflows/mod-compatibility-e2e.yml` owns admission, the fully parallel
   artifact-by-mod runtime matrix, and per-successful-lane secretless curation; one failed matrix
   sibling never suppresses capsules already produced by successful lanes.
@@ -147,14 +148,19 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   and the source completion marker before `scripts/pages/compatibility_evidence.py` projects the
   complete clean wave into a strict public bundle. That projection retains only the two
   `mod-compatibility` checkpoints as paired clean/modded 1280x720 WebPs, source and derivative
-  metrics, deterministic assertions, clean booleans, and provenance; raw provider text and the
-  remaining reviewed frames stay in short-lived private artifacts. Manual publication recovery
-  consumes the same already-complete reports and never calls a model.
+  metrics, deterministic assertions, clean booleans, and provenance; ordinary-suite captures stay
+  in the authenticated runtime artifact and never enter the model capsule. Raw provider text stays
+  in short-lived private artifacts. Manual publication recovery consumes the same already-complete
+  reports and never calls a model. Public schema v2 binds `reviewed_frame_count` to the two reviewed
+  checkpoints; the validator keeps schema v1 readable for older rolling caches whose count covered
+  the complete scenario contract.
 - `scripts/pages/select_compatibility_artifact.py` selects either that short-lived handoff or the
   newest successful protected Pages cache. Pages may carry its `coverage_sha` to a current release
   descendant only when `scripts/ci/mod_compatibility_impact.py` proves the complete intervening diff
-  cannot affect optional-mod compatibility. `scripts/pages/build_site.py` validates and renders the
-  optional bundle beside ordinary release evidence; `scripts/pages/rotate_artifacts.py` retains one
+  cannot affect optional-mod compatibility. A cache whose scenario or compatibility contract has
+  been superseded is omitted as unavailable; every other validation failure remains fatal.
+  `scripts/pages/build_site.py` validates and renders the optional bundle beside ordinary release
+  evidence; `scripts/pages/rotate_artifacts.py` retains one
   current compatibility cache per covered branch and retires older caches, consumed handoffs, and
   fan-in artifacts only after a successful atomic deployment.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
