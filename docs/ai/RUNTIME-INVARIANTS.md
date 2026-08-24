@@ -127,13 +127,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   published field is a schema change: validate it fail-closed in the same strict frame contract
   rather than letting a consumer read an unvalidated string.
 - Public optional-mod evidence is admitted only from a complete clean compatibility source wave.
-  Authenticate and validate the full runnable/N/A plan, every full paired review manifest and
-  normalized report, every clean lane marker, and the source completion marker before selecting a
-  public subset. Publish exactly the two `mod-compatibility` checkpoints per applicable lane, each
-  as its clean reference plus modded candidate, with deterministic assertion, exact mod version,
-  semantic fingerprints, source/derivative proof, clean verdict booleans, and run provenance.
-  Never publish provider-authored explanations or anomaly text. The compact subset does not weaken
-  the full review: `reviewed_frame_count` must still prove that every frame in the lane was clean.
+  Authenticate and validate the full runnable/N/A plan, every exact compatibility-profile paired
+  review manifest and normalized report, every clean lane marker, and the source completion marker
+  before publishing. Publish exactly the two `mod-compatibility` checkpoints per applicable lane,
+  each as its clean reference plus modded candidate, with deterministic assertion, exact mod
+  version, semantic fingerprints, source/derivative proof, clean verdict booleans, and run
+  provenance.
+  Never publish provider-authored explanations or anomaly text. `reviewed_frame_count` must equal
+  that exact two-checkpoint model product; the authenticated runtime result, not repeated model
+  review of ordinary screenshots, proves the complete base suite. Public compatibility schema v2
+  encodes that count; continue accepting schema v1's complete-scenario count until every rolling
+  branch cache has been regenerated.
 - Adding a published field must not invalidate evidence that already exists. Each release branch
   keeps one rolling cache built by its own checkout, and those caches are regenerated only when
   that branch ports and re-runs its packaged suite—which can itself wait on unrelated approvals.
@@ -270,6 +274,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   malformed, or unknown change invalidates that carry-forward and requires a new compatibility
   wave. Publication-only review workflow changes are explicitly non-impacting so generating the
   compact bundle cannot recursively schedule the expensive matrix.
+- A selected compatibility cache bound to a superseded scenario or optional-mod contract is
+  unavailable, not a failure of the atomic ordinary site. Omit that branch's optional gallery until
+  a current wave replaces it. Any malformed bundle or validation failure under the current contract
+  remains fatal and must never be downgraded to absence.
 - Discovery records one protected `master` SHA for the Pages run. Every collection and render job
   checks out that exact implementation revision; an advancing `master` may affect only a later run.
 - Treat downloaded artifacts and their JSON as untrusted. Require the exact curated tree, exact
@@ -370,8 +378,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   enforce Quick Skin's own expectations. External JARs must come from
   `e2e/mod-compatibility-contract.json` by exact HTTPS URL, filename, byte size, SHA-256, and
   SHA-512. CI never selects a newest upstream version or silently substitutes a dependency.
-- Compatibility visual judgment must compare the complete modded capture product with the clean
-  same-version, same-loader packaged result while still judging every non-exact semantic group.
+- Compatibility visual judgment must compare the exact compatibility-profile modded capture
+  product with the clean same-version, same-loader packaged result while still judging every
+  non-exact semantic group. The curator must first authenticate complete release-plus-compatibility
+  runtime coverage, but ordinary-suite captures must not enter the model capsule.
   Exact authored-region matches inherit the clean paired result, exact-equivalent pairs share one
   representative, and every remaining group reaches Haiku. Only a concern or confidence below high
   reaches Opus. The first Opus-confirmed defect publishes a durable
