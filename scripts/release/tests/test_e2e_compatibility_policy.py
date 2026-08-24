@@ -223,6 +223,18 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         feature = (
             E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
         ).read_text(encoding="utf-8")
+        network_sync = (
+            ROOT
+            / "common"
+            / "src"
+            / "main"
+            / "java"
+            / "com"
+            / "quickskin"
+            / "mod"
+            / "networking"
+            / "NetworkSyncService.java"
+        ).read_text(encoding="utf-8")
         assets = (E2E_JAVA / "TestAssets.java").read_text(encoding="utf-8")
         runtime = (ROOT / "e2e/packaged_runtime.py").read_text(encoding="utf-8")
 
@@ -297,11 +309,17 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             '"com.quickskin.mod.client.compat.ReplayModHelper"', feature
         )
         self.assertIn("TestAssets.makeDistinctSkin()", feature)
-        self.assertIn("LIVE_SYNC_REASSERT_POLL", feature)
-        self.assertIn("LIVE_SYNC_SETTLE_POLLS", feature)
-        self.assertIn("reasserted distinct ReplayMod fixture", feature)
+        self.assertIn("ACKNOWLEDGED_RECORDING_TAIL_POLLS", feature)
+        self.assertIn("isLatestAppearanceAcknowledged", feature)
+        self.assertIn("latestAcknowledgedSyncToken = awaiting.token", network_sync)
+        self.assertNotIn("LIVE_SYNC_REASSERT_POLL", feature)
+        self.assertNotIn("reasserted distinct ReplayMod fixture", feature)
         self.assertLess(
             feature.index("applied distinct ReplayMod fixture"),
+            feature.index("isLatestAppearanceAcknowledged"),
+        )
+        self.assertLess(
+            feature.index("isLatestAppearanceAcknowledged"),
             feature.index("ReplayMod recording close requested"),
         )
 
