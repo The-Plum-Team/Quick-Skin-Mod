@@ -103,7 +103,9 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         self.assertIn("panoramaMotionFields", source)
         self.assertIn("field.setFloat(renderer, E2E_FIXED_PANORAMA_TIME)", source)
         self.assertIn("Util.getMillis() / 1000.0f", source)
-        self.assertIn("panoramaSpeed:0.0", OPTIONS.read_text(encoding="utf-8"))
+        options = OPTIONS.read_text(encoding="utf-8")
+        self.assertIn("panoramaScrollSpeed:0.0", options)
+        self.assertNotIn("panoramaSpeed:0.0", options)
 
     def test_preview_pose_is_fixed_without_replacing_live_clocks(self) -> None:
         source = PLAYER.read_text(encoding="utf-8")
