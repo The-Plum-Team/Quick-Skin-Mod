@@ -109,6 +109,8 @@ public class ClientEvents {
 
         // Client tick (fires every game tick, ~20 times per second)
         ClientTickEvent.CLIENT_POST.register(client -> {
+            com.quickskin.mod.client.compat.CPMCompatIntegration
+                    .prepareForBackgroundModelLoading();
             // This also ensures the singleton instance is created.
             com.quickskin.mod.client.storage.NetworkTextureCache.getInstance()
                     .tickWorkingSet();
