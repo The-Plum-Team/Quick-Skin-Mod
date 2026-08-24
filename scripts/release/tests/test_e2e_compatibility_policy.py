@@ -74,6 +74,22 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("setYBodyRot(yaw)", evidence_view)
         self.assertIn("REMOTE_BEHIND_CAMERA_CLEARANCE", evidence_view)
         self.assertIn("lookX * remoteX + lookZ * remoteZ <= -0.95", evidence_view)
+        self.assertIn(
+            "VanillaShim.isTerrainRenderReady(mc, terrainPosition)", evidence_view
+        )
+        self.assertIn("public static boolean isTerrainRenderReady", shim)
+        for renderer_alias in (
+            '"isSectionCompiled"',
+            '"isSectionCompiledAndVisible"',
+            '"method_40050"',
+            '"m_202430_"',
+            '"hasRenderedAllChunks"',
+            '"hasRenderedAllSections"',
+            '"method_3281"',
+            '"m_109825_"',
+        ):
+            with self.subTest(renderer_alias=renderer_alias):
+                self.assertIn(renderer_alias, shim)
 
         live = scenarios[2].read_text(encoding="utf-8")
         self.assertIn("VanillaShim.isExpectedDefaultSkinResolved(a)", live)
