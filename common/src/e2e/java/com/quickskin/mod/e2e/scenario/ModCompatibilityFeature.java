@@ -21,6 +21,7 @@ import com.quickskin.mod.e2e.E2ELog;
 import com.quickskin.mod.e2e.Step;
 import com.quickskin.mod.e2e.TestAssets;
 import com.quickskin.mod.e2e.VanillaShim;
+import com.quickskin.mod.networking.NetworkSyncService;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -961,8 +962,7 @@ interface ModCompatibilityFeature {
         // ReplayMod freezes Minecraft's global timer at EOF. Keep enough recorded tail for the
         // applied screenshot, Retina re-grabs, and the harness screenshot-flush window.
         private static final long MIN_RECORDING_DURATION_MS = 15_000L;
-        private static final int LIVE_SYNC_REASSERT_POLL = 60;
-        private static final int LIVE_SYNC_SETTLE_POLLS = 120;
+        private static final int ACKNOWLEDGED_RECORDING_TAIL_POLLS = 20;
         private static final Object STARTUP_SCAN_LOCK = new Object();
         private static volatile Path protectedStartupScanPlaceholder;
         private static volatile Path protectedStartupScanMarker;
@@ -981,8 +981,8 @@ interface ModCompatibilityFeature {
         private volatile boolean saveWaitLogged;
         private volatile boolean replayModeLogged;
         private volatile boolean recordedPayloadLogged;
-        private volatile boolean liveSyncReasserted;
-        private volatile int liveSyncPolls;
+        private volatile boolean serverEchoAcknowledged;
+        private volatile int acknowledgedRecordingTailPolls;
         private volatile int replayPolls;
         private volatile UUID replayTarget;
         private volatile AbstractClientPlayer replayPlayer;
@@ -1058,15 +1058,21 @@ interface ModCompatibilityFeature {
             try {
                 if (!disconnectRequested) {
                     if (!activeSkinReady()) return false;
-                    liveSyncPolls++;
-                    if (!liveSyncReasserted && liveSyncPolls >= LIVE_SYNC_REASSERT_POLL) {
-                        liveSyncReasserted = true;
-                        appearances.applySkin(playerId, "local_skin:" + skinHash, "auto");
-                        E2ELog.info("reasserted distinct ReplayMod fixture during live recording");
-                    }
-                    if (liveSyncPolls < LIVE_SYNC_SETTLE_POLLS) return false;
                     if (minecraft.getConnection() == null) {
-                        failure = "live ReplayMod connection closed before the recorded sync settled";
+                        failure = "live ReplayMod connection closed before the recorded server echo";
+                        return false;
+                    }
+                    if (!serverEchoAcknowledged) {
+                        String expectedSkinId = "local_skin:" + skinHash;
+                        if (!NetworkSyncService.getInstance().isLatestAppearanceAcknowledged(
+                                playerId, expectedSkinId)) {
+                            return false;
+                        }
+                        serverEchoAcknowledged = true;
+                        E2ELog.info("received exact Quick Skin server echo; retaining recorded tail");
+                    }
+                    if (++acknowledgedRecordingTailPolls
+                            < ACKNOWLEDGED_RECORDING_TAIL_POLLS) {
                         return false;
                     }
                     disconnectRequested = true;
@@ -1156,6 +1162,9 @@ interface ModCompatibilityFeature {
         @Override
         public Step.Result assertQuickSkinFeature() {
             if (failure != null) return Step.Result.fail(failure);
+            if (!serverEchoAcknowledged) {
+                return Step.Result.fail("live recording never received the exact server echo");
+            }
             if (!ReplayModBridge.isInReplay() || replayPlayer == null || replayTarget == null) {
                 return Step.Result.fail("ReplayMod playback has no recorded player target");
             }
@@ -1175,8 +1184,9 @@ interface ModCompatibilityFeature {
             if (!String.valueOf(appearances.getSkinLocation(replayTarget)).equals(texture)) {
                 return Step.Result.fail("replay renderer texture disagrees with Quick Skin state");
             }
-            return Step.Result.pass("ReplayMod played the real recording, Quick Skin intercepted "
-                    + intercepted + " recorded payload(s), targeted recorded player " + replayTarget
+            return Step.Result.pass("ReplayMod recorded the exact live server acknowledgement, "
+                    + "played the real recording, Quick Skin intercepted " + intercepted
+                    + " recorded payload(s), targeted recorded player " + replayTarget
                     + " instead of CameraEntity, and rendered " + texture);
         }
 
