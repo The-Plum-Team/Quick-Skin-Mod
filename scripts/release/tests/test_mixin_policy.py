@@ -218,7 +218,7 @@ class MixinPolicyTest(unittest.TestCase):
                 self.assertIs(config["required"], False)
                 self.assertEqual(config["injectors"]["defaultRequire"], 0)
 
-    def test_configured_mixins_exist_and_dynamic_mixins_are_audited(self) -> None:
+    def test_configured_optional_mixins_exist_and_are_resource_gated(self) -> None:
         configs = self.configs_named("quickskin.mixins.json") + self.configs_named(
             "quickskin-ears.mixins.json"
         )
@@ -243,7 +243,8 @@ class MixinPolicyTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('"CpmRenderDepthMixin"', plugin)
         self.assertIn('"CpmSubmitCollectorMixin"', plugin)
-        configured.update({"CpmRenderDepthMixin", "CpmSubmitCollectorMixin"})
+        self.assertIn('"com/tom/cpm/client/ClientBase.class"', plugin)
+        self.assertIn('"com/tom/cpm/client/CPMOrderedSubmitNodeCollector.class"', plugin)
 
         source_classes = {source.stem for source in self.mixin_sources()}
         self.assertTrue(configured <= source_classes)
@@ -272,10 +273,9 @@ class MixinPolicyTest(unittest.TestCase):
             optional = json.loads(optional_path.read_text(encoding="utf-8"))
             core_names = {name.rsplit(".", 1)[-1] for name in core["client"]}
             optional_names = {name.rsplit(".", 1)[-1] for name in optional["client"]}
-            dynamic_names = {"CpmRenderDepthMixin", "CpmSubmitCollectorMixin"}
             with self.subTest(resources=relative(resource_root)):
                 self.assertTrue(compat_mixins.isdisjoint(core_names))
-                self.assertTrue(compat_mixins <= optional_names | dynamic_names)
+                self.assertTrue(compat_mixins <= optional_names)
 
     def test_packaged_clients_enable_expect_counting(self) -> None:
         runtime = (ROOT / "e2e" / "packaged_runtime.py").read_text(encoding="utf-8")

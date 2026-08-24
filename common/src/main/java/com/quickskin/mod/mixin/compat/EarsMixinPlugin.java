@@ -1,11 +1,9 @@
 package com.quickskin.mod.mixin.compat;
 
 import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -34,6 +32,12 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.contains("EarsModMixin")) {
             return classFileExists("com/unascribed/ears/EarsMod.class");
         }
+        if (mixinClassName.contains("CpmRenderDepthMixin")) {
+            return classFileExists("com/tom/cpm/client/ClientBase.class");
+        }
+        if (mixinClassName.contains("CpmSubmitCollectorMixin")) {
+            return classFileExists("com/tom/cpm/client/CPMOrderedSubmitNodeCollector.class");
+        }
         return true;
     }
 
@@ -46,14 +50,7 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
     }
 
     @Override
-    public List<String> getMixins() {
-        if (MixinEnvironment.getCurrentEnvironment().getSide() == MixinEnvironment.Side.CLIENT
-                && classFileExists("com/tom/cpm/client/ClientBase.class")) {
-            if (classFileExists("com/tom/cpm/client/CPMOrderedSubmitNodeCollector.class")) {
-                return List.of("CpmRenderDepthMixin", "CpmSubmitCollectorMixin");
-            }
-            return List.of("CpmRenderDepthMixin");
-        }
+    public java.util.List<String> getMixins() {
         return null;
     }
 
