@@ -48,11 +48,21 @@ public final class CPMCompatIntegration {
     private static final long STALE_RENDER_DEPTH_NANOS = 2_000_000_000L;
     private static final int MAX_MODEL_TEXT_BYTES = 1_048_576;
     private static final int MAX_MODEL_ICON_BYTES = 16_777_216;
+    /** CPM reads and lazily creates these roots from its parallel model-loading pool. */
+    private static final String[] BACKGROUND_CONFIG_ROOTS = {
+            "globalSettings",
+            "friendSettings",
+            "serverSettings",
+            "safetyProfiles",
+            "friendList",
+            "blockedList"
+    };
 
     private static volatile boolean checked;
     private static volatile boolean modAvailable;
     private static volatile long nextRuntimeReflectionRetryNanos;
     private static volatile long nextConfigReflectionRetryNanos;
+    private static volatile boolean backgroundConfigPrepared;
 
     // Independently optional, cached reflection handles.
     private static Object loaderInstance;
@@ -78,6 +88,7 @@ public final class CPMCompatIntegration {
     private static final AtomicBoolean serverReflectionUnavailableLogged = new AtomicBoolean();
     private static final AtomicBoolean configUnavailableLogged = new AtomicBoolean();
     private static final AtomicBoolean configReflectionUnavailableLogged = new AtomicBoolean();
+    private static final AtomicBoolean backgroundConfigPreparedLogged = new AtomicBoolean();
     private static final AtomicBoolean degradedBridgeLogged = new AtomicBoolean();
     private static final AtomicBoolean renderHookObservedLogged = new AtomicBoolean();
     private static final AtomicBoolean staleRenderDepthLogged = new AtomicBoolean();
@@ -119,6 +130,17 @@ public final class CPMCompatIntegration {
         return CpmCapabilities.current();
     }
 
+    /**
+     * Retries the early config preparation after every mod entry point has initialized. Client
+     * ticks begin before a player can join a world and start CPM's parallel definition loader.
+     */
+    public static void prepareForBackgroundModelLoading() {
+        if (!isAvailable() || backgroundConfigPrepared) {
+            return;
+        }
+        hasConfigHandles();
+    }
+
     private static void checkAvailability() {
         boolean loaderReported = PlatformHelper.isModLoaded("cpm");
         boolean resourcePresent = loaderReported || classFileExists(CPM_CLIENT_RESOURCE);
@@ -128,6 +150,11 @@ public final class CPMCompatIntegration {
         if (!resourcePresent) {
             return;
         }
+
+        // Quick Skin initializes its asset catalog before a world can start CPM's parallel model
+        // loader. Materialize the config roots that loader otherwise creates lazily so selecting a
+        // model cannot structurally mutate CPM's TreeMap at the same time as a safety check.
+        initializeConfigReflection();
 
         CpmCapabilities.Band band = CpmCapabilities.currentBand();
         CpmCapabilities.Capabilities capabilities = CpmCapabilities.current();
@@ -184,6 +211,7 @@ public final class CPMCompatIntegration {
     }
 
     private static void initializeConfigReflection() {
+        backgroundConfigPrepared = false;
         try {
             Class<?> modConfigClass = Class.forName("com.tom.cpm.shared.config.ModConfig");
             Method getCommonConfig = modConfigClass.getMethod("getCommonConfig");
@@ -196,12 +224,21 @@ public final class CPMCompatIntegration {
             configSetStringMethod = configClass.getMethod("setString", String.class, String.class);
             configClearValueMethod = configClass.getMethod("clearValue", String.class);
             configSaveMethod = configClass.getMethod("save");
+            Method configGetEntryMethod = configClass.getMethod("getEntry", String.class);
+            for (String root : BACKGROUND_CONFIG_ROOTS) {
+                configGetEntryMethod.invoke(configInstance, root);
+            }
+            backgroundConfigPrepared = true;
+            if (backgroundConfigPreparedLogged.compareAndSet(false, true)) {
+                CPMLOG.info("Prepared CPM safety config before background model loading");
+            }
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
             configInstance = null;
             configGetStringMethod = null;
             configSetStringMethod = null;
             configClearValueMethod = null;
             configSaveMethod = null;
+            backgroundConfigPrepared = false;
             if (configReflectionUnavailableLogged.compareAndSet(false, true)) {
                 CPMLOG.warn(
                         "CPM selectedModel config bridge is not ready; QuickSkin will retry lazily before selection",
@@ -619,7 +656,8 @@ public final class CPMCompatIntegration {
                 && configGetStringMethod != null
                 && configSetStringMethod != null
                 && configClearValueMethod != null
-                && configSaveMethod != null;
+                && configSaveMethod != null
+                && backgroundConfigPrepared;
         if (ready || !modAvailable) {
             return ready;
         }
@@ -638,7 +676,8 @@ public final class CPMCompatIntegration {
                     && configGetStringMethod != null
                     && configSetStringMethod != null
                     && configClearValueMethod != null
-                    && configSaveMethod != null;
+                    && configSaveMethod != null
+                    && backgroundConfigPrepared;
         }
     }
 
