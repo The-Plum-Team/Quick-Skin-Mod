@@ -356,15 +356,9 @@ interface ModCompatibilityFeature {
                 return Step.Result.fail("Quick Skin did not retain parsed Ears features");
             }
             try {
-                Class<?> rendererClass;
-                try {
-                    rendererClass = Class.forName("com.unascribed.ears.EarsLayerRenderer");
-                } catch (ClassNotFoundException ignored) {
-                    rendererClass = Class.forName("com.unascribed.ears.EarsMod");
-                }
                 Object playerRenderer = minecraft.getEntityRenderDispatcher()
                         .getRenderer(minecraft.player);
-                Object rendererFeatures = rendererFeatures(rendererClass, playerRenderer);
+                Object rendererFeatures = rendererFeatures(playerRenderer);
                 if (EarsCompatIntegration.isDisabledResult(rendererFeatures)) {
                     return Step.Result.fail("Ears renderer lookup did not receive Quick Skin features");
                 }
@@ -399,27 +393,41 @@ interface ModCompatibilityFeature {
          * through the live player renderer so this remains a renderer-path assertion rather than a
          * version-specific storage check.
          */
-        private Object rendererFeatures(Class<?> earsRenderer, Object playerRenderer)
+        private Object rendererFeatures(Object playerRenderer)
                 throws ReflectiveOperationException {
             Method incompatibleLookup = null;
-            for (Method method : earsRenderer.getMethods()) {
-                if (!"getEarsFeatures".equals(method.getName())
-                        || !java.lang.reflect.Modifier.isStatic(method.getModifiers())
-                        || method.getParameterCount() != 1) {
+            Class<?> incompatibleOwner = null;
+            for (String className : new String[] {
+                    "com.unascribed.ears.EarsLayerRenderer",
+                    "com.unascribed.ears.EarsMod"
+            }) {
+                Class<?> earsRenderer;
+                try {
+                    earsRenderer = Class.forName(className);
+                } catch (ClassNotFoundException ignored) {
                     continue;
                 }
-                incompatibleLookup = method;
-                Object argument = rendererLookupArgument(
-                        method.getParameterTypes()[0], playerRenderer);
-                if (argument == null) continue;
-                method.setAccessible(true);
-                return method.invoke(null, argument);
+                for (Method method : earsRenderer.getMethods()) {
+                    if (!"getEarsFeatures".equals(method.getName())
+                            || !java.lang.reflect.Modifier.isStatic(method.getModifiers())
+                            || method.getParameterCount() != 1) {
+                        continue;
+                    }
+                    incompatibleLookup = method;
+                    incompatibleOwner = earsRenderer;
+                    Object argument = rendererLookupArgument(
+                            method.getParameterTypes()[0], playerRenderer);
+                    if (argument == null) continue;
+                    method.setAccessible(true);
+                    return method.invoke(null, argument);
+                }
             }
             String parameter = incompatibleLookup == null
                     ? "missing getEarsFeatures"
-                    : incompatibleLookup.getParameterTypes()[0].getName();
-            throw new NoSuchMethodException("no renderer argument available for "
-                    + earsRenderer.getName() + ".getEarsFeatures(" + parameter + ")");
+                    : incompatibleOwner.getName() + ".getEarsFeatures("
+                    + incompatibleLookup.getParameterTypes()[0].getName() + ")";
+            throw new NoSuchMethodException(
+                    "no renderer argument available for Ears lookup: " + parameter);
         }
 
         private Object rendererLookupArgument(Class<?> expectedType, Object playerRenderer)
