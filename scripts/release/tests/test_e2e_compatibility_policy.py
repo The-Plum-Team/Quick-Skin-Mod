@@ -298,6 +298,24 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
                 self.assertIn(window_handle_accessor, feature)
 
         self.assertIn("com.unascribed.ears.common.EarsFeaturesWriterV1", assets)
+        ears_fixture = assets[
+            assets.index("public static Path makeEarsSkin()") : assets.index(
+                "public static Path makeCpmModel()"
+            )
+        ]
+        self.assertIn("clearModernSkinOverlay(image);", ears_fixture)
+        for base_island in (
+            "paintChecker(graphics, 0, 0, 32, 16,",  # head
+            "paintChecker(graphics, 16, 16, 24, 16,",  # torso
+            "paintChecker(graphics, 40, 16, 16, 16,",  # right arm
+            "paintChecker(graphics, 32, 48, 16, 16,",  # left arm
+            "paintChecker(graphics, 0, 16, 16, 16,",  # right leg
+            "paintChecker(graphics, 16, 48, 16, 16,",  # left leg
+        ):
+            with self.subTest(ears_base_island=base_island):
+                self.assertIn(base_island, ears_fixture)
+        self.assertIn("one complete saturated Ears skin", feature)
+        self.assertIn("both arms, and both legs", feature)
         self.assertIn("rendererFeatures(playerRenderer)", feature)
         self.assertIn('"com.unascribed.ears.EarsLayerRenderer"', feature)
         self.assertIn('"com.unascribed.ears.EarsMod"', feature)
