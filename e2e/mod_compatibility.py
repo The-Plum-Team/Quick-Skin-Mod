@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO, Iterable
 
+from visual_similarity import SimilarityError, normalize_regions
+
 
 REPO = Path(__file__).resolve().parent.parent
 RELEASE_SCRIPTS = REPO / "scripts" / "release"
@@ -30,7 +32,7 @@ from matrix import gha_matrix, load_matrix, read_mod_version  # noqa: E402
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("mod-compatibility-contract.json")
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 MAX_CONTRACT_BYTES = 2 * 1024 * 1024
 MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
 MAX_FILES_PER_ARTIFACT = 4
@@ -90,6 +92,12 @@ class CompatibilityEvidence:
 
 
 @dataclass(frozen=True)
+class CompatibilityReviewRegions:
+    baseline_with_mod: tuple[tuple[float, float, float, float], ...]
+    apply_local_skin_with_mod: tuple[tuple[float, float, float, float], ...]
+
+
+@dataclass(frozen=True)
 class CompatibilityMod:
     id: str
     name: str
@@ -99,6 +107,7 @@ class CompatibilityMod:
     allowed_version_types: tuple[str, ...]
     provided_dependencies: tuple[str, ...]
     evidence: CompatibilityEvidence
+    review_regions: CompatibilityReviewRegions
     supported_game_versions: tuple[str, ...] | None
     excluded_lanes: tuple[ExcludedLane, ...]
     artifacts: tuple[LockedArtifact, ...]
@@ -317,6 +326,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             "allowed_version_types",
             "provided_dependencies",
             "evidence",
+            "review_regions",
             "supported_game_versions",
             "excluded_lanes",
             "artifacts",
@@ -352,6 +362,24 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             f"{label}.evidence.apply_local_skin_with_mod",
         ),
     )
+    review_regions_value = _exact_keys(
+        item["review_regions"],
+        {"baseline_with_mod", "apply_local_skin_with_mod"},
+        f"{label}.review_regions",
+    )
+    try:
+        review_regions = CompatibilityReviewRegions(
+            baseline_with_mod=normalize_regions(
+                review_regions_value["baseline_with_mod"]
+            ),
+            apply_local_skin_with_mod=normalize_regions(
+                review_regions_value["apply_local_skin_with_mod"]
+            ),
+        )
+    except SimilarityError as exc:
+        raise CompatibilityContractError(
+            f"{label}.review_regions is invalid: {exc}"
+        ) from exc
     supported = item["supported_game_versions"]
     supported_versions = (
         None
@@ -447,6 +475,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             allow_empty=True,
         ),
         evidence=evidence,
+        review_regions=review_regions,
         supported_game_versions=supported_versions,
         excluded_lanes=tuple(excluded_lanes),
         artifacts=artifacts,

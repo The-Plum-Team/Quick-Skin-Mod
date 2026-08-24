@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "lock_revision": "2026-08-23",
   "artifact_source": {
     "kind": "modrinth-v2",
@@ -26,6 +26,10 @@
       "evidence": {
         "baseline_with_mod": "A stable rear third-person view shows the complete local player wearing the genuine CPM model generated through CPM's exporter and imported through Quick Skin. Two oversized cyan and magenta horn cubes visibly protrude above the head, while the player model and texture remain intact.",
         "apply_local_skin_with_mod": "The paired rear third-person view shows the same complete player wearing Quick Skin's dark charcoal-and-gray plaid skin with brown hands and with both CPM horns gone. This must visibly confirm that selecting a normal Quick Skin skin reset CPM model mode without corrupting the player renderer."
+      },
+      "review_regions": {
+        "baseline_with_mod": [[0.4, 0.06, 0.6, 0.92]],
+        "apply_local_skin_with_mod": [[0.4, 0.06, 0.6, 0.92]]
       },
       "excluded_lanes": [
         {
@@ -660,6 +664,10 @@
         "baseline_with_mod": "A stable rear third-person control view shows the complete player wearing a Quick Skin imported ordinary skin with no Ears ears, tail, wings, snout, or other added geometry. The body and texture remain intact while the Ears renderer is loaded.",
         "apply_local_skin_with_mod": "The paired rear third-person view shows the complete player wearing the Ears-authored Quick Skin skin with clearly visible tall ear geometry above the head and a rear tail. The saturated cyan, magenta, orange, and green texture landmarks remain coherent on both the player and added Ears geometry."
       },
+      "review_regions": {
+        "baseline_with_mod": [[0.4, 0.16, 0.6, 0.92]],
+        "apply_local_skin_with_mod": [[0.4, 0.16, 0.6, 0.92]]
+      },
       "excluded_lanes": [],
       "supported_game_versions": null,
       "artifacts": [
@@ -1016,6 +1024,10 @@
       "evidence": {
         "baseline_with_mod": "Quick Skin's skin menu is open and intact. Its complete player preview keeps the ordinary plaid base skin, head, torso, both arms, and both legs visible between separated subdued dark-gray voxels raised from the hat, jacket, sleeves, and trousers. The meshes must be coherent and visibly less saturated than the paired fixture.",
         "apply_local_skin_with_mod": "The paired Quick Skin menu remains intact. Its complete player preview keeps the ordinary plaid base skin and all four limbs visible between separated bright cyan, magenta, lime, and orange voxels raised from the hat, jacket, sleeves, and trousers. The transparent gaps and visible voxel depth must distinguish the outer layer from a flat recolour."
+      },
+      "review_regions": {
+        "baseline_with_mod": [[0.55, 0.25, 0.8, 0.85]],
+        "apply_local_skin_with_mod": [[0.55, 0.25, 0.8, 0.85]]
       },
       "excluded_lanes": [
         {
@@ -1604,6 +1616,10 @@
         "baseline_with_mod": "A stable world view shows a real server-owned CustomNPCs entity with its visible mod-owned nameplate standing near the complete local player. Both entities render cleanly, and the local player still has its untouched UUID-selected vanilla default skin.",
         "apply_local_skin_with_mod": "The paired world view retains the same real CustomNPCs entity and visible mod-owned nameplate beside the complete local player, while the player now visibly wears Quick Skin's dark charcoal-and-gray plaid skin with brown hands. Neither entity may disappear, inherit the other's texture, or show corrupted geometry."
       },
+      "review_regions": {
+        "baseline_with_mod": [[0.4, 0.28, 0.65, 0.92]],
+        "apply_local_skin_with_mod": [[0.4, 0.28, 0.65, 0.92]]
+      },
       "excluded_lanes": [],
       "supported_game_versions": null,
       "artifacts": [
@@ -1704,6 +1720,10 @@
       "evidence": {
         "baseline_with_mod": "Essential's title screen is intact and owns its player-model layout. Exactly one Quick Skin action icon is present beside Essential's widgets, and no duplicate Quick Skin PlayerWidget overlaps the Essential model or menu controls.",
         "apply_local_skin_with_mod": "The paired Essential-owned title screen remains intact with exactly one Quick Skin action and no duplicate Quick Skin player preview. Essential's visible player model now retains Quick Skin's selected dark charcoal-and-gray plaid skin with brown skin details."
+      },
+      "review_regions": {
+        "baseline_with_mod": [[0.1, 0.28, 0.25, 0.76], [0.75, 0.3, 0.9, 0.75]],
+        "apply_local_skin_with_mod": [[0.1, 0.28, 0.25, 0.76], [0.75, 0.3, 0.9, 0.75]]
       },
       "excluded_lanes": [],
       "supported_game_versions": null,
@@ -2152,6 +2172,10 @@
       "evidence": {
         "baseline_with_mod": "A stable rear third-person multiplayer view shows the complete player wearing Quick Skin's dark charcoal-and-gray plaid skin while ReplayMod's recording indicator is visibly active. The world, player texture, and recording overlay are intact.",
         "apply_local_skin_with_mod": "ReplayMod playback is visibly open with its replay timeline or playback controls and a stable third-person view of the recorded player wearing the same Quick Skin plaid skin. The recorded player renders normally while runtime evidence confirms CameraEntity mode, recorded-player targeting, and interception of a recorded Quick Skin payload."
+      },
+      "review_regions": {
+        "baseline_with_mod": [[0.0, 0.0, 0.15, 0.12], [0.4, 0.3, 0.6, 0.92]],
+        "apply_local_skin_with_mod": [[0.0, 0.0, 1.0, 0.21], [0.4, 0.3, 0.6, 0.92]]
       },
       "excluded_lanes": [],
       "supported_game_versions": [
