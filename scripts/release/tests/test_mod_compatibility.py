@@ -272,12 +272,22 @@ class ModCompatibilityContractTest(unittest.TestCase):
             "multiline\ntext"
         )
 
+        missing_regions = copy.deepcopy(self.payload)
+        del missing_regions["mods"][0]["review_regions"]["baseline_with_mod"]
+
+        malformed_regions = copy.deepcopy(self.payload)
+        malformed_regions["mods"][0]["review_regions"][
+            "apply_local_skin_with_mod"
+        ] = [[0.8, 0.2, 0.1, 0.9]]
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             for label, mutation in (
                 ("missing", missing),
                 ("extra", extra),
                 ("malformed", malformed),
+                ("missing regions", missing_regions),
+                ("malformed regions", malformed_regions),
             ):
                 with self.subTest(label=label):
                     path = self.write_contract(root, mutation)
@@ -426,6 +436,10 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 baseline_with_mod="Visible control",
                 apply_local_skin_with_mod="Visible integration",
             ),
+            review_regions=mod_compatibility.CompatibilityReviewRegions(
+                baseline_with_mod=((0.25, 0.25, 0.75, 0.75),),
+                apply_local_skin_with_mod=((0.25, 0.25, 0.75, 0.75),),
+            ),
             supported_game_versions=None,
             excluded_lanes=(),
             artifacts=(artifact,),
@@ -568,6 +582,47 @@ class ModCompatibilityContractTest(unittest.TestCase):
         self.assertEqual(compatibility_mod.evidence.apply_local_skin_with_mod, applied)
         self.assertIn("recording indicator", baseline)
         self.assertIn("recorded Quick Skin payload", applied)
+
+    def test_compatibility_curation_uses_mod_specific_review_regions(self) -> None:
+        contract = mod_compatibility.load_contract(self.contract_path)
+        generic_baseline = ((0.42, 0.34, 0.58, 0.86),)
+        generic_applied = ((0.7, 0.42, 1.0, 0.98),)
+
+        for compatibility_mod in contract.mods:
+            with self.subTest(mod=compatibility_mod.id):
+                baseline = mod_compatibility_visual._compatibility_review_regions(
+                    compatibility_mod,
+                    {
+                        "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_BASELINE_CAPTURE,
+                        "review_regions": generic_baseline,
+                    },
+                )
+                applied = mod_compatibility_visual._compatibility_review_regions(
+                    compatibility_mod,
+                    {
+                        "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_APPLIED_CAPTURE,
+                        "review_regions": generic_applied,
+                    },
+                )
+
+                self.assertEqual(
+                    compatibility_mod.review_regions.baseline_with_mod,
+                    baseline,
+                )
+                self.assertEqual(
+                    compatibility_mod.review_regions.apply_local_skin_with_mod,
+                    applied,
+                )
+                self.assertNotEqual(generic_applied, applied)
+
+        replaymod = contract.mod("replaymod")
+        self.assertEqual(2, len(replaymod.review_regions.baseline_with_mod))
+        self.assertEqual(2, len(replaymod.review_regions.apply_local_skin_with_mod))
+
+        essential = contract.mod("essential")
+        self.assertTrue(
+            any(region[2] <= 0.25 for region in essential.review_regions.baseline_with_mod)
+        )
 
     def test_compatibility_curation_selects_only_the_feature_profile(self) -> None:
         scenario_contract = visual_evidence.load_catalog(
