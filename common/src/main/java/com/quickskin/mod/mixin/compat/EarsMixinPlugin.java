@@ -1,7 +1,6 @@
 package com.quickskin.mod.mixin.compat;
 
 import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
@@ -14,6 +13,8 @@ import java.util.Set;
  * mixin transformer has had a chance to process them.
  */
 public class EarsMixinPlugin implements IMixinConfigPlugin {
+    private static final List<String> CPM_RENDER_MIXINS = List.of("CpmRenderDepthMixin");
+    private static final String CPM_SUBMIT_COLLECTOR_MIXIN = "CpmSubmitCollectorMixin";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -34,7 +35,18 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.contains("EarsModMixin")) {
             return classFileExists("com/unascribed/ears/EarsMod.class");
         }
-        return true;
+        // CPM targets are @Pseudo and live in this optional, fail-open config. Do not resource-gate
+        // them here: on current Fabric the plugin is queried before CPM's collector resource is
+        // visible, even though Mixin can resolve and transform that target later in startup.
+        if (CPM_RENDER_MIXINS.stream().anyMatch(name -> mixinNamed(mixinClassName, name))
+                || mixinNamed(mixinClassName, CPM_SUBMIT_COLLECTOR_MIXIN)) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean mixinNamed(String mixinClassName, String simpleName) {
+        return mixinClassName.equals(simpleName) || mixinClassName.endsWith("." + simpleName);
     }
 
     private static boolean classFileExists(String classFilePath) {
@@ -47,10 +59,6 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public List<String> getMixins() {
-        if (MixinEnvironment.getCurrentEnvironment().getSide() == MixinEnvironment.Side.CLIENT
-                && classFileExists("com/tom/cpm/client/ClientBase.class")) {
-            return List.of("CpmRenderDepthMixin");
-        }
         return null;
     }
 

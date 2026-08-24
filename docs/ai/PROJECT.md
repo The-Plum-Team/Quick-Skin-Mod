@@ -131,7 +131,8 @@ immutable workflow and governance activation contract.
   Queue admission also treats that exact authenticated certificate as terminal for the same
   automatic or scheduled anchor generation, and discards every capsule whose authenticated
   `master` generation is no longer current plus closed pull-request evidence before any model
-  call. This is identity-level deduplication, not reuse of an unpaired semantic verdict.
+  call. That identity-level deduplication is distinct from the exact-policy semantic cache used by
+  a later generation whose same-lane anchor frame is byte-for-byte and semantically identical.
   No immediate-tip exception may fan out directly: a documentation-only tip can contain an older
   runtime change whose certification is still pending or failed. Only the exact anchor merge diff,
   whose newest synchronization commit has current `master` as its second parent and whose bounded
@@ -156,8 +157,10 @@ immutable workflow and governance activation contract.
   pending artifact independently, so coalescing probe contenders never serializes the actual
   reviews. It consumes the bounded headless rate-limit status and optional utilization when
   present, without pretending Claude provides a reliable Pro/Max percentage to headless CI. A
-  certifiable anchor is prioritized before the cross-version wave. Unpaired anchor frames always
-  reach Haiku. For paired evidence, decoded RGB pixels from the authored regions can prove an exact
+  certifiable anchor is prioritized before the cross-version wave. An unpaired anchor frame reaches
+  Haiku unless an authenticated ancestor cache carries the exact same canonical PNG, lane label,
+  authored region fingerprint, scope, capture, expectation, and runtime evidence under the exact
+  current semantic policy. For paired evidence, decoded RGB pixels from the authored regions can prove an exact
   candidate/reference match without a model call; exact-equivalent versions share one AI-reviewed
   representative. Each drain triages the remaining loader-grouped chunks concurrently with Haiku
   from deterministic 1280x720 copies and sends only concerns or confidence below high to concurrent
@@ -166,15 +169,16 @@ immutable workflow and governance activation contract.
   Opus-confirmed defect publishes a protected generation-bound marker,
   cancels sibling drains and keeps later queue selection from spending more model calls on that
   automatic wave. Each drain also cancels its own outstanding calls on confirmation and reuses a
-  paired verdict only under exact semantic candidate/reference fingerprints, authored review
-  scope, capture, expectation, runtime evidence, contract, matrix, reviewer, prompt, model, and
-  chunk-policy identity. Artifact labels and loaders may differ when all reusable semantic identity
-  is exact. A cache shard from an earlier protected `master` SHA is eligible only when that SHA
+  verdict only under exact semantic candidate/reference fingerprints, authored review scope,
+  capture, expectation, runtime evidence, contract, matrix, reviewer, prompt, model, and
+  chunk-policy identity. Artifact labels and loaders may differ for paired comparisons when all
+  reusable semantic identity is exact; an anchor hit additionally binds the exact label so Fabric
+  and Forge remain independently judged. A cache shard from an earlier protected `master` SHA is eligible only when that SHA
   remains an ancestor and its cache-producing workflow blob is byte-identical to the current one;
   the current codec then revalidates every exact key. The capacity marker retains only normalized
   status, known limit type, and utilization
-  band rather than provider text or exact account usage;
-  unpaired anchor semantics are never cached. It keeps provider output private and uploads only the
+  band rather than provider text or exact account usage. Unpaired anchor cache entries also bind
+  the full content-addressed canonical PNG and never cross a lane label. It keeps provider output private and uploads only the
   protected normalized report or a sanitized retry marker, and deletes a settled queue entry by
   exact artifact id. If an authenticated capsule disappears between the final guard and its
   download, that exact wake settles without starting a model; every other download or validation
