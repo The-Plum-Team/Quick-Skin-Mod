@@ -961,6 +961,8 @@ interface ModCompatibilityFeature {
         // ReplayMod freezes Minecraft's global timer at EOF. Keep enough recorded tail for the
         // applied screenshot, Retina re-grabs, and the harness screenshot-flush window.
         private static final long MIN_RECORDING_DURATION_MS = 15_000L;
+        private static final int LIVE_SYNC_REASSERT_POLL = 60;
+        private static final int LIVE_SYNC_SETTLE_POLLS = 120;
         private static final Object STARTUP_SCAN_LOCK = new Object();
         private static volatile Path protectedStartupScanPlaceholder;
         private static volatile Path protectedStartupScanMarker;
@@ -979,6 +981,8 @@ interface ModCompatibilityFeature {
         private volatile boolean saveWaitLogged;
         private volatile boolean replayModeLogged;
         private volatile boolean recordedPayloadLogged;
+        private volatile boolean liveSyncReasserted;
+        private volatile int liveSyncPolls;
         private volatile int replayPolls;
         private volatile UUID replayTarget;
         private volatile AbstractClientPlayer replayPlayer;
@@ -1039,16 +1043,39 @@ interface ModCompatibilityFeature {
                 failure = "cannot finalize ReplayMod recording without a live connection";
                 return;
             }
-            disconnectRequested = true;
-            E2ELog.info("ReplayMod recording close requested for " + replayPath.getFileName());
-            minecraft.getConnection().getConnection().disconnect(
-                    Component.literal("Quick Skin E2E: finalize replay"));
+            try {
+                importAndApply(TestAssets.makeDistinctSkin());
+                E2ELog.info("applied distinct ReplayMod fixture; waiting for recorded server echo");
+            } catch (Exception exception) {
+                failure = "ReplayMod distinct skin fixture failed: " + concise(exception);
+                E2ELog.error(failure, exception);
+            }
         }
 
         @Override
         public boolean quickSkinFeatureReady() {
-            if (failure != null || !disconnectRequested || replayPath == null) return false;
+            if (failure != null || replayPath == null) return false;
             try {
+                if (!disconnectRequested) {
+                    if (!activeSkinReady()) return false;
+                    liveSyncPolls++;
+                    if (!liveSyncReasserted && liveSyncPolls >= LIVE_SYNC_REASSERT_POLL) {
+                        liveSyncReasserted = true;
+                        appearances.applySkin(playerId, "local_skin:" + skinHash, "auto");
+                        E2ELog.info("reasserted distinct ReplayMod fixture during live recording");
+                    }
+                    if (liveSyncPolls < LIVE_SYNC_SETTLE_POLLS) return false;
+                    if (minecraft.getConnection() == null) {
+                        failure = "live ReplayMod connection closed before the recorded sync settled";
+                        return false;
+                    }
+                    disconnectRequested = true;
+                    E2ELog.info("ReplayMod recording close requested for "
+                            + replayPath.getFileName());
+                    minecraft.getConnection().getConnection().disconnect(
+                            Component.literal("Quick Skin E2E: finalize replay"));
+                    return false;
+                }
                 if (!replayStarted) {
                     if (currentPacketListener() != null) {
                         if (!saveWaitLogged) {
