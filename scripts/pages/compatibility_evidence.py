@@ -31,6 +31,7 @@ from check_visual_review import (  # noqa: E402
 from mod_compatibility import (  # noqa: E402
     CompatibilityContract,
     CompatibilityContractError,
+    CompatibilityMod,
     load_contract as load_compatibility_contract,
     resolve_lane,
 )
@@ -48,14 +49,19 @@ from visual_evidence import (  # noqa: E402
 )
 
 
-SCHEMA_VERSION = 2
-LEGACY_SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
+LEGACY_SCHEMA_VERSIONS = frozenset({1, 2})
 KIND = "quick-skin-public-mod-compatibility"
 MANIFEST_NAME = "manifest.json"
 SOURCE_SCENARIO = "mod-compatibility"
-PUBLIC_CAPTURE_IDS = (
+REMOTE_SOURCE_SCENARIO = "mod-compatibility-remote"
+BASE_PUBLIC_CAPTURE_IDS = (
     "mod-compatibility.client_a.baseline_with_mod",
     "mod-compatibility.client_a.apply_local_skin_with_mod",
+)
+REMOTE_PUBLIC_CAPTURE_IDS = (
+    "mod-compatibility-remote.client_b.observe_remote_baseline",
+    "mod-compatibility-remote.client_b.observe_remote_applied",
 )
 PUBLIC_IMAGE_SIZE = (1280, 720)
 MAX_MANIFEST_BYTES = 8 * 1024 * 1024
@@ -63,7 +69,7 @@ MAX_IMAGE_BYTES = 32 * 1024 * 1024
 MAX_TOTAL_IMAGE_BYTES = 512 * 1024 * 1024
 MAX_LANES = 64
 MAX_NOT_APPLICABLE = 64
-MAX_IMAGES = MAX_LANES * 4
+MAX_IMAGES = MAX_LANES * 8
 MAX_TEXT = 4096
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -181,6 +187,32 @@ class CompatibilityEvidenceError(ValueError):
 
 class CompatibilityContractDriftError(CompatibilityEvidenceError):
     """Raised when a selected bundle binds superseded contracts."""
+
+
+def _public_capture_ids(
+    scenario_contract: ScenarioContract,
+    compatibility_mod: CompatibilityMod,
+    *,
+    schema_version: int = SCHEMA_VERSION,
+) -> list[str]:
+    base = tuple(
+        capture.capture_id
+        for capture in scenario_contract.captures
+        if capture.scenario == SOURCE_SCENARIO
+    )
+    remote = tuple(
+        capture.capture_id
+        for capture in scenario_contract.captures
+        if capture.scenario == REMOTE_SOURCE_SCENARIO
+    )
+    if base != BASE_PUBLIC_CAPTURE_IDS or remote != REMOTE_PUBLIC_CAPTURE_IDS:
+        raise CompatibilityEvidenceError(
+            "public compatibility checkpoint contract drifted"
+        )
+    selected = list(base)
+    if schema_version == SCHEMA_VERSION and compatibility_mod.multiplayer is not None:
+        selected.extend(remote)
+    return selected
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -466,7 +498,19 @@ def validate_plan(
         if any(row.get(key) != value for key, value in required_values.items()):
             raise CompatibilityEvidenceError(f"runnable lane identity drifted: {lane_id}")
         scenarios = row.get("scenarios")
-        if not isinstance(scenarios, str) or scenarios.split(",")[0] != SOURCE_SCENARIO:
+        scenario_items = scenarios.split(",") if isinstance(scenarios, str) else []
+        compatibility_prefix = [SOURCE_SCENARIO]
+        if expected.mod.multiplayer is not None:
+            compatibility_prefix.append(REMOTE_SOURCE_SCENARIO)
+        base_scenarios = scenario_items[len(compatibility_prefix):]
+        if (
+            scenario_items[:len(compatibility_prefix)] != compatibility_prefix
+            or not base_scenarios
+            or len(scenario_items) != len(set(scenario_items))
+            or SOURCE_SCENARIO in base_scenarios
+            or REMOTE_SOURCE_SCENARIO in base_scenarios
+            or any(SAFE_ID.fullmatch(item) is None for item in scenario_items)
+        ):
             raise CompatibilityEvidenceError(f"runnable lane lacks compatibility profile: {lane_id}")
         selected[lane_id] = row
     if set(selected) != set(expected_runnable):
@@ -826,17 +870,14 @@ def build_bundle(
     derivatives: dict[str, dict[str, Any]] = {}
     public_lanes: list[dict[str, Any]] = []
     try:
-        expected_capture_ids = [
-            capture.capture_id
-            for capture in scenario_contract.captures
-            if capture.scenario == SOURCE_SCENARIO
-        ]
-        if expected_capture_ids != list(PUBLIC_CAPTURE_IDS):
-            raise CompatibilityEvidenceError(
-                "public compatibility checkpoint contract drifted"
-            )
         for lane_id in sorted(plan_rows):
             plan_row = plan_rows[lane_id]
+            compatibility_mod = compatibility_contract.mod(
+                plan_row["compatibility_mod"]
+            )
+            expected_capture_ids = _public_capture_ids(
+                scenario_contract, compatibility_mod
+            )
             lane_root = root / lane_id
             capsule = lane_root / "capsule"
             report_root = lane_root / "report"
@@ -1153,7 +1194,7 @@ def validate_bundle(
     schema_version = manifest.get("schema_version")
     if (
         type(schema_version) is not int
-        or schema_version not in {LEGACY_SCHEMA_VERSION, SCHEMA_VERSION}
+        or schema_version not in LEGACY_SCHEMA_VERSIONS | {SCHEMA_VERSION}
         or manifest.get("kind") != KIND
     ):
         raise CompatibilityEvidenceError("compatibility manifest identity is invalid")
@@ -1218,15 +1259,6 @@ def validate_bundle(
         or len(not_applicable) > MAX_NOT_APPLICABLE
     ):
         raise CompatibilityEvidenceError("compatibility inventory is invalid")
-    expected_capture_ids = [
-        capture.capture_id
-        for capture in scenario_contract.captures
-        if capture.scenario == SOURCE_SCENARIO
-    ]
-    if expected_capture_ids != list(PUBLIC_CAPTURE_IDS):
-        raise CompatibilityEvidenceError(
-            "public compatibility checkpoint contract drifted"
-        )
     lane_ids: set[str] = set()
     expected_assets: set[str] = set()
     validated_assets: dict[str, dict[str, Any]] = {}
@@ -1248,6 +1280,11 @@ def validate_bundle(
         }
         if any(lane.get(key) != value for key, value in expected_identity.items()):
             raise CompatibilityEvidenceError(f"compatibility lane identity drifted: {lane_id}")
+        expected_capture_ids = _public_capture_ids(
+            scenario_contract,
+            expected.mod,
+            schema_version=schema_version,
+        )
         _positive_int(lane.get("review_run_id"), f"lane {lane_id}.review_run_id")
         for field in (
             "review_manifest_sha256",
@@ -1259,9 +1296,9 @@ def validate_bundle(
             lane.get("reviewed_frame_count"), f"lane {lane_id}.reviewed_frame_count"
         )
         expected_reviewed = (
-            len(expected_capture_ids)
-            if schema_version == SCHEMA_VERSION
-            else len(scenario_contract.captures)
+            len(scenario_contract.captures)
+            if schema_version == 1
+            else len(expected_capture_ids)
         )
         if reviewed != expected_reviewed:
             raise CompatibilityEvidenceError(f"lane {lane_id} review count is invalid")
@@ -1276,7 +1313,7 @@ def validate_bundle(
             )
             capture = scenario_contract.capture_by_id(frame["capture_id"])
             if (
-                capture.scenario != SOURCE_SCENARIO
+                capture.capture_id not in expected_capture_ids
                 or frame.get("reference_capture_id")
                 != capture.compatibility_reference_capture_id
                 or frame.get("title") != capture.title
