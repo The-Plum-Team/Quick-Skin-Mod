@@ -426,13 +426,21 @@ class PagesSiteTest(unittest.TestCase):
                 "pixel_validation": derivative_metrics,
             },
         }
-        captures = [
+        base_captures = [
             capture
             for capture in scenario_contract.captures
             if capture.scenario == "mod-compatibility"
         ]
+        remote_captures = [
+            capture
+            for capture in scenario_contract.captures
+            if capture.scenario == "mod-compatibility-remote"
+        ]
         lanes = []
         for lane_id, lane in sorted(runnable.items()):
+            captures = list(base_captures)
+            if lane.mod.multiplayer is not None:
+                captures.extend(remote_captures)
             frames = []
             for capture in captures:
                 frames.append(
@@ -1252,7 +1260,8 @@ class PagesSiteTest(unittest.TestCase):
         self.assertEqual(1, summary["compatibility_images"])
         self.assertTrue(compatibility["not_applicable"])
         for lane in compatibility["lanes"]:
-            self.assertEqual(2, len(lane["frames"]))
+            expected_frames = 4 if lane["mod"] in {"cpm", "ears"} else 2
+            self.assertEqual(expected_frames, len(lane["frames"]))
             self.assertEqual(lane["reviewed_frame_count"], len(lane["frames"]))
             self.assertRegex(lane["mod_version_id"], r"^[A-Za-z0-9_-]+$")
             for frame in lane["frames"]:
@@ -1365,6 +1374,18 @@ class PagesSiteTest(unittest.TestCase):
         compatibility_root = self.write_compatibility_bundle(branch)
         manifest_path = compatibility_root / branch / "manifest.json"
         legacy = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        schema_two = json.loads(json.dumps(legacy))
+        schema_two["schema_version"] = 2
+        for lane in schema_two["lanes"]:
+            lane["reviewed_frame_count"] = 2
+            lane["frames"] = lane["frames"][:2]
+        manifest_path.write_text(json.dumps(schema_two), encoding="utf-8")
+        validated_schema_two = validate_compatibility_bundle(
+            compatibility_root, branch
+        )
+        self.assertEqual(2, validated_schema_two["schema_version"])
+
         full_capture_count = len(load_scenario_contract().captures)
         for lane in legacy["lanes"]:
             lane["reviewed_frame_count"] = full_capture_count
@@ -1376,6 +1397,8 @@ class PagesSiteTest(unittest.TestCase):
             validate_compatibility_bundle(compatibility_root, branch)
 
         legacy["schema_version"] = 1
+        for lane in legacy["lanes"]:
+            lane["frames"] = lane["frames"][:2]
         manifest_path.write_text(json.dumps(legacy), encoding="utf-8")
         validated = validate_compatibility_bundle(compatibility_root, branch)
         self.assertEqual(1, validated["schema_version"])
