@@ -169,7 +169,7 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   all-single or all-paired bounded capsule,
   including each capture's exact passed assertion as `runtime_evidence`, keeps `semantic_valid`
   independent from nullable `matches_reference`, and normalizes bounded model output.
-  `e2e/visual_review_runner.py` sends every unpaired anchor frame through semantic Haiku
+  `e2e/visual_review_runner.py` sends every uncached unpaired anchor frame through semantic Haiku
   triage, inherits exact paired region matches, shares one model verdict across exact-equivalent
   paired versions, runs independent loader-grouped chunks concurrently, creates deterministic
   1280x720 model-only copies without altering the authenticated 1920x1080 evidence, and pipelines
@@ -178,14 +178,15 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   runner cancels outstanding calls after the first
   confirmed defect, publishes a protected exact-generation block, cancels sibling drains, and keeps
   raw provider output private.
-  `e2e/visual_review_cache.py` validates and combines bounded immutable paired-only verdict
-  cache shards: a hit binds candidate/reference semantic fingerprints, authored region scope,
-  expectation, runtime evidence, capture identity, scenario contract, release matrix, reviewer and
-  similarity code, prompts, models, mode, and chunk policy. Artifact labels and loaders need not
-  match when the entire reusable semantic identity does. Protected ancestor shards survive unrelated `master` merges only when their
+  `e2e/visual_review_cache.py` validates and combines bounded immutable exact-policy verdict
+  cache shards. A paired hit binds candidate/reference semantic fingerprints; an anchor hit binds
+  the canonical full-image digest, semantic fingerprint, and exact lane label so loaders never
+  certify each other. Both modes bind authored region scope, expectation, runtime evidence,
+  capture identity, scenario contract, release matrix, reviewer and similarity code, prompts,
+  models, mode, and chunk policy. Paired artifact labels and loaders need not match when the entire
+  reusable semantic identity does. Protected ancestor shards survive unrelated `master` merges only when their
   cache-producing workflow blob is byte-identical; the current codec and policy still validate
-  every entry before use;
-  unpaired semantic anchors never consume it. Parallel drains may briefly publish sibling shards;
+  every entry before use. Parallel drains may briefly publish sibling shards;
   a later protected successor combines and retires every authenticated shard it consumed.
 - `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
   an unpaired, loader-complete, completely clean 1.20.1 report and binds its source/proof/manifest/
