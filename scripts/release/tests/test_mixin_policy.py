@@ -64,6 +64,7 @@ DEGRADABLE_MIXINS = {
 # the integration is absent.
 OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
+    "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
@@ -82,6 +83,10 @@ ALTERNATIVE_HOOKS = {
     (
         "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
         "quickskin$cpmModernPlayerRenderStart",
+    ),
+    (
+        "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
+        "quickskin$skipStaleExtractedModel",
     ),
 }
 
@@ -124,6 +129,10 @@ ALLOW_COUNT_OVERRIDES = {
         "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
         "quickskin$getEarsFeatures",
     ): {2},
+    (
+        "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
+        "quickskin$skipStaleExtractedModel",
+    ): {8},
 }
 
 
@@ -162,6 +171,20 @@ class MixinPolicyTest(unittest.TestCase):
         for path in self.mixin_sources():
             with self.subTest(source=relative(path)):
                 self.assertIn(policy_id(path), classified)
+
+    def test_cpm_transition_defers_every_renderer_facing_skin_override(self) -> None:
+        for name in (
+            "MixinAbstractClientPlayer.java",
+            "PlayerInfoMixin.java",
+            "PlayerRendererMixin.java",
+            "SkinManagerMixin.java",
+        ):
+            with self.subTest(source=name):
+                source = (CANONICAL_JAVA / "com" / "quickskin" / "mod" / "mixin" / name)
+                self.assertIn(
+                    "CPMCompatIntegration.shouldDeferToCPM()",
+                    source.read_text(encoding="utf-8"),
+                )
 
     def test_every_injector_declares_bounded_counts(self) -> None:
         injector_sources = CRITICAL_MIXINS | DEGRADABLE_MIXINS | OPTIONAL_MIXINS
@@ -212,7 +235,7 @@ class MixinPolicyTest(unittest.TestCase):
                 self.assertIs(config["required"], False)
                 self.assertEqual(config["injectors"]["defaultRequire"], 0)
 
-    def test_configured_mixins_exist_and_dynamic_mixins_are_audited(self) -> None:
+    def test_configured_optional_mixins_exist(self) -> None:
         configs = self.configs_named("quickskin.mixins.json") + self.configs_named(
             "quickskin-ears.mixins.json"
         )
@@ -221,22 +244,6 @@ class MixinPolicyTest(unittest.TestCase):
             config = json.loads(path.read_text(encoding="utf-8"))
             configured.update(name.rsplit(".", 1)[-1] for name in config.get("client", []))
             configured.update(name.rsplit(".", 1)[-1] for name in config.get("mixins", []))
-
-        plugin = (
-            ROOT
-            / "common"
-            / "src"
-            / "main"
-            / "java"
-            / "com"
-            / "quickskin"
-            / "mod"
-            / "mixin"
-            / "compat"
-            / "EarsMixinPlugin.java"
-        ).read_text(encoding="utf-8")
-        self.assertIn('List.of("CpmRenderDepthMixin")', plugin)
-        configured.add("CpmRenderDepthMixin")
 
         source_classes = {source.stem for source in self.mixin_sources()}
         self.assertTrue(configured <= source_classes)
@@ -265,10 +272,9 @@ class MixinPolicyTest(unittest.TestCase):
             optional = json.loads(optional_path.read_text(encoding="utf-8"))
             core_names = {name.rsplit(".", 1)[-1] for name in core["client"]}
             optional_names = {name.rsplit(".", 1)[-1] for name in optional["client"]}
-            dynamic_names = {"CpmRenderDepthMixin"}
             with self.subTest(resources=relative(resource_root)):
                 self.assertTrue(compat_mixins.isdisjoint(core_names))
-                self.assertTrue(compat_mixins <= optional_names | dynamic_names)
+                self.assertTrue(compat_mixins <= optional_names)
 
     def test_packaged_clients_enable_expect_counting(self) -> None:
         runtime = (ROOT / "e2e" / "packaged_runtime.py").read_text(encoding="utf-8")
