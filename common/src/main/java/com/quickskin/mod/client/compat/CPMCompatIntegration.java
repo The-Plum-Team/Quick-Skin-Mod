@@ -64,6 +64,7 @@ public final class CPMCompatIntegration {
     private static Method getCurrentClientPlayerMethod;
     private static Method getServerSideStatusMethod;
     private static Method sendSkinUpdateMethod;
+    private static Method executeNextFrameMethod;
     private static Method getModelDefinitionMethod;
     private static Method getPlayerUuidMethod;
 
@@ -78,6 +79,8 @@ public final class CPMCompatIntegration {
     private static final AtomicBoolean renderHookObservedLogged = new AtomicBoolean();
     private static final AtomicBoolean staleRenderDepthLogged = new AtomicBoolean();
     private static final AtomicBoolean localModelProbeFailedLogged = new AtomicBoolean();
+    private static final AtomicBoolean cacheInvalidationQueued = new AtomicBoolean();
+    private static final AtomicBoolean cacheSchedulingFailedLogged = new AtomicBoolean();
     private static volatile boolean localModelProbeDisabled;
     private static volatile boolean cacheInvalidationDisabled;
 
@@ -215,6 +218,7 @@ public final class CPMCompatIntegration {
             getCurrentClientPlayerMethod = null;
             getServerSideStatusMethod = null;
             sendSkinUpdateMethod = null;
+            executeNextFrameMethod = null;
             getModelDefinitionMethod = null;
             getPlayerUuidMethod = null;
             if (runtimeReflectionUnavailableLogged.compareAndSet(false, true)) {
@@ -239,9 +243,11 @@ public final class CPMCompatIntegration {
         try {
             getServerSideStatusMethod = accessClass.getMethod("getServerSideStatus");
             sendSkinUpdateMethod = accessClass.getMethod("sendSkinUpdate");
+            executeNextFrameMethod = accessClass.getMethod("executeNextFrame", Runnable.class);
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
             getServerSideStatusMethod = null;
             sendSkinUpdateMethod = null;
+            executeNextFrameMethod = null;
             if (serverReflectionUnavailableLogged.compareAndSet(false, true)) {
                 CPMLOG.warn("CPM server-notification accessor is unavailable; local selection remains enabled", e);
             }
@@ -385,6 +391,40 @@ public final class CPMCompatIntegration {
     }
 
     /**
+     * Refreshes CPM after its current extracted/render-state frame has finished. Clearing the
+     * definition loader synchronously can leave CPM's already-built renderer pointing at a model
+     * whose render types were just discarded (notably Fabric 26.1/26.1.1). CPM exposes this
+     * one-frame scheduler for the same lifecycle boundary, so coalesce repeated skin updates onto
+     * it and retain the synchronous path only as a compatibility fallback.
+     */
+    private static void schedulePlayerCacheInvalidation() {
+        if (!isAvailable()) {
+            return;
+        }
+        ensureRuntimeHandles();
+        if (minecraftClientAccess == null || executeNextFrameMethod == null) {
+            invalidatePlayerCache();
+            return;
+        }
+        if (!cacheInvalidationQueued.compareAndSet(false, true)) {
+            return;
+        }
+        Runnable refresh = () -> {
+            cacheInvalidationQueued.set(false);
+            invalidatePlayerCache();
+        };
+        try {
+            executeNextFrameMethod.invoke(minecraftClientAccess, refresh);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            cacheInvalidationQueued.set(false);
+            if (cacheSchedulingFailedLogged.compareAndSet(false, true)) {
+                CPMLOG.warn("CPM next-frame cache refresh is unavailable; refreshing immediately", e);
+            }
+            invalidatePlayerCache();
+        }
+    }
+
+    /**
      * Switches the local player from an explicit model file back to normal skin
      * mode, then forces CPM to recreate its cached definition.
      */
@@ -392,8 +432,9 @@ public final class CPMCompatIntegration {
         java.util.UUID localUuid = getLocalPlayerUuid();
         if (localUuid != null && localUuid.equals(playerId)) {
             resetToSkinMode();
+        } else {
+            schedulePlayerCacheInvalidation();
         }
-        invalidatePlayerCache();
 
         // 1.20.1 also needs vanilla PlayerInfo to invoke registerSkins again so
         // CPM can read the newly installed file-backed texture.
@@ -424,14 +465,14 @@ public final class CPMCompatIntegration {
             String selectedModel = (String) configGetStringMethod.invoke(
                     configInstance, "selectedModel", (Object) null);
             if (selectedModel == null) {
-                invalidatePlayerCache();
+                schedulePlayerCacheInvalidation();
                 return true;
             }
             configClearValueMethod.invoke(configInstance, "selectedModel");
             configSaveMethod.invoke(configInstance);
             CPMLOG.info("CPM reset to skin mode from selectedModel={}", selectedModel);
             notifyServerIfInstalled("resetToSkinMode");
-            invalidatePlayerCache();
+            schedulePlayerCacheInvalidation();
             return true;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
             CPMLOG.warn("Failed to reset CPM to skin mode", e);
@@ -458,7 +499,7 @@ public final class CPMCompatIntegration {
             configSaveMethod.invoke(configInstance);
             CPMLOG.info("Selected CPM model {}", normalizedName);
             notifyServerIfInstalled("selectModel");
-            invalidatePlayerCache();
+            schedulePlayerCacheInvalidation();
             return true;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
             CPMLOG.warn("Failed to select CPM model {}", normalizedName, e);

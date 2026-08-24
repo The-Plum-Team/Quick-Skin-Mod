@@ -8,6 +8,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 E2E_JAVA = ROOT / "common" / "src" / "e2e" / "java" / "com" / "quickskin" / "mod" / "e2e"
 SHIM = E2E_JAVA / "VanillaShim.java"
+CPM_INTEGRATION = (
+    ROOT
+    / "common"
+    / "src"
+    / "main"
+    / "java"
+    / "com"
+    / "quickskin"
+    / "mod"
+    / "client"
+    / "compat"
+    / "CPMCompatIntegration.java"
+)
 
 
 class E2ECompatibilityPolicyTest(unittest.TestCase):
@@ -273,7 +286,9 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
                 self.assertIn(window_handle_accessor, feature)
 
         self.assertIn("com.unascribed.ears.common.EarsFeaturesWriterV1", assets)
-        self.assertIn("rendererFeatures(rendererClass, playerRenderer)", feature)
+        self.assertIn("rendererFeatures(playerRenderer)", feature)
+        self.assertIn('"com.unascribed.ears.EarsLayerRenderer"', feature)
+        self.assertIn('"com.unascribed.ears.EarsMod"', feature)
         self.assertIn("rendererLookupArgument", feature)
         self.assertIn("expectedType.isInstance(candidate)", feature)
         self.assertIn("com.tom.cpm.shared.editor.Exporter", assets)
@@ -281,6 +296,23 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn(
             '"com.quickskin.mod.client.compat.ReplayModHelper"', feature
         )
+
+    def test_cpm_cache_refresh_waits_for_the_extracted_frame_boundary(self) -> None:
+        """A skin/model transition must not invalidate CPM's active extracted frame."""
+
+        integration = CPM_INTEGRATION.read_text(encoding="utf-8")
+        self.assertIn(
+            'accessClass.getMethod("executeNextFrame", Runnable.class)', integration
+        )
+        self.assertIn(
+            "cacheInvalidationQueued.compareAndSet(false, true)", integration
+        )
+        self.assertIn("schedulePlayerCacheInvalidation();", integration)
+        force_refresh = integration[
+            integration.index("public static void forceReRegisterSkins") :
+            integration.index("/** Clears CPM's selectedModel key")
+        ]
+        self.assertNotIn("\n        invalidatePlayerCache();", force_refresh)
 
     def test_essential_raw_screenshot_supports_both_gpu_readback_eras(self) -> None:
         """Essential needs a silent framebuffer copy before and after 1.21.5's async API."""
