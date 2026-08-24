@@ -18,9 +18,12 @@ sys.path.insert(0, str(ROOT / "scripts" / "release"))
 
 from build_site import SiteBuildError, build  # noqa: E402
 from compatibility_evidence import (  # noqa: E402
+    CompatibilityContractDriftError,
     CompatibilityEvidenceError,
+    SCHEMA_VERSION as COMPATIBILITY_SCHEMA_VERSION,
     _expected_plan as expected_compatibility_plan,
     carry_forward as carry_compatibility_forward,
+    main as compatibility_evidence_main,
     validate_bundle as validate_compatibility_bundle,
 )
 import evidence as evidence_module  # noqa: E402
@@ -462,7 +465,7 @@ class PagesSiteTest(unittest.TestCase):
                     "mod_version": lane.artifact.version_number,
                     "mod_version_id": lane.artifact.version_id,
                     "review_run_id": 3000 + len(lanes),
-                    "reviewed_frame_count": len(scenario_contract.captures),
+                    "reviewed_frame_count": len(captures),
                     "review_manifest_sha256": "c" * 64,
                     "curation_proof_sha256": "d" * 64,
                     "review_report_sha256": "e" * 64,
@@ -470,7 +473,7 @@ class PagesSiteTest(unittest.TestCase):
                 }
             )
         manifest = {
-            "schema_version": 1,
+            "schema_version": COMPATIBILITY_SCHEMA_VERSION,
             "kind": "quick-skin-public-mod-compatibility",
             "repository": "AkaNebur/Quick-Skin-Mod",
             "contracts": {
@@ -1250,7 +1253,7 @@ class PagesSiteTest(unittest.TestCase):
         self.assertTrue(compatibility["not_applicable"])
         for lane in compatibility["lanes"]:
             self.assertEqual(2, len(lane["frames"]))
-            self.assertGreater(lane["reviewed_frame_count"], len(lane["frames"]))
+            self.assertEqual(lane["reviewed_frame_count"], len(lane["frames"]))
             self.assertRegex(lane["mod_version_id"], r"^[A-Za-z0-9_-]+$")
             for frame in lane["frames"]:
                 self.assertTrue(frame["semantic_valid"])
@@ -1316,6 +1319,71 @@ class PagesSiteTest(unittest.TestCase):
         self.assertEqual(
             original | {"provenance": original["provenance"] | {"coverage_sha": "4" * 40}},
             carried,
+        )
+
+    def test_compatibility_contract_drift_is_distinct_from_invalid_evidence(self) -> None:
+        branch = "fabric-and-neoforge-1.21.1"
+        compatibility_root = self.write_compatibility_bundle(branch)
+        manifest_path = compatibility_root / branch / "manifest.json"
+        stale = json.loads(manifest_path.read_text(encoding="utf-8"))
+        stale["contracts"]["scenario_sha256"] = "0" * 64
+        manifest_path.write_text(json.dumps(stale), encoding="utf-8")
+
+        with self.assertRaises(CompatibilityContractDriftError):
+            validate_compatibility_bundle(compatibility_root, branch)
+        self.assertEqual(
+            3,
+            compatibility_evidence_main(
+                [
+                    "validate",
+                    "--evidence-root",
+                    str(compatibility_root),
+                    "--branch",
+                    branch,
+                    "--only-branch",
+                    "--repository",
+                    "AkaNebur/Quick-Skin-Mod",
+                ]
+            ),
+        )
+
+        stale["contracts"]["scenario_sha256"] = "not-a-sha256"
+        manifest_path.write_text(json.dumps(stale), encoding="utf-8")
+        with self.assertRaises(CompatibilityEvidenceError) as raised:
+            validate_compatibility_bundle(compatibility_root, branch)
+        self.assertNotIsInstance(raised.exception, CompatibilityContractDriftError)
+
+        stale["contracts"]["scenario_sha256"] = load_scenario_contract().sha256
+        stale["unexpected"] = True
+        manifest_path.write_text(json.dumps(stale), encoding="utf-8")
+        with self.assertRaises(CompatibilityEvidenceError) as raised:
+            validate_compatibility_bundle(compatibility_root, branch)
+        self.assertNotIsInstance(raised.exception, CompatibilityContractDriftError)
+
+    def test_compatibility_bundle_accepts_the_legacy_full_review_count(self) -> None:
+        branch = "fabric-and-neoforge-1.21.1"
+        compatibility_root = self.write_compatibility_bundle(branch)
+        manifest_path = compatibility_root / branch / "manifest.json"
+        legacy = json.loads(manifest_path.read_text(encoding="utf-8"))
+        full_capture_count = len(load_scenario_contract().captures)
+        for lane in legacy["lanes"]:
+            lane["reviewed_frame_count"] = full_capture_count
+        manifest_path.write_text(json.dumps(legacy), encoding="utf-8")
+        with self.assertRaisesRegex(
+            CompatibilityEvidenceError,
+            "review count is invalid",
+        ):
+            validate_compatibility_bundle(compatibility_root, branch)
+
+        legacy["schema_version"] = 1
+        manifest_path.write_text(json.dumps(legacy), encoding="utf-8")
+        validated = validate_compatibility_bundle(compatibility_root, branch)
+        self.assertEqual(1, validated["schema_version"])
+        self.assertTrue(
+            all(
+                lane["reviewed_frame_count"] == full_capture_count
+                for lane in validated["lanes"]
+            )
         )
 
     def test_evidence_without_runtime_evidence_still_validates_and_publishes(self) -> None:
