@@ -308,6 +308,10 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             "cacheInvalidationQueued.compareAndSet(false, true)", integration
         )
         self.assertIn("schedulePlayerCacheInvalidation();", integration)
+        self.assertIn("usesFabricExtractorPipeline()", integration)
+        self.assertIn("return scheduleSkinModeReset();", integration)
+        self.assertIn("executeNextFrameMethod.invoke(minecraftClientAccess, reset)", integration)
+        self.assertIn('if (!notifyServerIfInstalled("resetToSkinMode"))', integration)
         force_refresh = integration[
             integration.index("public static void forceReRegisterSkins") :
             integration.index("/** Clears CPM's selectedModel key")
