@@ -41,11 +41,14 @@ public final class DefaultSkinEvidenceView {
             mc.player.setShiftKeyDown(false);
 
             // The first compatibility scenario can start while the client has a player object but
-            // the flat-world chunk below it is still absent. Pinning motion at that point freezes
-            // the disposable player over unloaded air and produces a semantically empty sky frame.
-            // Let vanilla finish placing the player before the deterministic pose takes ownership.
+            // the flat-world chunk below it is still absent. Forge can then expose that logical
+            // block before llvmpipe has compiled and uploaded the corresponding render section.
+            // Pinning motion in either interval freezes the disposable player into a semantically
+            // empty sky frame, so wait for both level and renderer truth before taking ownership.
+            var terrainPosition = mc.player.blockPosition().below();
             if (mc.level == null
-                    || mc.level.getBlockState(mc.player.blockPosition().below()).isAir()) {
+                    || mc.level.getBlockState(terrainPosition).isAir()
+                    || !VanillaShim.isTerrainRenderReady(mc, terrainPosition)) {
                 return false;
             }
 
