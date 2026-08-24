@@ -114,6 +114,20 @@ public final class TestAssets {
     }
 
     /**
+     * A byte-distinct copy of the normal plaid skin for ReplayMod acknowledgement evidence.
+     * Pixel {@code 0,0} is outside every player-model UV island, so the imported content gets a
+     * fresh hash without changing the appearance promised by the compatibility contract.
+     */
+    public static Path makeReplayAcknowledgedSkin() throws Exception {
+        BufferedImage image = bundledSkinCopy();
+        int marker = image.getRGB(0, 0) == 0xFF010203 ? 0xFF040506 : 0xFF010203;
+        image.setRGB(0, 0, marker);
+        Path fixture = deterministicFixture("qs_e2e_replay_ack_skin.png");
+        ImageIO.write(image, "png", fixture.toFile());
+        return fixture;
+    }
+
+    /**
      * A normal skin whose six second-layer UV islands are transparent. It is a featureless Ears
      * control and can also serve as a 3D Skin Layers control with no overlay voxels to extrude.
      */
