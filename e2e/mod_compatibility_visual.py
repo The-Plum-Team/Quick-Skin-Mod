@@ -43,6 +43,12 @@ MOD_COMPATIBILITY_BASELINE_CAPTURE = (
 MOD_COMPATIBILITY_APPLIED_CAPTURE = (
     "mod-compatibility.client_a.apply_local_skin_with_mod"
 )
+MOD_COMPATIBILITY_REMOTE_BASELINE_CAPTURE = (
+    "mod-compatibility-remote.client_b.observe_remote_baseline"
+)
+MOD_COMPATIBILITY_REMOTE_APPLIED_CAPTURE = (
+    "mod-compatibility-remote.client_b.observe_remote_applied"
+)
 
 
 class CompatibilityVisualError(ValueError):
@@ -58,6 +64,18 @@ def _compatibility_expectation(
         return compatibility_mod.evidence.baseline_with_mod
     if capture_id == MOD_COMPATIBILITY_APPLIED_CAPTURE:
         return compatibility_mod.evidence.apply_local_skin_with_mod
+    if capture_id == MOD_COMPATIBILITY_REMOTE_BASELINE_CAPTURE:
+        if compatibility_mod.multiplayer is None:
+            raise CompatibilityVisualError(
+                f"{compatibility_mod.id} has no multiplayer evidence contract"
+            )
+        return compatibility_mod.multiplayer.evidence.baseline_with_mod
+    if capture_id == MOD_COMPATIBILITY_REMOTE_APPLIED_CAPTURE:
+        if compatibility_mod.multiplayer is None:
+            raise CompatibilityVisualError(
+                f"{compatibility_mod.id} has no multiplayer evidence contract"
+            )
+        return compatibility_mod.multiplayer.evidence.apply_local_skin_with_mod
     return frame["expectation"]
 
 
@@ -70,6 +88,18 @@ def _compatibility_review_regions(
         return compatibility_mod.review_regions.baseline_with_mod
     if capture_id == MOD_COMPATIBILITY_APPLIED_CAPTURE:
         return compatibility_mod.review_regions.apply_local_skin_with_mod
+    if capture_id == MOD_COMPATIBILITY_REMOTE_BASELINE_CAPTURE:
+        if compatibility_mod.multiplayer is None:
+            raise CompatibilityVisualError(
+                f"{compatibility_mod.id} has no multiplayer review-region contract"
+            )
+        return compatibility_mod.multiplayer.review_regions.baseline_with_mod
+    if capture_id == MOD_COMPATIBILITY_REMOTE_APPLIED_CAPTURE:
+        if compatibility_mod.multiplayer is None:
+            raise CompatibilityVisualError(
+                f"{compatibility_mod.id} has no multiplayer review-region contract"
+            )
+        return compatibility_mod.multiplayer.review_regions.apply_local_skin_with_mod
     return tuple(tuple(region) for region in frame["review_regions"])
 
 
@@ -77,10 +107,16 @@ def _select_compatibility_frames(
     candidate_frames: list[dict[str, Any]],
     *,
     scenario_contract: ScenarioContract,
+    compatibility_mod: CompatibilityMod,
 ) -> list[dict[str, Any]]:
-    compatibility_scenarios = frozenset(
+    compatibility_scenarios = set(
         scenario_contract.scenarios_for_profile("compatibility")
     )
+    if compatibility_mod.multiplayer is not None:
+        compatibility_scenarios.update(
+            scenario_contract.scenarios_for_profile("compatibility-remote")
+        )
+    compatibility_scenarios = frozenset(compatibility_scenarios)
     expected_capture_ids = tuple(
         capture.capture_id
         for capture in scenario_contract.captures
@@ -233,6 +269,10 @@ def curate(
         *catalog.contract.scenarios_for_profile("release"),
         *catalog.contract.scenarios_for_profile("compatibility"),
     }
+    if lane.mod.multiplayer is not None:
+        expected_candidate_scenarios.update(
+            catalog.contract.scenarios_for_profile("compatibility-remote")
+        )
     observed_candidate_scenarios = {item["scenario"] for item in candidate_lanes}
     if observed_candidate_scenarios != expected_candidate_scenarios:
         raise CompatibilityVisualError(
@@ -251,6 +291,7 @@ def curate(
     compatibility_frames = _select_compatibility_frames(
         candidate_frames,
         scenario_contract=catalog.contract,
+        compatibility_mod=lane.mod,
     )
     base_by_capture: dict[str, dict[str, Any]] = {}
     for frame in base_frames:

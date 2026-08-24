@@ -23,7 +23,13 @@ ORCHESTRATION_MODES = frozenset(
     {"single-client", "sequential-two-client", "concurrent-two-client"}
 )
 EXECUTION_PROFILES = frozenset(
-    {"runtime-default", "pr", "release", "compatibility"}
+    {
+        "runtime-default",
+        "pr",
+        "release",
+        "compatibility",
+        "compatibility-remote",
+    }
 )
 REQUIRED_EXECUTION_PROFILES = frozenset({"runtime-default", "pr", "release"})
 
@@ -819,11 +825,6 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
             capture_steps = frozenset(
                 step.id for step in steps if step.capture is not None
             )
-            if not capture_steps:
-                raise ScenarioContractError(
-                    f"E2E role {(scenario_name, role_name)!r} has no captures"
-                )
-
             comparison_values = _array(
                 role_raw["comparisons"], f"{role_label}.comparisons"
             )
@@ -844,6 +845,15 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
                         "references a non-capture step"
                     )
             roles.append(RoleContract(role_name, tuple(steps), comparisons))
+
+        if not any(
+            step.capture is not None
+            for role in roles
+            for step in role.steps
+        ):
+            raise ScenarioContractError(
+                f"E2E scenario {scenario_name!r} has no captures"
+            )
 
         orchestration = _orchestration(
             scenario_raw["orchestration"],
@@ -903,7 +913,10 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
             )
         review_regions[capture_name] = regions
     for scenario in scenarios:
-        is_compatibility = "compatibility" in scenario.execution_profiles
+        is_compatibility = any(
+            profile in {"compatibility", "compatibility-remote"}
+            for profile in scenario.execution_profiles
+        )
         for role in scenario.roles:
             for step in role.steps:
                 if step.capture is None:
