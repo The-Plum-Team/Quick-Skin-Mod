@@ -309,7 +309,7 @@ public final class CPMCompatIntegration {
         return isAvailable() && (isCPMScreenOpen() || skinModeResetQueued.get());
     }
 
-    /** True only while Fabric's extracted CPM model is crossing into ordinary skin mode. */
+    /** True only while Fabric's deferred CPM model is crossing into ordinary skin mode. */
     public static boolean isSkinModeResetInProgress() {
         return isAvailable() && skinModeResetQueued.get();
     }
@@ -514,17 +514,18 @@ public final class CPMCompatIntegration {
             logConfigUnavailable();
             return false;
         }
-        if (usesFabricExtractorPipeline() && executeNextFrameMethod != null) {
+        if (usesFabricDeferredPipeline() && executeNextFrameMethod != null) {
             return scheduleSkinModeReset();
         }
         return performSkinModeReset();
     }
 
     /**
-     * Fabric's extractor has already materialized the current CPM model by the time a Quick Skin
-     * action runs. Changing CPM's selected model in that same frame can invalidate the render-type
-     * table underneath the extracted nodes. Execute the complete transition at CPM's next-frame
-     * boundary so both the old definition and its render types survive the current submission.
+     * Fabric's render-state and collector pipelines have already materialized the current CPM
+     * model by the time a Quick Skin action runs. Changing CPM's selected model in that same frame
+     * can invalidate the render-type table underneath the deferred nodes. Execute the complete
+     * transition at CPM's next-frame boundary so both the old definition and its render types
+     * survive the current submission.
      */
     private static boolean scheduleSkinModeReset() {
         if (!skinModeResetQueued.compareAndSet(false, true)) {
@@ -559,10 +560,9 @@ public final class CPMCompatIntegration {
         }
     }
 
-    private static boolean usesFabricExtractorPipeline() {
+    private static boolean usesFabricDeferredPipeline() {
         return "Fabric".equalsIgnoreCase(PlatformHelper.getPlatformName())
-                && CpmCapabilities.current().renderPipeline()
-                == CpmCapabilities.RenderPipeline.EXTRACTOR;
+                && CpmCapabilities.current().usesDeferredRendering();
     }
 
     private static boolean performSkinModeReset() {
