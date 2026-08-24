@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 //?}
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Optional compatibility bridge for Customizable Player Models (CPM).
@@ -83,6 +84,7 @@ public final class CPMCompatIntegration {
     private static final AtomicBoolean cacheSchedulingFailedLogged = new AtomicBoolean();
     private static final AtomicBoolean skinModeResetQueued = new AtomicBoolean();
     private static final AtomicBoolean skinModeResetApplied = new AtomicBoolean();
+    private static final AtomicInteger skinModeResetFrameBoundaries = new AtomicInteger();
     private static final AtomicBoolean staleSubmissionDroppedLogged = new AtomicBoolean();
     private static final AtomicBoolean deferredResetLogged = new AtomicBoolean();
     private static volatile boolean localModelProbeDisabled;
@@ -319,22 +321,29 @@ public final class CPMCompatIntegration {
         boolean suppress = isAvailable()
                 && skinModeResetQueued.get()
                 && skinModeResetApplied.get();
-        if (suppress && staleSubmissionDroppedLogged.compareAndSet(false, true)) {
-            CPMLOG.info("Discarded CPM's stale extracted player submission during skin-mode reset");
+        if (suppress) {
+            if (staleSubmissionDroppedLogged.compareAndSet(false, true)) {
+                CPMLOG.info("Discarded CPM's stale extracted player submission during skin-mode reset");
+            }
         }
         return suppress;
     }
 
     /**
-     * Releases the transition only after the frame containing CPM's reset has finished. Calling
-     * this from HUD/screen post-render keeps the suppression flag alive through every model part
-     * submitted in that frame, rather than clearing it inside CPM's pre-render task.
+     * Releases the transition only after two render callbacks following CPM's reset. On the
+     * extracted pipeline the HUD callback still precedes execution of the world frame graph, so
+     * the first boundary deliberately keeps the guard alive while that stale graph submits. The
+     * second boundary occurs after a fresh extraction and can safely expose Quick Skin's texture.
      */
     public static void onRenderedFrameBoundary() {
         if (!skinModeResetQueued.get() || !skinModeResetApplied.get()
                 || cacheInvalidationQueued.get()) {
             return;
         }
+        if (skinModeResetFrameBoundaries.incrementAndGet() < 2) {
+            return;
+        }
+        skinModeResetFrameBoundaries.set(0);
         skinModeResetApplied.set(false);
         skinModeResetQueued.set(false);
     }
@@ -520,6 +529,7 @@ public final class CPMCompatIntegration {
             return true;
         }
         skinModeResetApplied.set(false);
+        skinModeResetFrameBoundaries.set(0);
         Runnable reset = () -> {
             if (performSkinModeReset()) {
                 skinModeResetApplied.set(true);

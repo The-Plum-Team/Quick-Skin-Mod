@@ -316,6 +316,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("skinModeResetApplied.set(true)", integration)
         self.assertIn("shouldSuppressStaleSubmission()", integration)
         self.assertIn("onRenderedFrameBoundary()", integration)
+        self.assertIn("skinModeResetFrameBoundaries.incrementAndGet() < 2", integration)
         client_events = (ROOT / "common/src/main/java/com/quickskin/mod/event/ClientEvents.java").read_text(
             encoding="utf-8"
         )

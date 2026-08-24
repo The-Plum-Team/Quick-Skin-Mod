@@ -703,7 +703,9 @@ public class ClientEvents {
                 com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay.render(guiGraphics, tickDelta.getGameTimeDeltaPartialTick(false));
                 //?}
             }
-            com.quickskin.mod.client.compat.CPMCompatIntegration.onRenderedFrameBoundary();
+            if (getCurrentScreen(Minecraft.getInstance()) == null) {
+                com.quickskin.mod.client.compat.CPMCompatIntegration.onRenderedFrameBoundary();
+            }
         });
 
         /*
