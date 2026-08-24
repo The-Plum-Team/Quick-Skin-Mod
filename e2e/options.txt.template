@@ -6,7 +6,7 @@ simulationDistance:8
 fov:0.0
 gamma:1.0
 pauseOnLostFocus:false
-panoramaSpeed:0.0
+panoramaScrollSpeed:0.0
 narrator:0
 fullscreen:false
 bobView:false
