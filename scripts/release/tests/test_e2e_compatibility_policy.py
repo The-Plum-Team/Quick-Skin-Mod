@@ -343,7 +343,14 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             "cacheInvalidationQueued.compareAndSet(false, true)", integration
         )
         self.assertIn("schedulePlayerCacheInvalidation();", integration)
-        self.assertIn("usesFabricExtractorPipeline()", integration)
+        capabilities = (
+            ROOT / "common/src/main/java/com/quickskin/mod/client/compat/CpmCapabilities.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "return renderPipeline != RenderPipeline.IMMEDIATE;", capabilities
+        )
+        self.assertIn("usesFabricDeferredPipeline()", integration)
+        self.assertIn("CpmCapabilities.current().usesDeferredRendering()", integration)
         self.assertIn("return scheduleSkinModeReset();", integration)
         self.assertIn("executeNextFrameMethod.invoke(minecraftClientAccess, reset)", integration)
         self.assertIn('if (!notifyServerIfInstalled("resetToSkinMode"))', integration)
