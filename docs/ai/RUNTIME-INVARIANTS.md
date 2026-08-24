@@ -295,9 +295,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   before decoding images, and queue admission must recheck every capsule against the live
   `master` generation before any model call, including exact wakes. It must also reject closed or
   superseded pull-request evidence and an exact automatic or scheduled anchor generation that
-  already owns a successful protected semantic certificate. A certificate is a terminal generation
-  identity here, never a reusable unpaired verdict cache. The review runner accepts only that
-  immutable handoff and never skips an unpaired anchor frame. In paired mode, exact decoded RGB
+  already owns a successful protected semantic certificate. A certificate remains a terminal
+  generation identity, while a later generation may reuse an exact-policy same-lane anchor verdict
+  only when its canonical full PNG, semantic region fingerprint, label, scope, expectation, and
+  runtime evidence all match. The review runner accepts only that immutable handoff and sends every
+  remaining unpaired anchor frame to Haiku. In paired mode, exact decoded RGB
   fingerprints over the contract-authored regions may inherit the certified reference without a
   model, and exact-equivalent non-matching pairs may share one AI-reviewed representative. It
   exposes only bounded manifests/images plus authored regions and each passed capture assertion's
@@ -313,10 +315,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   implementation, and best-effort cancels its sibling
   drains; authenticated queue selection must skip every remaining capsule for that generation. A
   blocked report can never certify an anchor. A paired cache hit must bind exact candidate/reference
-  semantic-region fingerprints, review scope, expectation, runtime evidence, capture identity,
-  scenario contract, release matrix, protected code, prompts, models, mode, and chunk policy.
-  Artifact label and loader may differ only when all of that reusable identity is exact; never cache or reuse unpaired
-  anchor semantics. It revalidates the
+  semantic-region fingerprints; an anchor hit must bind its full canonical PNG, semantic-region
+  fingerprint, and exact label so Fabric and Forge remain independent. Every hit also binds review
+  scope, expectation, runtime evidence, capture identity, scenario contract, release matrix,
+  protected code, prompts, models, mode, and chunk policy. Paired artifact labels and loaders may
+  differ only when all of that reusable identity is exact. It revalidates the
   capsule after the model exits, publishes only a bounded normalized report or sanitized attempt
   marker, never uploads raw provider text, and
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
