@@ -107,9 +107,12 @@ immutable workflow and governance activation contract.
   runtime plan and all normalized AI reports, then exposes only the two compatibility-specific
   clean/modded image pairs per applicable mod/loader lane as 1280x720 WebPs. Pages discovers this
   evidence opportunistically: a missing compatibility bundle must not block ordinary evidence,
-  while a present bundle is strict, current-state evidence and may cross only a protected
-  compatibility-nonimpacting release-branch diff. Manual recovery republishes an already-clean wave
-  without another model call.
+  and a bundle bound to a superseded scenario or compatibility contract is treated as unavailable.
+  A bundle for the current contracts is strict, current-state evidence and may cross only a
+  protected compatibility-nonimpacting release-branch diff. Any other validation failure remains
+  fatal. Schema v2 records the exact two-frame review count while schema v1 remains readable for
+  rolling caches created by the former complete-scenario review. Manual recovery republishes an
+  already-clean wave without another model call.
 - Every automatic push to `master` propagates in two waves. The synchronizer first targets only
   the matrix-derived Minecraft 1.20.1 release branch and always requires its exact Build plus full
   Fabric/Forge packaged E2E. A protected classifier evaluates the complete anchor-port diff, not
@@ -205,10 +208,11 @@ immutable workflow and governance activation contract.
   release matrix and `e2e/mod-compatibility-contract.json`, including explicit N/A rows. Applicable
   lanes run concurrently, prove that the selected integration activated, and execute both the
   compatibility scenario and the complete base suite with only immutable size/SHA-256/SHA-512
-  verified external JARs. Secretless curation pairs the full modded result with the clean
-  same-version/loader result. Exact authored-region matches need no model call, exact-equivalent
-  pairs share one representative, Haiku reviews the remaining pairs, and Opus verifies only a
-  concern or confidence below high. The first confirmed defect records a durable wave
+  verified external JARs. Secretless curation authenticates that complete runtime result, then pairs
+  exactly the two compatibility-profile captures with the clean same-version/loader result. Exact
+  authored-region matches need no model call, exact-equivalent pairs share one representative,
+  Haiku reviews the remaining pairs, and Opus verifies only a concern or confidence below high. The
+  first confirmed defect records a durable wave
   block and cancels sibling reviews. Each successful runtime lane curates its own capsule before
   the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing
   successful lanes or preventing their concurrent AI review. The settled compatibility producer
