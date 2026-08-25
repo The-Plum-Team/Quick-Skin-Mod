@@ -32,6 +32,8 @@ import java.util.UUID;
  * camera after checking the real remote Ears or CPM state on his own client.
  */
 public final class ModCompatibilityRemoteScenario implements Scenario {
+    private static final String OBSERVER_READY_SKIN_ID =
+            "quickskin_e2e_observer_ready";
     private static final double VANTAGE_DISTANCE = 5.0;
     private static final double VANTAGE_SIDE = 1.5;
     private static final float SUBJECT_REAR_YAW = 180.0f;
@@ -132,18 +134,29 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                         PlayerAppearanceService.getInstance()
                                 .applyLook(observerId, "", "", "classic");
                         NetworkSyncService.getInstance()
-                                .syncAppearance(observerId, "", "", "classic");
-                        E2ELog.info("Bob confirmed the compatibility observation session");
+                                .syncAppearance(
+                                        observerId,
+                                        OBSERVER_READY_SKIN_ID,
+                                        "",
+                                        "classic");
+                        E2ELog.info(
+                                "Bob sent the post-join compatibility observer confirmation");
                     } catch (Throwable failure) {
                         E2ELog.error("remote compatibility confirm_self failed", failure);
                     }
                 })
                 .minTicks(10)
-                .ready(() -> minecraft.getConnection() != null)
-                .timeoutTicks(200)
-                .assertion(() -> minecraft.getConnection() != null
-                        ? Step.Result.pass("connected; sent observer confirmation")
-                        : Step.Result.fail("no server connection")));
+                .ready(() -> NetworkSyncService.getInstance()
+                        .isLatestAppearanceAcknowledged(
+                                observerId, OBSERVER_READY_SKIN_ID))
+                .timeoutTicks(400)
+                .assertion(() -> NetworkSyncService.getInstance()
+                        .isLatestAppearanceAcknowledged(
+                                observerId, OBSERVER_READY_SKIN_ID)
+                        ? Step.Result.pass(
+                                "server acknowledged the post-join observer confirmation")
+                        : Step.Result.fail(
+                                "server did not acknowledge the post-join observer confirmation")));
 
         steps.add(Step.of("observe_remote_baseline")
                 .action(() -> stepTowardVantage(minecraft))
@@ -523,7 +536,8 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
         if (observer == null) return false;
         PlayerAppearance confirmation = PlayerAppearanceRepository.getInstance()
                 .getAppearance(observer.getUUID());
-        return confirmation != null && "classic".equals(confirmation.getModel());
+        return confirmation != null
+                && OBSERVER_READY_SKIN_ID.equals(confirmation.getSkinId());
     }
 
     private static void disableAutomaticOwnSkin() {
