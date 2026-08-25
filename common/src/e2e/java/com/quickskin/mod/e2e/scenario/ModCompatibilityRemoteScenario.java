@@ -386,12 +386,11 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                 return CpmRemoteState.failed("CPM client players are not iterable");
             }
             Method getUuid = loader.getClass().getMethod("getGP_UUID", Object.class);
-            Method getLoadedPlayer = loader.getClass().getMethod("getLoadedPlayer", Object.class);
             for (Object gamePlayer : players) {
                 if (gamePlayer == null || !subjectId.equals(getUuid.invoke(loader, gamePlayer))) {
                     continue;
                 }
-                Object loadedPlayer = getLoadedPlayer.invoke(loader, gamePlayer);
+                Object loadedPlayer = getOrLoadCpmPlayer(loader, gamePlayer);
                 if (loadedPlayer == null) {
                     return new CpmRemoteState(true, true, false, false,
                             false, false, "Alice profile present; loaded CPM player absent");
@@ -415,6 +414,19 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
         } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
             return CpmRemoteState.failed(
                     "remote CPM inspection failed: " + concise(failure));
+        }
+    }
+
+    private static Object getOrLoadCpmPlayer(Object loader, Object gamePlayer)
+            throws ReflectiveOperationException {
+        try {
+            return loader.getClass().getMethod("getLoadedPlayer", Object.class)
+                    .invoke(loader, gamePlayer);
+        } catch (NoSuchMethodException unsupported) {
+            // CPM 0.6.22 and earlier expose only the public lazy-loading lookup. Later releases
+            // added getLoadedPlayer, which remains preferable because it has no loading side effect.
+            return loader.getClass().getMethod("loadPlayer", Object.class, String.class)
+                    .invoke(loader, gamePlayer, "player");
         }
     }
 
