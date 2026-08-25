@@ -21,6 +21,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO, Iterable
 
+from scenario_contract import (
+    DEFAULT_CONTRACT as DEFAULT_SCENARIO_CONTRACT,
+    ScenarioContractError,
+    load_contract as load_scenario_contract,
+)
 from visual_similarity import SimilarityError, normalize_regions
 
 
@@ -631,6 +636,7 @@ def build_plan(
     contract_path: Path = DEFAULT_CONTRACT,
     *,
     base_matrix_kind: str = "runtime",
+    scenario_contract_path: Path = DEFAULT_SCENARIO_CONTRACT,
 ) -> dict[str, Any]:
     if base_matrix_kind not in BASE_MATRIX_KINDS:
         raise CompatibilityContractError(
@@ -638,6 +644,20 @@ def build_plan(
         )
     matrix = load_matrix(matrix_path)
     contract = load_contract(contract_path)
+    try:
+        scenario_contract = load_scenario_contract(scenario_contract_path)
+    except (ScenarioContractError, OSError) as exc:
+        raise CompatibilityContractError(
+            f"cannot load scenario contract for compatibility planning: {exc}"
+        ) from exc
+    local_scenarios = scenario_contract.scenarios_for_profile("compatibility")
+    remote_scenarios = scenario_contract.scenarios_for_profile(
+        "compatibility-remote"
+    )
+    if not local_scenarios or not remote_scenarios:
+        raise CompatibilityContractError(
+            "scenario contract must declare local and remote compatibility profiles"
+        )
     base_rows = gha_matrix(
         matrix,
         base_matrix_kind,
@@ -718,8 +738,8 @@ def build_plan(
                     "compatibility_contract_sha256": contract.sha256,
                     "scenarios": ",".join(
                         (
-                            "mod-compatibility",
-                            *(("mod-compatibility-remote",) if mod.multiplayer else ()),
+                            *local_scenarios,
+                            *(remote_scenarios if mod.multiplayer else ()),
                             row["scenarios"],
                         )
                     ),
@@ -823,6 +843,9 @@ def materialize_lane(lane: CompatibilityLane, destination: Path) -> tuple[Path, 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
+    parser.add_argument(
+        "--scenario-contract", type=Path, default=DEFAULT_SCENARIO_CONTRACT
+    )
     parser.add_argument("--matrix", type=Path, default=REPO / "release/release-matrix.json")
     parser.add_argument(
         "--base-matrix-kind",
@@ -849,6 +872,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             args.matrix,
             args.contract,
             base_matrix_kind=args.base_matrix_kind,
+            scenario_contract_path=args.scenario_contract,
         )
         output: Any = {"include": plan["runnable"]} if args.github_matrix else plan
         json.dump(
