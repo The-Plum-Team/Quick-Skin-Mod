@@ -372,6 +372,21 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             remote.index("if (!observerConfirmed(minecraft)) return false;"),
             remote.index("feature.prepareBaseline();"),
         )
+        confirmation = remote[
+            remote.index('Step.of("confirm_self")') : remote.index(
+                'Step.of("observe_remote_baseline")'
+            )
+        ]
+        self.assertIn('"quickskin_e2e_observer_ready"', remote)
+        self.assertGreaterEqual(confirmation.count("OBSERVER_READY_SKIN_ID"), 3)
+        self.assertIn(".isLatestAppearanceAcknowledged(", confirmation)
+        self.assertIn(
+            "OBSERVER_READY_SKIN_ID.equals(confirmation.getSkinId())", remote
+        )
+        self.assertNotIn(
+            'return confirmation != null && "classic".equals(confirmation.getModel());',
+            remote,
+        )
         self.assertIn('syncAppearance(observerId, "", "", "slim")', remote)
         self.assertIn("NetworkTextureCache.getInstance().hasTexture", remote)
         self.assertIn('"quickskin:network/skin/" + hash', remote)
