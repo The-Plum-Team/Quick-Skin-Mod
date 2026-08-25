@@ -49,12 +49,13 @@ from visual_evidence import (  # noqa: E402
 )
 
 
-SCHEMA_VERSION = 3
-LEGACY_SCHEMA_VERSIONS = frozenset({1, 2})
+SCHEMA_VERSION = 4
+LEGACY_SCHEMA_VERSIONS = frozenset({1, 2, 3})
 KIND = "quick-skin-public-mod-compatibility"
 MANIFEST_NAME = "manifest.json"
 SOURCE_SCENARIO = "mod-compatibility"
 REMOTE_SOURCE_SCENARIO = "mod-compatibility-remote"
+LATE_JOIN_SOURCE_SCENARIO = "mod-compatibility-late-join"
 BASE_PUBLIC_CAPTURE_IDS = (
     "mod-compatibility.client_a.baseline_with_mod",
     "mod-compatibility.client_a.apply_local_skin_with_mod",
@@ -63,13 +64,16 @@ REMOTE_PUBLIC_CAPTURE_IDS = (
     "mod-compatibility-remote.client_b.observe_remote_baseline",
     "mod-compatibility-remote.client_b.observe_remote_applied",
 )
+LATE_JOIN_PUBLIC_CAPTURE_IDS = (
+    "mod-compatibility-late-join.client_b.observe_late_join_state",
+)
 PUBLIC_IMAGE_SIZE = (1280, 720)
 MAX_MANIFEST_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
 MAX_TOTAL_IMAGE_BYTES = 512 * 1024 * 1024
 MAX_LANES = 64
 MAX_NOT_APPLICABLE = 64
-MAX_IMAGES = MAX_LANES * 8
+MAX_IMAGES = MAX_LANES * 10
 MAX_TEXT = 4096
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -205,13 +209,27 @@ def _public_capture_ids(
         for capture in scenario_contract.captures
         if capture.scenario == REMOTE_SOURCE_SCENARIO
     )
-    if base != BASE_PUBLIC_CAPTURE_IDS or remote != REMOTE_PUBLIC_CAPTURE_IDS:
+    late_join = tuple(
+        capture.capture_id
+        for capture in scenario_contract.captures
+        if capture.scenario == LATE_JOIN_SOURCE_SCENARIO
+    )
+    if (
+        base != BASE_PUBLIC_CAPTURE_IDS
+        or remote != REMOTE_PUBLIC_CAPTURE_IDS
+        or late_join != LATE_JOIN_PUBLIC_CAPTURE_IDS
+    ):
         raise CompatibilityEvidenceError(
             "public compatibility checkpoint contract drifted"
         )
     selected = list(base)
-    if schema_version == SCHEMA_VERSION and compatibility_mod.multiplayer is not None:
+    if (
+        schema_version in {3, SCHEMA_VERSION}
+        and compatibility_mod.multiplayer is not None
+    ):
         selected.extend(remote)
+    if schema_version == SCHEMA_VERSION and compatibility_mod.multiplayer is not None:
+        selected.extend(late_join)
     return selected
 
 
@@ -429,6 +447,7 @@ def validate_plan(
     *,
     compatibility_run_id: int,
     contract: CompatibilityContract,
+    scenario_contract: ScenarioContract,
 ) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, str]]]:
     if not isinstance(plan, dict):
         raise CompatibilityEvidenceError("compatibility plan must be an object")
@@ -499,16 +518,21 @@ def validate_plan(
             raise CompatibilityEvidenceError(f"runnable lane identity drifted: {lane_id}")
         scenarios = row.get("scenarios")
         scenario_items = scenarios.split(",") if isinstance(scenarios, str) else []
-        compatibility_prefix = [SOURCE_SCENARIO]
+        compatibility_prefix = list(
+            scenario_contract.scenarios_for_profile("compatibility")
+        )
         if expected.mod.multiplayer is not None:
-            compatibility_prefix.append(REMOTE_SOURCE_SCENARIO)
+            compatibility_prefix.extend(
+                scenario_contract.scenarios_for_profile("compatibility-remote")
+            )
         base_scenarios = scenario_items[len(compatibility_prefix):]
+        compatibility_scenarios = set(compatibility_prefix)
         if (
             scenario_items[:len(compatibility_prefix)] != compatibility_prefix
-            or not base_scenarios
+            or tuple(base_scenarios)
+            != scenario_contract.scenarios_for_profile("release")
             or len(scenario_items) != len(set(scenario_items))
-            or SOURCE_SCENARIO in base_scenarios
-            or REMOTE_SOURCE_SCENARIO in base_scenarios
+            or not compatibility_scenarios.isdisjoint(base_scenarios)
             or any(SAFE_ID.fullmatch(item) is None for item in scenario_items)
         ):
             raise CompatibilityEvidenceError(f"runnable lane lacks compatibility profile: {lane_id}")
@@ -843,6 +867,7 @@ def build_bundle(
         plan,
         compatibility_run_id=compatibility_run_id,
         contract=compatibility_contract,
+        scenario_contract=scenario_contract,
     )
     if lanes_root.is_symlink():
         raise CompatibilityEvidenceError("lane evidence root cannot be a symlink")
