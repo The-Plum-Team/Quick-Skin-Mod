@@ -148,14 +148,16 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   the exact compatibility source plan, every source capsule, every complete normalized lane report,
   and the source completion marker before `scripts/pages/compatibility_evidence.py` projects the
   complete clean wave into a strict public bundle. That projection retains the two local
-  `mod-compatibility` checkpoints and, for integrations that opt in through the lock, the two
-  `mod-compatibility-remote` observer checkpoints as paired clean/modded 1280x720 WebPs, source and
+  `mod-compatibility` checkpoints and, for integrations that opt in through the lock, the two live
+  `mod-compatibility-remote` observer checkpoints plus the one sequential
+  `mod-compatibility-late-join` checkpoint as paired clean/modded 1280x720 WebPs, source and
   derivative metrics, deterministic assertions, clean booleans, and provenance; ordinary-suite
   captures stay in the authenticated runtime artifact and never enter the model capsule. Raw
   provider text stays in short-lived private artifacts. Manual publication recovery consumes the
-  same already-complete reports and never calls a model. Public schema v3 binds
-  `reviewed_frame_count` to the mod-selective two- or four-checkpoint product; the validator keeps
-  schemas v1 and v2 readable for older complete-scenario and local-only rolling caches.
+  same already-complete reports and never calls a model. Public schema v4 binds
+  `reviewed_frame_count` to the mod-selective two- or five-checkpoint product; the validator keeps
+  schemas v1, v2, and v3 readable for older complete-scenario, local-only, and four-checkpoint
+  rolling caches.
 - `scripts/pages/select_compatibility_artifact.py` selects either that short-lived handoff or the
   newest successful protected Pages cache. Pages may carry its `coverage_sha` to a current release
   descendant only when `scripts/ci/mod_compatibility_impact.py` proves the complete intervening diff
