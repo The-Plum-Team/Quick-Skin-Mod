@@ -49,10 +49,36 @@ MOD_COMPATIBILITY_REMOTE_BASELINE_CAPTURE = (
 MOD_COMPATIBILITY_REMOTE_APPLIED_CAPTURE = (
     "mod-compatibility-remote.client_b.observe_remote_applied"
 )
+MOD_COMPATIBILITY_LATE_JOIN_CAPTURE = (
+    "mod-compatibility-late-join.client_b.observe_late_join_state"
+)
 
 
 class CompatibilityVisualError(ValueError):
     pass
+
+
+def _late_join_evidence(
+    compatibility_mod: CompatibilityMod,
+) -> tuple[str, tuple[tuple[float, float, float, float], ...]]:
+    multiplayer = compatibility_mod.multiplayer
+    if multiplayer is None:
+        raise CompatibilityVisualError(
+            f"{compatibility_mod.id} has no multiplayer late-join contract"
+        )
+    if compatibility_mod.id == "cpm":
+        return (
+            multiplayer.evidence.baseline_with_mod,
+            multiplayer.review_regions.baseline_with_mod,
+        )
+    if compatibility_mod.id == "ears":
+        return (
+            multiplayer.evidence.apply_local_skin_with_mod,
+            multiplayer.review_regions.apply_local_skin_with_mod,
+        )
+    raise CompatibilityVisualError(
+        f"{compatibility_mod.id} has no authored late-join state"
+    )
 
 
 def _compatibility_expectation(
@@ -76,6 +102,9 @@ def _compatibility_expectation(
                 f"{compatibility_mod.id} has no multiplayer evidence contract"
             )
         return compatibility_mod.multiplayer.evidence.apply_local_skin_with_mod
+    if capture_id == MOD_COMPATIBILITY_LATE_JOIN_CAPTURE:
+        state_expectation, _regions = _late_join_evidence(compatibility_mod)
+        return frame["expectation"] + " " + state_expectation
     return frame["expectation"]
 
 
@@ -100,6 +129,9 @@ def _compatibility_review_regions(
                 f"{compatibility_mod.id} has no multiplayer review-region contract"
             )
         return compatibility_mod.multiplayer.review_regions.apply_local_skin_with_mod
+    if capture_id == MOD_COMPATIBILITY_LATE_JOIN_CAPTURE:
+        _expectation, regions = _late_join_evidence(compatibility_mod)
+        return regions
     return tuple(tuple(region) for region in frame["review_regions"])
 
 
