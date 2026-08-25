@@ -363,6 +363,15 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn('Step.of("await_observer_baseline")', remote)
         self.assertIn('Step.of("observe_remote_baseline")', remote)
         self.assertIn('Step.of("observe_remote_applied")', remote)
+        self.assertIn("prepareRemoteBaselineAfterObserver(minecraft, feature)", remote)
+        self.assertIn("if (!observerConfirmed(minecraft)) return false;", remote)
+        self.assertIn(
+            ".timeoutTicks(feature.baselineTimeoutTicks() + 20 * 120)", remote
+        )
+        self.assertLess(
+            remote.index("if (!observerConfirmed(minecraft)) return false;"),
+            remote.index("feature.prepareBaseline();"),
+        )
         self.assertIn('syncAppearance(observerId, "", "", "slim")', remote)
         self.assertIn("NetworkTextureCache.getInstance().hasTexture", remote)
         self.assertIn('"quickskin:network/skin/" + hash', remote)
