@@ -105,15 +105,16 @@ immutable workflow and governance activation contract.
 - A completely clean optional-mod wave may separately produce one
   `pages-mod-compatibility-<branch>` handoff. Its protected publisher reauthenticates the complete
   runtime plan and all normalized AI reports, then exposes the two local compatibility-specific
-  clean/modded image pairs plus, where the mod contract opts in, two remote-observer pairs per
-  applicable mod/loader lane as 1280x720 WebPs. Pages discovers this
+  clean/modded image pairs plus, where the mod contract opts in, two live remote-observer pairs and
+  one late-join observer pair per applicable mod/loader lane as 1280x720 WebPs. Pages discovers this
   evidence opportunistically: a missing compatibility bundle must not block ordinary evidence,
   and a bundle bound to a superseded scenario or compatibility contract is treated as unavailable.
   A bundle for the current contracts is strict, current-state evidence and may cross only a
   protected compatibility-nonimpacting release-branch diff. Any other validation failure remains
-  fatal. Schema v3 records the mod-selective two- or four-frame review count while schemas v1 and
-  v2 remain readable for rolling caches created by the former complete-scenario and local-only
-  reviews. Manual recovery republishes an already-clean wave without another model call.
+  fatal. Schema v4 records the mod-selective two- or five-frame review count while schemas v1, v2,
+  and v3 remain readable for rolling caches created by the former complete-scenario, local-only,
+  and four-frame multiplayer reviews. Manual recovery republishes an already-clean wave without
+  another model call.
 - Every automatic push to `master` propagates in two waves. The synchronizer first targets only
   the matrix-derived Minecraft 1.20.1 release branch and always requires its exact Build plus full
   Fabric/Forge packaged E2E. A protected classifier evaluates the complete anchor-port diff, not
@@ -208,7 +209,7 @@ immutable workflow and governance activation contract.
   `version x loader x mod` lane from the
   release matrix and `e2e/mod-compatibility-contract.json`, including explicit N/A rows. Applicable
   lanes run concurrently, prove that the selected integration activated, and execute both the
-  local compatibility scenario, any mod-contracted remote-observer scenario, and the complete base
+  local compatibility scenario, any mod-contracted remote-observer scenarios, and the complete base
   suite with only immutable size/SHA-256/SHA-512 verified external JARs. Secretless curation
   authenticates that complete runtime result, then pairs exactly the selected compatibility-profile
   captures with the clean same-version/loader result. Exact
