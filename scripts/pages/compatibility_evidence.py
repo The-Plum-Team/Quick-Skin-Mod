@@ -800,6 +800,16 @@ def _manifest_image_path(input_root: Path, raw_path: Any, label: str) -> Path:
     return input_root / "images" / path.name
 
 
+def _verdict_is_clean(verdict: dict[str, Any]) -> bool:
+    """Match the authenticated review gate's clean-verdict semantics."""
+
+    return (
+        verdict["semantic_valid"] is True
+        and verdict["matches_reference"] is True
+        and verdict["defect"] is False
+    )
+
+
 def build_bundle(
     *,
     plan_path: Path,
@@ -952,13 +962,7 @@ def build_bundle(
                 raise CompatibilityEvidenceError(
                     f"lane {lane_id} visual review is not complete"
                 )
-            if any(
-                verdict["semantic_valid"] is not True
-                or verdict["matches_reference"] is not True
-                or verdict["defect"] is not False
-                or verdict["anomalies"]
-                for verdict in verdicts
-            ):
+            if any(not _verdict_is_clean(verdict) for verdict in verdicts):
                 raise CompatibilityEvidenceError(f"lane {lane_id} is not clean")
             _validate_completion(
                 read_json(completion_path, "lane completion", maximum_bytes=1024 * 1024),
