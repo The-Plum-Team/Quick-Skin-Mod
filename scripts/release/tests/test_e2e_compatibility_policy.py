@@ -392,6 +392,10 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn('"quickskin:network/skin/" + hash', remote)
         self.assertIn('getMethod("getGP_UUID", Object.class)', remote)
         self.assertIn('getMethod("getLoadedPlayer", Object.class)', remote)
+        self.assertIn(
+            'getMethod("loadPlayer", Object.class, String.class)', remote
+        )
+        self.assertIn("getOrLoadCpmPlayer(loader, gamePlayer)", remote)
         self.assertIn('getMethod("getModelDefinition")', remote)
         self.assertIn('getMethod("doRender")', remote)
         self.assertIn('getMethod("getError")', remote)
