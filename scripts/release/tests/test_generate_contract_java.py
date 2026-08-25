@@ -58,6 +58,10 @@ class GenerateContractJavaTest(unittest.TestCase):
         self.assertIn('PHASE0_SMOKE("phase0-smoke")', source)
         self.assertIn('PROPAGATION_LIVE("propagation-live")', source)
         self.assertIn(
+            'MOD_COMPATIBILITY_LATE_JOIN("mod-compatibility-late-join")',
+            source,
+        )
+        self.assertIn(
             "public record StepSpec(String id, boolean assertionRequired, "
             "boolean captureRequired) {}",
             source,
