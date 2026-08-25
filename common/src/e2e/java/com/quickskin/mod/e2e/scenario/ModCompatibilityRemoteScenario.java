@@ -38,6 +38,7 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
 
     private volatile CompatibilityProbe.Result probe =
             new CompatibilityProbe.Result(false, "probe not executed");
+    private volatile boolean remoteBaselinePrepared;
     private volatile boolean sawRemoteBaseline;
 
     private double targetX;
@@ -67,12 +68,15 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
         steps.add(Step.of("prepare_remote_baseline")
                 .action(() -> {
                     disableAutomaticOwnSkin();
-                    feature.prepareBaseline();
+                    E2ELog.info(
+                            "Alice is waiting for Bob before selecting the optional-mod baseline");
                 })
                 .minTicks(feature.baselineMinTicks())
-                .ready(() -> probe.active() && feature.baselineReady())
+                .ready(() -> prepareRemoteBaselineAfterObserver(minecraft, feature)
+                        && probe.active()
+                        && feature.baselineReady())
                 .settleTicks(feature.baselineSettleTicks())
-                .timeoutTicks(feature.baselineTimeoutTicks())
+                .timeoutTicks(feature.baselineTimeoutTicks() + 20 * 120)
                 .assertion(() -> probe.active()
                         ? feature.assertBaseline()
                         : Step.Result.fail(probe.detail())));
@@ -100,6 +104,17 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                     return feature.assertQuickSkinFeature();
                 }));
         return steps;
+    }
+
+    private boolean prepareRemoteBaselineAfterObserver(
+            Minecraft minecraft, ModCompatibilityFeature feature) {
+        if (remoteBaselinePrepared) return true;
+        if (!observerConfirmed(minecraft)) return false;
+
+        feature.prepareBaseline();
+        remoteBaselinePrepared = true;
+        E2ELog.info("Alice selected the optional-mod baseline after Bob confirmed readiness");
+        return true;
     }
 
     private List<Step> buildObserver(Minecraft minecraft) {
@@ -501,6 +516,14 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
         PlayerAppearance acknowledgement = PlayerAppearanceRepository.getInstance()
                 .getAppearance(observer.getUUID());
         return acknowledgement != null && "slim".equals(acknowledgement.getModel());
+    }
+
+    private boolean observerConfirmed(Minecraft minecraft) {
+        AbstractClientPlayer observer = findOther(minecraft);
+        if (observer == null) return false;
+        PlayerAppearance confirmation = PlayerAppearanceRepository.getInstance()
+                .getAppearance(observer.getUUID());
+        return confirmation != null && "classic".equals(confirmation.getModel());
     }
 
     private static void disableAutomaticOwnSkin() {
