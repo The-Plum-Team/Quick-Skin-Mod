@@ -44,6 +44,12 @@ from mod_compatibility_impact import (  # noqa: E402
     classify_paths,
     git_diff_paths,
 )
+from scenario_contract import (  # noqa: E402
+    ScenarioContractError,
+    load_contract as load_scenario_contract,
+)
+
+
 SOURCE_WORKFLOW = ".github/workflows/mod-compatibility-e2e.yml"
 REVIEW_WORKFLOW = ".github/workflows/mod-compatibility-review.yml"
 SOURCE_EVENTS = frozenset({"repository_dispatch"})
@@ -497,11 +503,18 @@ def collect(
         )
         plan_path = plan_root / "mod-compatibility-plan.json"
         plan = read_json(plan_path, "compatibility plan")
-        compatibility_contract = load_compatibility_contract()
+        try:
+            compatibility_contract = load_compatibility_contract()
+            scenario_contract = load_scenario_contract()
+        except (CompatibilityContractError, ScenarioContractError, OSError) as exc:
+            raise CollectionError(
+                f"cannot load compatibility contracts: {exc}"
+            ) from exc
         identity, plan_rows, _not_applicable = validate_plan(
             plan,
             compatibility_run_id=source_run_id,
             contract=compatibility_contract,
+            scenario_contract=scenario_contract,
         )
         _fetch_commits(
             repository_root,
