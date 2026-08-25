@@ -173,7 +173,8 @@ class ModCompatibilityContractTest(unittest.TestCase):
             base_index = 1
             if lane["compatibility_mod"] in {"cpm", "ears"}:
                 self.assertEqual("mod-compatibility-remote", scenarios[1])
-                base_index = 2
+                self.assertEqual("mod-compatibility-late-join", scenarios[2])
+                base_index = 3
             self.assertEqual(
                 ["phase0-smoke", "propagation", "propagation-live", "full"],
                 scenarios[base_index:],
@@ -632,6 +633,30 @@ class ModCompatibilityContractTest(unittest.TestCase):
         )
         self.assertIn("remote Alice", remote_applied)
 
+        cpm = mod_compatibility.load_contract(self.contract_path).mod("cpm")
+        assert cpm.multiplayer is not None
+        late_join_cpm = mod_compatibility_visual._compatibility_expectation(
+            cpm,
+            {
+                "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_LATE_JOIN_CAPTURE,
+                "expectation": "generic late-join proof",
+            },
+        )
+        late_join_ears = mod_compatibility_visual._compatibility_expectation(
+            ears,
+            {
+                "capture_id": mod_compatibility_visual.MOD_COMPATIBILITY_LATE_JOIN_CAPTURE,
+                "expectation": "generic late-join proof",
+            },
+        )
+        self.assertIn("generic late-join proof", late_join_cpm)
+        self.assertIn(cpm.multiplayer.evidence.baseline_with_mod, late_join_cpm)
+        self.assertIn("generic late-join proof", late_join_ears)
+        self.assertIn(
+            ears.multiplayer.evidence.apply_local_skin_with_mod,
+            late_join_ears,
+        )
+
     def test_compatibility_curation_uses_mod_specific_review_regions(self) -> None:
         contract = mod_compatibility.load_contract(self.contract_path)
         generic_baseline = ((0.42, 0.34, 0.58, 0.86),)
@@ -676,6 +701,24 @@ class ModCompatibilityContractTest(unittest.TestCase):
                         compatibility_mod.multiplayer.review_regions.apply_local_skin_with_mod,
                         remote,
                     )
+                    late_join = (
+                        mod_compatibility_visual._compatibility_review_regions(
+                            compatibility_mod,
+                            {
+                                "capture_id": (
+                                    mod_compatibility_visual
+                                    .MOD_COMPATIBILITY_LATE_JOIN_CAPTURE
+                                ),
+                                "review_regions": generic_applied,
+                            },
+                        )
+                    )
+                    expected_late_join = (
+                        compatibility_mod.multiplayer.review_regions.baseline_with_mod
+                        if compatibility_mod.id == "cpm"
+                        else compatibility_mod.multiplayer.review_regions.apply_local_skin_with_mod
+                    )
+                    self.assertEqual(expected_late_join, late_join)
 
         replaymod = contract.mod("replaymod")
         self.assertEqual(2, len(replaymod.review_regions.baseline_with_mod))
@@ -707,6 +750,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 "mod-compatibility.client_a.apply_local_skin_with_mod",
                 "mod-compatibility-remote.client_b.observe_remote_baseline",
                 "mod-compatibility-remote.client_b.observe_remote_applied",
+                "mod-compatibility-late-join.client_b.observe_late_join_state",
             ],
             [frame["capture_id"] for frame in selected],
         )
