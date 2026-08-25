@@ -22,6 +22,7 @@ from collect_compatibility import (  # noqa: E402
     _select_review_artifact,
     RemoteArtifact,
 )
+from compatibility_evidence import _verdict_is_clean  # noqa: E402
 
 
 REPOSITORY = "AkaNebur/Quick-Skin-Mod"
@@ -73,6 +74,26 @@ class FakeReviewApi:
 
 
 class PagesCompatibilityTest(unittest.TestCase):
+    def test_clean_verdict_may_keep_a_non_defect_review_note(self) -> None:
+        verdict = {
+            "semantic_valid": True,
+            "matches_reference": True,
+            "defect": False,
+            "anomalies": ["The paired reference shows an unrelated camera angle."],
+        }
+
+        self.assertTrue(_verdict_is_clean(verdict))
+
+    def test_defect_verdict_cannot_be_published(self) -> None:
+        verdict = {
+            "semantic_valid": False,
+            "matches_reference": False,
+            "defect": True,
+            "anomalies": ["The expected model is missing."],
+        }
+
+        self.assertFalse(_verdict_is_clean(verdict))
+
     def test_artifact_download_stops_at_the_authenticated_size(self) -> None:
         class Response(io.BytesIO):
             def __enter__(self) -> "Response":
