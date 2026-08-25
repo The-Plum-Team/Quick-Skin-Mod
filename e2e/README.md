@@ -20,11 +20,11 @@ This `fabric-and-neoforge-1.21.11` release branch exercises the following exact 
 
 | Artifact | Minecraft | Loader | Java | Contract scenarios |
 |---|---:|---|---:|---:|
-| `fabric-1.21.11` | `1.21.11` | Fabric | `21` | `6` |
-| `neoforge-1.21.11` | `1.21.11` | NeoForge | `21` | `6` |
+| `fabric-1.21.11` | `1.21.11` | Fabric | `21` | `7` |
+| `neoforge-1.21.11` | `1.21.11` | NeoForge | `21` | `7` |
 
-Scenario contract SHA-256: `abb55a10699ba47ebd45719b0c3c218cab8a631a6466b83b593abecab24dd01e`
-Contract totals: `60` ordered steps, `47` captures.
+Scenario contract SHA-256: `c310585cf4b0010195576b21efc5bc708f67e5a400db0ba7d5fd285672cfc65b`
+Contract totals: `65` ordered steps, `48` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
@@ -34,6 +34,7 @@ Contract totals: `60` ordered steps, `47` captures.
 | `full` | `pr`, `release` | `single-client` | `client_a` | `34` | `32` |
 | `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
 | `mod-compatibility-remote` | `compatibility-remote` | `concurrent-two-client` | `client_a`, `client_b` | `8` | `2` |
+| `mod-compatibility-late-join` | `compatibility-remote` | `sequential-two-client` | `client_a`, `client_b` | `5` | `1` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->
@@ -372,10 +373,13 @@ evidence are discarded for the same reason.
 An automatic release-tree run starts this wave only after that exact tree has passed Build, the
 complete packaged suite, and independent semantic AI review. The execution unit is one release
 artifact plus one optional mod. Every applicable unit runs concurrently, first executes the
-`mod-compatibility` activation scenario, adds `mod-compatibility-remote` for Ears and CPM, and then
-executes the complete ordinary release scenario set. The remote scenario keeps Alice connected as
-the subject and lets only Bob capture the before/after pair from one fixed rear camera; Alice's
-coordination steps deliberately produce no duplicate screenshots. Unsupported combinations are
+`mod-compatibility` activation scenario, adds both `mod-compatibility-remote` and
+`mod-compatibility-late-join` for Ears and CPM, and then executes the complete ordinary release
+scenario set. The live remote scenario keeps Alice connected as the subject and lets only Bob
+capture the before/after pair from one fixed rear camera; Alice's coordination steps deliberately
+produce no duplicate screenshots. The late-join scenario completes Alice's optional-mod state
+before Bob is launched, keeps Alice connected after her harness steps finish, and lets Bob capture
+the recovered state without another Alice-side appearance change. Unsupported combinations are
 retained as explicit `not_applicable` plan rows rather than
 silently disappearing. The contract may also record a reviewed loader/version exclusion with an
 explicit reason when upstream metadata advertises a lane that upstream itself does not support;
@@ -404,13 +408,16 @@ workflow for each locked mod:
   resulting `.mcpr`, and requires a recorded Quick Skin payload to traverse the production bridge
   before capturing the recorded player in playback.
 
-CPM and Ears additionally opt into the two remote capture IDs. Bob first proves the real optional
-renderer state for Alice, captures it, and acknowledges that exact checkpoint through the normal
-Quick Skin relay. Alice then changes state while both clients remain connected. Bob's second
-capture requires the remote Quick Skin texture cache and renderer location to agree; Ears also
-requires TALL/BACK features in its cache, public storage, and renderer lookup, while CPM requires a
-healthy remote model definition before the change and an inactive definition after its server
-reset. Reflection failures never count as a successful CPM reset.
+CPM and Ears additionally opt into two live remote capture IDs and one late-join capture ID. In the
+live scenario, Bob first proves the real optional renderer state for Alice, captures it, and
+acknowledges that exact checkpoint through the normal Quick Skin relay. Alice then changes state
+while both clients remain connected. Bob's second capture requires the remote Quick Skin texture
+cache and renderer location to agree; Ears also requires TALL/BACK features in its cache, public
+storage, and renderer lookup, while CPM requires a healthy remote model definition before the
+change and an inactive definition after its server reset. In the sequential late-join scenario,
+Bob launches only after Alice has completed a genuine CPM horn model or an Ears-authored TALL/BACK
+skin, respectively, and must recover that already-active renderer state. Reflection failures never
+count as a successful CPM observation or reset.
 
 ReplayMod's E2E-only startup guard prevents Quick Play from racing its initial
 abandoned-recording scan and moving the live temporary file.
@@ -437,7 +444,7 @@ python3 e2e/orchestrator.py \
   --artifact-node fabric-1.20.1 \
   --runtime-version 1.20.1 \
   --compatibility-mod cpm \
-  --scenarios mod-compatibility,mod-compatibility-remote,phase0-smoke,propagation,propagation-live,full
+  --scenarios mod-compatibility,mod-compatibility-remote,mod-compatibility-late-join,phase0-smoke,propagation,propagation-live,full
 ```
 
 Refreshing external versions is a deliberate maintenance operation, not a test step. From a
@@ -468,10 +475,11 @@ compatibility review jobs.
 Once every applicable lane is complete and clean, the protected reviewer can publish the wave
 without another model call. It reauthenticates the source plan, every full capsule, all normalized
 reports and lane-complete records, then retains only the contracted compatibility checkpoints: two
-local checkpoints per lane plus the two remote checkpoints for CPM and Ears. Other mods remain at
-the two local checkpoints. Each public checkpoint is a paired clean reference and modded candidate, encoded as a
-content-addressed 1280x720 WebP. The manifest still records the full reviewed-frame count and exact
-mod version; raw model explanations, anomaly strings, and the other reviewed images are not public.
+local checkpoints per lane plus two live-remote and one late-join checkpoint for CPM and Ears.
+Other mods remain at the two local checkpoints. Each public checkpoint is a paired clean reference
+and modded candidate, encoded as a content-addressed 1280x720 WebP. The manifest still records the
+exact selected reviewed-frame count and mod version; raw model explanations, anomaly strings, and
+the other reviewed images are not public.
 `workflow_dispatch` operation `publish` is the recovery path for an already-complete source run.
 
 ## Public visual evidence
