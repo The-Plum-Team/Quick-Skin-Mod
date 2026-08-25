@@ -350,59 +350,76 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             feature.index("ReplayMod recording close requested"),
         )
 
-    def test_remote_optional_mod_scenario_asserts_the_second_client_renderer(self) -> None:
+    def test_remote_optional_mod_scenarios_assert_the_second_client_renderer(self) -> None:
         remote = (
             E2E_JAVA / "scenario" / "ModCompatibilityRemoteScenario.java"
+        ).read_text(encoding="utf-8")
+        late_join = (
+            E2E_JAVA / "scenario" / "ModCompatibilityLateJoinScenario.java"
+        ).read_text(encoding="utf-8")
+        evidence = (
+            E2E_JAVA / "scenario" / "ModCompatibilityRemoteEvidence.java"
         ).read_text(encoding="utf-8")
         harness = (E2E_JAVA / "E2EHarness.java").read_text(encoding="utf-8")
 
         self.assertIn("MOD_COMPATIBILITY_REMOTE", harness)
+        self.assertIn("MOD_COMPATIBILITY_LATE_JOIN", harness)
         self.assertEqual(2, remote.count(".screenshot("))
+        self.assertEqual(1, late_join.count(".screenshot("))
         self.assertIn('"client_b".equals(role)', remote)
+        self.assertIn('"client_b".equals(role)', late_join)
         self.assertIn('Step.of("prepare_remote_baseline")', remote)
         self.assertIn('Step.of("await_observer_baseline")', remote)
         self.assertIn('Step.of("observe_remote_baseline")', remote)
         self.assertIn('Step.of("observe_remote_applied")', remote)
+        self.assertIn('Step.of("prepare_late_join_state")', late_join)
+        self.assertIn('Step.of("observe_late_join_state")', late_join)
+        self.assertIn("lateJoinUsesAppliedState(modId)", late_join)
+        self.assertIn("feature.prepareBaseline();", late_join)
+        self.assertIn("feature.applyQuickSkinFeature();", late_join)
+        self.assertIn('case "cpm" -> false;', evidence)
+        self.assertIn('case "ears" -> true;', evidence)
         self.assertIn("prepareRemoteBaselineAfterObserver(minecraft, feature)", remote)
-        self.assertIn("if (!observerConfirmed(minecraft)) return false;", remote)
+        self.assertIn("if (!evidence.observerConfirmed(minecraft)) return false;", remote)
         self.assertIn(
             ".timeoutTicks(feature.baselineTimeoutTicks() + 20 * 120)", remote
         )
         self.assertLess(
-            remote.index("if (!observerConfirmed(minecraft)) return false;"),
+            remote.index("if (!evidence.observerConfirmed(minecraft)) return false;"),
             remote.index("feature.prepareBaseline();"),
         )
-        confirmation = remote[
-            remote.index('Step.of("confirm_self")') : remote.index(
-                'Step.of("observe_remote_baseline")'
+        confirmation = evidence[
+            evidence.index('Step.of("confirm_self")') : evidence.index(
+                "boolean integrationActive()"
             )
         ]
-        self.assertIn('"quickskin_e2e_observer_ready"', remote)
+        self.assertIn('"quickskin_e2e_observer_ready"', evidence)
         self.assertGreaterEqual(confirmation.count("OBSERVER_READY_SKIN_ID"), 3)
         self.assertIn(".isLatestAppearanceAcknowledged(", confirmation)
         self.assertIn(
-            "OBSERVER_READY_SKIN_ID.equals(confirmation.getSkinId())", remote
+            "OBSERVER_READY_SKIN_ID.equals(confirmation.getSkinId())", evidence
         )
         self.assertNotIn(
             'return confirmation != null && "classic".equals(confirmation.getModel());',
-            remote,
+            evidence,
         )
         self.assertIn('syncAppearance(observerId, "", "", "slim")', remote)
-        self.assertIn("NetworkTextureCache.getInstance().hasTexture", remote)
-        self.assertIn('"quickskin:network/skin/" + hash', remote)
-        self.assertIn('getMethod("getGP_UUID", Object.class)', remote)
-        self.assertIn('getMethod("getLoadedPlayer", Object.class)', remote)
+        self.assertIn("NetworkTextureCache.getInstance().hasTexture", evidence)
+        self.assertIn('"quickskin:network/skin/" + hash', evidence)
+        self.assertIn('getMethod("getGP_UUID", Object.class)', evidence)
+        self.assertIn('getMethod("getLoadedPlayer", Object.class)', evidence)
         self.assertIn(
-            'getMethod("loadPlayer", Object.class, String.class)', remote
+            'getMethod("loadPlayer", Object.class, String.class)', evidence
         )
-        self.assertIn("getOrLoadCpmPlayer(loader, gamePlayer)", remote)
-        self.assertIn('getMethod("getModelDefinition")', remote)
-        self.assertIn('getMethod("doRender")', remote)
-        self.assertIn('getMethod("getError")', remote)
-        self.assertIn('getMethod("getById", UUID.class)', remote)
-        self.assertIn('"TALL".equals(publicField(value, "earMode"))', remote)
-        self.assertIn('"BACK".equals(publicField(value, "tailMode"))', remote)
-        self.assertIn("DefaultSkinEvidenceView.checkRearView", remote)
+        self.assertIn("getOrLoadCpmPlayer(loader, gamePlayer)", evidence)
+        self.assertIn('getMethod("getModelDefinition")', evidence)
+        self.assertIn('getMethod("doRender")', evidence)
+        self.assertIn('getMethod("getError")', evidence)
+        self.assertIn('getMethod("getById", UUID.class)', evidence)
+        self.assertIn('"TALL".equals(publicField(value, "earMode"))', evidence)
+        self.assertIn('"BACK".equals(publicField(value, "tailMode"))', evidence)
+        self.assertIn("DefaultSkinEvidenceView.checkRearView", evidence)
+        self.assertIn("without another Alice-side change", late_join)
 
     def test_cpm_cache_refresh_waits_for_the_extracted_frame_boundary(self) -> None:
         """A skin/model transition must not invalidate CPM's active extracted frame."""

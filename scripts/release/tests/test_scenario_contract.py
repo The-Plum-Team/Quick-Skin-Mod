@@ -89,6 +89,15 @@ EXPECTED_STEPS = {
         "observe_remote_baseline",
         "observe_remote_applied",
     ),
+    ("mod-compatibility-late-join", "client_a"): (
+        "integration_active",
+        "prepare_late_join_state",
+    ),
+    ("mod-compatibility-late-join", "client_b"): (
+        "integration_active",
+        "confirm_self",
+        "observe_late_join_state",
+    ),
 }
 
 EXPECTED_CAPTURES = {
@@ -114,6 +123,10 @@ EXPECTED_CAPTURES = {
     ("mod-compatibility-remote", "client_b"): (
         "observe_remote_baseline",
         "observe_remote_applied",
+    ),
+    ("mod-compatibility-late-join", "client_a"): (),
+    ("mod-compatibility-late-join", "client_b"): (
+        "observe_late_join_state",
     ),
 }
 
@@ -169,6 +182,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "full",
                 "mod-compatibility",
                 "mod-compatibility-remote",
+                "mod-compatibility-late-join",
             ),
             self.contract.scenario_ids,
         )
@@ -191,7 +205,10 @@ class ScenarioContractTest(unittest.TestCase):
             self.contract.scenarios_for_profile("compatibility"),
         )
         self.assertEqual(
-            ("mod-compatibility-remote",),
+            (
+                "mod-compatibility-remote",
+                "mod-compatibility-late-join",
+            ),
             self.contract.scenarios_for_profile("compatibility-remote"),
         )
         self.assertEqual(
@@ -202,6 +219,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "full": ("client_a",),
                 "mod-compatibility": ("client_a",),
                 "mod-compatibility-remote": ("client_a", "client_b"),
+                "mod-compatibility-late-join": ("client_a", "client_b"),
             },
             {
                 scenario: self.contract.expected_roles(scenario)
@@ -255,6 +273,14 @@ class ScenarioContractTest(unittest.TestCase):
             "Alice joined the game",
             compatibility_remote.start_after.server_log_marker,
         )
+        compatibility_late_join = self.contract.orchestration_for(
+            "mod-compatibility-late-join"
+        )
+        self.assertEqual("sequential-two-client", compatibility_late_join.mode)
+        self.assertEqual(
+            ("client_a", "client_b"), compatibility_late_join.role_order
+        )
+        self.assertIsNone(compatibility_late_join.start_after)
 
     def test_steps_are_the_only_authored_source_of_capture_truth(self) -> None:
         self.assertNotIn("captures", self.payload)
@@ -295,7 +321,7 @@ class ScenarioContractTest(unittest.TestCase):
             for role in scenario["roles"]
             for step in role["steps"]
         )
-        self.assertEqual(47, authored_capture_count)
+        self.assertEqual(48, authored_capture_count)
         self.assertEqual(authored_capture_count, len(self.contract.captures))
 
     def test_capture_metadata_and_ids_are_derived_from_steps(self) -> None:
@@ -307,7 +333,7 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual(expected_ids, set(self.contract.capture_ids))
         self.assertEqual((1920, 1080), self.contract.screenshot_size)
         self.assertEqual(expected_ids, set(self.contract.review_regions))
-        self.assertEqual(47, len(expected_ids))
+        self.assertEqual(48, len(expected_ids))
         first = self.contract.capture_by_id("full.client_a.baseline")
         self.assertIs(
             first,
@@ -427,6 +453,14 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual(
             [],
             values("mod-compatibility-remote", "client_a"),
+        )
+        self.assertEqual(
+            [],
+            values("mod-compatibility-late-join", "client_a"),
+        )
+        self.assertEqual(
+            [],
+            values("mod-compatibility-late-join", "client_b"),
         )
         self.assertEqual(
             [
