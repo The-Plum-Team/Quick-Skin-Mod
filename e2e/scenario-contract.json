@@ -55,7 +55,8 @@
     "mod-compatibility.client_a.baseline_with_mod": [[0.42, 0.34, 0.58, 0.86]],
     "mod-compatibility.client_a.apply_local_skin_with_mod": [[0.7, 0.42, 1.0, 0.98]],
     "mod-compatibility-remote.client_b.observe_remote_baseline": [[0.32, 0.05, 0.68, 0.95]],
-    "mod-compatibility-remote.client_b.observe_remote_applied": [[0.32, 0.05, 0.68, 0.95]]
+    "mod-compatibility-remote.client_b.observe_remote_applied": [[0.32, 0.05, 0.68, 0.95]],
+    "mod-compatibility-late-join.client_b.observe_late_join_state": [[0.32, 0.05, 0.68, 0.95]]
   },
   "scenarios": [
     {
@@ -969,6 +970,60 @@
               ]
             }
           ]
+        }
+      ]
+    },
+    {
+      "scenario": "mod-compatibility-late-join",
+      "execution_profiles": [
+        "compatibility-remote"
+      ],
+      "orchestration": {
+        "mode": "sequential-two-client",
+        "role_order": [
+          "client_a",
+          "client_b"
+        ]
+      },
+      "roles": [
+        {
+          "role": "client_a",
+          "steps": [
+            {
+              "id": "integration_active",
+              "assertion_required": true
+            },
+            {
+              "id": "prepare_late_join_state",
+              "assertion_required": true
+            }
+          ],
+          "comparisons": []
+        },
+        {
+          "role": "client_b",
+          "steps": [
+            {
+              "id": "integration_active",
+              "assertion_required": true
+            },
+            {
+              "id": "confirm_self",
+              "assertion_required": true
+            },
+            {
+              "id": "observe_late_join_state",
+              "assertion_required": true,
+              "capture": {
+                "title": "Optional mod recovered after late join",
+                "review_tier": "all",
+                "expectation": "Bob joined only after Alice had completed the selected optional-mod appearance. His fixed rear camera must show complete remote Alice with that pre-existing CPM model or Ears-authored skin intact, and the runtime assertion must prove the state arrived without another Alice-side appearance change.",
+                "compatibility_reference_capture_id": "propagation.client_b.observe_a",
+                "probes": []
+              }
+            }
+          ],
+          "comparisons": []
         }
       ]
     }
