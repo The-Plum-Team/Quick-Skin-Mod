@@ -135,6 +135,21 @@ def _compatibility_review_regions(
     return tuple(tuple(region) for region in frame["review_regions"])
 
 
+def _compatibility_reference_capture(
+    compatibility_mod: CompatibilityMod,
+    candidate_capture_id: str,
+    default_reference_capture_id: str,
+) -> str:
+    references = compatibility_mod.reference_captures
+    if references is None:
+        return default_reference_capture_id
+    if candidate_capture_id == MOD_COMPATIBILITY_BASELINE_CAPTURE:
+        return references.baseline_with_mod
+    if candidate_capture_id == MOD_COMPATIBILITY_APPLIED_CAPTURE:
+        return references.apply_local_skin_with_mod
+    return default_reference_capture_id
+
+
 def _select_compatibility_frames(
     candidate_frames: list[dict[str, Any]],
     *,
@@ -339,8 +354,10 @@ def curate(
     private_manifest: list[dict[str, object]] = []
     for frame in compatibility_frames:
         capture = catalog.contract.capture_by_id(frame["capture_id"])
-        reference_capture = (
-            capture.compatibility_reference_capture_id or capture.capture_id
+        reference_capture = _compatibility_reference_capture(
+            lane.mod,
+            frame["capture_id"],
+            capture.compatibility_reference_capture_id or capture.capture_id,
         )
         reference = base_by_capture.get(reference_capture)
         if reference is None:
