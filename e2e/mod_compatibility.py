@@ -58,6 +58,12 @@ INSTALL_SIDES = frozenset({"client", "client-and-server"})
 VERSION_TYPES = frozenset({"release", "beta"})
 ALLOWED_DOWNLOAD_HOSTS = frozenset({"cdn.modrinth.com"})
 BASE_MATRIX_KINDS = frozenset({"runtime", "native-anchors", "pr-anchors"})
+MOD_COMPATIBILITY_BASELINE_CAPTURE = (
+    "mod-compatibility.client_a.baseline_with_mod"
+)
+MOD_COMPATIBILITY_APPLIED_CAPTURE = (
+    "mod-compatibility.client_a.apply_local_skin_with_mod"
+)
 
 
 class CompatibilityContractError(ValueError):
@@ -187,6 +193,23 @@ class CompatibilityLane:
                 for item in self.artifact.files
             ],
         }
+
+
+def resolve_reference_capture_id(
+    compatibility_mod: CompatibilityMod,
+    candidate_capture_id: str,
+    default_reference_capture_id: str,
+) -> str:
+    """Resolve one candidate's authenticated same-lane reference capture."""
+
+    references = compatibility_mod.reference_captures
+    if references is None:
+        return default_reference_capture_id
+    if candidate_capture_id == MOD_COMPATIBILITY_BASELINE_CAPTURE:
+        return references.baseline_with_mod
+    if candidate_capture_id == MOD_COMPATIBILITY_APPLIED_CAPTURE:
+        return references.apply_local_skin_with_mod
+    return default_reference_capture_id
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
