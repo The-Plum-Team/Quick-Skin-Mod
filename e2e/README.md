@@ -390,16 +390,18 @@ Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, and ReplayMod. P
 is intentionally absent and unsupported. A runtime may install only the exact URL, filename, byte
 size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth for `latest`.
 The contract also owns each mod's two local feature-specific expectations and normalized review
-regions plus an optional multiplayer pair, so caching and AI focus on the rendered integration
-rather than a generic part of the frame. The two stable local capture IDs select a different real
-workflow for each locked mod:
+regions, an optional comparable clean-reference capture override, and an optional multiplayer pair,
+so caching and AI focus on the rendered integration rather than a generic part of the frame. The
+two stable local capture IDs select a different real workflow for each locked mod:
 
 - CPM exports a genuine `.cpmmodel` through CPM's editor API, imports and renders its two coloured
   horn cubes, then selects a normal Quick Skin skin and proves CPM model mode was cleared.
 - Ears compares an ordinary Quick Skin control with a skin authored through Ears' own feature
   writer, then requires parsed tall ears and a rear tail in Ears' public renderer storage.
-- 3D Skin Layers compares subdued and saturated outer-layer fixtures inside Quick Skin's menu and
-  requires the third-party mesh cache and manual preview renderer to process both textures.
+- 3D Skin Layers compares subdued and saturated outer-layer fixtures over a uniquely coloured
+  head, torso, arms, and legs inside Quick Skin's menu. Its legacy preview uses the mod's public
+  injected-ModelPart seam to replace the six flat outer parts, and visual review rejects any voxel
+  cluster that is detached from or aligned to the wrong anatomical part.
 - CustomNPCs summons a real server-owned `customnpcs:*` entity and keeps it visible beside the
   local player while Quick Skin changes only the player's renderer-facing texture.
 - Essential keeps ownership of its title player model, requires exactly one Quick Skin action and
