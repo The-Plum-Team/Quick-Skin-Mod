@@ -161,6 +161,18 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("sleeve-to-sleeve span", semantic_prompt)
         self.assertIn("sleeve-to-sleeve span", verify_prompt)
 
+    def test_compatibility_review_authenticates_mod_reference_overrides(self) -> None:
+        workflow = (
+            ROOT / ".github/workflows/mod-compatibility-review.yml"
+        ).read_text(encoding="utf-8")
+        checker = (ROOT / "e2e/check_visual_review.py").read_text(encoding="utf-8")
+
+        self.assertIn("source-mod-compatibility-contract.json", workflow)
+        self.assertIn(
+            '--compatibility-contract "$source_compatibility_contract"', workflow
+        )
+        self.assertIn("resolve_reference_capture_id", checker)
+
     def test_elytra_texture_adapter_pins_exact_runtime_names(self) -> None:
         """Wrong reflection aliases can resolve unrelated methods with plausible values."""
 
