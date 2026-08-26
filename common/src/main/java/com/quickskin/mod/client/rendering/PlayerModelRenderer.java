@@ -1006,26 +1006,23 @@ public class PlayerModelRenderer {
         // Determine if using slim model
         boolean isSlimModel = "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null);
 
-        // Render model
-        model.renderToBuffer(
-                poseStack,
-                vertexConsumer,
-                15728880, // Full brightness (light level) - same as InventoryScreen
-                OverlayTexture.NO_OVERLAY,
-                1.0f, 1.0f, 1.0f, 1.0f // RGBA
-        );
-
-        // Render 3D skin layers (if mod is installed)
-        // The integration class handles all mod detection and graceful fallback
-        SkinLayers3DIntegration.render3DLayers(
-                poseStack,
-                bufferSource,
-                15728880,
-                OverlayTexture.NO_OVERLAY,
-                model,
-                playerData.getSkinLocation(),
-                isSlimModel
-        );
+        // 3D Skin Layers' compatibility path replaces each flat outer ModelPart while it renders.
+        // Keeping the injection scoped to this synchronous draw prevents stale preview state.
+        boolean injectedSkinLayers = SkinLayers3DIntegration.prepareInjectedPreview(
+                model, playerData.getSkinLocation(), isSlimModel);
+        try {
+            model.renderToBuffer(
+                    poseStack,
+                    vertexConsumer,
+                    15728880, // Full brightness (light level) - same as InventoryScreen
+                    OverlayTexture.NO_OVERLAY,
+                    1.0f, 1.0f, 1.0f, 1.0f // RGBA
+            );
+        } finally {
+            if (injectedSkinLayers) {
+                SkinLayers3DIntegration.clearInjectedPreview(model);
+            }
+        }
 
         // Render cape AFTER model if present
 //?} else if <1.21.11 {
@@ -1036,26 +1033,22 @@ public class PlayerModelRenderer {
         // Determine if using slim model
         boolean isSlimModel = "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null);
 
-        // Render model
-        model.renderToBuffer(
-                poseStack,
-                vertexConsumer,
-                15728880, // Full brightness (light level) - same as InventoryScreen
-                OverlayTexture.NO_OVERLAY,
-                0xFFFFFFFF  // ARGB color format
-        );
-
-        // Render 3D skin layers (if mod is installed)
-        // The integration class handles all mod detection and graceful fallback
-        SkinLayers3DIntegration.render3DLayers(
-                poseStack,
-                bufferSource,
-                15728880,
-                OverlayTexture.NO_OVERLAY,
-                model,
-                playerData.getSkinLocation(),
-                isSlimModel
-        );
+        // 3D Skin Layers' compatibility path replaces each flat outer ModelPart while it renders.
+        boolean injectedSkinLayers = SkinLayers3DIntegration.prepareInjectedPreview(
+                model, playerData.getSkinLocation(), isSlimModel);
+        try {
+            model.renderToBuffer(
+                    poseStack,
+                    vertexConsumer,
+                    15728880, // Full brightness (light level) - same as InventoryScreen
+                    OverlayTexture.NO_OVERLAY,
+                    0xFFFFFFFF  // ARGB color format
+            );
+        } finally {
+            if (injectedSkinLayers) {
+                SkinLayers3DIntegration.clearInjectedPreview(model);
+            }
+        }
 
         // Render cape AFTER model if present
 //?} else {
@@ -2875,7 +2868,14 @@ public class PlayerModelRenderer {
      * Call this when leaving a world to reset the player rendering state
      */
     public static void clearCachedPlayer() {
-//? if <26.2 {
+//? if <1.21.11 {
+//?} else if <26.2 {
+        if (classicModel != null) {
+            SkinLayers3DIntegration.clearInjectedPreview(classicModel);
+        }
+        if (slimModel != null) {
+            SkinLayers3DIntegration.clearInjectedPreview(slimModel);
+        }
 //?} else {
         if (classicModel != null) {
             SkinLayers3DIntegration.clearDeferredMeshes(classicModel.root());
