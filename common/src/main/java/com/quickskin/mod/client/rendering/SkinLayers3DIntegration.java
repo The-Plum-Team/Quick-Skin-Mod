@@ -201,7 +201,7 @@ public final class SkinLayers3DIntegration {
      * renderer, so every mesh inherits the exact pose of its corresponding outer part.
      */
     public static boolean prepareInjectedPreview(
-            PlayerModel<?> model, ResourceLocation skinLocation, boolean thinArms) {
+            PlayerModel model, ResourceLocation skinLocation, boolean thinArms) {
 //?} else {
     /**
      * Replaces the six flat outer parts with the meshes supplied by 3D Skin Layers for one
@@ -297,13 +297,8 @@ public final class SkinLayers3DIntegration {
 //?}
     }
 
-//? if <1.21.11 {
-    /** Clears the temporary injection after the synchronous preview draw completes. */
-    public static void clearInjectedPreview(PlayerModel<?> model) {
-//?} else {
     /** Clears the temporary injection after the synchronous preview draw completes. */
     public static void clearInjectedPreview(PlayerModel model) {
-//?}
 //? if <26.2 {
         if (model == null || injectedPreviewCapability != CapabilityState.AVAILABLE) {
             return;
