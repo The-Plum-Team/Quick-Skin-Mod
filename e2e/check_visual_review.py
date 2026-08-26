@@ -324,24 +324,38 @@ def validate_compatibility_references(
     manifest: Any,
     *,
     scenario_contract: Path,
+    compatibility_contract: Path,
     artifact_node: str,
     mod_id: str,
 ) -> None:
-    """Bind optional-mod candidate/reference identities to the exact source contract."""
+    """Bind optional-mod identities to both exact source contracts."""
 
     try:
+        from mod_compatibility import (
+            CompatibilityContractError,
+            load_contract as load_compatibility_contract,
+            resolve_reference_capture_id,
+        )
         from scenario_contract import ScenarioContractError, load_contract
     except ImportError as exc:
         raise ReviewError(
-            "compatibility scenario contract loader is unavailable"
+            "compatibility contract loaders are unavailable"
         ) from exc
     entries, _labels = validate_manifest(manifest, require_paired=True)
-    try:
-        contract = load_contract(scenario_contract)
-    except (OSError, ScenarioContractError, ValueError) as exc:
-        raise ReviewError(f"compatibility scenario contract is invalid: {exc}") from exc
     if not artifact_node or "/" in artifact_node or not mod_id or "/" in mod_id:
         raise ReviewError("compatibility review scope is invalid")
+    try:
+        contract = load_contract(scenario_contract)
+        compatibility_mod = load_compatibility_contract(compatibility_contract).mod(
+            mod_id
+        )
+    except (
+        OSError,
+        CompatibilityContractError,
+        ScenarioContractError,
+        ValueError,
+    ) as exc:
+        raise ReviewError(f"compatibility source contracts are invalid: {exc}") from exc
     for index, item in enumerate(entries):
         candidate_parts = item["label"].split("/")
         if candidate_parts[:2] != [artifact_node, mod_id] or len(candidate_parts) != 5:
@@ -354,9 +368,21 @@ def validate_compatibility_references(
             raise ReviewError(
                 f"manifest entry {index}.capture_id is absent from the source contract"
             ) from exc
-        expected_reference = (
+        default_reference = (
             capture.compatibility_reference_capture_id or capture.capture_id
         )
+        expected_reference = resolve_reference_capture_id(
+            compatibility_mod,
+            item["capture_id"],
+            default_reference,
+        )
+        try:
+            contract.capture_by_id(expected_reference)
+        except ScenarioContractError as exc:
+            raise ReviewError(
+                f"manifest entry {index} resolves a reference absent from the "
+                "source scenario contract"
+            ) from exc
         reference_parts = item["reference_label"].split("/")
         reference_capture_id = _label_capture_id(
             item["reference_label"], scope_segments=frozenset({1})
@@ -961,6 +987,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--normalized-report")
     parser.add_argument("--allow-blocking-partial", action="store_true")
     parser.add_argument("--compatibility-scenario-contract", type=Path)
+    parser.add_argument("--compatibility-contract", type=Path)
     parser.add_argument("--compatibility-artifact-node")
     parser.add_argument("--compatibility-mod")
     args = parser.parse_args(argv)
@@ -968,17 +995,19 @@ def main(argv: list[str] | None = None) -> int:
         manifest = load(Path(args.manifest), "review manifest")
         compatibility_arguments = (
             args.compatibility_scenario_contract,
+            args.compatibility_contract,
             args.compatibility_artifact_node,
             args.compatibility_mod,
         )
         if any(value is not None for value in compatibility_arguments):
             if not all(value is not None for value in compatibility_arguments):
                 raise ReviewError(
-                    "compatibility validation requires its contract, artifact node and mod"
+                    "compatibility validation requires both contracts, artifact node and mod"
                 )
             validate_compatibility_references(
                 manifest,
                 scenario_contract=args.compatibility_scenario_contract,
+                compatibility_contract=args.compatibility_contract,
                 artifact_node=args.compatibility_artifact_node,
                 mod_id=args.compatibility_mod,
             )
