@@ -1141,7 +1141,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertNotIn("player-armor-stands", execution_workflow.lower())
         self.assertNotIn("player-armor-stands", review_workflow.lower())
-        self.assertEqual(5, contract["schema_version"])
+        self.assertEqual(6, contract["schema_version"])
         self.assertEqual(
             [
                 {

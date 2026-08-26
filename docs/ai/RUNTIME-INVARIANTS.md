@@ -382,9 +382,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   `e2e/mod-compatibility-contract.json` by exact HTTPS URL, filename, byte size, SHA-256, and
   SHA-512. CI never selects a newest upstream version or silently substitutes a dependency.
 - Compatibility visual judgment must compare the exact compatibility-profile modded capture
-  product with the clean same-version, same-loader packaged result while still judging every
-  non-exact semantic group. The curator must first authenticate complete release-plus-compatibility
-  runtime coverage, but ordinary-suite captures must not enter the model capsule.
+  product with a contract-selected clean same-version, same-loader packaged capture while still
+  judging every non-exact semantic group. A feature-specific reference override may select a more
+  comparable clean scene but never candidate evidence or another runtime lane. The curator must
+  first authenticate complete release-plus-compatibility runtime coverage, but ordinary-suite
+  captures must not enter the model capsule.
   Exact authored-region matches inherit the clean paired result, exact-equivalent pairs share one
   representative, and every remaining group reaches Haiku. Only a concern or confidence below high
   reaches Opus. The first Opus-confirmed defect publishes a durable
