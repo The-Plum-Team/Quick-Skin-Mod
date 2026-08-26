@@ -1313,6 +1313,7 @@ class VisualReviewContractTest(unittest.TestCase):
         validate_compatibility_references(
             [paired],
             scenario_contract=ROOT / "e2e/scenario-contract.json",
+            compatibility_contract=ROOT / "e2e/mod-compatibility-contract.json",
             artifact_node="fabric-26.2",
             mod_id="cpm",
         )
@@ -1335,8 +1336,45 @@ class VisualReviewContractTest(unittest.TestCase):
                     }
                 ],
                 scenario_contract=ROOT / "e2e/scenario-contract.json",
+                compatibility_contract=ROOT / "e2e/mod-compatibility-contract.json",
                 artifact_node="fabric-26.2",
                 mod_id="cpm",
+            )
+
+    def test_compatibility_reference_override_is_bound_to_the_mod_contract(self) -> None:
+        paired = {
+            **self.manifest[0],
+            "label": (
+                "fabric-1.20.1/skin-layers-3d/mod-compatibility/"
+                "client_a/baseline_with_mod"
+            ),
+            "capture_id": "mod-compatibility.client_a.baseline_with_mod",
+            "kind": "mod-compatibility.client_a.baseline_with_mod",
+            "reference_path": "/tmp/reference.png",
+            "reference_label": "fabric-1.20.1/full/client_a/skin_menu_screen",
+            "reference_semantic_sha256": "b" * 64,
+            "semantic_changed_fraction": 0.25,
+            "perceptual_delta": 0.25,
+        }
+        arguments = {
+            "scenario_contract": ROOT / "e2e/scenario-contract.json",
+            "compatibility_contract": ROOT / "e2e/mod-compatibility-contract.json",
+            "artifact_node": "fabric-1.20.1",
+            "mod_id": "skin-layers-3d",
+        }
+
+        validate_compatibility_references([paired], **arguments)
+        with self.assertRaisesRegex(ReviewError, "source contract"):
+            validate_compatibility_references(
+                [
+                    {
+                        **paired,
+                        "reference_label": (
+                            "fabric-1.20.1/phase0-smoke/client_a/baseline"
+                        ),
+                    }
+                ],
+                **arguments,
             )
 
     def test_manifest_requires_bounded_runtime_evidence(self) -> None:
