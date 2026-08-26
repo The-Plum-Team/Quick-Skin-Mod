@@ -37,7 +37,7 @@ from matrix import gha_matrix, load_matrix, read_mod_version  # noqa: E402
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("mod-compatibility-contract.json")
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 MAX_CONTRACT_BYTES = 2 * 1024 * 1024
 MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
 MAX_FILES_PER_ARTIFACT = 4
@@ -52,6 +52,7 @@ PUBLISHED_AT = re.compile(
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SHA512 = re.compile(r"^[0-9a-f]{128}$")
 MODRINTH_ID = re.compile(r"^[A-Za-z0-9]{8}$")
+CAPTURE_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{1,191}$")
 LOADERS = frozenset({"fabric", "forge", "neoforge"})
 INSTALL_SIDES = frozenset({"client", "client-and-server"})
 VERSION_TYPES = frozenset({"release", "beta"})
@@ -103,6 +104,12 @@ class CompatibilityReviewRegions:
 
 
 @dataclass(frozen=True)
+class CompatibilityReferenceCaptures:
+    baseline_with_mod: str
+    apply_local_skin_with_mod: str
+
+
+@dataclass(frozen=True)
 class CompatibilityMultiplayer:
     evidence: CompatibilityEvidence
     review_regions: CompatibilityReviewRegions
@@ -123,6 +130,7 @@ class CompatibilityMod:
     supported_game_versions: tuple[str, ...] | None
     excluded_lanes: tuple[ExcludedLane, ...]
     artifacts: tuple[LockedArtifact, ...]
+    reference_captures: CompatibilityReferenceCaptures | None = None
 
 
 @dataclass(frozen=True)
@@ -339,6 +347,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             "provided_dependencies",
             "evidence",
             "review_regions",
+            "reference_captures",
             "multiplayer",
             "supported_game_versions",
             "excluded_lanes",
@@ -393,6 +402,28 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
         raise CompatibilityContractError(
             f"{label}.review_regions is invalid: {exc}"
         ) from exc
+    reference_captures_value = item["reference_captures"]
+    reference_captures: CompatibilityReferenceCaptures | None
+    if reference_captures_value is None:
+        reference_captures = None
+    else:
+        reference_captures_item = _exact_keys(
+            reference_captures_value,
+            {"baseline_with_mod", "apply_local_skin_with_mod"},
+            f"{label}.reference_captures",
+        )
+        reference_captures = CompatibilityReferenceCaptures(
+            baseline_with_mod=_string(
+                reference_captures_item["baseline_with_mod"],
+                f"{label}.reference_captures.baseline_with_mod",
+                CAPTURE_ID,
+            ),
+            apply_local_skin_with_mod=_string(
+                reference_captures_item["apply_local_skin_with_mod"],
+                f"{label}.reference_captures.apply_local_skin_with_mod",
+                CAPTURE_ID,
+            ),
+        )
     multiplayer_value = item["multiplayer"]
     multiplayer: CompatibilityMultiplayer | None
     if multiplayer_value is None:
@@ -538,6 +569,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
         supported_game_versions=supported_versions,
         excluded_lanes=tuple(excluded_lanes),
         artifacts=artifacts,
+        reference_captures=reference_captures,
     )
 
 
