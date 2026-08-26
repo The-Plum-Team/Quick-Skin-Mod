@@ -17,6 +17,7 @@ from mod_compatibility import (
     CompatibilityContractError,
     CompatibilityMod,
     load_contract as load_compatibility_contract,
+    resolve_reference_capture_id,
     resolve_lane,
 )
 from scenario_contract import (
@@ -140,14 +141,11 @@ def _compatibility_reference_capture(
     candidate_capture_id: str,
     default_reference_capture_id: str,
 ) -> str:
-    references = compatibility_mod.reference_captures
-    if references is None:
-        return default_reference_capture_id
-    if candidate_capture_id == MOD_COMPATIBILITY_BASELINE_CAPTURE:
-        return references.baseline_with_mod
-    if candidate_capture_id == MOD_COMPATIBILITY_APPLIED_CAPTURE:
-        return references.apply_local_skin_with_mod
-    return default_reference_capture_id
+    return resolve_reference_capture_id(
+        compatibility_mod,
+        candidate_capture_id,
+        default_reference_capture_id,
+    )
 
 
 def _select_compatibility_frames(
