@@ -82,6 +82,23 @@ class ModCompatibilityContractTest(unittest.TestCase):
             )
         )
         skin_layers = contract.mod("skin-layers-3d")
+        self.assertIsNotNone(skin_layers.reference_captures)
+        assert skin_layers.reference_captures is not None
+        self.assertEqual(
+            "full.client_a.skin_menu_screen",
+            skin_layers.reference_captures.baseline_with_mod,
+        )
+        self.assertEqual(
+            "full.client_a.skin_menu_screen",
+            skin_layers.reference_captures.apply_local_skin_with_mod,
+        )
+        self.assertTrue(
+            all(
+                item.reference_captures is None
+                for item in contract.mods
+                if item.id != "skin-layers-3d"
+            )
+        )
         self.assertIsNotNone(contract.mod("ears").multiplayer)
         self.assertTrue(
             all(
@@ -655,6 +672,36 @@ class ModCompatibilityContractTest(unittest.TestCase):
         self.assertIn(
             ears.multiplayer.evidence.apply_local_skin_with_mod,
             late_join_ears,
+        )
+
+    def test_3d_skin_layers_uses_a_comparable_menu_reference(self) -> None:
+        contract = mod_compatibility.load_contract(self.contract_path)
+        skin_layers = contract.mod("skin-layers-3d")
+        replaymod = contract.mod("replaymod")
+
+        self.assertEqual(
+            "full.client_a.skin_menu_screen",
+            mod_compatibility_visual._compatibility_reference_capture(
+                skin_layers,
+                mod_compatibility_visual.MOD_COMPATIBILITY_BASELINE_CAPTURE,
+                "phase0-smoke.client_a.baseline",
+            ),
+        )
+        self.assertEqual(
+            "full.client_a.skin_menu_screen",
+            mod_compatibility_visual._compatibility_reference_capture(
+                skin_layers,
+                mod_compatibility_visual.MOD_COMPATIBILITY_APPLIED_CAPTURE,
+                "phase0-smoke.client_a.apply_local_skin",
+            ),
+        )
+        self.assertEqual(
+            "phase0-smoke.client_a.baseline",
+            mod_compatibility_visual._compatibility_reference_capture(
+                replaymod,
+                mod_compatibility_visual.MOD_COMPATIBILITY_BASELINE_CAPTURE,
+                "phase0-smoke.client_a.baseline",
+            ),
         )
 
     def test_compatibility_curation_uses_mod_specific_review_regions(self) -> None:
