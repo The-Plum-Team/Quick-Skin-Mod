@@ -363,6 +363,10 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             ROOT
             / "common/src/main/java/com/quickskin/mod/client/rendering/SkinLayers3DIntegration.java"
         ).read_text(encoding="utf-8")
+        gui_renderer_mixin = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/mixin/GuiSkinRendererMixin.java"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("private static BufferedImage anatomical3DLayerBase()", assets)
         for base_island in (
@@ -383,6 +387,11 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("prepareInjectedPreview", renderer)
         self.assertIn("clearInjectedPreview(model);", renderer)
         self.assertNotIn("SkinLayers3DIntegration.render3DLayers(", renderer)
+        self.assertIn("quickskin$prepareSkinLayersMeshes", gui_renderer_mixin)
+        self.assertIn("prepareInjectedPreview", gui_renderer_mixin)
+        self.assertIn("quickskin$clearSkinLayersMeshes", gui_renderer_mixin)
+        self.assertIn("clearInjectedPreview", gui_renderer_mixin)
+        self.assertNotIn("SkinLayers3DIntegration.render3DLayers(", gui_renderer_mixin)
         self.assertIn('"injectedPreviewSuccessLogged"', feature)
 
     def test_remote_optional_mod_scenarios_assert_the_second_client_renderer(self) -> None:

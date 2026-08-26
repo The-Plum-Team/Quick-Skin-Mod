@@ -2814,7 +2814,14 @@ public class PlayerModelRenderer {
      * Call this when leaving a world to reset the player rendering state
      */
     public static void clearCachedPlayer() {
-//? if <26.2 {
+//? if <1.21.11 {
+//?} else if <26.2 {
+        if (classicModel != null) {
+            SkinLayers3DIntegration.clearInjectedPreview(classicModel);
+        }
+        if (slimModel != null) {
+            SkinLayers3DIntegration.clearInjectedPreview(slimModel);
+        }
 //?} else {
         if (classicModel != null) {
             SkinLayers3DIntegration.clearDeferredMeshes(classicModel.root());

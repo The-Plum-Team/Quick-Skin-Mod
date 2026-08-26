@@ -399,9 +399,10 @@ two stable local capture IDs select a different real workflow for each locked mo
 - Ears compares an ordinary Quick Skin control with a skin authored through Ears' own feature
   writer, then requires parsed tall ears and a rear tail in Ears' public renderer storage.
 - 3D Skin Layers compares subdued and saturated outer-layer fixtures over a uniquely coloured
-  head, torso, arms, and legs inside Quick Skin's menu. Its legacy preview uses the mod's public
-  injected-ModelPart seam to replace the six flat outer parts, and visual review rejects any voxel
-  cluster that is detached from or aligned to the wrong anatomical part.
+  head, torso, arms, and legs inside Quick Skin's menu. Pre-26.2 previews use the mod's public
+  injected-ModelPart seam to replace the six flat outer parts, while 26.2 retains the injection
+  through deferred submission; visual review rejects any voxel cluster that is detached from or
+  aligned to the wrong anatomical part.
 - CustomNPCs summons a real server-owned `customnpcs:*` entity and keeps it visible beside the
   local player while Quick Skin changes only the player's renderer-facing texture.
 - Essential keeps ownership of its title player model, requires exactly one Quick Skin action and
