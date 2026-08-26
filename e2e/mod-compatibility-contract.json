@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "lock_revision": "2026-08-23",
   "artifact_source": {
     "kind": "modrinth-v2",
@@ -31,6 +31,7 @@
         "baseline_with_mod": [[0.4, 0.06, 0.6, 0.92]],
         "apply_local_skin_with_mod": [[0.4, 0.06, 0.6, 0.92]]
       },
+      "reference_captures": null,
       "multiplayer": {
         "evidence": {
           "baseline_with_mod": "From Bob's fixed rear camera, the complete remote Alice wears the genuine CPM model with two oversized cyan and magenta horn cubes above her head. The model and texture are intact, proving CPM's client-and-server model state reached a second player.",
@@ -678,6 +679,7 @@
         "baseline_with_mod": [[0.4, 0.16, 0.6, 0.92]],
         "apply_local_skin_with_mod": [[0.4, 0.16, 0.6, 0.92]]
       },
+      "reference_captures": null,
       "multiplayer": {
         "evidence": {
           "baseline_with_mod": "From Bob's fixed rear camera, the complete remote Alice wears the ordinary Quick Skin control skin with no Ears ears, tail, wings, snout, or other added geometry. The Ears layer is loaded and the remote texture remains intact.",
@@ -1042,12 +1044,16 @@
         "P7dR8mSH"
       ],
       "evidence": {
-        "baseline_with_mod": "Quick Skin's skin menu is open and intact. Its complete player preview keeps the ordinary plaid base skin, head, torso, both arms, and both legs visible between separated subdued dark-gray voxels raised from the hat, jacket, sleeves, and trousers. The meshes must be coherent and visibly less saturated than the paired fixture.",
-        "apply_local_skin_with_mod": "The paired Quick Skin menu remains intact. Its complete player preview keeps the ordinary plaid base skin and all four limbs visible between separated bright cyan, magenta, lime, and orange voxels raised from the hat, jacket, sleeves, and trousers. The transparent gaps and visible voxel depth must distinguish the outer layer from a flat recolour."
+        "baseline_with_mod": "Quick Skin's skin menu is open and intact. The complete player preview has a blue head, green torso, red right arm, purple left arm, gold right leg, and teal left leg. Each muted raised voxel cluster is rooted on and follows the matching body part; detached, floating, swapped, or splayed geometry is a failure. Transparent gaps keep every base part visible and voxel depth distinguishes the overlay from a flat recolour.",
+        "apply_local_skin_with_mod": "The paired Quick Skin menu remains intact with the same blue head, green torso, red right arm, purple left arm, gold right leg, and teal left leg. Bright raised voxels must stay rooted on and aligned with their matching head, torso, arm, or leg and follow the same pose; detached, floating, swapped, or splayed clusters are a failure. Transparent gaps expose the intact base model and visible voxel depth distinguishes the outer layer from a flat recolour."
       },
       "review_regions": {
-        "baseline_with_mod": [[0.55, 0.25, 0.8, 0.85]],
-        "apply_local_skin_with_mod": [[0.55, 0.25, 0.8, 0.85]]
+        "baseline_with_mod": [[0.55, 0.15, 0.8, 0.9]],
+        "apply_local_skin_with_mod": [[0.55, 0.15, 0.8, 0.9]]
+      },
+      "reference_captures": {
+        "baseline_with_mod": "full.client_a.skin_menu_screen",
+        "apply_local_skin_with_mod": "full.client_a.skin_menu_screen"
       },
       "multiplayer": null,
       "excluded_lanes": [
@@ -1641,6 +1647,7 @@
         "baseline_with_mod": [[0.4, 0.28, 0.65, 0.92]],
         "apply_local_skin_with_mod": [[0.4, 0.28, 0.65, 0.92]]
       },
+      "reference_captures": null,
       "multiplayer": null,
       "excluded_lanes": [],
       "supported_game_versions": null,
@@ -1747,6 +1754,7 @@
         "baseline_with_mod": [[0.1, 0.28, 0.25, 0.76], [0.75, 0.3, 0.9, 0.75]],
         "apply_local_skin_with_mod": [[0.1, 0.28, 0.25, 0.76], [0.75, 0.3, 0.9, 0.75]]
       },
+      "reference_captures": null,
       "multiplayer": null,
       "excluded_lanes": [],
       "supported_game_versions": null,
@@ -2200,6 +2208,7 @@
         "baseline_with_mod": [[0.0, 0.0, 0.15, 0.12], [0.4, 0.3, 0.6, 0.92]],
         "apply_local_skin_with_mod": [[0.0, 0.0, 1.0, 0.21], [0.4, 0.3, 0.6, 0.92]]
       },
+      "reference_captures": null,
       "multiplayer": null,
       "excluded_lanes": [],
       "supported_game_versions": [
