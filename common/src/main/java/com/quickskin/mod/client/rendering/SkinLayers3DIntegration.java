@@ -77,6 +77,10 @@ public final class SkinLayers3DIntegration {
 
     private static final Object MESH_INIT_LOCK = new Object();
     private static final Object REFRESH_INIT_LOCK = new Object();
+//? if <26.2 {
+    private static final Object INJECTED_PREVIEW_INIT_LOCK = new Object();
+//?} else {
+//?}
 //? if <26.1.2 {
 //?} else if <26.2 {
 //?} else {
@@ -87,6 +91,10 @@ public final class SkinLayers3DIntegration {
 
     private static volatile CapabilityState meshCapability = CapabilityState.UNCHECKED;
     private static volatile CapabilityState refreshCapability = CapabilityState.UNCHECKED;
+//? if <26.2 {
+    private static volatile CapabilityState injectedPreviewCapability = CapabilityState.UNCHECKED;
+//?} else {
+//?}
 //? if <26.2 {
 //?} else {
     private static volatile CapabilityState deferredCapability = CapabilityState.UNCHECKED;
@@ -116,6 +124,20 @@ public final class SkinLayers3DIntegration {
     private static Method refreshMethod;
     private static boolean refreshMethodIsStatic;
 
+//? if <26.2 {
+    private static Class<?> previewModelPartInjectorClass;
+    private static Method setPreviewInjectedMeshMethod;
+    private static Object previewHeadOffsetProvider;
+    private static Object previewBodyOffsetProvider;
+    private static Object previewLeftArmOffsetProvider;
+    private static Object previewLeftArmSlimOffsetProvider;
+    private static Object previewRightArmOffsetProvider;
+    private static Object previewRightArmSlimOffsetProvider;
+    private static Object previewLeftLegOffsetProvider;
+    private static Object previewRightLegOffsetProvider;
+
+//?} else {
+//?}
 //? if <26.1.2 {
 //?} else if <26.2 {
 //?} else {
@@ -137,6 +159,13 @@ public final class SkinLayers3DIntegration {
     private static final AtomicBoolean renderFailureLogged = new AtomicBoolean();
 //? if <26.2 {
     private static final AtomicBoolean immediateRenderSuccessLogged = new AtomicBoolean();
+//?} else {
+//?}
+//? if <26.2 {
+    private static final AtomicBoolean injectedPreviewCapabilityLogged = new AtomicBoolean();
+    private static final AtomicBoolean injectedPreviewCapabilityFailureLogged = new AtomicBoolean();
+    private static final AtomicBoolean injectedPreviewAttachmentFailureLogged = new AtomicBoolean();
+    private static final AtomicBoolean injectedPreviewSuccessLogged = new AtomicBoolean();
 //?} else {
 //?}
     private static final AtomicBoolean configReadFailureLogged = new AtomicBoolean();
@@ -163,6 +192,143 @@ public final class SkinLayers3DIntegration {
     /** Returns whether the optional mesh/config surface is compatible. */
     public static boolean isAvailable() {
         return ensureMeshCapability();
+    }
+
+//? if <1.21.11 {
+    /**
+     * Replaces the six flat outer parts with the meshes supplied by 3D Skin Layers for one
+     * preview draw. This is the same public injection seam used by the mod's compatibility
+     * renderer, so every mesh inherits the exact pose of its corresponding outer part.
+     */
+    public static boolean prepareInjectedPreview(
+            PlayerModel model, ResourceLocation skinLocation, boolean thinArms) {
+//?} else {
+    /**
+     * Replaces the six flat outer parts with the meshes supplied by 3D Skin Layers for one
+     * preview draw. This is the same public injection seam used by the mod's compatibility
+     * renderer, so every mesh inherits the exact pose of its corresponding outer part.
+     */
+    public static boolean prepareInjectedPreview(
+            PlayerModel model, Identifier skinLocation, boolean thinArms) {
+//?}
+//? if <26.2 {
+        if (model == null || !ensureInjectedPreviewCapability()) {
+            return false;
+        }
+
+        ModelPart[] overlayParts = {
+                model.hat,
+                model.jacket,
+                model.leftSleeve,
+                model.rightSleeve,
+                model.leftPants,
+                model.rightPants
+        };
+        try {
+            validatePreviewOverlayParts(overlayParts);
+            clearPreviewOverlayParts(overlayParts);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError exception) {
+            bestEffortClearPreviewOverlayParts(overlayParts);
+            logInjectedPreviewAttachmentFailure(
+                    "3D Skin Layers could not reset Quick Skin's preview overlay parts", exception);
+            return false;
+        }
+
+        if (skinLocation == null || shouldSuppressManualLayers()) {
+            return false;
+        }
+        PlayerMeshes meshes = getOrCreateMeshes(skinLocation, thinArms);
+        if (meshes == null || !meshes.isValid()) {
+            return false;
+        }
+
+        Object[] providers = {
+                previewHeadOffsetProvider,
+                previewBodyOffsetProvider,
+                thinArms ? previewLeftArmSlimOffsetProvider : previewLeftArmOffsetProvider,
+                thinArms ? previewRightArmSlimOffsetProvider : previewRightArmOffsetProvider,
+                previewLeftLegOffsetProvider,
+                previewRightLegOffsetProvider
+        };
+        Object[] meshValues = {
+                meshes.headMesh,
+                meshes.torsoMesh,
+                meshes.leftArmMesh,
+                meshes.rightArmMesh,
+                meshes.leftLegMesh,
+                meshes.rightLegMesh
+        };
+        boolean[] enabled = {
+                getBooleanConfig(enableHatField),
+                getBooleanConfig(enableJacketField),
+                getBooleanConfig(enableLeftSleeveField),
+                getBooleanConfig(enableRightSleeveField),
+                getBooleanConfig(enableLeftPantsField),
+                getBooleanConfig(enableRightPantsField)
+        };
+
+        try {
+            for (int index = 0; index < overlayParts.length; index++) {
+                if (providers[index] == null || meshValues[index] == null) {
+                    throw new IllegalStateException(
+                            "3D Skin Layers returned a null mesh/provider for overlay " + index);
+                }
+                if (enabled[index]) {
+                    setPreviewInjectedMeshMethod.invoke(
+                            overlayParts[index], meshValues[index], providers[index]);
+                }
+            }
+            if (injectedPreviewSuccessLogged.compareAndSet(false, true)) {
+                SKIN_LAYERS_LOG.info(
+                        "3D Skin Layers preview bridge replaced Quick Skin's six flat outer parts "
+                                + "with pose-aligned injected meshes");
+            }
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError exception) {
+            bestEffortClearPreviewOverlayParts(overlayParts);
+            logInjectedPreviewAttachmentFailure(
+                    "3D Skin Layers rejected Quick Skin's preview mesh attachment; "
+                            + "the normal flat overlay remains active",
+                    exception);
+            return false;
+        }
+//?} else {
+        return prepareDeferredPreview(model, skinLocation, thinArms);
+//?}
+    }
+
+//? if <1.21.11 {
+    /** Clears the temporary injection after the synchronous preview draw completes. */
+    public static void clearInjectedPreview(PlayerModel model) {
+//?} else {
+    /** Clears the temporary injection after the synchronous preview draw completes. */
+    public static void clearInjectedPreview(PlayerModel model) {
+//?}
+//? if <26.2 {
+        if (model == null || injectedPreviewCapability != CapabilityState.AVAILABLE) {
+            return;
+        }
+        ModelPart[] overlayParts = {
+                model.hat,
+                model.jacket,
+                model.leftSleeve,
+                model.rightSleeve,
+                model.leftPants,
+                model.rightPants
+        };
+        try {
+            validatePreviewOverlayParts(overlayParts);
+            clearPreviewOverlayParts(overlayParts);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError exception) {
+            bestEffortClearPreviewOverlayParts(overlayParts);
+            logInjectedPreviewAttachmentFailure(
+                    "3D Skin Layers preview overlay cleanup failed", exception);
+        }
+//?} else {
+        if (model != null) {
+            clearDeferredMeshes(model.root());
+        }
+//?}
     }
 
 //? if <1.21.11 {
@@ -419,22 +585,14 @@ public final class SkinLayers3DIntegration {
                 initializeMeshCapability();
                 meshCapability = CapabilityState.AVAILABLE;
                 if (meshCapabilityLogged.compareAndSet(false, true)) {
-//? if <26.1.2 {
-                    String backend = "immediate";
-//?} else if <26.2 {
+//? if <26.2 {
+                    String backend = "injected-model-part";
 //?} else {
                     String backend = "deferred-injected-mesh";
 //?}
                     SKIN_LAYERS_LOG.info(
-//? if <26.1.2 {
                             "3D Skin Layers manual-preview mesh capability ready: backend={}, create3DMesh={} argument(s)",
                             backend,
-//?} else if <26.2 {
-                            "3D Skin Layers manual-preview mesh capability ready: backend=immediate-26.1.2, create3DMesh={} argument(s)",
-//?} else {
-                            "3D Skin Layers manual-preview mesh capability ready: backend={}, create3DMesh={} argument(s)",
-                            backend,
-//?}
                             create3DMeshSupportsMirror ? 9 : 8
                     );
                 }
@@ -548,6 +706,127 @@ public final class SkinLayers3DIntegration {
 //?}
     }
 
+//? if <26.2 {
+    private static boolean ensureInjectedPreviewCapability() {
+        if (!ensureMeshCapability()) {
+            return false;
+        }
+        CapabilityState state = injectedPreviewCapability;
+        if (state != CapabilityState.UNCHECKED) {
+            return state == CapabilityState.AVAILABLE;
+        }
+        synchronized (INJECTED_PREVIEW_INIT_LOCK) {
+            if (injectedPreviewCapability != CapabilityState.UNCHECKED) {
+                return injectedPreviewCapability == CapabilityState.AVAILABLE;
+            }
+            try {
+                Class<?> injectorClass = loadClass(
+                        "dev.tr7zw.skinlayers.accessor.ModelPartInjector");
+                Class<?> meshClass = loadClass(MESH_CLASS);
+                Class<?> offsetProviderClass = loadClass(
+                        "dev.tr7zw.skinlayers.api.OffsetProvider");
+                Method setter = injectorClass.getMethod(
+                        "setInjectedMesh", meshClass, offsetProviderClass);
+
+                Object resolvedHead = readPreviewOffsetProvider(offsetProviderClass, "HEAD");
+                Object resolvedBody = readPreviewOffsetProvider(offsetProviderClass, "BODY");
+                Object resolvedLeftArm = readPreviewOffsetProvider(
+                        offsetProviderClass, "LEFT_ARM");
+                Object resolvedLeftArmSlim = readPreviewOffsetProvider(
+                        offsetProviderClass, "LEFT_ARM_SLIM");
+                Object resolvedRightArm = readPreviewOffsetProvider(
+                        offsetProviderClass, "RIGHT_ARM");
+                Object resolvedRightArmSlim = readPreviewOffsetProvider(
+                        offsetProviderClass, "RIGHT_ARM_SLIM");
+                Object resolvedLeftLeg = readPreviewOffsetProvider(
+                        offsetProviderClass, "LEFT_LEG");
+                Object resolvedRightLeg = readPreviewOffsetProvider(
+                        offsetProviderClass, "RIGHT_LEG");
+
+                previewModelPartInjectorClass = injectorClass;
+                setPreviewInjectedMeshMethod = setter;
+                previewHeadOffsetProvider = resolvedHead;
+                previewBodyOffsetProvider = resolvedBody;
+                previewLeftArmOffsetProvider = resolvedLeftArm;
+                previewLeftArmSlimOffsetProvider = resolvedLeftArmSlim;
+                previewRightArmOffsetProvider = resolvedRightArm;
+                previewRightArmSlimOffsetProvider = resolvedRightArmSlim;
+                previewLeftLegOffsetProvider = resolvedLeftLeg;
+                previewRightLegOffsetProvider = resolvedRightLeg;
+                injectedPreviewCapability = CapabilityState.AVAILABLE;
+                if (injectedPreviewCapabilityLogged.compareAndSet(false, true)) {
+                    SKIN_LAYERS_LOG.info(
+                            "3D Skin Layers public ModelPartInjector/OffsetProvider capability "
+                                    + "is ready for synchronous previews");
+                }
+                return true;
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError exception) {
+                injectedPreviewCapability = CapabilityState.UNAVAILABLE;
+                if (injectedPreviewCapabilityFailureLogged.compareAndSet(false, true)) {
+                    SKIN_LAYERS_LOG.warn(
+                            "Detected 3D Skin Layers, but its injected-ModelPart API is incompatible. "
+                                    + "Quick Skin will retain the normal flat outer layer",
+                            exception);
+                }
+                return false;
+            }
+        }
+    }
+
+    private static Object readPreviewOffsetProvider(Class<?> providerClass, String fieldName)
+            throws ReflectiveOperationException {
+        Object value = providerClass.getField(fieldName).get(null);
+        if (value == null || !providerClass.isInstance(value)) {
+            throw new IllegalStateException(
+                    "OffsetProvider." + fieldName + " is null/incompatible");
+        }
+        return value;
+    }
+
+    private static void validatePreviewOverlayParts(ModelPart[] parts) {
+        if (parts == null || parts.length != 6) {
+            throw new IllegalStateException("Expected six preview overlay ModelParts");
+        }
+        for (ModelPart part : parts) {
+            if (part == null || !previewModelPartInjectorClass.isInstance(part)) {
+                throw new IllegalStateException(
+                        "Skin Layers ModelPartMixin is not applied to every preview overlay part");
+            }
+        }
+    }
+
+    private static void clearPreviewOverlayParts(ModelPart[] parts)
+            throws ReflectiveOperationException {
+        for (ModelPart part : parts) {
+            setPreviewInjectedMeshMethod.invoke(part, null, null);
+        }
+    }
+
+    private static void bestEffortClearPreviewOverlayParts(ModelPart[] parts) {
+        if (parts == null || setPreviewInjectedMeshMethod == null
+                || previewModelPartInjectorClass == null) {
+            return;
+        }
+        for (ModelPart part : parts) {
+            if (part == null || !previewModelPartInjectorClass.isInstance(part)) {
+                continue;
+            }
+            try {
+                setPreviewInjectedMeshMethod.invoke(part, null, null);
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+            }
+        }
+    }
+
+    private static void logInjectedPreviewAttachmentFailure(
+            String message, Throwable throwable) {
+        if (injectedPreviewAttachmentFailureLogged.compareAndSet(false, true)) {
+            SKIN_LAYERS_LOG.warn(message, throwable);
+        }
+    }
+
+//?} else {
+//?}
     private static boolean ensureRefreshCapability() {
         CapabilityState state = refreshCapability;
         if (state != CapabilityState.UNCHECKED) {
