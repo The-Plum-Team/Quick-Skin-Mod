@@ -693,9 +693,10 @@ jobs:
             > "$source_contract"
           [[ "$(sha256sum "$source_contract" | cut -d ' ' -f 1)" == \
             "$(jq -er .scenario_contract_sha256 "$proof")" ]]
-          [[ "$(git show \
-              "${{ matrix.source_sha }}:e2e/mod-compatibility-contract.json" |
-              sha256sum | cut -d ' ' -f 1)" == \
+          source_compatibility_contract="$RUNNER_TEMP/source-mod-compatibility-contract.json"
+          git show "${{ matrix.source_sha }}:e2e/mod-compatibility-contract.json" \
+            > "$source_compatibility_contract"
+          [[ "$(sha256sum "$source_compatibility_contract" | cut -d ' ' -f 1)" == \
             "$(jq -er .compatibility_contract_sha256 "$proof")" ]]
 
           for kind in base candidate; do
@@ -750,6 +751,7 @@ jobs:
             --input-root "$capsule/review-input" \
             --require-paired \
             --compatibility-scenario-contract "$source_contract" \
+            --compatibility-contract "$source_compatibility_contract" \
             --compatibility-artifact-node "${{ matrix.artifact_node }}" \
             --compatibility-mod "${{ matrix.mod }}" \
             --validate-input-only
