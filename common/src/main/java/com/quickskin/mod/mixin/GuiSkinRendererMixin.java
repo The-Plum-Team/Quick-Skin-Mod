@@ -48,12 +48,40 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GuiSkinRenderer.class)
 public class GuiSkinRendererMixin {
 
+    //? if <26.2 {
     @Inject(
             require = 0,
             expect = 1,
             allow = 1,
-//? if <26.2 {
+        //? if <26.1.2 {
             method = "renderToTexture(Lnet/minecraft/client/gui/render/state/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
+        //?} else {
+            method = "renderToTexture(Lnet/minecraft/client/renderer/state/gui/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
+        //?}
+            at = @At("HEAD")
+    )
+    private void quickskin$prepareSkinLayersMeshes(
+            GuiSkinRenderState state, PoseStack poseStack, CallbackInfo ci) {
+        Boolean thinArms = PlayerModelRenderer.getQuickSkinPreviewThinArms(state.playerModel());
+        if (thinArms != null) {
+            SkinLayers3DIntegration.prepareInjectedPreview(
+                    state.playerModel(), state.texture(), thinArms);
+        }
+    }
+
+    //?}
+    @Inject(
+            require = 0,
+            expect = 1,
+            allow = 1,
+//? if <26.1.2 {
+            method = "renderToTexture(Lnet/minecraft/client/gui/render/state/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;endBatch()V"
+            )
+//?} else if <26.2 {
+            method = "renderToTexture(Lnet/minecraft/client/renderer/state/gui/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;endBatch()V"
@@ -67,23 +95,17 @@ public class GuiSkinRendererMixin {
     private void quickskin$renderCapeInPiP(GuiSkinRenderState state, PoseStack poseStack, CallbackInfo ci) {
         // Use the shared buffer source (same instance used by the PiP system).
         MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
-        Boolean thinArms = PlayerModelRenderer.getQuickSkinPreviewThinArms(state.playerModel());
 //?} else {
     private void quickskin$attachSkinLayersMeshes(GuiSkinRenderState state, PoseStack poseStack,
                                                    SubmitNodeCollector collector, CallbackInfo ci) {
         var root = state.playerModel().root();
         Boolean thinArms = PlayerModelRenderer.getQuickSkinPreviewThinArms(root);
 //?}
+//? if <26.2 {
+//?} else {
         if (thinArms != null) {
-//? if <26.2 {
-            SkinLayers3DIntegration.render3DLayers(poseStack, bufferSource, 15728880,
-                    OverlayTexture.NO_OVERLAY, state.playerModel(), state.texture(), thinArms);
-//?} else {
             SkinLayers3DIntegration.attachDeferredMeshes(root, state.texture(), thinArms);
-//?}
         }
-//? if <26.2 {
-//?} else {
     }
 //?}
 
@@ -136,4 +158,22 @@ public class GuiSkinRendererMixin {
 //?}
         poseStack.popPose();
     }
+
+    //? if <26.2 {
+    @Inject(
+            require = 0,
+            expect = 1,
+            allow = 1,
+        //? if <26.1.2 {
+            method = "renderToTexture(Lnet/minecraft/client/gui/render/state/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
+        //?} else {
+            method = "renderToTexture(Lnet/minecraft/client/renderer/state/gui/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
+        //?}
+            at = @At("TAIL")
+    )
+    private void quickskin$clearSkinLayersMeshes(
+            GuiSkinRenderState state, PoseStack poseStack, CallbackInfo ci) {
+        SkinLayers3DIntegration.clearInjectedPreview(state.playerModel());
+    }
+    //?}
 }

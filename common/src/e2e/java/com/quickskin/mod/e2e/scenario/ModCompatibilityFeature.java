@@ -535,10 +535,11 @@ interface ModCompatibilityFeature {
                 return Step.Result.fail("3D Skin Layers mesh API is unavailable");
             }
             if (!meshCacheContains(flatLocation) || !manualRenderObserved()) {
-                return Step.Result.fail("Quick Skin's flat preview did not execute the 3D mesh path");
+                return Step.Result.fail(
+                        "Quick Skin's control preview did not execute the 3D mesh bridge");
             }
             return Step.Result.pass("Quick Skin menu rendered the subdued-overlay control "
-                    + "as subdued meshes through 3D Skin Layers' API at " + flatLocation);
+                    + "as pose-aligned meshes through 3D Skin Layers' API at " + flatLocation);
         }
 
         @Override
@@ -681,7 +682,9 @@ interface ModCompatibilityFeature {
 
         private static boolean manualRenderObserved() {
             for (String fieldName : new String[] {
-                    "immediateRenderSuccessLogged", "deferredAttachmentSuccessLogged"}) {
+                    "injectedPreviewSuccessLogged",
+                    "immediateRenderSuccessLogged",
+                    "deferredAttachmentSuccessLogged"}) {
                 try {
                     Field field = SkinLayers3DIntegration.class.getDeclaredField(fieldName);
                     field.setAccessible(true);
