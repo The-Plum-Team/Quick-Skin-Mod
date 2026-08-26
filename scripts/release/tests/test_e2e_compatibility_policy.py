@@ -350,6 +350,50 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             feature.index("ReplayMod recording close requested"),
         )
 
+    def test_3d_skin_layers_evidence_exposes_and_pose_aligns_every_body_part(self) -> None:
+        assets = (E2E_JAVA / "TestAssets.java").read_text(encoding="utf-8")
+        feature = (
+            E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+        renderer = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/client/rendering/PlayerModelRenderer.java"
+        ).read_text(encoding="utf-8")
+        integration = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/client/rendering/SkinLayers3DIntegration.java"
+        ).read_text(encoding="utf-8")
+        gui_renderer_mixin = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/mixin/GuiSkinRendererMixin.java"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("private static BufferedImage anatomical3DLayerBase()", assets)
+        for base_island in (
+            "paintChecker(graphics, 0, 0, 32, 16,",  # head
+            "paintChecker(graphics, 16, 16, 24, 16,",  # torso
+            "paintChecker(graphics, 40, 16, 16, 16,",  # right arm
+            "paintChecker(graphics, 32, 48, 16, 16,",  # left arm
+            "paintChecker(graphics, 0, 16, 16, 16,",  # right leg
+            "paintChecker(graphics, 16, 48, 16, 16,",  # left leg
+        ):
+            with self.subTest(base_island=base_island):
+                self.assertIn(base_island, assets)
+
+        self.assertEqual(2, assets.count("BufferedImage image = anatomical3DLayerBase();"))
+        self.assertIn("ModelPartInjector", integration)
+        self.assertIn("prepareInjectedPreview", integration)
+        self.assertIn("setPreviewInjectedMeshMethod.invoke", integration)
+        self.assertIn("prepareInjectedPreview", renderer)
+        self.assertIn("clearInjectedPreview(model);", renderer)
+        self.assertNotIn("SkinLayers3DIntegration.render3DLayers(", renderer)
+        self.assertIn("quickskin$prepareSkinLayersMeshes", gui_renderer_mixin)
+        self.assertIn("prepareInjectedPreview", gui_renderer_mixin)
+        self.assertIn("quickskin$clearSkinLayersMeshes", gui_renderer_mixin)
+        self.assertIn("clearInjectedPreview", gui_renderer_mixin)
+        self.assertNotIn("SkinLayers3DIntegration.render3DLayers(", gui_renderer_mixin)
+        self.assertIn('"injectedPreviewSuccessLogged"', feature)
+
     def test_remote_optional_mod_scenarios_assert_the_second_client_renderer(self) -> None:
         remote = (
             E2E_JAVA / "scenario" / "ModCompatibilityRemoteScenario.java"
