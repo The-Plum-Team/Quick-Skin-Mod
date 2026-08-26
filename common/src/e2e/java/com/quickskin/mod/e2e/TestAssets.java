@@ -141,20 +141,19 @@ public final class TestAssets {
 
     /**
      * A deliberately subdued but non-empty second layer on all six body parts. It is the control
-     * for 3D Skin Layers: every mesh must exist, while the dark gray voxels remain visually easy
-     * to distinguish from the saturated paired fixture.
+     * for 3D Skin Layers: every mesh must exist, while each muted voxel colour remains tied to the
+     * uniquely coloured body part beneath it.
      */
     public static Path makeSubtleOverlaySkin() throws Exception {
-        BufferedImage image = bundledSkinCopy();
-        clearModernSkinOverlay(image);
+        BufferedImage image = anatomical3DLayerBase();
         Graphics2D graphics = image.createGraphics();
         graphics.setComposite(AlphaComposite.Src);
-        paintSparseChecker(graphics, 40, 8, 8, 8, 0xFF30343B, 0xFF4A505A);
-        paintSparseChecker(graphics, 20, 36, 8, 12, 0xFF30343B, 0xFF4A505A);
-        paintSparseChecker(graphics, 44, 36, 4, 12, 0xFF30343B, 0xFF4A505A);
-        paintSparseChecker(graphics, 52, 52, 4, 12, 0xFF30343B, 0xFF4A505A);
-        paintSparseChecker(graphics, 4, 36, 4, 12, 0xFF30343B, 0xFF4A505A);
-        paintSparseChecker(graphics, 4, 52, 4, 12, 0xFF30343B, 0xFF4A505A);
+        paintSparseChecker(graphics, 40, 8, 8, 8, 0xFF7FA9DF, 0xFF9ABBE6);   // head
+        paintSparseChecker(graphics, 20, 36, 8, 12, 0xFF70B88E, 0xFF8BC8A3); // torso
+        paintSparseChecker(graphics, 44, 36, 4, 12, 0xFFD17B6D, 0xFFE29A8E); // right arm
+        paintSparseChecker(graphics, 52, 52, 4, 12, 0xFFA383CD, 0xFFB99CDB); // left arm
+        paintSparseChecker(graphics, 4, 36, 4, 12, 0xFFD1AE60, 0xFFE1C47E);  // right leg
+        paintSparseChecker(graphics, 4, 52, 4, 12, 0xFF68B7BA, 0xFF86C9CB);  // left leg
         graphics.dispose();
         Path fixture = deterministicFixture("qs_e2e_subtle_overlay_skin.png");
         ImageIO.write(image, "png", fixture.toFile());
@@ -167,16 +166,15 @@ public final class TestAssets {
      * preview; a flat fallback remains easy to distinguish in the paired capture.
      */
     public static Path makeRaisedOverlaySkin() throws Exception {
-        BufferedImage image = bundledSkinCopy();
-        clearModernSkinOverlay(image);
+        BufferedImage image = anatomical3DLayerBase();
         Graphics2D graphics = image.createGraphics();
         graphics.setComposite(AlphaComposite.Src);
-        paintSparseChecker(graphics, 40, 8, 8, 8, 0xFF00E5FF, 0xFFFF2BD6);   // hat front
-        paintSparseChecker(graphics, 20, 36, 8, 12, 0xFF7CFF00, 0xFFFF7A00); // jacket front
-        paintSparseChecker(graphics, 44, 36, 4, 12, 0xFF00E5FF, 0xFFFF2BD6); // right sleeve
-        paintSparseChecker(graphics, 52, 52, 4, 12, 0xFF7CFF00, 0xFFFF7A00); // left sleeve
-        paintSparseChecker(graphics, 4, 36, 4, 12, 0xFFFF2BD6, 0xFF00E5FF);  // right trousers
-        paintSparseChecker(graphics, 4, 52, 4, 12, 0xFFFF7A00, 0xFF7CFF00);  // left trousers
+        paintSparseChecker(graphics, 40, 8, 8, 8, 0xFF00B7FF, 0xFF6BDDFF);   // head
+        paintSparseChecker(graphics, 20, 36, 8, 12, 0xFF64FF5A, 0xFFB6FF56); // torso
+        paintSparseChecker(graphics, 44, 36, 4, 12, 0xFFFF3B30, 0xFFFF8A3D); // right arm
+        paintSparseChecker(graphics, 52, 52, 4, 12, 0xFFB642FF, 0xFFFF4FD8); // left arm
+        paintSparseChecker(graphics, 4, 36, 4, 12, 0xFFFFE600, 0xFFFFAE00);  // right leg
+        paintSparseChecker(graphics, 4, 52, 4, 12, 0xFF00F5D4, 0xFF00B8FF);  // left leg
         graphics.dispose();
         Path fixture = deterministicFixture("qs_e2e_raised_overlay_skin.png");
         ImageIO.write(image, "png", fixture.toFile());
@@ -312,6 +310,26 @@ public final class TestAssets {
             throw new IllegalStateException("E2E skin fixture must be a 64x64 PNG");
         }
         return toArgb(source);
+    }
+
+    /**
+     * Gives every body part a bright, unique base colour before 3D overlay pixels are added. The
+     * ordinary bundled skin is nearly black and disappears against Quick Skin's black menu, which
+     * made detached meshes impossible for either a person or the visual reviewer to diagnose.
+     */
+    private static BufferedImage anatomical3DLayerBase() throws Exception {
+        BufferedImage image = bundledSkinCopy();
+        clearModernSkinOverlay(image);
+        Graphics2D graphics = image.createGraphics();
+        graphics.setComposite(AlphaComposite.Src);
+        paintChecker(graphics, 0, 0, 32, 16, 0xFF245D99, 0xFF337BC4);   // head
+        paintChecker(graphics, 16, 16, 24, 16, 0xFF2D7048, 0xFF3C925E); // torso
+        paintChecker(graphics, 40, 16, 16, 16, 0xFF9A4437, 0xFFC05A48); // right arm
+        paintChecker(graphics, 32, 48, 16, 16, 0xFF654092, 0xFF8355B7); // left arm
+        paintChecker(graphics, 0, 16, 16, 16, 0xFF8A6C22, 0xFFB18B2D);  // right leg
+        paintChecker(graphics, 16, 48, 16, 16, 0xFF237579, 0xFF30999F); // left leg
+        graphics.dispose();
+        return image;
     }
 
     private static void clearModernSkinOverlay(BufferedImage image) {
