@@ -136,11 +136,19 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   or confidence below high to Opus, and publishes a durable source-wave block before
   cancelling siblings after a confirmed defect. Its authenticated source queue shares the global
   Claude capacity circuit, requires a fresh probe for each source, preserves one completion marker
-  per clean lane, and reschedules only unfinished lanes after a provider pause. Its matrix remains
-  lane-parallel, while protected admission fields bound aggregate nested model calls and ramp their
-  starts. The producer suppresses a delayed stale wake, the
-  direct consumer requires its source implementation to equal the protected current `master`, and
-  every parallel lane rechecks live `master` before capsule download or model admission.
+  per clean lane, and reschedules only unfinished lanes after a provider pause. A secretless
+  protected batcher first validates and merges those unfinished capsules, deduplicating exact image
+  bytes and exposing cross-lane semantic equivalence to one globally packed runner. Protected
+  admission fields directly bound its parallel calls and space their starts; a later secretless
+  matrix splits the complete normalized result and publishes each lane independently. Sanitized
+  telemetry records only model-process attempts, chunks, and retries. The producer suppresses a
+  delayed stale wake, the direct consumer requires its source implementation to equal the protected
+  current `master`, and both protected batch boundaries recheck live `master` before capsule or
+  model admission.
+  `scripts/ci/mod_compatibility_review_batch.py` owns the fail-closed merge and split codecs: it
+  preserves each authenticated proof and manifest byte-for-byte, copies content-addressed images
+  only once, binds every label to one lane, and reconstructs complete lane reports from a clean
+  aggregate without exposing images or credentials to the publication matrix.
 - `scripts/pages/collect_compatibility.py` is the protected post-review publisher. It authenticates
   the exact compatibility source plan, every source capsule, every complete normalized lane report,
   and the source completion marker before `scripts/pages/compatibility_evidence.py` projects the
@@ -179,8 +187,9 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   `e2e/visual_review_runner.py` sends every uncached unpaired anchor frame through semantic Haiku
   triage, inherits exact paired region matches, shares one model verdict across exact-equivalent
   paired versions, runs independent loader-grouped chunks concurrently, creates deterministic
-  1280x720 model-only copies without altering the authenticated 1920x1080 evidence, and pipelines
-  only concerns or confidence below high into concurrent bounded Opus verification. A clean
+  1280x720 model-only copies without altering the authenticated 1920x1080 evidence, and globally
+  packs only concerns or confidence below high into concurrent bounded Opus verification after
+  Haiku settles. A clean
   high-confidence Haiku result is final; perceptual metrics never create or route a verdict. The
   runner cancels outstanding calls after the first
   confirmed defect, publishes a protected exact-generation block, cancels sibling drains, and keeps
