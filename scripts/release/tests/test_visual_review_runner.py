@@ -168,6 +168,39 @@ class VisualReviewRunnerTest(unittest.TestCase):
                 self.assertEqual(MODEL_IMAGE_SIZE, image.size)
                 self.assertEqual("RGB", image.mode)
 
+    def test_provider_reports_only_sanitized_attempt_and_retry_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            capsule = Path(temporary)
+            provider = ClaudeProvider(
+                capsule=capsule,
+                work_root=capsule / "review-work",
+                claude=Path(sys.executable),
+                triage_prompt="triage",
+                verify_prompt="verify",
+                triage_model="haiku",
+                verify_model="opus",
+                paired=True,
+                attempts=3,
+                call_spacing_seconds=0,
+            )
+
+            provider._record_attempt("triage", 0)
+            provider._record_attempt("triage", 0)
+            provider._record_attempt("triage", 1)
+            provider._record_attempt("verify", 0)
+
+        self.assertEqual(
+            {
+                "retries": 1,
+                "total": 4,
+                "triage": 3,
+                "triage_chunks": 2,
+                "verify": 1,
+                "verify_chunks": 1,
+            },
+            provider.telemetry(),
+        )
+
     def test_plan_skips_only_exact_semantic_regions_and_bounds_chunks(self) -> None:
         plan = build_review_plan(self.manifest, triage_chunk_size=1)
 
@@ -238,6 +271,43 @@ class VisualReviewRunnerTest(unittest.TestCase):
         self.assertEqual(1, stats["represented"])
         self.assertEqual(SYNTHETIC_REPRESENTED_VISIBLE, verdicts[1]["visible"])
         self.assertFalse(any(verdict["defect"] for verdict in verdicts))
+
+    def test_source_wide_compatibility_wave_packs_34_frames_into_four_chunks(self) -> None:
+        representatives: list[dict[str, Any]] = []
+        index = 0
+        for step, count in (
+            ("baseline", 10),
+            ("apply_skin", 10),
+            ("remote_baseline", 4),
+            ("remote_applied", 4),
+            ("late_join", 4),
+        ):
+            for _offset in range(count):
+                representatives.append(
+                    paired(
+                        f"loader-{index}/full/client_a/{step}",
+                        f"review-input/images/candidate_{index}.png",
+                        f"review-input/images/reference_{index}.png",
+                    )
+                )
+                index += 1
+        followers = [
+            {
+                **representatives[follower_index],
+                "label": (
+                    f"follower-{follower_index}/full/client_a/"
+                    f"{representatives[follower_index]['capture_id'].split('.')[-1]}"
+                ),
+            }
+            for follower_index in range(2)
+        ]
+
+        plan = build_review_plan([*representatives, *followers])
+
+        self.assertEqual(32, len(plan["semantic"]))
+        self.assertEqual(2, len(plan["represented_by_label"]))
+        self.assertEqual(4, len(plan["triage_chunks"]))
+        self.assertTrue(all(len(chunk) == 8 for chunk in plan["triage_chunks"]))
 
     def test_compatibility_mode_reviews_even_byte_identical_pairs(self) -> None:
         calls: list[list[str]] = []
@@ -390,6 +460,62 @@ class VisualReviewRunnerTest(unittest.TestCase):
         self.assertEqual(2, maximum_active)
         self.assertEqual(2, len(verdicts))
         self.assertEqual(0, stats["stopped_early"])
+
+    def test_escalations_from_independent_triage_chunks_share_one_verify_chunk(
+        self,
+    ) -> None:
+        manifest = [
+            paired(
+                f"fabric-1.20.1/full/client_a/frame_{index}",
+                f"review-input/images/candidate_{index}.png",
+                f"review-input/images/reference_{index}.png",
+            )
+            for index in range(4)
+        ]
+        verify_calls: list[list[str]] = []
+
+        def provider(
+            stage: str,
+            _chunk_index: int,
+            chunk: list[dict[str, Any]],
+            _schema: dict[str, Any],
+        ) -> list[dict[str, Any]]:
+            labels = [item["label"] for item in chunk]
+            if stage == "triage":
+                return [
+                    {
+                        "anomalies": [],
+                        "confidence": "medium",
+                        "decision": "clean",
+                        "label": label,
+                    }
+                    for label in labels
+                ]
+            verify_calls.append(labels)
+            return [
+                {
+                    "anomalies": [],
+                    "defect": False,
+                    "label": label,
+                    "matches_reference": True,
+                    "semantic_valid": True,
+                    "visible": "The candidate remains visually correct.",
+                }
+                for label in labels
+            ]
+
+        verdicts, stats = execute_review(
+            manifest,
+            provider,
+            triage_chunk_size=1,
+            verify_chunk_size=4,
+            max_parallel_calls=4,
+        )
+
+        self.assertEqual([[item["label"] for item in manifest]], verify_calls)
+        self.assertEqual(4, len(verdicts))
+        self.assertEqual(4, stats["escalated"])
+        self.assertEqual(1, stats["verify_chunks"])
 
     def test_two_stage_review_escalates_only_non_high_clean_results(self) -> None:
         calls: list[tuple[str, list[str]]] = []

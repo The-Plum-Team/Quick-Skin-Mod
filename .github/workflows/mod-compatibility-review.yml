@@ -2,9 +2,10 @@ name: AI mod compatibility review
 
 # This secret-bearing workflow receives only metadata-free PNG capsules curated by the separate
 # compatibility workflow. Its protected producer wakes it explicitly because that producer was
-# itself created with GITHUB_TOKEN and cannot reliably recurse through workflow_run. Every
-# mod/loader capsule is reviewed concurrently. A durable marker is uploaded before an
-# Opus-confirmed defect cancels the remaining sessions.
+# itself created with GITHUB_TOKEN and cannot reliably recurse through workflow_run. All curated
+# mod/loader capsules are packed source-wide before the credential is exposed, then clean
+# results are split back into independently recoverable lane artifacts. A durable marker is
+# uploaded after an Opus-confirmed defect cancels the remaining calls.
 on:
   schedule:
     - cron: "17,47 * * * *"
@@ -123,6 +124,8 @@ jobs:
       count: ${{ steps.matrix.outputs.count }}
       completed_count: ${{ steps.matrix.outputs.completed_count }}
       matrix: ${{ steps.matrix.outputs.matrix }}
+      model_call_spacing_seconds: ${{ steps.matrix.outputs.model_call_spacing_seconds }}
+      model_parallelism: ${{ steps.matrix.outputs.model_parallelism }}
       pending_count: ${{ steps.matrix.outputs.pending_count }}
       source_run_id: ${{ steps.owner.outputs.source_run_id }}
       implementation_sha: ${{ steps.owner.outputs.implementation_sha }}
@@ -351,21 +354,30 @@ jobs:
           if (( pending_count > 0 )); then
             pending_input="$RUNNER_TEMP/mod-compatibility-pending.json"
             printf '%s\n' "$pending" > "$pending_input"
-            pending="$(python3 scripts/ci/mod_compatibility_review_queue.py \
+            admission="$(python3 scripts/ci/mod_compatibility_review_queue.py \
               --admit-matrix "$pending_input")"
             jq -e \
-              '.include | length > 0 and
-               all(.[];
-                 (.model_parallelism | type == "number" and
-                  floor == . and . >= 1 and . <= 32) and
-                 (.model_start_delay_seconds | type == "number" and
-                  floor == . and . >= 0 and . <= 30))' \
-              <<< "$pending" > /dev/null
+              '(.include | type == "array" and length > 0) and
+               (.model_parallelism | type == "number" and
+                floor == . and . >= 1 and . <= 32) and
+               (.model_call_spacing_seconds | type == "number" and
+                floor == . and . >= 0 and . <= 30)' \
+              <<< "$admission" > /dev/null
+            pending="$(jq -c '{include}' <<< "$admission")"
+            model_parallelism="$(jq -er .model_parallelism <<< "$admission")"
+            model_call_spacing_seconds="$(jq -er \
+              .model_call_spacing_seconds <<< "$admission")"
+          else
+            model_parallelism=0
+            model_call_spacing_seconds=0
           fi
           printf 'count=%s\n' "$count" >> "$GITHUB_OUTPUT"
           printf 'completed_count=%s\n' "$completed_count" >> "$GITHUB_OUTPUT"
           printf 'pending_count=%s\n' "$pending_count" >> "$GITHUB_OUTPUT"
           printf 'matrix=%s\n' "$pending" >> "$GITHUB_OUTPUT"
+          printf 'model_parallelism=%s\n' "$model_parallelism" >> "$GITHUB_OUTPUT"
+          printf 'model_call_spacing_seconds=%s\n' \
+            "$model_call_spacing_seconds" >> "$GITHUB_OUTPUT"
 
   capacity-check:
     name: Read shared Claude capacity
@@ -482,7 +494,7 @@ jobs:
             node_modules/.bin/claude --version
           )
 
-      - name: Probe once without tools before parallel review fan-out
+      - name: Probe once without tools before source-wide packed review
         id: probe
         if: >-
           steps.circuit.outputs.probe_required == 'true' ||
@@ -544,8 +556,8 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  review:
-    name: ${{ matrix.artifact_node }} / ${{ matrix.mod_name }}
+  prepare-review:
+    name: Pack authenticated compatibility capsules
     needs:
       - enumerate
       - capacity-check
@@ -557,30 +569,29 @@ jobs:
       needs.capacity-probe.result == 'success' &&
       needs.capacity-probe.outputs.fresh_ready == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 75
     permissions:
-      actions: write
+      actions: read
       contents: read
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.enumerate.outputs.matrix) }}
+    outputs:
+      artifact_name: ${{ steps.batch.outputs.artifact_name }}
 
     steps:
-      - name: Check out the exact protected reviewer
+      - name: Check out the exact protected batcher
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Revalidate current master before capsule or model admission
+      - name: Revalidate current master before capsule aggregation
         shell: bash
         env:
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
-          SOURCE_IMPLEMENTATION_SHA: ${{ matrix.implementation_sha }}
+          SOURCE_IMPLEMENTATION_SHA: ${{ needs.enumerate.outputs.implementation_sha }}
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
@@ -601,166 +612,312 @@ jobs:
             --only-binary=:all: --require-hashes \
             --requirement scripts/pages/requirements.txt
 
-      - name: Fetch and authenticate only the curated capsule
+      - name: Fetch and authenticate every curated capsule
+        id: batch
         shell: bash
         env:
-          ARTIFACT_DIGEST: ${{ matrix.artifact_digest }}
-          ARTIFACT_ID: ${{ matrix.artifact_id }}
-          ARTIFACT_NAME: ${{ matrix.artifact_name }}
-          ARTIFACT_SIZE: ${{ matrix.artifact_size }}
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
-          SOURCE_RUN_ID: ${{ matrix.source_run_id }}
+          PENDING_MATRIX: ${{ needs.enumerate.outputs.matrix }}
+          SOURCE_RUN_ID: ${{ needs.enumerate.outputs.source_run_id }}
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
-          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
-          (( ARTIFACT_SIZE <= 536870912 ))
-          [[ "$ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          [[ "$ARTIFACT_NAME" == \
-            "mod-compatibility-review-input-$SOURCE_RUN_ID-${{ matrix.id }}" ]]
-          metadata="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          pending="$RUNNER_TEMP/mod-compatibility-pending.json"
+          printf '%s\n' "$PENDING_MATRIX" > "$pending"
           jq -e \
-            --arg digest "$ARTIFACT_DIGEST" \
-            --arg name "$ARTIFACT_NAME" \
-            --argjson artifact_id "$ARTIFACT_ID" \
-            --argjson run_id "$SOURCE_RUN_ID" \
-            --argjson size "$ARTIFACT_SIZE" \
-            '.id == $artifact_id and .name == $name and .digest == $digest and
-             .size_in_bytes == $size and .expired == false and
-             .workflow_run.id == $run_id' <<< "$metadata" > /dev/null
-          archive="$RUNNER_TEMP/mod-compatibility-capsule.zip"
-          github_api_retry_to_file "$archive" \
-            -H 'Accept: application/vnd.github+json' \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip"
-          [[ "$(stat -c %s "$archive")" == "$ARTIFACT_SIZE" ]]
-          [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
-             "$ARTIFACT_DIGEST" ]]
-          capsule="$RUNNER_TEMP/mod-compatibility-capsule"
-          python3 scripts/ci/bounded_zip.py "$archive" "$capsule" \
-            --max-archive-bytes 536870912 \
-            --max-entries 520 \
-            --max-total-bytes 536870912 \
-            --max-file-bytes 33554432 \
-            --max-compression-ratio 200 > /dev/null
-          rm -f -- "$archive"
-          proof="$capsule/curation-proof.json"
-          manifest="$capsule/review-input/visual-review-manifest.json"
-          test -f "$proof" -a -f "$manifest"
-          test -d "$capsule/review-input/images"
-          [[ -z "$(find "$capsule/review-input/images" -mindepth 2 -print -quit)" ]]
-          jq -e \
-            --arg artifact_node "${{ matrix.artifact_node }}" \
-            --arg implementation_sha "${{ matrix.implementation_sha }}" \
-            --arg loader "${{ matrix.loader }}" \
-            --arg mod "${{ matrix.mod }}" \
-            --arg runtime_version "${{ matrix.runtime_version }}" \
-            --arg source_sha "${{ matrix.source_sha }}" \
-            --arg target_branch "${{ matrix.target_branch }}" \
-            --arg target_sha "${{ matrix.target_sha }}" \
-            --argjson compatibility_run_id "$SOURCE_RUN_ID" \
-            '(keys | sort) == (["artifact_inventory", "artifact_node",
-              "compatibility_contract_sha256", "compatibility_run_id", "frame_count",
-              "implementation_sha", "kind", "loader", "manifest_sha256", "mod",
-              "mod_name", "mod_version", "mod_version_id", "runtime_version",
-              "scenario_contract_sha256", "schema_version", "source_run_id", "source_sha",
-              "target_branch", "target_sha"] | sort) and
-             .schema_version == 1 and
-             .kind == "quick-skin-mod-compatibility-review-input" and
-             .compatibility_run_id == $compatibility_run_id and
-             .implementation_sha == $implementation_sha and
-             .artifact_node == $artifact_node and .runtime_version == $runtime_version and
-             .loader == $loader and .mod == $mod and .source_sha == $source_sha and
-             .target_branch == $target_branch and .target_sha == $target_sha and
-             (.source_run_id | type == "number" and . > 0) and
-             (.scenario_contract_sha256 | type == "string" and
-              test("^[0-9a-f]{64}$")) and
-             (.compatibility_contract_sha256 | type == "string" and
-              test("^[0-9a-f]{64}$")) and
-             (.manifest_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
-             (.frame_count | type == "number" and . > 0 and . <= 512)' \
-            "$proof" > /dev/null
-          [[ "$(sha256sum "$manifest" | cut -d ' ' -f 1)" == \
-            "$(jq -er .manifest_sha256 "$proof")" ]]
-          [[ "$(jq length "$manifest")" == "$(jq -er .frame_count "$proof")" ]]
-          git fetch --no-tags origin "${{ matrix.source_sha }}"
+            '(.include | type == "array" and length > 0 and length <= 64) and
+             all(.include[];
+               (.id | type == "string" and test("^[a-z0-9][a-z0-9_-]{0,255}$")) and
+               .source_run_id == $source_run_id and
+               .implementation_sha == $implementation_sha)' \
+            --arg implementation_sha "$GITHUB_SHA" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            "$pending" > /dev/null
+          source_sha="$(jq -er \
+            '[.include[].source_sha] | unique |
+             if length == 1 then .[0] else error("mixed source SHA") end' \
+            "$pending")"
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
+          git fetch --no-tags origin "$source_sha"
           source_contract="$RUNNER_TEMP/source-scenario-contract.json"
-          git show "${{ matrix.source_sha }}:e2e/scenario-contract.json" \
-            > "$source_contract"
-          [[ "$(sha256sum "$source_contract" | cut -d ' ' -f 1)" == \
-            "$(jq -er .scenario_contract_sha256 "$proof")" ]]
+          git show "$source_sha:e2e/scenario-contract.json" > "$source_contract"
           source_compatibility_contract="$RUNNER_TEMP/source-mod-compatibility-contract.json"
-          git show "${{ matrix.source_sha }}:e2e/mod-compatibility-contract.json" \
+          git show "$source_sha:e2e/mod-compatibility-contract.json" \
             > "$source_compatibility_contract"
-          [[ "$(sha256sum "$source_compatibility_contract" | cut -d ' ' -f 1)" == \
-            "$(jq -er .compatibility_contract_sha256 "$proof")" ]]
+          lanes_root="$RUNNER_TEMP/mod-compatibility-batch-lanes"
+          api_cache="$RUNNER_TEMP/mod-compatibility-api-cache"
+          mkdir -p "$lanes_root" "$api_cache"
 
-          for kind in base candidate; do
-            artifact_id="$(jq -er ".artifact_inventory.$kind.id" "$proof")"
-            artifact_run_id="$(jq -er ".artifact_inventory.$kind.run_id" "$proof")"
-            artifact_name="$(jq -er ".artifact_inventory.$kind.name" "$proof")"
-            artifact_size="$(jq -er ".artifact_inventory.$kind.size_in_bytes" "$proof")"
-            artifact_digest="$(jq -er ".artifact_inventory.$kind.digest" "$proof")"
+          while IFS= read -r lane; do
+            lane_id="$(jq -er .id <<< "$lane")"
+            artifact_id="$(jq -er .artifact_id <<< "$lane")"
+            artifact_name="$(jq -er .artifact_name <<< "$lane")"
+            artifact_size="$(jq -er .artifact_size <<< "$lane")"
+            artifact_digest="$(jq -er .artifact_digest <<< "$lane")"
+            artifact_node="$(jq -er .artifact_node <<< "$lane")"
+            base_evidence_name="$(jq -er .base_evidence_name <<< "$lane")"
+            implementation_sha="$(jq -er .implementation_sha <<< "$lane")"
+            loader="$(jq -er .loader <<< "$lane")"
+            mod="$(jq -er .mod <<< "$lane")"
+            runtime_version="$(jq -er .runtime_version <<< "$lane")"
+            target_branch="$(jq -er .target_branch <<< "$lane")"
+            target_sha="$(jq -er .target_sha <<< "$lane")"
             [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]]
-            [[ "$artifact_run_id" =~ ^[1-9][0-9]*$ ]]
             [[ "$artifact_size" =~ ^[1-9][0-9]*$ ]]
+            (( artifact_size <= 536870912 ))
             [[ "$artifact_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-            raw_metadata="$(github_api_retry \
+            [[ "$artifact_name" == \
+              "mod-compatibility-review-input-$SOURCE_RUN_ID-$lane_id" ]]
+            metadata="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id")"
             jq -e \
               --arg digest "$artifact_digest" \
               --arg name "$artifact_name" \
               --argjson artifact_id "$artifact_id" \
-              --argjson run_id "$artifact_run_id" \
+              --argjson run_id "$SOURCE_RUN_ID" \
               --argjson size "$artifact_size" \
               '.id == $artifact_id and .name == $name and .digest == $digest and
                .size_in_bytes == $size and .expired == false and
-               .workflow_run.id == $run_id' <<< "$raw_metadata" > /dev/null
-            raw_owner="$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$artifact_run_id")"
-            if [[ "$kind" == base ]]; then
-              [[ "$artifact_name" == "${{ matrix.base_evidence_name }}" ]]
-              [[ "$artifact_run_id" == "$(jq -er .source_run_id "$proof")" ]]
+               .workflow_run.id == $run_id' <<< "$metadata" > /dev/null
+            archive="$RUNNER_TEMP/mod-compatibility-capsule-$artifact_id.zip"
+            github_api_retry_to_file "$archive" \
+              -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip"
+            [[ "$(stat -c %s "$archive")" == "$artifact_size" ]]
+            [[ "sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)" == \
+              "$artifact_digest" ]]
+            capsule="$lanes_root/$lane_id"
+            python3 scripts/ci/bounded_zip.py "$archive" "$capsule" \
+              --max-archive-bytes 536870912 \
+              --max-entries 520 \
+              --max-total-bytes 536870912 \
+              --max-file-bytes 33554432 \
+              --max-compression-ratio 200 > /dev/null
+            rm -f -- "$archive"
+            proof="$capsule/curation-proof.json"
+            manifest="$capsule/review-input/visual-review-manifest.json"
+            test -f "$proof" -a -f "$manifest"
+            test -d "$capsule/review-input/images"
+            [[ -z "$(find "$capsule/review-input/images" -mindepth 2 -print -quit)" ]]
+            jq -e \
+              --arg artifact_node "$artifact_node" \
+              --arg implementation_sha "$implementation_sha" \
+              --arg loader "$loader" \
+              --arg mod "$mod" \
+              --arg runtime_version "$runtime_version" \
+              --arg source_sha "$source_sha" \
+              --arg target_branch "$target_branch" \
+              --arg target_sha "$target_sha" \
+              --argjson compatibility_run_id "$SOURCE_RUN_ID" \
+              '(keys | sort) == (["artifact_inventory", "artifact_node",
+                "compatibility_contract_sha256", "compatibility_run_id", "frame_count",
+                "implementation_sha", "kind", "loader", "manifest_sha256", "mod",
+                "mod_name", "mod_version", "mod_version_id", "runtime_version",
+                "scenario_contract_sha256", "schema_version", "source_run_id", "source_sha",
+                "target_branch", "target_sha"] | sort) and
+               .schema_version == 1 and
+               .kind == "quick-skin-mod-compatibility-review-input" and
+               .compatibility_run_id == $compatibility_run_id and
+               .implementation_sha == $implementation_sha and
+               .artifact_node == $artifact_node and .runtime_version == $runtime_version and
+               .loader == $loader and .mod == $mod and .source_sha == $source_sha and
+               .target_branch == $target_branch and .target_sha == $target_sha and
+               (.source_run_id | type == "number" and . > 0) and
+               (.scenario_contract_sha256 | type == "string" and
+                test("^[0-9a-f]{64}$")) and
+               (.compatibility_contract_sha256 | type == "string" and
+                test("^[0-9a-f]{64}$")) and
+               (.manifest_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+               (.frame_count | type == "number" and . > 0 and . <= 512)' \
+              "$proof" > /dev/null
+            [[ "$(sha256sum "$manifest" | cut -d ' ' -f 1)" == \
+              "$(jq -er .manifest_sha256 "$proof")" ]]
+            [[ "$(jq length "$manifest")" == "$(jq -er .frame_count "$proof")" ]]
+            [[ "$(sha256sum "$source_contract" | cut -d ' ' -f 1)" == \
+              "$(jq -er .scenario_contract_sha256 "$proof")" ]]
+            [[ "$(sha256sum "$source_compatibility_contract" | cut -d ' ' -f 1)" == \
+              "$(jq -er .compatibility_contract_sha256 "$proof")" ]]
+
+            for kind in base candidate; do
+              raw_id="$(jq -er ".artifact_inventory.$kind.id" "$proof")"
+              raw_run_id="$(jq -er ".artifact_inventory.$kind.run_id" "$proof")"
+              raw_name="$(jq -er ".artifact_inventory.$kind.name" "$proof")"
+              raw_size="$(jq -er ".artifact_inventory.$kind.size_in_bytes" "$proof")"
+              raw_digest="$(jq -er ".artifact_inventory.$kind.digest" "$proof")"
+              [[ "$raw_id" =~ ^[1-9][0-9]*$ ]]
+              [[ "$raw_run_id" =~ ^[1-9][0-9]*$ ]]
+              [[ "$raw_size" =~ ^[1-9][0-9]*$ ]]
+              [[ "$raw_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+              raw_metadata_file="$api_cache/artifact-$raw_id.json"
+              if [[ ! -f "$raw_metadata_file" ]]; then
+                github_api_retry \
+                  "repos/$GITHUB_REPOSITORY/actions/artifacts/$raw_id" \
+                  > "$raw_metadata_file"
+              fi
               jq -e \
-                --arg source_sha "${{ matrix.source_sha }}" \
-                --arg repository "$GITHUB_REPOSITORY" \
-                '.status == "completed" and .conclusion == "success" and
-                 .head_sha == $source_sha and .path == ".github/workflows/on-demand-e2e.yml" and
-                 .head_repository.full_name == $repository' \
-                <<< "$raw_owner" > /dev/null
-            else
-              [[ "$artifact_name" == "mod-compatibility-e2e-${{ matrix.id }}" ]]
-              [[ "$artifact_run_id" == "$SOURCE_RUN_ID" ]]
-              jq -e \
-                --arg implementation_sha "${{ matrix.implementation_sha }}" \
-                --arg repository "$GITHUB_REPOSITORY" \
-                '.status == "completed" and
-                 (.conclusion == "success" or .conclusion == "failure") and
-                 .head_sha == $implementation_sha and
-                 .path == ".github/workflows/mod-compatibility-e2e.yml" and
-                 .head_repository.full_name == $repository' \
-                <<< "$raw_owner" > /dev/null
-            fi
-          done
-          python3 e2e/check_visual_review.py \
-            --manifest "$manifest" \
-            --input-root "$capsule/review-input" \
-            --require-paired \
-            --compatibility-scenario-contract "$source_contract" \
-            --compatibility-contract "$source_compatibility_contract" \
-            --compatibility-artifact-node "${{ matrix.artifact_node }}" \
-            --compatibility-mod "${{ matrix.mod }}" \
-            --validate-input-only
-          sha256sum "$manifest" > "$RUNNER_TEMP/mod-compatibility-manifest.sha256"
+                --arg digest "$raw_digest" \
+                --arg name "$raw_name" \
+                --argjson artifact_id "$raw_id" \
+                --argjson run_id "$raw_run_id" \
+                --argjson size "$raw_size" \
+                '.id == $artifact_id and .name == $name and .digest == $digest and
+                 .size_in_bytes == $size and .expired == false and
+                 .workflow_run.id == $run_id' "$raw_metadata_file" > /dev/null
+              raw_owner_file="$api_cache/run-$raw_run_id.json"
+              if [[ ! -f "$raw_owner_file" ]]; then
+                github_api_retry \
+                  "repos/$GITHUB_REPOSITORY/actions/runs/$raw_run_id" \
+                  > "$raw_owner_file"
+              fi
+              if [[ "$kind" == base ]]; then
+                [[ "$raw_name" == "$base_evidence_name" ]]
+                [[ "$raw_run_id" == "$(jq -er .source_run_id "$proof")" ]]
+                jq -e \
+                  --arg source_sha "$source_sha" \
+                  --arg repository "$GITHUB_REPOSITORY" \
+                  '.status == "completed" and .conclusion == "success" and
+                   .head_sha == $source_sha and
+                   .path == ".github/workflows/on-demand-e2e.yml" and
+                   .head_repository.full_name == $repository' \
+                  "$raw_owner_file" > /dev/null
+              else
+                [[ "$raw_name" == "mod-compatibility-e2e-$lane_id" ]]
+                [[ "$raw_run_id" == "$SOURCE_RUN_ID" ]]
+                jq -e \
+                  --arg implementation_sha "$implementation_sha" \
+                  --arg repository "$GITHUB_REPOSITORY" \
+                  '.status == "completed" and
+                   (.conclusion == "success" or .conclusion == "failure") and
+                   .head_sha == $implementation_sha and
+                   .path == ".github/workflows/mod-compatibility-e2e.yml" and
+                   .head_repository.full_name == $repository' \
+                  "$raw_owner_file" > /dev/null
+              fi
+            done
+            python3 e2e/check_visual_review.py \
+              --manifest "$manifest" \
+              --input-root "$capsule/review-input" \
+              --require-paired \
+              --compatibility-scenario-contract "$source_contract" \
+              --compatibility-contract "$source_compatibility_contract" \
+              --compatibility-artifact-node "$artifact_node" \
+              --compatibility-mod "$mod" \
+              --validate-input-only
+          done < <(jq -c '.include[]' "$pending")
+
+          batch="$RUNNER_TEMP/mod-compatibility-review-batch"
+          python3 scripts/ci/mod_compatibility_review_batch.py assemble \
+            --matrix "$pending" \
+            --lanes-root "$lanes_root" \
+            --output "$batch"
+          jq -e \
+            --arg implementation_sha "$GITHUB_SHA" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '.implementation_sha == $implementation_sha and
+             .source_run_id == $source_run_id' \
+            "$batch/batch.json" > /dev/null
+          artifact_name="mod-compatibility-review-batch-$SOURCE_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf 'artifact_name=%s\n' "$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the bounded source-wide review batch
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.batch.outputs.artifact_name }}
+          path: ${{ runner.temp }}/mod-compatibility-review-batch/
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 1
+
+  review:
+    name: Review globally packed compatibility frames
+    needs:
+      - enumerate
+      - capacity-check
+      - capacity-probe
+      - prepare-review
+    if: >-
+      always() &&
+      needs.enumerate.outputs.pending_count != '0' &&
+      needs.capacity-check.result == 'success' &&
+      needs.capacity-probe.result == 'success' &&
+      needs.capacity-probe.outputs.fresh_ready == 'true' &&
+      needs.prepare-review.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: Check out the exact protected reviewer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Revalidate current master before batch or model admission
+        shell: bash
+        env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_IMPLEMENTATION_SHA: ${{ needs.enumerate.outputs.implementation_sha }}
+        run: |
+          set -euo pipefail
+          source scripts/ci/github_api_retry.sh
+          [[ "$SOURCE_IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_IMPLEMENTATION_SHA" == "$GITHUB_SHA" ]]
+          current_master="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          [[ "$current_master" == "$GITHUB_SHA" ]]
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install hash-locked image decoder
+        run: |
+          python3 -m pip install --disable-pip-version-check \
+            --only-binary=:all: --require-hashes \
+            --requirement scripts/pages/requirements.txt
+
+      - name: Download only the authenticated source-wide review batch
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.prepare-review.outputs.artifact_name }}
+          path: ${{ runner.temp }}/mod-compatibility-review-batch
+
+      - name: Validate the bounded batch before revealing the credential
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ needs.enumerate.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          batch="$RUNNER_TEMP/mod-compatibility-review-batch"
+          python3 scripts/ci/mod_compatibility_review_batch.py validate \
+            --batch "$batch" \
+            --require-images
+          jq -e \
+            --arg implementation_sha "$GITHUB_SHA" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '.implementation_sha == $implementation_sha and
+             .source_run_id == $source_run_id' \
+            "$batch/batch.json" > /dev/null
+          sha256sum "$batch/review-input/visual-review-manifest.json" \
+            > "$RUNNER_TEMP/mod-compatibility-batch-manifest.sha256"
 
       - name: Restore authenticated compatibility verdict cache shards
         id: verdict-cache
         continue-on-error: true
-        working-directory: ${{ runner.temp }}/mod-compatibility-capsule
+        working-directory: ${{ runner.temp }}/mod-compatibility-review-batch
         shell: bash
         env:
           GITHUB_API_RETRY_ATTEMPTS: "10"
@@ -770,7 +927,6 @@ jobs:
           set -euo pipefail
           source "$GITHUB_WORKSPACE/scripts/ci/github_api_retry.sh"
           printf 'restored=false\n' >> "$GITHUB_OUTPUT"
-          printf 'artifact_ids=\n' >> "$GITHUB_OUTPUT"
           policy_sha256="$(python3 \
             "$GITHUB_WORKSPACE/e2e/visual_review_cache.py" policy \
             --runner "$GITHUB_WORKSPACE/e2e/visual_review_runner.py" \
@@ -792,20 +948,38 @@ jobs:
             --verify-chunk-size 4)"
           [[ "$policy_sha256" =~ ^[0-9a-f]{64}$ ]]
           printf 'policy_sha256=%s\n' "$policy_sha256" >> "$GITHUB_OUTPUT"
-          cache_name="mod-compatibility-verdict-cache-$policy_sha256-${{ matrix.id }}"
-          if ! artifacts="$(github_api_retry --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$cache_name&per_page=100")"; then
-            exit 0
-          fi
-          if ! jq -e \
-            '(type == "array") and
-             ([.[] | (.artifacts | type == "array")] | all) and
-             ([.[].artifacts[]] | length <= 100)' \
-              <<< "$artifacts" > /dev/null; then
-            exit 0
-          fi
+          global_cache_name="mod-compatibility-verdict-cache-$policy_sha256"
+          cache_names=("$global_cache_name")
+          candidates='[]'
+          for cache_name in "${cache_names[@]}"; do
+            if ! artifacts="$(github_api_retry --paginate --slurp \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$cache_name&per_page=100")"; then
+              exit 0
+            fi
+            jq -e \
+              '(type == "array") and
+               ([.[] | (.artifacts | type == "array")] | all) and
+               ([.[].artifacts[]] | length <= 100)' \
+              <<< "$artifacts" > /dev/null
+            candidates="$(jq -cn \
+              --arg name "$cache_name" \
+              --argjson current "$candidates" \
+              --argjson pages "$artifacts" \
+              '$current + [$pages[].artifacts[] |
+                select(.name == $name and .expired == false and
+                  (.size_in_bytes | type == "number" and . > 0 and . <= 4194304) and
+                  (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
+                  (.created_at | type == "string" and length > 0) and
+                  (.id | type == "number" and . > 0) and
+                  (.workflow_run.id | type == "number" and . > 0))]')"
+          done
+          jq -e 'length <= 100' <<< "$candidates" > /dev/null
+          candidates="$(jq -c 'unique_by(.id) | sort_by(.created_at, .id) | reverse' \
+            <<< "$candidates")"
           cache_arguments=()
-          cache_ids=()
+          consumed='[]'
+          current_producer="$(git -C "$GITHUB_WORKSPACE" rev-parse \
+            "$GITHUB_SHA:.github/workflows/mod-compatibility-review.yml")"
           while IFS=$'\t' read -r candidate_id candidate_run_id; do
             [[ "$candidate_id" =~ ^[1-9][0-9]*$ ]]
             [[ "$candidate_run_id" =~ ^[1-9][0-9]*$ ]]
@@ -841,24 +1015,15 @@ jobs:
             owner_producer="$(git -C "$GITHUB_WORKSPACE" rev-parse \
               "$cache_owner_sha:.github/workflows/mod-compatibility-review.yml" \
               2>/dev/null || true)"
-            current_producer="$(git -C "$GITHUB_WORKSPACE" rev-parse \
-              "$GITHUB_SHA:.github/workflows/mod-compatibility-review.yml")"
-            if [[ -z "$owner_producer" \
-                || "$owner_producer" != "$current_producer" ]]; then
+            if [[ -z "$owner_producer" || "$owner_producer" != "$current_producer" ]]; then
               continue
             fi
             cache_metadata="$(jq -c --argjson id "$candidate_id" \
-              '[.[].artifacts[] | select(.id == $id)] |
-               if length == 1 then .[0] else empty end' <<< "$artifacts")"
-            if [[ -z "$cache_metadata" ]]; then
-              continue
-            fi
-            if ! cache_size="$(jq -er .size_in_bytes <<< "$cache_metadata")" || \
-                ! cache_digest="$(jq -er \
-                  '.digest | select(type == "string" and
-                    test("^sha256:[0-9a-f]{64}$"))' <<< "$cache_metadata")"; then
-              continue
-            fi
+              '[.[] | select(.id == $id)] |
+               if length == 1 then .[0] else empty end' <<< "$candidates")"
+            [[ -n "$cache_metadata" ]] || continue
+            cache_size="$(jq -er .size_in_bytes <<< "$cache_metadata")"
+            cache_digest="$(jq -er .digest <<< "$cache_metadata")"
             cache_archive="$RUNNER_TEMP/mod-compatibility-verdict-cache-$candidate_id.zip"
             if ! github_api_retry_to_file "$cache_archive" \
                 -H 'Accept: application/vnd.github+json' \
@@ -893,29 +1058,26 @@ jobs:
               continue
             fi
             cache_arguments+=(--cache "$normalized")
-            cache_ids+=("$candidate_id")
-            if (( ${#cache_ids[@]} == 32 )); then
+            consumed="$(jq -cn \
+              --argjson current "$consumed" \
+              --argjson artifact "$cache_metadata" \
+              '$current + [{
+                id:$artifact.id,name:$artifact.name,digest:$artifact.digest,
+                size_in_bytes:$artifact.size_in_bytes,
+                run_id:$artifact.workflow_run.id}]')"
+            if (( ${#cache_arguments[@]} == 64 )); then
               break
             fi
-          done < <(jq -r --arg name "$cache_name" \
-            '[.[].artifacts[] |
-              select(.name == $name and .expired == false and
-                (.size_in_bytes | type == "number" and . > 0 and . <= 4194304) and
-                (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
-                (.id | type == "number" and . > 0) and
-                (.workflow_run.id | type == "number" and . > 0))] |
-             sort_by(.created_at, .id) | reverse | .[] |
-             [.id, .workflow_run.id] | @tsv' <<< "$artifacts" || true)
-          if (( ${#cache_ids[@]} == 0 )); then
+          done < <(jq -r '.[] | [.id, .workflow_run.id] | @tsv' <<< "$candidates")
+          if (( ${#cache_arguments[@]} == 0 )); then
             exit 0
           fi
           python3 "$GITHUB_WORKSPACE/e2e/visual_review_cache.py" combine \
             "${cache_arguments[@]}" \
             --policy-sha256 "$policy_sha256" \
             --output visual-review-verdict-cache.input.json
-          cache_id_list="$(IFS=,; printf '%s' "${cache_ids[*]}")"
-          [[ "$cache_id_list" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]]
-          printf 'artifact_ids=%s\n' "$cache_id_list" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$consumed" \
+            > "$RUNNER_TEMP/consumed-mod-compatibility-caches.json"
           printf 'restored=true\n' >> "$GITHUB_OUTPUT"
 
       - name: Install Node for the locked Claude CLI
@@ -936,9 +1098,9 @@ jobs:
             node_modules/.bin/claude --version
           )
 
-      - name: Reuse exact regions, then review with Haiku and selective Opus
+      - name: Pack globally, reuse exact regions, then run selective review
         id: model
-        working-directory: ${{ runner.temp }}/mod-compatibility-capsule
+        working-directory: ${{ runner.temp }}/mod-compatibility-review-batch
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           CLAUDE_CODE_SKIP_PROMPT_HISTORY: "1"
@@ -949,11 +1111,6 @@ jobs:
           unset GH_TOKEN GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN \
             ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL \
             ACTIONS_CACHE_URL ACTIONS_RESULTS_URL
-          admission_delay="${{ matrix.model_start_delay_seconds }}"
-          [[ "$admission_delay" =~ ^([0-9]|[12][0-9]|30)$ ]]
-          if (( admission_delay > 0 )); then
-            sleep "$admission_delay"
-          fi
           cache_arguments=()
           if [[ "${{ steps.verdict-cache.outputs.restored }}" == true ]]; then
             cache_arguments=(
@@ -975,19 +1132,90 @@ jobs:
             --verify-model claude-opus-5 \
             --triage-chunk-size 8 \
             --verify-chunk-size 4 \
-            --max-parallel-calls "${{ matrix.model_parallelism }}" \
+            --max-parallel-calls "${{ needs.enumerate.outputs.model_parallelism }}" \
             --model-attempts 3 \
-            --call-spacing-seconds 2 \
+            --call-spacing-seconds \
+              "${{ needs.enumerate.outputs.model_call_spacing_seconds }}" \
             "${cache_arguments[@]}" \
             --output visual-review-report.staged.json \
             --completion-state visual-review-completion.json \
             --failure-report visual-review-failure.json \
+            --telemetry-report visual-review-telemetry.json \
             || model_status=$?
           printf 'model_status=%s\n' "$model_status" >> "$GITHUB_OUTPUT"
 
-      - name: Normalize and classify the protected verdict
+      - name: Validate only sanitized model-call telemetry
+        id: telemetry
+        if: always() && steps.model.outcome == 'success'
+        working-directory: ${{ runner.temp }}/mod-compatibility-review-batch
+        shell: bash
+        env:
+          MODEL_STATUS: ${{ steps.model.outputs.model_status }}
+          SOURCE_RUN_ID: ${{ needs.enumerate.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$MODEL_STATUS" =~ ^[0-9]{1,3}$ ]]
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          lane_count="$(jq -er .lane_count batch.json)"
+          [[ "$lane_count" =~ ^[1-9][0-9]*$ ]]
+          jq \
+            --arg implementation_sha "$GITHUB_SHA" \
+            --arg kind "quick-skin-mod-compatibility-review-telemetry" \
+            --argjson capacity_probe_calls 1 \
+            --argjson lane_count "$lane_count" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '. + {schema_version:2,kind:$kind,source_run_id:$source_run_id,
+              implementation_sha:$implementation_sha,lane_count:$lane_count,
+              capacity_probe_calls:$capacity_probe_calls}' \
+            visual-review-telemetry.json \
+            > visual-review-telemetry.normalized.json
+          mv -- visual-review-telemetry.normalized.json \
+            visual-review-telemetry.json
+          jq -e \
+            --arg state "$([[ "$MODEL_STATUS" == 0 ]] && printf complete || printf failed)" \
+            --arg implementation_sha "$GITHUB_SHA" \
+            --argjson lane_count "$lane_count" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '(keys | sort) == (["capacity_probe_calls", "implementation_sha",
+              "kind", "lane_count", "model_attempts", "review_plan",
+              "schema_version", "source_run_id", "state"] | sort) and
+             .schema_version == 2 and
+             .kind == "quick-skin-mod-compatibility-review-telemetry" and
+             .source_run_id == $source_run_id and
+             .implementation_sha == $implementation_sha and
+             .lane_count == $lane_count and .capacity_probe_calls == 1 and
+             .state == $state and
+             (.model_attempts | (keys | sort) == (["retries", "total",
+               "triage", "triage_chunks", "verify", "verify_chunks"] | sort)) and
+             ([.model_attempts[]] |
+               all(.[]; type == "number" and floor == . and . >= 0)) and
+             .model_attempts.total ==
+               (.model_attempts.triage + .model_attempts.verify) and
+             .model_attempts.retries ==
+               (.model_attempts.total - .model_attempts.triage_chunks -
+                .model_attempts.verify_chunks) and
+             (if .state == "complete" then
+                (.review_plan | type == "object" and
+                 (keys | sort) == (["cached", "escalated", "frames", "identical",
+                   "paired", "represented", "reviewed", "stopped_early",
+                   "triage_chunks", "triaged", "verify_chunks"] | sort) and
+                 ([.[]] | all(.[]; type == "number" and floor == . and . >= 0)))
+              else .review_plan == null end)' \
+            visual-review-telemetry.json > /dev/null
+
+      - name: Upload the sanitized source-wide model-call telemetry
+        if: always() && steps.telemetry.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mod-compatibility-review-telemetry-${{ needs.enumerate.outputs.source_run_id }}
+          path: ${{ runner.temp }}/mod-compatibility-review-batch/visual-review-telemetry.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Normalize and classify the protected aggregate verdict
         id: check
-        working-directory: ${{ runner.temp }}/mod-compatibility-capsule
+        if: steps.telemetry.outcome == 'success'
+        working-directory: ${{ runner.temp }}/mod-compatibility-review-batch
         shell: bash
         env:
           MODEL_STATUS: ${{ steps.model.outputs.model_status }}
@@ -998,7 +1226,7 @@ jobs:
           if (( MODEL_STATUS != 0 )); then
             exit "$MODEL_STATUS"
           fi
-          sha256sum --check "$RUNNER_TEMP/mod-compatibility-manifest.sha256"
+          sha256sum --check "$RUNNER_TEMP/mod-compatibility-batch-manifest.sha256"
           state="$(jq -er '.state | select(. == "complete" or
             . == "blocking-partial")' visual-review-completion.json)"
           report_arguments=(
@@ -1031,7 +1259,7 @@ jobs:
           always() && steps.check.outcome == 'success' &&
           steps.model.outputs.model_status == '0' &&
           steps.verdict-cache.outputs.policy_sha256 != ''
-        working-directory: ${{ runner.temp }}/mod-compatibility-capsule
+        working-directory: ${{ runner.temp }}/mod-compatibility-review-batch
         continue-on-error: true
         shell: bash
         run: |
@@ -1047,9 +1275,8 @@ jobs:
             --policy-sha256 "${{ steps.verdict-cache.outputs.policy_sha256 }}" \
             --review-mode reference-comparison \
             --output visual-review-verdict-cache.json
-          printf 'artifact_name=mod-compatibility-verdict-cache-%s-%s\n' \
-            "${{ steps.verdict-cache.outputs.policy_sha256 }}" \
-            "${{ matrix.id }}" >> "$GITHUB_OUTPUT"
+          printf 'artifact_name=mod-compatibility-verdict-cache-%s\n' \
+            "${{ steps.verdict-cache.outputs.policy_sha256 }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload the protected compatibility verdict cache
         id: verdict-cache-artifact
@@ -1058,7 +1285,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.publish-verdict-cache.outputs.artifact_name }}
-          path: ${{ runner.temp }}/mod-compatibility-capsule/visual-review-verdict-cache.json
+          path: ${{ runner.temp }}/mod-compatibility-review-batch/visual-review-verdict-cache.json
           if-no-files-found: error
           retention-days: 7
 
@@ -1075,15 +1302,18 @@ jobs:
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
-          old_id_list="${{ steps.verdict-cache.outputs.artifact_ids }}"
+          consumed="$RUNNER_TEMP/consumed-mod-compatibility-caches.json"
+          test -f "$consumed" -a ! -L "$consumed"
+          jq -e 'type == "array" and length > 0 and length <= 64' "$consumed" \
+            > /dev/null
           new_id="${{ steps.verdict-cache-artifact.outputs.artifact-id }}"
-          cache_name="${{ steps.publish-verdict-cache.outputs.artifact_name }}"
-          expected_cache_name="mod-compatibility-verdict-cache-${{ steps.verdict-cache.outputs.policy_sha256 }}-${{ matrix.id }}"
-          [[ "$old_id_list" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]]
           [[ "$new_id" =~ ^[1-9][0-9]*$ ]]
-          [[ "$cache_name" == "$expected_cache_name" ]]
-          IFS=, read -r -a old_ids <<< "$old_id_list"
-          for old_id in "${old_ids[@]}"; do
+          while IFS= read -r artifact; do
+            old_id="$(jq -er .id <<< "$artifact")"
+            old_name="$(jq -er .name <<< "$artifact")"
+            old_digest="$(jq -er .digest <<< "$artifact")"
+            old_size="$(jq -er .size_in_bytes <<< "$artifact")"
+            old_run_id="$(jq -er .run_id <<< "$artifact")"
             [[ "$old_id" =~ ^[1-9][0-9]*$ ]]
             [[ "$old_id" != "$new_id" ]]
             metadata="$(github_api_retry \
@@ -1093,24 +1323,56 @@ jobs:
               continue
             fi
             jq -e \
-              --arg name "$cache_name" \
+              --arg digest "$old_digest" \
+              --arg name "$old_name" \
               --argjson artifact_id "$old_id" \
-              '.id == $artifact_id and .name == $name and .expired == false' \
-              <<< "$metadata" > /dev/null
+              --argjson run_id "$old_run_id" \
+              --argjson size "$old_size" \
+              '.id == $artifact_id and .name == $name and .digest == $digest and
+               .size_in_bytes == $size and .expired == false and
+               .workflow_run.id == $run_id' <<< "$metadata" > /dev/null
             github_api_retry --method DELETE \
               "repos/$GITHUB_REPOSITORY/actions/artifacts/$old_id" > /dev/null
-          done
+          done < <(jq -c '.[]' "$consumed")
 
-      - name: Classify a failed lane without provider text
+      - name: Prepare the normalized source-wide result for lane splitting
+        if: >-
+          steps.check.outcome == 'success' &&
+          steps.check.outputs.confirmed_defect == 'false'
+        working-directory: ${{ runner.temp }}/mod-compatibility-review-batch
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$RUNNER_TEMP/mod-compatibility-review-batch-result"
+          mkdir -p "$result/review-input"
+          cp -- batch.json "$result/batch.json"
+          cp -R -- lanes "$result/lanes"
+          cp -- review-input/visual-review-manifest.json \
+            "$result/review-input/visual-review-manifest.json"
+          cp -- visual-review-report.json visual-review-completion.json \
+            visual-review-telemetry.json "$result/"
+
+      - name: Upload the normalized source-wide result
+        if: >-
+          steps.check.outcome == 'success' &&
+          steps.check.outputs.confirmed_defect == 'false'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mod-compatibility-review-batch-result-${{ needs.enumerate.outputs.source_run_id }}
+          path: ${{ runner.temp }}/mod-compatibility-review-batch-result/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Classify a failed batch without provider text
         id: failure
         if: always() && steps.check.outcome != 'success'
         working-directory: ${{ runner.temp }}
         shell: bash
         run: |
           set -euo pipefail
-          capsule="$RUNNER_TEMP/mod-compatibility-capsule"
-          mkdir -p "$capsule"
-          failure="$capsule/visual-review-failure.json"
+          batch="$RUNNER_TEMP/mod-compatibility-review-batch"
+          mkdir -p "$batch"
+          failure="$batch/visual-review-failure.json"
           if [[ ! -f "$failure" ]]; then
             jq -n \
               '{schema_version:1,category:"protected_validation",
@@ -1126,36 +1388,140 @@ jobs:
              (.transient | type == "boolean")' "$failure" > /dev/null
           category="$(jq -er .category "$failure")"
           printf 'category=%s\n' "$category" >> "$GITHUB_OUTPUT"
-          cp -- "$failure" \
-            "$RUNNER_TEMP/mod-compatibility-failure-${{ matrix.id }}.json"
+          cp -- "$failure" "$RUNNER_TEMP/mod-compatibility-failure-batch.json"
 
-      - name: Upload only the sanitized failed-lane marker
+      - name: Upload only the sanitized failed-batch marker
         if: always() && steps.failure.outputs.category != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mod-compatibility-attempt-${{ matrix.source_run_id }}-${{ matrix.id }}
-          path: ${{ runner.temp }}/mod-compatibility-failure-${{ matrix.id }}.json
+          name: mod-compatibility-attempt-${{ needs.enumerate.outputs.source_run_id }}-batch
+          path: ${{ runner.temp }}/mod-compatibility-failure-batch.json
           if-no-files-found: error
           retention-days: 1
 
+      - name: Create an Opus-confirmed wave block
+        if: steps.check.outputs.confirmed_defect == 'true'
+        working-directory: ${{ runner.temp }}/mod-compatibility-review-batch
+        shell: bash
+        env:
+          PENDING_MATRIX: ${{ needs.enumerate.outputs.matrix }}
+          SOURCE_RUN_ID: ${{ needs.enumerate.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          defect_label="$(jq -er 'map(select(.defect == true)) | .[0].label' \
+            visual-review-report.json)"
+          lane="$(jq -er --arg label "$defect_label" \
+            '[.lanes[] | select(.labels | index($label))] |
+             if length == 1 then .[0].id else error("defect lane is ambiguous") end' \
+            batch.json)"
+          pending="$RUNNER_TEMP/mod-compatibility-block-pending.json"
+          printf '%s\n' "$PENDING_MATRIX" > "$pending"
+          mod="$(jq -er --arg lane "$lane" \
+            '.include[] | select(.id == $lane) | .mod' "$pending")"
+          target_sha="$(jq -er --arg lane "$lane" \
+            '.include[] | select(.id == $lane) | .target_sha' "$pending")"
+          report_sha256="$(sha256sum visual-review-report.json | cut -d ' ' -f 1)"
+          jq -n \
+            --arg lane "$lane" \
+            --arg mod "$mod" \
+            --arg report_sha256 "$report_sha256" \
+            --arg target_sha "$target_sha" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            '{schema_version:1,kind:"quick-skin-mod-compatibility-wave-block",
+              source_run_id:$source_run_id,target_sha:$target_sha,lane:$lane,
+              mod:$mod,report_sha256:$report_sha256}' \
+            > mod-compatibility-wave-block.json
+
+      - name: Upload the durable confirmed-defect marker
+        id: block-artifact
+        if: steps.check.outputs.confirmed_defect == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mod-compatibility-wave-block-${{ needs.enumerate.outputs.source_run_id }}
+          path: ${{ runner.temp }}/mod-compatibility-review-batch/mod-compatibility-wave-block.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after the durable Opus block cancels outstanding calls
+        if: steps.block-artifact.outputs.artifact-id != ''
+        run: exit 1
+
+  publish-lanes:
+    name: Publish ${{ matrix.artifact_node }} / ${{ matrix.mod_name }}
+    needs:
+      - enumerate
+      - review
+    if: >-
+      always() &&
+      needs.enumerate.outputs.pending_count != '0' &&
+      needs.review.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.enumerate.outputs.matrix) }}
+
+    steps:
+      - name: Check out the protected lane splitter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Download the normalized source-wide result
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mod-compatibility-review-batch-result-${{ matrix.source_run_id }}
+          path: ${{ runner.temp }}/mod-compatibility-review-batch-result
+
+      - name: Split and revalidate this complete clean lane
+        shell: bash
+        run: |
+          set -euo pipefail
+          batch="$RUNNER_TEMP/mod-compatibility-review-batch-result"
+          jq -e \
+            --arg implementation_sha "${{ matrix.implementation_sha }}" \
+            --argjson source_run_id "${{ matrix.source_run_id }}" \
+            '.implementation_sha == $implementation_sha and
+             .source_run_id == $source_run_id' \
+            "$batch/batch.json" > /dev/null
+          output="$RUNNER_TEMP/mod-compatibility-lane-result"
+          python3 scripts/ci/mod_compatibility_review_batch.py split \
+            --batch "$batch" \
+            --report "$batch/visual-review-report.json" \
+            --completion "$batch/visual-review-completion.json" \
+            --lane "${{ matrix.id }}" \
+            --output "$output"
+          python3 e2e/check_visual_review.py \
+            --manifest "$output/review-input/visual-review-manifest.json" \
+            --report "$output/visual-review-report.json" \
+            --normalized-report "$RUNNER_TEMP/visual-review-report.revalidated.json" \
+            --require-paired
+          cmp -- "$output/visual-review-report.json" \
+            "$RUNNER_TEMP/visual-review-report.revalidated.json"
+
       - name: Upload the exact normalized lane report
-        if: always() && steps.check.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mod-compatibility-review-${{ matrix.source_run_id }}-${{ matrix.id }}
           path: |
-            ${{ runner.temp }}/mod-compatibility-capsule/curation-proof.json
-            ${{ runner.temp }}/mod-compatibility-capsule/review-input/visual-review-manifest.json
-            ${{ runner.temp }}/mod-compatibility-capsule/visual-review-report.json
-            ${{ runner.temp }}/mod-compatibility-capsule/visual-review-completion.json
+            ${{ runner.temp }}/mod-compatibility-lane-result/curation-proof.json
+            ${{ runner.temp }}/mod-compatibility-lane-result/review-input/visual-review-manifest.json
+            ${{ runner.temp }}/mod-compatibility-lane-result/visual-review-report.json
+            ${{ runner.temp }}/mod-compatibility-lane-result/visual-review-completion.json
           if-no-files-found: error
           retention-days: 7
 
       - name: Create a clean lane completion marker
-        if: >-
-          steps.check.outcome == 'success' &&
-          steps.check.outputs.confirmed_defect == 'false'
-        working-directory: ${{ runner.temp }}/mod-compatibility-capsule
+        working-directory: ${{ runner.temp }}/mod-compatibility-lane-result
         shell: bash
         run: |
           set -euo pipefail
@@ -1170,59 +1536,12 @@ jobs:
             > mod-compatibility-lane-complete.json
 
       - name: Upload the durable clean lane marker
-        if: >-
-          steps.check.outcome == 'success' &&
-          steps.check.outputs.confirmed_defect == 'false'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}
-          path: ${{ runner.temp }}/mod-compatibility-capsule/mod-compatibility-lane-complete.json
+          path: ${{ runner.temp }}/mod-compatibility-lane-result/mod-compatibility-lane-complete.json
           if-no-files-found: error
           retention-days: 7
-
-      - name: Create an Opus-confirmed wave block
-        id: block
-        if: steps.check.outputs.confirmed_defect == 'true'
-        working-directory: ${{ runner.temp }}/mod-compatibility-capsule
-        shell: bash
-        run: |
-          set -euo pipefail
-          report_sha256="$(sha256sum visual-review-report.json | cut -d ' ' -f 1)"
-          jq -n \
-            --arg lane "${{ matrix.id }}" \
-            --arg mod "${{ matrix.mod }}" \
-            --arg report_sha256 "$report_sha256" \
-            --arg target_sha "${{ matrix.target_sha }}" \
-            --argjson source_run_id "${{ matrix.source_run_id }}" \
-            '{schema_version:1,kind:"quick-skin-mod-compatibility-wave-block",
-              source_run_id:$source_run_id,target_sha:$target_sha,lane:$lane,
-              mod:$mod,report_sha256:$report_sha256}' \
-            > mod-compatibility-wave-block.json
-
-      - name: Upload the durable confirmed-defect marker
-        id: block-artifact
-        if: steps.check.outputs.confirmed_defect == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: mod-compatibility-wave-block-${{ matrix.source_run_id }}
-          path: ${{ runner.temp }}/mod-compatibility-capsule/mod-compatibility-wave-block.json
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Cancel every sibling session after the durable Opus block exists
-        if: steps.block-artifact.outputs.artifact-id != ''
-        shell: bash
-        env:
-          GITHUB_API_RETRY_ATTEMPTS: "10"
-          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
-          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          source scripts/ci/github_api_retry.sh
-          github_api_retry --method POST \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/cancel"
-          exit 1
 
   gate:
     name: AI mod compatibility gate
@@ -1230,7 +1549,9 @@ jobs:
       - enumerate
       - capacity-check
       - capacity-probe
+      - prepare-review
       - review
+      - publish-lanes
     if: always() && needs.enumerate.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -1241,7 +1562,7 @@ jobs:
       complete: ${{ steps.result.outputs.complete }}
 
     steps:
-      - name: Download sanitized failed-lane markers from this attempt
+      - name: Download sanitized failed-batch markers from this attempt
         if: always() && needs.review.result == 'failure'
         continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1307,10 +1628,12 @@ jobs:
           COMPLETED_COUNT: ${{ needs.enumerate.outputs.completed_count }}
           COUNT: ${{ needs.enumerate.outputs.count }}
           PENDING_COUNT: ${{ needs.enumerate.outputs.pending_count }}
+          PREPARE_RESULT: ${{ needs.prepare-review.result }}
           PROBE_FRESH_READY: ${{ needs.capacity-probe.outputs.fresh_ready }}
           PROBE_READY: ${{ needs.capacity-probe.outputs.ready }}
           PROBE_REQUIRED: ${{ needs.capacity-check.outputs.probe_required }}
           PROBE_RESULT: ${{ needs.capacity-probe.result }}
+          PUBLISH_RESULT: ${{ needs.publish-lanes.result }}
           REVIEW_RESULT: ${{ needs.review.result }}
         run: |
           set -euo pipefail
@@ -1320,7 +1643,9 @@ jobs:
           (( COMPLETED_COUNT + PENDING_COUNT == COUNT ))
           printf 'complete=false\n' >> "$GITHUB_OUTPUT"
           if (( PENDING_COUNT == 0 )); then
+            [[ "$PREPARE_RESULT" == skipped ]]
             [[ "$REVIEW_RESULT" == skipped ]]
+            [[ "$PUBLISH_RESULT" == skipped ]]
             printf 'complete=true\n' >> "$GITHUB_OUTPUT"
             printf 'All %s available compatibility lanes were already reviewed.\n' \
               "$COUNT" >> "$GITHUB_STEP_SUMMARY"
@@ -1345,12 +1670,16 @@ jobs:
             ready="$PROBE_FRESH_READY"
           fi
           if [[ "$ready" == true ]]; then
+            [[ "$PREPARE_RESULT" == success ]]
             [[ "$REVIEW_RESULT" == success ]]
+            [[ "$PUBLISH_RESULT" == success ]]
             printf 'complete=true\n' >> "$GITHUB_OUTPUT"
-            printf 'All %s compatibility lanes passed durable independent visual review.\n' \
+            printf 'All %s compatibility lanes passed packed review and independent publication.\n' \
               "$COUNT" >> "$GITHUB_STEP_SUMMARY"
           else
+            [[ "$PREPARE_RESULT" == skipped ]]
             [[ "$REVIEW_RESULT" == skipped ]]
+            [[ "$PUBLISH_RESULT" == skipped ]]
             printf 'Claude capacity is paused; %s unfinished compatibility lanes remain queued.\n' \
               "$PENDING_COUNT" >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -1398,25 +1727,36 @@ jobs:
       always() && needs.gate.result == 'success' &&
       needs.gate.outputs.complete == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 75
     permissions:
       contents: write
 
     steps:
+      - name: Check out the protected publication dispatcher
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
       - name: Dispatch the completed source into a fresh protected publisher
         shell: bash
         env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ needs.enumerate.outputs.source_run_id }}
         run: |
           set -euo pipefail
+          source scripts/ci/github_api_retry.sh
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           payload="$RUNNER_TEMP/mod-compatibility-publication-request.json"
           jq -n \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             '{event_type:"mod-compatibility-publication-requested",client_payload:{
               source_run_id:$source_run_id}}' > "$payload"
-          gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+          github_api_retry --method POST \
+            "repos/$GITHUB_REPOSITORY/dispatches" \
             --input "$payload" > /dev/null
 
   publish-evidence:

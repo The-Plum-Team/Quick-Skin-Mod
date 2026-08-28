@@ -55,6 +55,7 @@ SAFE_EXACT_PATHS = frozenset(
         "scripts/ci/e2e_impact.py",
         "scripts/ci/e2e_job_graph.py",
         "scripts/ci/github_api_retry.sh",
+        "scripts/ci/mod_compatibility_review_batch.py",
         "scripts/ci/mod_compatibility_impact.py",
         "scripts/ci/visual_anchor_certification.py",
         "scripts/ci/visual_nonimpact_certification.py",
