@@ -333,9 +333,9 @@ semantic fingerprints, review scope, expectation, passed runtime evidence, captu
 scenario contract, release matrix, prompts, reviewer/checker/cache/similarity code, models, mode,
 and chunk policy match exactly; artifact labels and loaders may differ because they are not visual
 identity. Unpaired anchor semantics are never cached. Haiku triages the remaining representative
-frames in chunks of at most eight. All independent chunks run concurrently. Only a Haiku concern
-or confidence below high is independently rechecked by Opus in concurrent chunks of at most four
-as soon as its Haiku result is available; a clean high-confidence Haiku verdict is final.
+frames in chunks of at most eight. All independent chunks run concurrently. After the complete
+Haiku stage settles, every concern or confidence below high is packed source-wide and rechecked by
+Opus in concurrent chunks of at most four; a clean high-confidence Haiku verdict is final.
 Perceptual similarity is model context only and can never produce a pass or force an escalation.
 The authenticated evidence remains 1920x1080 for exact comparison and caching, while the runner
 creates deterministic 1280x720 copies only for chunks that actually reach a model. Provider
@@ -473,14 +473,18 @@ sibling keeps the runtime wave red but cannot erase or suppress these
 successful capsules. Compatibility launches omit Mixin's global debug injection-count flag because
 it changes optional third-party mixin behavior; the clean packaged suite retains that stricter
 Quick Skin injector check. The credential-bearing review workflow receives only the successful
-curated capsules, never raw packaged artifacts, and reviews them concurrently. Exact authored-region
-matches need no AI call, exact-equivalent pairs share one representative, Haiku reviews the
-remaining groups from deterministic 1280x720 copies, and Opus confirms only a Haiku concern or
-confidence below high. Clean paired verdicts also enter the protected exact-policy cache, so a
+curated capsules, never raw packaged artifacts. A secretless step authenticates and combines the
+unfinished capsules, deduplicates content-addressed images, and exposes exact equivalence across
+loaders to one source-wide review plan. Exact authored-region matches need no AI call,
+exact-equivalent pairs share one representative, Haiku reviews globally packed groups from
+deterministic 1280x720 copies, and Opus confirms only a Haiku concern or confidence below high.
+The workflow records sanitized attempt/chunk/retry counts without provider text or usage details,
+then secretless jobs split a clean result into independently recoverable lane artifacts. Clean
+paired verdicts also enter the protected source-wide exact-policy cache, so a
 later compatibility wave can reuse the previous decision only when both semantic-region images,
 the authored scope and expectation, passed runtime evidence, contracts, prompts, models, and
-reviewer implementation still match exactly. A first Opus-confirmed defect creates a durable source-wave block and cancels the remaining
-compatibility review jobs.
+reviewer implementation still match exactly. A first Opus-confirmed defect creates a durable
+source-wave block and cancels the remaining model calls.
 
 Once every applicable lane is complete and clean, the protected reviewer can publish the wave
 without another model call. It reauthenticates the source plan, every full capsule, all normalized
