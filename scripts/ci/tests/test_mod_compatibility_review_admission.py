@@ -16,7 +16,7 @@ def matrix(count: int) -> dict[str, list[dict[str, str]]]:
 
 
 class ModCompatibilityReviewAdmissionTest(unittest.TestCase):
-    def test_all_ten_lanes_remain_present_with_one_nested_call_each(self) -> None:
+    def test_all_lanes_share_one_source_wide_call_budget(self) -> None:
         result = admit(matrix(10))
 
         self.assertEqual(10, len(result["include"]))
@@ -24,33 +24,27 @@ class ModCompatibilityReviewAdmissionTest(unittest.TestCase):
             [f"lane-{index}" for index in range(10)],
             [lane["id"] for lane in result["include"]],
         )
-        self.assertEqual(
-            {1}, {lane["model_parallelism"] for lane in result["include"]}
-        )
-        self.assertEqual(
-            list(range(0, 20, 2)),
-            [lane["model_start_delay_seconds"] for lane in result["include"]],
-        )
+        self.assertEqual(12, result["model_parallelism"])
+        self.assertEqual(2, result["model_call_spacing_seconds"])
+        self.assertFalse(any("model_parallelism" in lane for lane in result["include"]))
 
-    def test_smaller_wave_uses_the_available_nested_budget(self) -> None:
-        result = admit(matrix(3))
+    def test_custom_source_wide_limits_are_preserved(self) -> None:
+        result = admit(matrix(3), call_budget=7, call_spacing_seconds=5)
 
-        self.assertEqual(
-            {4}, {lane["model_parallelism"] for lane in result["include"]}
-        )
-        self.assertEqual(
-            [0, 2, 4],
-            [lane["model_start_delay_seconds"] for lane in result["include"]],
-        )
+        self.assertEqual(7, result["model_parallelism"])
+        self.assertEqual(5, result["model_call_spacing_seconds"])
 
-    def test_ramp_is_bounded(self) -> None:
-        result = admit(matrix(3), ramp_seconds=30)
+    def test_call_spacing_is_bounded(self) -> None:
+        result = admit(matrix(3), call_spacing_seconds=30)
 
-        self.assertEqual(30, result["include"][-1]["model_start_delay_seconds"])
+        self.assertEqual(30, result["model_call_spacing_seconds"])
 
-    def test_rejects_a_wave_larger_than_the_concurrent_budget(self) -> None:
+    def test_lane_count_no_longer_consumes_the_call_budget(self) -> None:
+        self.assertEqual(13, len(admit(matrix(13))["include"]))
+
+    def test_rejects_a_wave_larger_than_the_batch_bound(self) -> None:
         with self.assertRaises(AdmissionError):
-            admit(matrix(13))
+            admit(matrix(65))
 
     def test_rejects_empty_or_preannotated_matrices(self) -> None:
         with self.assertRaises(AdmissionError):
@@ -62,7 +56,7 @@ class ModCompatibilityReviewAdmissionTest(unittest.TestCase):
         with self.assertRaises(AdmissionError):
             admit(matrix(1), call_budget=33)
         with self.assertRaises(AdmissionError):
-            admit(matrix(1), ramp_seconds=-1)
+            admit(matrix(1), call_spacing_seconds=-1)
 
 
 if __name__ == "__main__":
