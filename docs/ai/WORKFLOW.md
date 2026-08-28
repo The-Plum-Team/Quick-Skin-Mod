@@ -52,8 +52,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   reports at least 95%; pause only for an explicit rejection or a failed probe classified as a
   transient quota/provider condition. A later rejected review remains fail-closed and retryable.
   Each optional-mod source must obtain a fresh serialized probe instead of spending a ready marker
-  produced for an earlier source. Its lane matrix stays concurrent, but protected admission must
-  bound the combined nested chunk-call fan-out and apply a short bounded start ramp.
+  produced for an earlier source. Its deterministic lane matrix stays concurrent, while a
+  secretless post-curation batch deduplicates exact images and semantic representatives across the
+  unfinished lanes. Protected admission must bound the source-wide runner's parallel calls and
+  apply short bounded call spacing; a secretless matrix then republishes complete clean lane
+  reports independently.
   Upload only bounded normalized status/type/band evidence, never raw provider text or exact
   account-usage details. If a capsule disappears after its exact metadata guard but before its
   download, settle only that coalesced wake without starting a model; keep every other download or
@@ -62,7 +65,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   the live `master` SHA before model admission, including artifact-scoped exact wakes.
 - Optional-mod review must suppress a producer wake that settles after `master` advances, reject a
   direct request whose source SHA differs from the protected current implementation, and recheck
-  live `master` independently in every parallel lane before capsule download or model admission.
+  live `master` independently at both the secretless batch boundary and credential-bearing model
+  boundary before capsule download or model admission.
 - Keep deterministic E2E applicability and model applicability separate. A PR to `master` runs
   deterministic Build and Packaged E2E but defers semantic model work to the cumulative post-merge
   1.20.1 anchor; a direct release-branch PR retains fail-closed source-PR review because no such
