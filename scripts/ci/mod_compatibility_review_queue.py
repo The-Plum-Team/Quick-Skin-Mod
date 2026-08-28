@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select a compatibility source or admit its lane matrix to the Claude budget."""
+"""Select a compatibility source or admit its source-wide Claude batch."""
 
 from __future__ import annotations
 
@@ -39,9 +39,10 @@ MAX_MARKER_BYTES = 1_048_576
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 DEFAULT_CALL_BUDGET = 12
-DEFAULT_RAMP_SECONDS = 2
+DEFAULT_CALL_SPACING_SECONDS = 2
 MAX_PARALLEL_CALLS = 32
-MAX_RAMP_SECONDS = 30
+MAX_CALL_SPACING_SECONDS = 30
+MAX_BATCH_LANES = 64
 
 
 class AdmissionError(QueueError):
@@ -52,8 +53,8 @@ def admit(
     matrix: Any,
     *,
     call_budget: int = DEFAULT_CALL_BUDGET,
-    ramp_seconds: int = DEFAULT_RAMP_SECONDS,
-) -> dict[str, list[dict[str, Any]]]:
+    call_spacing_seconds: int = DEFAULT_CALL_SPACING_SECONDS,
+) -> dict[str, Any]:
     if (
         isinstance(call_budget, bool)
         or not isinstance(call_budget, int)
@@ -61,41 +62,31 @@ def admit(
     ):
         raise AdmissionError("call budget must be between 1 and 32")
     if (
-        isinstance(ramp_seconds, bool)
-        or not isinstance(ramp_seconds, int)
-        or not 0 <= ramp_seconds <= MAX_RAMP_SECONDS
+        isinstance(call_spacing_seconds, bool)
+        or not isinstance(call_spacing_seconds, int)
+        or not 0 <= call_spacing_seconds <= MAX_CALL_SPACING_SECONDS
     ):
-        raise AdmissionError("ramp spacing must be between 0 and 30 seconds")
+        raise AdmissionError("call spacing must be between 0 and 30 seconds")
     if not isinstance(matrix, dict) or set(matrix) != {"include"}:
         raise AdmissionError("matrix must contain only include")
     lanes = matrix["include"]
-    if not isinstance(lanes, list) or not 1 <= len(lanes) <= call_budget:
-        raise AdmissionError(
-            "lane count must fit the protected concurrent call budget"
-        )
+    if not isinstance(lanes, list) or not 1 <= len(lanes) <= MAX_BATCH_LANES:
+        raise AdmissionError("batch must contain between 1 and 64 lanes")
     if not all(isinstance(lane, dict) for lane in lanes):
         raise AdmissionError("every matrix lane must be an object")
     if any(
-        "model_parallelism" in lane or "model_start_delay_seconds" in lane
+        "model_parallelism" in lane or "model_call_spacing_seconds" in lane
         for lane in lanes
     ):
         raise AdmissionError("matrix already contains protected admission fields")
 
-    # GitHub still starts every lane concurrently. Only each lane's nested chunk executor is
-    # bounded, preventing lane_count * 32 simultaneous Claude calls. A short deterministic ramp
-    # avoids an exact same-second burst without serializing the compatibility jobs.
-    per_lane = call_budget // len(lanes)
+    # Curated lanes remain independently recoverable, but one source-wide runner packs their
+    # exact semantic representatives before model admission. The budget therefore bounds actual
+    # concurrent calls directly instead of being divided into under-filled per-lane executors.
     return {
-        "include": [
-            {
-                **lane,
-                "model_parallelism": per_lane,
-                "model_start_delay_seconds": min(
-                    index * ramp_seconds, MAX_RAMP_SECONDS
-                ),
-            }
-            for index, lane in enumerate(lanes)
-        ]
+        "include": lanes,
+        "model_call_spacing_seconds": call_spacing_seconds,
+        "model_parallelism": call_budget,
     }
 
 
@@ -239,7 +230,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--github-output", type=Path)
     parser.add_argument("--admit-matrix", type=Path)
     parser.add_argument("--call-budget", type=int, default=DEFAULT_CALL_BUDGET)
-    parser.add_argument("--ramp-seconds", type=int, default=DEFAULT_RAMP_SECONDS)
+    parser.add_argument(
+        "--call-spacing-seconds",
+        type=int,
+        default=DEFAULT_CALL_SPACING_SECONDS,
+    )
     return parser.parse_args(argv)
 
 
@@ -256,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
             admitted = admit(
                 matrix,
                 call_budget=args.call_budget,
-                ramp_seconds=args.ramp_seconds,
+                call_spacing_seconds=args.call_spacing_seconds,
             )
             json.dump(admitted, sys.stdout, separators=(",", ":"), sort_keys=True)
             sys.stdout.write("\n")
