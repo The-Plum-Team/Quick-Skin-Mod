@@ -168,10 +168,10 @@ immutable workflow and governance activation contract.
   current semantic policy. For paired evidence, decoded RGB pixels from the authored regions can prove an exact
   candidate/reference match without a model call; exact-equivalent versions share one AI-reviewed
   representative. Each drain triages the remaining loader-grouped chunks concurrently with Haiku
-  from deterministic 1280x720 copies and sends only concerns or confidence below high to concurrent
-  bounded Opus verification. A clean high-confidence Haiku decision is final. Perceptual
-  similarity is model context only and can never synthesize a pass or force escalation. The first
-  Opus-confirmed defect publishes a protected generation-bound marker,
+  from deterministic 1280x720 copies, then globally packs only concerns or confidence below high
+  into concurrent bounded Opus verification. A clean high-confidence Haiku decision is final.
+  Perceptual similarity is model context only and can never synthesize a pass or force escalation.
+  The first Opus-confirmed defect publishes a protected generation-bound marker,
   cancels sibling drains and keeps later queue selection from spending more model calls on that
   automatic wave. Each drain also cancels its own outstanding calls on confirmation and reuses a
   verdict only under exact semantic candidate/reference fingerprints, authored review scope,
@@ -214,23 +214,30 @@ immutable workflow and governance activation contract.
   authenticates that complete runtime result, then pairs exactly the selected compatibility-profile
   captures with the clean same-version/loader result. Exact
   authored-region matches need no model call, exact-equivalent pairs share one representative,
-  Haiku reviews the remaining pairs, and Opus verifies only a concern or confidence below high. The
-  first confirmed defect records a durable wave
-  block and cancels sibling reviews. Each successful runtime lane curates its own capsule before
+  Haiku reviews the remaining pairs, and Opus verifies only a concern or confidence below high.
+  The first confirmed defect records a durable wave block and cancels outstanding model calls.
+  Each successful runtime lane curates its own capsule before
   the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing
-  successful lanes or preventing their concurrent AI review. The settled compatibility producer
-  explicitly dispatches the protected reviewer and that reviewer polls until the exact source run
-  is complete; relying on a recursive `workflow_run` would silently lose token-created waves. The
-  reviewer shares the repository-wide Claude capacity circuit, records clean lanes independently,
+  successful lanes or preventing their later source-wide AI review. The settled compatibility
+  producer explicitly dispatches the protected reviewer and that reviewer polls until the exact
+  source run is complete; relying on a recursive `workflow_run` would silently lose token-created
+  waves. The reviewer shares the repository-wide Claude capacity circuit, records clean lanes
+  independently,
   and keeps the authenticated source plan pending across quota pauses. Every compatibility source
   requires its own fresh serialized tool-free probe; a ready marker from the preceding source is
-  not treated as capacity reserved for another wave. All mod lanes still start concurrently, while
-  a protected per-wave call budget and bounded start ramp prevent their internal chunk executors
-  from multiplying into an unbounded provider burst. Scheduled recovery reruns only unfinished
-  lanes and publishes a source completion marker after the full set is clean. A
-  producer that settles after `master` advances suppresses its wake; direct review admission binds
-  the source SHA to the protected current implementation, and every lane rechecks live `master`
-  before it downloads a capsule or starts a model.
+  not treated as capacity reserved for another wave. All deterministic mod lanes still start
+  concurrently. After the fresh probe, a secretless protected batcher authenticates every
+  unfinished curated capsule, deduplicates content-addressed images, and combines their manifests
+  so exact-equivalent pairs can share representatives across loaders and chunks can fill to their
+  global bound. One credential-bearing runner applies the protected per-wave parallel-call budget
+  and bounded call spacing, then secretless matrix jobs split a complete clean result back into
+  independently authenticated lane reports and completion markers. It publishes only sanitized
+  per-stage call, chunk, and retry counts, never provider text, token counts, or account usage.
+  Scheduled recovery reruns only unfinished lanes and publishes a source completion marker after
+  the full set is clean. A producer that settles after `master` advances suppresses its wake;
+  direct review admission binds
+  the source SHA to the protected current implementation, and both the secretless batcher and
+  credential-bearing runner recheck live `master` before capsules or a model are admitted.
   `e2e/full-validation-baseline.json` is an intentionally runtime-impacting one-time marker for the
   2026-08-17 cape/Elytra and compatibility rollout. It carries the previously quota-paused full
   wave across this admission-policy change; normal policy-only changes leave it untouched.
