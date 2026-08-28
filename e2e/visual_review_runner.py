@@ -139,24 +139,40 @@ def _chunks(items: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]
 def _checkpoint_chunks(
     items: list[dict[str, Any]], size: int
 ) -> list[list[dict[str, Any]]]:
-    """Pack loader siblings together without exceeding the provider chunk bound."""
+    """Minimize chunks while keeping loader siblings together whenever possible."""
 
     _chunks([], size)
     grouped: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
     for item in items:
         grouped.setdefault(item["capture_id"], []).append(item)
-    chunks: list[list[dict[str, Any]]] = []
-    current: list[dict[str, Any]] = []
+    full_chunks: list[list[dict[str, Any]]] = []
+    residual_groups: list[list[dict[str, Any]]] = []
     for siblings in grouped.values():
-        for offset in range(0, len(siblings), size):
-            bounded = siblings[offset : offset + size]
-            if current and len(current) + len(bounded) > size:
-                chunks.append(current)
-                current = []
-            current.extend(bounded)
-    if current:
-        chunks.append(current)
-    return chunks
+        full_count = len(siblings) // size
+        for index in range(full_count):
+            offset = index * size
+            full_chunks.append(siblings[offset : offset + size])
+        remainder = siblings[full_count * size :]
+        if remainder:
+            residual_groups.append(remainder)
+
+    residual_chunks: list[list[dict[str, Any]]] = []
+    for siblings in residual_groups:
+        for chunk in residual_chunks:
+            if len(chunk) + len(siblings) <= size:
+                chunk.extend(siblings)
+                break
+        else:
+            residual_chunks.append(list(siblings))
+
+    residual_count = sum(len(group) for group in residual_groups)
+    minimum_residual_chunks = (residual_count + size - 1) // size
+    if len(residual_chunks) > minimum_residual_chunks:
+        residual_chunks = _chunks(
+            [item for group in residual_groups for item in group],
+            size,
+        )
+    return [*full_chunks, *residual_chunks]
 
 
 def build_review_plan(
@@ -236,7 +252,7 @@ def execute_review(
     cache_hits: dict[str, dict[str, Any]] | None = None,
     review_identical: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Pipeline concurrent triage and verification, stopping on one confirmed defect.
+    """Run concurrent triage, pack selective verification, and stop on one defect.
 
     The provider must be safe for concurrent calls when ``max_parallel_calls`` is above one.
     """
@@ -306,6 +322,7 @@ def execute_review(
     escalated_count = 0
     verify_chunks_count = 0
     confirmed_defects: list[dict[str, Any]] = []
+    verification_started = False
     executor: concurrent.futures.ThreadPoolExecutor | None = None
     pending: dict[
         concurrent.futures.Future[list[dict[str, Any]]],
@@ -370,7 +387,6 @@ def execute_review(
                     normalized_triage = validate_triage(
                         chunk, raw, require_paired=paired
                     )
-                    escalated: list[dict[str, Any]] = []
                     for item, triage in zip(chunk, normalized_triage, strict=True):
                         triage_by_label[item["label"]] = triage
                         if (
@@ -389,13 +405,6 @@ def execute_review(
                                 "anomalies": [],
                                 "defect": False,
                             }
-                        else:
-                            escalated.append({**item, "first_review": triage})
-                    escalated_count += len(escalated)
-                    for verify_chunk in _checkpoint_chunks(
-                        escalated, verify_chunk_size
-                    ):
-                        submit_verify(verify_chunk)
                     continue
 
                 validation_chunk = [
@@ -417,6 +426,21 @@ def execute_review(
                     break
                 for verdict in verdicts:
                     final_by_label[verdict["label"]] = verdict
+            if not verification_started and not any(
+                stage == "triage" for stage, _chunk in pending.values()
+            ):
+                verification_started = True
+                escalated = [
+                    {**item, "first_review": triage_by_label[item["label"]]}
+                    for item in plan["semantic"]
+                    if not (
+                        triage_by_label[item["label"]]["decision"] == "clean"
+                        and triage_by_label[item["label"]]["confidence"] == "high"
+                    )
+                ]
+                escalated_count = len(escalated)
+                for verify_chunk in _checkpoint_chunks(escalated, verify_chunk_size):
+                    submit_verify(verify_chunk)
     except BaseException:
         cancel = getattr(provider, "cancel", None)
         if callable(cancel):
@@ -509,6 +533,38 @@ def _write_failure(path: Path | None, error: RunnerError) -> None:
     )
 
 
+def _write_telemetry(
+    path: Path | None,
+    provider: ClaudeProvider | None,
+    stats: dict[str, int] | None,
+    *,
+    state: str,
+) -> None:
+    if path is None or path.exists() or path.is_symlink():
+        return
+    attempts = (
+        provider.telemetry()
+        if provider is not None
+        else {
+            "retries": 0,
+            "total": 0,
+            "triage": 0,
+            "triage_chunks": 0,
+            "verify": 0,
+            "verify_chunks": 0,
+        }
+    )
+    _write_json_new(
+        path,
+        {
+            "model_attempts": attempts,
+            "review_plan": stats,
+            "schema_version": 1,
+            "state": state,
+        },
+    )
+
+
 class ClaudeProvider:
     """Invoke the pinned CLI with one exact manifest and a read-only tool surface."""
 
@@ -540,9 +596,35 @@ class ClaudeProvider:
         self._model_paths: dict[str, str] = {}
         self._pace_lock = threading.Lock()
         self._artifact_lock = threading.Lock()
+        self._telemetry_lock = threading.Lock()
         self._process_lock = threading.Lock()
         self._processes: set[subprocess.Popen[bytes]] = set()
+        self._attempts = {"triage": 0, "verify": 0}
+        self._attempted_chunks = {"triage": set(), "verify": set()}
         self._cancelled = threading.Event()
+
+    def _record_attempt(self, stage: str, chunk_index: int) -> None:
+        with self._telemetry_lock:
+            self._attempts[stage] += 1
+            self._attempted_chunks[stage].add(chunk_index)
+
+    def telemetry(self) -> dict[str, int]:
+        """Return sanitized model-process counts without provider-authored content."""
+
+        with self._telemetry_lock:
+            triage = self._attempts["triage"]
+            verify = self._attempts["verify"]
+            triage_chunks = len(self._attempted_chunks["triage"])
+            verify_chunks = len(self._attempted_chunks["verify"])
+        total = triage + verify
+        return {
+            "retries": total - triage_chunks - verify_chunks,
+            "total": total,
+            "triage": triage,
+            "triage_chunks": triage_chunks,
+            "verify": verify,
+            "verify_chunks": verify_chunks,
+        }
 
     def cancel(self) -> None:
         self._cancelled.set()
@@ -711,6 +793,7 @@ class ClaudeProvider:
                         stderr=stderr,
                         start_new_session=True,
                     )
+                    self._record_attempt(stage, chunk_index)
                     with self._process_lock:
                         if self._cancelled.is_set():
                             try:
@@ -835,6 +918,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--verify-model", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--failure-report", type=Path)
+    parser.add_argument("--telemetry-report", type=Path)
     parser.add_argument("--cache", type=Path)
     parser.add_argument("--cache-policy-sha256")
     parser.add_argument("--completion-state", type=Path, required=True)
@@ -867,6 +951,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     failure_path = args.failure_report.absolute() if args.failure_report else None
+    telemetry_path = (
+        args.telemetry_report.absolute() if args.telemetry_report else None
+    )
+    provider: ClaudeProvider | None = None
+    stats: dict[str, int] | None = None
     try:
         if not 1 <= args.model_attempts <= MAX_MODEL_ATTEMPTS:
             raise RunnerError("configuration", "arguments", transient=False)
@@ -932,17 +1021,32 @@ def main(argv: list[str] | None = None) -> int:
                 "report_verdicts": len(verdicts),
             },
         )
+        _write_telemetry(telemetry_path, provider, stats, state="complete")
         print(
             "Visual review plan: "
             + ", ".join(f"{key}={value}" for key, value in stats.items())
         )
+        print(
+            "Sanitized model calls: "
+            + ", ".join(
+                f"{key}={value}" for key, value in provider.telemetry().items()
+            )
+        )
         return 0
     except RunnerError as exc:
+        try:
+            _write_telemetry(telemetry_path, provider, None, state="failed")
+        except OSError:
+            pass
         _write_failure(failure_path, exc)
         print(str(exc), file=sys.stderr)
         return 2
     except (OSError, ReviewError, ValueError) as exc:
         error = RunnerError("protected_validation", "runner", transient=False)
+        try:
+            _write_telemetry(telemetry_path, provider, None, state="failed")
+        except OSError:
+            pass
         _write_failure(failure_path, error)
         print(str(error), file=sys.stderr)
         return 2

@@ -315,9 +315,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   exposes only bounded manifests/images plus authored regions and each passed capture assertion's
   bounded printable runtime evidence to concurrent loader-grouped Haiku triage. Authenticated
   evidence and exact identities stay at 1920x1080; model-visible copies are deterministic
-  1280x720 PNGs. Only a concern or confidence below high reaches selective concurrent Opus
-  verification with a read-only tool surface; a clean high-confidence Haiku decision is final and
-  perceptual similarity can neither route nor pass.
+  1280x720 PNGs. After Haiku settles, only concerns or confidence below high are globally packed
+  into selective concurrent Opus verification with a read-only tool surface; a clean
+  high-confidence Haiku decision is final and perceptual similarity can neither route nor pass.
   The runner captures each verdict from stdout,
   and validates exact labels and semantic coherence after every call. A first Opus-confirmed defect
   cancels outstanding work, emits only an explicit fail-closed partial report, publishes a sanitized
@@ -368,14 +368,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   mod's contract. All applicable units run in parallel; unsupported loader/mod pairs
   and reviewed upstream loader/version exclusions remain explicit `not_applicable` records. Each
   successful unit must curate its capsule in that same matrix job; a failing sibling keeps the
-  runtime gate red but cannot suppress the successful capsule or its later parallel review. The
+  runtime gate red but cannot suppress the successful capsule or its later packed review. The
   producer must explicitly dispatch that separate reviewer after its gate settles, because the
   producer is itself token-created and cannot rely on recursive `workflow_run` delivery. The
   reviewer must authenticate the repository, source run id, protected implementation SHA, workflow
   identity, terminal conclusion, and capsule provenance after polling the exact producer to
   completion. A producer that settles after `master` advances must not dispatch its stale source;
   direct review admission must require the source implementation to equal the protected current
-  `master`, and every lane must recheck live `master` before capsule download or model admission.
+  `master`, and both the secretless source batcher and credential-bearing reviewer must recheck
+  live `master` before capsule download or model admission.
   Compatibility launches must not enable Mixin's global debug injection-count flag because that
   changes third-party optional-injector semantics; the clean packaged suite still enables it to
   enforce Quick Skin's own expectations. External JARs must come from
@@ -388,11 +389,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   first authenticate complete release-plus-compatibility runtime coverage, but ordinary-suite
   captures must not enter the model capsule.
   Exact authored-region matches inherit the clean paired result, exact-equivalent pairs share one
-  representative, and every remaining group reaches Haiku. Only a concern or confidence below high
-  reaches Opus. The first Opus-confirmed defect publishes a durable
-  source-wave marker and cancels remaining review jobs. Raw packaged artifacts are authenticated
-  and re-encoded by a secretless curator; a credential-bearing reviewer receives only the bounded,
-  metadata-free capsule and its source/target/artifact proof.
+  representative across every unfinished lane, and globally packed chunks send every remaining
+  group to Haiku. Only a concern or confidence below high reaches Opus. The first Opus-confirmed
+  defect publishes a durable source-wave marker and cancels outstanding model calls. Raw packaged
+  artifacts are authenticated and re-encoded by per-lane secretless curators; another secretless
+  boundary authenticates and deduplicates those capsules before the credential-bearing reviewer
+  receives only the bounded, metadata-free source batch and its source/target/artifact proofs. A
+  clean aggregate is split back into complete lane reports without another model call, so completed
+  lanes remain independently recoverable.
 - Every automatic `master` synchronization releases non-anchor version branches through exactly
   one of two authenticated routes. The ordinary route requires the protected drainer to produce a
   semantic 1.20.1 certificate. The certificate must cover identical

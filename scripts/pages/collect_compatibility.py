@@ -315,11 +315,12 @@ def _validate_run(
     workflow: str,
     events: frozenset[str],
     head_sha: str | None = None,
+    conclusions: frozenset[str] = frozenset({"success"}),
 ) -> str:
     run_sha = run.get("head_sha")
     if (
         run.get("status") != "completed"
-        or run.get("conclusion") != "success"
+        or run.get("conclusion") not in conclusions
         or run.get("event") not in events
         or run.get("path") != workflow
         or run.get("head_branch") != "master"
@@ -428,6 +429,7 @@ def _select_review_artifact(
                 workflow=REVIEW_WORKFLOW,
                 events=REVIEW_EVENTS,
                 head_sha=required_owner_sha,
+                conclusions=frozenset({"success", "failure"}),
             )
             _fetch_commits(repository_root, run_sha)
             _require_nonimpacting_ancestor(
