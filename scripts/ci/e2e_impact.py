@@ -39,6 +39,7 @@ EXACT_NON_RUNTIME_PATHS = frozenset(
         "scripts/ci/gradle_cache_policy.py",
         "scripts/ci/prune_actions_caches.py",
         "scripts/ci/github_api_retry.sh",
+        "scripts/ci/mod_compatibility_review_batch.py",
         "scripts/ci/mod_compatibility_review_queue.py",
         "scripts/ci/mod_compatibility_impact.py",
         "scripts/ci/visual_review_queue.py",
