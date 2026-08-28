@@ -287,13 +287,18 @@ class WorkflowSecurityTest(unittest.TestCase):
             ): "7",
             (
                 "mod-compatibility-review.yml",
+                "Upload the sanitized source-wide model-call telemetry",
+                "mod-compatibility-review-telemetry-${{ needs.enumerate.outputs.source_run_id }}",
+            ): "7",
+            (
+                "mod-compatibility-review.yml",
                 "Upload the durable clean lane marker",
                 "mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}",
             ): "7",
             (
                 "mod-compatibility-review.yml",
                 "Upload the durable confirmed-defect marker",
-                "mod-compatibility-wave-block-${{ matrix.source_run_id }}",
+                "mod-compatibility-wave-block-${{ needs.enumerate.outputs.source_run_id }}",
             ): "7",
             (
                 "mod-compatibility-review.yml",
@@ -848,7 +853,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         capacity_probe = job_block(
             "mod-compatibility-review.yml", "capacity-probe"
         )
+        prepare_review = job_block(
+            "mod-compatibility-review.yml", "prepare-review"
+        )
         review = job_block("mod-compatibility-review.yml", "review")
+        publish_lanes = job_block(
+            "mod-compatibility-review.yml", "publish-lanes"
+        )
         review_gate = job_block("mod-compatibility-review.yml", "gate")
         review_continue = job_block("mod-compatibility-review.yml", "continue")
         plan_step_start = prepare.index(
@@ -1018,50 +1029,73 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("name: ${{ steps.probe.outputs.marker_name }}", capacity_probe)
         self.assertIn("mod_compatibility_review_queue.py", enumerate_review)
+        self.assertIn("ref: ${{ github.sha }}", prepare_review)
         self.assertIn("ref: ${{ github.sha }}", review)
-        self.assertNotIn("ref: ${{ matrix.implementation_sha }}", review)
+        self.assertIn("ref: ${{ github.sha }}", publish_lanes)
         self.assertIn(
-            "Revalidate current master before capsule or model admission", review
+            "Revalidate current master before capsule aggregation", prepare_review
+        )
+        self.assertIn(
+            "Revalidate current master before batch or model admission", review
+        )
+        self.assertIn(
+            '[[ "$SOURCE_IMPLEMENTATION_SHA" == "$GITHUB_SHA" ]]',
+            prepare_review,
         )
         self.assertIn(
             '[[ "$SOURCE_IMPLEMENTATION_SHA" == "$GITHUB_SHA" ]]', review
         )
+        self.assertIn('[[ "$current_master" == "$GITHUB_SHA" ]]', prepare_review)
         self.assertIn('[[ "$current_master" == "$GITHUB_SHA" ]]', review)
         self.assertLess(
-            review.index(
-                "Revalidate current master before capsule or model admission"
+            prepare_review.index(
+                "Revalidate current master before capsule aggregation"
             ),
-            review.index("Fetch and authenticate only the curated capsule"),
+            prepare_review.index("Fetch and authenticate every curated capsule"),
         )
         self.assertLess(
             review.index(
-                "Revalidate current master before capsule or model admission"
+                "Revalidate current master before batch or model admission"
             ),
-            review.index("Install Python"),
+            review.index("Download only the authenticated source-wide review batch"),
         )
-        self.assertIn("strategy:\n      fail-fast: false", review)
+        self.assertNotIn("strategy:", review.split("\n    steps:", 1)[0])
+        self.assertIn("strategy:\n      fail-fast: false", publish_lanes)
         self.assertNotIn("max-parallel", review.split("\n    steps:", 1)[0])
-        self.assertIn("needs.enumerate.outputs.pending_count != '0'", review)
-        self.assertIn("needs.capacity-probe.outputs.fresh_ready == 'true'", review)
+        self.assertIn("needs.enumerate.outputs.pending_count != '0'", prepare_review)
+        self.assertIn("needs.capacity-probe.outputs.fresh_ready == 'true'", prepare_review)
+        self.assertIn("needs.prepare-review.result == 'success'", review)
         self.assertNotIn("needs.capacity-check.outputs.ready == 'true'", review)
         self.assertIn(
-            '--max-parallel-calls "${{ matrix.model_parallelism }}"', review
+            '--max-parallel-calls "${{ needs.enumerate.outputs.model_parallelism }}"',
+            review,
         )
-        self.assertIn("--call-spacing-seconds 2", review)
         self.assertIn(
-            'admission_delay="${{ matrix.model_start_delay_seconds }}"', review
+            '"${{ needs.enumerate.outputs.model_call_spacing_seconds }}"',
+            review,
         )
         self.assertNotIn("--max-parallel-calls 32", review)
         self.assertNotIn("--review-identical", review)
+        self.assertIn(
+            "scripts/ci/mod_compatibility_review_batch.py assemble",
+            prepare_review,
+        )
+        self.assertIn(
+            "scripts/ci/mod_compatibility_review_batch.py validate", review
+        )
+        self.assertIn(
+            "scripts/ci/mod_compatibility_review_batch.py split", publish_lanes
+        )
         self.assertIn("Restore authenticated compatibility verdict cache shards", review)
         self.assertIn("--cache visual-review-verdict-cache.input.json", review)
         self.assertIn("--cache-policy-sha256", review)
         self.assertIn("e2e/mod-compatibility-contract.json", review)
         self.assertIn("release/release-matrix.json", review)
         self.assertIn(
-            "mod-compatibility-verdict-cache-$policy_sha256-${{ matrix.id }}",
+            'global_cache_name="mod-compatibility-verdict-cache-$policy_sha256"',
             review,
         )
+        self.assertNotIn('cache_names+=("$global_cache_name-$lane_id")', review)
         self.assertIn('merge-base --is-ancestor \\', review)
         self.assertIn(
             '$cache_owner_sha:.github/workflows/mod-compatibility-review.yml',
@@ -1074,39 +1108,66 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("steps.verdict-cache-artifact.outputs.artifact-id", review)
         self.assertIn("--max-entries 1", review)
         self.assertIn("git show", enumerate_review)
-        self.assertIn("$plan_source_sha:e2e/mod-compatibility-contract.json", enumerate_review)
-        self.assertIn("${{ matrix.source_sha }}:e2e/scenario-contract.json", review)
-        self.assertIn('source_contract="$RUNNER_TEMP/source-scenario-contract.json"', review)
-        self.assertIn('--compatibility-scenario-contract "$source_contract"', review)
         self.assertIn(
-            '--compatibility-artifact-node "${{ matrix.artifact_node }}"', review
+            "$plan_source_sha:e2e/mod-compatibility-contract.json",
+            enumerate_review,
         )
-        self.assertIn('--compatibility-mod "${{ matrix.mod }}"', review)
+        self.assertIn(
+            'source_contract="$RUNNER_TEMP/source-scenario-contract.json"',
+            prepare_review,
+        )
+        self.assertIn(
+            '--compatibility-scenario-contract "$source_contract"',
+            prepare_review,
+        )
+        self.assertIn(
+            '--compatibility-artifact-node "$artifact_node"', prepare_review
+        )
+        self.assertIn('--compatibility-mod "$mod"', prepare_review)
         self.assertIn("--model claude-haiku-4-5", capacity_probe)
         self.assertIn("--triage-model claude-haiku-4-5", review)
         self.assertIn("--verify-model claude-opus-5", review)
         self.assertNotIn("claude-sonnet-5", review)
+        self.assertIn("Install hash-locked image decoder", prepare_review)
         self.assertIn("Install hash-locked image decoder", review)
-        self.assertIn("--only-binary=:all: --require-hashes", review)
+        self.assertIn("--only-binary=:all: --require-hashes", prepare_review)
         self.assertIn("--requirement scripts/pages/requirements.txt", review)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", prepare_review)
+        self.assertNotIn("Install Node", prepare_review)
+        self.assertIn("--telemetry-report visual-review-telemetry.json", review)
+        self.assertIn("Validate only sanitized model-call telemetry", review)
+        self.assertIn("mod-compatibility-review-telemetry-", review)
         self.assertIn("mod-compatibility-wave-block", review)
         self.assertIn(
-            "name: mod-compatibility-wave-block-${{ matrix.source_run_id }}",
+            "name: mod-compatibility-wave-block-${{ needs.enumerate.outputs.source_run_id }}",
             review,
         )
-        self.assertIn("mod-compatibility-attempt-${{ matrix.source_run_id }}", review)
+        self.assertIn(
+            "mod-compatibility-attempt-${{ needs.enumerate.outputs.source_run_id }}-batch",
+            review,
+        )
+        self.assertIn(
+            "mod-compatibility-review-${{ matrix.source_run_id }}-${{ matrix.id }}",
+            publish_lanes,
+        )
         self.assertIn(
             "mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}",
-            review,
+            publish_lanes,
         )
-        self.assertIn("/cancel", review)
         self.assertGreaterEqual(
-            review.count("source scripts/ci/github_api_retry.sh"), 3
+            prepare_review.count("source scripts/ci/github_api_retry.sh"), 2
         )
+        self.assertGreaterEqual(
+            review.count("source scripts/ci/github_api_retry.sh"), 2
+        )
+        self.assertIn("github_api_retry_to_file", prepare_review)
         self.assertIn("github_api_retry_to_file", review)
-        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', review)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', prepare_review)
+        self.assertNotIn("gh api", prepare_review)
         self.assertNotIn("gh api", review)
         self.assertIn("REVIEW_RESULT", review_gate)
+        self.assertIn("PREPARE_RESULT", review_gate)
+        self.assertIn("PUBLISH_RESULT", review_gate)
         self.assertIn("PROBE_FRESH_READY", review_gate)
         self.assertIn("CAPACITY_STATE", review_gate)
         self.assertIn("claude-capacity-pause", review_gate)
@@ -1121,7 +1182,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("needs.gate.outputs.complete == 'true'", review_continue)
         self.assertNotIn("base-evidence", review)
         self.assertNotIn("candidate-evidence", review)
-        self.assertEqual(review.count("actions/download-artifact@"), 0)
+        self.assertEqual(prepare_review.count("actions/download-artifact@"), 0)
+        self.assertEqual(review.count("actions/download-artifact@"), 1)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", publish_lanes)
 
         self.assertIn("locked.url", compatibility_runtime)
         self.assertIn("locked.sha256", compatibility_runtime)
@@ -1414,6 +1477,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("needs.enumerate.outputs.source_run_id", request)
         self.assertIn("mod-compatibility-publication-requested", request)
         self.assertIn("repos/$GITHUB_REPOSITORY/dispatches", request)
+        self.assertIn("actions/checkout@", request)
+        self.assertIn("persist-credentials: false", request)
+        self.assertIn("source scripts/ci/github_api_retry.sh", request)
+        self.assertIn("github_api_retry --method POST", request)
+        self.assertIn('GITHUB_API_RETRY_ATTEMPTS: "10"', request)
+        self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', request)
         self.assertIn("inputs.source_run_id", publish)
         self.assertIn("github.event.client_payload.source_run_id", publish)
         self.assertIn("github.event.action == 'mod-compatibility-publication-requested'", publish)
