@@ -44,11 +44,11 @@ def artifact(artifact_id: int, run_id: int, created_at: str) -> RemoteArtifact:
     )
 
 
-def run(run_id: int, sha: str) -> dict[str, Any]:
+def run(run_id: int, sha: str, *, conclusion: str = "success") -> dict[str, Any]:
     return {
         "id": run_id,
         "status": "completed",
-        "conclusion": "success",
+        "conclusion": conclusion,
         "event": "workflow_dispatch",
         "path": REVIEW_WORKFLOW,
         "head_branch": "master",
@@ -183,6 +183,31 @@ class PagesCompatibilityTest(unittest.TestCase):
             )
 
         self.assertEqual(newest, selected)
+        self.assertEqual(SOURCE_SHA, owner_sha)
+
+    def test_review_artifact_selector_accepts_clean_artifact_from_failed_run(self) -> None:
+        completed_before_post_success_failure = artifact(
+            4, 14, "2026-08-22T19:17:01Z"
+        )
+        api = FakeReviewApi(
+            [completed_before_post_success_failure],
+            {14: run(14, SOURCE_SHA, conclusion="failure")},
+        )
+
+        with patch("collect_compatibility._fetch_commits"), patch(
+            "collect_compatibility._require_nonimpacting_ancestor"
+        ):
+            selected, owner_sha = _select_review_artifact(
+                api,  # type: ignore[arg-type]
+                name=completed_before_post_success_failure.name,
+                repository=REPOSITORY,
+                current_sha=CURRENT_SHA,
+                repository_root=ROOT,
+                maximum_size=1024,
+                required_owner_sha=SOURCE_SHA,
+            )
+
+        self.assertEqual(completed_before_post_success_failure, selected)
         self.assertEqual(SOURCE_SHA, owner_sha)
 
 
