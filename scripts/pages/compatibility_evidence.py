@@ -956,6 +956,7 @@ def build_bundle(
                 validate_compatibility_references(
                     manifest,
                     scenario_contract=scenario_contract_path,
+                    compatibility_contract=compatibility_contract_path,
                     artifact_node=plan_row["artifact_node"],
                     mod_id=plan_row["compatibility_mod"],
                 )
