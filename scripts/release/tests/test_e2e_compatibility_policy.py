@@ -393,11 +393,36 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
                 self.assertIn(base_island, assets)
 
         self.assertEqual(2, assets.count("BufferedImage image = anatomical3DLayerBase();"))
+        self.assertIn("previewOuterLayerAlignmentFailure", feature)
+        self.assertIn("findModelChild", feature)
+        self.assertIn("part.storePose().equals(part.getInitialPose())", feature)
+        self.assertIn("carries a non-local pose", feature)
+        for child_key in (
+            "hat",
+            "jacket",
+            "left_sleeve",
+            "right_sleeve",
+            "left_pants",
+            "right_pants",
+        ):
+            with self.subTest(child_key=child_key):
+                self.assertIn(f'"{child_key}"', feature)
         self.assertIn("ModelPartInjector", integration)
         self.assertIn("prepareInjectedPreview", integration)
         self.assertIn("setPreviewInjectedMeshMethod.invoke", integration)
         self.assertIn("prepareInjectedPreview", renderer)
         self.assertIn("clearInjectedPreview(model);", renderer)
+        self.assertIn("resetOuterLayerTransforms", renderer)
+        for child_part in (
+            "hat",
+            "leftSleeve",
+            "rightSleeve",
+            "leftPants",
+            "rightPants",
+            "jacket",
+        ):
+            with self.subTest(child_part=child_part):
+                self.assertIn(f"model.{child_part}.resetPose();", renderer)
         self.assertNotIn("SkinLayers3DIntegration.render3DLayers(", renderer)
         self.assertIn("quickskin$prepareSkinLayersMeshes", gui_renderer_mixin)
         self.assertIn("prepareInjectedPreview", gui_renderer_mixin)
