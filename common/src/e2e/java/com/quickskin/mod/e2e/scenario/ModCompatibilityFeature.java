@@ -11,6 +11,7 @@ import com.quickskin.mod.client.gui.util.GuiScaleManager;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.IconActionButton;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
+import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.AssetMetadata;
@@ -27,6 +28,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -534,6 +536,10 @@ interface ModCompatibilityFeature {
             if (!SkinLayers3DIntegration.isAvailable()) {
                 return Step.Result.fail("3D Skin Layers mesh API is unavailable");
             }
+            String alignmentFailure = previewOuterLayerAlignmentFailure();
+            if (alignmentFailure != null) {
+                return Step.Result.fail(alignmentFailure);
+            }
             if (!meshCacheContains(flatLocation) || !manualRenderObserved()) {
                 return Step.Result.fail(
                         "Quick Skin's control preview did not execute the 3D mesh bridge");
@@ -566,6 +572,10 @@ interface ModCompatibilityFeature {
         @Override
         public Step.Result assertQuickSkinFeature() {
             if (failure != null) return Step.Result.fail(failure);
+            String alignmentFailure = previewOuterLayerAlignmentFailure();
+            if (alignmentFailure != null) {
+                return Step.Result.fail(alignmentFailure);
+            }
             if (!meshCacheContains(raisedLocation) || !manualRenderObserved()) {
                 return Step.Result.fail("raised overlay never reached the third-party mesh renderer");
             }
@@ -600,7 +610,86 @@ interface ModCompatibilityFeature {
                     || !meshReady || !renderReady) {
                 return false;
             }
+            String alignmentFailure = previewOuterLayerAlignmentFailure();
+            if (alignmentFailure != null) {
+                failure = alignmentFailure;
+                E2ELog.warn(alignmentFailure);
+                return true;
+            }
             return true;
+        }
+
+        /**
+         * Fail before visual review when a modern child overlay carries its parent's pose locally.
+         * Minecraft 1.21.6 moved these parts below their matching body parts, so a copied parent
+         * pivot deterministically proves the same detached/splayed geometry that the screenshot
+         * contract forbids.
+         */
+        private static String previewOuterLayerAlignmentFailure() {
+            String runtimeVersion = System.getProperty("quickskin.e2e.version", "");
+            if (!usesChildOuterLayerHierarchy(runtimeVersion)) {
+                return null;
+            }
+            try {
+                Field modelField = PlayerModelRenderer.class.getDeclaredField("classicModel");
+                modelField.setAccessible(true);
+                Object model = modelField.get(null);
+                if (model == null) {
+                    return "Quick Skin's classic preview model is unavailable for alignment proof";
+                }
+                for (String childName : new String[] {
+                        "hat", "jacket", "left_sleeve", "right_sleeve",
+                        "left_pants", "right_pants"}) {
+                    ModelPart part = findModelChild(model, childName);
+                    if (part == null) {
+                        return "Quick Skin preview has no child ModelPart " + childName;
+                    }
+                    if (!part.storePose().equals(part.getInitialPose())) {
+                        return "Quick Skin preview outer part " + childName
+                                + " carries a non-local pose: current=" + part.storePose()
+                                + ", baked=" + part.getInitialPose();
+                    }
+                }
+                return null;
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                return "could not prove Quick Skin preview outer-layer alignment: "
+                        + concise(exception);
+            }
+        }
+
+        /**
+         * Finds a baked child by its stable model-tree key. Minecraft member names are remapped in
+         * packaged Fabric clients, so string-reflecting fields such as {@code leftSleeve} would
+         * inspect development names that do not exist at runtime.
+         */
+        private static ModelPart findModelChild(Object model, String childName)
+                throws IllegalAccessException {
+            for (Field field : model.getClass().getFields()) {
+                Object value = field.get(model);
+                if (!(value instanceof ModelPart parent)) {
+                    continue;
+                }
+                try {
+                    return parent.getChild(childName);
+                } catch (java.util.NoSuchElementException ignored) {
+                }
+            }
+            return null;
+        }
+
+        private static boolean usesChildOuterLayerHierarchy(String runtimeVersion) {
+            if (runtimeVersion.startsWith("26.")) {
+                return true;
+            }
+            String prefix = "1.21.";
+            if (!runtimeVersion.startsWith(prefix)) {
+                return false;
+            }
+            try {
+                return Integer.parseInt(runtimeVersion.substring(prefix.length())) >= 6;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
         }
 
         private boolean ensureOfflineMenu() {
