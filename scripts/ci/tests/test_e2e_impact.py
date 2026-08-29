@@ -22,10 +22,13 @@ class E2EImpactTest(unittest.TestCase):
             [
                 "docs/ai/PROJECT.md",
                 "site/app.js",
+                "e2e/mod_compatibility_review_prompt.md",
+                "e2e/mod_compatibility_review_verify_prompt.md",
                 "scripts/ci/ai_patch_policy.py",
                 "scripts/ci/github_api_retry.sh",
                 "scripts/ci/mod_compatibility_review_batch.py",
                 "scripts/ci/mod_compatibility_review_queue.py",
+                "scripts/ci/visual_review_impact.py",
                 "scripts/ci/visual_review_queue.py",
                 "scripts/pages/collect_compatibility.py",
                 "scripts/pages/compatibility_evidence.py",
