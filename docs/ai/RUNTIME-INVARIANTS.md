@@ -101,6 +101,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 - CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, and ReplayMod are optional. Guard their entry
   points and preserve the normal skin/cape path when an optional mod or API is absent.
+- From Minecraft 1.21.6 onward, the vanilla outer skin parts are children of their matching body
+  parts. Preserve their baked local poses; copying the parent pose onto a child applies the pivot
+  twice and detaches the 3D Skin Layers geometry. The compatibility harness must authenticate these
+  local poses before visual review.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
