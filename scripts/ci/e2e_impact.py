@@ -44,6 +44,7 @@ EXACT_NON_RUNTIME_PATHS = frozenset(
         "scripts/ci/mod_compatibility_review_batch.py",
         "scripts/ci/mod_compatibility_review_queue.py",
         "scripts/ci/mod_compatibility_impact.py",
+        "scripts/ci/visual_review_impact.py",
         "scripts/ci/visual_review_queue.py",
         "scripts/pages/build_site.py",
         "scripts/pages/collect_compatibility.py",
