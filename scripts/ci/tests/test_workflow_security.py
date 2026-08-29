@@ -838,6 +838,12 @@ class WorkflowSecurityTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
+        compatibility_triage_prompt = (
+            ROOT / "e2e" / "mod_compatibility_review_prompt.md"
+        ).read_text(encoding="utf-8")
+        compatibility_verify_prompt = (
+            ROOT / "e2e" / "mod_compatibility_review_verify_prompt.md"
+        ).read_text(encoding="utf-8")
 
         admit = job_block("mod-compatibility-e2e.yml", "admit")
         base_review_curate = job_block("visual-review.yml", "curate")
@@ -1091,6 +1097,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--cache-policy-sha256", review)
         self.assertIn("e2e/mod-compatibility-contract.json", review)
         self.assertIn("release/release-matrix.json", review)
+        for prompt in (compatibility_triage_prompt, compatibility_verify_prompt):
+            normalized_prompt = " ".join(prompt.split()).lower()
+            self.assertIn("one-pixel checkerboards", normalized_prompt)
+            self.assertIn("not a requirement for solid colour blocks", normalized_prompt)
         self.assertIn(
             'global_cache_name="mod-compatibility-verdict-cache-$policy_sha256"',
             review,
