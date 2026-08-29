@@ -19,6 +19,13 @@ textures, wrong named colours, cape/elytra rectangles or clipping, transparency 
 Quick Skin UI, black/crashed frames, and absent expected transitions are defects. Ignore irrelevant
 pixels outside the authored regions, loader chrome, and intact Vanilla default-skin variation.
 
+The Ears E2E fixture deliberately paints the vanilla skin and the ear/tail feature faces with
+saturated one-pixel checkerboards, including cyan/magenta and orange/green pairs. That regular
+alternating pattern is the authored landmark, not texture corruption and not a requirement for
+solid colour blocks. Confirm an Ears defect only when the mapping is missing, scrambled,
+transparently damaged, inconsistent across visible faces, or the expected ear/tail geometry is
+absent.
+
 Runtime evidence is validated support for hidden state, but cannot hide a clear visual regression.
 At slim/classic checkpoints, do not derive arm width from the total span of angled,
 outer-layer-inflated sleeves; use the individual silhouette, same-version reference, and exact final
