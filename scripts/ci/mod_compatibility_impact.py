@@ -40,6 +40,8 @@ SAFE_EXACT_PATHS = frozenset(
         "VERSION-BRANCHES.md",
         "e2e/README.md",
         "e2e/check_visual_review.py",
+        "e2e/mod_compatibility_review_prompt.md",
+        "e2e/mod_compatibility_review_verify_prompt.md",
         "e2e/visual_review.py",
         "e2e/visual_review_cache.py",
         "e2e/visual_similarity.py",

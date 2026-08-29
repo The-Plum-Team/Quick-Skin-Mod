@@ -121,13 +121,15 @@ class VisualReviewImpactTest(unittest.TestCase):
         compatibility = pages(
             changed(".github/workflows/mod-compatibility-e2e.yml"),
             changed(".github/workflows/mod-compatibility-review.yml"),
+            changed("e2e/mod_compatibility_review_prompt.md"),
+            changed("e2e/mod_compatibility_review_verify_prompt.md"),
             changed("scripts/ci/mod_compatibility_review_queue.py"),
             changed("scripts/ci/tests/test_workflow_security.py"),
             changed("docs/ai/PROJECT.md"),
         )
         self.assertTrue(
             infrastructure_only(
-                compatibility, changed_files=5, scope="source-pr"
+                compatibility, changed_files=7, scope="source-pr"
             )
         )
         for path in (
@@ -148,6 +150,8 @@ class VisualReviewImpactTest(unittest.TestCase):
             ".github/workflows/mod-compatibility-review.yml",
             ".github/workflows/sync-version-branches.yml",
             ".github/workflows/visual-review.yml",
+            "e2e/mod_compatibility_review_prompt.md",
+            "e2e/mod_compatibility_review_verify_prompt.md",
             "scripts/ci/visual_nonimpact_certification.py",
             "scripts/ci/visual_review_impact.py",
             "scripts/ci/tests/test_visual_review_impact.py",
