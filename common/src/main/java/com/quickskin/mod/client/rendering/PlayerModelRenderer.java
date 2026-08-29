@@ -1930,10 +1930,10 @@ public class PlayerModelRenderer {
             model.rightPants.loadPose(model.rightLeg.storePose());
             model.jacket.loadPose(model.body.storePose());
 //?} else {
-            // In MC 1.21.11+, outer layers (sleeves, pants, jacket) are children of their
-            // corresponding body parts, so they inherit transforms automatically.
-            // Just reset their local rotations to zero to avoid doubling.
-            resetOuterLayerRotations(model);
+            // In MC 1.21.6+, outer layers are children of their corresponding body parts and
+            // inherit every transform. Keep their local pose at its baked value so a reused
+            // preview model can never apply the parent's pivot or rotation twice.
+            resetOuterLayerTransforms(model);
 //?}
             return; // EXIT EARLY - saves 40-60% CPU time
         }
@@ -1979,9 +1979,8 @@ public class PlayerModelRenderer {
         // ModelPart.copyFrom was replaced by pose snapshots in 1.21.9.
         model.hat.loadPose(model.head.storePose());
 //?} else {
-        // In MC 1.21.11+, outer layers are children of their body parts and inherit
-        // transforms automatically. Reset their local rotations to zero.
-        resetOuterLayerRotations(model);
+        // In MC 1.21.6+, outer layers inherit their parent transforms.
+        resetOuterLayerTransforms(model);
     }
 //?}
 
@@ -2001,30 +2000,17 @@ public class PlayerModelRenderer {
         model.jacket.loadPose(model.body.storePose());
 //?} else {
     /**
-     * Reset outer layer rotations to zero.
-     * In MC 1.21.11+, outer layers (hat, sleeves, pants, jacket) are children of their
-     * corresponding body parts in the model hierarchy, so they inherit parent transforms.
-     * Setting their local rotations to zero ensures they stay aligned with the body.
+     * Restore the baked local transforms of child outer layers.
+     * In MC 1.21.6+, hat, sleeves, pants, and jacket are children of their corresponding body
+     * parts. Copying a parent pose into one of these children applies its pivot and rotation twice.
      */
-    private static void resetOuterLayerRotations(PlayerModel model) {
-        model.hat.xRot = 0;
-        model.hat.yRot = 0;
-        model.hat.zRot = 0;
-        model.leftSleeve.xRot = 0;
-        model.leftSleeve.yRot = 0;
-        model.leftSleeve.zRot = 0;
-        model.rightSleeve.xRot = 0;
-        model.rightSleeve.yRot = 0;
-        model.rightSleeve.zRot = 0;
-        model.leftPants.xRot = 0;
-        model.leftPants.yRot = 0;
-        model.leftPants.zRot = 0;
-        model.rightPants.xRot = 0;
-        model.rightPants.yRot = 0;
-        model.rightPants.zRot = 0;
-        model.jacket.xRot = 0;
-        model.jacket.yRot = 0;
-        model.jacket.zRot = 0;
+    private static void resetOuterLayerTransforms(PlayerModel model) {
+        model.hat.resetPose();
+        model.leftSleeve.resetPose();
+        model.rightSleeve.resetPose();
+        model.leftPants.resetPose();
+        model.rightPants.resetPose();
+        model.jacket.resetPose();
 //?}
     }
 
