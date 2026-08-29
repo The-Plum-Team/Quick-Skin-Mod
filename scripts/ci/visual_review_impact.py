@@ -23,6 +23,8 @@ REPLICATED_SAFE_EXACT_PATHS = frozenset(
         ".github/workflows/visual-review.yml",
         ".github/workflows/visual-review-drain.yml",
         ".github/workflows/pages.yml",
+        "e2e/mod_compatibility_review_prompt.md",
+        "e2e/mod_compatibility_review_verify_prompt.md",
         "scripts/ci/github_api_retry.sh",
         "scripts/ci/e2e_impact.py",
         "scripts/ci/mod_compatibility_review_batch.py",
@@ -45,6 +47,8 @@ SOURCE_PR_SAFE_EXACT_PATHS = frozenset(
     {
         ".github/workflows/mod-compatibility-e2e.yml",
         ".github/workflows/mod-compatibility-review.yml",
+        "e2e/mod_compatibility_review_prompt.md",
+        "e2e/mod_compatibility_review_verify_prompt.md",
         "scripts/ci/mod_compatibility_review_batch.py",
         "scripts/ci/mod_compatibility_review_queue.py",
         "scripts/ci/mod_compatibility_impact.py",
