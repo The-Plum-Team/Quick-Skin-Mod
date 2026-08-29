@@ -35,6 +35,8 @@ EXACT_NON_RUNTIME_PATHS = frozenset(
     {
         ".github/pull_request_template.md",
         "e2e/README.md",
+        "e2e/mod_compatibility_review_prompt.md",
+        "e2e/mod_compatibility_review_verify_prompt.md",
         "scripts/ci/ai_patch_policy.py",
         "scripts/ci/gradle_cache_policy.py",
         "scripts/ci/prune_actions_caches.py",
