@@ -1913,7 +1913,7 @@ public class PlayerModelRenderer {
                 || (now - lastAnimationUpdate) >= ANIMATION_UPDATE_INTERVAL_MS;
 
         if (!shouldUpdate) {
-//? if <1.21.9 {
+//? if <1.21.6 {
             // Keep previous pose, just update hat/sleeves to match
             model.hat.copyFrom(model.head);
             model.leftSleeve.copyFrom(model.leftArm);
@@ -1921,14 +1921,6 @@ public class PlayerModelRenderer {
             model.leftPants.copyFrom(model.leftLeg);
             model.rightPants.copyFrom(model.rightLeg);
             model.jacket.copyFrom(model.body);
-//?} else if <1.21.11 {
-            // Keep previous pose, just update outer layers to match
-            model.hat.loadPose(model.head.storePose());
-            model.leftSleeve.loadPose(model.leftArm.storePose());
-            model.rightSleeve.loadPose(model.rightArm.storePose());
-            model.leftPants.loadPose(model.leftLeg.storePose());
-            model.rightPants.loadPose(model.rightLeg.storePose());
-            model.jacket.loadPose(model.body.storePose());
 //?} else {
             // In MC 1.21.6+, outer layers are children of their corresponding body parts and
             // inherit every transform. Keep their local pose at its baked value so a reused
@@ -1972,32 +1964,22 @@ public class PlayerModelRenderer {
                 break;
         }
 
-//? if <1.21.9 {
+//? if <1.21.6 {
         // Hat layer (outer layer of head) follows head rotation
         model.hat.copyFrom(model.head);
-//?} else if <1.21.11 {
-        // ModelPart.copyFrom was replaced by pose snapshots in 1.21.9.
-        model.hat.loadPose(model.head.storePose());
 //?} else {
         // In MC 1.21.6+, outer layers inherit their parent transforms.
         resetOuterLayerTransforms(model);
     }
 //?}
 
-//? if <1.21.9 {
+//? if <1.21.6 {
         // Setup arm rendering
         model.leftSleeve.copyFrom(model.leftArm);
         model.rightSleeve.copyFrom(model.rightArm);
         model.leftPants.copyFrom(model.leftLeg);
         model.rightPants.copyFrom(model.rightLeg);
         model.jacket.copyFrom(model.body);
-//?} else if <1.21.11 {
-        // ModelPart.copyFrom was replaced by pose snapshots in 1.21.9.
-        model.leftSleeve.loadPose(model.leftArm.storePose());
-        model.rightSleeve.loadPose(model.rightArm.storePose());
-        model.leftPants.loadPose(model.leftLeg.storePose());
-        model.rightPants.loadPose(model.rightLeg.storePose());
-        model.jacket.loadPose(model.body.storePose());
 //?} else {
     /**
      * Restore the baked local transforms of child outer layers.
