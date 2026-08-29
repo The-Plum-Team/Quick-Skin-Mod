@@ -34,6 +34,8 @@ class ModCompatibilityImpactTest(unittest.TestCase):
             ".github/workflows/visual-review.yml",
             ".github/workflows/visual-review-drain.yml",
             ".github/workflows/mod-compatibility-review.yml",
+            "e2e/mod_compatibility_review_prompt.md",
+            "e2e/mod_compatibility_review_verify_prompt.md",
             "e2e/visual_review_prompt.md",
             "e2e/visual_review_runner.py",
             "scripts/ci/mod_compatibility_review_batch.py",
