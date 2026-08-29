@@ -1889,7 +1889,7 @@ public class PlayerModelRenderer {
                 || (now - lastAnimationUpdate) >= ANIMATION_UPDATE_INTERVAL_MS;
 
         if (!shouldUpdate) {
-//? if <1.21 {
+//? if <1.21.6 {
             // Keep previous pose, just update hat/sleeves to match
             model.hat.copyFrom(model.head);
             model.leftSleeve.copyFrom(model.leftArm);
@@ -1897,19 +1897,11 @@ public class PlayerModelRenderer {
             model.leftPants.copyFrom(model.leftLeg);
             model.rightPants.copyFrom(model.rightLeg);
             model.jacket.copyFrom(model.body);
-//?} else if <1.21.4 {
-            // Keep previous pose, just update outer layers to match
-            model.hat.copyFrom(model.head);
-            model.leftSleeve.copyFrom(model.leftArm);
-            model.rightSleeve.copyFrom(model.rightArm);
-            model.leftPants.copyFrom(model.leftLeg);
-            model.rightPants.copyFrom(model.rightLeg);
-            model.jacket.copyFrom(model.body);
 //?} else {
-            // In MC 1.21.4+, outer layers (sleeves, pants, jacket) are children of their
-            // corresponding body parts, so they inherit transforms automatically.
-            // Just reset their local rotations to zero to avoid doubling.
-            resetOuterLayerRotations(model);
+            // In MC 1.21.6+, outer layers are children of their corresponding body parts and
+            // inherit every transform. Keep their local pose at its baked value so a reused
+            // preview model can never apply the parent's pivot or rotation twice.
+            resetOuterLayerTransforms(model);
 //?}
             return; // EXIT EARLY - saves 40-60% CPU time
         }
@@ -1948,7 +1940,7 @@ public class PlayerModelRenderer {
                 break;
         }
 
-//? if <1.21.4 {
+//? if <1.21.6 {
         // Hat layer (outer layer of head) follows head rotation
         model.hat.copyFrom(model.head);
         model.leftSleeve.copyFrom(model.leftArm);
@@ -1957,38 +1949,25 @@ public class PlayerModelRenderer {
         model.rightPants.copyFrom(model.rightLeg);
         model.jacket.copyFrom(model.body);
 //?} else {
-        // In MC 1.21.4+, outer layers are children of their body parts and inherit
-        // transforms automatically. Reset their local rotations to zero.
-        resetOuterLayerRotations(model);
+        // In MC 1.21.6+, outer layers are children of their body parts and inherit every
+        // transform. Restore their baked local pose instead of copying the parent's.
+        resetOuterLayerTransforms(model);
 //?}
     }
 
 //? if >=1.21.4 {
     /**
-     * Reset outer layer rotations to zero.
-     * In MC 1.21.4+, outer layers (hat, sleeves, pants, jacket) are children of their
-     * corresponding body parts in the model hierarchy, so they inherit parent transforms.
-     * Setting their local rotations to zero ensures they stay aligned with the body.
+     * Restore the baked local transforms of child outer layers.
+     * In MC 1.21.6+, hat, sleeves, pants, and jacket are children of their corresponding body
+     * parts. Copying a parent pose into one of these children applies its pivot and rotation twice.
      */
-    private static void resetOuterLayerRotations(PlayerModel model) {
-        model.hat.xRot = 0;
-        model.hat.yRot = 0;
-        model.hat.zRot = 0;
-        model.leftSleeve.xRot = 0;
-        model.leftSleeve.yRot = 0;
-        model.leftSleeve.zRot = 0;
-        model.rightSleeve.xRot = 0;
-        model.rightSleeve.yRot = 0;
-        model.rightSleeve.zRot = 0;
-        model.leftPants.xRot = 0;
-        model.leftPants.yRot = 0;
-        model.leftPants.zRot = 0;
-        model.rightPants.xRot = 0;
-        model.rightPants.yRot = 0;
-        model.rightPants.zRot = 0;
-        model.jacket.xRot = 0;
-        model.jacket.yRot = 0;
-        model.jacket.zRot = 0;
+    private static void resetOuterLayerTransforms(PlayerModel model) {
+        model.hat.resetPose();
+        model.leftSleeve.resetPose();
+        model.rightSleeve.resetPose();
+        model.leftPants.resetPose();
+        model.rightPants.resetPose();
+        model.jacket.resetPose();
     }
 //?}
 
