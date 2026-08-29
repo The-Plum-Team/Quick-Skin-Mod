@@ -18,6 +18,12 @@ the named mod is acceptable—for example, 3D Skin Layers may add depth—but mi
 Skin content, altered state, broken geometry, clipping, unintended opacity, blurred Quick Skin UI,
 or a failed expected transition is not.
 
+The Ears E2E fixture deliberately paints the vanilla skin and the ear/tail feature faces with
+saturated one-pixel checkerboards, including cyan/magenta and orange/green pairs. That regular
+alternating pattern is the authored landmark, not texture corruption and not a requirement for
+solid colour blocks. Flag it only when the mapping is missing, scrambled, transparently damaged,
+inconsistent across visible faces, or the expected ear/tail geometry is absent.
+
 Use runtime evidence as validated support for hidden state, not as permission to ignore a clear
 visual regression. For slim/classic checkpoints, angled arms plus the inflated jacket layer make
 total sleeve-span ratios invalid; require a clear contradiction against the individual silhouette,
