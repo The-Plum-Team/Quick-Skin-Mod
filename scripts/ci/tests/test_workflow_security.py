@@ -928,6 +928,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("base_matrix_kind=pr-anchors", admit)
         self.assertIn(".base_matrix_kind == $base_matrix_kind", prepare)
         self.assertIn('.base_matrix_kind == "pr-anchors"', enumerate_review)
+        self.assertIn(
+            ".source_branch == .target_branch and",
+            enumerate_review,
+        )
+        self.assertIn(".source_sha == .target_sha", enumerate_review)
         self.assertIn("source_artifacts=", prepare)
         self.assertIn("GH_TOKEN: ${{ github.token }}", plan_step)
         self.assertLess(
