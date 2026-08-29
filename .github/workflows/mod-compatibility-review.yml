@@ -217,6 +217,9 @@ jobs:
           source scripts/ci/github_api_retry.sh
           plan="$RUNNER_TEMP/compatibility-plan/mod-compatibility-plan.json"
           test -f "$plan" -a ! -L "$plan"
+          # A direct workflow_dispatch on an exact release branch still names its evidence
+          # pr-anchors. Admit that shape only when both branch and commit equal the target;
+          # every other pr-anchors source remains a bot-owned synchronization branch.
           jq -e \
             '.schema_version == 1 and
              (.source_run_id | type == "number" and . > 0) and
@@ -229,7 +232,10 @@ jobs:
              (.target_branch | type == "string" and
               test("^[a-z0-9]+(-and-[a-z0-9]+)*-[0-9]+([.][0-9]+)+$")) and
              (if .base_matrix_kind == "pr-anchors" then
-                (.source_branch | test("^automation/sync/[A-Za-z0-9._/-]+$"))
+                ((.source_branch |
+                  test("^automation/sync/[A-Za-z0-9._/-]+$")) or
+                 (.source_branch == .target_branch and
+                  .source_sha == .target_sha))
               else .source_branch == .target_branch end) and
              .release_branch == .target_branch and
              (.compatibility_contract_sha256 | type == "string" and
