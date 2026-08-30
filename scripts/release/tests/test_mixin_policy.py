@@ -28,7 +28,7 @@ LOADER_RESOURCES = {
     if (ROOT / loader / "src" / "main" / "resources").is_dir()
 }
 MIXIN_MARKER = re.compile(r"@Mixin\s*\(")
-INJECTOR_MARKER = re.compile(r"@(Inject|Redirect)\s*\(")
+INJECTOR_MARKER = re.compile(r"@(Inject|ModifyArg|Redirect)\s*\(")
 HANDLER_MARKER = re.compile(r"\b(quickskin\$[A-Za-z0-9_$]+)\s*\(")
 JAVA_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
 
@@ -85,6 +85,7 @@ DEGRADABLE_MIXINS = {
 # the optional-config plugin or are harmless vanilla interception points whose handlers no-op when
 # the integration is absent.
 OPTIONAL_MIXINS = {
+    "main:com/quickskin/mod/mixin/compat/CpmModelDefinitionLoaderMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
@@ -289,7 +290,8 @@ class MixinPolicyTest(unittest.TestCase):
             / "compat"
             / "EarsMixinPlugin.java"
         ).read_text(encoding="utf-8")
-        self.assertIn('List.of("CpmRenderDepthMixin")', plugin)
+        self.assertIn('"CpmModelDefinitionLoaderMixin"', plugin)
+        self.assertIn('"CpmRenderDepthMixin"', plugin)
         configured.add("CpmRenderDepthMixin")
 
         source_classes = {source.stem for source in self.mixin_sources()}
@@ -319,7 +321,10 @@ class MixinPolicyTest(unittest.TestCase):
             optional = json.loads(optional_path.read_text(encoding="utf-8"))
             core_names = {name.rsplit(".", 1)[-1] for name in core["client"]}
             optional_names = {name.rsplit(".", 1)[-1] for name in optional["client"]}
-            dynamic_names = {"CpmRenderDepthMixin"}
+            dynamic_names = {
+                "CpmModelDefinitionLoaderMixin",
+                "CpmRenderDepthMixin",
+            }
             with self.subTest(resources=relative(resource_root)):
                 self.assertTrue(compat_mixins.isdisjoint(core_names))
                 self.assertTrue(compat_mixins <= optional_names | dynamic_names)
