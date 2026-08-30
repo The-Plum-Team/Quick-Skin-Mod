@@ -759,6 +759,10 @@ def build_plan(
         raise CompatibilityContractError(
             "scenario contract must declare local and remote compatibility profiles"
         )
+    compatibility_scenarios_by_mod = {
+        mod.id: compatibility_scenarios_for_mod(scenario_contract, mod)
+        for mod in contract.mods
+    }
     base_rows = gha_matrix(
         matrix,
         base_matrix_kind,
@@ -827,10 +831,6 @@ def build_plan(
                 runtime_version=row["runtime_version"],
                 loader=row["loader"],
             )
-            compatibility_scenarios = compatibility_scenarios_for_mod(
-                scenario_contract,
-                mod,
-            )
             runnable.append(
                 {
                     **row,
@@ -843,7 +843,7 @@ def build_plan(
                     "compatibility_contract_sha256": contract.sha256,
                     "scenarios": ",".join(
                         (
-                            *compatibility_scenarios,
+                            *compatibility_scenarios_by_mod[mod.id],
                             row["scenarios"],
                         )
                     ),
