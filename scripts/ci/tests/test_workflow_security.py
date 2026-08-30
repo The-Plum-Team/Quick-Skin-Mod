@@ -1226,7 +1226,22 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertNotIn("player-armor-stands", execution_workflow.lower())
         self.assertNotIn("player-armor-stands", review_workflow.lower())
-        self.assertEqual(6, contract["schema_version"])
+        self.assertEqual(7, contract["schema_version"])
+        self.assertEqual(
+            ["compatibility-cpm"],
+            next(
+                item["additional_execution_profiles"]
+                for item in contract["mods"]
+                if item["id"] == "cpm"
+            ),
+        )
+        self.assertTrue(
+            all(
+                not item["additional_execution_profiles"]
+                for item in contract["mods"]
+                if item["id"] != "cpm"
+            )
+        )
         self.assertEqual(
             [
                 {
