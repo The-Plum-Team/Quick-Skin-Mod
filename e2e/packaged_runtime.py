@@ -196,17 +196,17 @@ REPLAYMOD_LOGIN_PROGRESS_MARKERS = (
 )
 SERVER_WORLD_SANITIZED_MARKER = "QS_E2E_WORLD_SANITIZED"
 SERVER_WORLD_SANITIZE_COMMANDS = (
-    # server.properties prevents later ambient spawns, while this removes passive entities that
-    # some Minecraft generations may create while preparing the initial superflat spawn chunks.
+    # The datapack suppresses ordinary mob spawning and continuously evacuates later worldgen
+    # entities. This initial purge removes anything created while the spawn chunks were prepared.
     "kill @e[type=!minecraft:player]",
     f"say {SERVER_WORLD_SANITIZED_MARKER}",
 )
 CUSTOM_NPC_READY_MARKER = "QS_E2E_CUSTOM_NPC_READY"
 CUSTOM_NPC_FIXTURE_COMMANDS = (
     "execute at Alice run summon customnpcs:customnpc ~3 ~ ~3 "
-    "{CustomName:'{\"text\":\"Quick Skin NPC\"}',CustomNameVisible:1b,"
+    "{Tags:['qs_e2e_keep'],CustomName:'{\"text\":\"Quick Skin NPC\"}',CustomNameVisible:1b,"
     "NoAI:1b,Invulnerable:1b,PersistenceRequired:1b,Silent:1b}",
-    "execute if entity @e[type=customnpcs:customnpc,limit=1] "
+    "execute if entity @e[type=customnpcs:customnpc,tag=qs_e2e_keep,limit=1] "
     f"run say {CUSTOM_NPC_READY_MARKER}",
 )
 
@@ -1322,11 +1322,11 @@ def sanitize_server_world(
 ) -> None:
     """Remove ambient entities before any client can capture public evidence.
 
-    The disposable server already disables animal, monster, and NPC spawning in
-    ``server.properties``. A generated passive entity can nevertheless be present in the initial
-    spawn chunks on some game versions. Drive the dedicated-server console directly after startup,
-    then require its acknowledgement before launching a client; a best-effort command would merely
-    move this race into the screenshots.
+    The disposable server disables animal, monster, and NPC spawning in ``server.properties`` and
+    its datapack. A generated passive entity can nevertheless be present in the initial spawn
+    chunks on some game versions. Drive the dedicated-server console directly after startup, then
+    require its acknowledgement before launching a client; the datapack keeps evacuating unowned
+    entities from chunks generated later while preserving explicitly tagged test fixtures.
     """
 
     if process.poll() is not None:
