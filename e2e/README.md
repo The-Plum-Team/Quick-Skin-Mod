@@ -412,8 +412,9 @@ two stable local capture IDs select a different real workflow for each locked mo
   aligned to the wrong anatomical part.
 - CustomNPCs summons a real server-owned `customnpcs:*` entity and keeps it visible beside the
   local player while Quick Skin changes only the player's renderer-facing texture.
-- Essential keeps ownership of its title player model, requires exactly one Quick Skin action and
-  no duplicate Quick Skin preview, then verifies Essential retained the selected appearance.
+- Essential keeps ownership of its title player model, anchors exactly one Quick Skin action to
+  the bottom of Essential's right-hand action rail, suppresses Quick Skin's duplicate preview, and
+  verifies Essential retained the selected appearance.
 - ReplayMod records the real multiplayer Quick Skin exchange, closes the recording, opens the
   resulting `.mcpr`, and requires a recorded Quick Skin payload to traverse the production bridge
   before capturing the recorded player in playback.
