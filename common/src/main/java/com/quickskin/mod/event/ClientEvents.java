@@ -240,7 +240,7 @@ public class ClientEvents {
             if (screen instanceof TitleScreen titleScreen) {
                 boolean positioned = false;
 
-                // If Essential is present, position to the left of Essential's bottom-most widget
+                // If Essential is present, position beside its right-hand action rail
                 if (essentialPresent) {
                     net.minecraft.client.gui.components.events.GuiEventListener bottomWidget =
                             com.quickskin.mod.client.compat.EssentialCompatIntegration.findBottomEssentialWidget(screen);
@@ -319,7 +319,7 @@ public class ClientEvents {
             } else if (screen instanceof PauseScreen pauseScreen) {
                 boolean positioned = false;
 
-                // If Essential is present, position to the left of Essential's bottom-most widget
+                // If Essential is present, position beside its right-hand action rail
                 if (essentialPresent) {
                     net.minecraft.client.gui.components.events.GuiEventListener bottomWidget =
                             com.quickskin.mod.client.compat.EssentialCompatIntegration.findBottomEssentialWidget(screen);
