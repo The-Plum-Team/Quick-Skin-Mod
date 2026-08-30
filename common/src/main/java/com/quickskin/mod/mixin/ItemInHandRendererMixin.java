@@ -48,10 +48,12 @@ public class ItemInHandRendererMixin {
                     value = "INVOKE",
                     target = "Lnet/minecraft/client/renderer/MultiBufferSource;getBuffer(Lnet/minecraft/client/renderer/RenderType;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
             ),
-            require = 0,
+    //? if <1.21.6 {
             // Vanilla requests one buffer for the arm and one for the sleeve.
             expect = 2,
-            allow = 2
+            allow = 2,
+    //?}
+            require = 1
     )
 //?}
 //? if <1.21.6 {
