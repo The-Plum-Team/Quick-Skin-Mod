@@ -558,6 +558,16 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("shouldSuppressStaleSubmission()", integration)
         self.assertIn("onRenderedFrameBoundary()", integration)
         self.assertIn("skinModeResetFrameBoundaries.incrementAndGet() < 2", integration)
+        cpm_loader_mixin = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/mixin/compat/CpmModelDefinitionLoaderMixin.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn("ByteArrayInputStream;<init>([B)V", cpm_loader_mixin)
+        self.assertIn("data == null ? new byte[0] : data", cpm_loader_mixin)
+        optional_mixins = (
+            ROOT / "common/src/main/resources/quickskin-ears.mixins.json"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"CpmModelDefinitionLoaderMixin"', optional_mixins)
         client_events = (ROOT / "common/src/main/java/com/quickskin/mod/event/ClientEvents.java").read_text(
             encoding="utf-8"
         )
@@ -578,6 +588,25 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("Consumer<Object> writer = captured ->", shim)
         self.assertIn("for (int parameterCount : new int[] {2, 3})", shim)
         self.assertIn("closeRawScreenshot(captured);", shim)
+
+    def test_essential_action_is_anchored_to_the_right_hand_rail(self) -> None:
+        """The model-column controls must not win Essential's global bottom-widget search."""
+
+        integration = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/client/compat/EssentialCompatIntegration.java"
+        ).read_text(encoding="utf-8")
+        feature = (
+            E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+        contract = (ROOT / "e2e/mod-compatibility-contract.json").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("widget.getX() < screen.width / 2", integration)
+        self.assertIn("quickSkinAction.getY() != essentialWidget.getY()", feature)
+        self.assertIn("actionGap != 4", feature)
+        self.assertIn("Minecraft-owned center icon row", contract)
 
     def test_string_class_lookups_declare_an_intermediary_fallback(self) -> None:
         """Fabric serves intermediary names at runtime; a Mojang name alone resolves only on Forge."""
