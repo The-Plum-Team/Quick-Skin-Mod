@@ -232,12 +232,7 @@ interface ModCompatibilityFeature {
 
         @Override
         public boolean baselineReady() {
-            return failure == null
-                    && modelActivated
-                    && model != null
-                    && model.hash().equals(ClientConfig.getInstance().activeCpmModelHash)
-                    && CPMCompatIntegration.isLocalPlayerWearingCpmModel()
-                    && holdFullBody();
+            return modelReady() && holdFullBody();
         }
 
         @Override
@@ -256,6 +251,28 @@ interface ModCompatibilityFeature {
             }
             return Step.Result.pass("Quick Skin imported, selected and rendered protected complex "
                     + "CPM fixture " + model.hash());
+        }
+
+        void enterFirstPerson() {
+            DefaultSkinEvidenceView.enterFirstPerson(minecraft);
+        }
+
+        boolean firstPersonReady() {
+            return modelReady()
+                    && minecraft.options.getCameraType() == CameraType.FIRST_PERSON
+                    && VanillaShim.currentScreen(minecraft) == null;
+        }
+
+        Step.Result assertFirstPersonHand(String checkpoint) {
+            Step.Result baseline = assertBaseline();
+            if (!baseline.pass()) return baseline;
+            if (minecraft.options.getCameraType() != CameraType.FIRST_PERSON) {
+                return Step.Result.fail("CPM " + checkpoint
+                        + " hand checkpoint did not retain first-person camera mode");
+            }
+            return Step.Result.pass("CPM " + checkpoint + " first-person hand checkpoint retained "
+                    + "the protected complex model " + model.hash()
+                    + "; the screenshot proves its rendered hand geometry");
         }
 
         @Override
@@ -292,6 +309,14 @@ interface ModCompatibilityFeature {
                 failure = label + " fixture failed: " + concise(exception);
                 return null;
             }
+        }
+
+        private boolean modelReady() {
+            return failure == null
+                    && modelActivated
+                    && model != null
+                    && model.hash().equals(ClientConfig.getInstance().activeCpmModelHash)
+                    && CPMCompatIntegration.isLocalPlayerWearingCpmModel();
         }
     }
 
