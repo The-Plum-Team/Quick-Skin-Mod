@@ -56,6 +56,7 @@ def policy_id(path: Path) -> str:
 
 CRITICAL_MIXINS = {
     "main:com/quickskin/mod/mixin/CapeLayerMixin.java",
+    "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
     "main:com/quickskin/mod/mixin/MixinAbstractClientPlayer.java",
     "main:com/quickskin/mod/mixin/PlayerInfoMixin.java",
     "main:com/quickskin/mod/mixin/PlayerRendererMixin.java",
@@ -73,7 +74,6 @@ CRITICAL_MIXINS = {
 # deterministic compatibility gate.
 DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/GuiSkinRendererMixin.java",
-    "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
     "main:com/quickskin/mod/mixin/PanoramaRendererMixin.java",
     "main:com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
     "neoforge:com/quickskin/mod/neoforge/mixin/GuiSkinRendererMixin.java",
@@ -114,15 +114,16 @@ ALTERNATIVE_HOOKS = {
 }
 
 # Audited vanilla bytecode multiplicities. The ItemInHand source contains Stonecutter branches:
-# pre-1.21.11 renderHand requests two buffers (arm + sleeve), while the new renderer submits one
-# model part. SkinManager 1.20.1 has two RETURN opcodes in its one target method; in 1.21.11,
+# pre-1.21.4 renderHand requests two buffers (arm + sleeve), while 1.21.4-1.21.10 rely on
+# require=1 for their single buffer. SkinManager 1.20.1 has two RETURN opcodes in its one target
+# method; in 1.21.11,
 # NeoForge's patched getInsecureSkin changes from two returns to one at 1.21.6. In 1.21.11,
 # createLookup and get have three and two returns respectively on both loaders.
 INJECTION_COUNT_OVERRIDES = {
     (
         "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
         "quickskin$redirectRenderHandBuffer",
-    ): {1, 2},
+    ): {2},
     (
         "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
         "quickskin$overrideSkinInfo",
