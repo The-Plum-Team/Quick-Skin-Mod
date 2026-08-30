@@ -1747,8 +1747,8 @@
         "P7dR8mSH"
       ],
       "evidence": {
-        "baseline_with_mod": "Essential's title screen is intact and owns its player-model layout. Exactly one Quick Skin action icon is present beside Essential's widgets, and no duplicate Quick Skin PlayerWidget overlaps the Essential model or menu controls.",
-        "apply_local_skin_with_mod": "The paired Essential-owned title screen remains intact with exactly one Quick Skin action and no duplicate Quick Skin player preview. Essential's visible player model now retains Quick Skin's selected dark charcoal-and-gray plaid skin with brown skin details."
+        "baseline_with_mod": "Essential's title screen is intact and owns its player-model layout. Exactly one Quick Skin multi-skin action icon sits immediately to the left of the bottom Account button in Essential's right-hand action rail, and no duplicate Quick Skin PlayerWidget overlaps the Essential model or menu controls. Essential's own Wardrobe button, the small shirt control below its player model, and any Minecraft-owned center icon row are expected controls, not duplicate Quick Skin actions.",
+        "apply_local_skin_with_mod": "The paired Essential-owned title screen remains intact with exactly one Quick Skin multi-skin action icon immediately to the left of the bottom Account button in Essential's right-hand action rail and no duplicate Quick Skin player preview. Essential's own Wardrobe button, model-column shirt control, and any Minecraft-owned center icon row remain separate expected controls. Essential's visible player model now retains Quick Skin's selected dark charcoal-and-gray plaid skin with brown skin details."
       },
       "review_regions": {
         "baseline_with_mod": [[0.1, 0.28, 0.25, 0.76], [0.75, 0.3, 0.9, 0.75]],

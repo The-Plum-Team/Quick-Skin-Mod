@@ -25,6 +25,7 @@ import com.quickskin.mod.e2e.VanillaShim;
 import com.quickskin.mod.networking.NetworkSyncService;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -1023,14 +1024,20 @@ interface ModCompatibilityFeature {
         private String essentialTitleFailure(boolean requireSkin) {
             Screen screen = VanillaShim.currentScreen(minecraft);
             if (!(screen instanceof TitleScreen)) return "Essential title screen is not open";
-            if (EssentialCompatIntegration.findBottomEssentialWidget(screen) == null) {
+            GuiEventListener essentialAnchor =
+                    EssentialCompatIntegration.findBottomEssentialWidget(screen);
+            if (!(essentialAnchor instanceof AbstractWidget essentialWidget)) {
                 return "Essential title widgets were not detected";
             }
             int playerWidgets = 0;
             int quickSkinActions = 0;
+            IconActionButton quickSkinAction = null;
             for (GuiEventListener child : screen.children()) {
                 if (child instanceof PlayerWidget) playerWidgets++;
-                if (child instanceof IconActionButton) quickSkinActions++;
+                if (child instanceof IconActionButton action) {
+                    quickSkinActions++;
+                    quickSkinAction = action;
+                }
             }
             if (playerWidgets != 0) {
                 return "Quick Skin rendered " + playerWidgets
@@ -1039,6 +1046,13 @@ interface ModCompatibilityFeature {
             if (quickSkinActions != 1) {
                 return "Essential title screen has " + quickSkinActions
                         + " Quick Skin actions; expected exactly one";
+            }
+            int actionGap = essentialWidget.getX()
+                    - (quickSkinAction.getX() + quickSkinAction.getWidth());
+            if (essentialWidget.getX() < screen.width / 2
+                    || quickSkinAction.getY() != essentialWidget.getY()
+                    || actionGap != 4) {
+                return "Quick Skin action is not immediately beside Essential's right-hand rail";
             }
             if (!requireSkin) return null;
             UUID profileId = minecraft.getUser() == null
