@@ -58,6 +58,7 @@ class VersionPortConflictsTest(unittest.TestCase):
                 "common/src/main/java/com/quickskin/mod/Screen.java",
                 "common/src/legacy1_20_1/resources/quickskin.mixins.json",
                 "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction",
+                "e2e/server-template/datapack/data/qs_e2e/function/load.mcfunction",
                 "e2e/README.md",
             ),
             {"fabric", "neoforge"},
@@ -75,6 +76,7 @@ class VersionPortConflictsTest(unittest.TestCase):
                 "target_paths": ["release/release-matrix.json"],
                 "delete_paths": [
                     "common/src/legacy1_20_1/resources/quickskin.mixins.json",
+                    "e2e/server-template/datapack/data/qs_e2e/function/load.mcfunction",
                     "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction",
                     "forge/build.gradle.kts",
                 ],

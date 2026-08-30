@@ -302,6 +302,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 with self.subTest(profile=profile):
                     payload = copy.deepcopy(self.payload)
                     payload["mods"][0]["additional_execution_profiles"] = [profile]
+                    payload["mods"][0]["artifacts"] = []
                     contract_path = self.write_contract(Path(temporary), payload)
                     with self.assertRaisesRegex(
                         mod_compatibility.CompatibilityContractError,
