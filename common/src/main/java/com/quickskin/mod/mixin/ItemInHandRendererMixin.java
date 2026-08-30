@@ -124,14 +124,12 @@ public class ItemInHandRendererMixin {
                 || TextureAlphaDetector.hasTransparency(skinTexture);
 
         if (needsTranslucent) {
-//? if <1.21.4 {
-            // The vanilla method calls getBuffer for both the solid arm and the translucent sleeve.
-            // By forcing entityTranslucent here, we correctly render the arm with transparency.
-            // It's harmless to also request a translucent buffer for the sleeve, which already uses it.
-//?} else if <1.21.11 {
-            // Minecraft 1.21.4-1.21.10 performs one getBuffer lookup for this arm draw.
-            // Force entityTranslucent so transparent body pixels remain visible.
-//?}
+            // Before 1.21.4 the vanilla method calls getBuffer for both the solid arm and the
+            // translucent sleeve; 1.21.4 through 1.21.10 perform one getBuffer lookup for this arm
+            // draw. Forcing entityTranslucent here renders the arm with transparency, and it is
+            // harmless for the older sleeve, which already requests a translucent buffer.
+            // Keep this note outside the version conditionals: Stonecutter uncomments a branch
+            // whose body is only line comments, emitting the prose as broken statements.
 //? if <1.21.11 {
             // We use entityTranslucent instead of entityTranslucentCull to avoid z-fighting on complex layers.
             return instance.getBuffer(RenderType.entityTranslucent(skinTexture));
