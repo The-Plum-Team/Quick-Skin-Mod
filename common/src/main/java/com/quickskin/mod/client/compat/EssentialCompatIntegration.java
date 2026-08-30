@@ -20,7 +20,7 @@ import java.util.UUID;
  * Essential includes its own player model rendering on the title screen and pause menu.
  * When both QuickSkin and Essential are installed, this integration:
  * 1. Hides QuickSkin's PlayerWidget, rotate button, and animation buttons from vanilla menus
- * 2. Positions the "Change Skin" button below Essential's button cluster instead
+ * 2. Positions the "Change Skin" button beside Essential's right-hand action rail
  */
 @Environment(EnvType.CLIENT)
 public class EssentialCompatIntegration {
@@ -55,9 +55,11 @@ public class EssentialCompatIntegration {
     }
 
     /**
-     * Finds the bottom-most Essential widget on the given screen.
-     * Scans screen.children() for widgets from the gg.essential package
-     * and returns the one with the highest (y + height) value.
+     * Finds the bottom-most widget in Essential's right-hand action rail.
+     *
+     * <p>Essential also owns controls below its title-screen player model. Selecting the globally
+     * bottom-most widget anchors Quick Skin inside that model column, so only widgets on the right
+     * half of the screen are eligible for the action-rail anchor.</p>
      *
      * @param screen The screen to scan
      * @return The bottom-most Essential widget, or null if none found
@@ -74,6 +76,9 @@ public class EssentialCompatIntegration {
             String className = listener.getClass().getName();
             if (className.startsWith("gg.essential")) {
                 if (listener instanceof net.minecraft.client.gui.components.AbstractWidget widget) {
+                    if (widget.getX() < screen.width / 2) {
+                        continue;
+                    }
                     int bottom = widget.getY() + widget.getHeight();
                     if (bottom > maxBottom) {
                         maxBottom = bottom;
