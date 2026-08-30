@@ -56,7 +56,9 @@
     "mod-compatibility.client_a.apply_local_skin_with_mod": [[0.7, 0.42, 1.0, 0.98]],
     "mod-compatibility-remote.client_b.observe_remote_baseline": [[0.32, 0.05, 0.68, 0.95]],
     "mod-compatibility-remote.client_b.observe_remote_applied": [[0.32, 0.05, 0.68, 0.95]],
-    "mod-compatibility-late-join.client_b.observe_late_join_state": [[0.32, 0.05, 0.68, 0.95]]
+    "mod-compatibility-late-join.client_b.observe_late_join_state": [[0.32, 0.05, 0.68, 0.95]],
+    "mod-compatibility-cpm-first-person.client_a.first_person_hand_initial": [[0.58, 0.3, 1.0, 1.0]],
+    "mod-compatibility-cpm-first-person.client_a.first_person_hand_after_10_seconds": [[0.58, 0.3, 1.0, 1.0]]
   },
   "scenarios": [
     {
@@ -1019,6 +1021,53 @@
                 "review_tier": "all",
                 "expectation": "Bob joined only after Alice had completed the selected optional-mod appearance. His fixed rear camera must show complete remote Alice with that pre-existing CPM model or Ears-authored skin intact, and the runtime assertion must prove the state arrived without another Alice-side appearance change.",
                 "compatibility_reference_capture_id": "propagation.client_b.observe_a",
+                "probes": []
+              }
+            }
+          ],
+          "comparisons": []
+        }
+      ]
+    },
+    {
+      "scenario": "mod-compatibility-cpm-first-person",
+      "execution_profiles": [
+        "compatibility-cpm"
+      ],
+      "orchestration": {
+        "mode": "single-client"
+      },
+      "roles": [
+        {
+          "role": "client_a",
+          "steps": [
+            {
+              "id": "integration_active",
+              "assertion_required": true
+            },
+            {
+              "id": "prepare_model",
+              "assertion_required": true
+            },
+            {
+              "id": "first_person_hand_initial",
+              "assertion_required": true,
+              "capture": {
+                "title": "CPM first-person hand",
+                "review_tier": "all",
+                "expectation": "A normal first-person world view shows the protected complex CPM model's coherent custom right hand in the lower-right corner, including its white glove and red sleeve. The hand is attached, textured and shaped correctly, with no missing, detached, fallback or corrupted geometry.",
+                "compatibility_reference_capture_id": "phase0-smoke.client_a.apply_local_skin",
+                "probes": []
+              }
+            },
+            {
+              "id": "first_person_hand_after_10_seconds",
+              "assertion_required": true,
+              "capture": {
+                "title": "CPM first-person hand after 10 seconds",
+                "review_tier": "all",
+                "expectation": "After at least 10 uninterrupted seconds in the same first-person view, the protected complex CPM model's custom right hand still appears coherently in the lower-right corner with its white glove and red sleeve. It must not disappear, detach, revert to fallback geometry, change shape or become visually corrupted over time.",
+                "compatibility_reference_capture_id": "phase0-smoke.client_a.apply_local_skin",
                 "probes": []
               }
             }
