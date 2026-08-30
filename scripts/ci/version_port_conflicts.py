@@ -45,6 +45,7 @@ DATAPACK_FUNCTION_MIGRATION_TRIGGER = (
 DATAPACK_FUNCTION_MIGRATION_CONFLICTS = frozenset(
     {
         DATAPACK_FUNCTION_MIGRATION_TRIGGER,
+        "e2e/server-template/datapack/data/qs_e2e/function/load.mcfunction",
         "e2e/server-template/datapack/data/qs_e2e/functions/tick.mcfunction",
         "e2e/server-template/datapack/data/qs_e2e/function/tick.mcfunction",
         "e2e/server-template/datapack/data/minecraft/tags/functions/tick.json",
