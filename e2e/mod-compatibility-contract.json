@@ -1,6 +1,6 @@
 {
-  "schema_version": 6,
-  "lock_revision": "2026-08-23",
+  "schema_version": 7,
+  "lock_revision": "2026-08-30",
   "artifact_source": {
     "kind": "modrinth-v2",
     "api_base": "https://api.modrinth.com/v2",
@@ -32,6 +32,9 @@
         "apply_local_skin_with_mod": [[0.4, 0.06, 0.6, 0.92]]
       },
       "reference_captures": null,
+      "additional_execution_profiles": [
+        "compatibility-cpm"
+      ],
       "multiplayer": {
         "evidence": {
           "baseline_with_mod": "From Bob's fixed rear camera, the complete remote Alice wears the protected complex CPM fixture. Its layered red cap, brown hair, blue overalls, white gloves, brown boots, custom proportions, and textured geometry are attached and rendered coherently, proving CPM's client-and-server model state reached a second player.",
@@ -680,6 +683,7 @@
         "apply_local_skin_with_mod": [[0.4, 0.16, 0.6, 0.92]]
       },
       "reference_captures": null,
+      "additional_execution_profiles": [],
       "multiplayer": {
         "evidence": {
           "baseline_with_mod": "From Bob's fixed rear camera, the complete remote Alice wears the ordinary Quick Skin control skin with no Ears ears, tail, wings, snout, or other added geometry. The Ears layer is loaded and the remote texture remains intact.",
@@ -1055,6 +1059,7 @@
         "baseline_with_mod": "full.client_a.skin_menu_screen",
         "apply_local_skin_with_mod": "full.client_a.skin_menu_screen"
       },
+      "additional_execution_profiles": [],
       "multiplayer": null,
       "excluded_lanes": [
         {
@@ -1648,6 +1653,7 @@
         "apply_local_skin_with_mod": [[0.4, 0.28, 0.65, 0.92]]
       },
       "reference_captures": null,
+      "additional_execution_profiles": [],
       "multiplayer": null,
       "excluded_lanes": [],
       "supported_game_versions": null,
@@ -1755,6 +1761,7 @@
         "apply_local_skin_with_mod": [[0.1, 0.28, 0.25, 0.76], [0.75, 0.3, 0.9, 0.75]]
       },
       "reference_captures": null,
+      "additional_execution_profiles": [],
       "multiplayer": null,
       "excluded_lanes": [],
       "supported_game_versions": null,
@@ -2209,6 +2216,7 @@
         "apply_local_skin_with_mod": [[0.0, 0.0, 1.0, 0.21], [0.4, 0.3, 0.6, 0.92]]
       },
       "reference_captures": null,
+      "additional_execution_profiles": [],
       "multiplayer": null,
       "excluded_lanes": [],
       "supported_game_versions": [

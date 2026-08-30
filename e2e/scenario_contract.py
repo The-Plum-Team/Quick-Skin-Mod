@@ -28,8 +28,12 @@ EXECUTION_PROFILES = frozenset(
         "pr",
         "release",
         "compatibility",
+        "compatibility-cpm",
         "compatibility-remote",
     }
+)
+COMPATIBILITY_EXECUTION_PROFILES = frozenset(
+    {"compatibility", "compatibility-cpm", "compatibility-remote"}
 )
 REQUIRED_EXECUTION_PROFILES = frozenset({"runtime-default", "pr", "release"})
 
@@ -914,7 +918,7 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
         review_regions[capture_name] = regions
     for scenario in scenarios:
         is_compatibility = any(
-            profile in {"compatibility", "compatibility-remote"}
+            profile in COMPATIBILITY_EXECUTION_PROFILES
             for profile in scenario.execution_profiles
         )
         for role in scenario.roles:
