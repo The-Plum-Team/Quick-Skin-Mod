@@ -16,6 +16,7 @@ from mod_compatibility import (
     DEFAULT_CONTRACT as DEFAULT_COMPATIBILITY_CONTRACT,
     CompatibilityContractError,
     CompatibilityMod,
+    compatibility_scenarios_for_mod,
     load_contract as load_compatibility_contract,
     resolve_reference_capture_id,
     resolve_lane,
@@ -57,6 +58,19 @@ MOD_COMPATIBILITY_LATE_JOIN_CAPTURE = (
 
 class CompatibilityVisualError(ValueError):
     pass
+
+
+def _compatibility_scenarios(
+    scenario_contract: ScenarioContract,
+    compatibility_mod: CompatibilityMod,
+) -> tuple[str, ...]:
+    try:
+        return compatibility_scenarios_for_mod(
+            scenario_contract,
+            compatibility_mod,
+        )
+    except CompatibilityContractError as exc:
+        raise CompatibilityVisualError(str(exc)) from exc
 
 
 def _late_join_evidence(
@@ -154,14 +168,9 @@ def _select_compatibility_frames(
     scenario_contract: ScenarioContract,
     compatibility_mod: CompatibilityMod,
 ) -> list[dict[str, Any]]:
-    compatibility_scenarios = set(
-        scenario_contract.scenarios_for_profile("compatibility")
+    compatibility_scenarios = frozenset(
+        _compatibility_scenarios(scenario_contract, compatibility_mod)
     )
-    if compatibility_mod.multiplayer is not None:
-        compatibility_scenarios.update(
-            scenario_contract.scenarios_for_profile("compatibility-remote")
-        )
-    compatibility_scenarios = frozenset(compatibility_scenarios)
     expected_capture_ids = tuple(
         capture.capture_id
         for capture in scenario_contract.captures
@@ -312,12 +321,8 @@ def curate(
     )
     expected_candidate_scenarios = {
         *catalog.contract.scenarios_for_profile("release"),
-        *catalog.contract.scenarios_for_profile("compatibility"),
+        *_compatibility_scenarios(catalog.contract, lane.mod),
     }
-    if lane.mod.multiplayer is not None:
-        expected_candidate_scenarios.update(
-            catalog.contract.scenarios_for_profile("compatibility-remote")
-        )
     observed_candidate_scenarios = {item["scenario"] for item in candidate_lanes}
     if observed_candidate_scenarios != expected_candidate_scenarios:
         raise CompatibilityVisualError(
