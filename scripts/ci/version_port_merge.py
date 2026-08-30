@@ -82,6 +82,7 @@ DATAPACK_PLURAL_PREFIXES = (
 NAMESPACED_GAME_RULES = {
     b"gamerule doWeatherCycle false\n": b"gamerule minecraft:advance_weather false\n",
     b"gamerule doDaylightCycle false\n": b"gamerule minecraft:advance_time false\n",
+    b"gamerule doMobSpawning false\n": b"gamerule minecraft:spawn_mobs false\n",
     b"gamerule spawnRadius 0\n": b"gamerule minecraft:respawn_radius 0\n",
 }
 
