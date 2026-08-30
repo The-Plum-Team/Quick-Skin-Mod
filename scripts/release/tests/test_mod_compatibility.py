@@ -67,6 +67,14 @@ class ModCompatibilityContractTest(unittest.TestCase):
         self.assertEqual(104, sum(len(item.artifacts) for item in contract.mods))
         cpm = contract.mod("cpm")
         self.assertIsNotNone(cpm.multiplayer)
+        self.assertEqual(("compatibility-cpm",), cpm.additional_execution_profiles)
+        self.assertTrue(
+            all(
+                not item.additional_execution_profiles
+                for item in contract.mods
+                if item.id != "cpm"
+            )
+        )
         self.assertEqual(
             (("1.21.2", "neoforge"),),
             tuple(
@@ -186,15 +194,16 @@ class ModCompatibilityContractTest(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         for lane in plan["runnable"]:
             scenarios = lane["scenarios"].split(",")
-            self.assertEqual("mod-compatibility", scenarios[0])
-            base_index = 1
-            if lane["compatibility_mod"] in {"cpm", "ears"}:
-                self.assertEqual("mod-compatibility-remote", scenarios[1])
-                self.assertEqual("mod-compatibility-late-join", scenarios[2])
-                base_index = 3
+            expected_prefix = list(
+                mod_compatibility.compatibility_scenarios_for_mod(
+                    mod_compatibility.load_scenario_contract(),
+                    contract.mod(lane["compatibility_mod"]),
+                )
+            )
+            self.assertEqual(expected_prefix, scenarios[:len(expected_prefix)])
             self.assertEqual(
                 ["phase0-smoke", "propagation", "propagation-live", "full"],
-                scenarios[base_index:],
+                scenarios[len(expected_prefix):],
             )
             self.assertTrue(lane["base_evidence_name"].startswith("packaged-e2e-"))
             self.assertTrue(lane["base_evidence_name"].endswith("--release-behavior"))
@@ -270,6 +279,12 @@ class ModCompatibilityContractTest(unittest.TestCase):
         )
         mutations.append(excluded_artifact)
 
+        duplicate_profile = copy.deepcopy(self.payload)
+        duplicate_profile["mods"][0]["additional_execution_profiles"].append(
+            "compatibility-cpm"
+        )
+        mutations.append(duplicate_profile)
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             for index, mutation in enumerate(mutations):
@@ -277,6 +292,25 @@ class ModCompatibilityContractTest(unittest.TestCase):
                     path = self.write_contract(root, mutation)
                     with self.assertRaises(mod_compatibility.CompatibilityContractError):
                         mod_compatibility.load_contract(path)
+
+    def test_plan_rejects_invalid_mod_specific_execution_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            for profile, message in (
+                ("compatibility-unknown", "unknown E2E profile"),
+                ("release", "overlap the release suite"),
+            ):
+                with self.subTest(profile=profile):
+                    payload = copy.deepcopy(self.payload)
+                    payload["mods"][0]["additional_execution_profiles"] = [profile]
+                    contract_path = self.write_contract(Path(temporary), payload)
+                    with self.assertRaisesRegex(
+                        mod_compatibility.CompatibilityContractError,
+                        message,
+                    ):
+                        mod_compatibility.build_plan(
+                            ROOT / "release" / "release-matrix.json",
+                            contract_path,
+                        )
 
     def test_contract_rejects_duplicate_json_keys(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -798,6 +832,10 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 "mod-compatibility-remote.client_b.observe_remote_baseline",
                 "mod-compatibility-remote.client_b.observe_remote_applied",
                 "mod-compatibility-late-join.client_b.observe_late_join_state",
+                "mod-compatibility-cpm-first-person.client_a."
+                "first_person_hand_initial",
+                "mod-compatibility-cpm-first-person.client_a."
+                "first_person_hand_after_10_seconds",
             ],
             [frame["capture_id"] for frame in selected],
         )
