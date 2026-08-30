@@ -62,6 +62,11 @@ class GenerateContractJavaTest(unittest.TestCase):
             source,
         )
         self.assertIn(
+            'MOD_COMPATIBILITY_CPM_FIRST_PERSON('
+            '"mod-compatibility-cpm-first-person")',
+            source,
+        )
+        self.assertIn(
             "public record StepSpec(String id, boolean assertionRequired, "
             "boolean captureRequired) {}",
             source,
