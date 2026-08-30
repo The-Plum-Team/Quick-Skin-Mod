@@ -193,6 +193,59 @@ class VersionPortMergeTest(unittest.TestCase):
     def assert_clean_target(self) -> None:
         self.assert_clean_at(self.target)
 
+    def prepare_neoforge_collector_fixture_branches(
+        self,
+        *,
+        runtime_version: str,
+        target_payload: str | None = None,
+    ) -> tuple[str, str, str, str]:
+        input_payload = (
+            ROOT / version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH
+        ).read_text(encoding="utf-8")
+        result_payload = (
+            ROOT / version_port_merge.NEOFORGE_PLAYER_RENDERER_RESULT_PATH
+        ).read_text(encoding="utf-8")
+        target_payload = target_payload or input_payload
+
+        self.git("switch", "--create", "collector-source", self.base)
+        self.write(
+            version_port_merge.CPM_TRANSITION_POLICY_PATH,
+            "def test_modern_first_person_collectors_remain_owned_by_model_mods():\n"
+            '    self.assertNotIn("quickskin$redirectSubmitModelPart", source)\n'
+            '    self.assertNotIn("SubmitNodeCollector;submitModelPart", source)\n',
+        )
+        self.write(
+            version_port_merge.COMMON_HAND_RENDERER_PATH,
+            "class ItemInHandRendererMixin {\n"
+            "    void quickskin$redirectRenderHandBuffer() {}\n"
+            "}\n",
+        )
+        self.write(
+            version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH,
+            input_payload,
+        )
+        self.write(
+            version_port_merge.NEOFORGE_PLAYER_RENDERER_RESULT_PATH,
+            result_payload,
+        )
+        self.git("add", "--all")
+        self.commit("add CPM collector ownership policy")
+        source = self.sha("HEAD")
+
+        self.git("switch", "--create", "collector-target", self.base)
+        self.write(
+            "release/release-matrix.json",
+            self.matrix(
+                f"collector target {runtime_version}",
+                runtime_version=runtime_version,
+            ),
+        )
+        self.write(version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH, target_payload)
+        self.git("add", "--all")
+        self.commit(f"add NeoForge renderer for {runtime_version}")
+        target = self.sha("HEAD")
+        return source, target, input_payload, result_payload
+
     def unmerged_paths(self) -> tuple[str, ...]:
         output = self.git("diff", "--name-only", "-z", "--diff-filter=U")
         return tuple(sorted(value.decode("utf-8") for value in output.split(b"\0") if value))
@@ -337,6 +390,94 @@ class VersionPortMergeTest(unittest.TestCase):
         self.assertEqual(evidence["protected_resolutions"], [])
         self.assertFalse((self.repository / "clean-source.txt").exists())
         self.assert_clean_target()
+
+    def test_modern_neoforge_collector_is_replaced_by_audited_fixture(self) -> None:
+        source, target, _, result_payload = (
+            self.prepare_neoforge_collector_fixture_branches(
+                runtime_version="1.21.11"
+            )
+        )
+
+        evidence = version_port_merge.reproduce_merge(
+            self.repository,
+            target,
+            source,
+            mode="prepare",
+        )
+
+        self.assertEqual(evidence["ai_conflicts"], [])
+        migrated = [
+            item
+            for item in evidence["protected_resolutions"]
+            if item["policy"] == "migrate-neoforge-modern-hand-collector"
+        ]
+        self.assertEqual(len(migrated), 1)
+        self.assertEqual(
+            migrated[0]["path"], version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH
+        )
+        self.assertEqual(
+            migrated[0]["source_path"],
+            version_port_merge.NEOFORGE_PLAYER_RENDERER_RESULT_PATH,
+        )
+        self.assertEqual(
+            (
+                self.repository / version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH
+            ).read_text(encoding="utf-8"),
+            result_payload,
+        )
+        self.git("merge", "--abort")
+        self.assert_clean_at(target)
+
+    def test_neoforge_collector_migration_preserves_pre_1_21_11_redirect(
+        self,
+    ) -> None:
+        source, target, input_payload, _ = (
+            self.prepare_neoforge_collector_fixture_branches(
+                runtime_version="1.21.10"
+            )
+        )
+
+        evidence = version_port_merge.reproduce_merge(
+            self.repository,
+            target,
+            source,
+            mode="prepare",
+        )
+
+        self.assertEqual(evidence["protected_resolutions"], [])
+        self.assertEqual(
+            (
+                self.repository / version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH
+            ).read_text(encoding="utf-8"),
+            input_payload,
+        )
+        self.git("merge", "--abort")
+        self.assert_clean_at(target)
+
+    def test_unknown_modern_neoforge_collector_fails_closed(self) -> None:
+        input_payload = (
+            ROOT / version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH
+        ).read_text(encoding="utf-8")
+        source, target, _, _ = self.prepare_neoforge_collector_fixture_branches(
+            runtime_version="26.1.2",
+            target_payload=input_payload.replace(
+                "NeoForge-specific mixin",
+                "Unexpected NeoForge mixin",
+                1,
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            version_port_merge.VersionPortMergeError,
+            "does not match the audited migration input",
+        ):
+            version_port_merge.reproduce_merge(
+                self.repository,
+                target,
+                source,
+                mode="prepare",
+            )
+        self.assert_clean_at(target)
 
     def test_renamed_datapack_layout_is_migrated_with_versioned_game_rules(
         self,
