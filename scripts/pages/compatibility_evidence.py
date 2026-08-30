@@ -32,6 +32,7 @@ from mod_compatibility import (  # noqa: E402
     CompatibilityContract,
     CompatibilityContractError,
     CompatibilityMod,
+    compatibility_scenarios_for_mod,
     load_contract as load_compatibility_contract,
     resolve_lane,
 )
@@ -49,13 +50,14 @@ from visual_evidence import (  # noqa: E402
 )
 
 
-SCHEMA_VERSION = 4
-LEGACY_SCHEMA_VERSIONS = frozenset({1, 2, 3})
+SCHEMA_VERSION = 5
+LEGACY_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4})
 KIND = "quick-skin-public-mod-compatibility"
 MANIFEST_NAME = "manifest.json"
 SOURCE_SCENARIO = "mod-compatibility"
 REMOTE_SOURCE_SCENARIO = "mod-compatibility-remote"
 LATE_JOIN_SOURCE_SCENARIO = "mod-compatibility-late-join"
+CPM_FIRST_PERSON_SOURCE_SCENARIO = "mod-compatibility-cpm-first-person"
 BASE_PUBLIC_CAPTURE_IDS = (
     "mod-compatibility.client_a.baseline_with_mod",
     "mod-compatibility.client_a.apply_local_skin_with_mod",
@@ -67,13 +69,17 @@ REMOTE_PUBLIC_CAPTURE_IDS = (
 LATE_JOIN_PUBLIC_CAPTURE_IDS = (
     "mod-compatibility-late-join.client_b.observe_late_join_state",
 )
+CPM_FIRST_PERSON_PUBLIC_CAPTURE_IDS = (
+    "mod-compatibility-cpm-first-person.client_a.first_person_hand_initial",
+    "mod-compatibility-cpm-first-person.client_a.first_person_hand_after_10_seconds",
+)
 PUBLIC_IMAGE_SIZE = (1280, 720)
 MAX_MANIFEST_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
 MAX_TOTAL_IMAGE_BYTES = 512 * 1024 * 1024
 MAX_LANES = 64
 MAX_NOT_APPLICABLE = 64
-MAX_IMAGES = MAX_LANES * 10
+MAX_IMAGES = MAX_LANES * 14
 MAX_TEXT = 4096
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -214,21 +220,39 @@ def _public_capture_ids(
         for capture in scenario_contract.captures
         if capture.scenario == LATE_JOIN_SOURCE_SCENARIO
     )
+    cpm_first_person = tuple(
+        capture.capture_id
+        for capture in scenario_contract.captures
+        if capture.scenario == CPM_FIRST_PERSON_SOURCE_SCENARIO
+    )
     if (
         base != BASE_PUBLIC_CAPTURE_IDS
         or remote != REMOTE_PUBLIC_CAPTURE_IDS
         or late_join != LATE_JOIN_PUBLIC_CAPTURE_IDS
+        or cpm_first_person != CPM_FIRST_PERSON_PUBLIC_CAPTURE_IDS
     ):
         raise CompatibilityEvidenceError(
             "public compatibility checkpoint contract drifted"
         )
+    if schema_version == SCHEMA_VERSION:
+        try:
+            selected_scenarios = frozenset(
+                compatibility_scenarios_for_mod(
+                    scenario_contract,
+                    compatibility_mod,
+                )
+            )
+        except CompatibilityContractError as exc:
+            raise CompatibilityEvidenceError(str(exc)) from exc
+        return [
+            capture.capture_id
+            for capture in scenario_contract.captures
+            if capture.scenario in selected_scenarios
+        ]
     selected = list(base)
-    if (
-        schema_version in {3, SCHEMA_VERSION}
-        and compatibility_mod.multiplayer is not None
-    ):
+    if schema_version in {3, 4} and compatibility_mod.multiplayer is not None:
         selected.extend(remote)
-    if schema_version == SCHEMA_VERSION and compatibility_mod.multiplayer is not None:
+    if schema_version == 4 and compatibility_mod.multiplayer is not None:
         selected.extend(late_join)
     return selected
 
@@ -518,13 +542,12 @@ def validate_plan(
             raise CompatibilityEvidenceError(f"runnable lane identity drifted: {lane_id}")
         scenarios = row.get("scenarios")
         scenario_items = scenarios.split(",") if isinstance(scenarios, str) else []
-        compatibility_prefix = list(
-            scenario_contract.scenarios_for_profile("compatibility")
-        )
-        if expected.mod.multiplayer is not None:
-            compatibility_prefix.extend(
-                scenario_contract.scenarios_for_profile("compatibility-remote")
+        try:
+            compatibility_prefix = list(
+                compatibility_scenarios_for_mod(scenario_contract, expected.mod)
             )
+        except CompatibilityContractError as exc:
+            raise CompatibilityEvidenceError(str(exc)) from exc
         base_scenarios = scenario_items[len(compatibility_prefix):]
         compatibility_scenarios = set(compatibility_prefix)
         if (
