@@ -375,6 +375,7 @@ class VersionPortMergeTest(unittest.TestCase):
             "weather clear\n"
             "gamerule doWeatherCycle false\n"
             "gamerule doDaylightCycle false\n"
+            "gamerule doMobSpawning false\n"
             "gamerule spawnRadius 0\n"
             "team add qs_e2e\n"
             "team modify qs_e2e collisionRule never\n"
@@ -387,7 +388,11 @@ class VersionPortMergeTest(unittest.TestCase):
             "time set day\n"
         )
         load_tag = '{"values":["qs_e2e:load"]}\n'
-        tick_function = "team join qs_e2e @a[team=!qs_e2e]\n"
+        tick_function = (
+            "team join qs_e2e @a[team=!qs_e2e]\n"
+            "execute as @e[type=!minecraft:player,tag=!qs_e2e_keep] at @s "
+            "run tp @s ~ -1024 ~\n"
+        )
         tick_tag = '{"values":["qs_e2e:tick"]}\n'
 
         self.git("switch", "--create", "datapack-base", self.base)
@@ -411,6 +416,7 @@ class VersionPortMergeTest(unittest.TestCase):
                 (
                     "gamerule doWeatherCycle false",
                     "gamerule doDaylightCycle false",
+                    "gamerule doMobSpawning false",
                     "gamerule spawnRadius 0",
                 ),
             ),
@@ -419,6 +425,7 @@ class VersionPortMergeTest(unittest.TestCase):
                 (
                     "gamerule minecraft:advance_weather false",
                     "gamerule minecraft:advance_time false",
+                    "gamerule minecraft:spawn_mobs false",
                     "gamerule minecraft:respawn_radius 0",
                 ),
             ),
@@ -427,6 +434,7 @@ class VersionPortMergeTest(unittest.TestCase):
                 (
                     "gamerule minecraft:advance_weather false",
                     "gamerule minecraft:advance_time false",
+                    "gamerule minecraft:spawn_mobs false",
                     "gamerule minecraft:respawn_radius 0",
                 ),
             ),
@@ -484,6 +492,10 @@ class VersionPortMergeTest(unittest.TestCase):
                     .replace(
                         "gamerule doDaylightCycle false",
                         "gamerule minecraft:advance_time false",
+                    )
+                    .replace(
+                        "gamerule doMobSpawning false",
+                        "gamerule minecraft:spawn_mobs false",
                     )
                     .replace(
                         "gamerule spawnRadius 0",
