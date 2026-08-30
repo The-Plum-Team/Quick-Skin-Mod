@@ -962,6 +962,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("strategy:\n      fail-fast: false", runtime)
         self.assertNotIn("max-parallel", runtime)
         self.assertIn("compatibility-mod: ${{ matrix.compatibility_mod }}", runtime)
+        self.assertIn("if: matrix.compatibility_mod == 'cpm'", runtime)
+        self.assertIn("cpm_fixture_secret.py materialize", runtime)
+        self.assertEqual(
+            runtime.count("secrets.QSM_E2E_CPM_FIXTURE_GZIP_B64_"),
+            4,
+        )
+        self.assertIn("cpm-model-path:", runtime)
         self.assertIn("source-sha: ${{ needs.admit.outputs.source_sha }}", runtime)
         self.assertIn("same-version baseline", runtime)
         self.assertIn("--candidate-root e2e-out/current", runtime)
