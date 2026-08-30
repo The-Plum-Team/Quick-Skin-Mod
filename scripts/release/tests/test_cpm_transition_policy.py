@@ -6,9 +6,26 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
+MATRIX = json.loads(
+    (ROOT / "release" / "release-matrix.json").read_text(encoding="utf-8")
+)
 MIXIN_ROOT = (
     ROOT / "common" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "mixin"
 )
+
+
+def uses_vanilla_translucent_hand_collector() -> bool:
+    runtime_versions = {
+        runtime["runtime_version"] for runtime in MATRIX["runtimes"]
+    }
+    if len(runtime_versions) != 1:
+        raise AssertionError("release runtimes must share one Minecraft version")
+    components = tuple(int(value) for value in runtime_versions.pop().split("."))
+    return components[0] >= 26 or (
+        len(components) == 3 and components[:2] == (1, 21) and components[2] >= 11
+    )
+
+
 CPM_INTEGRATION = (
     ROOT
     / "common"
@@ -115,12 +132,16 @@ class CpmTransitionPolicyTest(unittest.TestCase):
         for path in paths:
             with self.subTest(source=path.relative_to(ROOT).as_posix()):
                 source = path.read_text(encoding="utf-8")
+                self.assertIn("quickskin$redirectRenderHandBuffer", source)
+                if not uses_vanilla_translucent_hand_collector() and MATRIX[
+                    "runtimes"
+                ][0]["runtime_version"] != "1.20.1":
+                    continue
                 legacy_guard = source.index(
                     "//? if <1.21.11 {", source.index("public class")
                 )
                 redirect = source.index("@Redirect(", legacy_guard)
                 self.assertLess(legacy_guard, redirect)
-                self.assertIn("quickskin$redirectRenderHandBuffer", source)
                 self.assertNotIn("quickskin$redirectSubmitModelPart", source)
                 self.assertNotIn("SubmitNodeCollector;submitModelPart", source)
 
