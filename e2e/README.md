@@ -121,10 +121,12 @@ evidence discovery or uploaded as a successful run.
 
 After the dedicated server reports that its fresh world is ready, the orchestrator removes every
 non-player entity through the server console and requires a log acknowledgement before it launches
-any client. The spawn-disabled server properties prevent later ambient spawns; the explicit purge
-also covers passive entities created while a game version prepares its initial superflat chunks,
-so a wandering mob cannot contaminate two screenshots that a deterministic comparison treats as
-the same scene.
+any client. Spawn-disabled server properties plus the version-correct mob-spawning game rule stop
+ordinary ambient spawns. Some game versions can still create passive entities when a client causes
+a new superflat chunk to be generated, so the tick datapack immediately moves every unowned
+non-player entity below the world. Intentional fixtures opt in with the `qs_e2e_keep` entity tag;
+this keeps the real CustomNPCs subject visible without allowing a wandering mob to contaminate two
+screenshots that a deterministic comparison treats as the same scene.
 
 Only the current invocation's complete, bounded evidence is promoted to `e2e-out/current`. This
 atomic promotion uses guarded same-filesystem renames and an owned last-good sibling, so an
