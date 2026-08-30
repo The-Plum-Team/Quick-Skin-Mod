@@ -24,8 +24,8 @@
         "P7dR8mSH"
       ],
       "evidence": {
-        "baseline_with_mod": "A stable rear third-person view shows the complete local player wearing the genuine CPM model generated through CPM's exporter and imported through Quick Skin. Two oversized cyan and magenta horn cubes visibly protrude above the head, while the player model and texture remain intact.",
-        "apply_local_skin_with_mod": "The paired rear third-person view shows the same complete player wearing Quick Skin's dark charcoal-and-gray plaid skin with brown hands and with both CPM horns gone. This must visibly confirm that selecting a normal Quick Skin skin reset CPM model mode without corrupting the player renderer."
+        "baseline_with_mod": "A stable rear third-person view shows the complete local player wearing the protected complex CPM fixture imported through Quick Skin. Its layered red cap, brown hair, blue overalls, white gloves, brown boots, custom proportions, and textured geometry are attached and rendered coherently without missing, detached, or corrupted parts.",
+        "apply_local_skin_with_mod": "The paired rear third-person view shows the same complete player wearing Quick Skin's dark charcoal-and-gray plaid skin with brown hands. All fixture-specific cap, hair, overalls, glove, boot, and custom-proportion geometry is gone, visibly confirming that selecting a normal Quick Skin skin reset CPM model mode without corrupting the player renderer."
       },
       "review_regions": {
         "baseline_with_mod": [[0.4, 0.06, 0.6, 0.92]],
@@ -34,8 +34,8 @@
       "reference_captures": null,
       "multiplayer": {
         "evidence": {
-          "baseline_with_mod": "From Bob's fixed rear camera, the complete remote Alice wears the genuine CPM model with two oversized cyan and magenta horn cubes above her head. The model and texture are intact, proving CPM's client-and-server model state reached a second player.",
-          "apply_local_skin_with_mod": "From the same fixed rear camera, remote Alice now wears Quick Skin's dark charcoal-and-gray plaid skin with brown hands and both CPM horns are gone. This proves the CPM reset and normal Quick Skin skin both propagated to the observing client."
+          "baseline_with_mod": "From Bob's fixed rear camera, the complete remote Alice wears the protected complex CPM fixture. Its layered red cap, brown hair, blue overalls, white gloves, brown boots, custom proportions, and textured geometry are attached and rendered coherently, proving CPM's client-and-server model state reached a second player.",
+          "apply_local_skin_with_mod": "From the same fixed rear camera, remote Alice now wears Quick Skin's dark charcoal-and-gray plaid skin with brown hands, and all fixture-specific model geometry is gone. This proves the CPM reset and normal Quick Skin skin both propagated to the observing client."
         },
         "review_regions": {
           "baseline_with_mod": [[0.32, 0.05, 0.68, 0.95]],
