@@ -428,10 +428,20 @@ python3 scripts/ci/cpm_fixture_secret.py encode \
   --output-directory "$fixture_secret_dir"
 ```
 
-The command prints four `gh secret set QSM_E2E_CPM_FIXTURE_GZIP_B64_<n>` commands. Run them, then
-delete the temporary directory. A missing or altered chunk fails the CPM lane before Minecraft is
-launched. The raw model file is absent from source archives, production JARs, E2E harness JARs, and
-uploaded evidence.
+Upload the four generated files, then delete the temporary directory:
+
+```bash
+for secret_name in \
+  QSM_E2E_CPM_FIXTURE_GZIP_B64_1 \
+  QSM_E2E_CPM_FIXTURE_GZIP_B64_2 \
+  QSM_E2E_CPM_FIXTURE_GZIP_B64_3 \
+  QSM_E2E_CPM_FIXTURE_GZIP_B64_4; do
+  gh secret set "$secret_name" < "$fixture_secret_dir/$secret_name"
+done
+```
+
+A missing or altered chunk fails the CPM lane before Minecraft is launched. The raw model file is
+absent from source archives, production JARs, E2E harness JARs, and uploaded evidence.
 
 CPM and Ears additionally opt into two live remote capture IDs and one late-join capture ID. In the
 live scenario, Bob first proves the real optional renderer state for Alice, captures it, and

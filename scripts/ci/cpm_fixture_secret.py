@@ -10,7 +10,6 @@ import gzip
 import hashlib
 import io
 import os
-import shlex
 import sys
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -113,7 +112,7 @@ def encode_fixture(source: Path, output_directory: Path) -> None:
             raise FixtureSecretError(f"refusing to replace symlink {destination}")
         destination.write_text(chunk, encoding="ascii")
         destination.chmod(0o600)
-        print(f"gh secret set {secret_name} < {shlex.quote(str(destination))}")
+    print("prepared four protected CPM fixture secret files")
 
 
 def materialize_fixture(output: Path, environment: Mapping[str, str]) -> None:
