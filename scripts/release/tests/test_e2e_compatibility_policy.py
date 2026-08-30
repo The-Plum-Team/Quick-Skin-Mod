@@ -21,6 +21,8 @@ CPM_INTEGRATION = (
     / "compat"
     / "CPMCompatIntegration.java"
 )
+CPM_RESOURCES = ROOT / "common" / "src" / "e2e" / "resources"
+CPM_SECRET_TOOL = ROOT / "scripts" / "ci" / "cpm_fixture_secret.py"
 
 
 class E2ECompatibilityPolicyTest(unittest.TestCase):
@@ -249,6 +251,13 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         assets = (E2E_JAVA / "TestAssets.java").read_text(encoding="utf-8")
         runtime = (ROOT / "e2e/packaged_runtime.py").read_text(encoding="utf-8")
+        action = (
+            ROOT / ".github" / "actions" / "run-packaged-e2e" / "action.yml"
+        ).read_text(encoding="utf-8")
+        workflow = (
+            ROOT / ".github" / "workflows" / "mod-compatibility-e2e.yml"
+        ).read_text(encoding="utf-8")
+        secret_tool = CPM_SECRET_TOOL.read_text(encoding="utf-8")
 
         self.assertIn("feature::prepareBaseline", scenario)
         self.assertIn("feature::applyQuickSkinFeature", scenario)
@@ -333,7 +342,27 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn('"com.unascribed.ears.EarsMod"', feature)
         self.assertIn("rendererLookupArgument", feature)
         self.assertIn("expectedType.isInstance(candidate)", feature)
-        self.assertIn("com.tom.cpm.shared.editor.Exporter", assets)
+        self.assertEqual(list(CPM_RESOURCES.glob("*.cpmmodel")), [])
+        self.assertIn(
+            'CPM_MODEL_PATH_ENV = "QUICKSKIN_E2E_CPM_MODEL_PATH"', assets
+        )
+        self.assertIn("HashUtil.computeFileContentId(source)", assets)
+        self.assertIn(
+            "2acd67e358456caf86aa0fad54f88b2e2fe0dfd2bc1160638b6f69b1689e1845",
+            assets,
+        )
+        self.assertNotIn("getResourceAsStream(BUNDLED_CPM_MODEL)", assets)
+        self.assertNotIn("Mario", assets)
+        self.assertNotIn("Mario", feature)
+        self.assertIn("cpm_fixture_secret.py materialize", workflow)
+        self.assertEqual(workflow.count("secrets.QSM_E2E_CPM_FIXTURE_GZIP_B64_"), 4)
+        self.assertIn("cpm-model-path:", action)
+        self.assertIn("QUICKSKIN_E2E_CPM_MODEL_PATH", action)
+        self.assertIn("Remove the protected CPM fixture", action)
+        self.assertIn("EXPECTED_SIZE = 134_115", secret_tool)
+        self.assertIn("MAX_SECRET_CHARS = 40_000", secret_tool)
+        self.assertIn("len(SECRET_NAMES)", secret_tool)
+        self.assertNotIn("com.tom.cpm.shared.editor.Exporter", assets)
         self.assertIn("summon customnpcs:customnpc", runtime)
         self.assertIn(
             '"com.quickskin.mod.client.compat.ReplayModHelper"', feature
