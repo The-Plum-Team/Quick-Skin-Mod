@@ -394,8 +394,8 @@ regions, an optional comparable clean-reference capture override, and an optiona
 so caching and AI focus on the rendered integration rather than a generic part of the frame. The
 two stable local capture IDs select a different real workflow for each locked mod:
 
-- CPM exports a genuine `.cpmmodel` through CPM's editor API, imports and renders its two coloured
-  horn cubes, then selects a normal Quick Skin skin and proves CPM model mode was cleared.
+- CPM imports and renders a protected complex `.cpmmodel` fixture, checking its distinctive layered
+  geometry and textures, then selects a normal Quick Skin skin and proves CPM model mode was cleared.
 - Ears compares an ordinary Quick Skin control with a skin authored through Ears' own feature
   writer, then requires parsed tall ears and a rear tail in Ears' public renderer storage.
 - 3D Skin Layers compares subdued and saturated outer-layer fixtures over a uniquely coloured
@@ -410,6 +410,38 @@ two stable local capture IDs select a different real workflow for each locked mo
 - ReplayMod records the real multiplayer Quick Skin exchange, closes the recording, opens the
   resulting `.mcpr`, and requires a recorded Quick Skin payload to traverse the production bridge
   before capturing the recorded player in playback.
+
+The protected CPM fixture is the freely available `.cpmmodel` from
+[Alphs' Super Mario Skin Pack](https://ko-fi.com/s/1e9ed29b27). Alphs retains authorship; Quick Skin
+uses the model only as a high-quality, structurally complex compatibility input and does not
+version or redistribute its bytes. Locally, set `QUICKSKIN_E2E_CPM_MODEL_PATH` to the downloaded
+file before running a CPM scenario. The harness verifies the exact reviewed SHA-256
+`2acd67e358456caf86aa0fad54f88b2e2fe0dfd2bc1160638b6f69b1689e1845` before importing it.
+
+GitHub Actions reconstructs the same file only inside the protected CPM job from four repository
+secrets, then removes it before evidence is uploaded. Prepare the four bounded secret values with:
+
+```bash
+fixture_secret_dir="$(mktemp -d)"
+python3 scripts/ci/cpm_fixture_secret.py encode \
+  --input /absolute/path/to/complex-model.cpmmodel \
+  --output-directory "$fixture_secret_dir"
+```
+
+Upload the four generated files, then delete the temporary directory:
+
+```bash
+for secret_name in \
+  QSM_E2E_CPM_FIXTURE_GZIP_B64_1 \
+  QSM_E2E_CPM_FIXTURE_GZIP_B64_2 \
+  QSM_E2E_CPM_FIXTURE_GZIP_B64_3 \
+  QSM_E2E_CPM_FIXTURE_GZIP_B64_4; do
+  gh secret set "$secret_name" < "$fixture_secret_dir/$secret_name"
+done
+```
+
+A missing or altered chunk fails the CPM lane before Minecraft is launched. The raw model file is
+absent from source archives, production JARs, E2E harness JARs, and uploaded evidence.
 
 CPM and Ears additionally opt into two live remote capture IDs and one late-join capture ID. In the
 live scenario, Bob first proves the real optional renderer state for Alice, captures it, and
@@ -441,6 +473,7 @@ To exercise one lane manually after staging the ordinary release artifacts, use 
 orchestrator and include both the activation scenario and the complete base profile:
 
 ```bash
+QUICKSKIN_E2E_CPM_MODEL_PATH=/absolute/path/to/complex-model.cpmmodel \
 python3 e2e/orchestrator.py \
   --packaged \
   --artifacts-manifest build/release/artifacts.json \
