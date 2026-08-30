@@ -1105,7 +1105,11 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
             packaged_runtime.CUSTOM_NPC_FIXTURE_COMMANDS[0],
         )
         self.assertIn(
-            "if entity @e[type=customnpcs:customnpc,limit=1]",
+            "Tags:['qs_e2e_keep']",
+            packaged_runtime.CUSTOM_NPC_FIXTURE_COMMANDS[0],
+        )
+        self.assertIn(
+            "if entity @e[type=customnpcs:customnpc,tag=qs_e2e_keep,limit=1]",
             packaged_runtime.CUSTOM_NPC_FIXTURE_COMMANDS[1],
         )
 
