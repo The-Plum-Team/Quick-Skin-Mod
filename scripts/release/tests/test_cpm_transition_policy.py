@@ -94,6 +94,36 @@ class CpmTransitionPolicyTest(unittest.TestCase):
                 source = (MIXIN_ROOT / name).read_text(encoding="utf-8")
                 self.assertIn("CPMCompatIntegration.shouldDeferToCPM()", source)
 
+    def test_modern_first_person_collectors_remain_owned_by_model_mods(self) -> None:
+        paths = [MIXIN_ROOT / "ItemInHandRendererMixin.java"]
+        neoforge_renderer = (
+            ROOT
+            / "neoforge"
+            / "src"
+            / "main"
+            / "java"
+            / "com"
+            / "quickskin"
+            / "mod"
+            / "neoforge"
+            / "mixin"
+            / "PlayerRendererMixin.java"
+        )
+        if neoforge_renderer.is_file():
+            paths.append(neoforge_renderer)
+
+        for path in paths:
+            with self.subTest(source=path.relative_to(ROOT).as_posix()):
+                source = path.read_text(encoding="utf-8")
+                legacy_guard = source.index(
+                    "//? if <1.21.11 {", source.index("public class")
+                )
+                redirect = source.index("@Redirect(", legacy_guard)
+                self.assertLess(legacy_guard, redirect)
+                self.assertIn("quickskin$redirectRenderHandBuffer", source)
+                self.assertNotIn("quickskin$redirectSubmitModelPart", source)
+                self.assertNotIn("SubmitNodeCollector;submitModelPart", source)
+
     def test_cpm_mixins_are_registered_in_the_optional_config(self) -> None:
         config_path = (
             ROOT
