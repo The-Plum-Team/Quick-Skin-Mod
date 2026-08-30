@@ -14,20 +14,16 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
- * Generates deterministic test textures at runtime so no binary assets need to be committed and the
- * file-upload flow can be exercised. Skins are written to a deterministic per-run fixture and handed to
- * {@code SkinImporter.importSkin(Path)}; capes are registered headlessly via
+ * Creates deterministic test textures and copies protected test fixtures into per-run paths. Skins are
+ * handed to {@code SkinImporter.importSkin(Path)}; capes are registered headlessly via
  * {@link #registerLocalCape(Path)} (bypassing the interactive {@code CapeAdjustScreen}).
  */
 public final class TestAssets {
@@ -36,6 +32,13 @@ public final class TestAssets {
 
     /** Classpath location of an optional real skin bundled into the e2e resources (see makeClassicSkin). */
     private static final String BUNDLED_SKIN = "/qs_e2e_test_skin.png";
+
+    /** Environment variable pointing to the protected complex CPM compatibility fixture. */
+    private static final String CPM_MODEL_PATH_ENV = "QUICKSKIN_E2E_CPM_MODEL_PATH";
+
+    /** Exact public identity of the reviewed fixture; its bytes are deliberately not versioned. */
+    private static final String CPM_MODEL_CONTENT_ID =
+            "sha256-2acd67e358456caf86aa0fad54f88b2e2fe0dfd2bc1160638b6f69b1689e1845";
 
     /** The production BMO atlas used to prove that the editor preserves bundled cape UVs. */
     private static final String BUNDLED_BMO_CAPE =
@@ -248,59 +251,34 @@ public final class TestAssets {
         return fixture;
     }
 
-    /**
-     * Export a genuine standalone CPM model through the editor/exporter API supplied by the exact
-     * installed CPM version. Two oversized recoloured head cubes make model selection visually
-     * undeniable while the outer file still exercises Quick Skin's normal .cpmmodel importer.
-     */
+    /** Copies the protected complex standalone CPM model into Quick Skin's normal import workflow. */
     public static Path makeCpmModel() throws Exception {
-        ClassLoader loader = TestAssets.class.getClassLoader();
-        Class<?> uiClass = Class.forName("com.tom.cpl.gui.UI", true, loader);
-        Object ui = Proxy.newProxyInstance(loader, new Class<?>[]{uiClass}, cpmUiHandler());
-        Class<?> editorClass = Class.forName("com.tom.cpm.shared.editor.Editor", true, loader);
-        Object editor = editorClass.getConstructor().newInstance();
-        editorClass.getMethod("setUI", uiClass).invoke(editor, ui);
-        editorClass.getMethod("loadDefaultPlayerModel").invoke(editor);
+        String configuredPath = System.getenv(CPM_MODEL_PATH_ENV);
+        if (configuredPath == null || configuredPath.trim().isEmpty()) {
+            throw new IllegalStateException(
+                    "Missing required CPM model path in " + CPM_MODEL_PATH_ENV);
+        }
+        Path source = Paths.get(configuredPath);
+        if (!Files.isRegularFile(source)) {
+            throw new IllegalStateException("Configured CPM fixture is not a regular file");
+        }
+        String contentId = HashUtil.computeFileContentId(source);
+        if (!CPM_MODEL_CONTENT_ID.equals(contentId)) {
+            throw new IllegalStateException(
+                    "Configured CPM fixture has unexpected content identity " + contentId);
+        }
 
-        @SuppressWarnings("unchecked")
-        List<Object> roots = (List<Object>) editorClass.getField("elements").get(editor);
-        Object head = roots.stream()
-                .filter(root -> {
-                    try {
-                        Object typeData = root.getClass().getField("typeData").get(root);
-                        return typeData instanceof Enum<?> value && "HEAD".equals(value.name());
-                    } catch (ReflectiveOperationException ignored) {
-                        return false;
-                    }
-                })
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("CPM editor exposed no HEAD root"));
-        addCpmCube(editorClass, editor, head, "E2E cyan horn",
-                -4.0f, -13.0f, -1.5f, 3.0f, 6.0f, 3.0f, 0x00E5FF);
-        addCpmCube(editorClass, editor, head, "E2E magenta horn",
-                1.0f, -13.0f, -1.5f, 3.0f, 6.0f, 3.0f, 0xFF2BD6);
-
-        Class<?> descriptionClass = Class.forName(
-                "com.tom.cpm.shared.editor.util.ModelDescription", true, loader);
-        Object description = descriptionClass.getConstructor().newInstance();
-        descriptionClass.getField("name").set(description, "Quick Skin E2E horns");
-        descriptionClass.getField("desc").set(
-                description, "Generated by the compatibility scenario through CPM's exporter");
-        Path fixture = deterministicFixture("qs_e2e_horns.cpmmodel");
-        Class<?> exporterClass = Class.forName(
-                "com.tom.cpm.shared.editor.Exporter", true, loader);
-        exporterClass.getMethod(
-                        "exportModel", editorClass, uiClass, java.io.File.class,
-                        descriptionClass, boolean.class)
-                .invoke(null, editor, ui, fixture.toFile(), description, false);
+        Path fixture = deterministicFixture("qs_e2e_complex_model.cpmmodel");
+        Files.copy(source, fixture, StandardCopyOption.REPLACE_EXISTING);
         if (!Files.isRegularFile(fixture) || Files.size(fixture) < 16) {
-            throw new IllegalStateException("CPM exporter did not create a model file");
+            throw new IllegalStateException("Protected CPM fixture did not create a model file");
         }
         try (InputStream input = Files.newInputStream(fixture)) {
             if (input.read() != 0x53) {
-                throw new IllegalStateException("CPM exporter wrote an invalid model header");
+                throw new IllegalStateException("Protected CPM fixture has an invalid model header");
             }
         }
+        E2ELog.info("using protected complex CPM fixture " + CPM_MODEL_CONTENT_ID);
         return fixture;
     }
 
@@ -388,78 +366,6 @@ public final class TestAssets {
         Class<?> enumClass = Class.forName(enumClassName, true, TestAssets.class.getClassLoader());
         Object value = Enum.valueOf((Class<? extends Enum>) enumClass.asSubclass(Enum.class), valueName);
         builder.getClass().getMethod(methodName, enumClass).invoke(builder, value);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void addCpmCube(
-            Class<?> editorClass,
-            Object editor,
-            Object parent,
-            String name,
-            float offsetX,
-            float offsetY,
-            float offsetZ,
-            float sizeX,
-            float sizeY,
-            float sizeZ,
-            int rgb
-    ) throws Exception {
-        ClassLoader loader = TestAssets.class.getClassLoader();
-        Class<?> elementClass = Class.forName(
-                "com.tom.cpm.shared.editor.elements.ModelElement", true, loader);
-        Class<?> vectorClass = Class.forName("com.tom.cpl.math.Vec3f", true, loader);
-        Object child = elementClass.getConstructor(editorClass).newInstance(editor);
-        elementClass.getField("name").set(child, name);
-        elementClass.getField("parent").set(child, parent);
-        elementClass.getField("texture").setBoolean(child, false);
-        elementClass.getField("rgb").setInt(child, rgb);
-        elementClass.getField("offset").set(
-                child, vectorClass.getConstructor(float.class, float.class, float.class)
-                        .newInstance(offsetX, offsetY, offsetZ));
-        elementClass.getField("pos").set(
-                child, vectorClass.getConstructor(float.class, float.class, float.class)
-                        .newInstance(0.0f, 0.0f, 0.0f));
-        elementClass.getField("size").set(
-                child, vectorClass.getConstructor(float.class, float.class, float.class)
-                        .newInstance(sizeX, sizeY, sizeZ));
-        elementClass.getField("rotation").set(
-                child, vectorClass.getConstructor(float.class, float.class, float.class)
-                        .newInstance(0.0f, 0.0f, 0.0f));
-        elementClass.getField("scale").set(
-                child, vectorClass.getConstructor(float.class, float.class, float.class)
-                        .newInstance(1.0f, 1.0f, 1.0f));
-        elementClass.getField("meshScale").set(
-                child, vectorClass.getConstructor(float.class, float.class, float.class)
-                        .newInstance(1.0f, 1.0f, 1.0f));
-        List<Object> children = (List<Object>) parent.getClass().getField("children").get(parent);
-        children.add(child);
-    }
-
-    private static InvocationHandler cpmUiHandler() {
-        return (proxy, method, args) -> {
-            if (method.getDeclaringClass() == Object.class) {
-                return switch (method.getName()) {
-                    case "toString" -> "QuickSkinE2ECpmUI";
-                    case "hashCode" -> System.identityHashCode(proxy);
-                    case "equals" -> proxy == (args == null ? null : args[0]);
-                    default -> null;
-                };
-            }
-            if ("i18nFormat".equals(method.getName())) {
-                return args != null && args.length > 0 ? String.valueOf(args[0]) : "";
-            }
-            if ("executeLater".equals(method.getName())
-                    && args != null && args.length == 1 && args[0] instanceof Runnable runnable) {
-                runnable.run();
-                return null;
-            }
-            if ("onGuiException".equals(method.getName())) {
-                Throwable failure = args != null && args.length > 1 && args[1] instanceof Throwable t
-                        ? t : new IllegalStateException("CPM exporter reported an unknown failure");
-                throw new IllegalStateException("CPM exporter reported a GUI exception", failure);
-            }
-            return null;
-        };
     }
 
     /**
