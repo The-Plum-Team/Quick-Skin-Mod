@@ -21,6 +21,10 @@ inputs:
     description: Optional lock-selected compatibility mod id
     required: false
     default: ""
+  cpm-model-path:
+    description: Optional authenticated external CPM fixture path for the CPM compatibility lane
+    required: false
+    default: ""
   evidence-retention-days:
     description: Bounded retention needed by downstream authenticated consumers
     required: false
@@ -96,6 +100,7 @@ runs:
         E2E_ROW_JSON: ${{ inputs.row-json }}
         E2E_SCENARIOS: ${{ inputs.scenarios }}
         E2E_COMPATIBILITY_MOD: ${{ inputs.compatibility-mod }}
+        QUICKSKIN_E2E_CPM_MODEL_PATH: ${{ inputs.cpm-model-path }}
         QUICKSKIN_E2E_RUNTIME_STORE: ${{ runner.temp }}/quick-skin-runtime-store
       run: |
         set -euo pipefail
@@ -106,6 +111,14 @@ runs:
             --compatibility-mod "$E2E_COMPATIBILITY_MOD"
           )
         fi
+        if [[ "$E2E_COMPATIBILITY_MOD" == cpm ]]; then
+          expected_cpm_model="$RUNNER_TEMP/qsm-protected-cpm-fixture/complex-model.bin"
+          [[ "$QUICKSKIN_E2E_CPM_MODEL_PATH" == "$expected_cpm_model" ]]
+          test -f "$QUICKSKIN_E2E_CPM_MODEL_PATH" \
+            -a ! -L "$QUICKSKIN_E2E_CPM_MODEL_PATH"
+        else
+          [[ -z "$QUICKSKIN_E2E_CPM_MODEL_PATH" ]]
+        fi
         xvfb-run --auto-servernum \
           --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render" \
           python e2e/orchestrator.py \
@@ -115,6 +128,20 @@ runs:
             --packaged \
             --scenarios "$E2E_SCENARIOS" \
             "${compatibility_arguments[@]}"
+
+    - name: Remove the protected CPM fixture
+      if: always() && inputs.cpm-model-path != ''
+      shell: bash
+      env:
+        QUICKSKIN_E2E_CPM_MODEL_PATH: ${{ inputs.cpm-model-path }}
+      run: |
+        set -euo pipefail
+        fixture_root="$RUNNER_TEMP/qsm-protected-cpm-fixture"
+        expected_cpm_model="$fixture_root/complex-model.bin"
+        [[ "$QUICKSKIN_E2E_CPM_MODEL_PATH" == "$expected_cpm_model" ]]
+        test ! -L "$QUICKSKIN_E2E_CPM_MODEL_PATH"
+        rm -f -- "$QUICKSKIN_E2E_CPM_MODEL_PATH"
+        rmdir "$fixture_root"
 
     - name: Summarize runtime cost and cache behavior
       if: always()
