@@ -964,7 +964,8 @@ interface ModCompatibilityFeature {
             String problem = essentialTitleFailure(false);
             return problem == null
                     ? Step.Result.pass("Essential owns the title player model; Quick Skin suppresses "
-                    + "its duplicate preview and places exactly one action beside Essential's widgets")
+                    + "its duplicate preview and places exactly one action immediately left of "
+                    + "Essential's bottom right-rail widget")
                     : Step.Result.fail(problem);
         }
 
@@ -991,7 +992,8 @@ interface ModCompatibilityFeature {
             String problem = essentialTitleFailure(true);
             if (problem != null) return Step.Result.fail(problem);
             return Step.Result.pass("Essential's title model owns the layout while Quick Skin "
-                    + "registers local_skin:" + skinHash + " and keeps its single action icon");
+                    + "registers local_skin:" + skinHash + " and keeps its single action icon "
+                    + "immediately left of Essential's bottom right-rail widget");
         }
 
         private void openTitle() {
