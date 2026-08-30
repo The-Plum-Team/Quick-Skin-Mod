@@ -27,6 +27,7 @@ WORLD_GAMERULE_VARIANTS = (
         {
             "gamerule doWeatherCycle false",
             "gamerule doDaylightCycle false",
+            "gamerule doMobSpawning false",
             "gamerule spawnRadius 0",
         }
     ),
@@ -34,6 +35,7 @@ WORLD_GAMERULE_VARIANTS = (
         {
             "gamerule minecraft:advance_weather false",
             "gamerule minecraft:advance_time false",
+            "gamerule minecraft:spawn_mobs false",
             "gamerule minecraft:respawn_radius 0",
         }
     ),
@@ -134,10 +136,22 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         load_function = world_load.read_text(encoding="utf-8")
 
         self.assertIn("level-seed=quickskin-e2e", properties)
+        for setting in (
+            "difficulty=peaceful",
+            "spawn-monsters=false",
+            "spawn-animals=false",
+            "spawn-npcs=false",
+        ):
+            self.assertIn(setting, properties)
         self.assertIn(world_gamerules(load_function), WORLD_GAMERULE_VARIANTS)
         self.assertIn("team modify qs_e2e collisionRule never", load_function)
         self.assertIn(
             "team join qs_e2e @a[team=!qs_e2e]",
+            world_tick.read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            "execute as @e[type=!minecraft:player,tag=!qs_e2e_keep] at @s "
+            "run tp @s ~ -1024 ~",
             world_tick.read_text(encoding="utf-8"),
         )
         self.assertIn('"qs_e2e:tick"', world_tick_tag.read_text(encoding="utf-8"))
