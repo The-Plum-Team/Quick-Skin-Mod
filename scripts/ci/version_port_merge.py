@@ -85,6 +85,36 @@ NAMESPACED_GAME_RULES = {
     b"gamerule doMobSpawning false\n": b"gamerule minecraft:spawn_mobs false\n",
     b"gamerule spawnRadius 0\n": b"gamerule minecraft:respawn_radius 0\n",
 }
+CPM_TRANSITION_POLICY_PATH = "scripts/release/tests/test_cpm_transition_policy.py"
+COMMON_HAND_RENDERER_PATH = (
+    "common/src/main/java/com/quickskin/mod/mixin/ItemInHandRendererMixin.java"
+)
+NEOFORGE_PLAYER_RENDERER_PATH = (
+    "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java"
+)
+NEOFORGE_PLAYER_RENDERER_INPUT_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "neoforge-player-renderer-with-modern-collector.java.fixture"
+)
+NEOFORGE_PLAYER_RENDERER_RESULT_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "neoforge-player-renderer-without-modern-collector.java.fixture"
+)
+NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256 = (
+    "cf93f0042e3bc277ab077ff31d30f363d207a8be588931efcf1f8936c6eb724b"
+)
+NEOFORGE_PLAYER_RENDERER_RESULT_SHA256 = (
+    "5273c8bad6c77a5bcd0729fb04e5c3e2250c8490d4618507a04a84855b358ab7"
+)
+MODERN_HAND_COLLECTOR_MARKERS = (
+    b"quickskin$redirectSubmitModelPart",
+    b"SubmitNodeCollector;submitModelPart",
+)
+CPM_TRANSITION_POLICY_MARKERS = (
+    b"def test_modern_first_person_collectors_remain_owned_by_model_mods",
+    b'self.assertNotIn("quickskin$redirectSubmitModelPart", source)',
+    b'self.assertNotIn("SubmitNodeCollector;submitModelPart", source)',
+)
 
 
 class VersionPortMergeError(ValueError):
@@ -843,6 +873,181 @@ def _needs_datapack_function_migration(
     )
 
 
+def _runtime_uses_vanilla_translucent_hand_collector(
+    runtime_version: str,
+) -> bool:
+    try:
+        components = tuple(int(value) for value in runtime_version.split("."))
+    except ValueError as exc:
+        raise VersionPortMergeError(
+            f"target runtime version {runtime_version!r} is invalid"
+        ) from exc
+    return components[0] >= 26 or (
+        len(components) == 3
+        and components[:2] == (1, 21)
+        and components[2] >= 11
+    )
+
+
+def _neoforge_collector_migration_fixture(
+    repository: Path,
+    source: str,
+    oid_length: int,
+) -> IndexEntry | None:
+    """Authenticate the source policy and its audited NeoForge result fixture."""
+
+    if _tree_entry(
+        repository, source, NEOFORGE_PLAYER_RENDERER_PATH, oid_length
+    ) is not None:
+        return None
+    policy_entry = _tree_entry(
+        repository, source, CPM_TRANSITION_POLICY_PATH, oid_length
+    )
+    common_entry = _tree_entry(repository, source, COMMON_HAND_RENDERER_PATH, oid_length)
+    if policy_entry is None or common_entry is None:
+        return None
+
+    policy_payload = _read_blob(
+        repository,
+        policy_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="source CPM transition policy",
+    )
+    policy_matches = tuple(
+        marker in policy_payload for marker in CPM_TRANSITION_POLICY_MARKERS
+    )
+    if not any(policy_matches):
+        return None
+    if not all(policy_matches):
+        raise VersionPortMergeError(
+            "source CPM transition policy has incomplete collector ownership markers"
+        )
+
+    common_payload = _read_blob(
+        repository,
+        common_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="source common hand renderer",
+    )
+    if any(marker in common_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
+        raise VersionPortMergeError(
+            "source common hand renderer contradicts the CPM collector ownership policy"
+        )
+
+    input_entry = _tree_entry(
+        repository, source, NEOFORGE_PLAYER_RENDERER_INPUT_PATH, oid_length
+    )
+    result_entry = _tree_entry(
+        repository, source, NEOFORGE_PLAYER_RENDERER_RESULT_PATH, oid_length
+    )
+    if input_entry is None or result_entry is None:
+        raise VersionPortMergeError(
+            "source CPM collector policy lacks its NeoForge migration fixtures"
+        )
+    input_payload = _read_blob(
+        repository,
+        input_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="source NeoForge collector migration input fixture",
+    )
+    _validate_text_blob(
+        input_payload,
+        "source NeoForge collector migration input fixture",
+        markers=True,
+    )
+    if hashlib.sha256(input_payload).hexdigest() != (
+        NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256
+    ):
+        raise VersionPortMergeError(
+            "source NeoForge collector migration input fixture is not audited"
+        )
+    if not all(marker in input_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
+        raise VersionPortMergeError(
+            "source NeoForge collector migration input lacks the modern redirect"
+        )
+    result_payload = _read_blob(
+        repository,
+        result_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="source NeoForge collector migration fixture",
+    )
+    _validate_text_blob(
+        result_payload,
+        "source NeoForge collector migration fixture",
+        markers=True,
+    )
+    if hashlib.sha256(result_payload).hexdigest() != (
+        NEOFORGE_PLAYER_RENDERER_RESULT_SHA256
+    ):
+        raise VersionPortMergeError(
+            "source NeoForge collector migration fixture is not the audited result"
+        )
+    if any(marker in result_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
+        raise VersionPortMergeError(
+            "source NeoForge collector migration fixture still intercepts the modern collector"
+        )
+    return result_entry
+
+
+def _migrate_neoforge_modern_hand_collector(
+    repository: Path,
+    work_head: str,
+    result_fixture: IndexEntry,
+    oid_length: int,
+) -> list[dict[str, Any]]:
+    """Replace one exact target-only NeoForge redirect with its audited safe form."""
+
+    target_entry = _tree_entry(
+        repository, work_head, NEOFORGE_PLAYER_RENDERER_PATH, oid_length
+    )
+    if target_entry is None:
+        return []
+    target_payload = _read_blob(
+        repository,
+        target_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="target NeoForge player renderer",
+    )
+    _validate_text_blob(
+        target_payload, "target NeoForge player renderer", markers=True
+    )
+    if not any(marker in target_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
+        return []
+    if hashlib.sha256(target_payload).hexdigest() != (
+        NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256
+    ):
+        raise VersionPortMergeError(
+            "target NeoForge modern hand collector does not match the audited migration input"
+        )
+
+    before = _snapshot_index(repository, oid_length)
+    current_entries = _entries_by_path(before.entries).get(
+        NEOFORGE_PLAYER_RENDERER_PATH, ()
+    )
+    if current_entries != (target_entry,):
+        raise VersionPortMergeError(
+            "merged NeoForge player renderer is not the exact target blob"
+        )
+
+    result_entry = IndexEntry(
+        NEOFORGE_PLAYER_RENDERER_PATH,
+        0,
+        target_entry.mode,
+        result_fixture.oid,
+    )
+    _install_index_entry(repository, result_entry)
+    return [
+        {
+            "path": NEOFORGE_PLAYER_RENDERER_PATH,
+            "policy": "migrate-neoforge-modern-hand-collector",
+            "source_path": NEOFORGE_PLAYER_RENDERER_RESULT_PATH,
+            "source": result_fixture.object_payload(),
+            "target": target_entry.object_payload(),
+            "result": result_entry.object_payload(),
+        }
+    ]
+
+
 def _read_regular_file(path: Path, *, limit: int, label: str) -> bytes:
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
@@ -1332,6 +1537,25 @@ def reproduce_merge(
                         temporary,
                     )
                 )
+
+            if (
+                "neoforge" in active_loaders
+                and _runtime_uses_vanilla_translucent_hand_collector(
+                    target_profile.runtime_version
+                )
+            ):
+                result_fixture = _neoforge_collector_migration_fixture(
+                    repository, source, oid_length
+                )
+                if result_fixture is not None:
+                    protected_resolutions.extend(
+                        _migrate_neoforge_modern_hand_collector(
+                            repository,
+                            work_head,
+                            result_fixture,
+                            oid_length,
+                        )
+                    )
 
             mechanical = _snapshot_index(repository, oid_length)
             remaining = _unmerged_paths(mechanical)
