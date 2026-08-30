@@ -441,12 +441,19 @@ class PagesSiteTest(unittest.TestCase):
             for capture in scenario_contract.captures
             if capture.scenario == "mod-compatibility-late-join"
         ]
+        cpm_first_person_captures = [
+            capture
+            for capture in scenario_contract.captures
+            if capture.scenario == "mod-compatibility-cpm-first-person"
+        ]
         lanes = []
         for lane_id, lane in sorted(runnable.items()):
             captures = list(base_captures)
             if lane.mod.multiplayer is not None:
                 captures.extend(remote_captures)
                 captures.extend(late_join_captures)
+            if lane.mod.additional_execution_profiles:
+                captures.extend(cpm_first_person_captures)
             frames = []
             for capture in captures:
                 frames.append(
@@ -1266,7 +1273,9 @@ class PagesSiteTest(unittest.TestCase):
         self.assertEqual(1, summary["compatibility_images"])
         self.assertTrue(compatibility["not_applicable"])
         for lane in compatibility["lanes"]:
-            expected_frames = 5 if lane["mod"] in {"cpm", "ears"} else 2
+            expected_frames = 7 if lane["mod"] == "cpm" else (
+                5 if lane["mod"] == "ears" else 2
+            )
             self.assertEqual(expected_frames, len(lane["frames"]))
             self.assertEqual(lane["reviewed_frame_count"], len(lane["frames"]))
             self.assertRegex(lane["mod_version_id"], r"^[A-Za-z0-9_-]+$")
@@ -1392,6 +1401,18 @@ class PagesSiteTest(unittest.TestCase):
             compatibility_root, branch
         )
         self.assertEqual(3, validated_schema_three["schema_version"])
+
+        schema_four = json.loads(json.dumps(legacy))
+        schema_four["schema_version"] = 4
+        for lane in schema_four["lanes"]:
+            frame_count = 5 if lane["mod"] in {"cpm", "ears"} else 2
+            lane["reviewed_frame_count"] = frame_count
+            lane["frames"] = lane["frames"][:frame_count]
+        manifest_path.write_text(json.dumps(schema_four), encoding="utf-8")
+        validated_schema_four = validate_compatibility_bundle(
+            compatibility_root, branch
+        )
+        self.assertEqual(4, validated_schema_four["schema_version"])
 
         schema_two = json.loads(json.dumps(legacy))
         schema_two["schema_version"] = 2

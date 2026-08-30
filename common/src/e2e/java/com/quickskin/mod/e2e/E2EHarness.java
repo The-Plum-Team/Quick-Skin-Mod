@@ -1,5 +1,6 @@
 package com.quickskin.mod.e2e;
 
+import com.quickskin.mod.e2e.scenario.CpmFirstPersonScenario;
 import com.quickskin.mod.e2e.scenario.FullScenario;
 import com.quickskin.mod.e2e.scenario.ModCompatibilityLateJoinScenario;
 import com.quickskin.mod.e2e.scenario.ModCompatibilityScenario;
@@ -144,6 +145,7 @@ public final class E2EHarness {
             case PROPAGATION -> new PropagationScenario();
             case PROPAGATION_LIVE -> new PropagationLiveScenario();
             case FULL -> new FullScenario();
+            case MOD_COMPATIBILITY_CPM_FIRST_PERSON -> new CpmFirstPersonScenario();
             case MOD_COMPATIBILITY -> new ModCompatibilityScenario();
             case MOD_COMPATIBILITY_LATE_JOIN -> new ModCompatibilityLateJoinScenario();
             case MOD_COMPATIBILITY_REMOTE -> new ModCompatibilityRemoteScenario();
