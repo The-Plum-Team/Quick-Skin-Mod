@@ -57,6 +57,9 @@ local.properties
 # E2E test harness output (screenshots + reports collected by the orchestrator)
 e2e-out/
 
+# Protected third-party CPM fixtures are injected by local path or CI secrets.
+/common/src/e2e/resources/*.cpmmodel
+
 # Generated public-evidence bundles and local GitHub Pages output
 public-evidence/
 _site/
