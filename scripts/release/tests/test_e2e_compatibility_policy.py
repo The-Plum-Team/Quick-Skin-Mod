@@ -558,6 +558,16 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("shouldSuppressStaleSubmission()", integration)
         self.assertIn("onRenderedFrameBoundary()", integration)
         self.assertIn("skinModeResetFrameBoundaries.incrementAndGet() < 2", integration)
+        cpm_loader_mixin = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/mixin/compat/CpmModelDefinitionLoaderMixin.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn("ByteArrayInputStream;<init>([B)V", cpm_loader_mixin)
+        self.assertIn("data == null ? new byte[0] : data", cpm_loader_mixin)
+        optional_mixins = (
+            ROOT / "common/src/main/resources/quickskin-ears.mixins.json"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"CpmModelDefinitionLoaderMixin"', optional_mixins)
         client_events = (ROOT / "common/src/main/java/com/quickskin/mod/event/ClientEvents.java").read_text(
             encoding="utf-8"
         )
