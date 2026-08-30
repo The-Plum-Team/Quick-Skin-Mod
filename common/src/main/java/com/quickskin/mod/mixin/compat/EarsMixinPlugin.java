@@ -13,7 +13,10 @@ import java.util.Set;
  * mixin transformer has had a chance to process them.
  */
 public class EarsMixinPlugin implements IMixinConfigPlugin {
-    private static final List<String> CPM_RENDER_MIXINS = List.of("CpmRenderDepthMixin");
+    private static final List<String> CPM_MIXINS = List.of(
+            "CpmModelDefinitionLoaderMixin",
+            "CpmRenderDepthMixin"
+    );
     private static final String CPM_SUBMIT_COLLECTOR_MIXIN = "CpmSubmitCollectorMixin";
     private static final String REPLAY_MOD_COMPAT_MIXIN = "ReplayModCompatMixin";
 
@@ -39,7 +42,7 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // CPM targets are @Pseudo and live in this optional, fail-open config. Do not resource-gate
         // them here: on current Fabric the plugin is queried before CPM's collector resource is
         // visible, even though Mixin can resolve and transform that target later in startup.
-        if (CPM_RENDER_MIXINS.stream().anyMatch(name -> mixinNamed(mixinClassName, name))
+        if (CPM_MIXINS.stream().anyMatch(name -> mixinNamed(mixinClassName, name))
                 || mixinNamed(mixinClassName, CPM_SUBMIT_COLLECTOR_MIXIN)) {
             return true;
         }
