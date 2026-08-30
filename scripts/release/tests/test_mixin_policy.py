@@ -90,14 +90,14 @@ ALTERNATIVE_HOOKS = {
     ),
 }
 
-# Audited vanilla bytecode multiplicities. The pre-1.21.11 renderHand requests two buffers (arm +
-# sleeve); the modern collector is deliberately not intercepted. SkinManager 1.20.1 has two RETURN
-# opcodes in its one target method.
+# Audited vanilla bytecode multiplicities. The ItemInHand source contains Stonecutter branches:
+# pre-1.21.11 renderHand requests two buffers (arm + sleeve), while the new renderer submits one
+# model part. SkinManager 1.20.1 has two RETURN opcodes in its one target method.
 INJECTION_COUNT_OVERRIDES = {
     (
         "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
         "quickskin$redirectRenderHandBuffer",
-    ): {2},
+    ): {1, 2},
     (
         "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
         "quickskin$overrideSkinInfo",
@@ -177,6 +177,11 @@ class MixinPolicyTest(unittest.TestCase):
                 expected_counts = INJECTION_COUNT_OVERRIDES.get(
                     (source_name, handler_name), {1}
                 )
+                if (
+                    handler_name == "quickskin$redirectRenderHandBuffer"
+                    and "quickskin$redirectSubmitModelPart" not in text
+                ):
+                    expected_counts = expected_counts - {1}
 
                 with self.subTest(source=source_name, handler=handler_name):
                     self.assertEqual(assignment_values(context, "require"), {expected_require})
