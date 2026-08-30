@@ -98,6 +98,12 @@ EXPECTED_STEPS = {
         "confirm_self",
         "observe_late_join_state",
     ),
+    ("mod-compatibility-cpm-first-person", "client_a"): (
+        "integration_active",
+        "prepare_model",
+        "first_person_hand_initial",
+        "first_person_hand_after_10_seconds",
+    ),
 }
 
 EXPECTED_CAPTURES = {
@@ -127,6 +133,10 @@ EXPECTED_CAPTURES = {
     ("mod-compatibility-late-join", "client_a"): (),
     ("mod-compatibility-late-join", "client_b"): (
         "observe_late_join_state",
+    ),
+    ("mod-compatibility-cpm-first-person", "client_a"): (
+        "first_person_hand_initial",
+        "first_person_hand_after_10_seconds",
     ),
 }
 
@@ -183,6 +193,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "mod-compatibility",
                 "mod-compatibility-remote",
                 "mod-compatibility-late-join",
+                "mod-compatibility-cpm-first-person",
             ),
             self.contract.scenario_ids,
         )
@@ -212,6 +223,10 @@ class ScenarioContractTest(unittest.TestCase):
             self.contract.scenarios_for_profile("compatibility-remote"),
         )
         self.assertEqual(
+            ("mod-compatibility-cpm-first-person",),
+            self.contract.scenarios_for_profile("compatibility-cpm"),
+        )
+        self.assertEqual(
             {
                 "phase0-smoke": ("client_a",),
                 "propagation": ("client_a", "client_b"),
@@ -220,6 +235,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "mod-compatibility": ("client_a",),
                 "mod-compatibility-remote": ("client_a", "client_b"),
                 "mod-compatibility-late-join": ("client_a", "client_b"),
+                "mod-compatibility-cpm-first-person": ("client_a",),
             },
             {
                 scenario: self.contract.expected_roles(scenario)
@@ -281,6 +297,10 @@ class ScenarioContractTest(unittest.TestCase):
             ("client_a", "client_b"), compatibility_late_join.role_order
         )
         self.assertIsNone(compatibility_late_join.start_after)
+        cpm_first_person = self.contract.orchestration_for(
+            "mod-compatibility-cpm-first-person"
+        )
+        self.assertEqual("single-client", cpm_first_person.mode)
 
     def test_steps_are_the_only_authored_source_of_capture_truth(self) -> None:
         self.assertNotIn("captures", self.payload)
@@ -321,7 +341,7 @@ class ScenarioContractTest(unittest.TestCase):
             for role in scenario["roles"]
             for step in role["steps"]
         )
-        self.assertEqual(48, authored_capture_count)
+        self.assertEqual(50, authored_capture_count)
         self.assertEqual(authored_capture_count, len(self.contract.captures))
 
     def test_capture_metadata_and_ids_are_derived_from_steps(self) -> None:
@@ -333,7 +353,7 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual(expected_ids, set(self.contract.capture_ids))
         self.assertEqual((1920, 1080), self.contract.screenshot_size)
         self.assertEqual(expected_ids, set(self.contract.review_regions))
-        self.assertEqual(48, len(expected_ids))
+        self.assertEqual(50, len(expected_ids))
         first = self.contract.capture_by_id("full.client_a.baseline")
         self.assertIs(
             first,
@@ -400,6 +420,24 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertIn("Noor", live_before)
         self.assertIn("red top", live_before)
 
+        cpm_initial = self.contract.capture_by_id(
+            "mod-compatibility-cpm-first-person.client_a.first_person_hand_initial"
+        )
+        cpm_delayed = self.contract.capture_by_id(
+            "mod-compatibility-cpm-first-person.client_a."
+            "first_person_hand_after_10_seconds"
+        )
+        self.assertIn("white glove", cpm_initial.expectation)
+        self.assertIn("10 uninterrupted seconds", cpm_delayed.expectation)
+        self.assertEqual(
+            "phase0-smoke.client_a.apply_local_skin",
+            cpm_initial.compatibility_reference_capture_id,
+        )
+        self.assertEqual(
+            ((0.58, 0.3, 1.0, 1.0),),
+            self.contract.review_regions_for(cpm_delayed.capture_id),
+        )
+
     def test_comparisons_preserve_thresholds_regions_and_order(self) -> None:
         def values(scenario: str, role: str) -> list[tuple[object, ...]]:
             return [
@@ -461,6 +499,10 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual(
             [],
             values("mod-compatibility-late-join", "client_b"),
+        )
+        self.assertEqual(
+            [],
+            values("mod-compatibility-cpm-first-person", "client_a"),
         )
         self.assertEqual(
             [
