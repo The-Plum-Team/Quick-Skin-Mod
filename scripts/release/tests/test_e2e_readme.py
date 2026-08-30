@@ -29,14 +29,18 @@ class E2EReadmeTest(unittest.TestCase):
         for artifact in self.matrix["artifacts"]:
             self.assertIn(f"`{artifact['artifact_node']}`", rendered)
         self.assertIn("`concurrent-two-client`", rendered)
-        self.assertIn("`65`", rendered)
-        self.assertIn("`48`", rendered)
+        self.assertIn("`69`", rendered)
+        self.assertIn("`50`", rendered)
         self.assertIn("| Scenario | Profiles | Orchestration |", rendered)
         self.assertIn(
             "| `phase0-smoke` | `runtime-default`, `pr`, `release` |",
             rendered,
         )
         self.assertIn("| `propagation` | `pr`, `release` |", rendered)
+        self.assertIn(
+            "| `mod-compatibility-cpm-first-person` | `compatibility-cpm` |",
+            rendered,
+        )
         self.assertIn(
             "must emit a screenshot if and only if its contract entry declares `capture`",
             rendered,

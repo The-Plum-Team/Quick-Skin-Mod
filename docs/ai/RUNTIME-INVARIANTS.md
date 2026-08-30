@@ -134,16 +134,18 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Authenticate and validate the full runnable/N/A plan, every exact compatibility-profile paired
   review manifest and normalized report, every clean lane marker, and the source completion marker
   before publishing. Publish exactly the two local `mod-compatibility` checkpoints and, only when
-  the mod contract opts in, the two live `mod-compatibility-remote` observer checkpoints plus the
-  one sequential `mod-compatibility-late-join` observer checkpoint per applicable lane. Each
+  the mod contract opts in, the two CPM `mod-compatibility-cpm-first-person` hand checkpoints, the
+  two live `mod-compatibility-remote` observer checkpoints, plus the one sequential
+  `mod-compatibility-late-join` observer checkpoint per applicable lane. Each
   remains its clean reference plus modded candidate, with deterministic assertion,
   exact mod version, semantic fingerprints, source/derivative proof, clean verdict booleans, and
   run provenance. Never publish provider-authored explanations or anomaly text.
-  `reviewed_frame_count` must equal that exact mod-selective two- or five-checkpoint model product;
-  the authenticated runtime result, not repeated model review of ordinary screenshots, proves the
-  complete base suite. Public compatibility schema v4 encodes that count; continue accepting
-  schema v3's four-checkpoint multiplayer count, schema v2's local-only count, and schema v1's
-  complete-scenario count until every rolling branch cache has been regenerated.
+  `reviewed_frame_count` must equal that exact mod-selective two-, five-, or seven-checkpoint model
+  product; the authenticated runtime result, not repeated model review of ordinary screenshots,
+  proves the complete base suite. Public compatibility schema v5 encodes that count; continue
+  accepting schema v4's five-checkpoint multiplayer count, schema v3's four-checkpoint multiplayer
+  count, schema v2's local-only count, and schema v1's complete-scenario count until every rolling
+  branch cache has been regenerated.
 - Adding a published field must not invalidate evidence that already exists. Each release branch
   keeps one rolling cache built by its own checkout, and those caches are regenerated only when
   that branch ports and re-runs its packaged suite—which can itself wait on unrelated approvals.
