@@ -501,6 +501,25 @@ jobs:
           ref: ${{ needs.admit.outputs.source_sha }}
           persist-credentials: false
 
+      - name: Install Python for the protected CPM fixture
+        if: matrix.compatibility_mod == 'cpm'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Materialize the protected CPM fixture
+        if: matrix.compatibility_mod == 'cpm'
+        shell: bash
+        env:
+          QSM_E2E_CPM_FIXTURE_GZIP_B64_1: ${{ secrets.QSM_E2E_CPM_FIXTURE_GZIP_B64_1 }}
+          QSM_E2E_CPM_FIXTURE_GZIP_B64_2: ${{ secrets.QSM_E2E_CPM_FIXTURE_GZIP_B64_2 }}
+          QSM_E2E_CPM_FIXTURE_GZIP_B64_3: ${{ secrets.QSM_E2E_CPM_FIXTURE_GZIP_B64_3 }}
+          QSM_E2E_CPM_FIXTURE_GZIP_B64_4: ${{ secrets.QSM_E2E_CPM_FIXTURE_GZIP_B64_4 }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/cpm_fixture_secret.py materialize \
+            --output "$RUNNER_TEMP/qsm-protected-cpm-fixture/complex-model.bin"
+
       - name: Run the activation probe and complete packaged suite
         uses: ./.github/actions/run-packaged-e2e
         with:
@@ -509,6 +528,7 @@ jobs:
           source-sha: ${{ needs.admit.outputs.source_sha }}
           scenarios: ${{ matrix.scenarios }}
           compatibility-mod: ${{ matrix.compatibility_mod }}
+          cpm-model-path: ${{ matrix.compatibility_mod == 'cpm' && format('{0}/qsm-protected-cpm-fixture/complex-model.bin', runner.temp) || '' }}
           evidence-name: mod-compatibility-e2e-${{ matrix.id }}
           evidence-retention-days: "7"
 
