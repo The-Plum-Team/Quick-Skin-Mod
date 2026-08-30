@@ -23,6 +23,7 @@ from typing import Any, BinaryIO, Iterable
 
 from scenario_contract import (
     DEFAULT_CONTRACT as DEFAULT_SCENARIO_CONTRACT,
+    ScenarioContract,
     ScenarioContractError,
     load_contract as load_scenario_contract,
 )
@@ -37,7 +38,7 @@ from matrix import gha_matrix, load_matrix, read_mod_version  # noqa: E402
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("mod-compatibility-contract.json")
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 MAX_CONTRACT_BYTES = 2 * 1024 * 1024
 MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
 MAX_FILES_PER_ARTIFACT = 4
@@ -137,6 +138,7 @@ class CompatibilityMod:
     excluded_lanes: tuple[ExcludedLane, ...]
     artifacts: tuple[LockedArtifact, ...]
     reference_captures: CompatibilityReferenceCaptures | None = None
+    additional_execution_profiles: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -210,6 +212,43 @@ def resolve_reference_capture_id(
     if candidate_capture_id == MOD_COMPATIBILITY_APPLIED_CAPTURE:
         return references.apply_local_skin_with_mod
     return default_reference_capture_id
+
+
+def compatibility_scenarios_for_mod(
+    scenario_contract: ScenarioContract,
+    compatibility_mod: CompatibilityMod,
+) -> tuple[str, ...]:
+    """Return the exact ordered compatibility scenario prefix for one mod."""
+
+    profiles = ("compatibility", *compatibility_mod.additional_execution_profiles)
+    if compatibility_mod.multiplayer is not None:
+        profiles += ("compatibility-remote",)
+    scenarios: list[str] = []
+    for profile in profiles:
+        try:
+            selected = scenario_contract.scenarios_for_profile(profile)
+        except ScenarioContractError as exc:
+            raise CompatibilityContractError(
+                f"{compatibility_mod.id} selects unknown E2E profile {profile!r}"
+            ) from exc
+        if not selected:
+            raise CompatibilityContractError(
+                f"{compatibility_mod.id} selects empty E2E profile {profile!r}"
+            )
+        scenarios.extend(selected)
+    if len(scenarios) != len(set(scenarios)):
+        raise CompatibilityContractError(
+            f"{compatibility_mod.id} compatibility profiles select duplicate scenarios"
+        )
+    release_overlap = set(scenarios) & set(
+        scenario_contract.scenarios_for_profile("release")
+    )
+    if release_overlap:
+        raise CompatibilityContractError(
+            f"{compatibility_mod.id} compatibility profiles overlap the release suite: "
+            f"{sorted(release_overlap)}"
+        )
+    return tuple(scenarios)
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -371,6 +410,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             "evidence",
             "review_regions",
             "reference_captures",
+            "additional_execution_profiles",
             "multiplayer",
             "supported_game_versions",
             "excluded_lanes",
@@ -447,6 +487,12 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
                 CAPTURE_ID,
             ),
         )
+    additional_execution_profiles = _string_list(
+        item["additional_execution_profiles"],
+        f"{label}.additional_execution_profiles",
+        pattern=IDENTIFIER,
+        allow_empty=True,
+    )
     multiplayer_value = item["multiplayer"]
     multiplayer: CompatibilityMultiplayer | None
     if multiplayer_value is None:
@@ -593,6 +639,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
         excluded_lanes=tuple(excluded_lanes),
         artifacts=artifacts,
         reference_captures=reference_captures,
+        additional_execution_profiles=additional_execution_profiles,
     )
 
 
@@ -705,14 +752,17 @@ def build_plan(
         raise CompatibilityContractError(
             f"cannot load scenario contract for compatibility planning: {exc}"
         ) from exc
-    local_scenarios = scenario_contract.scenarios_for_profile("compatibility")
-    remote_scenarios = scenario_contract.scenarios_for_profile(
-        "compatibility-remote"
-    )
-    if not local_scenarios or not remote_scenarios:
+    if (
+        not scenario_contract.scenarios_for_profile("compatibility")
+        or not scenario_contract.scenarios_for_profile("compatibility-remote")
+    ):
         raise CompatibilityContractError(
             "scenario contract must declare local and remote compatibility profiles"
         )
+    compatibility_scenarios_by_mod = {
+        mod.id: compatibility_scenarios_for_mod(scenario_contract, mod)
+        for mod in contract.mods
+    }
     base_rows = gha_matrix(
         matrix,
         base_matrix_kind,
@@ -793,8 +843,7 @@ def build_plan(
                     "compatibility_contract_sha256": contract.sha256,
                     "scenarios": ",".join(
                         (
-                            *local_scenarios,
-                            *(remote_scenarios if mod.multiplayer else ()),
+                            *compatibility_scenarios_by_mod[mod.id],
                             row["scenarios"],
                         )
                     ),

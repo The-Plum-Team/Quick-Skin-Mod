@@ -498,6 +498,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             remote.index("if (!evidence.observerConfirmed(minecraft)) return false;"),
             remote.index("feature.prepareBaseline();"),
         )
+
         confirmation = evidence[
             evidence.index('Step.of("confirm_self")') : evidence.index(
                 "boolean integrationActive()"
@@ -530,6 +531,29 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn('"BACK".equals(publicField(value, "tailMode"))', evidence)
         self.assertIn("DefaultSkinEvidenceView.checkRearView", evidence)
         self.assertIn("without another Alice-side change", late_join)
+
+    def test_cpm_first_person_hand_is_captured_again_after_ten_seconds(self) -> None:
+        scenario = (
+            E2E_JAVA / "scenario" / "CpmFirstPersonScenario.java"
+        ).read_text(encoding="utf-8")
+        feature = (
+            E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+        harness = (E2E_JAVA / "E2EHarness.java").read_text(encoding="utf-8")
+
+        self.assertIn("MOD_COMPATIBILITY_CPM_FIRST_PERSON", harness)
+        self.assertEqual(2, scenario.count(".screenshot("))
+        self.assertIn('Step.of("first_person_hand_initial")', scenario)
+        self.assertIn(
+            'Step.of("first_person_hand_after_10_seconds")',
+            scenario,
+        )
+        self.assertIn("FIRST_PERSON_RECHECK_TICKS = 20 * 10", scenario)
+        self.assertIn(".minTicks(FIRST_PERSON_RECHECK_TICKS)", scenario)
+        self.assertEqual(1, scenario.count("feature::enterFirstPerson"))
+        self.assertIn("feature.firstPersonReady()", scenario)
+        self.assertIn("CPMCompatIntegration.isLocalPlayerWearingCpmModel()", feature)
+        self.assertIn("CameraType.FIRST_PERSON", feature)
 
     def test_cpm_cache_refresh_waits_for_the_extracted_frame_boundary(self) -> None:
         """A skin/model transition must not invalidate CPM's active extracted frame."""
