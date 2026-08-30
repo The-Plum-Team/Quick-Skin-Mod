@@ -17,12 +17,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.resources.ResourceLocation;
 //?} else {
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.resources.Identifier;
 //?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -60,13 +55,7 @@ public class ItemInHandRendererMixin {
 //?}
             at = @At(
                     value = "INVOKE",
-//? if <1.21.11 {
                     target = "Lnet/minecraft/client/renderer/MultiBufferSource;getBuffer(Lnet/minecraft/client/renderer/RenderType;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
-//?} else if <26.2 {
-                    target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModelPart(Lnet/minecraft/client/model/geom/ModelPart;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/RenderType;IILnet/minecraft/client/renderer/texture/TextureAtlasSprite;)V"
-//?} else {
-                    target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModelPart(Lnet/minecraft/client/model/geom/ModelPart;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IILnet/minecraft/client/renderer/texture/TextureAtlasSprite;)V"
-//?}
             ),
             require = 1,
 //? if <1.21.2 {
@@ -74,6 +63,7 @@ public class ItemInHandRendererMixin {
             expect = 2,
             allow = 2
 //?} else {
+            // Minecraft 1.21.2 and later perform exactly one draw for this arm.
             expect = 1,
             allow = 1
 //?}
@@ -123,24 +113,10 @@ public class ItemInHandRendererMixin {
         ResourceLocation skinTexture = player.getSkin().texture();
 //?} else if <1.21.11 {
 //?} else {
-        if (CPMCompatIntegration.isCPMActivelyRendering()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-
-        if (ClientConfig.getInstance().shouldDisableSkinTransparency()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-
+        ResourceLocation skinTexture = player.getSkin().texture();
 //?}
         if (skinTexture == null) {
-//? if <1.21.11 {
             return instance.getBuffer(renderType);
-//?} else {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-//?}
         }
 
         // Determine if the skin needs a translucent render type
@@ -153,18 +129,10 @@ public class ItemInHandRendererMixin {
             // Force entityTranslucent so transparent body pixels remain visible.
             // We use entityTranslucent instead of entityTranslucentCull to avoid z-fighting on complex layers.
             return instance.getBuffer(RenderType.entityTranslucent(skinTexture));
-//?} else {
-            RenderType translucentType = RenderTypes.entityTranslucent(skinTexture);
-            collector.submitModelPart(part, poseStack, translucentType, packedLight, overlay, sprite);
-        } else {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-//?}
         }
-//? if <1.21.11 {
 
         // If no transparency is needed, use the original render type provided by the vanilla method.
         return instance.getBuffer(renderType);
-//?} else {
-//?}
     }
+//?}
 }

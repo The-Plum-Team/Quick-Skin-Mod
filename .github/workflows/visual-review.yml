@@ -139,20 +139,41 @@ jobs:
           # release-branch PRs have no guaranteed post-merge anchor and retain the narrower
           # fail-closed source-PR classifier below.
           if [[ "$(jq -r .event <<< "$source_run")" == pull_request ]]; then
-            associated_pulls="$(github_api_retry -H 'Accept: application/vnd.github+json' \
-              "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20")"
-            source_pr_number="$(jq -er \
-              --arg branch "$source_branch" \
-              --arg repository "$GITHUB_REPOSITORY" \
-              --arg sha "$source_sha" \
-              'select(type == "array" and length <= 20) |
-               [.[] | select(
-                 .head.ref == $branch and .head.sha == $sha and
-                 .head.repo.full_name == $repository and
-                 .base.repo.full_name == $repository)] |
-               if length == 1 then .[0].number else error("ambiguous source PR") end' \
-              <<< "$associated_pulls")"
-            [[ "$source_pr_number" =~ ^[1-9][0-9]*$ ]]
+            # GitHub may briefly return no commit-to-PR association while it closes a merged PR
+            # and deletes its head. Wait for that eventually consistent index before deciding;
+            # an advisory review with no exact PR identity must never fall through to Claude.
+            source_pr_number=""
+            for attempt in {1..30}; do
+              associated_pulls="$(github_api_retry \
+                -H 'Accept: application/vnd.github+json' \
+                "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20")"
+              matching_pulls="$(jq -ce \
+                --arg branch "$source_branch" \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg sha "$source_sha" \
+                'select(type == "array" and length <= 20) |
+                 [.[] | select(
+                   .head.ref == $branch and .head.sha == $sha and
+                   .head.repo.full_name == $repository and
+                   .base.repo.full_name == $repository)]' \
+                <<< "$associated_pulls")"
+              matching_pull_count="$(jq -r length <<< "$matching_pulls")"
+              if [[ "$matching_pull_count" -eq 1 ]]; then
+                source_pr_number="$(jq -er '.[0].number' <<< "$matching_pulls")"
+                break
+              fi
+              if [[ "$matching_pull_count" -gt 1 ]]; then
+                printf 'Ambiguous source PR association for %s\n' "$source_sha" >&2
+                exit 1
+              fi
+              if [[ "$attempt" -lt 30 ]]; then
+                sleep 2
+              fi
+            done
+            if [[ ! "$source_pr_number" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'Source PR association did not settle; skipping advisory review\n'
+              exit 0
+            fi
             source_pr="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/pulls/$source_pr_number")"
             jq -e \
@@ -212,25 +233,44 @@ jobs:
             # unaffected screenshots would spend model capacity without product signal. The
             # broader allowlist is admitted below only for an authenticated certificate-driven
             # synchronization run. Any ambiguity, manual target, or runtime path stays strict.
-            associated_pulls="$(github_api_retry -H 'Accept: application/vnd.github+json' \
-              "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20" \
-              2>/dev/null || true)"
             source_pr_number=""
-            if [[ -n "$associated_pulls" ]]; then
-              source_pr_number="$(jq -er \
-                --arg branch "$source_branch" \
-                --arg repository "$GITHUB_REPOSITORY" \
-                --arg sha "$source_sha" \
-                'select(type == "array" and length <= 20) |
-                 [.[] | select(
-                   .head.ref == $branch and .head.sha == $sha and
-                   .head.repo.full_name == $repository and
-                   .base.repo.full_name == $repository and
-                   .user.login == "github-actions[bot]")] |
-                 if length == 1 then .[0].number else empty end' \
-                <<< "$associated_pulls" 2>/dev/null || true)"
-            fi
-            if [[ "$source_pr_number" =~ ^[1-9][0-9]*$ ]]; then
+            for attempt in {1..30}; do
+              associated_pulls="$(github_api_retry \
+                -H 'Accept: application/vnd.github+json' \
+                "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls?per_page=20" \
+                2>/dev/null || true)"
+              matching_pulls=""
+              if [[ -n "$associated_pulls" ]]; then
+                matching_pulls="$(jq -ce \
+                  --arg branch "$source_branch" \
+                  --arg repository "$GITHUB_REPOSITORY" \
+                  --arg sha "$source_sha" \
+                  'select(type == "array" and length <= 20) |
+                   [.[] | select(
+                     .head.ref == $branch and .head.sha == $sha and
+                     .head.repo.full_name == $repository and
+                     .base.repo.full_name == $repository and
+                     .user.login == "github-actions[bot]")]' \
+                  <<< "$associated_pulls" 2>/dev/null || true)"
+              fi
+              matching_pull_count="$(jq -r 'length' \
+                <<< "${matching_pulls:-[]}" 2>/dev/null || printf '0')"
+              if [[ "$matching_pull_count" -eq 1 ]]; then
+                source_pr_number="$(jq -er '.[0].number' <<< "$matching_pulls")"
+                break
+              fi
+              if [[ "$matching_pull_count" -gt 1 ]]; then
+                printf 'Ambiguous automation PR association; skipping advisory review\n'
+                exit 0
+              fi
+              if [[ "$attempt" -lt 30 ]]; then
+                sleep 2
+              fi
+            done
+            if [[ ! "$source_pr_number" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'Automation PR association did not settle; skipping advisory review\n'
+              exit 0
+            else
               source_pr="$(github_api_retry \
                 "repos/$GITHUB_REPOSITORY/pulls/$source_pr_number" \
                 2>/dev/null || true)"
