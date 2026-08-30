@@ -20,11 +20,11 @@ This `fabric-and-neoforge-1.21.9` release branch exercises the following exact p
 
 | Artifact | Minecraft | Loader | Java | Contract scenarios |
 |---|---:|---|---:|---:|
-| `fabric-1.21.9` | `1.21.9` | Fabric | `21` | `7` |
-| `neoforge-1.21.9` | `1.21.9` | NeoForge | `21` | `7` |
+| `fabric-1.21.9` | `1.21.9` | Fabric | `21` | `8` |
+| `neoforge-1.21.9` | `1.21.9` | NeoForge | `21` | `8` |
 
-Scenario contract SHA-256: `c310585cf4b0010195576b21efc5bc708f67e5a400db0ba7d5fd285672cfc65b`
-Contract totals: `65` ordered steps, `48` captures.
+Scenario contract SHA-256: `e3122cbe8360352c4ac380af7c54597c33a54320ed798c19a7d71be4138ec902`
+Contract totals: `69` ordered steps, `50` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
@@ -35,6 +35,7 @@ Contract totals: `65` ordered steps, `48` captures.
 | `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
 | `mod-compatibility-remote` | `compatibility-remote` | `concurrent-two-client` | `client_a`, `client_b` | `8` | `2` |
 | `mod-compatibility-late-join` | `compatibility-remote` | `sequential-two-client` | `client_a`, `client_b` | `5` | `1` |
+| `mod-compatibility-cpm-first-person` | `compatibility-cpm` | `single-client` | `client_a` | `4` | `2` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->
@@ -375,9 +376,10 @@ evidence are discarded for the same reason.
 An automatic release-tree run starts this wave only after that exact tree has passed Build, the
 complete packaged suite, and independent semantic AI review. The execution unit is one release
 artifact plus one optional mod. Every applicable unit runs concurrently, first executes the
-`mod-compatibility` activation scenario, adds both `mod-compatibility-remote` and
-`mod-compatibility-late-join` for Ears and CPM, and then executes the complete ordinary release
-scenario set. The live remote scenario keeps Alice connected as the subject and lets only Bob
+`mod-compatibility` activation scenario, adds `mod-compatibility-cpm-first-person` for CPM, adds
+both `mod-compatibility-remote` and `mod-compatibility-late-join` for Ears and CPM, and then
+executes the complete ordinary release scenario set. The live remote scenario keeps Alice
+connected as the subject and lets only Bob
 capture the before/after pair from one fixed rear camera; Alice's coordination steps deliberately
 produce no duplicate screenshots. The late-join scenario completes Alice's optional-mod state
 before Bob is launched, keeps Alice connected after her harness steps finish, and lets Bob capture
@@ -392,12 +394,16 @@ Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, and ReplayMod. P
 is intentionally absent and unsupported. A runtime may install only the exact URL, filename, byte
 size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth for `latest`.
 The contract also owns each mod's two local feature-specific expectations and normalized review
-regions, an optional comparable clean-reference capture override, and an optional multiplayer pair,
-so caching and AI focus on the rendered integration rather than a generic part of the frame. The
-two stable local capture IDs select a different real workflow for each locked mod:
+regions, an optional comparable clean-reference capture override, an optional multiplayer pair,
+and any mod-specific execution profiles, so caching and AI focus on the rendered integration
+rather than a generic part of the frame. The two stable local capture IDs select a different real
+workflow for each locked mod:
 
 - CPM imports and renders a protected complex `.cpmmodel` fixture, checking its distinctive layered
-  geometry and textures, then selects a normal Quick Skin skin and proves CPM model mode was cleared.
+  geometry and textures, then selects a normal Quick Skin skin and proves CPM model mode was
+  cleared. Its dedicated first-person scenario reloads the same fixture, captures the custom hand,
+  holds first-person view for at least 200 ticks (10 seconds), and captures it again to catch
+  delayed hand-render corruption.
 - Ears compares an ordinary Quick Skin control with a skin authored through Ears' own feature
   writer, then requires parsed tall ears and a rear tail in Ears' public renderer storage.
 - 3D Skin Layers compares subdued and saturated outer-layer fixtures over a uniquely coloured
@@ -446,6 +452,10 @@ done
 A missing or altered chunk fails the CPM lane before Minecraft is launched. The raw model file is
 absent from source archives, production JARs, E2E harness JARs, and uploaded evidence.
 
+Only CPM opts into `compatibility-cpm`. Its two first-person hand captures use the clean
+`phase0-smoke.client_a.apply_local_skin` frame as their same-version reference and are reviewed
+independently, so other optional mods do not pay the extra ten-second runtime or AI-image cost.
+
 CPM and Ears additionally opt into two live remote capture IDs and one late-join capture ID. In the
 live scenario, Bob first proves the real optional renderer state for Alice, captures it, and
 acknowledges that exact checkpoint through the normal Quick Skin relay. Alice then changes state
@@ -483,7 +493,7 @@ python3 e2e/orchestrator.py \
   --artifact-node fabric-1.20.1 \
   --runtime-version 1.20.1 \
   --compatibility-mod cpm \
-  --scenarios mod-compatibility,mod-compatibility-remote,mod-compatibility-late-join,phase0-smoke,propagation,propagation-live,full
+  --scenarios mod-compatibility,mod-compatibility-cpm-first-person,mod-compatibility-remote,mod-compatibility-late-join,phase0-smoke,propagation,propagation-live,full
 ```
 
 Refreshing external versions is a deliberate maintenance operation, not a test step. From a
@@ -518,11 +528,12 @@ source-wave block and cancels the remaining model calls.
 Once every applicable lane is complete and clean, the protected reviewer can publish the wave
 without another model call. It reauthenticates the source plan, every full capsule, all normalized
 reports and lane-complete records, then retains only the contracted compatibility checkpoints: two
-local checkpoints per lane plus two live-remote and one late-join checkpoint for CPM and Ears.
-Other mods remain at the two local checkpoints. Each public checkpoint is a paired clean reference
-and modded candidate, encoded as a content-addressed 1280x720 WebP. The manifest still records the
-exact selected reviewed-frame count and mod version; raw model explanations, anomaly strings, and
-the other reviewed images are not public.
+local checkpoints per lane, two CPM-only first-person hand checkpoints, plus two live-remote and
+one late-join checkpoint for CPM and Ears. CPM therefore publishes seven checkpoints, Ears five,
+and every other mod two. Each public checkpoint is a paired clean reference and modded candidate,
+encoded as a content-addressed 1280x720 WebP. The manifest still records the exact selected
+reviewed-frame count and mod version; raw model explanations, anomaly strings, and the other
+reviewed images are not public.
 `workflow_dispatch` operation `publish` is the recovery path for an already-complete source run.
 
 ## Public visual evidence
