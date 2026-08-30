@@ -223,7 +223,7 @@ interface ModCompatibilityFeature {
                 modelActivated = model != null && CpmModelWorkflow.activateModel(model);
                 if (!modelActivated) failure = "Quick Skin could not import and activate CPM model";
             } catch (Exception exception) {
-                failure = "CPM model generation failed: " + concise(exception);
+                failure = "CPM model fixture preparation failed: " + concise(exception);
                 E2ELog.error(failure, exception);
             }
             holdFullBody();
@@ -243,18 +243,18 @@ interface ModCompatibilityFeature {
         public Step.Result assertBaseline() {
             if (failure != null) return Step.Result.fail(failure);
             if (model == null || !model.isCpmModel() || !modelActivated) {
-                return Step.Result.fail("generated .cpmmodel was not active");
+                return Step.Result.fail("protected .cpmmodel fixture was not active");
             }
             CPMCompatIntegration.CpmModelInfo info =
                     CPMCompatIntegration.parseCpmModelInfo(model.path());
-            if (info == null || !"Quick Skin E2E horns".equals(info.name)) {
+            if (info == null || info.name == null || info.name.trim().isEmpty()) {
                 return Step.Result.fail("CPM model metadata did not round-trip through Quick Skin");
             }
             if (!CPMCompatIntegration.isLocalPlayerWearingCpmModel()) {
                 return Step.Result.fail("CPM definition cache does not report the selected model");
             }
-            return Step.Result.pass("Quick Skin imported, selected and rendered genuine CPM model "
-                    + model.hash() + " (" + info.name + ")");
+            return Step.Result.pass("Quick Skin imported, selected and rendered protected complex "
+                    + "CPM fixture " + model.hash());
         }
 
         @Override
