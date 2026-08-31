@@ -114,8 +114,8 @@ ALTERNATIVE_HOOKS = {
 }
 
 # Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and
-# sleeve); 1.21.2 through 1.21.10 make one immediate arm draw. The modern collector is deliberately
-# not intercepted. SkinManager 1.20.1 has two RETURN opcodes in its one target method; in 1.21.11,
+# sleeve); 1.21.2 through 1.21.8 make one immediate arm draw. The collector used from 1.21.9 onward
+# is deliberately not intercepted. SkinManager 1.20.1 has two RETURN opcodes in its one target method; in 1.21.11,
 # createLookup and get have three and two returns respectively on both loaders.
 INJECTION_COUNT_OVERRIDES = {
     (
@@ -221,6 +221,13 @@ class MixinPolicyTest(unittest.TestCase):
                 expected_counts = INJECTION_COUNT_OVERRIDES.get(
                     (source_name, handler_name), {1}
                 )
+                if (
+                    source_name == "neoforge:com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java"
+                    and handler_name == "quickskin$redirectRenderHandBuffer"
+                    and "quickskin$redirectSubmitModelPart" not in text
+                ):
+                    expected_counts = expected_counts - {1}
+
                 with self.subTest(source=source_name, handler=handler_name):
                     self.assertEqual(assignment_values(context, "require"), {expected_require})
                     self.assertEqual(
