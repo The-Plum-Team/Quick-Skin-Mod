@@ -2043,8 +2043,11 @@ jobs:
              .head_repository.full_name == $repository' \
             <<< "$source_run" > /dev/null
 
+          # Review can finish while the exact-head controller is still publishing statuses and
+          # merging the port. Keep this read-only release step alive for up to 15 minutes so a
+          # valid report is not stranded a few seconds before its authenticated merge appears.
           associated=''
-          for attempt in {1..60}; do
+          for attempt in {1..180}; do
             associated="$(github_api_retry \
               -H 'Accept: application/vnd.github+json' \
               "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls?per_page=20")"
