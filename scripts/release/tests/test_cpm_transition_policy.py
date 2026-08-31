@@ -22,7 +22,7 @@ def uses_vanilla_translucent_hand_collector() -> bool:
         raise AssertionError("release runtimes must share one Minecraft version")
     components = tuple(int(value) for value in runtime_versions.pop().split("."))
     return components[0] >= 26 or (
-        len(components) == 3 and components[:2] == (1, 21) and components[2] >= 11
+        len(components) == 3 and components[:2] == (1, 21) and components[2] >= 9
     )
 
 
@@ -111,6 +111,36 @@ class CpmTransitionPolicyTest(unittest.TestCase):
                 source = (MIXIN_ROOT / name).read_text(encoding="utf-8")
                 self.assertIn("CPMCompatIntegration.shouldDeferToCPM()", source)
 
+    def test_immediate_hand_redirect_matches_vanilla_multiplicity(self) -> None:
+        source = (MIXIN_ROOT / "ItemInHandRendererMixin.java").read_text(
+            encoding="utf-8"
+        )
+        redirect = source.index("@Redirect(", source.index("public class"))
+        handler = source.index("quickskin$redirectRenderHandBuffer", redirect)
+        annotation = source[redirect:handler]
+
+        self.assertIn(
+            "//? if <1.21.9 {\n@Mixin(value = PlayerRenderer.class", source
+        )
+        self.assertIn("//?} else {\n@Mixin(value = AvatarRenderer.class", source)
+        self.assertLess(
+            source.index("//? if <1.21.9 {", source.index("public class")),
+            redirect,
+        )
+        legacy_guard = annotation.index("//? if <1.21.2 {")
+        legacy_expect = annotation.index("expect = 2", legacy_guard)
+        modern_branch = annotation.index("//?} else {", legacy_expect)
+        modern_expect = annotation.index("expect = 1", modern_branch)
+        mandatory = annotation.index("require = 1", modern_expect)
+
+        self.assertLess(legacy_guard, legacy_expect)
+        self.assertLess(legacy_expect, modern_branch)
+        self.assertLess(modern_branch, modern_expect)
+        self.assertLess(modern_expect, mandatory)
+        self.assertIn("allow = 2", annotation[legacy_expect:modern_branch])
+        self.assertIn("allow = 1", annotation[modern_expect:mandatory])
+        self.assertNotIn("require = 0", annotation)
+
     def test_modern_first_person_collectors_remain_owned_by_model_mods(self) -> None:
         paths = [MIXIN_ROOT / "ItemInHandRendererMixin.java"]
         neoforge_renderer = (
@@ -137,9 +167,7 @@ class CpmTransitionPolicyTest(unittest.TestCase):
                     "runtimes"
                 ][0]["runtime_version"] != "1.20.1":
                     continue
-                legacy_guard = source.index(
-                    "//? if <1.21.11 {", source.index("public class")
-                )
+                legacy_guard = source.index("//? if <", source.index("public class"))
                 redirect = source.index("@Redirect(", legacy_guard)
                 self.assertLess(legacy_guard, redirect)
                 self.assertNotIn("quickskin$redirectSubmitModelPart", source)

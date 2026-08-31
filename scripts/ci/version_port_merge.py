@@ -86,8 +86,97 @@ NAMESPACED_GAME_RULES = {
     b"gamerule spawnRadius 0\n": b"gamerule minecraft:respawn_radius 0\n",
 }
 CPM_TRANSITION_POLICY_PATH = "scripts/release/tests/test_cpm_transition_policy.py"
+CPM_TRANSITION_POLICY_SHA256 = (
+    "4a403ea808a5e9a21fd61a948e9e0ec076212c6094b211298a337a82bfbdcf67"
+)
+MIXIN_POLICY_PATH = "scripts/release/tests/test_mixin_policy.py"
+MIXIN_POLICY_SOURCE_FIXTURE_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "mixin-policy-with-mandatory-hand.py.fixture"
+)
+MIXIN_POLICY_SHA256 = (
+    "392c43cf5100d1546b3f0be776d687e5e9b001e3830e984097670be3bf38922b"
+)
 COMMON_HAND_RENDERER_PATH = (
     "common/src/main/java/com/quickskin/mod/mixin/ItemInHandRendererMixin.java"
+)
+COMMON_HAND_RENDERER_SHA256 = (
+    "42056697d34cade1f6b05c712fcc656da0b8f21a72d707acb811caa415e20941"
+)
+COMMON_HAND_MULTIPLICITY_POLICY_MARKERS = (
+    b"def test_immediate_hand_redirect_matches_vanilla_multiplicity",
+    b'legacy_guard = annotation.index("//? if <1.21.2 {")',
+    b'self.assertNotIn("require = 0", annotation)',
+)
+MIXIN_HAND_POLICY_LINE = (
+    b'    "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",\n'
+)
+MIXIN_CAPE_POLICY_LINE = b'    "main:com/quickskin/mod/mixin/CapeLayerMixin.java",\n'
+MIXIN_HAND_OVERRIDE_MARKER = (
+    b"    (\n"
+    b'        "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",\n'
+    b'        "quickskin$redirectRenderHandBuffer",\n'
+    b"    ): {1, 2},"
+)
+MIXIN_NEOFORGE_HAND_OVERRIDE_MARKER = (
+    b"    (\n"
+    b'        "neoforge:com/quickskin/mod/neoforge/mixin/'
+    b'PlayerRendererMixin.java",\n'
+    b'        "quickskin$redirectRenderHandBuffer",\n'
+    b"    ): {1, 2},"
+)
+MIXIN_COUNT_SUBTEST_MARKER = (
+    b"                with self.subTest("
+    b"source=source_name, handler=handler_name):\n"
+)
+MIXIN_LEGACY_HAND_COMMENT = (
+    b"# Audited vanilla bytecode multiplicities. The ItemInHand source contains Stonecutter branches:\n"
+    b"# pre-1.21.11 renderHand requests two buffers (arm + sleeve), while the new renderer submits one\n"
+    b"# model part."
+)
+MIXIN_1_21_2_HAND_COMMENT = (
+    b"# Audited vanilla bytecode multiplicities. The ItemInHand source contains Stonecutter branches:\n"
+    b"# renderHand requests two buffers through 1.21.1, one buffer from 1.21.2 through 1.21.10, and the\n"
+    b"# later renderer submits one model part."
+)
+MIXIN_1_21_4_HAND_COMMENT = (
+    b"# Audited vanilla bytecode multiplicities. The ItemInHand source contains Stonecutter branches:\n"
+    b"# renderHand requests two buffers through 1.21.3, one buffer from 1.21.4 through 1.21.10, and the\n"
+    b"# later renderer submits one model part."
+)
+MIXIN_1_21_11_HAND_COMMENT = (
+    b"# Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and\n"
+    b"# sleeve); 1.21.2 through 1.21.10 make one immediate arm draw. The modern collector is deliberately\n"
+    b"# not intercepted."
+)
+MIXIN_HISTORICAL_HAND_COMMENTS = (
+    MIXIN_LEGACY_HAND_COMMENT,
+    MIXIN_1_21_2_HAND_COMMENT,
+    MIXIN_1_21_4_HAND_COMMENT,
+    MIXIN_1_21_11_HAND_COMMENT,
+)
+MIXIN_CANONICAL_HAND_COMMENT = (
+    b"# Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and\n"
+    b"# sleeve); 1.21.2 through 1.21.8 make one immediate arm draw. The collector used from 1.21.9 onward\n"
+    b"# is deliberately not intercepted."
+)
+MIXIN_LEGACY_OPTIONAL_HAND_BLOCK = (
+    b"                if (\n"
+    b'                    handler_name == "quickskin$redirectRenderHandBuffer"\n'
+    b'                    and "quickskin$redirectSubmitModelPart" not in text\n'
+    b"                ):\n"
+    b"                    expected_counts = expected_counts - {1}\n"
+    b"\n"
+)
+MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK = (
+    b"                if (\n"
+    b'                    source_name == "neoforge:com/quickskin/mod/neoforge/'
+    b'mixin/PlayerRendererMixin.java"\n'
+    b'                    and handler_name == "quickskin$redirectRenderHandBuffer"\n'
+    b'                    and "quickskin$redirectSubmitModelPart" not in text\n'
+    b"                ):\n"
+    b"                    expected_counts = expected_counts - {1}\n"
+    b"\n"
 )
 NEOFORGE_PLAYER_RENDERER_PATH = (
     "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java"
@@ -105,6 +194,34 @@ NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256 = (
 )
 NEOFORGE_PLAYER_RENDERER_RESULT_SHA256 = (
     "5273c8bad6c77a5bcd0729fb04e5c3e2250c8490d4618507a04a84855b358ab7"
+)
+NEOFORGE_PLAYER_RENDERER_1_21_9_INPUT_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "neoforge-player-renderer-1.21.9-with-modern-collector.java.fixture"
+)
+NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "neoforge-player-renderer-1.21.9-without-modern-collector.java.fixture"
+)
+NEOFORGE_PLAYER_RENDERER_1_21_9_BEFORE_SHA256 = (
+    "a07ddda07a90b36a57d564e4e666e9077174b15b277d1d3ab942aba6c94e0b14"
+)
+NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_SHA256 = (
+    "1812986d8a18c9878eb1e573f70c70fcf222b5e4aff4c89e14b9f2624b12fadd"
+)
+NEOFORGE_PLAYER_RENDERER_MIGRATION_FIXTURES = (
+    (
+        NEOFORGE_PLAYER_RENDERER_1_21_9_INPUT_PATH,
+        NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_PATH,
+        NEOFORGE_PLAYER_RENDERER_1_21_9_BEFORE_SHA256,
+        NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_SHA256,
+    ),
+    (
+        NEOFORGE_PLAYER_RENDERER_INPUT_PATH,
+        NEOFORGE_PLAYER_RENDERER_RESULT_PATH,
+        NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256,
+        NEOFORGE_PLAYER_RENDERER_RESULT_SHA256,
+    ),
 )
 MODERN_HAND_COLLECTOR_MARKERS = (
     b"quickskin$redirectSubmitModelPart",
@@ -510,6 +627,160 @@ def _stages_payload(stages: Mapping[int, IndexEntry]) -> dict[str, Any]:
     }
 
 
+def _policy_set_span(payload: bytes, name: str) -> tuple[int, int]:
+    marker = f"{name} = {{\n".encode("ascii")
+    if payload.count(marker) != 1:
+        raise VersionPortMergeError(f"mixin policy has an invalid {name} declaration")
+    start = payload.index(marker) + len(marker)
+    end = payload.find(b"\n}\n", start)
+    if end < 0:
+        raise VersionPortMergeError(f"mixin policy has an unterminated {name} declaration")
+    return start, end + 1
+
+
+def _migrate_mixin_hand_policy_payload(payload: bytes) -> bytes:
+    _validate_text_blob(payload, "target mixin policy", markers=True)
+    if len(payload) > MAX_PROTECTED_BLOB_BYTES:
+        raise VersionPortMergeError("target mixin policy is too large")
+    critical_start, critical_end = _policy_set_span(payload, "CRITICAL_MIXINS")
+    degradable_start, degradable_end = _policy_set_span(
+        payload, "DEGRADABLE_MIXINS"
+    )
+    critical_occurrences = payload[critical_start:critical_end].count(
+        MIXIN_HAND_POLICY_LINE
+    )
+    degradable_occurrences = payload[degradable_start:degradable_end].count(
+        MIXIN_HAND_POLICY_LINE
+    )
+    if critical_occurrences + degradable_occurrences != 1:
+        raise VersionPortMergeError(
+            "target mixin policy has an ambiguous common hand classification"
+        )
+    in_degradable = degradable_occurrences == 1
+    if in_degradable:
+        critical = payload[critical_start:critical_end]
+        if critical.count(MIXIN_CAPE_POLICY_LINE) != 1:
+            raise VersionPortMergeError(
+                "target mixin policy lacks the audited critical cape insertion point"
+            )
+        hand_position = payload.index(
+            MIXIN_HAND_POLICY_LINE, degradable_start, degradable_end
+        )
+        payload = (
+            payload[:hand_position]
+            + payload[hand_position + len(MIXIN_HAND_POLICY_LINE) :]
+        )
+        critical_start, critical_end = _policy_set_span(payload, "CRITICAL_MIXINS")
+        cape_position = payload.index(
+            MIXIN_CAPE_POLICY_LINE, critical_start, critical_end
+        )
+        insertion = cape_position + len(MIXIN_CAPE_POLICY_LINE)
+        payload = payload[:insertion] + MIXIN_HAND_POLICY_LINE + payload[insertion:]
+
+    historical_comments = tuple(
+        comment
+        for comment in MIXIN_HISTORICAL_HAND_COMMENTS
+        if comment in payload
+    )
+    if len(historical_comments) > 1:
+        raise VersionPortMergeError(
+            "target mixin policy contains ambiguous historical hand comments"
+        )
+    if historical_comments:
+        historical_comment = historical_comments[0]
+        if payload.count(historical_comment) != 1:
+            raise VersionPortMergeError(
+                "target mixin policy repeats a historical hand comment"
+            )
+        payload = payload.replace(
+            historical_comment,
+            MIXIN_CANONICAL_HAND_COMMENT,
+            1,
+        )
+    if payload.count(MIXIN_CANONICAL_HAND_COMMENT) != 1:
+        raise VersionPortMergeError(
+            "target mixin policy lacks the audited hand multiplicity comment"
+        )
+
+    optional_blocks = payload.count(MIXIN_LEGACY_OPTIONAL_HAND_BLOCK)
+    scoped_blocks = payload.count(MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK)
+    neoforge_hand_overrides = payload.count(MIXIN_NEOFORGE_HAND_OVERRIDE_MARKER)
+    if (
+        optional_blocks > 1
+        or scoped_blocks > 1
+        or (optional_blocks and scoped_blocks)
+    ):
+        raise VersionPortMergeError(
+            "target mixin policy repeats the obsolete optional-hand rule"
+        )
+    if neoforge_hand_overrides > 1:
+        raise VersionPortMergeError(
+            "target mixin policy repeats the NeoForge hand override"
+        )
+    if optional_blocks == 1:
+        payload = payload.replace(
+            MIXIN_LEGACY_OPTIONAL_HAND_BLOCK,
+            MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK,
+            1,
+        )
+    elif scoped_blocks == 0 and neoforge_hand_overrides == 1:
+        if payload.count(MIXIN_COUNT_SUBTEST_MARKER) != 1:
+            raise VersionPortMergeError(
+                "target mixin policy lacks the audited count-check insertion point"
+            )
+        insertion = payload.index(MIXIN_COUNT_SUBTEST_MARKER)
+        payload = (
+            payload[:insertion]
+            + MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK
+            + payload[insertion:]
+        )
+
+    if payload.count(MIXIN_HAND_OVERRIDE_MARKER) != 1:
+        raise VersionPortMergeError(
+            "target mixin policy lacks the audited hand multiplicity override"
+        )
+    critical_start, critical_end = _policy_set_span(payload, "CRITICAL_MIXINS")
+    degradable_start, degradable_end = _policy_set_span(
+        payload, "DEGRADABLE_MIXINS"
+    )
+    if (
+        MIXIN_HAND_POLICY_LINE not in payload[critical_start:critical_end]
+        or MIXIN_HAND_POLICY_LINE in payload[degradable_start:degradable_end]
+        or MIXIN_LEGACY_OPTIONAL_HAND_BLOCK in payload
+        or payload.count(b"expected_counts = expected_counts - {1}")
+        != payload.count(MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK)
+    ):
+        raise VersionPortMergeError(
+            "target mixin policy did not reach the mandatory hand policy"
+        )
+    return payload
+
+
+def _index_entry_from_payload(
+    repository: Path,
+    path: str,
+    mode: str,
+    payload: bytes,
+    temporary: Path,
+    label: str,
+    oid_length: int,
+) -> IndexEntry:
+    if mode not in REGULAR_MODES:
+        raise VersionPortMergeError(f"{label} mode is not regular")
+    _validate_text_blob(payload, label, markers=True)
+    if len(payload) > MAX_PROTECTED_BLOB_BYTES:
+        raise VersionPortMergeError(f"{label} is too large")
+    payload_file = temporary / "payload"
+    payload_file.write_bytes(payload)
+    payload_file.chmod(0o600)
+    return IndexEntry(
+        path,
+        0,
+        mode,
+        _hash_blob_file(repository, payload_file, oid_length),
+    )
+
+
 def _resolve_source_path(
     repository: Path,
     path: str,
@@ -537,6 +808,53 @@ def _resolve_source_path(
         )
         _validate_text_blob(payload, f"{label} blob for {path}", markers=False)
         inputs[stage] = payload
+
+    if (
+        path == MIXIN_POLICY_PATH
+        and hashlib.sha256(inputs[3]).hexdigest() == MIXIN_POLICY_SHA256
+    ):
+        result = _index_entry_from_payload(
+            repository,
+            path,
+            stages[2].mode,
+            _migrate_mixin_hand_policy_payload(inputs[2]),
+            merge_files,
+            "migrated target mixin policy",
+            oid_length,
+        )
+        _install_index_entry(repository, result)
+        return result, {
+            "path": path,
+            "policy": "migrate-mandatory-common-hand-policy",
+            "stages": _stages_payload(stages),
+            "result": result.object_payload(),
+        }
+
+    if (
+        path == CPM_TRANSITION_POLICY_PATH
+        and hashlib.sha256(inputs[3]).hexdigest() == CPM_TRANSITION_POLICY_SHA256
+    ):
+        result = IndexEntry(path, 0, stages[3].mode, stages[3].oid)
+        _install_index_entry(repository, result)
+        return result, {
+            "path": path,
+            "policy": "install-canonical-cpm-transition-policy",
+            "stages": _stages_payload(stages),
+            "result": result.object_payload(),
+        }
+
+    if (
+        path == COMMON_HAND_RENDERER_PATH
+        and hashlib.sha256(inputs[3]).hexdigest() == COMMON_HAND_RENDERER_SHA256
+    ):
+        result = IndexEntry(path, 0, stages[3].mode, stages[3].oid)
+        _install_index_entry(repository, result)
+        return result, {
+            "path": path,
+            "policy": "install-canonical-common-hand-renderer",
+            "stages": _stages_payload(stages),
+            "result": result.object_payload(),
+        }
 
     base_file = merge_files / "base"
     target_file = merge_files / "target"
@@ -594,6 +912,182 @@ def _resolve_target_path(
         "stages": _stages_payload(stages),
         "result": result.object_payload(),
     }
+
+
+def _canonical_hand_policy_entries(
+    repository: Path,
+    source: str,
+    oid_length: int,
+) -> tuple[IndexEntry, IndexEntry, IndexEntry] | None:
+    policy_entry = _tree_entry(
+        repository, source, CPM_TRANSITION_POLICY_PATH, oid_length
+    )
+    if policy_entry is None:
+        return None
+    policy_payload = _read_blob(
+        repository,
+        policy_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="source CPM transition policy",
+    )
+    policy_matches = tuple(
+        marker in policy_payload
+        for marker in COMMON_HAND_MULTIPLICITY_POLICY_MARKERS
+    )
+    if not any(policy_matches):
+        return None
+    if not all(policy_matches):
+        raise VersionPortMergeError(
+            "source CPM transition policy has incomplete hand multiplicity markers"
+        )
+    _validate_text_blob(policy_payload, "source CPM transition policy", markers=True)
+    if hashlib.sha256(policy_payload).hexdigest() != CPM_TRANSITION_POLICY_SHA256:
+        raise VersionPortMergeError(
+            "source CPM transition policy is not the audited multiplicity policy"
+        )
+
+    mixin_policy_entry = _tree_entry(
+        repository, source, MIXIN_POLICY_PATH, oid_length
+    )
+    if mixin_policy_entry is None:
+        raise VersionPortMergeError(
+            "source hand multiplicity policy lacks the mixin policy"
+        )
+    mixin_policy_payload = _read_blob(
+        repository,
+        mixin_policy_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="source mixin policy",
+    )
+    _validate_text_blob(mixin_policy_payload, "source mixin policy", markers=True)
+    if hashlib.sha256(mixin_policy_payload).hexdigest() != MIXIN_POLICY_SHA256:
+        raise VersionPortMergeError(
+            "source mixin policy is not the audited mandatory-hand policy"
+        )
+    if _migrate_mixin_hand_policy_payload(mixin_policy_payload) != mixin_policy_payload:
+        raise VersionPortMergeError(
+            "source mixin policy is not already in canonical hand-policy form"
+        )
+
+    common_entry = _tree_entry(
+        repository, source, COMMON_HAND_RENDERER_PATH, oid_length
+    )
+    if common_entry is None:
+        raise VersionPortMergeError(
+            "source hand multiplicity policy lacks the common hand renderer"
+        )
+    common_payload = _read_blob(
+        repository,
+        common_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="source common hand renderer",
+    )
+    _validate_text_blob(common_payload, "source common hand renderer", markers=True)
+    if hashlib.sha256(common_payload).hexdigest() != COMMON_HAND_RENDERER_SHA256:
+        raise VersionPortMergeError(
+            "source common hand renderer is not the audited multiplicity implementation"
+        )
+    if any(marker in common_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
+        raise VersionPortMergeError(
+            "source common hand renderer intercepts the modern hand collector"
+        )
+    return common_entry, mixin_policy_entry, policy_entry
+
+
+def _install_canonical_hand_policy(
+    repository: Path,
+    source: str,
+    oid_length: int,
+    temporary: Path,
+) -> list[dict[str, Any]]:
+    source_entries = _canonical_hand_policy_entries(
+        repository, source, oid_length
+    )
+    if source_entries is None:
+        return []
+    source_entry, _, _ = source_entries
+
+    indexed = _entries_by_path(_snapshot_index(repository, oid_length).entries)
+    current_renderer = indexed.get(COMMON_HAND_RENDERER_PATH, ())
+    if len(current_renderer) != 1 or current_renderer[0].stage != 0:
+        raise VersionPortMergeError(
+            "common hand renderer is not resolved before canonical installation"
+        )
+    resolutions: list[dict[str, Any]] = []
+    current_entry = current_renderer[0]
+    if current_entry.object_payload() != source_entry.object_payload():
+        _install_index_entry(repository, source_entry)
+        resolutions.append(
+            {
+                "path": COMMON_HAND_RENDERER_PATH,
+                "policy": "install-canonical-common-hand-renderer",
+                "source": source_entry.object_payload(),
+                "target": current_entry.object_payload(),
+                "result": source_entry.object_payload(),
+            }
+        )
+
+    current_mixin_policy = indexed.get(MIXIN_POLICY_PATH, ())
+    if len(current_mixin_policy) != 1 or current_mixin_policy[0].stage != 0:
+        raise VersionPortMergeError(
+            "mixin policy is not resolved before mandatory-hand migration"
+        )
+    current_mixin_entry = current_mixin_policy[0]
+    current_mixin_payload = _read_blob(
+        repository,
+        current_mixin_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="merged target mixin policy",
+    )
+    migrated_mixin_payload = _migrate_mixin_hand_policy_payload(
+        current_mixin_payload
+    )
+    if migrated_mixin_payload != current_mixin_payload:
+        migration_directory = temporary / "mixin-policy-migration"
+        migration_directory.mkdir(mode=0o700)
+        migrated_mixin_entry = _index_entry_from_payload(
+            repository,
+            MIXIN_POLICY_PATH,
+            current_mixin_entry.mode,
+            migrated_mixin_payload,
+            migration_directory,
+            "migrated target mixin policy",
+            oid_length,
+        )
+        _install_index_entry(repository, migrated_mixin_entry)
+        resolutions.append(
+            {
+                "path": MIXIN_POLICY_PATH,
+                "policy": "migrate-mandatory-common-hand-policy",
+                "source": source_entries[1].object_payload(),
+                "target": current_mixin_entry.object_payload(),
+                "result": migrated_mixin_entry.object_payload(),
+            }
+        )
+
+    current_transition_policy = indexed.get(CPM_TRANSITION_POLICY_PATH, ())
+    if (
+        len(current_transition_policy) != 1
+        or current_transition_policy[0].stage != 0
+    ):
+        raise VersionPortMergeError(
+            "CPM transition policy is not resolved before hand-policy validation"
+        )
+    transition_payload = _read_blob(
+        repository,
+        current_transition_policy[0].oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="merged CPM transition policy",
+    )
+    _validate_text_blob(transition_payload, "merged CPM transition policy", markers=True)
+    if not all(
+        marker in transition_payload
+        for marker in COMMON_HAND_MULTIPLICITY_POLICY_MARKERS
+    ):
+        raise VersionPortMergeError(
+            "merged CPM transition policy lost hand multiplicity coverage"
+        )
+    return resolutions
 
 
 def _resolve_delete_path(
@@ -885,16 +1379,16 @@ def _runtime_uses_vanilla_translucent_hand_collector(
     return components[0] >= 26 or (
         len(components) == 3
         and components[:2] == (1, 21)
-        and components[2] >= 11
+        and components[2] >= 9
     )
 
 
-def _neoforge_collector_migration_fixture(
+def _neoforge_collector_migration_fixtures(
     repository: Path,
     source: str,
     oid_length: int,
-) -> IndexEntry | None:
-    """Authenticate the source policy and its audited NeoForge result fixture."""
+) -> dict[str, tuple[IndexEntry, str]] | None:
+    """Authenticate the source policy and every audited NeoForge migration pair."""
 
     if _tree_entry(
         repository, source, NEOFORGE_PLAYER_RENDERER_PATH, oid_length
@@ -934,65 +1428,71 @@ def _neoforge_collector_migration_fixture(
             "source common hand renderer contradicts the CPM collector ownership policy"
         )
 
-    input_entry = _tree_entry(
-        repository, source, NEOFORGE_PLAYER_RENDERER_INPUT_PATH, oid_length
-    )
-    result_entry = _tree_entry(
-        repository, source, NEOFORGE_PLAYER_RENDERER_RESULT_PATH, oid_length
-    )
-    if input_entry is None or result_entry is None:
-        raise VersionPortMergeError(
-            "source CPM collector policy lacks its NeoForge migration fixtures"
-        )
-    input_payload = _read_blob(
-        repository,
-        input_entry.oid,
-        limit=MAX_PROTECTED_BLOB_BYTES,
-        label="source NeoForge collector migration input fixture",
-    )
-    _validate_text_blob(
-        input_payload,
-        "source NeoForge collector migration input fixture",
-        markers=True,
-    )
-    if hashlib.sha256(input_payload).hexdigest() != (
-        NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256
+    results: dict[str, tuple[IndexEntry, str]] = {}
+    for input_path, result_path, before_sha256, result_sha256 in (
+        NEOFORGE_PLAYER_RENDERER_MIGRATION_FIXTURES
     ):
-        raise VersionPortMergeError(
-            "source NeoForge collector migration input fixture is not audited"
+        input_entry = _tree_entry(repository, source, input_path, oid_length)
+        result_entry = _tree_entry(repository, source, result_path, oid_length)
+        if input_entry is None or result_entry is None:
+            raise VersionPortMergeError(
+                "source CPM collector policy lacks its NeoForge migration fixtures"
+            )
+        input_payload = _read_blob(
+            repository,
+            input_entry.oid,
+            limit=MAX_PROTECTED_BLOB_BYTES,
+            label=f"source NeoForge collector migration input {input_path}",
         )
-    if not all(marker in input_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
-        raise VersionPortMergeError(
-            "source NeoForge collector migration input lacks the modern redirect"
+        _validate_text_blob(
+            input_payload,
+            f"source NeoForge collector migration input {input_path}",
+            markers=True,
         )
-    result_payload = _read_blob(
-        repository,
-        result_entry.oid,
-        limit=MAX_PROTECTED_BLOB_BYTES,
-        label="source NeoForge collector migration fixture",
-    )
-    _validate_text_blob(
-        result_payload,
-        "source NeoForge collector migration fixture",
-        markers=True,
-    )
-    if hashlib.sha256(result_payload).hexdigest() != (
-        NEOFORGE_PLAYER_RENDERER_RESULT_SHA256
-    ):
-        raise VersionPortMergeError(
-            "source NeoForge collector migration fixture is not the audited result"
+        if hashlib.sha256(input_payload).hexdigest() != before_sha256:
+            raise VersionPortMergeError(
+                "source NeoForge collector migration input fixture is not audited"
+            )
+        if not all(
+            marker in input_payload for marker in MODERN_HAND_COLLECTOR_MARKERS
+        ):
+            raise VersionPortMergeError(
+                "source NeoForge collector migration input lacks the modern redirect"
+            )
+
+        result_payload = _read_blob(
+            repository,
+            result_entry.oid,
+            limit=MAX_PROTECTED_BLOB_BYTES,
+            label=f"source NeoForge collector migration result {result_path}",
         )
-    if any(marker in result_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
-        raise VersionPortMergeError(
-            "source NeoForge collector migration fixture still intercepts the modern collector"
+        _validate_text_blob(
+            result_payload,
+            f"source NeoForge collector migration result {result_path}",
+            markers=True,
         )
-    return result_entry
+        if hashlib.sha256(result_payload).hexdigest() != result_sha256:
+            raise VersionPortMergeError(
+                "source NeoForge collector migration fixture is not the audited result"
+            )
+        if any(
+            marker in result_payload for marker in MODERN_HAND_COLLECTOR_MARKERS
+        ):
+            raise VersionPortMergeError(
+                "source NeoForge collector migration fixture still intercepts the modern collector"
+            )
+        if before_sha256 in results:
+            raise VersionPortMergeError(
+                "source NeoForge collector migrations repeat an audited input"
+            )
+        results[before_sha256] = (result_entry, result_path)
+    return results
 
 
 def _migrate_neoforge_modern_hand_collector(
     repository: Path,
     work_head: str,
-    result_fixture: IndexEntry,
+    result_fixtures: Mapping[str, tuple[IndexEntry, str]],
     oid_length: int,
 ) -> list[dict[str, Any]]:
     """Replace one exact target-only NeoForge redirect with its audited safe form."""
@@ -1013,12 +1513,13 @@ def _migrate_neoforge_modern_hand_collector(
     )
     if not any(marker in target_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
         return []
-    if hashlib.sha256(target_payload).hexdigest() != (
-        NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256
-    ):
+    target_sha256 = hashlib.sha256(target_payload).hexdigest()
+    selected_fixture = result_fixtures.get(target_sha256)
+    if selected_fixture is None:
         raise VersionPortMergeError(
             "target NeoForge modern hand collector does not match the audited migration input"
         )
+    result_fixture, result_path = selected_fixture
 
     before = _snapshot_index(repository, oid_length)
     current_entries = _entries_by_path(before.entries).get(
@@ -1040,7 +1541,7 @@ def _migrate_neoforge_modern_hand_collector(
         {
             "path": NEOFORGE_PLAYER_RENDERER_PATH,
             "policy": "migrate-neoforge-modern-hand-collector",
-            "source_path": NEOFORGE_PLAYER_RENDERER_RESULT_PATH,
+            "source_path": result_path,
             "source": result_fixture.object_payload(),
             "target": target_entry.object_payload(),
             "result": result_entry.object_payload(),
@@ -1524,6 +2025,15 @@ def reproduce_merge(
                         )
                     )
 
+            protected_resolutions.extend(
+                _install_canonical_hand_policy(
+                    repository,
+                    source,
+                    oid_length,
+                    temporary,
+                )
+            )
+
             if _needs_datapack_function_migration(
                 repository, work_head, source, oid_length
             ):
@@ -1544,15 +2054,15 @@ def reproduce_merge(
                     target_profile.runtime_version
                 )
             ):
-                result_fixture = _neoforge_collector_migration_fixture(
+                result_fixtures = _neoforge_collector_migration_fixtures(
                     repository, source, oid_length
                 )
-                if result_fixture is not None:
+                if result_fixtures is not None:
                     protected_resolutions.extend(
                         _migrate_neoforge_modern_hand_collector(
                             repository,
                             work_head,
-                            result_fixture,
+                            result_fixtures,
                             oid_length,
                         )
                     )
