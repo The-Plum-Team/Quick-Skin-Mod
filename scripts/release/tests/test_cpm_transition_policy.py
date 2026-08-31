@@ -173,7 +173,40 @@ class CpmTransitionPolicyTest(unittest.TestCase):
         self.assertIn("isLocalPlayerWearingCpmModel()", preservation)
         self.assertIn("firstPersonRenderTypePreservations.incrementAndGet()", preservation)
         self.assertIn(".action(feature::beginFirstPersonRecheck)", scenario)
-        self.assertIn("preservationCount <= firstPersonRenderTypeCheckpoint", feature)
+        self.assertIn(
+            "!usesModernCollector && preservationCount <= firstPersonRenderTypeCheckpoint",
+            feature,
+        )
+        self.assertIn("usesModernFirstPersonCollector()", feature)
+        self.assertIn('String prefix = "1.21."', feature)
+        self.assertIn(">= 9", feature)
+        self.assertIn(
+            '"Quick Skin left CPM\'s model-owned modern collector untouched"',
+            feature,
+        )
+
+    def test_neoforge_immediate_hand_redirect_preserves_cpm_render_type(self) -> None:
+        neoforge_source_path = (
+            ROOT
+            / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/"
+            / "PlayerRendererMixin.java"
+        )
+        if not neoforge_source_path.is_file():
+            return
+
+        neoforge_source = neoforge_source_path.read_text(encoding="utf-8")
+        guard = "CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()"
+        self.assertIn(guard, neoforge_source)
+        self.assertNotIn(
+            "if (CPMCompatIntegration.shouldDeferToCPM()) "
+            "return instance.getBuffer(renderType);",
+            neoforge_source,
+        )
+        self.assertNotIn(
+            "if (CPMCompatIntegration.isCPMActivelyRendering()) "
+            "return instance.getBuffer(renderType);",
+            neoforge_source,
+        )
 
     def test_modern_first_person_collectors_remain_owned_by_model_mods(self) -> None:
         paths = [MIXIN_ROOT / "ItemInHandRendererMixin.java"]
