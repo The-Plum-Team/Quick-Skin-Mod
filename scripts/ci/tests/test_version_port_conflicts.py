@@ -55,11 +55,14 @@ class VersionPortConflictsTest(unittest.TestCase):
                 "release/release-matrix.json",
                 "forge/build.gradle.kts",
                 "docs/ai/WORKFLOW.md",
+                "common/src/main/java/com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
                 "common/src/main/java/com/quickskin/mod/Screen.java",
                 "common/src/legacy1_20_1/resources/quickskin.mixins.json",
                 "e2e/server-template/datapack/data/qs_e2e/functions/load.mcfunction",
                 "e2e/server-template/datapack/data/qs_e2e/function/load.mcfunction",
                 "e2e/README.md",
+                "scripts/release/tests/test_cpm_transition_policy.py",
+                "scripts/release/tests/test_mixin_policy.py",
             ),
             {"fabric", "neoforge"},
             {"common/src/legacy1_21_10"},
@@ -69,9 +72,12 @@ class VersionPortConflictsTest(unittest.TestCase):
             {
                 "schema_version": 1,
                 "source_paths": [
+                    "common/src/main/java/com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
                     "docs/ai/WORKFLOW.md",
                     "e2e/README.md",
                     "e2e/packaged_runtime.py",
+                    "scripts/release/tests/test_cpm_transition_policy.py",
+                    "scripts/release/tests/test_mixin_policy.py",
                 ],
                 "target_paths": ["release/release-matrix.json"],
                 "delete_paths": [
