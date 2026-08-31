@@ -70,6 +70,7 @@ public final class CpmFirstPersonScenario implements Scenario {
                 .assertion(() -> feature.assertFirstPersonHand("initial")));
 
         steps.add(Step.of("first_person_hand_after_10_seconds")
+                .action(feature::beginFirstPersonRecheck)
                 .minTicks(FIRST_PERSON_RECHECK_TICKS)
                 .ready(() -> probe.active() && feature.firstPersonReady())
                 .settleTicks(FIRST_PERSON_SETTLE_TICKS)
