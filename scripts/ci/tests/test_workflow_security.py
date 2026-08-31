@@ -584,6 +584,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("branches/master", authenticate)
         self.assertIn("actions/runs/$source_run_id/artifacts", authenticate)
         self.assertIn("artifact_inventory", authenticate)
+        self.assertIn('source_run_attempt="$(jq -er', authenticate)
+        self.assertIn('raw_artifact_inventory="$(jq -c', authenticate)
+        self.assertIn("scenario_job_count * source_run_attempt", authenticate)
+        self.assertIn("group_by(.name)", authenticate)
+        self.assertIn("length <= $source_run_attempt", authenticate)
+        self.assertIn("map(sort_by(.id) | .[-1])", authenticate)
+        self.assertLess(
+            authenticate.index("length <= $source_run_attempt"),
+            authenticate.index("map(sort_by(.id) | .[-1])"),
+        )
 
         self.assertIn("git fetch --no-tags origin \"$SOURCE_SHA\"", curate)
         self.assertIn("timeout-minutes: 90", curate)
