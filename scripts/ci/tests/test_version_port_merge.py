@@ -229,6 +229,7 @@ class VersionPortMergeTest(unittest.TestCase):
         *,
         runtime_version: str,
         target_payload: str | None = None,
+        target_path: str = version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH,
     ) -> tuple[str, str, str, str]:
         components = tuple(int(value) for value in runtime_version.split("."))
         if (
@@ -258,7 +259,10 @@ class VersionPortMergeTest(unittest.TestCase):
             version_port_merge.CPM_TRANSITION_POLICY_PATH,
             "def test_modern_first_person_collectors_remain_owned_by_model_mods():\n"
             '    self.assertNotIn("quickskin$redirectSubmitModelPart", source)\n'
-            '    self.assertNotIn("SubmitNodeCollector;submitModelPart", source)\n',
+            '    self.assertNotIn("SubmitNodeCollector;submitModelPart", source)\n'
+            "def test_neoforge_immediate_hand_redirect_preserves_cpm_render_type():\n"
+            '    guard = "shouldPreserveFirstPersonHandRenderType"\n'
+            "    self.assertIn(guard, neoforge_source)\n",
         )
         self.write(
             version_port_merge.COMMON_HAND_RENDERER_PATH,
@@ -284,7 +288,7 @@ class VersionPortMergeTest(unittest.TestCase):
                 runtime_version=runtime_version,
             ),
         )
-        self.write(version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH, target_payload)
+        self.write(target_path, target_payload)
         self.git("add", "--all")
         self.commit(f"add NeoForge renderer for {runtime_version}")
         target = self.sha("HEAD")
@@ -693,6 +697,26 @@ class VersionPortMergeTest(unittest.TestCase):
             fixture,
         )
 
+    def test_neoforge_collector_results_carry_the_cpm_hand_guard(self) -> None:
+        for _, result_path, _, result_sha256 in (
+            version_port_merge.NEOFORGE_PLAYER_RENDERER_MIGRATION_FIXTURES
+        ):
+            with self.subTest(result=result_path):
+                result = (ROOT / result_path).read_bytes()
+                self.assertEqual(hashlib.sha256(result).hexdigest(), result_sha256)
+                self.assertIn(
+                    version_port_merge.NEOFORGE_CPM_HAND_PRESERVE_BLOCK,
+                    result,
+                )
+                self.assertNotIn(
+                    version_port_merge.NEOFORGE_CPM_HAND_DEFER_LINE,
+                    result,
+                )
+                self.assertNotIn(
+                    version_port_merge.NEOFORGE_CPM_HAND_ACTIVE_LINE,
+                    result,
+                )
+
     def test_modern_neoforge_collector_is_replaced_by_audited_fixture(self) -> None:
         source, target, _, result_payload = (
             self.prepare_neoforge_collector_fixture_branches(
@@ -765,7 +789,7 @@ class VersionPortMergeTest(unittest.TestCase):
         self.git("merge", "--abort")
         self.assert_clean_at(target)
 
-    def test_neoforge_collector_migration_preserves_pre_1_21_9_redirect(
+    def test_neoforge_hand_scope_migration_preserves_pre_1_21_9_redirect(
         self,
     ) -> None:
         source, target, input_payload, _ = (
@@ -781,14 +805,108 @@ class VersionPortMergeTest(unittest.TestCase):
             mode="prepare",
         )
 
-        self.assertEqual(evidence["protected_resolutions"], [])
-        self.assertEqual(
-            (
-                self.repository / version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH
-            ).read_text(encoding="utf-8"),
-            input_payload,
+        migrated = [
+            item
+            for item in evidence["protected_resolutions"]
+            if item["policy"] == "migrate-neoforge-cpm-hand-scope"
+        ]
+        self.assertEqual(len(migrated), 1)
+        renderer = (
+            self.repository / version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH
+        ).read_text(encoding="utf-8")
+        self.assertNotEqual(renderer, input_payload)
+        self.assertIn(
+            "CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()",
+            renderer,
         )
+        self.assertNotIn(
+            "if (CPMCompatIntegration.shouldDeferToCPM()) "
+            "return instance.getBuffer(renderType);",
+            renderer,
+        )
+        self.assertIn("quickskin$redirectSubmitModelPart", renderer)
         self.git("merge", "--abort")
+        self.assert_clean_at(target)
+
+    def test_neoforge_legacy_adapter_hashes_cover_every_target_overlay(self) -> None:
+        fixture = (
+            ROOT / version_port_merge.NEOFORGE_LEGACY_PLAYER_RENDERER_FIXTURE_PATH
+        ).read_bytes()
+        for patch, path in enumerate(
+            version_port_merge.NEOFORGE_LEGACY_PLAYER_RENDERER_PATHS,
+            start=2,
+        ):
+            with self.subTest(runtime_version=f"1.21.{patch}"):
+                payload = fixture.replace(b"1.21.5", f"1.21.{patch}".encode(), 1)
+                before_sha256, result_sha256 = (
+                    version_port_merge.NEOFORGE_CPM_HAND_ADAPTER_MIGRATIONS[path]
+                )
+                self.assertEqual(hashlib.sha256(payload).hexdigest(), before_sha256)
+                migrated = payload.replace(
+                    version_port_merge.NEOFORGE_CPM_HAND_ADAPTER_LEGACY_PREFIX,
+                    version_port_merge.NEOFORGE_CPM_HAND_ADAPTER_PRESERVE_PREFIX,
+                )
+                self.assertEqual(hashlib.sha256(migrated).hexdigest(), result_sha256)
+
+    def test_neoforge_legacy_adapter_uses_cpm_preserving_guard(self) -> None:
+        target_path = version_port_merge.NEOFORGE_LEGACY_PLAYER_RENDERER_PATHS[-1]
+        input_payload = (
+            ROOT / version_port_merge.NEOFORGE_LEGACY_PLAYER_RENDERER_FIXTURE_PATH
+        ).read_text(encoding="utf-8")
+        source, target, _, _ = self.prepare_neoforge_collector_fixture_branches(
+            runtime_version="1.21.5",
+            target_payload=input_payload,
+            target_path=target_path,
+        )
+
+        evidence = version_port_merge.reproduce_merge(
+            self.repository,
+            target,
+            source,
+            mode="prepare",
+        )
+
+        migrated = [
+            item
+            for item in evidence["protected_resolutions"]
+            if item["policy"] == "migrate-neoforge-cpm-hand-scope"
+        ]
+        self.assertEqual([item["path"] for item in migrated], [target_path])
+        renderer = (self.repository / target_path).read_text(encoding="utf-8")
+        self.assertIn(
+            "CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()",
+            renderer,
+        )
+        self.assertNotIn("CPMCompatIntegration.shouldDeferToCPM()", renderer)
+        self.assertNotIn("CPMCompatIntegration.isCPMActivelyRendering()", renderer)
+        self.git("merge", "--abort")
+        self.assert_clean_at(target)
+
+    def test_unknown_neoforge_legacy_adapter_fails_closed(self) -> None:
+        target_path = version_port_merge.NEOFORGE_LEGACY_PLAYER_RENDERER_PATHS[-1]
+        input_payload = (
+            ROOT / version_port_merge.NEOFORGE_LEGACY_PLAYER_RENDERER_FIXTURE_PATH
+        ).read_text(encoding="utf-8")
+        source, target, _, _ = self.prepare_neoforge_collector_fixture_branches(
+            runtime_version="1.21.5",
+            target_payload=input_payload.replace(
+                "renderer adapter",
+                "unexpected renderer adapter",
+                1,
+            ),
+            target_path=target_path,
+        )
+
+        with self.assertRaisesRegex(
+            version_port_merge.VersionPortMergeError,
+            "does not match an audited target source",
+        ):
+            version_port_merge.reproduce_merge(
+                self.repository,
+                target,
+                source,
+                mode="prepare",
+            )
         self.assert_clean_at(target)
 
     def test_unknown_modern_neoforge_collector_fails_closed(self) -> None:
@@ -807,6 +925,31 @@ class VersionPortMergeTest(unittest.TestCase):
         with self.assertRaisesRegex(
             version_port_merge.VersionPortMergeError,
             "does not match the audited migration input",
+        ):
+            version_port_merge.reproduce_merge(
+                self.repository,
+                target,
+                source,
+                mode="prepare",
+            )
+        self.assert_clean_at(target)
+
+    def test_unknown_legacy_neoforge_hand_scope_fails_closed(self) -> None:
+        input_payload = (
+            ROOT / version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH
+        ).read_text(encoding="utf-8")
+        source, target, _, _ = self.prepare_neoforge_collector_fixture_branches(
+            runtime_version="1.21.8",
+            target_payload=input_payload.replace(
+                "NeoForge-specific mixin",
+                "Unexpected NeoForge mixin",
+                1,
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            version_port_merge.VersionPortMergeError,
+            "does not match an audited target source",
         ):
             version_port_merge.reproduce_merge(
                 self.repository,
