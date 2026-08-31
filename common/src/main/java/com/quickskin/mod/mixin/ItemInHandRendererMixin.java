@@ -1,7 +1,7 @@
 package com.quickskin.mod.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-//? if <1.21.11 {
+//? if <1.21.9 {
 import com.mojang.blaze3d.vertex.VertexConsumer;
 //?} else {
 //?}
@@ -12,7 +12,7 @@ import net.minecraft.client.model.geom.ModelPart;
 //? if <1.21.2 {
 import net.minecraft.client.player.AbstractClientPlayer;
 //?}
-//? if <1.21.11 {
+//? if <1.21.9 {
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
@@ -26,17 +26,17 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
  * Enables transparent first-person arms on the legacy immediate-rendering pipeline.
- * Minecraft 1.21.11 and later already submit the hand with entityTranslucent; intercepting its
+ * Minecraft 1.21.9 and later already submit the hand with entityTranslucent; intercepting its
  * collector would bypass wrappers installed by model mods such as CPM.
  */
-//? if <1.21.11 {
+//? if <1.21.9 {
 @Mixin(value = PlayerRenderer.class, priority = 1100) // Higher priority to override TLSkinCape and other mods
 //?} else {
 @Mixin(value = AvatarRenderer.class, priority = 1100)
 //?}
 public class ItemInHandRendererMixin {
 
-//? if <1.21.11 {
+//? if <1.21.9 {
     /** Redirects the legacy first-person arm buffers when the selected skin needs translucency. */
     @Redirect(
 //? if <1.21.2 {
