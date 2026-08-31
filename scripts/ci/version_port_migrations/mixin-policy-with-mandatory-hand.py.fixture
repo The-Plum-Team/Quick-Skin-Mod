@@ -16,17 +16,6 @@ OVERLAY_JAVA = tuple(ROOT / "common" / "src" / name / "java" for name in OVERLAY
 OVERLAY_RESOURCES = tuple(
     ROOT / "common" / "src" / name / "resources" for name in OVERLAY_NAMES
 )
-ACTIVE_LOADERS = tuple(sorted({artifact["loader"] for artifact in MATRIX["artifacts"]}))
-LOADER_JAVA = {
-    loader: ROOT / loader / "src" / "main" / "java"
-    for loader in ACTIVE_LOADERS
-    if (ROOT / loader / "src" / "main" / "java").is_dir()
-}
-LOADER_RESOURCES = {
-    loader: ROOT / loader / "src" / "main" / "resources"
-    for loader in ACTIVE_LOADERS
-    if (ROOT / loader / "src" / "main" / "resources").is_dir()
-}
 MIXIN_MARKER = re.compile(r"@Mixin\s*\(")
 INJECTOR_MARKER = re.compile(r"@(Inject|ModifyArg|Redirect)\s*\(")
 HANDLER_MARKER = re.compile(r"\b(quickskin\$[A-Za-z0-9_$]+)\s*\(")
@@ -46,11 +35,6 @@ def policy_id(path: Path) -> str:
                 return "overlay:" + path.relative_to(source_root).as_posix()
             except ValueError:
                 continue
-        for loader, source_root in LOADER_JAVA.items():
-            try:
-                return f"{loader}:" + path.relative_to(source_root).as_posix()
-            except ValueError:
-                continue
     raise AssertionError(f"Mixin source is outside an active source root: {path}")
 
 
@@ -63,10 +47,6 @@ CRITICAL_MIXINS = {
     "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinAbstractClientPlayer.java",
     "overlay:com/quickskin/mod/mixin/PlayerInfoMixin.java",
-    "neoforge:com/quickskin/mod/neoforge/mixin/CapeLayerMixin.java",
-    "neoforge:com/quickskin/mod/neoforge/mixin/MixinAbstractClientPlayer.java",
-    "neoforge:com/quickskin/mod/neoforge/mixin/PlayerInfoMixin.java",
-    "neoforge:com/quickskin/mod/neoforge/mixin/SkinManagerMixin.java",
 }
 
 # These are real Quick Skin features, but losing one hook should degrade only that rendering or UI
@@ -76,9 +56,6 @@ DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/GuiSkinRendererMixin.java",
     "main:com/quickskin/mod/mixin/PanoramaRendererMixin.java",
     "main:com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
-    "neoforge:com/quickskin/mod/neoforge/mixin/GuiSkinRendererMixin.java",
-    "neoforge:com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java",
-    "neoforge:com/quickskin/mod/neoforge/mixin/PreviewEquipmentMixin.java",
 }
 
 # Third-party integrations remain fail-local in production. Their targets are either selected by
@@ -115,8 +92,7 @@ ALTERNATIVE_HOOKS = {
 
 # Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and
 # sleeve); 1.21.2 through 1.21.10 make one immediate arm draw. The modern collector is deliberately
-# not intercepted. SkinManager 1.20.1 has two RETURN opcodes in its one target method; in 1.21.11,
-# createLookup and get have three and two returns respectively on both loaders.
+# not intercepted. SkinManager 1.20.1 has two RETURN opcodes in its one target method.
 INJECTION_COUNT_OVERRIDES = {
     (
         "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
@@ -125,34 +101,6 @@ INJECTION_COUNT_OVERRIDES = {
     (
         "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
         "quickskin$overrideSkinInfo",
-    ): {2},
-    (
-        "neoforge:com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java",
-        "quickskin$redirectRenderHandBuffer",
-    ): {1, 2},
-    (
-        "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
-        "quickskin$modifyInsecureSkin",
-    ): {1, 2},
-    (
-        "neoforge:com/quickskin/mod/neoforge/mixin/SkinManagerMixin.java",
-        "quickskin$modifyInsecureSkin",
-    ): {1, 2},
-    (
-        "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
-        "quickskin$modifyCreateLookup",
-    ): {3},
-    (
-        "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
-        "quickskin$modifyGet",
-    ): {2},
-    (
-        "neoforge:com/quickskin/mod/neoforge/mixin/SkinManagerMixin.java",
-        "quickskin$modifyCreateLookup",
-    ): {3},
-    (
-        "neoforge:com/quickskin/mod/neoforge/mixin/SkinManagerMixin.java",
-        "quickskin$modifyGet",
     ): {2},
 }
 
@@ -183,7 +131,7 @@ def assignment_values(context: str, name: str) -> set[int]:
 class MixinPolicyTest(unittest.TestCase):
     def mixin_sources(self) -> tuple[Path, ...]:
         sources: list[Path] = []
-        for source_root in (CANONICAL_JAVA, *OVERLAY_JAVA, *LOADER_JAVA.values()):
+        for source_root in (CANONICAL_JAVA, *OVERLAY_JAVA):
             for path in source_root.rglob("*.java"):
                 if MIXIN_MARKER.search(path.read_text(encoding="utf-8")):
                     sources.append(path)
@@ -229,7 +177,6 @@ class MixinPolicyTest(unittest.TestCase):
                 expected_counts = INJECTION_COUNT_OVERRIDES.get(
                     (source_name, handler_name), {1}
                 )
-
                 with self.subTest(source=source_name, handler=handler_name):
                     self.assertEqual(assignment_values(context, "require"), {expected_require})
                     self.assertEqual(
@@ -256,16 +203,6 @@ class MixinPolicyTest(unittest.TestCase):
                 config = json.loads(path.read_text(encoding="utf-8"))
                 self.assertIs(config["required"], False)
                 self.assertEqual(config["injectors"]["defaultRequire"], 0)
-
-    def test_loader_specific_core_configs_fail_closed(self) -> None:
-        for loader, resource_root in LOADER_RESOURCES.items():
-            path = resource_root / f"quickskin-{loader}.mixins.json"
-            if not path.is_file():
-                continue
-            with self.subTest(config=relative(path)):
-                config = json.loads(path.read_text(encoding="utf-8"))
-                self.assertIs(config["required"], True)
-                self.assertEqual(config["injectors"]["defaultRequire"], 1)
 
     def test_configured_mixins_exist_and_dynamic_mixins_are_audited(self) -> None:
         configs = self.configs_named("quickskin.mixins.json") + self.configs_named(
