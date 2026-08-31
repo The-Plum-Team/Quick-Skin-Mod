@@ -1030,6 +1030,18 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
                 ):
                     packaged_runtime.scan_runtime_logs([log])
 
+    def test_runtime_log_filter_does_not_confuse_model_with_mod(self) -> None:
+        log = self.root / "server.log"
+        log.write_text("[CPM/]: Failed to load model\n", encoding="utf-8")
+
+        packaged_runtime.scan_runtime_logs([log])
+
+        log.write_text("Failed to load mod quickskin\n", encoding="utf-8")
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure, "fatal runtime log evidence"
+        ):
+            packaged_runtime.scan_runtime_logs([log])
+
     def test_server_world_is_sanitized_and_acknowledged_before_client_launch(self) -> None:
         process = mock.Mock()
         process.poll.return_value = None

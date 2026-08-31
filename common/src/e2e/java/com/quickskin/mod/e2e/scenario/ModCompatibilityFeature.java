@@ -210,6 +210,7 @@ interface ModCompatibilityFeature {
     final class CpmFeature extends BaseFeature {
         private volatile AssetMetadata model;
         private volatile boolean modelActivated;
+        private volatile long firstPersonRenderTypeCheckpoint;
 
         CpmFeature(Minecraft minecraft) {
             super(minecraft);
@@ -254,7 +255,13 @@ interface ModCompatibilityFeature {
         }
 
         void enterFirstPerson() {
+            beginFirstPersonRecheck();
             DefaultSkinEvidenceView.enterFirstPerson(minecraft);
+        }
+
+        void beginFirstPersonRecheck() {
+            firstPersonRenderTypeCheckpoint =
+                    CPMCompatIntegration.firstPersonRenderTypePreservationCount();
         }
 
         boolean firstPersonReady() {
@@ -270,9 +277,16 @@ interface ModCompatibilityFeature {
                 return Step.Result.fail("CPM " + checkpoint
                         + " hand checkpoint did not retain first-person camera mode");
             }
+            long preservationCount =
+                    CPMCompatIntegration.firstPersonRenderTypePreservationCount();
+            if (preservationCount <= firstPersonRenderTypeCheckpoint) {
+                return Step.Result.fail("CPM " + checkpoint
+                        + " hand checkpoint never preserved CPM's model-owned render type");
+            }
             return Step.Result.pass("CPM " + checkpoint + " first-person hand checkpoint retained "
                     + "the protected complex model " + model.hash()
-                    + "; the screenshot proves its rendered hand geometry");
+                    + "; Quick Skin preserved CPM's model-owned render type and the screenshot "
+                    + "records its rendered hand geometry");
         }
 
         @Override
