@@ -461,6 +461,13 @@ jobs:
       (needs.capacity-check.outputs.ready == 'true' ||
        (needs.capacity-probe.result == 'success' &&
         needs.capacity-probe.outputs.ready == 'true'))
+    # Exact wakes remain independent through authentication and release, but only one capsule for
+    # one protected implementation may restore, extend and republish its verdict cache at a time.
+    # This lets the next version reuse the preceding review instead of paying for the same frames
+    # while concurrent jobs race from the same older cache snapshot.
+    concurrency:
+      group: quick-skin-visual-review-model-${{ needs.select.outputs.implementation_sha }}
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:

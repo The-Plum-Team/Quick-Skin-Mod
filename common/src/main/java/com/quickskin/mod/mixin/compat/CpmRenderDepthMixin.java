@@ -10,7 +10,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Optional, descriptor-neutral activity hooks for current CPM versions.
  * ClientBase keeps these four method names across every active band while its
- * Minecraft parameter descriptors change between render eras.
+ * Minecraft parameter descriptors change between render eras. Its first declared
+ * {@code renderHand} overload is the stable outer bridge, so bracket it from HEAD;
+ * the overload that invokes {@code bindHand} is not the one selected by a bare name.
  */
 @Pseudo
 @Mixin(targets = "com.tom.cpm.client.ClientBase", remap = false)
@@ -53,12 +55,7 @@ public abstract class CpmRenderDepthMixin {
 
     @Inject(
             method = "renderHand",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lcom/tom/cpm/shared/model/RenderManager;bindHand(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V",
-                    shift = At.Shift.AFTER,
-                    remap = false
-            ),
+            at = @At("HEAD"),
             require = 0,
             expect = 1,
             allow = 1,
