@@ -118,6 +118,17 @@ MIXIN_HAND_OVERRIDE_MARKER = (
     b'        "quickskin$redirectRenderHandBuffer",\n'
     b"    ): {1, 2},"
 )
+MIXIN_NEOFORGE_HAND_OVERRIDE_MARKER = (
+    b"    (\n"
+    b'        "neoforge:com/quickskin/mod/neoforge/mixin/'
+    b'PlayerRendererMixin.java",\n'
+    b'        "quickskin$redirectRenderHandBuffer",\n'
+    b"    ): {1, 2},"
+)
+MIXIN_COUNT_SUBTEST_MARKER = (
+    b"                with self.subTest("
+    b"source=source_name, handler=handler_name):\n"
+)
 MIXIN_LEGACY_HAND_COMMENT = (
     b"# Audited vanilla bytecode multiplicities. The ItemInHand source contains Stonecutter branches:\n"
     b"# pre-1.21.11 renderHand requests two buffers (arm + sleeve), while the new renderer submits one\n"
@@ -693,6 +704,7 @@ def _migrate_mixin_hand_policy_payload(payload: bytes) -> bytes:
 
     optional_blocks = payload.count(MIXIN_LEGACY_OPTIONAL_HAND_BLOCK)
     scoped_blocks = payload.count(MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK)
+    neoforge_hand_overrides = payload.count(MIXIN_NEOFORGE_HAND_OVERRIDE_MARKER)
     if (
         optional_blocks > 1
         or scoped_blocks > 1
@@ -701,11 +713,26 @@ def _migrate_mixin_hand_policy_payload(payload: bytes) -> bytes:
         raise VersionPortMergeError(
             "target mixin policy repeats the obsolete optional-hand rule"
         )
+    if neoforge_hand_overrides > 1:
+        raise VersionPortMergeError(
+            "target mixin policy repeats the NeoForge hand override"
+        )
     if optional_blocks == 1:
         payload = payload.replace(
             MIXIN_LEGACY_OPTIONAL_HAND_BLOCK,
             MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK,
             1,
+        )
+    elif scoped_blocks == 0 and neoforge_hand_overrides == 1:
+        if payload.count(MIXIN_COUNT_SUBTEST_MARKER) != 1:
+            raise VersionPortMergeError(
+                "target mixin policy lacks the audited count-check insertion point"
+            )
+        insertion = payload.index(MIXIN_COUNT_SUBTEST_MARKER)
+        payload = (
+            payload[:insertion]
+            + MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK
+            + payload[insertion:]
         )
 
     if payload.count(MIXIN_HAND_OVERRIDE_MARKER) != 1:
