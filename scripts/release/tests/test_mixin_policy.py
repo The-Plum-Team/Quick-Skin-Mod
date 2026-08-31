@@ -91,8 +91,8 @@ ALTERNATIVE_HOOKS = {
 }
 
 # Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and
-# sleeve); 1.21.2 through 1.21.10 make one immediate arm draw. The modern collector is deliberately
-# not intercepted. The NeoForge-specific arm renderer has the same pre-1.21.11 multiplicity.
+# sleeve); 1.21.2 through 1.21.8 make one immediate arm draw. The collector used from 1.21.9 onward
+# is deliberately not intercepted. The NeoForge-specific arm renderer has the same pre-1.21.11 multiplicity.
 # SkinManager 1.20.1 and 1.21.1 each have two RETURN opcodes in their target methods; the later
 # SkinManager branches retain a single RETURN.
 INJECTION_COUNT_OVERRIDES = {
