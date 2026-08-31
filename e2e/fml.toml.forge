@@ -1,0 +1,16 @@
+# Complete Forge 47.4.9 defaults. Its embedded template omits the final four keys even though
+# FMLConfig requires them during concurrent early-window startup.
+earlyWindowHeight = 480
+earlyWindowFBScale = 1
+versionCheck = true
+earlyWindowProvider = "fmlearlywindow"
+earlyWindowWidth = 854
+earlyWindowMaximized = false
+defaultConfigPath = "defaultconfigs"
+disableOptimizedDFU = true
+earlyWindowControl = true
+maxThreads = -1
+earlyWindowSkipGLVersions = []
+earlyWindowSquir = false
+earlyWindowShowCPU = false
+earlyWindowLogHelpMessage = true
