@@ -151,6 +151,16 @@ MIXIN_LEGACY_OPTIONAL_HAND_BLOCK = (
     b"                    expected_counts = expected_counts - {1}\n"
     b"\n"
 )
+MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK = (
+    b"                if (\n"
+    b'                    source_name == "neoforge:com/quickskin/mod/neoforge/'
+    b'mixin/PlayerRendererMixin.java"\n'
+    b'                    and handler_name == "quickskin$redirectRenderHandBuffer"\n'
+    b'                    and "quickskin$redirectSubmitModelPart" not in text\n'
+    b"                ):\n"
+    b"                    expected_counts = expected_counts - {1}\n"
+    b"\n"
+)
 NEOFORGE_PLAYER_RENDERER_PATH = (
     "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java"
 )
@@ -648,12 +658,21 @@ def _migrate_mixin_hand_policy_payload(payload: bytes) -> bytes:
         )
 
     optional_blocks = payload.count(MIXIN_LEGACY_OPTIONAL_HAND_BLOCK)
-    if optional_blocks > 1:
+    scoped_blocks = payload.count(MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK)
+    if (
+        optional_blocks > 1
+        or scoped_blocks > 1
+        or (optional_blocks and scoped_blocks)
+    ):
         raise VersionPortMergeError(
             "target mixin policy repeats the obsolete optional-hand rule"
         )
     if optional_blocks == 1:
-        payload = payload.replace(MIXIN_LEGACY_OPTIONAL_HAND_BLOCK, b"", 1)
+        payload = payload.replace(
+            MIXIN_LEGACY_OPTIONAL_HAND_BLOCK,
+            MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK,
+            1,
+        )
 
     if payload.count(MIXIN_HAND_OVERRIDE_MARKER) != 1:
         raise VersionPortMergeError(
@@ -666,7 +685,9 @@ def _migrate_mixin_hand_policy_payload(payload: bytes) -> bytes:
     if (
         MIXIN_HAND_POLICY_LINE not in payload[critical_start:critical_end]
         or MIXIN_HAND_POLICY_LINE in payload[degradable_start:degradable_end]
-        or b"expected_counts = expected_counts - {1}" in payload
+        or MIXIN_LEGACY_OPTIONAL_HAND_BLOCK in payload
+        or payload.count(b"expected_counts = expected_counts - {1}")
+        != payload.count(MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK)
     ):
         raise VersionPortMergeError(
             "target mixin policy did not reach the mandatory hand policy"

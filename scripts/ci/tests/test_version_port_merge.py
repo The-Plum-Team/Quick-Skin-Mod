@@ -546,7 +546,18 @@ class VersionPortMergeTest(unittest.TestCase):
             version_port_merge.MIXIN_HAND_POLICY_LINE,
             encoded_policy[degradable_start:degradable_end],
         )
-        self.assertNotIn("expected_counts = expected_counts - {1}", mixin_policy)
+        self.assertNotIn(
+            version_port_merge.MIXIN_LEGACY_OPTIONAL_HAND_BLOCK.decode("utf-8"),
+            mixin_policy,
+        )
+        self.assertEqual(
+            mixin_policy.count(
+                version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK.decode(
+                    "utf-8"
+                )
+            ),
+            1,
+        )
         self.assertIn(
             "migrate-mandatory-common-hand-policy",
             [item["policy"] for item in evidence["protected_resolutions"]],
@@ -601,6 +612,25 @@ class VersionPortMergeTest(unittest.TestCase):
                     version_port_merge._migrate_mixin_hand_policy_payload(legacy),
                     canonical,
                 )
+
+    def test_scoped_neoforge_hand_count_migration_is_idempotent(self) -> None:
+        legacy = self.legacy_mixin_hand_policy().encode("utf-8")
+
+        migrated = version_port_merge._migrate_mixin_hand_policy_payload(legacy)
+
+        self.assertNotIn(
+            version_port_merge.MIXIN_LEGACY_OPTIONAL_HAND_BLOCK, migrated
+        )
+        self.assertEqual(
+            migrated.count(
+                version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK
+            ),
+            1,
+        )
+        self.assertEqual(
+            version_port_merge._migrate_mixin_hand_policy_payload(migrated),
+            migrated,
+        )
 
     def test_mixin_policy_source_fixture_is_the_authenticated_policy(self) -> None:
         fixture = (
