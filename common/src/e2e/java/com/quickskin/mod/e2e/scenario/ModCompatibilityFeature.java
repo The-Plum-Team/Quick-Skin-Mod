@@ -210,7 +210,10 @@ interface ModCompatibilityFeature {
     final class CpmFeature extends BaseFeature {
         private volatile AssetMetadata model;
         private volatile boolean modelActivated;
+//? if <1.21.9 {
         private volatile long firstPersonRenderTypeCheckpoint;
+//?} else {
+//?}
 
         CpmFeature(Minecraft minecraft) {
             super(minecraft);
@@ -277,16 +280,39 @@ interface ModCompatibilityFeature {
                 return Step.Result.fail("CPM " + checkpoint
                         + " hand checkpoint did not retain first-person camera mode");
             }
-            long preservationCount =
-                    CPMCompatIntegration.firstPersonRenderTypePreservationCount();
-            if (preservationCount <= firstPersonRenderTypeCheckpoint) {
+            long preservationCount = CPMCompatIntegration.firstPersonRenderTypePreservationCount();
+            boolean usesModernCollector = usesModernFirstPersonCollector();
+            if (!usesModernCollector && preservationCount <= firstPersonRenderTypeCheckpoint) {
                 return Step.Result.fail("CPM " + checkpoint
                         + " hand checkpoint never preserved CPM's model-owned render type");
             }
+            String renderProof = usesModernCollector
+                    ? "Quick Skin left CPM's model-owned modern collector untouched"
+                    : "Quick Skin preserved CPM's model-owned render type";
             return Step.Result.pass("CPM " + checkpoint + " first-person hand checkpoint retained "
                     + "the protected complex model " + model.hash()
-                    + "; Quick Skin preserved CPM's model-owned render type and the screenshot "
-                    + "records its rendered hand geometry");
+                    + "; " + renderProof + " and the screenshot records its rendered hand geometry");
+        }
+
+        private static boolean usesModernFirstPersonCollector() {
+            String runtimeVersion = System.getProperty("quickskin.e2e.version", "")
+                    .trim()
+                    .replace('_', '.');
+            if (runtimeVersion.startsWith("v")) {
+                runtimeVersion = runtimeVersion.substring(1);
+            }
+            if (runtimeVersion.startsWith("26.")) {
+                return true;
+            }
+            String prefix = "1.21.";
+            if (!runtimeVersion.startsWith(prefix)) {
+                return false;
+            }
+            try {
+                return Integer.parseInt(runtimeVersion.substring(prefix.length())) >= 9;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
         }
 
         @Override
