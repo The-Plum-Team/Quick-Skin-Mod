@@ -50,7 +50,7 @@ FATAL_LOG_PATTERNS = (
         r"AbstractMethodError|VerifyError|LinkageError)"
     ),
     re.compile(r"(?i)@ExpectPlatform.*(?:assert|not transformed|missing)"),
-    re.compile(r"(?i)(?:ModLoadingException|Failed to load mod|Incompatible mod set)"),
+    re.compile(r"(?i)(?:ModLoadingException|Failed to load mod\b|Incompatible mod set)"),
     re.compile(r"(?i)missing or unsupported mandatory dependencies"),
     re.compile(r"(?i)minecraft game provider couldn't locate the game"),
     re.compile(r"(?i)couldn't load (?:function|tag)"),
