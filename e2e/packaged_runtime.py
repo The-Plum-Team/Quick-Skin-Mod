@@ -1059,6 +1059,31 @@ def write_e2e_client_config(game_dir: Path) -> Path:
     return config_path
 
 
+def write_loader_client_config(
+    game_dir: Path, loader: str, template_root: Path
+) -> Path | None:
+    """Install a complete loader config before its bootstrap threads start.
+
+    Forge 47.4.9 ships a default FML config that omits newer early-window keys.  Its loader
+    corrects the file while the early display starts on another thread, which can expose a
+    transient null value and crash one client in a multi-client scenario.  Disposable E2E
+    profiles use the complete checked-in defaults so loader startup is deterministic.
+    """
+
+    if loader not in {"forge", "neoforge"}:
+        return None
+
+    source = template_root / f"fml.toml.{loader}"
+    config_path = game_dir / "config" / "fml.toml"
+    if not source.is_file() or source.is_symlink():
+        raise RuntimeFailure(f"loader client config must be a regular file: {source}")
+    if config_path.exists() or config_path.is_symlink():
+        raise RuntimeFailure(f"loader client config must start absent: {config_path}")
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, config_path)
+    return config_path
+
+
 def write_compatibility_client_config(
     game_dir: Path, compatibility_mod: str
 ) -> Path | None:
@@ -2310,11 +2335,7 @@ def run_packaged_row(
                     write_compatibility_client_config(
                         game_dir, compatibility_lane.mod.id
                     )
-                if row["loader"] == "neoforge":
-                    shutil.copy2(
-                        repo / "e2e" / "fml.toml.neoforge",
-                        game_dir / "config" / "fml.toml",
-                    )
+                write_loader_client_config(game_dir, row["loader"], repo / "e2e")
             if compatibility_lane is not None:
                 locked_by_name = {
                     item.filename: item for item in compatibility_lane.artifact.files
