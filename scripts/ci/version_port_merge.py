@@ -87,7 +87,7 @@ NAMESPACED_GAME_RULES = {
 }
 CPM_TRANSITION_POLICY_PATH = "scripts/release/tests/test_cpm_transition_policy.py"
 CPM_TRANSITION_POLICY_SHA256 = (
-    "1034aa5559394e2dbddd6a8f21ad04a367c194ee5dde8afece2f67dee27b501a"
+    "24201865fc492cb32844d5d9e73c4422a5bb03d13dc4f036e18024468f5b257c"
 )
 MIXIN_POLICY_PATH = "scripts/release/tests/test_mixin_policy.py"
 MIXIN_POLICY_SOURCE_FIXTURE_PATH = (
@@ -181,6 +181,19 @@ MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK = (
 NEOFORGE_PLAYER_RENDERER_PATH = (
     "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java"
 )
+NEOFORGE_LEGACY_PLAYER_RENDERER_PATHS = tuple(
+    "neoforge/src/legacy1_21_"
+    f"{patch}/java/com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java"
+    for patch in range(2, 6)
+)
+NEOFORGE_PLAYER_RENDERER_TARGET_PATHS = (
+    NEOFORGE_PLAYER_RENDERER_PATH,
+    *NEOFORGE_LEGACY_PLAYER_RENDERER_PATHS,
+)
+NEOFORGE_LEGACY_PLAYER_RENDERER_FIXTURE_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "neoforge-player-renderer-1.21.5-legacy-adapter.java.fixture"
+)
 NEOFORGE_PLAYER_RENDERER_INPUT_PATH = (
     "scripts/ci/version_port_migrations/"
     "neoforge-player-renderer-with-modern-collector.java.fixture"
@@ -193,7 +206,7 @@ NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256 = (
     "cf93f0042e3bc277ab077ff31d30f363d207a8be588931efcf1f8936c6eb724b"
 )
 NEOFORGE_PLAYER_RENDERER_RESULT_SHA256 = (
-    "5273c8bad6c77a5bcd0729fb04e5c3e2250c8490d4618507a04a84855b358ab7"
+    "8a654cc7cfea1b2bbb170509bd042e2630c59ea1464c62f6cc7c97b1855eb274"
 )
 NEOFORGE_PLAYER_RENDERER_1_21_9_INPUT_PATH = (
     "scripts/ci/version_port_migrations/"
@@ -207,7 +220,7 @@ NEOFORGE_PLAYER_RENDERER_1_21_9_BEFORE_SHA256 = (
     "a07ddda07a90b36a57d564e4e666e9077174b15b277d1d3ab942aba6c94e0b14"
 )
 NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_SHA256 = (
-    "1812986d8a18c9878eb1e573f70c70fcf222b5e4aff4c89e14b9f2624b12fadd"
+    "6f79cce52b54db149f6b88463ffdef27d4cb91902bc7084014a85a1d463210fe"
 )
 NEOFORGE_PLAYER_RENDERER_MIGRATION_FIXTURES = (
     (
@@ -232,6 +245,81 @@ CPM_TRANSITION_POLICY_MARKERS = (
     b'self.assertNotIn("quickskin$redirectSubmitModelPart", source)',
     b'self.assertNotIn("SubmitNodeCollector;submitModelPart", source)',
 )
+NEOFORGE_CPM_HAND_SCOPE_POLICY_MARKERS = (
+    b"def test_neoforge_immediate_hand_redirect_preserves_cpm_render_type",
+    b"self.assertIn(guard, neoforge_source)",
+)
+NEOFORGE_CPM_HAND_DEFER_LINE = (
+    b"        if (CPMCompatIntegration.shouldDeferToCPM()) "
+    b"return instance.getBuffer(renderType);\n"
+)
+NEOFORGE_CPM_HAND_ACTIVE_LINE = (
+    b"        if (CPMCompatIntegration.isCPMActivelyRendering()) "
+    b"return instance.getBuffer(renderType);\n"
+)
+NEOFORGE_CPM_HAND_PRESERVE_BLOCK = (
+    b"        if (CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()) {\n"
+    b"            return instance.getBuffer(renderType);\n"
+    b"        }\n"
+)
+NEOFORGE_CPM_HAND_ADAPTER_LEGACY_PREFIX = (
+    b"        if (CPMCompatIntegration.shouldDeferToCPM()\n"
+    b"                || CPMCompatIntegration.isCPMActivelyRendering()\n"
+)
+NEOFORGE_CPM_HAND_ADAPTER_PRESERVE_PREFIX = (
+    b"        if (CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()\n"
+)
+# Exact target-only NeoForge source variants currently present across the supported release
+# branches. The narrow rewrite below changes only their immediate-buffer CPM guard; modern
+# SubmitNodeCollector branches remain byte-for-byte untouched.
+NEOFORGE_CPM_HAND_SCOPE_MIGRATIONS = {
+    "a8aa912b9c4f35b275e04db6a52a4ca3b1899dae3aa4266a50dc9f3b294bcc81": (
+        "1cd53e93b83ebc01c563359c90365c21d6c31e3e48797d5fbec67122f5236f76",
+        2,
+    ),
+    "13b7f97c0211dd87f6e3a58e92dcf036cc448b436aaf3bdd2630317d9fd12e28": (
+        "a4b4213699f3f4a239f7c5b42292f3d6f510859fee91756b5eb0aa00de0690a7",
+        1,
+    ),
+    "1812986d8a18c9878eb1e573f70c70fcf222b5e4aff4c89e14b9f2624b12fadd": (
+        NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_SHA256,
+        1,
+    ),
+    "5273c8bad6c77a5bcd0729fb04e5c3e2250c8490d4618507a04a84855b358ab7": (
+        NEOFORGE_PLAYER_RENDERER_RESULT_SHA256,
+        1,
+    ),
+    NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256: (
+        "960a0e0d9a8b11593d66ece9993bb908b9903895386365b77322d7093737e4c6",
+        1,
+    ),
+    NEOFORGE_PLAYER_RENDERER_1_21_9_BEFORE_SHA256: (
+        "7d84d90d9dc24a463bf843d478d878256c5313e1f4d406d2d0ce3000e0fb2c75",
+        1,
+    ),
+}
+NEOFORGE_CPM_HAND_SCOPE_RESULTS = {
+    result_sha256: replacement_count
+    for result_sha256, replacement_count in NEOFORGE_CPM_HAND_SCOPE_MIGRATIONS.values()
+}
+NEOFORGE_CPM_HAND_ADAPTER_MIGRATIONS = {
+    NEOFORGE_LEGACY_PLAYER_RENDERER_PATHS[0]: (
+        "791457b94e8f05bdbe0c920517634c0a6b8a8e9ec92724d76bd8e6bd3f0a791e",
+        "6097dce15a79da374d358e457b7a9eb75206b294b100a415a9a03d9cdbac5462",
+    ),
+    NEOFORGE_LEGACY_PLAYER_RENDERER_PATHS[1]: (
+        "04bbb032ac9365e9dfcdfb2c4eaf4c2f37736893ff52bef6ae00af6fc8bf027f",
+        "0c004bd5e761a5a77a4a539ed07713174002dfd426ca6136c711a62180eecfb5",
+    ),
+    NEOFORGE_LEGACY_PLAYER_RENDERER_PATHS[2]: (
+        "16ae5f64c9e71351733bc46b8d7925d1ba1ef4833d2e4a1b55fe669e4064a536",
+        "749c8de6e99b1c1312ec9960d6e1ea96cbd8e20fe6354e1a174f8475a3f2fd89",
+    ),
+    NEOFORGE_LEGACY_PLAYER_RENDERER_PATHS[3]: (
+        "d7e355848c4b87a4086e35d0085795c91637581adee4bd6ea01ebdaa4d7bf6b5",
+        "19785378f03084cd9f391c02584d5efb8d168a7eeb4243b4a59a829f94ce2157",
+    ),
+}
 
 
 class VersionPortMergeError(ValueError):
@@ -1383,6 +1471,38 @@ def _runtime_uses_vanilla_translucent_hand_collector(
     )
 
 
+def _source_requests_neoforge_cpm_hand_scope(
+    repository: Path,
+    source: str,
+    oid_length: int,
+) -> bool:
+    """Return whether the source carries the complete audited NeoForge CPM hand policy."""
+
+    policy_entry = _tree_entry(
+        repository, source, CPM_TRANSITION_POLICY_PATH, oid_length
+    )
+    if policy_entry is None:
+        return False
+    policy_payload = _read_blob(
+        repository,
+        policy_entry.oid,
+        limit=MAX_PROTECTED_BLOB_BYTES,
+        label="source CPM transition policy",
+    )
+    policy_matches = tuple(
+        marker in policy_payload
+        for marker in NEOFORGE_CPM_HAND_SCOPE_POLICY_MARKERS
+    )
+    if not any(policy_matches):
+        return False
+    if not all(policy_matches):
+        raise VersionPortMergeError(
+            "source CPM transition policy has incomplete NeoForge hand-scope markers"
+        )
+    _validate_text_blob(policy_payload, "source CPM transition policy", markers=True)
+    return True
+
+
 def _neoforge_collector_migration_fixtures(
     repository: Path,
     source: str,
@@ -1486,6 +1606,151 @@ def _neoforge_collector_migration_fixtures(
                 "source NeoForge collector migrations repeat an audited input"
             )
         results[before_sha256] = (result_entry, result_path)
+    return results
+
+
+def _migrate_neoforge_cpm_hand_scope(
+    repository: Path,
+    oid_length: int,
+    temporary: Path,
+) -> list[dict[str, Any]]:
+    """Install the CPM-preserving guard in exact target-only NeoForge renderers."""
+
+    indexed = _entries_by_path(_snapshot_index(repository, oid_length).entries)
+    results: list[dict[str, Any]] = []
+    for path in NEOFORGE_PLAYER_RENDERER_TARGET_PATHS:
+        current_entries = indexed.get(path, ())
+        if not current_entries:
+            continue
+        if len(current_entries) != 1 or current_entries[0].stage != 0:
+            raise VersionPortMergeError(
+                f"NeoForge player renderer {path!r} is not resolved before CPM "
+                "hand-scope migration"
+            )
+        current_entry = current_entries[0]
+        current_payload = _read_blob(
+            repository,
+            current_entry.oid,
+            limit=MAX_PROTECTED_BLOB_BYTES,
+            label=f"merged NeoForge player renderer {path}",
+        )
+        _validate_text_blob(
+            current_payload, f"merged NeoForge player renderer {path}", markers=True
+        )
+        current_sha256 = hashlib.sha256(current_payload).hexdigest()
+
+        if path != NEOFORGE_PLAYER_RENDERER_PATH:
+            before_sha256, expected_sha256 = NEOFORGE_CPM_HAND_ADAPTER_MIGRATIONS[path]
+            if current_sha256 == expected_sha256:
+                if (
+                    current_payload.count(NEOFORGE_CPM_HAND_ADAPTER_PRESERVE_PREFIX)
+                    != 1
+                    or NEOFORGE_CPM_HAND_ADAPTER_LEGACY_PREFIX in current_payload
+                ):
+                    raise VersionPortMergeError(
+                        "audited NeoForge legacy adapter result has inconsistent markers"
+                    )
+                continue
+            if current_sha256 != before_sha256:
+                raise VersionPortMergeError(
+                    f"NeoForge legacy adapter {path!r} does not match an audited "
+                    "target source"
+                )
+            if (
+                current_payload.count(NEOFORGE_CPM_HAND_ADAPTER_LEGACY_PREFIX) != 1
+                or NEOFORGE_CPM_HAND_ADAPTER_PRESERVE_PREFIX in current_payload
+            ):
+                raise VersionPortMergeError(
+                    "audited NeoForge legacy adapter has inconsistent CPM guards"
+                )
+            migrated_payload = current_payload.replace(
+                NEOFORGE_CPM_HAND_ADAPTER_LEGACY_PREFIX,
+                NEOFORGE_CPM_HAND_ADAPTER_PRESERVE_PREFIX,
+            )
+            if (
+                hashlib.sha256(migrated_payload).hexdigest() != expected_sha256
+                or migrated_payload.count(NEOFORGE_CPM_HAND_ADAPTER_PRESERVE_PREFIX)
+                != 1
+                or NEOFORGE_CPM_HAND_ADAPTER_LEGACY_PREFIX in migrated_payload
+            ):
+                raise VersionPortMergeError(
+                    "NeoForge legacy adapter migration did not produce its audited result"
+                )
+        else:
+            settled_count = NEOFORGE_CPM_HAND_SCOPE_RESULTS.get(current_sha256)
+            if settled_count is not None:
+                if (
+                    current_payload.count(NEOFORGE_CPM_HAND_PRESERVE_BLOCK)
+                    != settled_count
+                    or NEOFORGE_CPM_HAND_DEFER_LINE in current_payload
+                    or NEOFORGE_CPM_HAND_ACTIVE_LINE in current_payload
+                ):
+                    raise VersionPortMergeError(
+                        "audited NeoForge CPM hand-scope result has inconsistent markers"
+                    )
+                continue
+
+            migration = NEOFORGE_CPM_HAND_SCOPE_MIGRATIONS.get(current_sha256)
+            if migration is None:
+                if (
+                    NEOFORGE_CPM_HAND_DEFER_LINE in current_payload
+                    or NEOFORGE_CPM_HAND_ACTIVE_LINE in current_payload
+                ):
+                    raise VersionPortMergeError(
+                        "NeoForge CPM hand scope does not match an audited target source"
+                    )
+                continue
+
+            expected_sha256, replacement_count = migration
+            if (
+                current_payload.count(NEOFORGE_CPM_HAND_DEFER_LINE)
+                != replacement_count
+                or current_payload.count(NEOFORGE_CPM_HAND_ACTIVE_LINE)
+                != replacement_count
+                or NEOFORGE_CPM_HAND_PRESERVE_BLOCK in current_payload
+            ):
+                raise VersionPortMergeError(
+                    "audited NeoForge CPM hand source has inconsistent legacy guards"
+                )
+            migrated_payload = current_payload.replace(
+                NEOFORGE_CPM_HAND_DEFER_LINE + b"\n", b""
+            )
+            migrated_payload = migrated_payload.replace(
+                NEOFORGE_CPM_HAND_DEFER_LINE, b""
+            )
+            migrated_payload = migrated_payload.replace(
+                NEOFORGE_CPM_HAND_ACTIVE_LINE,
+                NEOFORGE_CPM_HAND_PRESERVE_BLOCK,
+            )
+            if (
+                hashlib.sha256(migrated_payload).hexdigest() != expected_sha256
+                or migrated_payload.count(NEOFORGE_CPM_HAND_PRESERVE_BLOCK)
+                != replacement_count
+                or NEOFORGE_CPM_HAND_DEFER_LINE in migrated_payload
+                or NEOFORGE_CPM_HAND_ACTIVE_LINE in migrated_payload
+            ):
+                raise VersionPortMergeError(
+                    "NeoForge CPM hand-scope migration did not produce its audited result"
+                )
+
+        result_entry = _index_entry_from_payload(
+            repository,
+            path,
+            current_entry.mode,
+            migrated_payload,
+            temporary,
+            f"migrated NeoForge CPM hand renderer {path}",
+            oid_length,
+        )
+        _install_index_entry(repository, result_entry)
+        results.append(
+            {
+                "path": path,
+                "policy": "migrate-neoforge-cpm-hand-scope",
+                "target": current_entry.object_payload(),
+                "result": result_entry.object_payload(),
+            }
+        )
     return results
 
 
@@ -2048,22 +2313,31 @@ def reproduce_merge(
                     )
                 )
 
-            if (
-                "neoforge" in active_loaders
-                and _runtime_uses_vanilla_translucent_hand_collector(
+            if "neoforge" in active_loaders:
+                if _runtime_uses_vanilla_translucent_hand_collector(
                     target_profile.runtime_version
-                )
-            ):
-                result_fixtures = _neoforge_collector_migration_fixtures(
+                ):
+                    result_fixtures = _neoforge_collector_migration_fixtures(
+                        repository, source, oid_length
+                    )
+                    if result_fixtures is not None:
+                        protected_resolutions.extend(
+                            _migrate_neoforge_modern_hand_collector(
+                                repository,
+                                work_head,
+                                result_fixtures,
+                                oid_length,
+                            )
+                        )
+
+                if _source_requests_neoforge_cpm_hand_scope(
                     repository, source, oid_length
-                )
-                if result_fixtures is not None:
+                ):
                     protected_resolutions.extend(
-                        _migrate_neoforge_modern_hand_collector(
+                        _migrate_neoforge_cpm_hand_scope(
                             repository,
-                            work_head,
-                            result_fixtures,
                             oid_length,
+                            temporary,
                         )
                     )
 
