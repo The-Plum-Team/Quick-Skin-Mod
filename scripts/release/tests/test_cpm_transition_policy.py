@@ -6,9 +6,26 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
+MATRIX = json.loads(
+    (ROOT / "release" / "release-matrix.json").read_text(encoding="utf-8")
+)
 MIXIN_ROOT = (
     ROOT / "common" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "mixin"
 )
+
+
+def uses_vanilla_translucent_hand_collector() -> bool:
+    runtime_versions = {
+        runtime["runtime_version"] for runtime in MATRIX["runtimes"]
+    }
+    if len(runtime_versions) != 1:
+        raise AssertionError("release runtimes must share one Minecraft version")
+    components = tuple(int(value) for value in runtime_versions.pop().split("."))
+    return components[0] >= 26 or (
+        len(components) == 3 and components[:2] == (1, 21) and components[2] >= 9
+    )
+
+
 CPM_INTEGRATION = (
     ROOT
     / "common"
@@ -93,6 +110,68 @@ class CpmTransitionPolicyTest(unittest.TestCase):
             with self.subTest(source=name):
                 source = (MIXIN_ROOT / name).read_text(encoding="utf-8")
                 self.assertIn("CPMCompatIntegration.shouldDeferToCPM()", source)
+
+    def test_immediate_hand_redirect_matches_vanilla_multiplicity(self) -> None:
+        source = (MIXIN_ROOT / "ItemInHandRendererMixin.java").read_text(
+            encoding="utf-8"
+        )
+        redirect = source.index("@Redirect(", source.index("public class"))
+        handler = source.index("quickskin$redirectRenderHandBuffer", redirect)
+        annotation = source[redirect:handler]
+
+        self.assertIn(
+            "//? if <1.21.9 {\n@Mixin(value = PlayerRenderer.class", source
+        )
+        self.assertIn("//?} else {\n@Mixin(value = AvatarRenderer.class", source)
+        self.assertLess(
+            source.index("//? if <1.21.9 {", source.index("public class")),
+            redirect,
+        )
+        legacy_guard = annotation.index("//? if <1.21.2 {")
+        legacy_expect = annotation.index("expect = 2", legacy_guard)
+        modern_branch = annotation.index("//?} else {", legacy_expect)
+        modern_expect = annotation.index("expect = 1", modern_branch)
+        mandatory = annotation.index("require = 1", modern_expect)
+
+        self.assertLess(legacy_guard, legacy_expect)
+        self.assertLess(legacy_expect, modern_branch)
+        self.assertLess(modern_branch, modern_expect)
+        self.assertLess(modern_expect, mandatory)
+        self.assertIn("allow = 2", annotation[legacy_expect:modern_branch])
+        self.assertIn("allow = 1", annotation[modern_expect:mandatory])
+        self.assertNotIn("require = 0", annotation)
+
+    def test_modern_first_person_collectors_remain_owned_by_model_mods(self) -> None:
+        paths = [MIXIN_ROOT / "ItemInHandRendererMixin.java"]
+        neoforge_renderer = (
+            ROOT
+            / "neoforge"
+            / "src"
+            / "main"
+            / "java"
+            / "com"
+            / "quickskin"
+            / "mod"
+            / "neoforge"
+            / "mixin"
+            / "PlayerRendererMixin.java"
+        )
+        if neoforge_renderer.is_file():
+            paths.append(neoforge_renderer)
+
+        for path in paths:
+            with self.subTest(source=path.relative_to(ROOT).as_posix()):
+                source = path.read_text(encoding="utf-8")
+                self.assertIn("quickskin$redirectRenderHandBuffer", source)
+                if not uses_vanilla_translucent_hand_collector() and MATRIX[
+                    "runtimes"
+                ][0]["runtime_version"] != "1.20.1":
+                    continue
+                legacy_guard = source.index("//? if <", source.index("public class"))
+                redirect = source.index("@Redirect(", legacy_guard)
+                self.assertLess(legacy_guard, redirect)
+                self.assertNotIn("quickskin$redirectSubmitModelPart", source)
+                self.assertNotIn("SubmitNodeCollector;submitModelPart", source)
 
     def test_cpm_mixins_are_registered_in_the_optional_config(self) -> None:
         config_path = (
