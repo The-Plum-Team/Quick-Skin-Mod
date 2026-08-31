@@ -40,7 +40,6 @@ def policy_id(path: Path) -> str:
 
 CRITICAL_MIXINS = {
     "main:com/quickskin/mod/mixin/CapeLayerMixin.java",
-    "overlay:com/quickskin/mod/mixin/CapeLayerMixin.java",
     "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
     "main:com/quickskin/mod/mixin/MixinAbstractClientPlayer.java",
     "main:com/quickskin/mod/mixin/PlayerInfoMixin.java",
@@ -93,8 +92,7 @@ ALTERNATIVE_HOOKS = {
 
 # Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and
 # sleeve); 1.21.2 through 1.21.10 make one immediate arm draw. The modern collector is deliberately
-# not intercepted. SkinManager 1.20.1, 1.21.1, and 1.21.5 each have two
-# RETURN opcodes in getInsecureSkin; the modern render-state branches retain a single RETURN.
+# not intercepted. SkinManager 1.20.1 has two RETURN opcodes in its one target method.
 INJECTION_COUNT_OVERRIDES = {
     (
         "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
@@ -103,25 +101,6 @@ INJECTION_COUNT_OVERRIDES = {
     (
         "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
         "quickskin$overrideSkinInfo",
-    ): {2},
-    (
-        "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
-        "quickskin$modifyInsecureSkinLegacy",
-    ): {2},
-}
-
-ACTIVE_LOADER_INJECTION_COUNT_OVERRIDES = {
-    (
-        "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java",
-        "quickskin$redirectRenderHandBuffer",
-    ): {1, 2},
-    (
-        "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/SkinManagerMixin.java",
-        "quickskin$modifyInsecureSkinLegacy",
-    ): {2},
-    (
-        "neoforge/src/legacy1_21_5/java/com/quickskin/mod/neoforge/mixin/SkinManagerMixin.java",
-        "quickskin$modifyInsecureSkin",
     ): {2},
 }
 
@@ -290,62 +269,6 @@ class MixinPolicyTest(unittest.TestCase):
     def test_packaged_clients_enable_expect_counting(self) -> None:
         runtime = (ROOT / "e2e" / "packaged_runtime.py").read_text(encoding="utf-8")
         self.assertIn('"-Dmixin.debug.countInjections=true"', runtime)
-
-    def test_active_loader_mixins_have_explicit_failure_and_count_policies(self) -> None:
-        for artifact in MATRIX["artifacts"]:
-            loader = artifact["loader"]
-            version = artifact["artifact_version"]
-            overlay_name = MATRIX["source_overlays"].get(loader, {}).get(version)
-            canonical_root = ROOT / loader / "src" / "main"
-            overlay_root = ROOT / loader / "src" / overlay_name if overlay_name else None
-            config_name = f"quickskin-{loader}.mixins.json"
-            config_path = (
-                overlay_root / "resources" / config_name
-                if overlay_root is not None
-                and (overlay_root / "resources" / config_name).is_file()
-                else canonical_root / "resources" / config_name
-            )
-            if not config_path.is_file():
-                continue
-
-            config = json.loads(config_path.read_text(encoding="utf-8"))
-            with self.subTest(config=relative(config_path)):
-                self.assertIs(config["required"], True)
-                self.assertEqual(config["injectors"]["defaultRequire"], 1)
-
-            package_path = Path(*config["package"].split("."))
-            configured = tuple(config.get("client", ())) + tuple(config.get("mixins", ()))
-            for class_name in configured:
-                relative_source = package_path / Path(*class_name.split(".")).with_suffix(".java")
-                candidates = []
-                if overlay_root is not None:
-                    candidates.append(overlay_root / "java" / relative_source)
-                candidates.append(canonical_root / "java" / relative_source)
-                source_path = next((path for path in candidates if path.is_file()), None)
-                self.assertIsNotNone(
-                    source_path,
-                    f"{relative(config_path)} configures missing mixin {class_name}",
-                )
-                assert source_path is not None
-                text = source_path.read_text(encoding="utf-8")
-                annotations = list(INJECTOR_MARKER.finditer(text))
-                self.assertTrue(annotations, relative(source_path))
-                for annotation in annotations:
-                    handler = HANDLER_MARKER.search(text, annotation.end())
-                    self.assertIsNotNone(handler, f"{relative(source_path)}: injector has no handler")
-                    assert handler is not None
-                    handler_name = handler.group(1)
-                    context = text[annotation.start() : handler.start()]
-                    expected_require = (
-                        0 if handler_name == "quickskin$suppressPreviewEquipment" else 1
-                    )
-                    expected_counts = ACTIVE_LOADER_INJECTION_COUNT_OVERRIDES.get(
-                        (relative(source_path), handler_name), {1}
-                    )
-                    with self.subTest(source=relative(source_path), handler=handler_name):
-                        self.assertEqual(assignment_values(context, "require"), {expected_require})
-                        self.assertEqual(assignment_values(context, "expect"), expected_counts)
-                        self.assertEqual(assignment_values(context, "allow"), expected_counts)
 
 
 if __name__ == "__main__":

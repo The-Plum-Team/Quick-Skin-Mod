@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -169,6 +170,36 @@ class VersionPortMergeTest(unittest.TestCase):
             message,
         )
 
+    @staticmethod
+    def legacy_mixin_hand_policy() -> str:
+        payload = (
+            ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
+        ).read_text(encoding="utf-8")
+        cape = version_port_merge.MIXIN_CAPE_POLICY_LINE.decode("utf-8")
+        hand = version_port_merge.MIXIN_HAND_POLICY_LINE.decode("utf-8")
+        payload = payload.replace(cape + hand, cape, 1)
+        payload = payload.replace(
+            "DEGRADABLE_MIXINS = {\n",
+            "DEGRADABLE_MIXINS = {\n" + hand,
+            1,
+        )
+        payload = payload.replace(
+            version_port_merge.MIXIN_CANONICAL_HAND_COMMENT.decode("utf-8"),
+            version_port_merge.MIXIN_LEGACY_HAND_COMMENT.decode("utf-8"),
+            1,
+        )
+        subtest = (
+            "                with self.subTest("
+            "source=source_name, handler=handler_name):\n"
+        )
+        payload = payload.replace(
+            subtest,
+            version_port_merge.MIXIN_LEGACY_OPTIONAL_HAND_BLOCK.decode("utf-8")
+            + subtest,
+            1,
+        )
+        return payload
+
     def assert_clean_at(self, expected_head: str) -> None:
         self.assertEqual(self.sha("HEAD"), expected_head)
         self.assertEqual(
@@ -245,6 +276,73 @@ class VersionPortMergeTest(unittest.TestCase):
         self.commit(f"add NeoForge renderer for {runtime_version}")
         target = self.sha("HEAD")
         return source, target, input_payload, result_payload
+
+    def prepare_common_hand_renderer_branches(
+        self,
+        *,
+        drift_source: bool = False,
+        drift_mixin_policy: bool = False,
+    ) -> tuple[str, str, str]:
+        canonical_payload = (
+            ROOT / version_port_merge.COMMON_HAND_RENDERER_PATH
+        ).read_text(encoding="utf-8")
+        canonical_mixin_policy = (
+            ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
+        ).read_text(encoding="utf-8")
+        legacy_mixin_policy = self.legacy_mixin_hand_policy()
+        source_payload = canonical_payload
+        if drift_source:
+            source_payload += "// unaudited drift\n"
+        if drift_mixin_policy:
+            canonical_mixin_policy += "# unaudited drift\n"
+
+        self.git("switch", "--create", "hand-base", self.base)
+        self.write(
+            version_port_merge.COMMON_HAND_RENDERER_PATH,
+            "class ItemInHandRendererMixin {\n"
+            "    // Shared legacy implementation.\n"
+            "}\n",
+        )
+        self.write(version_port_merge.MIXIN_POLICY_PATH, legacy_mixin_policy)
+        self.git("add", "--all")
+        self.commit("add shared hand renderer")
+        hand_base = self.sha("HEAD")
+
+        self.git("switch", "--create", "hand-source", hand_base)
+        self.write(
+            version_port_merge.CPM_TRANSITION_POLICY_PATH,
+            (
+                ROOT / version_port_merge.CPM_TRANSITION_POLICY_PATH
+            ).read_text(encoding="utf-8"),
+        )
+        self.write(version_port_merge.COMMON_HAND_RENDERER_PATH, source_payload)
+        self.write(version_port_merge.MIXIN_POLICY_PATH, canonical_mixin_policy)
+        self.git("add", "--all")
+        self.commit("make hand multiplicity canonical")
+        source = self.sha("HEAD")
+
+        self.git("switch", "--create", "hand-target", hand_base)
+        self.write(
+            "release/release-matrix.json",
+            self.matrix("hand target", runtime_version="1.21.8"),
+        )
+        self.write(
+            version_port_merge.COMMON_HAND_RENDERER_PATH,
+            "class ItemInHandRendererMixin {\n"
+            "    // Target retained require=0 and expect=2.\n"
+            "}\n",
+        )
+        target_mixin_policy = legacy_mixin_policy.replace(
+            version_port_merge.MIXIN_CAPE_POLICY_LINE.decode("utf-8"),
+            version_port_merge.MIXIN_CAPE_POLICY_LINE.decode("utf-8")
+            + '    "neoforge:target-only-loader-policy.java",\n',
+            1,
+        )
+        self.write(version_port_merge.MIXIN_POLICY_PATH, target_mixin_policy)
+        self.git("add", "--all")
+        self.commit("diverge hand renderer")
+        target = self.sha("HEAD")
+        return source, target, canonical_payload
 
     def unmerged_paths(self) -> tuple[str, ...]:
         output = self.git("diff", "--name-only", "-z", "--diff-filter=U")
@@ -390,6 +488,133 @@ class VersionPortMergeTest(unittest.TestCase):
         self.assertEqual(evidence["protected_resolutions"], [])
         self.assertFalse((self.repository / "clean-source.txt").exists())
         self.assert_clean_target()
+
+    def test_common_hand_renderer_uses_the_audited_source_across_versions(
+        self,
+    ) -> None:
+        source, target, canonical_payload = (
+            self.prepare_common_hand_renderer_branches()
+        )
+
+        evidence = version_port_merge.reproduce_merge(
+            self.repository,
+            target,
+            source,
+            mode="prepare",
+        )
+
+        self.assertEqual(evidence["ai_conflicts"], [])
+        self.assertIn(
+            version_port_merge.COMMON_HAND_RENDERER_PATH,
+            evidence["conflicts"],
+        )
+        self.assertIn(
+            version_port_merge.MIXIN_POLICY_PATH,
+            evidence["conflicts"],
+        )
+        migrated = [
+            item
+            for item in evidence["protected_resolutions"]
+            if item["policy"] == "install-canonical-common-hand-renderer"
+        ]
+        self.assertEqual(len(migrated), 1)
+        self.assertEqual(
+            migrated[0]["path"], version_port_merge.COMMON_HAND_RENDERER_PATH
+        )
+        self.assertEqual(
+            (
+                self.repository / version_port_merge.COMMON_HAND_RENDERER_PATH
+            ).read_text(encoding="utf-8"),
+            canonical_payload,
+        )
+        mixin_policy = (
+            self.repository / version_port_merge.MIXIN_POLICY_PATH
+        ).read_text(encoding="utf-8")
+        self.assertIn("neoforge:target-only-loader-policy.java", mixin_policy)
+        critical_start, critical_end = version_port_merge._policy_set_span(
+            mixin_policy.encode("utf-8"), "CRITICAL_MIXINS"
+        )
+        degradable_start, degradable_end = version_port_merge._policy_set_span(
+            mixin_policy.encode("utf-8"), "DEGRADABLE_MIXINS"
+        )
+        encoded_policy = mixin_policy.encode("utf-8")
+        self.assertIn(
+            version_port_merge.MIXIN_HAND_POLICY_LINE,
+            encoded_policy[critical_start:critical_end],
+        )
+        self.assertNotIn(
+            version_port_merge.MIXIN_HAND_POLICY_LINE,
+            encoded_policy[degradable_start:degradable_end],
+        )
+        self.assertNotIn("expected_counts = expected_counts - {1}", mixin_policy)
+        self.assertIn(
+            "migrate-mandatory-common-hand-policy",
+            [item["policy"] for item in evidence["protected_resolutions"]],
+        )
+        self.git("merge", "--abort")
+        self.assert_clean_at(target)
+
+    def test_unaudited_common_hand_renderer_fails_closed(self) -> None:
+        source, target, _ = self.prepare_common_hand_renderer_branches(
+            drift_source=True
+        )
+
+        with self.assertRaisesRegex(
+            version_port_merge.VersionPortMergeError,
+            "not the audited multiplicity implementation",
+        ):
+            version_port_merge.reproduce_merge(
+                self.repository,
+                target,
+                source,
+                mode="prepare",
+            )
+        self.assert_clean_at(target)
+
+    def test_unaudited_mixin_hand_policy_fails_closed(self) -> None:
+        source, target, _ = self.prepare_common_hand_renderer_branches(
+            drift_mixin_policy=True
+        )
+
+        with self.assertRaisesRegex(
+            version_port_merge.VersionPortMergeError,
+            "not the audited mandatory-hand policy",
+        ):
+            version_port_merge.reproduce_merge(
+                self.repository,
+                target,
+                source,
+                mode="prepare",
+            )
+        self.assert_clean_at(target)
+
+    def test_historical_hand_comments_normalize_to_the_audited_threshold(self) -> None:
+        canonical = (ROOT / version_port_merge.MIXIN_POLICY_PATH).read_bytes()
+        for historical in version_port_merge.MIXIN_HISTORICAL_HAND_COMMENTS:
+            with self.subTest(comment=historical):
+                legacy = canonical.replace(
+                    version_port_merge.MIXIN_CANONICAL_HAND_COMMENT,
+                    historical,
+                    1,
+                )
+                self.assertEqual(
+                    version_port_merge._migrate_mixin_hand_policy_payload(legacy),
+                    canonical,
+                )
+
+    def test_mixin_policy_source_fixture_is_the_authenticated_policy(self) -> None:
+        fixture = (
+            ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
+        ).read_bytes()
+
+        self.assertEqual(
+            hashlib.sha256(fixture).hexdigest(),
+            version_port_merge.MIXIN_POLICY_SHA256,
+        )
+        self.assertEqual(
+            version_port_merge._migrate_mixin_hand_policy_payload(fixture),
+            fixture,
+        )
 
     def test_modern_neoforge_collector_is_replaced_by_audited_fixture(self) -> None:
         source, target, _, result_payload = (
