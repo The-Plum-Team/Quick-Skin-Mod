@@ -536,6 +536,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("source scripts/ci/github_api_retry.sh", release_compatibility)
         self.assertIn("github_api_retry --method POST", release_compatibility)
         self.assertIn('GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"', release_compatibility)
+        self.assertIn("for attempt in {1..180}", release_compatibility)
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
         self.assertIn('endswith(" - contract scenarios")', authenticate)
