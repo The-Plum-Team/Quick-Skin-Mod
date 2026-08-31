@@ -87,7 +87,7 @@ NAMESPACED_GAME_RULES = {
 }
 CPM_TRANSITION_POLICY_PATH = "scripts/release/tests/test_cpm_transition_policy.py"
 CPM_TRANSITION_POLICY_SHA256 = (
-    "4a403ea808a5e9a21fd61a948e9e0ec076212c6094b211298a337a82bfbdcf67"
+    "1034aa5559394e2dbddd6a8f21ad04a367c194ee5dde8afece2f67dee27b501a"
 )
 MIXIN_POLICY_PATH = "scripts/release/tests/test_mixin_policy.py"
 MIXIN_POLICY_SOURCE_FIXTURE_PATH = (
@@ -101,7 +101,7 @@ COMMON_HAND_RENDERER_PATH = (
     "common/src/main/java/com/quickskin/mod/mixin/ItemInHandRendererMixin.java"
 )
 COMMON_HAND_RENDERER_SHA256 = (
-    "42056697d34cade1f6b05c712fcc656da0b8f21a72d707acb811caa415e20941"
+    "55fffbeb1f1b948cbe826f87610c18eaddab784dfea1bbc3b276f9c6fd638e33"
 )
 COMMON_HAND_MULTIPLICITY_POLICY_MARKERS = (
     b"def test_immediate_hand_redirect_matches_vanilla_multiplicity",
