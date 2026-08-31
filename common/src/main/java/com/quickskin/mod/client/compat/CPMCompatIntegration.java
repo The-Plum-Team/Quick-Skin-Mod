@@ -2,6 +2,7 @@ package com.quickskin.mod.client.compat;
 
 import com.quickskin.mod.QuickSkin;
 import com.quickskin.mod.client.services.LocalAssetManager;
+import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.platform.PlatformHelper;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -33,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 //?}
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Optional compatibility bridge for Customizable Player Models (CPM).
@@ -46,6 +48,7 @@ public final class CPMCompatIntegration {
     private static final Logger CPMLOG = LoggerFactory.getLogger("QuickSkin-CPM");
     private static final String CPM_CLIENT_RESOURCE = "com/tom/cpm/client/CustomPlayerModelsClient.class";
     private static final long STALE_RENDER_DEPTH_NANOS = 2_000_000_000L;
+    private static final long FIRST_PERSON_MODEL_PROBE_TTL_NANOS = 500_000_000L;
     private static final int MAX_MODEL_TEXT_BYTES = 1_048_576;
     private static final int MAX_MODEL_ICON_BYTES = 16_777_216;
     /** CPM reads and lazily creates these roots from its parallel model-loading pool. */
@@ -63,6 +66,8 @@ public final class CPMCompatIntegration {
     private static volatile long nextRuntimeReflectionRetryNanos;
     private static volatile long nextConfigReflectionRetryNanos;
     private static volatile boolean backgroundConfigPrepared;
+    private static volatile boolean cachedFirstPersonModelActive;
+    private static volatile long nextFirstPersonModelProbeNanos;
 
     // Independently optional, cached reflection handles.
     private static Object loaderInstance;
@@ -98,6 +103,7 @@ public final class CPMCompatIntegration {
     private static final AtomicBoolean skinModeResetQueued = new AtomicBoolean();
     private static final AtomicBoolean skinModeResetApplied = new AtomicBoolean();
     private static final AtomicInteger skinModeResetFrameBoundaries = new AtomicInteger();
+    private static final AtomicLong firstPersonRenderTypePreservations = new AtomicLong();
     private static final AtomicBoolean staleSubmissionDroppedLogged = new AtomicBoolean();
     private static final AtomicBoolean deferredResetLogged = new AtomicBoolean();
     private static volatile boolean localModelProbeDisabled;
@@ -450,6 +456,46 @@ public final class CPMCompatIntegration {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Returns whether CPM owns the first-person hand texture for this frame.
+     *
+     * <p>The render-depth hook is the cheapest signal, but older CPM builds route their stable
+     * outer hand bridge through an overloaded inner method. Keep an explicit Quick Skin selection
+     * and a bounded CPM definition-cache probe as fail-closed fallbacks so our transparency mixin
+     * never replaces CPM's model texture with the ordinary player-skin texture.</p>
+     */
+    public static boolean shouldPreserveFirstPersonHandRenderType() {
+        if (!isAvailable()) {
+            return false;
+        }
+
+        boolean preserve = shouldDeferToCPM() || isCPMActivelyRendering();
+        ClientConfig config = ClientConfig.getInstance();
+        if (!preserve && config.activeCpmModelHash != null
+                && !config.activeCpmModelHash.isEmpty()) {
+            preserve = true;
+        }
+
+        if (!preserve) {
+            long now = System.nanoTime();
+            if (now >= nextFirstPersonModelProbeNanos) {
+                cachedFirstPersonModelActive = isLocalPlayerWearingCpmModel();
+                nextFirstPersonModelProbeNanos = now + FIRST_PERSON_MODEL_PROBE_TTL_NANOS;
+            }
+            preserve = cachedFirstPersonModelActive;
+        }
+
+        if (preserve) {
+            firstPersonRenderTypePreservations.incrementAndGet();
+        }
+        return preserve;
+    }
+
+    /** Monotonic E2E-visible proof that the actual hand-buffer redirect deferred to CPM. */
+    public static long firstPersonRenderTypePreservationCount() {
+        return firstPersonRenderTypePreservations.get();
     }
 
     /** Invalidates CPM's definition cache so it recreates player/model state. */
