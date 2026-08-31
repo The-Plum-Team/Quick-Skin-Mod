@@ -87,7 +87,7 @@ NAMESPACED_GAME_RULES = {
 }
 CPM_TRANSITION_POLICY_PATH = "scripts/release/tests/test_cpm_transition_policy.py"
 CPM_TRANSITION_POLICY_SHA256 = (
-    "6cebd1a4dad2b1be2e98ecf2a73487c0786fa4e77d14311e15ad21e7871a9ce2"
+    "4a403ea808a5e9a21fd61a948e9e0ec076212c6094b211298a337a82bfbdcf67"
 )
 MIXIN_POLICY_PATH = "scripts/release/tests/test_mixin_policy.py"
 MIXIN_POLICY_SOURCE_FIXTURE_PATH = (
@@ -95,13 +95,13 @@ MIXIN_POLICY_SOURCE_FIXTURE_PATH = (
     "mixin-policy-with-mandatory-hand.py.fixture"
 )
 MIXIN_POLICY_SHA256 = (
-    "ab2283c17662caeb8772ead0c180889a92a379cc376325a95150b34450c09d33"
+    "392c43cf5100d1546b3f0be776d687e5e9b001e3830e984097670be3bf38922b"
 )
 COMMON_HAND_RENDERER_PATH = (
     "common/src/main/java/com/quickskin/mod/mixin/ItemInHandRendererMixin.java"
 )
 COMMON_HAND_RENDERER_SHA256 = (
-    "b8ac3fc281be249207003971291277fc92d467a45be8be4f86dac8bb7fee641c"
+    "42056697d34cade1f6b05c712fcc656da0b8f21a72d707acb811caa415e20941"
 )
 COMMON_HAND_MULTIPLICITY_POLICY_MARKERS = (
     b"def test_immediate_hand_redirect_matches_vanilla_multiplicity",
@@ -133,19 +133,35 @@ MIXIN_1_21_4_HAND_COMMENT = (
     b"# renderHand requests two buffers through 1.21.3, one buffer from 1.21.4 through 1.21.10, and the\n"
     b"# later renderer submits one model part."
 )
-MIXIN_HISTORICAL_HAND_COMMENTS = (
-    MIXIN_LEGACY_HAND_COMMENT,
-    MIXIN_1_21_2_HAND_COMMENT,
-    MIXIN_1_21_4_HAND_COMMENT,
-)
-MIXIN_CANONICAL_HAND_COMMENT = (
+MIXIN_1_21_11_HAND_COMMENT = (
     b"# Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and\n"
     b"# sleeve); 1.21.2 through 1.21.10 make one immediate arm draw. The modern collector is deliberately\n"
     b"# not intercepted."
 )
+MIXIN_HISTORICAL_HAND_COMMENTS = (
+    MIXIN_LEGACY_HAND_COMMENT,
+    MIXIN_1_21_2_HAND_COMMENT,
+    MIXIN_1_21_4_HAND_COMMENT,
+    MIXIN_1_21_11_HAND_COMMENT,
+)
+MIXIN_CANONICAL_HAND_COMMENT = (
+    b"# Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and\n"
+    b"# sleeve); 1.21.2 through 1.21.8 make one immediate arm draw. The collector used from 1.21.9 onward\n"
+    b"# is deliberately not intercepted."
+)
 MIXIN_LEGACY_OPTIONAL_HAND_BLOCK = (
     b"                if (\n"
     b'                    handler_name == "quickskin$redirectRenderHandBuffer"\n'
+    b'                    and "quickskin$redirectSubmitModelPart" not in text\n'
+    b"                ):\n"
+    b"                    expected_counts = expected_counts - {1}\n"
+    b"\n"
+)
+MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK = (
+    b"                if (\n"
+    b'                    source_name == "neoforge:com/quickskin/mod/neoforge/'
+    b'mixin/PlayerRendererMixin.java"\n'
+    b'                    and handler_name == "quickskin$redirectRenderHandBuffer"\n'
     b'                    and "quickskin$redirectSubmitModelPart" not in text\n'
     b"                ):\n"
     b"                    expected_counts = expected_counts - {1}\n"
@@ -167,6 +183,34 @@ NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256 = (
 )
 NEOFORGE_PLAYER_RENDERER_RESULT_SHA256 = (
     "5273c8bad6c77a5bcd0729fb04e5c3e2250c8490d4618507a04a84855b358ab7"
+)
+NEOFORGE_PLAYER_RENDERER_1_21_9_INPUT_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "neoforge-player-renderer-1.21.9-with-modern-collector.java.fixture"
+)
+NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "neoforge-player-renderer-1.21.9-without-modern-collector.java.fixture"
+)
+NEOFORGE_PLAYER_RENDERER_1_21_9_BEFORE_SHA256 = (
+    "a07ddda07a90b36a57d564e4e666e9077174b15b277d1d3ab942aba6c94e0b14"
+)
+NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_SHA256 = (
+    "1812986d8a18c9878eb1e573f70c70fcf222b5e4aff4c89e14b9f2624b12fadd"
+)
+NEOFORGE_PLAYER_RENDERER_MIGRATION_FIXTURES = (
+    (
+        NEOFORGE_PLAYER_RENDERER_1_21_9_INPUT_PATH,
+        NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_PATH,
+        NEOFORGE_PLAYER_RENDERER_1_21_9_BEFORE_SHA256,
+        NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_SHA256,
+    ),
+    (
+        NEOFORGE_PLAYER_RENDERER_INPUT_PATH,
+        NEOFORGE_PLAYER_RENDERER_RESULT_PATH,
+        NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256,
+        NEOFORGE_PLAYER_RENDERER_RESULT_SHA256,
+    ),
 )
 MODERN_HAND_COLLECTOR_MARKERS = (
     b"quickskin$redirectSubmitModelPart",
@@ -648,12 +692,21 @@ def _migrate_mixin_hand_policy_payload(payload: bytes) -> bytes:
         )
 
     optional_blocks = payload.count(MIXIN_LEGACY_OPTIONAL_HAND_BLOCK)
-    if optional_blocks > 1:
+    scoped_blocks = payload.count(MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK)
+    if (
+        optional_blocks > 1
+        or scoped_blocks > 1
+        or (optional_blocks and scoped_blocks)
+    ):
         raise VersionPortMergeError(
             "target mixin policy repeats the obsolete optional-hand rule"
         )
     if optional_blocks == 1:
-        payload = payload.replace(MIXIN_LEGACY_OPTIONAL_HAND_BLOCK, b"", 1)
+        payload = payload.replace(
+            MIXIN_LEGACY_OPTIONAL_HAND_BLOCK,
+            MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK,
+            1,
+        )
 
     if payload.count(MIXIN_HAND_OVERRIDE_MARKER) != 1:
         raise VersionPortMergeError(
@@ -666,7 +719,9 @@ def _migrate_mixin_hand_policy_payload(payload: bytes) -> bytes:
     if (
         MIXIN_HAND_POLICY_LINE not in payload[critical_start:critical_end]
         or MIXIN_HAND_POLICY_LINE in payload[degradable_start:degradable_end]
-        or b"expected_counts = expected_counts - {1}" in payload
+        or MIXIN_LEGACY_OPTIONAL_HAND_BLOCK in payload
+        or payload.count(b"expected_counts = expected_counts - {1}")
+        != payload.count(MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK)
     ):
         raise VersionPortMergeError(
             "target mixin policy did not reach the mandatory hand policy"
@@ -1297,16 +1352,16 @@ def _runtime_uses_vanilla_translucent_hand_collector(
     return components[0] >= 26 or (
         len(components) == 3
         and components[:2] == (1, 21)
-        and components[2] >= 11
+        and components[2] >= 9
     )
 
 
-def _neoforge_collector_migration_fixture(
+def _neoforge_collector_migration_fixtures(
     repository: Path,
     source: str,
     oid_length: int,
-) -> IndexEntry | None:
-    """Authenticate the source policy and its audited NeoForge result fixture."""
+) -> dict[str, tuple[IndexEntry, str]] | None:
+    """Authenticate the source policy and every audited NeoForge migration pair."""
 
     if _tree_entry(
         repository, source, NEOFORGE_PLAYER_RENDERER_PATH, oid_length
@@ -1346,65 +1401,71 @@ def _neoforge_collector_migration_fixture(
             "source common hand renderer contradicts the CPM collector ownership policy"
         )
 
-    input_entry = _tree_entry(
-        repository, source, NEOFORGE_PLAYER_RENDERER_INPUT_PATH, oid_length
-    )
-    result_entry = _tree_entry(
-        repository, source, NEOFORGE_PLAYER_RENDERER_RESULT_PATH, oid_length
-    )
-    if input_entry is None or result_entry is None:
-        raise VersionPortMergeError(
-            "source CPM collector policy lacks its NeoForge migration fixtures"
-        )
-    input_payload = _read_blob(
-        repository,
-        input_entry.oid,
-        limit=MAX_PROTECTED_BLOB_BYTES,
-        label="source NeoForge collector migration input fixture",
-    )
-    _validate_text_blob(
-        input_payload,
-        "source NeoForge collector migration input fixture",
-        markers=True,
-    )
-    if hashlib.sha256(input_payload).hexdigest() != (
-        NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256
+    results: dict[str, tuple[IndexEntry, str]] = {}
+    for input_path, result_path, before_sha256, result_sha256 in (
+        NEOFORGE_PLAYER_RENDERER_MIGRATION_FIXTURES
     ):
-        raise VersionPortMergeError(
-            "source NeoForge collector migration input fixture is not audited"
+        input_entry = _tree_entry(repository, source, input_path, oid_length)
+        result_entry = _tree_entry(repository, source, result_path, oid_length)
+        if input_entry is None or result_entry is None:
+            raise VersionPortMergeError(
+                "source CPM collector policy lacks its NeoForge migration fixtures"
+            )
+        input_payload = _read_blob(
+            repository,
+            input_entry.oid,
+            limit=MAX_PROTECTED_BLOB_BYTES,
+            label=f"source NeoForge collector migration input {input_path}",
         )
-    if not all(marker in input_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
-        raise VersionPortMergeError(
-            "source NeoForge collector migration input lacks the modern redirect"
+        _validate_text_blob(
+            input_payload,
+            f"source NeoForge collector migration input {input_path}",
+            markers=True,
         )
-    result_payload = _read_blob(
-        repository,
-        result_entry.oid,
-        limit=MAX_PROTECTED_BLOB_BYTES,
-        label="source NeoForge collector migration fixture",
-    )
-    _validate_text_blob(
-        result_payload,
-        "source NeoForge collector migration fixture",
-        markers=True,
-    )
-    if hashlib.sha256(result_payload).hexdigest() != (
-        NEOFORGE_PLAYER_RENDERER_RESULT_SHA256
-    ):
-        raise VersionPortMergeError(
-            "source NeoForge collector migration fixture is not the audited result"
+        if hashlib.sha256(input_payload).hexdigest() != before_sha256:
+            raise VersionPortMergeError(
+                "source NeoForge collector migration input fixture is not audited"
+            )
+        if not all(
+            marker in input_payload for marker in MODERN_HAND_COLLECTOR_MARKERS
+        ):
+            raise VersionPortMergeError(
+                "source NeoForge collector migration input lacks the modern redirect"
+            )
+
+        result_payload = _read_blob(
+            repository,
+            result_entry.oid,
+            limit=MAX_PROTECTED_BLOB_BYTES,
+            label=f"source NeoForge collector migration result {result_path}",
         )
-    if any(marker in result_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
-        raise VersionPortMergeError(
-            "source NeoForge collector migration fixture still intercepts the modern collector"
+        _validate_text_blob(
+            result_payload,
+            f"source NeoForge collector migration result {result_path}",
+            markers=True,
         )
-    return result_entry
+        if hashlib.sha256(result_payload).hexdigest() != result_sha256:
+            raise VersionPortMergeError(
+                "source NeoForge collector migration fixture is not the audited result"
+            )
+        if any(
+            marker in result_payload for marker in MODERN_HAND_COLLECTOR_MARKERS
+        ):
+            raise VersionPortMergeError(
+                "source NeoForge collector migration fixture still intercepts the modern collector"
+            )
+        if before_sha256 in results:
+            raise VersionPortMergeError(
+                "source NeoForge collector migrations repeat an audited input"
+            )
+        results[before_sha256] = (result_entry, result_path)
+    return results
 
 
 def _migrate_neoforge_modern_hand_collector(
     repository: Path,
     work_head: str,
-    result_fixture: IndexEntry,
+    result_fixtures: Mapping[str, tuple[IndexEntry, str]],
     oid_length: int,
 ) -> list[dict[str, Any]]:
     """Replace one exact target-only NeoForge redirect with its audited safe form."""
@@ -1425,12 +1486,13 @@ def _migrate_neoforge_modern_hand_collector(
     )
     if not any(marker in target_payload for marker in MODERN_HAND_COLLECTOR_MARKERS):
         return []
-    if hashlib.sha256(target_payload).hexdigest() != (
-        NEOFORGE_PLAYER_RENDERER_BEFORE_SHA256
-    ):
+    target_sha256 = hashlib.sha256(target_payload).hexdigest()
+    selected_fixture = result_fixtures.get(target_sha256)
+    if selected_fixture is None:
         raise VersionPortMergeError(
             "target NeoForge modern hand collector does not match the audited migration input"
         )
+    result_fixture, result_path = selected_fixture
 
     before = _snapshot_index(repository, oid_length)
     current_entries = _entries_by_path(before.entries).get(
@@ -1452,7 +1514,7 @@ def _migrate_neoforge_modern_hand_collector(
         {
             "path": NEOFORGE_PLAYER_RENDERER_PATH,
             "policy": "migrate-neoforge-modern-hand-collector",
-            "source_path": NEOFORGE_PLAYER_RENDERER_RESULT_PATH,
+            "source_path": result_path,
             "source": result_fixture.object_payload(),
             "target": target_entry.object_payload(),
             "result": result_entry.object_payload(),
@@ -1965,15 +2027,15 @@ def reproduce_merge(
                     target_profile.runtime_version
                 )
             ):
-                result_fixture = _neoforge_collector_migration_fixture(
+                result_fixtures = _neoforge_collector_migration_fixtures(
                     repository, source, oid_length
                 )
-                if result_fixture is not None:
+                if result_fixtures is not None:
                     protected_resolutions.extend(
                         _migrate_neoforge_modern_hand_collector(
                             repository,
                             work_head,
-                            result_fixture,
+                            result_fixtures,
                             oid_length,
                         )
                     )
