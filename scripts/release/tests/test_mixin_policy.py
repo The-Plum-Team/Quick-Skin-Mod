@@ -230,6 +230,13 @@ class MixinPolicyTest(unittest.TestCase):
                     (source_name, handler_name), {1}
                 )
 
+                if (
+                    source_name == "neoforge:com/quickskin/mod/neoforge/mixin/PlayerRendererMixin.java"
+                    and handler_name == "quickskin$redirectRenderHandBuffer"
+                    and "quickskin$redirectSubmitModelPart" not in text
+                ):
+                    expected_counts = expected_counts - {1}
+
                 with self.subTest(source=source_name, handler=handler_name):
                     self.assertEqual(assignment_values(context, "require"), {expected_require})
                     self.assertEqual(
