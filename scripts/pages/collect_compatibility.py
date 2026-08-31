@@ -397,6 +397,41 @@ def _one_artifact(
     return selected[0]
 
 
+def _latest_attempt_artifact(
+    artifacts: list[RemoteArtifact],
+    *,
+    name_prefix: str,
+    run_id: int,
+    maximum_attempt: int,
+    maximum_size: int,
+) -> RemoteArtifact:
+    if maximum_attempt <= 0:
+        raise CollectionError("source run attempt is invalid")
+    selected: dict[int, RemoteArtifact] = {}
+    for artifact in artifacts:
+        if (
+            not artifact.name.startswith(name_prefix)
+            or artifact.expired
+            or artifact.size > maximum_size
+            or artifact.run_id != run_id
+        ):
+            continue
+        attempt_text = artifact.name.removeprefix(name_prefix)
+        if re.fullmatch(r"[1-9][0-9]*", attempt_text) is None:
+            continue
+        attempt = int(attempt_text)
+        if attempt > maximum_attempt:
+            continue
+        if attempt in selected:
+            raise CollectionError(
+                f"duplicate authenticated artifact attempt {name_prefix}{attempt}"
+            )
+        selected[attempt] = artifact
+    if not selected:
+        raise CollectionError(f"no authenticated artifact exists for {name_prefix}")
+    return selected[max(selected)]
+
+
 def _select_review_artifact(
     api: GitHubClient,
     *,
@@ -474,6 +509,13 @@ def collect(
         workflow=SOURCE_WORKFLOW,
         events=SOURCE_EVENTS,
     )
+    source_run_attempt = source_run.get("run_attempt")
+    if (
+        isinstance(source_run_attempt, bool)
+        or not isinstance(source_run_attempt, int)
+        or source_run_attempt <= 0
+    ):
+        raise CollectionError("source run attempt is invalid")
     _fetch_commits(repository_root, source_implementation_sha, current_implementation_sha)
     _require_nonimpacting_ancestor(
         repository_root,
@@ -588,11 +630,14 @@ def collect(
         for lane_id in sorted(plan_rows):
             lane_root = lanes_root / lane_id
             lane_root.mkdir()
-            capsule_name = f"mod-compatibility-review-input-{source_run_id}-{lane_id}"
-            capsule_artifact = _one_artifact(
+            capsule_prefix = (
+                f"mod-compatibility-review-input-{source_run_id}-{lane_id}-"
+            )
+            capsule_artifact = _latest_attempt_artifact(
                 source_artifacts,
-                name=capsule_name,
+                name_prefix=capsule_prefix,
                 run_id=source_run_id,
+                maximum_attempt=source_run_attempt,
                 maximum_size=MAX_CAPSULE_ARCHIVE_BYTES,
             )
             api.download_and_extract(
