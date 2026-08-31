@@ -230,11 +230,26 @@ class VersionPortMergeTest(unittest.TestCase):
         runtime_version: str,
         target_payload: str | None = None,
     ) -> tuple[str, str, str, str]:
+        components = tuple(int(value) for value in runtime_version.split("."))
+        if (
+            len(components) == 3
+            and components[:2] == (1, 21)
+            and 9 <= components[2] < 11
+        ):
+            input_path = (
+                version_port_merge.NEOFORGE_PLAYER_RENDERER_1_21_9_INPUT_PATH
+            )
+            result_path = (
+                version_port_merge.NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_PATH
+            )
+        else:
+            input_path = version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH
+            result_path = version_port_merge.NEOFORGE_PLAYER_RENDERER_RESULT_PATH
         input_payload = (
-            ROOT / version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH
+            ROOT / input_path
         ).read_text(encoding="utf-8")
         result_payload = (
-            ROOT / version_port_merge.NEOFORGE_PLAYER_RENDERER_RESULT_PATH
+            ROOT / result_path
         ).read_text(encoding="utf-8")
         target_payload = target_payload or input_payload
 
@@ -251,14 +266,12 @@ class VersionPortMergeTest(unittest.TestCase):
             "    void quickskin$redirectRenderHandBuffer() {}\n"
             "}\n",
         )
-        self.write(
-            version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH,
-            input_payload,
-        )
-        self.write(
-            version_port_merge.NEOFORGE_PLAYER_RENDERER_RESULT_PATH,
-            result_payload,
-        )
+        for fixture_paths in version_port_merge.NEOFORGE_PLAYER_RENDERER_MIGRATION_FIXTURES:
+            for fixture_path in fixture_paths[:2]:
+                self.write(
+                    fixture_path,
+                    (ROOT / fixture_path).read_text(encoding="utf-8"),
+                )
         self.git("add", "--all")
         self.commit("add CPM collector ownership policy")
         source = self.sha("HEAD")
@@ -546,7 +559,18 @@ class VersionPortMergeTest(unittest.TestCase):
             version_port_merge.MIXIN_HAND_POLICY_LINE,
             encoded_policy[degradable_start:degradable_end],
         )
-        self.assertNotIn("expected_counts = expected_counts - {1}", mixin_policy)
+        self.assertNotIn(
+            version_port_merge.MIXIN_LEGACY_OPTIONAL_HAND_BLOCK.decode("utf-8"),
+            mixin_policy,
+        )
+        self.assertEqual(
+            mixin_policy.count(
+                version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK.decode(
+                    "utf-8"
+                )
+            ),
+            1,
+        )
         self.assertIn(
             "migrate-mandatory-common-hand-policy",
             [item["policy"] for item in evidence["protected_resolutions"]],
@@ -602,6 +626,59 @@ class VersionPortMergeTest(unittest.TestCase):
                     canonical,
                 )
 
+    def test_scoped_neoforge_hand_count_migration_is_idempotent(self) -> None:
+        legacy = self.legacy_mixin_hand_policy().encode("utf-8")
+
+        migrated = version_port_merge._migrate_mixin_hand_policy_payload(legacy)
+
+        self.assertNotIn(
+            version_port_merge.MIXIN_LEGACY_OPTIONAL_HAND_BLOCK, migrated
+        )
+        self.assertEqual(
+            migrated.count(
+                version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK
+            ),
+            1,
+        )
+        self.assertEqual(
+            version_port_merge._migrate_mixin_hand_policy_payload(migrated),
+            migrated,
+        )
+
+    def test_missing_scoped_neoforge_hand_count_is_restored(self) -> None:
+        inherited = (
+            ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
+        ).read_bytes()
+        inherited = inherited.replace(
+            version_port_merge.MIXIN_HAND_OVERRIDE_MARKER,
+            version_port_merge.MIXIN_HAND_OVERRIDE_MARKER
+            + b"\n"
+            + version_port_merge.MIXIN_NEOFORGE_HAND_OVERRIDE_MARKER,
+            1,
+        )
+
+        self.assertNotIn(
+            version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK,
+            inherited,
+        )
+
+        migrated = version_port_merge._migrate_mixin_hand_policy_payload(inherited)
+
+        self.assertEqual(
+            migrated.count(
+                version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK
+            ),
+            1,
+        )
+        self.assertLess(
+            migrated.index(version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK),
+            migrated.index(version_port_merge.MIXIN_COUNT_SUBTEST_MARKER),
+        )
+        self.assertEqual(
+            version_port_merge._migrate_mixin_hand_policy_payload(migrated),
+            migrated,
+        )
+
     def test_mixin_policy_source_fixture_is_the_authenticated_policy(self) -> None:
         fixture = (
             ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
@@ -653,12 +730,47 @@ class VersionPortMergeTest(unittest.TestCase):
         self.git("merge", "--abort")
         self.assert_clean_at(target)
 
-    def test_neoforge_collector_migration_preserves_pre_1_21_11_redirect(
+    def test_1_21_9_neoforge_collector_is_replaced_by_audited_fixture(
+        self,
+    ) -> None:
+        source, target, _, result_payload = (
+            self.prepare_neoforge_collector_fixture_branches(
+                runtime_version="1.21.10"
+            )
+        )
+
+        evidence = version_port_merge.reproduce_merge(
+            self.repository,
+            target,
+            source,
+            mode="prepare",
+        )
+
+        migrated = [
+            item
+            for item in evidence["protected_resolutions"]
+            if item["policy"] == "migrate-neoforge-modern-hand-collector"
+        ]
+        self.assertEqual(len(migrated), 1)
+        self.assertEqual(
+            migrated[0]["source_path"],
+            version_port_merge.NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_PATH,
+        )
+        self.assertEqual(
+            (
+                self.repository / version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH
+            ).read_text(encoding="utf-8"),
+            result_payload,
+        )
+        self.git("merge", "--abort")
+        self.assert_clean_at(target)
+
+    def test_neoforge_collector_migration_preserves_pre_1_21_9_redirect(
         self,
     ) -> None:
         source, target, input_payload, _ = (
             self.prepare_neoforge_collector_fixture_branches(
-                runtime_version="1.21.10"
+                runtime_version="1.21.8"
             )
         )
 
