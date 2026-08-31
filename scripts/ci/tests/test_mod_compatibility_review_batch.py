@@ -44,7 +44,9 @@ def matrix_lane(lane_id: str, artifact_node: str, mod: str) -> dict[str, Any]:
     return {
         "artifact_digest": "sha256:" + "d" * 64,
         "artifact_id": 10,
-        "artifact_name": f"mod-compatibility-review-input-{SOURCE_RUN_ID}-{lane_id}",
+        "artifact_name": (
+            f"mod-compatibility-review-input-{SOURCE_RUN_ID}-{lane_id}-1"
+        ),
         "artifact_node": artifact_node,
         "artifact_size": 1024,
         "base_evidence_name": f"packaged-e2e-{artifact_node}--scheduled-behavior",
