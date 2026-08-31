@@ -36,6 +36,7 @@ class VisualReviewImpactTest(unittest.TestCase):
             changed(".github/workflows/pages.yml"),
             changed("scripts/ci/github_api_retry.sh", status="added"),
             changed("scripts/ci/e2e_impact.py"),
+            changed("scripts/ci/version_port_failure_policy.py", status="added"),
             changed("scripts/ci/visual_review_queue.py"),
             changed("scripts/pages/build_site.py"),
             changed("scripts/pages/collect_compatibility.py", status="added"),
@@ -50,7 +51,7 @@ class VisualReviewImpactTest(unittest.TestCase):
             changed("e2e/README.md"),
             changed("docs/ai/PROJECT.md"),
         )
-        self.assertTrue(infrastructure_only(inventory, changed_files=18))
+        self.assertTrue(infrastructure_only(inventory, changed_files=19))
 
     def test_compatibility_publication_does_not_repeat_game_review(self) -> None:
         paths = [
