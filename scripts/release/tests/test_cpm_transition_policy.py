@@ -141,6 +141,40 @@ class CpmTransitionPolicyTest(unittest.TestCase):
         self.assertIn("allow = 1", annotation[modern_expect:mandatory])
         self.assertNotIn("require = 0", annotation)
 
+    def test_cpm_first_person_hand_keeps_the_model_owned_render_type(self) -> None:
+        hand_source = (MIXIN_ROOT / "ItemInHandRendererMixin.java").read_text(
+            encoding="utf-8"
+        )
+        integration = CPM_INTEGRATION.read_text(encoding="utf-8")
+        scenario = (
+            ROOT
+            / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/"
+            / "CpmFirstPersonScenario.java"
+        ).read_text(encoding="utf-8")
+        feature = (
+            ROOT
+            / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/"
+            / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+
+        guard = "CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()"
+        self.assertIn(guard, hand_source)
+        self.assertLess(
+            hand_source.index(guard),
+            hand_source.index("TextureAlphaDetector.hasTransparency"),
+        )
+        preservation = integration[
+            integration.index("shouldPreserveFirstPersonHandRenderType()") : integration.index(
+                "/** Monotonic E2E-visible proof"
+            )
+        ]
+        self.assertIn("activeCpmModelHash", preservation)
+        self.assertIn("isCPMActivelyRendering()", preservation)
+        self.assertIn("isLocalPlayerWearingCpmModel()", preservation)
+        self.assertIn("firstPersonRenderTypePreservations.incrementAndGet()", preservation)
+        self.assertIn(".action(feature::beginFirstPersonRecheck)", scenario)
+        self.assertIn("preservationCount <= firstPersonRenderTypeCheckpoint", feature)
+
     def test_modern_first_person_collectors_remain_owned_by_model_mods(self) -> None:
         paths = [MIXIN_ROOT / "ItemInHandRendererMixin.java"]
         neoforge_renderer = (
