@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.UUID;
 
-/** NeoForge Minecraft 1.21.2 renderer adapter. */
+/** NeoForge Minecraft 1.21.5 renderer adapter. */
 @Mixin(value = PlayerRenderer.class, priority = 1100)
 public class PlayerRendererMixin {
 
@@ -65,7 +65,8 @@ public class PlayerRendererMixin {
                                                               ResourceLocation skinTexture,
                                                               ModelPart arm,
                                                               boolean slim) {
-        if (CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()
+        if (CPMCompatIntegration.shouldDeferToCPM()
+                || CPMCompatIntegration.isCPMActivelyRendering()
                 || ClientConfig.getInstance().shouldDisableSkinTransparency()
                 || skinTexture == null) {
             return instance.getBuffer(originalRenderType);
