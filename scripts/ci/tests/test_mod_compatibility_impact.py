@@ -40,6 +40,7 @@ class ModCompatibilityImpactTest(unittest.TestCase):
             "e2e/visual_review_runner.py",
             "scripts/ci/mod_compatibility_review_batch.py",
             "scripts/ci/mod_compatibility_impact.py",
+            "scripts/ci/version_port_failure_policy.py",
             "scripts/ci/tests/test_mod_compatibility_impact.py",
             "docs/ai/PROJECT.md",
         ]
