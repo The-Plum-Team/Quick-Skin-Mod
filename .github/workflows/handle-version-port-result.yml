@@ -25,9 +25,9 @@ jobs:
       github.event.client_payload.gate == 'on-demand-e2e.yml') &&
       startsWith(github.event.client_payload.head_branch, 'automation/sync/')
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 75
     permissions:
-      actions: read
+      actions: write
       contents: read
       issues: write
       pull-requests: write
@@ -37,18 +37,11 @@ jobs:
       repair: ${{ steps.repair.outputs.attempt }}
 
     steps:
-      - name: Ignore non-actionable dispatches without a checkout
-        id: sibling
+      - name: Ignore malformed non-actionable dispatches
+        id: dispatch
         shell: bash
         env:
           EXPECTED_CONCLUSION: ${{ github.event.client_payload.conclusion }}
-          EXPECTED_GATE: ${{ github.event.client_payload.gate }}
-          EXPECTED_SHA: ${{ github.event.client_payload.head_sha }}
-          HEAD_BRANCH: ${{ github.event.client_payload.head_branch }}
-          # GH_REPO supplies the repository context because this step deliberately runs
-          # before any checkout.
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           # Gate senders normalize their dispatch to success or failure; anything else is
@@ -61,32 +54,9 @@ jobs:
             printf 'current=false\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # A failure dispatch always runs the full inspect: the bounded repair path needs it
-          # regardless of the sibling gate's state.
-          if [[ "$EXPECTED_CONCLUSION" == failure ]]; then
-            exit 0
-          fi
-          # A success dispatch can merge only after BOTH exact-head gates passed. When the
-          # sibling gate has not finished, its own completion dispatch redoes this work, so
-          # end here before paying for two full-history checkouts at propagation peak.
-          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$HEAD_BRANCH" =~ ^automation/sync/[A-Za-z0-9._/-]+$ ]]
-          sibling_gate=on-demand-e2e.yml
-          if [[ "$EXPECTED_GATE" == on-demand-e2e.yml ]]; then
-            sibling_gate=build-gate.yml
-          fi
-          sibling_success="$(gh run list --workflow "$sibling_gate" \
-            --branch "$HEAD_BRANCH" --event workflow_dispatch --limit 100 \
-            --json headSha,status,conclusion \
-            --jq "[.[] | select(.headSha == \"$EXPECTED_SHA\") | select(.status == \"completed\" and .conclusion == \"success\")] | length")"
-          if [[ "$sibling_success" == 0 ]]; then
-            printf 'sibling gate not yet complete; deferring to its dispatch\n'
-            printf 'current=false\n' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
 
       - name: Check out the exact port head without credentials
-        if: steps.sibling.outputs.current != 'false'
+        if: steps.dispatch.outputs.current != 'false'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.client_payload.head_sha }}
@@ -95,7 +65,7 @@ jobs:
 
       - name: Ignore a superseded gate result
         id: port
-        if: steps.sibling.outputs.current != 'false'
+        if: steps.dispatch.outputs.current != 'false'
         shell: bash
         env:
           EXPECTED_SHA: ${{ github.event.client_payload.head_sha }}
@@ -112,6 +82,8 @@ jobs:
           fi
           remote_head="$(git rev-parse "refs/remotes/origin/$HEAD_BRANCH")"
           protected_sha="$(git rev-parse refs/remotes/origin/master)"
+          git show "${protected_sha}:scripts/ci/github_api_retry.sh" \
+            > "$RUNNER_TEMP/protected-github-api-retry.sh"
           if [[ "$remote_head" == "$EXPECTED_SHA" ]] \
               && git merge-base --is-ancestor "$protected_sha" "$EXPECTED_SHA"; then
             printf 'current=true\n' >> "$GITHUB_OUTPUT"
@@ -121,8 +93,46 @@ jobs:
             printf 'current=false\n' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Verify the notifying gate
+      - name: Defer until the sibling exact-head gate passes
+        id: sibling
         if: steps.port.outputs.current == 'true'
+        shell: bash
+        env:
+          EXPECTED_CONCLUSION: ${{ github.event.client_payload.conclusion }}
+          EXPECTED_GATE: ${{ github.event.client_payload.gate }}
+          EXPECTED_SHA: ${{ github.event.client_payload.head_sha }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
+          HEAD_BRANCH: ${{ github.event.client_payload.head_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/protected-github-api-retry.sh"
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$HEAD_BRANCH" =~ ^automation/sync/[A-Za-z0-9._/-]+$ ]]
+          if [[ "$EXPECTED_CONCLUSION" == failure ]]; then
+            printf 'current=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sibling_gate=on-demand-e2e.yml
+          if [[ "$EXPECTED_GATE" == on-demand-e2e.yml ]]; then
+            sibling_gate=build-gate.yml
+          fi
+          sibling_success="$(github_cli_retry gh run list \
+            --workflow "$sibling_gate" \
+            --branch "$HEAD_BRANCH" --event workflow_dispatch --limit 100 \
+            --json headSha,status,conclusion \
+            --jq "[.[] | select(.headSha == \"$EXPECTED_SHA\") | select(.status == \"completed\" and .conclusion == \"success\")] | length")"
+          if [[ "$sibling_success" == 0 ]]; then
+            printf 'sibling gate not yet complete; deferring to its dispatch\n'
+            printf 'current=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf 'current=true\n' >> "$GITHUB_OUTPUT"
+
+      - name: Verify the notifying gate
+        if: steps.sibling.outputs.current == 'true'
         shell: bash
         env:
           EXPECTED_CONCLUSION: ${{ github.event.client_payload.conclusion }}
@@ -130,10 +140,14 @@ jobs:
           EXPECTED_RUNTIME_POLICY: ${{ github.event.client_payload.runtime_policy }}
           EXPECTED_SHA: ${{ github.event.client_payload.head_sha }}
           GATE_RUN_ID: ${{ github.event.client_payload.run_id }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           HEAD_BRANCH: ${{ github.event.client_payload.head_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          source "$RUNNER_TEMP/protected-github-api-retry.sh"
           [[ "$GATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$HEAD_BRANCH" =~ ^automation/sync/[A-Za-z0-9._/-]+$ ]]
@@ -143,7 +157,8 @@ jobs:
             || "$EXPECTED_GATE" == on-demand-e2e.yml ]]
           run_json=''
           for attempt in {1..30}; do
-            run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GATE_RUN_ID")"
+            run_json="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$GATE_RUN_ID")"
             if [[ "$(jq -r .status <<< "$run_json")" == completed ]]; then
               break
             fi
@@ -168,7 +183,7 @@ jobs:
           if [[ "$EXPECTED_GATE" == on-demand-e2e.yml ]]; then
             [[ "$EXPECTED_RUNTIME_POLICY" == full \
               || "$EXPECTED_RUNTIME_POLICY" == not-applicable ]]
-            jobs_json="$(gh api --paginate --slurp \
+            jobs_json="$(github_api_retry --paginate --slurp \
               "repos/$GITHUB_REPOSITORY/actions/runs/$GATE_RUN_ID/jobs?per_page=100")"
             policy_result="$(jq -r \
               '[.[].jobs[] | select(.name == "Classify packaged runtime impact")] | if length == 1 then .[0].conclusion else "invalid" end' \
@@ -195,18 +210,23 @@ jobs:
       - name: Reserve the single repair attempt
         id: repair
         if: >-
-          steps.port.outputs.current == 'true' &&
+          steps.sibling.outputs.current == 'true' &&
           github.event.client_payload.conclusion != 'success'
         shell: bash
         env:
           EXPECTED_SHA: ${{ github.event.client_payload.head_sha }}
           GATE_RUN_ID: ${{ github.event.client_payload.run_id }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           HEAD_BRANCH: ${{ github.event.client_payload.head_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          source "$RUNNER_TEMP/protected-github-api-retry.sh"
           [[ "$GATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          pr_json="$(gh pr list --state open --head "$HEAD_BRANCH" --limit 2 \
+          pr_json="$(github_cli_retry gh pr list \
+            --state open --head "$HEAD_BRANCH" --limit 2 \
             --json number,baseRefName,baseRefOid,headRefName,headRefOid,isCrossRepository,labels,state)"
           jq -e \
             --arg branch "$HEAD_BRANCH" \
@@ -216,7 +236,7 @@ jobs:
           pr_number="$(jq -r '.[0].number' <<< "$pr_json")"
           target_branch="$(jq -r '.[0].baseRefName' <<< "$pr_json")"
           base_sha="$(jq -r '.[0].baseRefOid' <<< "$pr_json")"
-          protected_sha="$(gh api \
+          protected_sha="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
           [[ "$protected_sha" =~ ^[0-9a-f]{40}$ ]]
           git fetch --no-tags origin "$protected_sha"
@@ -227,36 +247,78 @@ jobs:
             --exclude master --target "$target_branch" > /dev/null
           target_slug="${target_branch//[^A-Za-z0-9._-]/-}"
           [[ "$HEAD_BRANCH" == "automation/sync/$target_slug/"* ]]
-          remote_base_sha="$(gh api \
+          remote_base_sha="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/git/ref/heads/$target_branch" \
             --jq .object.sha)"
           [[ "$remote_base_sha" == "$base_sha" ]]
           printf 'pr_number=%s\n' "$pr_number" >> "$GITHUB_OUTPUT"
 
-          # A dependency-verification rejection is a supply-chain decision, not a source repair.
-          # Never give a model authority to bless new dependency bytes; leave the PR red until a
-          # protected change records a checksum that was independently reviewed.
+          # Classify only with the current protected policy. Known external infrastructure
+          # failures receive one failed-job retry and never consume an AI repair attempt.
           failure_log="$RUNNER_TEMP/version-port-failure.log"
-          gh run view "$GATE_RUN_ID" --log-failed > "$failure_log" 2>&1
-          if grep -Fq 'Dependency verification failed for configuration' "$failure_log"; then
-            gh pr comment "$pr_number" --body \
-              "Gradle dependency verification rejected downloaded bytes. Automated AI repair is intentionally disabled for supply-chain failures; repository variants and checksums require independent review."
-            printf 'attempt=false\n' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          github_cli_retry gh run view "$GATE_RUN_ID" --log-failed \
+            > "$failure_log" 2>&1
+          git show "${protected_sha}:scripts/ci/version_port_failure_policy.py" \
+            > "$RUNNER_TEMP/protected-version-port-failure-policy.py"
+          failure_policy="$(python3 \
+            "$RUNNER_TEMP/protected-version-port-failure-policy.py" \
+            --log "$failure_log")"
+          disposition="$(jq -r .disposition <<< "$failure_policy")"
+          case "$disposition" in
+            supply-chain)
+              github_cli_retry gh pr comment "$pr_number" --body \
+                "Gradle dependency verification rejected downloaded bytes. Automated AI repair is intentionally disabled for supply-chain failures; repository variants and checksums require independent review."
+              printf 'attempt=false\n' >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            transient-infrastructure)
+              run_json="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$GATE_RUN_ID")"
+              run_attempt="$(jq -er '.run_attempt | select(type == "number")' \
+                <<< "$run_json")"
+              run_status="$(jq -er '.status | select(type == "string")' \
+                <<< "$run_json")"
+              if [[ "$run_attempt" == 1 && "$run_status" == completed ]]; then
+                if github_cli_retry gh run rerun "$GATE_RUN_ID" --failed; then
+                  github_cli_retry gh pr comment "$pr_number" --body \
+                    "The gate failed on explicit external infrastructure evidence. Retrying only failed jobs once; no AI repair was started."
+                else
+                  github_cli_retry gh pr comment "$pr_number" --body \
+                    "The gate failed on explicit external infrastructure evidence, but GitHub did not accept the bounded failed-job retry. No AI repair was started."
+                fi
+              elif [[ "$run_status" != completed ]]; then
+                github_cli_retry gh pr comment "$pr_number" --body \
+                  "The gate failed on explicit external infrastructure evidence and is already being rerun. No AI repair was started."
+              else
+                github_cli_retry gh pr comment "$pr_number" --body \
+                  "The gate still has explicit external infrastructure evidence after its single failed-job retry. No AI repair was started."
+              fi
+              printf 'attempt=false\n' >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            repairable)
+              ;;
+            *)
+              printf 'Protected failure policy returned invalid disposition %q\n' \
+                "$disposition" >&2
+              exit 1
+              ;;
+          esac
 
-          if gh pr view "$pr_number" --json labels --jq '.labels[].name' \
+          if github_cli_retry gh pr view "$pr_number" \
+              --json labels --jq '.labels[].name' \
               | grep -Fxq ai-repair-attempted; then
-            gh pr comment "$pr_number" --body \
+            github_cli_retry gh pr comment "$pr_number" --body \
               "The latest automated gate still fails after the bounded AI repair. Leaving this PR open for review."
             printf 'attempt=false\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          gh label create ai-repair-attempted \
+          github_cli_retry gh label create ai-repair-attempted \
             --color D93F0B \
             --description 'One bounded automated repair has been attempted' \
             --force
-          gh pr edit "$pr_number" --add-label ai-repair-attempted
+          github_cli_retry gh pr edit "$pr_number" \
+            --add-label ai-repair-attempted
           printf 'attempt=true\n' >> "$GITHUB_OUTPUT"
 
   propose-repair:
@@ -682,7 +744,7 @@ jobs:
       needs.inspect.outputs.current == 'true' &&
       github.event.client_payload.conclusion == 'success'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 75
     permissions:
       actions: write
       contents: write
@@ -701,6 +763,9 @@ jobs:
         id: merge
         shell: bash
         env:
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           HEAD_BRANCH: ${{ github.event.client_payload.head_branch }}
           GH_TOKEN: ${{ github.token }}
           NOTIFYING_GATE: ${{ github.event.client_payload.gate }}
@@ -709,9 +774,16 @@ jobs:
           set -euo pipefail
           printf 'nonvisual_anchor=false\n' >> "$GITHUB_OUTPUT"
           head_sha="$(git rev-parse HEAD)"
+          git fetch --no-tags origin \
+            "+refs/heads/master:refs/remotes/origin/master"
+          retry_policy_sha="$(git rev-parse refs/remotes/origin/master)"
+          git show "$retry_policy_sha:scripts/ci/github_api_retry.sh" \
+            > "$RUNNER_TEMP/protected-github-api-retry.sh"
+          source "$RUNNER_TEMP/protected-github-api-retry.sh"
           exact_head_runs() {
             local workflow="$1"
-            gh run list --workflow "$workflow" --branch "$HEAD_BRANCH" \
+            github_cli_retry gh run list \
+              --workflow "$workflow" --branch "$HEAD_BRANCH" \
               --event workflow_dispatch --limit 100 \
               --json databaseId,headSha,status,conclusion \
               --jq "[.[] | select(.headSha == \"$head_sha\")]"
@@ -739,14 +811,15 @@ jobs:
               "$build_run_id" "$e2e_run_id"
             exit 0
           fi
-          pr_number="$(gh pr list --state open --head "$HEAD_BRANCH" \
+          pr_number="$(github_cli_retry gh pr list \
+            --state open --head "$HEAD_BRANCH" \
             --json number --jq 'if length == 1 then .[0].number else empty end')"
           if [[ -z "$pr_number" ]]; then
             printf 'No single open automation PR for %s; it was closed or merged outside this run.\n' \
               "$HEAD_BRANCH"
             exit 0
           fi
-          pr_json="$(gh pr view "$pr_number" \
+          pr_json="$(github_cli_retry gh pr view "$pr_number" \
             --json baseRefName,baseRefOid,headRefName,headRefOid,isCrossRepository,labels,state)"
           jq -e \
             --arg branch "$HEAD_BRANCH" \
@@ -758,9 +831,10 @@ jobs:
           target_slug="${target_branch//[^A-Za-z0-9._-]/-}"
           [[ "$HEAD_BRANCH" == "automation/sync/$target_slug/"* ]]
 
-          protected_sha="$(gh api \
+          protected_sha="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
           [[ "$protected_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$protected_sha" == "$retry_policy_sha" ]]
           git fetch --no-tags origin \
             "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH" \
             "+refs/heads/$target_branch:refs/remotes/origin/$target_branch" \
@@ -866,7 +940,7 @@ jobs:
             fi
           fi
 
-          current_pr_json="$(gh pr view "$pr_number" \
+          current_pr_json="$(github_cli_retry gh pr view "$pr_number" \
             --json baseRefName,baseRefOid,headRefName,headRefOid,isCrossRepository,labels,state)"
           jq -e \
             --arg base "$base_sha" \
@@ -891,7 +965,7 @@ jobs:
             > "$controller/e2e/scenario-contract.json"
           git show "$protected_sha:e2e/loader-bootstrap-contract.json" \
             > "$controller/e2e/loader-bootstrap-contract.json"
-          gh api --paginate --slurp \
+          github_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/runs/$e2e_run_id/jobs?per_page=100" \
             > "$RUNNER_TEMP/e2e-jobs.json"
           python3 "$controller/scripts/ci/e2e_job_graph.py" \
@@ -925,7 +999,7 @@ jobs:
               --arg target_url \
                 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id" \
               '{state:$state,context:$context,description:$description,target_url:$target_url}' \
-              | gh api --method POST \
+              | github_api_retry --method POST \
                   "repos/$GITHUB_REPOSITORY/statuses/$head_sha" --input - \
                   > /dev/null
           }
@@ -934,15 +1008,16 @@ jobs:
           publish_required_status \
             "Packaged E2E gate" "$e2e_description" "$e2e_run_id"
 
-          gh pr comment "$pr_number" --body \
+          github_cli_retry gh pr comment "$pr_number" --body \
             "$e2e_comment and the required status \
             contexts were bound to this commit; merging the version port."
-          gh pr merge "$pr_number" --merge --delete-branch \
+          github_cli_retry gh pr merge "$pr_number" --merge --delete-branch \
             --match-head-commit "$head_sha"
 
           target_sha=''
           for attempt in {1..30}; do
-            target_sha="$(gh pr view "$pr_number" --json mergeCommit \
+            target_sha="$(github_cli_retry gh pr view \
+              "$pr_number" --json mergeCommit \
               --jq '.mergeCommit.oid // ""')"
             if [[ -n "$target_sha" ]]; then
               break
@@ -954,12 +1029,14 @@ jobs:
           # Dispatch the attestations as soon as the merge commit is known so a concurrent
           # push to the release branch cannot strand them; verify-gate-attestation
           # revalidates the original runs, ancestry and exact trees before publishing.
-          gh workflow run build-gate.yml --ref "$target_branch" \
+          github_cli_retry gh workflow run build-gate.yml \
+            --ref "$target_branch" \
             -f attest_run_id="$build_run_id" \
             -f attest_branch="$HEAD_BRANCH" \
             -f attest_sha="$head_sha" \
             -f attest_target_sha="$target_sha"
-          gh workflow run on-demand-e2e.yml --ref "$target_branch" \
+          github_cli_retry gh workflow run on-demand-e2e.yml \
+            --ref "$target_branch" \
             -f attest_run_id="$e2e_run_id" \
             -f attest_branch="$HEAD_BRANCH" \
             -f attest_sha="$head_sha" \
@@ -1004,7 +1081,7 @@ jobs:
               > "$review_payload"
             review_dispatched=false
             for attempt in {1..5}; do
-              if timeout 20s gh api --method POST \
+              if github_api_retry --method POST \
                   "repos/$GITHUB_REPOSITORY/dispatches" \
                   --input "$review_payload"; then
                 review_dispatched=true
@@ -1040,13 +1117,17 @@ jobs:
         env:
           ARTIFACT_ID: ${{ steps.nonvisual-handoff.outputs.artifact-id }}
           ARTIFACT_NAME: ${{ steps.merge.outputs.artifact_name }}
+          GITHUB_API_RETRY_ATTEMPTS: "10"
+          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
+          GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           MASTER_SOURCE_SHA: ${{ steps.merge.outputs.master_source_sha }}
         run: |
           set -euo pipefail
+          source "$RUNNER_TEMP/protected-github-api-retry.sh"
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$ARTIFACT_NAME" == "visual-anchor-nonimpact-$MASTER_SOURCE_SHA" ]]
-          metadata="$(gh api \
+          metadata="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
           artifact_digest="$(jq -er .digest <<< "$metadata")"
           artifact_size="$(jq -er .size_in_bytes <<< "$metadata")"
@@ -1080,7 +1161,7 @@ jobs:
             > "$payload"
           dispatched=false
           for attempt in {1..5}; do
-            if timeout 20s gh api --method POST \
+            if github_api_retry --method POST \
                 "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload"; then
               dispatched=true
               break
