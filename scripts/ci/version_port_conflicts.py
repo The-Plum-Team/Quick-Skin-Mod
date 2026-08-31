@@ -29,9 +29,12 @@ MAX_MATRIX_BYTES = 4 * 1024 * 1024
 
 SOURCE_PATHS = frozenset(
     {
+        "common/src/main/java/com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
         "docs/ai/WORKFLOW.md",
         "e2e/README.md",
         "e2e/packaged_runtime.py",
+        "scripts/release/tests/test_cpm_transition_policy.py",
+        "scripts/release/tests/test_mixin_policy.py",
     }
 )
 TARGET_PATHS = frozenset({"release/release-matrix.json"})
