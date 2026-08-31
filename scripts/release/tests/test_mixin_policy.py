@@ -198,6 +198,11 @@ class MixinPolicyTest(unittest.TestCase):
                 expected_counts = INJECTION_COUNT_OVERRIDES.get(
                     (source_name, handler_name), {1}
                 )
+                if (
+                    handler_name == "quickskin$redirectRenderHandBuffer"
+                    and "quickskin$redirectSubmitModelPart" not in text
+                ):
+                    expected_counts = expected_counts - {1}
 
                 with self.subTest(source=source_name, handler=handler_name):
                     self.assertEqual(assignment_values(context, "require"), {expected_require})
