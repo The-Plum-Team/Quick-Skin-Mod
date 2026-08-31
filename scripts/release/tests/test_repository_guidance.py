@@ -75,8 +75,15 @@ class RepositoryGuidanceTest(unittest.TestCase):
         self.assertEqual(readme.count("<!-- release-status:end -->"), 1)
         self.assertIn("uses: ./.github/workflows/verify-gate-attestation.yml", build_gate)
         self.assertIn("uses: ./.github/workflows/verify-gate-attestation.yml", e2e_gate)
-        self.assertIn("gh workflow run build-gate.yml --ref \"$target_branch\"", handler)
-        self.assertIn("gh workflow run on-demand-e2e.yml --ref \"$target_branch\"", handler)
+        normalized_handler = re.sub(r"[ \t]*\\\n[ \t]*", " ", handler)
+        self.assertIn(
+            'gh workflow run build-gate.yml --ref "$target_branch"',
+            normalized_handler,
+        )
+        self.assertIn(
+            'gh workflow run on-demand-e2e.yml --ref "$target_branch"',
+            normalized_handler,
+        )
         self.assertIn("git/commits/$TESTED_SHA", attestation)
         self.assertIn("git/commits/$TARGET_SHA", attestation)
         self.assertIn("compare/$TESTED_SHA...$TARGET_SHA", attestation)
