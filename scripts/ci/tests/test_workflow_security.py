@@ -273,7 +273,8 @@ class WorkflowSecurityTest(unittest.TestCase):
             (
                 "mod-compatibility-e2e.yml",
                 "Upload the bounded credential-free review capsule",
-                "mod-compatibility-review-input-${{ github.run_id }}-${{ matrix.id }}",
+                "mod-compatibility-review-input-${{ github.run_id }}-"
+                "${{ matrix.id }}-${{ github.run_attempt }}",
             ): "7",
             (
                 "mod-compatibility-review.yml",
@@ -976,7 +977,19 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("source-sha: ${{ needs.admit.outputs.source_sha }}", runtime)
         self.assertIn("same-version baseline", runtime)
         self.assertIn("--candidate-root e2e-out/current", runtime)
-        self.assertIn("mod-compatibility-review-input-${{ github.run_id }}", runtime)
+        self.assertIn(
+            "mod-compatibility-review-input-${{ github.run_id }}-"
+            "${{ matrix.id }}-${{ github.run_attempt }}",
+            runtime,
+        )
+        self.assertIn(
+            "mod-compatibility-e2e-${{ matrix.id }}-${{ github.run_attempt }}",
+            runtime,
+        )
+        self.assertIn("source_run_attempt", enumerate_review)
+        self.assertIn(
+            '[[ "$candidate_attempt" == "$capsule_attempt" ]]', prepare_review
+        )
         self.assertNotRegex(execution_workflow, r"(?m)^  curate:$")
         self.assertNotIn("CURATE_RESULT", execution_gate)
 
@@ -1031,7 +1044,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn(". as $plan |", enumerate_review)
         self.assertNotIn("source_sha:$.source_sha", enumerate_review)
-        self.assertIn('elif ($matches|length) == 0 then empty', enumerate_review)
+        self.assertIn('if ($matches|length) == 0 then empty', enumerate_review)
         self.assertIn('error("duplicate review capsule', enumerate_review)
         self.assertIn("mod-compatibility-lane-complete-$SOURCE_RUN_ID", enumerate_review)
         self.assertIn("timeout-minutes: 75", enumerate_review)
@@ -1272,6 +1285,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             r'matrix="\$\(jq -c \\\n'
             r'\s+--argjson artifacts "\$artifacts" \\\n'
             r'\s+--argjson compatibility_run_id "\$SOURCE_RUN_ID" \\\n'
+            r'\s+--argjson compatibility_run_attempt "\$SOURCE_RUN_ATTEMPT" \\\n'
             r'\s+--arg implementation_sha "\$IMPLEMENTATION_SHA" \\\n'
             r"\s+'(?P<program>.*?)' \"\$plan\"\)\"",
             enumerate_review,
@@ -1301,13 +1315,29 @@ class WorkflowSecurityTest(unittest.TestCase):
             "target_branch": "fabric-and-neoforge-26.2",
             "target_sha": "b" * 40,
         }
-        artifact = {
+        first_artifact = {
             "id": 789,
-            "name": f"mod-compatibility-review-input-{compatibility_run_id}-{lane_id}",
+            "name": (
+                f"mod-compatibility-review-input-{compatibility_run_id}-{lane_id}-1"
+            ),
             "expired": False,
             "workflow_run": {"id": compatibility_run_id},
             "digest": "sha256:" + "d" * 64,
             "size_in_bytes": 1024,
+        }
+        latest_artifact = {
+            **first_artifact,
+            "id": 790,
+            "name": (
+                f"mod-compatibility-review-input-{compatibility_run_id}-{lane_id}-2"
+            ),
+        }
+        future_artifact = {
+            **first_artifact,
+            "id": 791,
+            "name": (
+                f"mod-compatibility-review-input-{compatibility_run_id}-{lane_id}-3"
+            ),
         }
 
         selected = subprocess.run(
@@ -1316,10 +1346,15 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "-c",
                 "--argjson",
                 "artifacts",
-                json.dumps({"artifacts": [artifact]}),
+                json.dumps(
+                    {"artifacts": [future_artifact, first_artifact, latest_artifact]}
+                ),
                 "--argjson",
                 "compatibility_run_id",
                 str(compatibility_run_id),
+                "--argjson",
+                "compatibility_run_attempt",
+                "2",
                 "--arg",
                 "implementation_sha",
                 "e" * 40,
@@ -1335,6 +1370,34 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertEqual(len(matrix["include"]), 1)
         self.assertEqual(matrix["include"][0]["source_run_id"], compatibility_run_id)
         self.assertNotEqual(matrix["include"][0]["source_run_id"], base_run_id)
+        self.assertEqual(matrix["include"][0]["artifact_id"], latest_artifact["id"])
+
+        duplicate_artifact = {**latest_artifact, "id": 792}
+        duplicate = subprocess.run(
+            [
+                "jq",
+                "-c",
+                "--argjson",
+                "artifacts",
+                json.dumps({"artifacts": [latest_artifact, duplicate_artifact]}),
+                "--argjson",
+                "compatibility_run_id",
+                str(compatibility_run_id),
+                "--argjson",
+                "compatibility_run_attempt",
+                "2",
+                "--arg",
+                "implementation_sha",
+                "e" * 40,
+                program,
+            ],
+            input=json.dumps(plan),
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertNotEqual(duplicate.returncode, 0)
+        self.assertIn("duplicate review capsule attempt", duplicate.stderr)
 
     def test_mod_compatibility_artifact_inventory_filter_executes(self) -> None:
         prepare = job_block("mod-compatibility-e2e.yml", "prepare")
