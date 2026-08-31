@@ -40,6 +40,7 @@ def policy_id(path: Path) -> str:
 
 CRITICAL_MIXINS = {
     "main:com/quickskin/mod/mixin/CapeLayerMixin.java",
+    "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
     "main:com/quickskin/mod/mixin/MixinAbstractClientPlayer.java",
     "main:com/quickskin/mod/mixin/PlayerInfoMixin.java",
     "main:com/quickskin/mod/mixin/PlayerRendererMixin.java",
@@ -53,7 +54,6 @@ CRITICAL_MIXINS = {
 # deterministic compatibility gate.
 DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/GuiSkinRendererMixin.java",
-    "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
     "main:com/quickskin/mod/mixin/PanoramaRendererMixin.java",
     "main:com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
 }
@@ -90,9 +90,9 @@ ALTERNATIVE_HOOKS = {
     ),
 }
 
-# Audited vanilla bytecode multiplicities. The ItemInHand source contains Stonecutter branches:
-# pre-1.21.11 renderHand requests two buffers (arm + sleeve), while the new renderer submits one
-# model part. SkinManager 1.20.1 has two RETURN opcodes in its one target method.
+# Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and
+# sleeve); 1.21.2 through 1.21.10 make one immediate arm draw. The modern collector is deliberately
+# not intercepted. SkinManager 1.20.1 has two RETURN opcodes in its one target method.
 INJECTION_COUNT_OVERRIDES = {
     (
         "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
@@ -177,12 +177,6 @@ class MixinPolicyTest(unittest.TestCase):
                 expected_counts = INJECTION_COUNT_OVERRIDES.get(
                     (source_name, handler_name), {1}
                 )
-                if (
-                    handler_name == "quickskin$redirectRenderHandBuffer"
-                    and "quickskin$redirectSubmitModelPart" not in text
-                ):
-                    expected_counts = expected_counts - {1}
-
                 with self.subTest(source=source_name, handler=handler_name):
                     self.assertEqual(assignment_values(context, "require"), {expected_require})
                     self.assertEqual(
