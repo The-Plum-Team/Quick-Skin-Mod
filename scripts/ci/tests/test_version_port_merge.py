@@ -230,11 +230,26 @@ class VersionPortMergeTest(unittest.TestCase):
         runtime_version: str,
         target_payload: str | None = None,
     ) -> tuple[str, str, str, str]:
+        components = tuple(int(value) for value in runtime_version.split("."))
+        if (
+            len(components) == 3
+            and components[:2] == (1, 21)
+            and 9 <= components[2] < 11
+        ):
+            input_path = (
+                version_port_merge.NEOFORGE_PLAYER_RENDERER_1_21_9_INPUT_PATH
+            )
+            result_path = (
+                version_port_merge.NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_PATH
+            )
+        else:
+            input_path = version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH
+            result_path = version_port_merge.NEOFORGE_PLAYER_RENDERER_RESULT_PATH
         input_payload = (
-            ROOT / version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH
+            ROOT / input_path
         ).read_text(encoding="utf-8")
         result_payload = (
-            ROOT / version_port_merge.NEOFORGE_PLAYER_RENDERER_RESULT_PATH
+            ROOT / result_path
         ).read_text(encoding="utf-8")
         target_payload = target_payload or input_payload
 
@@ -251,14 +266,12 @@ class VersionPortMergeTest(unittest.TestCase):
             "    void quickskin$redirectRenderHandBuffer() {}\n"
             "}\n",
         )
-        self.write(
-            version_port_merge.NEOFORGE_PLAYER_RENDERER_INPUT_PATH,
-            input_payload,
-        )
-        self.write(
-            version_port_merge.NEOFORGE_PLAYER_RENDERER_RESULT_PATH,
-            result_payload,
-        )
+        for fixture_paths in version_port_merge.NEOFORGE_PLAYER_RENDERER_MIGRATION_FIXTURES:
+            for fixture_path in fixture_paths[:2]:
+                self.write(
+                    fixture_path,
+                    (ROOT / fixture_path).read_text(encoding="utf-8"),
+                )
         self.git("add", "--all")
         self.commit("add CPM collector ownership policy")
         source = self.sha("HEAD")
@@ -683,12 +696,47 @@ class VersionPortMergeTest(unittest.TestCase):
         self.git("merge", "--abort")
         self.assert_clean_at(target)
 
-    def test_neoforge_collector_migration_preserves_pre_1_21_11_redirect(
+    def test_1_21_9_neoforge_collector_is_replaced_by_audited_fixture(
+        self,
+    ) -> None:
+        source, target, _, result_payload = (
+            self.prepare_neoforge_collector_fixture_branches(
+                runtime_version="1.21.10"
+            )
+        )
+
+        evidence = version_port_merge.reproduce_merge(
+            self.repository,
+            target,
+            source,
+            mode="prepare",
+        )
+
+        migrated = [
+            item
+            for item in evidence["protected_resolutions"]
+            if item["policy"] == "migrate-neoforge-modern-hand-collector"
+        ]
+        self.assertEqual(len(migrated), 1)
+        self.assertEqual(
+            migrated[0]["source_path"],
+            version_port_merge.NEOFORGE_PLAYER_RENDERER_1_21_9_RESULT_PATH,
+        )
+        self.assertEqual(
+            (
+                self.repository / version_port_merge.NEOFORGE_PLAYER_RENDERER_PATH
+            ).read_text(encoding="utf-8"),
+            result_payload,
+        )
+        self.git("merge", "--abort")
+        self.assert_clean_at(target)
+
+    def test_neoforge_collector_migration_preserves_pre_1_21_9_redirect(
         self,
     ) -> None:
         source, target, input_payload, _ = (
             self.prepare_neoforge_collector_fixture_branches(
-                runtime_version="1.21.10"
+                runtime_version="1.21.8"
             )
         )
 
