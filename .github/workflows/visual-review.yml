@@ -127,6 +127,10 @@ jobs:
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == $repository' \
             <<< "$source_run" > /dev/null
+          source_run_attempt="$(jq -er '
+            .run_attempt |
+            select(type == "number" and . == floor and . >= 1 and . <= 100)
+          ' <<< "$source_run")"
 
           if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
             [[ "$(jq -r .event <<< "$source_run")" == workflow_dispatch ]]
@@ -469,24 +473,23 @@ jobs:
              ([.[] | (.artifacts | type == "array")] | all) and
              ([.[].artifacts[]] | length <= 100)' \
             <<< "$source_artifacts" > /dev/null
-          artifact_inventory="$(jq -c --argjson run_id "$source_run_id" '[
+          raw_artifact_inventory="$(jq -c --argjson run_id "$source_run_id" '[
             .[].artifacts[] | select(.name | startswith("packaged-e2e-")) |
-            {id,name,size_in_bytes,digest,expired,workflow_run}] | sort_by(.name)' \
+            {id,name,size_in_bytes,digest,expired,workflow_run}] |
+            sort_by(.name, .id)' \
             <<< "$source_artifacts")"
-          packaged_count="$(jq length <<< "$artifact_inventory")"
-          if [[ "$packaged_count" -eq 0 ]]; then
+          raw_packaged_count="$(jq length <<< "$raw_artifact_inventory")"
+          if [[ "$raw_packaged_count" -eq 0 ]]; then
             printf 'Ignoring successful run %s without packaged runtime artifacts\n' \
               "$source_run_id"
             exit 0
           fi
           [[ "$scenario_job_count" -gt 0 ]]
           [[ "$scenario_job_count" -le 8 ]]
-          [[ "$packaged_count" -eq "$scenario_job_count" ]]
-          [[ "$(jq -c '[.[].name] | sort' <<< "$artifact_inventory")" \
-            == "$expected_artifact_names" ]]
+          [[ "$raw_packaged_count" -le \
+            "$((scenario_job_count * source_run_attempt))" ]]
           jq -e --argjson run_id "$source_run_id" '
             ([.[].id] | length) == ([.[].id] | unique | length) and
-            ([.[].name] | length) == ([.[].name] | unique | length) and
             ([.[] |
               (.id | type == "number" and . > 0) and
               (.name | type == "string" and
@@ -494,7 +497,27 @@ jobs:
               (.size_in_bytes | type == "number" and . > 0 and . <= 67108864) and
               (.digest | type == "string" and
                 test("^sha256:[0-9a-f]{64}$")) and
-              (.expired == false) and (.workflow_run.id == $run_id)] | all) and
+              (.expired == false) and (.workflow_run.id == $run_id)] | all)
+          ' <<< "$raw_artifact_inventory" > /dev/null
+          jq -e --argjson source_run_attempt "$source_run_attempt" '
+            sort_by(.name) | group_by(.name) |
+            ([.[] | length <= $source_run_attempt] | all)
+          ' <<< "$raw_artifact_inventory" > /dev/null
+
+          # Failed-only reruns retain immutable artifacts from earlier attempts. Use the newest
+          # artifact ID for each latest successful job name, while bounding duplicates by the
+          # authenticated source attempt so retries cannot multiply the review surface.
+          artifact_inventory="$(jq -c '
+            sort_by(.name) | group_by(.name) |
+            map(sort_by(.id) | .[-1]) | sort_by(.name)
+          ' <<< "$raw_artifact_inventory")"
+          packaged_count="$(jq length <<< "$artifact_inventory")"
+          [[ "$packaged_count" -eq "$scenario_job_count" ]]
+          [[ "$(jq -c '[.[].name] | sort' <<< "$artifact_inventory")" \
+            == "$expected_artifact_names" ]]
+          jq -e '
+            ([.[].id] | length) == ([.[].id] | unique | length) and
+            ([.[].name] | length) == ([.[].name] | unique | length) and
             ([.[].size_in_bytes] | add // 0) <= 268435456
           ' <<< "$artifact_inventory" > /dev/null
 
