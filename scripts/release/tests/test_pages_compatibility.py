@@ -19,6 +19,7 @@ from collect_compatibility import (  # noqa: E402
     GitHubClient,
     REVIEW_WORKFLOW,
     _CredentialStrippingRedirect,
+    _latest_attempt_artifact,
     _select_review_artifact,
     RemoteArtifact,
 )
@@ -30,10 +31,16 @@ CURRENT_SHA = "c" * 40
 SOURCE_SHA = "a" * 40
 
 
-def artifact(artifact_id: int, run_id: int, created_at: str) -> RemoteArtifact:
+def artifact(
+    artifact_id: int,
+    run_id: int,
+    created_at: str,
+    *,
+    name: str = "mod-compatibility-review-complete-123",
+) -> RemoteArtifact:
     return RemoteArtifact(
         artifact_id=artifact_id,
-        name="mod-compatibility-review-complete-123",
+        name=name,
         size=100,
         digest=f"sha256:{artifact_id:064x}",
         expired=False,
@@ -74,6 +81,40 @@ class FakeReviewApi:
 
 
 class PagesCompatibilityTest(unittest.TestCase):
+    def test_latest_attempt_artifact_selects_the_newest_completed_lane_attempt(
+        self,
+    ) -> None:
+        prefix = "mod-compatibility-review-input-123-fabric-lane-"
+        first = artifact(1, 123, "2026-08-22T19:14:27Z", name=f"{prefix}1")
+        second = artifact(2, 123, "2026-08-22T19:15:27Z", name=f"{prefix}2")
+        future = artifact(3, 123, "2026-08-22T19:16:27Z", name=f"{prefix}3")
+
+        selected = _latest_attempt_artifact(
+            [first, future, second],
+            name_prefix=prefix,
+            run_id=123,
+            maximum_attempt=2,
+            maximum_size=1024,
+        )
+
+        self.assertEqual(second, selected)
+
+    def test_latest_attempt_artifact_rejects_a_duplicate_attempt(self) -> None:
+        prefix = "mod-compatibility-review-input-123-fabric-lane-"
+        duplicate = [
+            artifact(1, 123, "2026-08-22T19:14:27Z", name=f"{prefix}2"),
+            artifact(2, 123, "2026-08-22T19:15:27Z", name=f"{prefix}2"),
+        ]
+
+        with self.assertRaisesRegex(CollectionError, "duplicate authenticated"):
+            _latest_attempt_artifact(
+                duplicate,
+                name_prefix=prefix,
+                run_id=123,
+                maximum_attempt=2,
+                maximum_size=1024,
+            )
+
     def test_clean_verdict_may_keep_a_non_defect_review_note(self) -> None:
         verdict = {
             "semantic_valid": True,
