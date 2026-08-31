@@ -167,12 +167,12 @@ public class PlayerRendererMixin {
                                                               ResourceLocation skinTexture, ModelPart arm, boolean slim) {
 //?}
 //? if <1.21.9 {
-        if (CPMCompatIntegration.shouldDeferToCPM()) return instance.getBuffer(renderType);
-
         // When CPM has a bound player, it manages the texture pipeline and already converts
         // entitySolidâ†’entityTranslucent when needed. Overriding the RenderType here would
         // use a different ResourceLocation, causing first-person arm texture artifacts.
-        if (CPMCompatIntegration.isCPMActivelyRendering()) return instance.getBuffer(renderType);
+        if (CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()) {
+            return instance.getBuffer(renderType);
+        }
 
         // Check if transparency is disabled globally by config
         if (ClientConfig.getInstance().shouldDisableSkinTransparency()) {
