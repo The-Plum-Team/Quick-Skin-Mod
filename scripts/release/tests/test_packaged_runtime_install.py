@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import tempfile
+import tomllib
 import types
 import unittest
 from contextlib import ExitStack
@@ -508,6 +509,52 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
             },
             json.loads(config_path.read_text(encoding="utf-8")),
         )
+
+    def test_forge_client_config_preseeds_complete_early_window_defaults(self) -> None:
+        game_dir = self.root / "forge-game"
+
+        config_path = packaged_runtime.write_loader_client_config(
+            game_dir, "forge", ROOT / "e2e"
+        )
+
+        self.assertEqual(game_dir / "config" / "fml.toml", config_path)
+        assert config_path is not None
+        self.assertEqual(
+            {
+                "defaultConfigPath": "defaultconfigs",
+                "disableOptimizedDFU": True,
+                "earlyWindowControl": True,
+                "earlyWindowFBScale": 1,
+                "earlyWindowHeight": 480,
+                "earlyWindowLogHelpMessage": True,
+                "earlyWindowMaximized": False,
+                "earlyWindowProvider": "fmlearlywindow",
+                "earlyWindowShowCPU": False,
+                "earlyWindowSkipGLVersions": [],
+                "earlyWindowSquir": False,
+                "earlyWindowWidth": 854,
+                "maxThreads": -1,
+                "versionCheck": True,
+            },
+            tomllib.loads(config_path.read_text(encoding="utf-8")),
+        )
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure,
+            "loader client config must start absent",
+        ):
+            packaged_runtime.write_loader_client_config(
+                game_dir, "forge", ROOT / "e2e"
+            )
+
+    def test_fabric_client_does_not_receive_an_fml_config(self) -> None:
+        game_dir = self.root / "fabric-game"
+
+        config_path = packaged_runtime.write_loader_client_config(
+            game_dir, "fabric", ROOT / "e2e"
+        )
+
+        self.assertIsNone(config_path)
+        self.assertFalse(game_dir.exists())
 
     def test_replaymod_compatibility_config_enables_deterministic_recording(self) -> None:
         game_dir = self.root / "replaymod-game"
