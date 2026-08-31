@@ -65,7 +65,8 @@ public class PlayerRendererMixin {
                                                               ResourceLocation skinTexture,
                                                               ModelPart arm,
                                                               boolean slim) {
-        if (CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()
+        if (CPMCompatIntegration.shouldDeferToCPM()
+                || CPMCompatIntegration.isCPMActivelyRendering()
                 || ClientConfig.getInstance().shouldDisableSkinTransparency()
                 || skinTexture == null) {
             return instance.getBuffer(originalRenderType);
