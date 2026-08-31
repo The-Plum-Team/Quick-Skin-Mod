@@ -470,7 +470,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("github.event.client_payload.artifact_id", drain_header)
         self.assertIn("'queue-sweep'", drain_header)
         self.assertIn("cancel-in-progress: false", drain_header)
-        self.assertNotIn("concurrency:", review)
+        self.assertIn("concurrency:", review)
+        self.assertIn(
+            "quick-skin-visual-review-model-${{ "
+            "needs.select.outputs.implementation_sha }}",
+            review,
+        )
+        self.assertIn("cancel-in-progress: false", review)
         self.assertNotIn("concurrency:", capacity_check)
         self.assertIn("scripts/ci/claude_capacity_gate.py", capacity_check)
         self.assertIn("needs.select.outputs.direct == 'true'", capacity_check)
