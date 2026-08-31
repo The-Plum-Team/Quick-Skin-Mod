@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -171,9 +172,9 @@ class VersionPortMergeTest(unittest.TestCase):
 
     @staticmethod
     def legacy_mixin_hand_policy() -> str:
-        payload = (ROOT / version_port_merge.MIXIN_POLICY_PATH).read_text(
-            encoding="utf-8"
-        )
+        payload = (
+            ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
+        ).read_text(encoding="utf-8")
         cape = version_port_merge.MIXIN_CAPE_POLICY_LINE.decode("utf-8")
         hand = version_port_merge.MIXIN_HAND_POLICY_LINE.decode("utf-8")
         payload = payload.replace(cape + hand, cape, 1)
@@ -286,7 +287,7 @@ class VersionPortMergeTest(unittest.TestCase):
             ROOT / version_port_merge.COMMON_HAND_RENDERER_PATH
         ).read_text(encoding="utf-8")
         canonical_mixin_policy = (
-            ROOT / version_port_merge.MIXIN_POLICY_PATH
+            ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
         ).read_text(encoding="utf-8")
         legacy_mixin_policy = self.legacy_mixin_hand_policy()
         source_payload = canonical_payload
@@ -600,6 +601,20 @@ class VersionPortMergeTest(unittest.TestCase):
                     version_port_merge._migrate_mixin_hand_policy_payload(legacy),
                     canonical,
                 )
+
+    def test_mixin_policy_source_fixture_is_the_authenticated_policy(self) -> None:
+        fixture = (
+            ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
+        ).read_bytes()
+
+        self.assertEqual(
+            hashlib.sha256(fixture).hexdigest(),
+            version_port_merge.MIXIN_POLICY_SHA256,
+        )
+        self.assertEqual(
+            version_port_merge._migrate_mixin_hand_policy_payload(fixture),
+            fixture,
+        )
 
     def test_modern_neoforge_collector_is_replaced_by_audited_fixture(self) -> None:
         source, target, _, result_payload = (
