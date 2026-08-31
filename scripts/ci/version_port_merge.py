@@ -90,6 +90,10 @@ CPM_TRANSITION_POLICY_SHA256 = (
     "6cebd1a4dad2b1be2e98ecf2a73487c0786fa4e77d14311e15ad21e7871a9ce2"
 )
 MIXIN_POLICY_PATH = "scripts/release/tests/test_mixin_policy.py"
+MIXIN_POLICY_SOURCE_FIXTURE_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "mixin-policy-with-mandatory-hand.py.fixture"
+)
 MIXIN_POLICY_SHA256 = (
     "ab2283c17662caeb8772ead0c180889a92a379cc376325a95150b34450c09d33"
 )
