@@ -9,38 +9,25 @@ import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.common.util.TextureAlphaDetector;
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.model.geom.ModelPart;
-//? if <1.21.9 {
+//? if <1.21.2 {
 import net.minecraft.client.player.AbstractClientPlayer;
+//?}
+//? if <1.21.9 {
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.resources.ResourceLocation;
 //?} else {
-import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-    //? if <1.21.11 {
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-    //?} else {
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.resources.Identifier;
-    //?}
 //?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * Mixin to enable transparent arm rendering in first-person view.
- * Before 1.21.9 it targets PlayerRenderer and redirects the MultiBufferSource buffers requested for
- * the arm and the sleeve. From 1.21.9 it targets AvatarRenderer, whose renderHand submits the arm
- * through SubmitNodeCollector, so the submit is redirected instead; this mirrors the NeoForge
- * PlayerRendererMixin.
- *
- * Every branch replays the vanilla call unchanged while CPM is bound or actively rendering, so
- * wrappers installed by model mods keep ownership of the hand pipeline and its texture identity.
+ * Enables transparent first-person arms on the legacy immediate-rendering pipeline.
+ * Minecraft 1.21.9 and later already submit the hand with entityTranslucent; intercepting its
+ * collector would bypass wrappers installed by model mods such as CPM.
  */
 //? if <1.21.9 {
 @Mixin(value = PlayerRenderer.class, priority = 1100) // Higher priority to override TLSkinCape and other mods
@@ -49,43 +36,39 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 //?}
 public class ItemInHandRendererMixin {
 
-    /**
-     * Redirects the vanilla arm draw inside renderHand so a skin with transparent pixels is
-     * rendered with entityTranslucent instead of the solid render type.
-     */
-    @Redirect(
 //? if <1.21.9 {
+    /** Redirects the legacy first-person arm buffers when the selected skin needs translucency. */
+    @Redirect(
+//? if <1.21.2 {
             method = "renderHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/player/AbstractClientPlayer;Lnet/minecraft/client/model/geom/ModelPart;Lnet/minecraft/client/model/geom/ModelPart;)V",
-//?} else if <1.21.11 {
-            method = "renderHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/resources/ResourceLocation;Lnet/minecraft/client/model/geom/ModelPart;Z)V",
 //?} else {
-            method = "renderHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/resources/Identifier;Lnet/minecraft/client/model/geom/ModelPart;Z)V",
+            method = "renderHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/resources/ResourceLocation;Lnet/minecraft/client/model/geom/ModelPart;Z)V",
 //?}
             at = @At(
                     value = "INVOKE",
-//? if <1.21.9 {
                     target = "Lnet/minecraft/client/renderer/MultiBufferSource;getBuffer(Lnet/minecraft/client/renderer/RenderType;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
-//?} else if <1.21.11 {
-                    target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModelPart(Lnet/minecraft/client/model/geom/ModelPart;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/RenderType;IILnet/minecraft/client/renderer/texture/TextureAtlasSprite;)V"
-//?} else {
-                    target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModelPart(Lnet/minecraft/client/model/geom/ModelPart;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IILnet/minecraft/client/renderer/texture/TextureAtlasSprite;)V"
-//?}
             ),
-            require = 0,
-//? if <1.21.9 {
+//? if <1.21.2 {
             // Vanilla requests one buffer for the arm and one for the sleeve.
             expect = 2,
-            allow = 2
+            allow = 2,
 //?} else {
-            // The collector submits the arm once; the sleeve rides along as its child part.
+            // The newer immediate renderer performs exactly one arm draw.
             expect = 1,
-            allow = 1
+            allow = 1,
 //?}
+            require = 1
     )
-//? if <1.21.9 {
+//? if <1.21.2 {
     private VertexConsumer quickskin$redirectRenderHandBuffer(MultiBufferSource instance, RenderType renderType,
                                                               // Injected arguments from renderHand:
                                                               PoseStack poseStack, MultiBufferSource buffer, int packedLight, AbstractClientPlayer player, ModelPart arm, ModelPart sleeve) {
+//?} else {
+    private VertexConsumer quickskin$redirectRenderHandBuffer(MultiBufferSource instance, RenderType renderType,
+                                                              // Injected arguments from renderHand:
+                                                              PoseStack poseStack, MultiBufferSource buffer, int packedLight,
+                                                              ResourceLocation skinTexture, ModelPart arm, boolean slim) {
+//?}
         if (CPMCompatIntegration.shouldDeferToCPM()) return instance.getBuffer(renderType);
 
         // When CPM has a bound player, it manages the texture pipeline and already converts
@@ -98,87 +81,29 @@ public class ItemInHandRendererMixin {
         if (ClientConfig.getInstance().shouldDisableSkinTransparency()) {
             return instance.getBuffer(renderType);
         }
-//?} else if <1.21.11 {
-    private void quickskin$redirectSubmitModelPart(SubmitNodeCollector collector, ModelPart part,
-                                                    PoseStack poseStack, RenderType renderType,
-                                                    int packedLight, int overlay, TextureAtlasSprite sprite,
-                                                    // Injected arguments from renderHand:
-                                                    PoseStack poseStackOuter, SubmitNodeCollector bufferOuter,
-                                                    int packedLightOuter, ResourceLocation skinTexture,
-                                                    ModelPart arm, boolean slim) {
-        if (CPMCompatIntegration.shouldDeferToCPM()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-//?} else {
-    private void quickskin$redirectSubmitModelPart(SubmitNodeCollector collector, ModelPart part,
-                                                    PoseStack poseStack, RenderType renderType,
-                                                    int packedLight, int overlay, TextureAtlasSprite sprite,
-                                                    // Injected arguments from renderHand:
-                                                    PoseStack poseStackOuter, SubmitNodeCollector bufferOuter,
-                                                    int packedLightOuter, Identifier skinTexture,
-                                                    ModelPart arm, boolean slim) {
-        if (CPMCompatIntegration.shouldDeferToCPM()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-//?}
 
-//? if <1.21.9 {
-    //? if <1.21 {
+//? if <1.21 {
         ResourceLocation skinTexture = player.getSkinTextureLocation();
-    //?} else {
+//?} else if <1.21.2 {
         ResourceLocation skinTexture = player.getSkin().texture();
-    //?}
+//?}
         if (skinTexture == null) {
             return instance.getBuffer(renderType);
         }
 
         // Determine if the skin needs a translucent render type
-//?} else {
-        // The collector is the render type a model mod already wrapped; leave its submit alone.
-        if (CPMCompatIntegration.isCPMActivelyRendering()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-
-        if (ClientConfig.getInstance().shouldDisableSkinTransparency()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-
-        if (skinTexture == null) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-
-//?}
         boolean needsTranslucent = TextureAlphaDetector.hasTransparency(skinTexture);
 
         if (needsTranslucent) {
-//? if <1.21.9 {
-            // The vanilla method calls getBuffer for both the solid arm and the translucent sleeve.
-            // By forcing entityTranslucent here, we correctly render the arm with transparency.
-            // It's harmless to also request a translucent buffer for the sleeve, which already uses it.
+            // The oldest renderer calls getBuffer for both the solid arm and translucent sleeve;
+            // newer immediate renderers make one arm draw. Forcing entityTranslucent renders the
+            // arm correctly and is harmless for the older sleeve, which is already translucent.
             // We use entityTranslucent instead of entityTranslucentCull to avoid z-fighting on complex layers.
             return instance.getBuffer(RenderType.entityTranslucent(skinTexture));
-//?} else if <1.21.11 {
-            RenderType translucentType = RenderType.entityTranslucent(skinTexture);
-            collector.submitModelPart(part, poseStack, translucentType, packedLight, overlay, sprite);
-        } else {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-//?} else {
-            RenderType translucentType = RenderTypes.entityTranslucent(skinTexture);
-            collector.submitModelPart(part, poseStack, translucentType, packedLight, overlay, sprite);
-        } else {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-//?}
         }
-//? if <1.21.9 {
 
         // If no transparency is needed, use the original render type provided by the vanilla method.
         return instance.getBuffer(renderType);
-//?} else {
-//?}
     }
+//?}
 }
