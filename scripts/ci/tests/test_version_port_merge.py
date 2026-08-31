@@ -645,6 +645,40 @@ class VersionPortMergeTest(unittest.TestCase):
             migrated,
         )
 
+    def test_missing_scoped_neoforge_hand_count_is_restored(self) -> None:
+        inherited = (
+            ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
+        ).read_bytes()
+        inherited = inherited.replace(
+            version_port_merge.MIXIN_HAND_OVERRIDE_MARKER,
+            version_port_merge.MIXIN_HAND_OVERRIDE_MARKER
+            + b"\n"
+            + version_port_merge.MIXIN_NEOFORGE_HAND_OVERRIDE_MARKER,
+            1,
+        )
+
+        self.assertNotIn(
+            version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK,
+            inherited,
+        )
+
+        migrated = version_port_merge._migrate_mixin_hand_policy_payload(inherited)
+
+        self.assertEqual(
+            migrated.count(
+                version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK
+            ),
+            1,
+        )
+        self.assertLess(
+            migrated.index(version_port_merge.MIXIN_NEOFORGE_LEGACY_HAND_COUNT_BLOCK),
+            migrated.index(version_port_merge.MIXIN_COUNT_SUBTEST_MARKER),
+        )
+        self.assertEqual(
+            version_port_merge._migrate_mixin_hand_policy_payload(migrated),
+            migrated,
+        )
+
     def test_mixin_policy_source_fixture_is_the_authenticated_policy(self) -> None:
         fixture = (
             ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
