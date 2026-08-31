@@ -529,7 +529,8 @@ jobs:
           scenarios: ${{ matrix.scenarios }}
           compatibility-mod: ${{ matrix.compatibility_mod }}
           cpm-model-path: ${{ matrix.compatibility_mod == 'cpm' && format('{0}/qsm-protected-cpm-fixture/complex-model.bin', runner.temp) || '' }}
-          evidence-name: mod-compatibility-e2e-${{ matrix.id }}
+          evidence-name: >-
+            mod-compatibility-e2e-${{ matrix.id }}-${{ github.run_attempt }}
           evidence-retention-days: "7"
 
       - name: Install the hash-locked evidence decoder
@@ -586,7 +587,8 @@ jobs:
         shell: bash
         env:
           BASE_NAME: ${{ matrix.base_evidence_name }}
-          CANDIDATE_NAME: mod-compatibility-e2e-${{ matrix.id }}
+          CANDIDATE_NAME: >-
+            mod-compatibility-e2e-${{ matrix.id }}-${{ github.run_attempt }}
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
@@ -651,7 +653,7 @@ jobs:
       - name: Upload the bounded credential-free review capsule
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mod-compatibility-review-input-${{ github.run_id }}-${{ matrix.id }}
+          name: mod-compatibility-review-input-${{ github.run_id }}-${{ matrix.id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/mod-compatibility-capsule/
           if-no-files-found: error
           compression-level: 6
