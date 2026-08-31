@@ -1888,8 +1888,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("Classify packaged runtime impact", inspect)
         self.assertIn("Build immutable E2E input bundle", inspect)
         self.assertIn('endswith(" - contract scenarios")', inspect)
-        self.assertIn("gh api --paginate --slurp", inspect)
+        self.assertIn("github_api_retry --paginate --slurp", inspect)
         self.assertIn("[.[].jobs[]", inspect)
+        self.assertIn("protected-github-api-retry.sh", inspect)
+        self.assertIn("GITHUB_API_RETRY_MAX_WAIT_SECONDS", inspect)
+        self.assertIn("github_cli_retry gh run list", inspect)
         self.assertIn(
             '"+refs/heads/master:refs/remotes/origin/master"', inspect
         )
@@ -1899,10 +1902,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("Ignoring superseded port result", inspect)
         self.assertIn('gh run view "$GATE_RUN_ID" --log-failed', inspect)
-        self.assertIn("Dependency verification failed for configuration", inspect)
+        self.assertIn("version_port_failure_policy.py", inspect)
+        self.assertIn('disposition="$(jq -r .disposition', inspect)
         self.assertIn("Automated AI repair is intentionally disabled", inspect)
+        self.assertIn('gh run rerun "$GATE_RUN_ID" --failed', inspect)
+        self.assertIn('[[ "$run_attempt" == 1', inspect)
+        self.assertIn("no AI repair was started", inspect)
         self.assertLess(
-            inspect.index("Dependency verification failed for configuration"),
+            inspect.index("version_port_failure_policy.py"),
             inspect.index("gh label create ai-repair-attempted"),
         )
         self.assertIn("-f runtime_policy=full", repair)
@@ -1919,6 +1926,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('--head "$head_sha"', merge)
         self.assertIn("NOTIFYING_RUNTIME_POLICY", merge)
         self.assertIn("scripts/ci/e2e_job_graph.py", merge)
+        self.assertIn("protected-github-api-retry.sh", merge)
+        self.assertIn("github_cli_retry gh pr merge", merge)
+        self.assertIn("github_api_retry --paginate --slurp", merge)
         self.assertIn('--runtime-policy "$runtime_policy"', merge)
         self.assertIn('--protected-sha "$protected_sha"', merge)
         self.assertIn('--head-sha "$head_sha"', merge)
@@ -1930,7 +1940,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             '--bootstrap-contract "$controller/e2e/loader-bootstrap-contract.json"',
             merge,
         )
-        self.assertIn("gh api --paginate --slurp", merge)
+        self.assertIn("github_api_retry --paginate --slurp", merge)
         self.assertNotIn("observed_policy", merge)
         self.assertIn("Packaged E2E not applicable (non-runtime port)", merge)
         self.assertIn("Verified exact-head Packaged E2E", merge)
