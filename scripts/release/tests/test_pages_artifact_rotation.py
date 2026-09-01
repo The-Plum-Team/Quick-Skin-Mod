@@ -130,15 +130,6 @@ class FakeApi:
     def list_artifacts(self, name: str) -> list[Artifact]:
         return list(self.inventories.get(name, []))
 
-    def list_artifacts_with_prefix(self, prefix: str) -> list[Artifact]:
-        by_id = {
-            item.artifact_id: item
-            for values in self.inventories.values()
-            for item in values
-            if item.name.startswith(prefix)
-        }
-        return list(by_id.values())
-
     def list_artifacts_for_run(self, run_id: int) -> list[Artifact]:
         return list(self.run_artifacts.get(run_id, []))
 
@@ -844,6 +835,36 @@ class PagesArtifactRotationTest(unittest.TestCase):
         self.assertEqual(api.deleted, [100, 110])
         self.assertNotIn(raw_source.artifact_id, api.deleted)
 
+    def test_rotation_leaves_namespaced_caches_to_bounded_retention(self) -> None:
+        namespaced_cache = artifact(
+            100,
+            f"pages-cache-{BRANCH}--{OLD_PAGES_SHA}",
+            "2026-08-03T11:00:00Z",
+            run_id=700,
+            head_branch="master",
+            head_sha=OLD_PAGES_SHA,
+        )
+        api = FakeApi(
+            keep=self.keep,
+            inventories={
+                namespaced_cache.name: [namespaced_cache],
+                f"pages-e2e-{BRANCH}": [],
+            },
+            runs={},
+        )
+
+        deleted = rotate_branch(
+            api,
+            self.generation,
+            repository=REPOSITORY,
+            pages_run_id=900,
+            pages_run_sha=PAGES_SHA,
+            delete_delay_seconds=0,
+        )
+
+        self.assertEqual(deleted, [])
+        self.assertEqual(api.deleted, [])
+
     def test_rotation_replaces_but_never_compacts_the_lossless_reference(self) -> None:
         old_cache = artifact(
             100,
@@ -1107,6 +1128,36 @@ class PagesArtifactRotationTest(unittest.TestCase):
         self.assertEqual(deleted, [300, 301])
         self.assertEqual(api.deleted, [300, 301])
 
+    def test_pages_run_transients_defer_before_exceeding_validation_budget(self) -> None:
+        collected = artifact(
+            300,
+            f"collected-pages-{BRANCH}",
+            "2026-08-03T11:30:00Z",
+            run_id=900,
+            head_branch="master",
+            head_sha=PAGES_SHA,
+        )
+        api = FakeApi(
+            keep=self.keep,
+            inventories={},
+            runs={},
+            run_artifacts={900: [self.keep, collected]},
+        )
+
+        with patch("rotate_artifacts.MAX_TRANSIENT_KEEP_VALIDATIONS", 0):
+            with self.assertRaisesRegex(RotationError, "retention will retire"):
+                retire_pages_run_transients(
+                    api,
+                    generations=[self.generation],
+                    trigger_artifacts=[self.keep, collected],
+                    repository=REPOSITORY,
+                    pages_run_id=900,
+                    pages_run_sha=PAGES_SHA,
+                    delete_delay_seconds=0,
+                )
+
+        self.assertEqual(api.deleted, [])
+
     def test_artifact_identity_change_fails_closed_before_delete(self) -> None:
         collected = artifact(
             300,
@@ -1217,7 +1268,11 @@ class PagesArtifactRotationTest(unittest.TestCase):
                 }
 
             def assert_request(self, method: str, path: str) -> None:
-                if method != "GET" or "per_page=100" not in path:
+                if (
+                    method != "GET"
+                    or "name=pages-cache-test" not in path
+                    or "per_page=100" not in path
+                ):
                     raise AssertionError(f"unexpected request: {method} {path}")
 
         api = StubApi()
