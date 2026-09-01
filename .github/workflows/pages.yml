@@ -1088,7 +1088,9 @@ jobs:
       github.ref == 'refs/heads/master' &&
       inputs.operation == 'rotate'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # Rotation revalidates every retained generation before each deletion. A full historical
+    # backlog can safely outlive the deployment itself, so leave room for bounded cleanup.
+    timeout-minutes: 45
     permissions:
       actions: write
       contents: read
