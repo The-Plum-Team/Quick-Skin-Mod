@@ -40,6 +40,7 @@ COMPATIBILITY_REVIEW_EVENTS = frozenset(
 )
 REQUEST_ATTEMPTS = 4
 RETRYABLE_HTTP_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
+MAX_TRANSIENT_KEEP_VALIDATIONS = 512
 
 
 class RotationError(RuntimeError):
@@ -109,8 +110,6 @@ class ArtifactApi(Protocol):
     def get_artifact(self, artifact_id: int) -> Artifact: ...
 
     def list_artifacts(self, name: str) -> list[Artifact]: ...
-
-    def list_artifacts_with_prefix(self, prefix: str) -> list[Artifact]: ...
 
     def list_artifacts_for_run(self, run_id: int) -> list[Artifact]: ...
 
@@ -380,11 +379,6 @@ class GitHubApi:
             self._repo_path("/actions/artifacts"), query=query
         )
 
-    def list_artifacts_with_prefix(self, prefix: str) -> list[Artifact]:
-        return self._list_artifacts(
-            self._repo_path("/actions/artifacts"), query={}, name_prefix=prefix
-        )
-
     def list_artifacts_for_run(self, run_id: int) -> list[Artifact]:
         return self._list_artifacts(
             self._repo_path(f"/actions/runs/{run_id}/artifacts"), query={}
@@ -395,7 +389,6 @@ class GitHubApi:
         path: str,
         *,
         query: dict[str, Any],
-        name_prefix: str | None = None,
     ) -> list[Artifact]:
         artifacts: list[Artifact] = []
         for page in range(1, 1001):
@@ -406,12 +399,6 @@ class GitHubApi:
                 raise RotationError("artifact inventory response is invalid")
             batch = payload["artifacts"]
             for item in batch:
-                if name_prefix is not None and (
-                    not isinstance(item, dict)
-                    or not isinstance(item.get("name"), str)
-                    or not item["name"].startswith(name_prefix)
-                ):
-                    continue
                 artifacts.append(Artifact.parse(item))
             if len(batch) < 100:
                 return artifacts
@@ -548,19 +535,12 @@ def rotate_branch(
 
     cache_name = f"pages-cache-{generation.branch}"
     handoff_name = f"pages-e2e-{generation.branch}"
+    # GitHub supports exact artifact-name filtering but not prefixes. A repository-wide prefix
+    # scan grows with every unrelated artifact and can exhaust the installation quota before a
+    # single branch is rotated. Retire legacy exact-name caches here; SHA-namespaced caches remain
+    # bounded by their 90-day retention policy.
     old_caches = select_old_caches(
-        api.list_artifacts_with_prefix(f"{cache_name}--"),
-        branch=generation.branch,
-        keep=generation.keep,
-    )
-    old_caches.extend(
-        select_old_caches(
-            api.list_artifacts(cache_name), branch=generation.branch, keep=generation.keep
-        )
-    )
-    old_caches = sorted(
-        {artifact.artifact_id: artifact for artifact in old_caches}.values(),
-        key=lambda artifact: artifact.order,
+        api.list_artifacts(cache_name), branch=generation.branch, keep=generation.keep
     )
     handoff_inventory = api.list_artifacts(handoff_name)
     consumed_handoffs = select_consumed_handoffs(
@@ -780,6 +760,14 @@ def retire_pages_run_transients(
         pages_run_id=pages_run_id,
         pages_run_sha=pages_run_sha,
     )
+    compatibility = compatibility_generations or []
+    keep_validation_count = len(transients) * (len(generations) + len(compatibility))
+    if keep_validation_count > MAX_TRANSIENT_KEEP_VALIDATIONS:
+        raise RotationError(
+            "Pages run transient retirement requires "
+            f"{keep_validation_count} keep validations, exceeding the bounded maximum of "
+            f"{MAX_TRANSIENT_KEEP_VALIDATIONS}; retention will retire these uploads"
+        )
     deleted: list[int] = []
     for artifact in transients:
         for generation in generations:
@@ -790,7 +778,7 @@ def retire_pages_run_transients(
                 pages_run_id=pages_run_id,
                 pages_run_sha=pages_run_sha,
             )
-        for generation in compatibility_generations or []:
+        for generation in compatibility:
             _validate_compatibility_keep(
                 api,
                 generation,
