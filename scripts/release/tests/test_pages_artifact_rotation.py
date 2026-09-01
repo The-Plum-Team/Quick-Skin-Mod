@@ -19,6 +19,7 @@ from rotate_artifacts import (  # noqa: E402
     Artifact,
     BranchGeneration,
     CompatibilityGeneration,
+    DeletionBudget,
     GitHubApi,
     RotationError,
     load_generations,
@@ -27,6 +28,7 @@ from rotate_artifacts import (  # noqa: E402
     rotate_branch,
     rotate_generations,
     rotate_compatibility_branch,
+    rotate_compatibility_generations,
     select_consumed_handoffs,
     select_old_handoffs,
     select_old_caches,
@@ -1041,6 +1043,72 @@ class PagesArtifactRotationTest(unittest.TestCase):
         self.assertEqual(summary, {BRANCH: [], other_branch: [101]})
         self.assertEqual(api.deleted, [101])
 
+    def test_global_deletion_budget_bounds_all_rotation_families(self) -> None:
+        cache_name = f"pages-cache-{BRANCH}"
+        old_caches = [
+            artifact(
+                artifact_id,
+                cache_name,
+                f"2026-08-03T{hour:02d}:00:00Z",
+                run_id=700,
+                head_branch="master",
+                head_sha=OLD_PAGES_SHA,
+            )
+            for artifact_id, hour in ((100, 9), (101, 10), (102, 11))
+        ]
+        api = FakeApi(
+            keep=self.keep,
+            inventories={
+                cache_name: [*old_caches, self.keep],
+                f"pages-e2e-{BRANCH}": [],
+            },
+            runs={
+                700: run(
+                    700,
+                    workflow=".github/workflows/pages.yml",
+                    event="schedule",
+                    branch="master",
+                    sha=OLD_PAGES_SHA,
+                ),
+                900: run(
+                    900,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_dispatch",
+                    branch="master",
+                    sha=PAGES_SHA,
+                ),
+            },
+        )
+        deletion_budget = DeletionBudget(2)
+
+        summary, deferred = rotate_generations(
+            api,
+            [self.generation],
+            repository=REPOSITORY,
+            pages_run_id=900,
+            pages_run_sha=PAGES_SHA,
+            delete_delay_seconds=0,
+            deletion_budget=deletion_budget,
+        )
+        compatibility_summary, compatibility_deferred = (
+            rotate_compatibility_generations(
+                api,
+                [self.compatibility_generation],
+                repository=REPOSITORY,
+                pages_run_id=900,
+                pages_run_sha=PAGES_SHA,
+                delete_delay_seconds=0,
+                deletion_budget=deletion_budget,
+            )
+        )
+
+        self.assertEqual(summary, {BRANCH: [100, 101]})
+        self.assertEqual(deferred, [BRANCH])
+        self.assertEqual(compatibility_summary, {BRANCH: []})
+        self.assertEqual(compatibility_deferred, [BRANCH])
+        self.assertEqual(api.deleted, [100, 101])
+        self.assertEqual(deletion_budget.remaining, 0)
+
     def test_delete_404_is_idempotent(self) -> None:
         old_cache = artifact(
             100,
@@ -1155,6 +1223,36 @@ class PagesArtifactRotationTest(unittest.TestCase):
                     pages_run_sha=PAGES_SHA,
                     delete_delay_seconds=0,
                 )
+
+        self.assertEqual(api.deleted, [])
+
+    def test_pages_run_transients_defer_before_exceeding_deletion_budget(self) -> None:
+        collected = artifact(
+            300,
+            f"collected-pages-{BRANCH}",
+            "2026-08-03T11:30:00Z",
+            run_id=900,
+            head_branch="master",
+            head_sha=PAGES_SHA,
+        )
+        api = FakeApi(
+            keep=self.keep,
+            inventories={},
+            runs={},
+            run_artifacts={900: [self.keep, collected]},
+        )
+
+        with self.assertRaisesRegex(RotationError, "global deletion budget"):
+            retire_pages_run_transients(
+                api,
+                generations=[self.generation],
+                trigger_artifacts=[self.keep, collected],
+                repository=REPOSITORY,
+                pages_run_id=900,
+                pages_run_sha=PAGES_SHA,
+                delete_delay_seconds=0,
+                deletion_budget=DeletionBudget(0),
+            )
 
         self.assertEqual(api.deleted, [])
 
