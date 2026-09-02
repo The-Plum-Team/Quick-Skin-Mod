@@ -26,6 +26,8 @@
     "full.client_a.external_skin_drop": [[0.34, 0.09, 0.66, 0.91]],
     "full.client_a.model_slim": [[0.42, 0.34, 0.58, 0.86]],
     "full.client_a.model_classic": [[0.42, 0.34, 0.58, 0.86]],
+    "full.client_a.hd_skin_no_downscale": [[0.42, 0.34, 0.58, 0.86]],
+    "full.client_a.transparent_skin_layers": [[0.42, 0.34, 0.58, 0.86]],
     "full.client_a.cape_menu_screen": [[0.12, 0.07, 0.7, 0.91]],
     "full.client_a.known_cape_apply": [[0.4, 0.32, 0.6, 0.88]],
     "full.client_a.cape_adjust_screen": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
@@ -408,6 +410,30 @@
                 "expectation": "A stable FOV-50 rear view shows the complete custom dark charcoal-and-gray plaid jacket and blue trousers on the classic Steve renderer; each arm has the wider silhouette produced by 4-pixel base geometry beneath the inflated jacket outer layer.",
                 "probes": []
               }
+            },
+            {
+              "id": "hd_skin_no_downscale",
+              "assertion_required": true,
+              "capture": {
+                "title": "HD skin no downscale",
+                "review_tier": "key",
+                "expectation": "A stable third-person view shows the complete local player wearing a crisp custom HD skin: a deep indigo body with a cyan stripe across the torso and a bright orange face carrying a fine dark checker. The checker must read as distinct small squares rather than a blurred or flattened patch, which is what a downscale to the standard resolution would produce.",
+                "probes": []
+              }
+            },
+            {
+              "id": "transparent_skin_layers",
+              "assertion_required": true,
+              "capture": {
+                "title": "Transparent skin layers",
+                "review_tier": "key",
+                "expectation": "A stable third-person view shows the complete local player wearing a green skin with a warm skin-toned face and a narrow magenta band around the head at brow height. The head must keep its normal shape with the band sitting flush against it; an opaque black or solid block enclosing the head means the transparent hat layer was flattened. The arms show the narrower slim silhouette that the empty outer arm columns select.",
+                "probes": []
+              }
+            },
+            {
+              "id": "restore_reference_skin",
+              "assertion_required": true
             },
             {
               "id": "cape_menu_screen",
