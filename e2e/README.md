@@ -23,15 +23,15 @@ This `master` integration baseline exercises the following exact packaged lanes:
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `8` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `8` |
 
-Scenario contract SHA-256: `e3122cbe8360352c4ac380af7c54597c33a54320ed798c19a7d71be4138ec902`
-Contract totals: `69` ordered steps, `50` captures.
+Scenario contract SHA-256: `0061323d1bd981ef42f8dcf41e9f1cd51c86fe4d9ed3f66914adca0caa21d504`
+Contract totals: `72` ordered steps, `52` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `7` | `5` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `34` | `32` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `37` | `34` |
 | `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
 | `mod-compatibility-remote` | `compatibility-remote` | `concurrent-two-client` | `client_a`, `client_b` | `8` | `2` |
 | `mod-compatibility-late-join` | `compatibility-remote` | `sequential-two-client` | `client_a`, `client_b` | `5` | `1` |
