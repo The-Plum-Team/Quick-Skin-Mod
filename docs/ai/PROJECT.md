@@ -97,7 +97,9 @@ immutable workflow and governance activation contract.
   atomically. The producer sends an authenticated explicit wake-up because token-created runs do
   not reliably create a recursive completion event. `collected-pages-*` and `pages-cache-*`
   contain only compact derivatives plus the
-  source and derivative proof records, never original PNG bytes. Only after that Pages run reaches
+  source and derivative proof records, never original PNG bytes. A release branch that advanced
+  only through a certified non-visual port keeps publishing its existing validated evidence,
+  carried forward to the current head by the collector's own ancestry and impact recomputation. Only after that Pages run reaches
   `completed/success` may protected automation replace the branch's single rolling cache and
   retire older caches plus the consumed handoff.
   Never delete the fallback before its replacement succeeds, introduce a second version list,

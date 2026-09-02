@@ -21,6 +21,7 @@ sys.path.insert(0, str(REPO / "scripts" / "release"))
 from evidence import (  # noqa: E402
     COMPACT_SCHEMA_VERSION,
     PublicEvidenceError,
+    bundle_coverage_sha,
     sha256_file,
     validate_bundle,
 )
@@ -212,8 +213,10 @@ def build(
     release_rank = {
         manifest["release"]["version"]: index for index, manifest in enumerate(manifests)
     }
+    # Compatibility evidence is bound to the head the ordinary bundle covers, which a
+    # non-visual port may have carried past the head its packaged run actually tested.
     ordinary_head_by_branch = {
-        manifest["release"]["branch"]: manifest["provenance"]["target"]["sha"]
+        manifest["release"]["branch"]: bundle_coverage_sha(manifest)
         for manifest in manifests
     }
 
@@ -305,6 +308,7 @@ def build(
                 "target_branch": provenance["target"]["branch"],
                 "target_sha": provenance["target"]["sha"],
                 "target_created_at": provenance["target"]["created_at"],
+                "coverage_sha": bundle_coverage_sha(manifest),
                 "short_sha": provenance["target"]["sha"][:12],
                 "target_run_url": provenance["target"]["run_url"],
                 "branch_url": f"https://github.com/{repository}/tree/{branch}",
