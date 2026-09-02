@@ -23,15 +23,15 @@ This `fabric-and-neoforge-26.1.2` release branch exercises the following exact p
 | `fabric-26.1.2` | `26.1.2` | Fabric | `25` | `8` |
 | `neoforge-26.1.2` | `26.1.2` | NeoForge | `25` | `8` |
 
-Scenario contract SHA-256: `e3122cbe8360352c4ac380af7c54597c33a54320ed798c19a7d71be4138ec902`
-Contract totals: `69` ordered steps, `50` captures.
+Scenario contract SHA-256: `0b887d1b5c6884124dce3c8ff02870dba6345d66cf8b6b7a88decf0619691f54`
+Contract totals: `72` ordered steps, `52` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `7` | `5` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `34` | `32` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `37` | `34` |
 | `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
 | `mod-compatibility-remote` | `compatibility-remote` | `concurrent-two-client` | `client_a`, `client_b` | `8` | `2` |
 | `mod-compatibility-late-join` | `compatibility-remote` | `sequential-two-client` | `client_a`, `client_b` | `5` | `1` |
