@@ -529,6 +529,7 @@ jobs:
           python3 scripts/pages/select_artifact.py
           --repository "$GITHUB_REPOSITORY"
           --branch "$BRANCH"
+          --allow-continuation
           --github-output "$GITHUB_OUTPUT"
 
       - name: Download the digest-checked branch artifact
@@ -548,6 +549,7 @@ jobs:
           BRANCH: ${{ matrix.branch }}
           EXPECTED_SHA: ${{ steps.artifact.outputs.sha }}
           GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
           OWNER_RUN_ID: ${{ steps.artifact.outputs.run_id }}
         run: |
           set -euo pipefail
@@ -598,8 +600,32 @@ jobs:
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == env.GITHUB_REPOSITORY' \
             <<< "$target_run" > /dev/null
-          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
-            --jq .commit.sha)" == "$EXPECTED_SHA" ]]
+          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
+            --jq .commit.sha)"
+          [[ "$current_sha" == "$HEAD_SHA" ]]
+          if [[ "$EXPECTED_SHA" != "$HEAD_SHA" ]]; then
+            # This job is privileged on the default branch, so the continuation is proved
+            # from the comparison API instead of fetching release-branch objects: untrusted
+            # history never reaches a workspace that can write the Actions cache.
+            # "ahead" with a base merge base is the only relation that proves the evidence
+            # head is a strict ancestor of the current head without divergence, and the
+            # bounded file count keeps a truncated inventory from reading as a complete one.
+            comparison="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/compare/$EXPECTED_SHA...$HEAD_SHA")"
+            jq -e --arg base "$EXPECTED_SHA" \
+              '.status == "ahead" and .behind_by == 0 and
+               .base_commit.sha == $base and .merge_base_commit.sha == $base and
+               (.total_commits | type) == "number" and .total_commits <= 20 and
+               (.files | type) == "array" and (.files | length) <= 100' \
+              <<< "$comparison" > /dev/null
+            jq -er '.files' <<< "$comparison" > compare-files.json
+            classification="$(python3 scripts/ci/visual_review_impact.py \
+              --files compare-files.json \
+              --changed-files "$(jq -er 'length' compare-files.json)" \
+              --scope replicated-port)"
+            [[ "$classification" == skip ]]
+            rm -f compare-files.json
+          fi
 
       - name: Convert the validated handoff into an atomic compact bundle
         shell: bash
@@ -607,6 +633,7 @@ jobs:
           ARTIFACT_NAME: ${{ steps.artifact.outputs.name }}
           BRANCH: ${{ matrix.branch }}
           EXPECTED_SHA: ${{ steps.artifact.outputs.sha }}
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
           OWNER_RUN_ID: ${{ steps.artifact.outputs.run_id }}
         run: |
           set -euo pipefail
@@ -632,6 +659,16 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --target-sha "$EXPECTED_SHA" \
             "${target_run_argument[@]}"
+          if [[ "$EXPECTED_SHA" != "$HEAD_SHA" ]]; then
+            python3 scripts/pages/evidence.py carry-forward \
+              --evidence-root public-evidence \
+              --output carried-evidence \
+              --branch "$BRANCH" \
+              --coverage-sha "$HEAD_SHA" \
+              --repository "$GITHUB_REPOSITORY"
+            rm -rf public-evidence
+            mv carried-evidence public-evidence
+          fi
 
       - name: Upload this validated branch to the atomic fan-in
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -939,18 +976,26 @@ jobs:
           manifest="public-evidence/$BRANCH/manifest.json"
           manifest_branch="$(jq -er .release.branch "$manifest")"
           target_sha="$(jq -er .provenance.target.sha "$manifest")"
+          # The cache is keyed by the head this bundle covers, which a protected
+          # carry-forward may have advanced past the head its packaged run tested. Keying
+          # by the packaged head instead would strand every continued branch on a cache
+          # name no later run can ask for.
+          coverage_sha="$(jq -er '.provenance.coverage_sha // .provenance.target.sha' \
+            "$manifest")"
           [[ "$manifest_branch" == "$BRANCH" ]]
           [[ "$target_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$coverage_sha" =~ ^[0-9a-f]{40}$ ]]
           [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
-            --jq .commit.sha)" == "$target_sha" ]]
+            --jq .commit.sha)" == "$coverage_sha" ]]
           python3 scripts/pages/evidence.py validate \
             --evidence-root public-evidence \
             --branch "$BRANCH" \
             --only-branch \
             --kind compact \
             --repository "$GITHUB_REPOSITORY" \
-            --target-sha "$target_sha"
-          printf 'name=pages-cache-%s--%s\n' "$BRANCH" "$target_sha" >> "$GITHUB_OUTPUT"
+            --target-sha "$target_sha" \
+            --coverage-sha "$coverage_sha"
+          printf 'name=pages-cache-%s--%s\n' "$BRANCH" "$coverage_sha" >> "$GITHUB_OUTPUT"
 
       - name: Roll the protected evidence cache forward
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1088,9 +1133,9 @@ jobs:
       github.ref == 'refs/heads/master' &&
       inputs.operation == 'rotate'
     runs-on: ubuntu-24.04
-    # Rotation revalidates every retained generation before each deletion. A full historical
-    # backlog can safely outlive the deployment itself, so leave room for bounded cleanup.
-    timeout-minutes: 45
+    # Rotation revalidates every deletion but admits only one bounded batch per invocation.
+    # Historical overflow remains under the repository's 90-day artifact retention policy.
+    timeout-minutes: 20
     permissions:
       actions: write
       contents: read

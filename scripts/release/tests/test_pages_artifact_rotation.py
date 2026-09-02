@@ -19,6 +19,7 @@ from rotate_artifacts import (  # noqa: E402
     Artifact,
     BranchGeneration,
     CompatibilityGeneration,
+    DeletionBudget,
     GitHubApi,
     RotationError,
     load_generations,
@@ -27,6 +28,7 @@ from rotate_artifacts import (  # noqa: E402
     rotate_branch,
     rotate_generations,
     rotate_compatibility_branch,
+    rotate_compatibility_generations,
     select_consumed_handoffs,
     select_old_handoffs,
     select_old_caches,
@@ -35,7 +37,11 @@ from rotate_artifacts import (  # noqa: E402
     select_pages_run_transients,
 )
 import select_artifact  # noqa: E402
-from select_artifact import PROBE_NO_EVIDENCE_EXIT, select_source  # noqa: E402
+from select_artifact import (  # noqa: E402
+    PROBE_NO_EVIDENCE_EXIT,
+    resolve_evidence,
+    select_source,
+)
 from select_compatibility_artifact import (  # noqa: E402
     select_source as select_compatibility_source,
 )
@@ -101,6 +107,7 @@ class FakeApi:
         run_artifacts: dict[int, list[Artifact]] | None = None,
         branch_sha: str = TARGET_SHA,
         branch_shas: dict[str, str] | None = None,
+        branch_commits: list[str] | None = None,
         missing_on_delete: set[int] | None = None,
         artifact_overrides: dict[int, Artifact] | None = None,
     ) -> None:
@@ -110,6 +117,8 @@ class FakeApi:
         self.run_artifacts = run_artifacts or {}
         self.branch_sha = branch_sha
         self.branch_shas = branch_shas
+        self.branch_commits = branch_commits
+        self.commit_requests = 0
         self.missing_on_delete = missing_on_delete or set()
         self.deleted: list[int] = []
         self.artifacts_by_id = {
@@ -143,6 +152,13 @@ class FakeApi:
             return self.branch_shas[branch]
         self.assert_branch(branch)
         return self.branch_sha
+
+    def list_branch_commits(self, branch: str, limit: int) -> list[str]:
+        self.assert_branch(branch)
+        if self.branch_commits is None:
+            raise AssertionError("unexpected branch commit lookup")
+        self.commit_requests += 1
+        return list(self.branch_commits[:limit])
 
     def delete_artifact(self, artifact_id: int) -> None:
         if artifact_id in self.missing_on_delete:
@@ -719,6 +735,114 @@ class PagesArtifactRotationTest(unittest.TestCase):
         self.assertEqual(selected, handoff)
         self.assertNotIn(901, api.runs)
 
+    def _continuation_api(self, *, commits: list[str]) -> "FakeApi":
+        """A branch whose head owns no evidence while its parent still does."""
+
+        cache = artifact(
+            410,
+            f"pages-cache-{BRANCH}--{OLD_PAGES_SHA}",
+            "2026-08-03T14:00:00Z",
+            run_id=902,
+            head_branch="master",
+            head_sha=OLD_PAGES_SHA,
+        )
+        return FakeApi(
+            keep=self.keep,
+            inventories={cache.name: [cache]},
+            runs={
+                902: run(
+                    902,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_run",
+                    branch="master",
+                    sha=OLD_PAGES_SHA,
+                )
+            },
+            branch_commits=commits,
+        )
+
+    def test_continuation_nominates_the_newest_ancestor_that_owns_evidence(self) -> None:
+        api = self._continuation_api(commits=[TARGET_SHA, OLD_PAGES_SHA])
+        evidence = resolve_evidence(
+            api,
+            repository=REPOSITORY,
+            branch=BRANCH,
+            current_sha=TARGET_SHA,
+            allow_continuation=True,
+        )
+        # The nomination reports the head the evidence was written for, never the current
+        # head, so the caller still validates provenance against the run that produced it.
+        self.assertEqual(evidence.sha, OLD_PAGES_SHA)
+        self.assertEqual(evidence.artifact.artifact_id, 410)
+        self.assertEqual(api.commit_requests, 1)
+
+    def test_continuation_refuses_a_head_the_branch_already_left(self) -> None:
+        api = self._continuation_api(commits=[PAGES_SHA, TARGET_SHA, OLD_PAGES_SHA])
+        with self.assertRaises(RotationError):
+            resolve_evidence(
+                api,
+                repository=REPOSITORY,
+                branch=BRANCH,
+                current_sha=TARGET_SHA,
+                allow_continuation=True,
+            )
+
+    def test_selection_never_continues_without_the_explicit_opt_in(self) -> None:
+        api = self._continuation_api(commits=[TARGET_SHA, OLD_PAGES_SHA])
+        with self.assertRaises(RotationError):
+            resolve_evidence(
+                api,
+                repository=REPOSITORY,
+                branch=BRANCH,
+                current_sha=TARGET_SHA,
+            )
+        self.assertEqual(api.commit_requests, 0)
+
+    def test_lossless_oracle_selection_never_continues(self) -> None:
+        api = self._continuation_api(commits=[TARGET_SHA, OLD_PAGES_SHA])
+        with self.assertRaises(RotationError):
+            resolve_evidence(
+                api,
+                repository=REPOSITORY,
+                branch=BRANCH,
+                current_sha=TARGET_SHA,
+                require_raw=True,
+                allow_continuation=True,
+            )
+        self.assertEqual(api.commit_requests, 0)
+
+    def test_exact_current_head_evidence_never_consults_the_lineage(self) -> None:
+        cache = artifact(
+            420,
+            f"pages-cache-{BRANCH}--{TARGET_SHA}",
+            "2026-08-03T15:00:00Z",
+            run_id=903,
+            head_branch="master",
+            head_sha=PAGES_SHA,
+        )
+        api = FakeApi(
+            keep=self.keep,
+            inventories={cache.name: [cache]},
+            runs={
+                903: run(
+                    903,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_run",
+                    branch="master",
+                    sha=PAGES_SHA,
+                )
+            },
+        )
+        evidence = resolve_evidence(
+            api,
+            repository=REPOSITORY,
+            branch=BRANCH,
+            current_sha=TARGET_SHA,
+            allow_continuation=True,
+        )
+        self.assertEqual(evidence.sha, TARGET_SHA)
+        self.assertEqual(evidence.artifact.artifact_id, 420)
+
     def test_source_selection_skips_invalid_owner_and_supports_legacy_fallback(self) -> None:
         legacy_name = f"pages-cache-{BRANCH}"
         invalid = artifact(
@@ -1041,6 +1165,72 @@ class PagesArtifactRotationTest(unittest.TestCase):
         self.assertEqual(summary, {BRANCH: [], other_branch: [101]})
         self.assertEqual(api.deleted, [101])
 
+    def test_global_deletion_budget_bounds_all_rotation_families(self) -> None:
+        cache_name = f"pages-cache-{BRANCH}"
+        old_caches = [
+            artifact(
+                artifact_id,
+                cache_name,
+                f"2026-08-03T{hour:02d}:00:00Z",
+                run_id=700,
+                head_branch="master",
+                head_sha=OLD_PAGES_SHA,
+            )
+            for artifact_id, hour in ((100, 9), (101, 10), (102, 11))
+        ]
+        api = FakeApi(
+            keep=self.keep,
+            inventories={
+                cache_name: [*old_caches, self.keep],
+                f"pages-e2e-{BRANCH}": [],
+            },
+            runs={
+                700: run(
+                    700,
+                    workflow=".github/workflows/pages.yml",
+                    event="schedule",
+                    branch="master",
+                    sha=OLD_PAGES_SHA,
+                ),
+                900: run(
+                    900,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_dispatch",
+                    branch="master",
+                    sha=PAGES_SHA,
+                ),
+            },
+        )
+        deletion_budget = DeletionBudget(2)
+
+        summary, deferred = rotate_generations(
+            api,
+            [self.generation],
+            repository=REPOSITORY,
+            pages_run_id=900,
+            pages_run_sha=PAGES_SHA,
+            delete_delay_seconds=0,
+            deletion_budget=deletion_budget,
+        )
+        compatibility_summary, compatibility_deferred = (
+            rotate_compatibility_generations(
+                api,
+                [self.compatibility_generation],
+                repository=REPOSITORY,
+                pages_run_id=900,
+                pages_run_sha=PAGES_SHA,
+                delete_delay_seconds=0,
+                deletion_budget=deletion_budget,
+            )
+        )
+
+        self.assertEqual(summary, {BRANCH: [100, 101]})
+        self.assertEqual(deferred, [BRANCH])
+        self.assertEqual(compatibility_summary, {BRANCH: []})
+        self.assertEqual(compatibility_deferred, [BRANCH])
+        self.assertEqual(api.deleted, [100, 101])
+        self.assertEqual(deletion_budget.remaining, 0)
+
     def test_delete_404_is_idempotent(self) -> None:
         old_cache = artifact(
             100,
@@ -1155,6 +1345,36 @@ class PagesArtifactRotationTest(unittest.TestCase):
                     pages_run_sha=PAGES_SHA,
                     delete_delay_seconds=0,
                 )
+
+        self.assertEqual(api.deleted, [])
+
+    def test_pages_run_transients_defer_before_exceeding_deletion_budget(self) -> None:
+        collected = artifact(
+            300,
+            f"collected-pages-{BRANCH}",
+            "2026-08-03T11:30:00Z",
+            run_id=900,
+            head_branch="master",
+            head_sha=PAGES_SHA,
+        )
+        api = FakeApi(
+            keep=self.keep,
+            inventories={},
+            runs={},
+            run_artifacts={900: [self.keep, collected]},
+        )
+
+        with self.assertRaisesRegex(RotationError, "global deletion budget"):
+            retire_pages_run_transients(
+                api,
+                generations=[self.generation],
+                trigger_artifacts=[self.keep, collected],
+                repository=REPOSITORY,
+                pages_run_id=900,
+                pages_run_sha=PAGES_SHA,
+                delete_delay_seconds=0,
+                deletion_budget=DeletionBudget(0),
+            )
 
         self.assertEqual(api.deleted, [])
 
@@ -1375,6 +1595,7 @@ class SelectArtifactProbeTest(unittest.TestCase):
                     f"name=pages-cache-{BRANCH}--{TARGET_SHA}",
                     "run_id=900",
                     f"sha={TARGET_SHA}",
+                    f"head_sha={TARGET_SHA}",
                     "size_in_bytes=100",
                 ],
                 output.read_text(encoding="utf-8").splitlines(),
