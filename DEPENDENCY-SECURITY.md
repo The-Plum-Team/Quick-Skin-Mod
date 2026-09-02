@@ -1,8 +1,15 @@
 # Dependency security policy
 
 Quick Skin treats build plugins and dependencies as executable supply-chain inputs.
-`gradle.properties` explicitly selects Gradle's strict verification mode; do not pass
-`--dependency-verification lenient` or `off` in development, CI, or release automation.
+
+**Gradle's artifact verification is recorded but not enforced.** `gradle.properties` selects
+`org.gradle.dependency.verification=off` deliberately. Upstream publishers occasionally replace an
+artifact under an existing version coordinate: on 2026-09-02 Fabric API republished its complete
+1.21.1 module set, and every build and packaged run on that branch failed until the lock was
+rewritten. Because that recurs on each upstream republication, the maintainer accepted the trade
+and turned enforcement off. `gradle/verification-metadata.xml` remains the recorded hash inventory
+and is still consumed by the SBOM and by the packaged-runtime store; it simply no longer fails a
+build. Every other layer below stays in force.
 
 ## Enforcement layers
 
@@ -14,9 +21,11 @@ Quick Skin treats build plugins and dependencies as executable supply-chain inpu
 - `gradle/repository-policy.gradle.kts` applies to every buildable common/loader node. It limits
   each remote repository to its owned groups, rejects unknown remote hosts, and prevents generated
   Loom namespaces from ever resolving over the network.
-- `gradle/verification-metadata.xml` verifies both artifacts and Maven/Gradle metadata with
-  SHA-256. It covers settings and build plugins plus the resolvable common, test, Fabric, NeoForge,
+- `gradle/verification-metadata.xml` records SHA-256 for both artifacts and Maven/Gradle metadata.
+  It covers settings and build plugins plus the resolvable common, test, Fabric, NeoForge,
   Minecraft, mappings, transform, runtime, native, and E2E classpaths for the active 1.21.11 graph.
+  Gradle no longer rejects a mismatch, but `e2e/packaged_runtime.py` still resolves the exact
+  SHA-256 it pins for each packaged-runtime download from this file, so keep it accurate.
 - `gradle/dependency-locks/` strictly locks only `shadowBundle`, the external graph physically
   embedded in each release JAR. Locking Loom's generated configurations is deliberately avoided;
   their external inputs remain pinned by coordinate-specific verification metadata.
