@@ -484,6 +484,18 @@ def prepare(
     return bundle
 
 
+def bundle_coverage_sha(manifest: dict[str, Any]) -> str:
+    """Return the release-branch head this bundle covers.
+
+    Evidence written before the coverage field existed covers exactly the head its
+    packaged run tested, so its target SHA remains the answer.
+    """
+
+    provenance = manifest["provenance"]
+    covered = provenance.get("coverage_sha")
+    return covered if isinstance(covered, str) else provenance["target"]["sha"]
+
+
 def validate_bundle(
     evidence_root: Path,
     branch: str,
@@ -494,6 +506,7 @@ def validate_bundle(
     expected_source_run_id: str | None = None,
     expected_target_run_id: str | None = None,
     expected_target_sha: str | None = None,
+    expected_coverage_sha: str | None = None,
     catalog_path: Path = DEFAULT_CATALOG,
 ) -> dict[str, Any]:
     branch = _branch(branch, "branch", release=True)
@@ -622,7 +635,15 @@ def validate_bundle(
         )
 
     provenance = manifest.get("provenance")
-    if not isinstance(provenance, dict) or set(provenance) != {"source", "target"}:
+    # A non-visual synchronization port advances a release branch without re-running
+    # packaged Minecraft, so validated evidence may legitimately outlive the head that
+    # produced it. The optional coverage_sha records how far that proof was carried.
+    # It stays optional until every release branch has republished, so an older rolling
+    # cache keeps validating; absence means the packaged target head is also the coverage.
+    if not isinstance(provenance, dict) or set(provenance) not in (
+        {"source", "target"},
+        {"source", "target", "coverage_sha"},
+    ):
         raise PublicEvidenceError("evidence provenance is invalid")
     for name in ("source", "target"):
         record = provenance[name]
@@ -654,6 +675,13 @@ def validate_bundle(
     if expected_target_sha is not None and target["sha"] != expected_target_sha:
         raise PublicEvidenceError(
             f"evidence target SHA mismatch: {target['sha']} != {expected_target_sha}"
+        )
+    if "coverage_sha" in provenance:
+        _sha(provenance["coverage_sha"], "provenance.coverage_sha")
+    covered = bundle_coverage_sha(manifest)
+    if expected_coverage_sha is not None and covered != expected_coverage_sha:
+        raise PublicEvidenceError(
+            f"evidence coverage SHA mismatch: {covered} != {expected_coverage_sha}"
         )
 
     lanes = manifest.get("lanes")
@@ -1316,6 +1344,62 @@ def compact_bundle(
     return destination
 
 
+def carry_forward(
+    *,
+    evidence_root: Path,
+    output_root: Path,
+    branch: str,
+    coverage_sha: str,
+    expected_repository: str | None = None,
+    catalog_path: Path = DEFAULT_CATALOG,
+) -> Path:
+    """Rebind one validated bundle to a protected non-visual descendant head.
+
+    Only the coverage head changes. The packaged provenance keeps naming the exact run and
+    commit that produced these pixels, so the published record still says where the
+    screenshots came from and never claims a run tested a head it did not.
+    """
+
+    branch = _branch(branch, "branch", release=True)
+    coverage_sha = _sha(coverage_sha, "coverage_sha")
+    manifest = validate_bundle(
+        evidence_root,
+        branch,
+        only_branch=True,
+        expected_repository=expected_repository,
+        catalog_path=catalog_path,
+    )
+    if output_root.is_symlink():
+        raise PublicEvidenceError("evidence output root cannot be a symlink")
+    destination_root = output_root.resolve()
+    destination_root.mkdir(parents=True, exist_ok=True)
+    destination = destination_root / branch
+    if destination.exists() or destination.is_symlink():
+        raise PublicEvidenceError(f"refusing to replace {destination}")
+    temporary = Path(tempfile.mkdtemp(prefix=f".{branch}.carry-", dir=destination_root))
+    staged = temporary / branch
+    try:
+        shutil.copytree(evidence_root.resolve() / branch, staged)
+        carried = json.loads(json.dumps(manifest))
+        carried["provenance"]["coverage_sha"] = coverage_sha
+        (staged / "manifest.json").write_text(
+            json.dumps(carried, indent=2, sort_keys=True, allow_nan=False) + "\n",
+            encoding="utf-8",
+        )
+        validate_bundle(
+            temporary,
+            branch,
+            only_branch=True,
+            expected_repository=expected_repository,
+            expected_coverage_sha=coverage_sha,
+            catalog_path=catalog_path,
+        )
+        os.replace(staged, destination)
+        return destination
+    finally:
+        shutil.rmtree(temporary, ignore_errors=True)
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1366,8 +1450,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     validate_parser.add_argument("--source-run-id")
     validate_parser.add_argument("--target-run-id")
     validate_parser.add_argument("--target-sha")
+    validate_parser.add_argument("--coverage-sha")
     validate_parser.add_argument("--kind", choices=("raw", "compact"))
     validate_parser.add_argument(
+        "--contract",
+        "--catalog",
+        dest="catalog",
+        type=Path,
+        default=DEFAULT_CATALOG,
+    )
+
+    carry_parser = subparsers.add_parser("carry-forward")
+    carry_parser.add_argument("--evidence-root", type=Path, required=True)
+    carry_parser.add_argument("--output", type=Path, required=True)
+    carry_parser.add_argument("--branch", required=True)
+    carry_parser.add_argument("--coverage-sha", required=True)
+    carry_parser.add_argument("--repository")
+    carry_parser.add_argument(
         "--contract",
         "--catalog",
         dest="catalog",
@@ -1411,6 +1510,16 @@ def main(argv: list[str] | None = None) -> int:
                 catalog_path=args.catalog,
             )
             print(bundle)
+        elif args.command == "carry-forward":
+            bundle = carry_forward(
+                evidence_root=args.evidence_root,
+                output_root=args.output,
+                branch=args.branch,
+                coverage_sha=args.coverage_sha,
+                expected_repository=args.repository,
+                catalog_path=args.catalog,
+            )
+            print(bundle)
         else:
             validate_bundle(
                 args.evidence_root,
@@ -1421,6 +1530,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_source_run_id=args.source_run_id,
                 expected_target_run_id=args.target_run_id,
                 expected_target_sha=args.target_sha,
+                expected_coverage_sha=args.coverage_sha,
                 catalog_path=args.catalog,
             )
             print(f"validated public E2E evidence for {args.branch}")
