@@ -505,6 +505,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Python
@@ -529,6 +530,7 @@ jobs:
           python3 scripts/pages/select_artifact.py
           --repository "$GITHUB_REPOSITORY"
           --branch "$BRANCH"
+          --allow-continuation
           --github-output "$GITHUB_OUTPUT"
 
       - name: Download the digest-checked branch artifact
@@ -548,6 +550,7 @@ jobs:
           BRANCH: ${{ matrix.branch }}
           EXPECTED_SHA: ${{ steps.artifact.outputs.sha }}
           GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
           OWNER_RUN_ID: ${{ steps.artifact.outputs.run_id }}
         run: |
           set -euo pipefail
@@ -598,8 +601,16 @@ jobs:
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == env.GITHUB_REPOSITORY' \
             <<< "$target_run" > /dev/null
-          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
-            --jq .commit.sha)" == "$EXPECTED_SHA" ]]
+          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
+            --jq .commit.sha)"
+          [[ "$current_sha" == "$HEAD_SHA" ]]
+          if [[ "$EXPECTED_SHA" != "$HEAD_SHA" ]]; then
+            git fetch --no-tags origin "$EXPECTED_SHA" "$HEAD_SHA"
+            git merge-base --is-ancestor "$EXPECTED_SHA" "$HEAD_SHA"
+            classification="$(python3 scripts/ci/visual_review_impact.py \
+              --repository . --base "$EXPECTED_SHA" --head "$HEAD_SHA")"
+            [[ "$classification" == skip ]]
+          fi
 
       - name: Convert the validated handoff into an atomic compact bundle
         shell: bash
@@ -607,6 +618,7 @@ jobs:
           ARTIFACT_NAME: ${{ steps.artifact.outputs.name }}
           BRANCH: ${{ matrix.branch }}
           EXPECTED_SHA: ${{ steps.artifact.outputs.sha }}
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
           OWNER_RUN_ID: ${{ steps.artifact.outputs.run_id }}
         run: |
           set -euo pipefail
@@ -632,6 +644,16 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --target-sha "$EXPECTED_SHA" \
             "${target_run_argument[@]}"
+          if [[ "$EXPECTED_SHA" != "$HEAD_SHA" ]]; then
+            python3 scripts/pages/evidence.py carry-forward \
+              --evidence-root public-evidence \
+              --output carried-evidence \
+              --branch "$BRANCH" \
+              --coverage-sha "$HEAD_SHA" \
+              --repository "$GITHUB_REPOSITORY"
+            rm -rf public-evidence
+            mv carried-evidence public-evidence
+          fi
 
       - name: Upload this validated branch to the atomic fan-in
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -939,18 +961,26 @@ jobs:
           manifest="public-evidence/$BRANCH/manifest.json"
           manifest_branch="$(jq -er .release.branch "$manifest")"
           target_sha="$(jq -er .provenance.target.sha "$manifest")"
+          # The cache is keyed by the head this bundle covers, which a protected
+          # carry-forward may have advanced past the head its packaged run tested. Keying
+          # by the packaged head instead would strand every continued branch on a cache
+          # name no later run can ask for.
+          coverage_sha="$(jq -er '.provenance.coverage_sha // .provenance.target.sha' \
+            "$manifest")"
           [[ "$manifest_branch" == "$BRANCH" ]]
           [[ "$target_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$coverage_sha" =~ ^[0-9a-f]{40}$ ]]
           [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
-            --jq .commit.sha)" == "$target_sha" ]]
+            --jq .commit.sha)" == "$coverage_sha" ]]
           python3 scripts/pages/evidence.py validate \
             --evidence-root public-evidence \
             --branch "$BRANCH" \
             --only-branch \
             --kind compact \
             --repository "$GITHUB_REPOSITORY" \
-            --target-sha "$target_sha"
-          printf 'name=pages-cache-%s--%s\n' "$BRANCH" "$target_sha" >> "$GITHUB_OUTPUT"
+            --target-sha "$target_sha" \
+            --coverage-sha "$coverage_sha"
+          printf 'name=pages-cache-%s--%s\n' "$BRANCH" "$coverage_sha" >> "$GITHUB_OUTPUT"
 
       - name: Roll the protected evidence cache forward
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

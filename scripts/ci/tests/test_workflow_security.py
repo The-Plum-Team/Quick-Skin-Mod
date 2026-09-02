@@ -1566,6 +1566,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("if exact:", selector)
         self.assertIn("^[0-9a-f]{40}$", refresh)
         self.assertIn("name=pages-cache-%s--%s", refresh)
+        # The rolling cache is keyed by the covered head so a continued branch can still be
+        # asked for by name on the next run.
+        self.assertIn(".provenance.coverage_sha // .provenance.target.sha", refresh)
+        self.assertIn('--coverage-sha "$coverage_sha"', refresh)
+        self.assertIn('"$coverage_sha" ]]', refresh)
         self.assertIn("name: ${{ steps.cache.outputs.name }}", refresh)
         self.assertIn("actions/checkout@", refresh)
         self.assertIn("ref: ${{ github.sha }}", refresh)
@@ -1578,6 +1583,24 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("api.list_artifacts(cache_name)", selector)
         self.assertIn("--require-hashes", build)
         self.assertIn("scripts/pages/requirements.txt", build)
+
+        # A non-visual port advances a release branch without re-running Minecraft. The
+        # selector may nominate the earlier head that still owns evidence, but only the
+        # collector may publish it, and only after recomputing the range from Git itself.
+        self.assertIn("--allow-continuation", collect)
+        self.assertIn("MAX_CONTINUATION_COMMITS = 20", selector)
+        self.assertIn("api.list_branch_commits(branch, MAX_CONTINUATION_COMMITS)", selector)
+        self.assertIn("if require_raw or not allow_continuation:", selector)
+        self.assertIn("if not commits or commits[0] != current_sha:", selector)
+        self.assertIn("fetch-depth: 0", collect)
+        self.assertIn('[[ "$current_sha" == "$HEAD_SHA" ]]', collect)
+        self.assertIn(
+            'git merge-base --is-ancestor "$EXPECTED_SHA" "$HEAD_SHA"', collect
+        )
+        self.assertIn("scripts/ci/visual_review_impact.py", collect)
+        self.assertIn('[[ "$classification" == skip ]]', collect)
+        self.assertIn("scripts/pages/evidence.py carry-forward", collect)
+        self.assertIn('--coverage-sha "$HEAD_SHA"', collect)
 
     def test_mod_compatibility_pages_publication_reuses_only_complete_clean_reports(self) -> None:
         review_workflow = (
