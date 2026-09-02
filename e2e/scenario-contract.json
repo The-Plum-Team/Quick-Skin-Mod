@@ -427,7 +427,7 @@
               "capture": {
                 "title": "Transparent skin layers",
                 "review_tier": "key",
-                "expectation": "A stable third-person view shows the complete local player wearing a green skin with a warm skin-toned face and a narrow magenta band around the head at brow height. The head must keep its normal shape with the band sitting flush against it; an opaque black or solid block enclosing the head means the transparent hat layer was flattened. The arms show the narrower slim silhouette that the empty outer arm columns select.",
+                "expectation": "A stable third-person view from behind shows the complete local player wearing a solid green skin. The top of the head is plain green and the rest of it carries a broad magenta band running down to the shoulders. That plain green upper head is the proof: the hat layer is transparent there, whereas a flattened one would enclose the whole head in an opaque black or solid block. The head keeps its normal cube shape. The camera is behind the player, so no face is visible and none is expected. The arms show the narrower slim silhouette that the empty outer arm columns select.",
                 "probes": []
               }
             },
