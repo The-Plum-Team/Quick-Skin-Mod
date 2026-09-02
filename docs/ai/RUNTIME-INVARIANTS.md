@@ -239,7 +239,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   deletion (including read-only files), so a partial delete cannot poison the active namespace.
   Treat stale/unknown/corrupt identity as a miss or fail-closed error. Garbage
   collection is bounded housekeeping, never a correctness mechanism. Dependency hashes come from
-  the strict Gradle verification metadata; first-download trust is forbidden.
+  the recorded Gradle verification metadata; first-download trust is forbidden here. Gradle's own
+  artifact verification is deliberately off (see `DEPENDENCY-SECURITY.md`), so this file is a
+  recorded inventory rather than a build gate, but the packaged-runtime store still pins every
+  download to the exact SHA-256 it reads from that inventory.
 - An ingested runtime tree may contain a symbolic link only when it resolves inside that tree and
   to a regular file; real Java runtimes ship such links. Store the target's bytes, refuse escaping,
   dangling, and directory links, and never publish or materialize a link. Compare containment by
