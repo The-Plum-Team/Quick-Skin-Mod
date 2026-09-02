@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -30,6 +31,11 @@ from version_branches import parse_version_branch  # noqa: E402
 # Probe callers distinguish "no current-head evidence" (defer and wait for the next
 # attestation wake) from a genuine selection error, which keeps the ordinary exit code 2.
 PROBE_NO_EVIDENCE_EXIT = 3
+
+# A release branch collects only a handful of synchronization commits between two packaged
+# runs, so a short walk covers every realistic continuation while keeping the cost to one
+# bounded commit page plus exact-name artifact lookups instead of an inventory scan.
+MAX_CONTINUATION_COMMITS = 20
 
 
 def _newest_valid(
@@ -137,6 +143,64 @@ def select_source(
     return legacy
 
 
+@dataclass(frozen=True)
+class Evidence:
+    """One authenticated bundle plus the exact release-branch head it was written for."""
+
+    artifact: Artifact
+    sha: str
+
+
+def resolve_evidence(
+    api: ArtifactApi,
+    *,
+    repository: str,
+    branch: str,
+    current_sha: str,
+    require_raw: bool = False,
+    allow_continuation: bool = False,
+) -> Evidence:
+    """Select current-head evidence, or the newest earlier head still on this lineage.
+
+    Exact current-head evidence always wins. A continuation only nominates an ancestor that
+    owns an authenticated bundle; proving that the range between the two heads cannot change
+    a pixel stays with the caller, which recomputes it from Git before publishing anything.
+    The AI oracle path requires an exact lossless handoff and never continues.
+    """
+
+    try:
+        return Evidence(
+            select_source(
+                api,
+                repository=repository,
+                branch=branch,
+                current_sha=current_sha,
+                require_raw=require_raw,
+            ),
+            current_sha,
+        )
+    except RotationError:
+        if require_raw or not allow_continuation:
+            raise
+    commits = api.list_branch_commits(branch, MAX_CONTINUATION_COMMITS)
+    if not commits or commits[0] != current_sha:
+        # The branch moved while this selection was running. Refuse rather than nominate an
+        # ancestor of a head that is already historical.
+        raise RotationError(f"no authenticated current evidence exists for {branch}")
+    for candidate in commits[1:]:
+        try:
+            selected = select_source(
+                api,
+                repository=repository,
+                branch=branch,
+                current_sha=candidate,
+            )
+        except RotationError:
+            continue
+        return Evidence(selected, candidate)
+    raise RotationError(f"no authenticated current evidence exists for {branch}")
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", required=True)
@@ -151,6 +215,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--require-raw",
         action="store_true",
         help="select only a lossless pages-e2e handoff and never a compact cache",
+    )
+    parser.add_argument(
+        "--allow-continuation",
+        action="store_true",
+        help="nominate an earlier head whose evidence the caller may still carry forward",
     )
     args = parser.parse_args(argv)
     if not args.probe and args.github_output is None:
@@ -180,12 +249,13 @@ def main(argv: list[str] | None = None) -> int:
             # The probe authenticates exactly like a selection but downloads nothing and
             # reports a missing source as a distinct clean outcome for defer decisions.
             try:
-                selected = select_source(
+                evidence = resolve_evidence(
                     api,
                     repository=repository,
                     branch=branch,
                     current_sha=current_sha,
                     require_raw=args.require_raw,
+                    allow_continuation=args.allow_continuation,
                 )
             except ApiError:
                 # Infrastructure failure is not evidence absence. Keep it visible so the
@@ -194,20 +264,26 @@ def main(argv: list[str] | None = None) -> int:
             except RotationError as exc:
                 print(f"Pages evidence probe: {exc}", file=sys.stderr)
                 return PROBE_NO_EVIDENCE_EXIT
-            print(f"Pages evidence probe: {selected.name} covers {branch} at {current_sha}")
+            print(
+                f"Pages evidence probe: {evidence.artifact.name} covers {branch} "
+                f"at {evidence.sha}"
+            )
             return 0
-        selected = select_source(
+        evidence = resolve_evidence(
             api,
             repository=repository,
             branch=branch,
             current_sha=current_sha,
             require_raw=args.require_raw,
+            allow_continuation=args.allow_continuation,
         )
+        selected = evidence.artifact
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write(f"artifact_id={selected.artifact_id}\n")
             output.write(f"name={selected.name}\n")
             output.write(f"run_id={selected.run_id}\n")
-            output.write(f"sha={current_sha}\n")
+            output.write(f"sha={evidence.sha}\n")
+            output.write(f"head_sha={current_sha}\n")
             output.write(f"size_in_bytes={selected.size_in_bytes}\n")
         return 0
     except (OSError, RotationError) as exc:
