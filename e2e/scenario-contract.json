@@ -417,7 +417,7 @@
               "capture": {
                 "title": "HD skin no downscale",
                 "review_tier": "key",
-                "expectation": "A stable third-person view shows the complete local player wearing a crisp custom HD skin: a deep indigo body with a cyan stripe across the torso and a bright orange face carrying a fine dark checker. The checker must read as distinct small squares rather than a blurred or flattened patch, which is what a downscale to the standard resolution would produce.",
+                "expectation": "A stable third-person view from behind shows the complete local player wearing a crisp custom HD skin: a deep indigo body with a bright cyan band across the upper back and a fine dark checker filling the back below it. The checker must read as distinct small squares rather than a blurred, averaged or flattened patch, which is what a downscale to the standard resolution would produce. The camera is behind the player, so no face is visible and none is expected; the arms show the wider classic silhouette.",
                 "probes": []
               }
             },
