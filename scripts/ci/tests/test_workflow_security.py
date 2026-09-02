@@ -1671,6 +1671,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("github.event_name == 'workflow_dispatch'", rotate)
         self.assertIn("github.ref == 'refs/heads/master'", rotate)
         self.assertIn("inputs.operation == 'rotate'", rotate)
+        self.assertIn("timeout-minutes: 20", rotate)
         self.assertIn("actions: write", rotate)
         self.assertIn("contents: read", rotate)
         self.assertIn("protected_gh_api_retry", rotate)
@@ -1697,6 +1698,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--pages-run-sha", rotate)
         self.assertIn("--compatibility-evidence-root", rotate)
         self.assertIn("steps.owner.outputs.pages_run_sha", rotate)
+        self.assertNotIn("list_artifacts_with_prefix", rotator)
+        self.assertIn("api.list_artifacts(cache_name)", rotator)
+        self.assertIn("MAX_ROTATION_DELETIONS", rotator)
+        self.assertIn("deletion_budget=deletion_budget", rotator)
+        self.assertIn("MAX_TRANSIENT_KEEP_VALIDATIONS", rotator)
 
         self.assertIn("actions: read", handoff)
         self.assertNotIn("actions: write", handoff)
@@ -1712,7 +1718,8 @@ class WorkflowSecurityTest(unittest.TestCase):
             'f"collected-pages-{generation.branch}" for generation in generations',
             rotator,
         )
-        self.assertIn("for artifact in (*old_caches, *handoffs):", rotator)
+        self.assertIn("candidates = [*old_caches, *handoffs]", rotator)
+        self.assertIn("for artifact in candidates:", rotator)
         self.assertIn("select_old_handoffs(", rotator)
         self.assertIn("lossless visual reference changed", rotator)
         self.assertIn("retire_pages_run_transients(", rotator)
