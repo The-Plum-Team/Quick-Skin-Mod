@@ -1088,6 +1088,8 @@ jobs:
       github.ref == 'refs/heads/master' &&
       inputs.operation == 'rotate'
     runs-on: ubuntu-24.04
+    # Rotation revalidates every deletion but admits only one bounded batch per invocation.
+    # Historical overflow remains under the repository's 90-day artifact retention policy.
     timeout-minutes: 20
     permissions:
       actions: write
