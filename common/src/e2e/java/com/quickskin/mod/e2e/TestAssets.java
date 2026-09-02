@@ -386,22 +386,41 @@ public final class TestAssets {
         final int s = HD_SKIN_SCALE;
         BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
-        // Deep indigo body so the player reads as one solid custom skin at any distance.
+        g.setComposite(AlphaComposite.Src);
+        // Deep indigo base so the player reads as one solid custom skin at any distance.
         g.setColor(new Color(0x2A, 0x2F, 0x8A));
         g.fillRect(0, 0, size, size);
-        // Head front (8,8)-(16,16) at 1x: bright orange, the primary landmark in screenshots.
+        // Clear every outer layer. Minecraft always draws that second layer slightly inflated over
+        // the base, so leaving it opaque encases the model and hides every base-layer landmark.
+        g.setColor(new Color(0, 0, 0, 0));
+        for (int[] overlay : new int[][] {
+            {32, 0, 32, 16},   // head
+            {16, 32, 24, 16},  // body
+            {40, 32, 16, 16},  // right arm
+            {0, 32, 16, 16},   // right leg
+            {48, 48, 16, 16},  // left arm
+            {0, 48, 16, 16},   // left leg
+        }) {
+            g.fillRect(overlay[0] * s, overlay[1] * s, overlay[2] * s, overlay[3] * s);
+        }
+        // Head front (8,8)-(16,16) at 1x: bright orange. Not visible from the rear evidence camera,
+        // kept only so the fixture is a plausible skin from every angle.
         g.setColor(new Color(0xF0, 0x8A, 0x1E));
         g.fillRect(8 * s, 8 * s, 8 * s, 8 * s);
-        // A fine 2px-at-4x checker inside the face that a downscale to 64x64 could not preserve.
+        // Cyan band on the torso back (32,20)-(40,24) at 1x, the primary rear landmark. Confined
+        // to that one face so no unexplained mark appears elsewhere on the model.
+        g.setColor(new Color(0x22, 0xCC, 0xCC));
+        g.fillRect(32 * s, 20 * s, 8 * s, 4 * s);
+        // A fine checker on the torso back (32,24)-(40,32) at 1x, drawn in 2px cells at 4x scale.
+        // Half a pixel at the standard resolution, so any downscale destroys it: this is the
+        // landmark that proves the HD source really survived import.
         g.setColor(new Color(0x10, 0x10, 0x18));
-        for (int y = 0; y < 8 * s; y += 2) {
-            for (int x = (y / 2) % 2 == 0 ? 0 : 2; x < 8 * s; x += 4) {
-                g.fillRect(8 * s + x, 8 * s + y, 2, 2);
+        for (int y = 0; y < 8 * s; y += 4) {
+            for (int x = 0; x < 8 * s; x += 4) {
+                g.fillRect(32 * s + x, 24 * s + y, 2, 2);
+                g.fillRect(32 * s + x + 2, 24 * s + y + 2, 2, 2);
             }
         }
-        // A cyan stripe across the body for orientation.
-        g.setColor(new Color(0x22, 0xCC, 0xCC));
-        g.fillRect(0, 20 * s, size, 4 * s);
         g.dispose();
         Path tmp = deterministicFixture("qs_e2e_skin_hd.png");
         ImageIO.write(img, "png", tmp.toFile());

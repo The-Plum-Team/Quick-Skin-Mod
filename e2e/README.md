@@ -23,7 +23,7 @@ This `master` integration baseline exercises the following exact packaged lanes:
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `8` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `8` |
 
-Scenario contract SHA-256: `0061323d1bd981ef42f8dcf41e9f1cd51c86fe4d9ed3f66914adca0caa21d504`
+Scenario contract SHA-256: `68ebf7f805f2ed2ee4c866a9c4333fd8dbd8107e3d033c29c99c9431c914036e`
 Contract totals: `72` ordered steps, `52` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
