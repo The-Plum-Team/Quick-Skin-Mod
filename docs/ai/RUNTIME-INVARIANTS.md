@@ -251,9 +251,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Mojang-mapped loaders and fails on Fabric's intermediary runtime, so a string lookup additionally
   requires an explicit intermediary fallback.
 - Public evidence is bound to source run/branch/SHA and final run/branch/SHA. Pages may select a
-  bundle only when its authenticated originating target run and manifest both match the current
-  release-branch head; a later protected Pages run may only roll that already validated bundle
-  into cache.
+  bundle only when its authenticated originating target run and manifest both match the head that
+  bundle covers; a later protected Pages run may only roll that already validated bundle
+  into cache. That covered head is the packaged target head unless a protected carry-forward
+  recorded an optional `provenance.coverage_sha`, which a non-visual synchronization port may
+  advance because it deliberately never re-runs packaged Minecraft. Carrying evidence requires the
+  collector's own strict-ancestry proof from the comparison API plus a fresh `replicated-port`
+  impact classification of that exact bounded inventory, never a flag from the selector and never
+  a fetch of untrusted release-branch history into this privileged workspace; the packaged provenance never moves, so a run can
+  never appear to have tested a head it did not. The field stays optional until every release
+  branch has republished, and the AI oracle never consumes a continued bundle.
 - Pages repository wakes and deploys use one shared publication concurrency group so a branch wave
   cannot fan out multiple collectors. Discovery may defer on active release attestations, but must
   not preselect every artifact and repeat selection in the collector. The collector owns exact

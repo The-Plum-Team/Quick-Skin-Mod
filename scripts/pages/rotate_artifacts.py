@@ -135,6 +135,8 @@ class ArtifactApi(Protocol):
 
     def get_branch_sha(self, branch: str) -> str: ...
 
+    def list_branch_commits(self, branch: str, limit: int) -> list[str]: ...
+
     def delete_artifact(self, artifact_id: int) -> None: ...
 
 
@@ -434,6 +436,20 @@ class GitHubApi:
         if not isinstance(payload, dict) or not isinstance(payload.get("commit"), dict):
             raise RotationError("branch response is invalid")
         return _commit(payload["commit"].get("sha"), "branch.commit.sha")
+
+    def list_branch_commits(self, branch: str, limit: int) -> list[str]:
+        """Return one bounded page of a branch's newest commits, newest first."""
+
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise RotationError("branch commit limit is out of range")
+        parameters = urllib.parse.urlencode({"sha": branch, "per_page": limit})
+        payload = self._request("GET", self._repo_path(f"/commits?{parameters}"))
+        if not isinstance(payload, list):
+            raise RotationError("branch commit response is invalid")
+        return [
+            _commit(item.get("sha") if isinstance(item, dict) else None, "commit.sha")
+            for item in payload
+        ]
 
     def delete_artifact(self, artifact_id: int) -> None:
         self._request("DELETE", self._repo_path(f"/actions/artifacts/{artifact_id}"))
