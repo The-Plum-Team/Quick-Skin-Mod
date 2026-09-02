@@ -368,6 +368,101 @@ public final class TestAssets {
         builder.getClass().getMethod(methodName, enumClass).invoke(builder, value);
     }
 
+    /** Exactly {@code SkinResolution.HD_256}, so the importer keeps it verbatim instead of resizing. */
+    public static final int HD_SKIN_SIZE = 256;
+
+    /** The 1x scale factor of {@link #HD_SKIN_SIZE}, used to place landmarks on the HD grid. */
+    public static final int HD_SKIN_SCALE = HD_SKIN_SIZE / 64;
+
+    /**
+     * A deliberately fully opaque <b>256x256</b> skin. 256x256 is exactly
+     * {@code SkinResolution.HD_256}, so {@code SkinImporter.importSkin} keeps the source resolution
+     * instead of snapping it to the nearest valid size — letting "HD skin import preserves source
+     * resolution (no downscale)" be asserted on the metadata. Opaque everywhere so the model stays
+     * classic and this checkpoint isolates resolution from {@link #makeTransparentLayerSkin()}.
+     */
+    public static Path makeHdSkin() throws Exception {
+        final int size = HD_SKIN_SIZE;
+        final int s = HD_SKIN_SCALE;
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setComposite(AlphaComposite.Src);
+        // Deep indigo base so the player reads as one solid custom skin at any distance.
+        g.setColor(new Color(0x2A, 0x2F, 0x8A));
+        g.fillRect(0, 0, size, size);
+        // Clear every outer layer. Minecraft always draws that second layer slightly inflated over
+        // the base, so leaving it opaque encases the model and hides every base-layer landmark.
+        g.setColor(new Color(0, 0, 0, 0));
+        for (int[] overlay : new int[][] {
+            {32, 0, 32, 16},   // head
+            {16, 32, 24, 16},  // body
+            {40, 32, 16, 16},  // right arm
+            {0, 32, 16, 16},   // right leg
+            {48, 48, 16, 16},  // left arm
+            {0, 48, 16, 16},   // left leg
+        }) {
+            g.fillRect(overlay[0] * s, overlay[1] * s, overlay[2] * s, overlay[3] * s);
+        }
+        // Head front (8,8)-(16,16) at 1x: bright orange. Not visible from the rear evidence camera,
+        // kept only so the fixture is a plausible skin from every angle.
+        g.setColor(new Color(0xF0, 0x8A, 0x1E));
+        g.fillRect(8 * s, 8 * s, 8 * s, 8 * s);
+        // Cyan band on the torso back (32,20)-(40,24) at 1x, the primary rear landmark. Confined
+        // to that one face so no unexplained mark appears elsewhere on the model.
+        g.setColor(new Color(0x22, 0xCC, 0xCC));
+        g.fillRect(32 * s, 20 * s, 8 * s, 4 * s);
+        // A fine checker on the torso back (32,24)-(40,32) at 1x, drawn in 2px cells at 4x scale.
+        // Half a pixel at the standard resolution, so any downscale destroys it: this is the
+        // landmark that proves the HD source really survived import.
+        g.setColor(new Color(0x10, 0x10, 0x18));
+        for (int y = 0; y < 8 * s; y += 4) {
+            for (int x = 0; x < 8 * s; x += 4) {
+                g.fillRect(32 * s + x, 24 * s + y, 2, 2);
+                g.fillRect(32 * s + x + 2, 24 * s + y + 2, 2, 2);
+            }
+        }
+        g.dispose();
+        Path tmp = deterministicFixture("qs_e2e_skin_hd.png");
+        ImageIO.write(img, "png", tmp.toFile());
+        return tmp;
+    }
+
+    /**
+     * A 64x64 skin whose <b>outer</b> layer is genuinely transparent and whose outer arm columns are
+     * empty, so it exercises the two skin paths every other fixture deliberately avoids:
+     * <ul>
+     *   <li>{@code SkinModelDetector} reads the empty arm columns and auto-detects <b>slim</b>.</li>
+     *   <li>The hat overlay keeps real alpha, so a flattened import would wrap the head in an opaque
+     *       block instead of showing a narrow brim over the base face.</li>
+     * </ul>
+     */
+    public static Path makeTransparentLayerSkin() throws Exception {
+        BufferedImage img = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setComposite(AlphaComposite.Src);
+        // Opaque base everywhere: the body must stay solid even where the overlay is empty.
+        g.setColor(new Color(0x1E, 0x7A, 0x3C));
+        g.fillRect(0, 0, 64, 64);
+        // Base head front, a warm skin tone that must remain visible through the empty hat layer.
+        g.setColor(new Color(0xE8, 0xB4, 0x8A));
+        g.fillRect(8, 8, 8, 8);
+        // Clear the whole head overlay (32-63, 0-15), then paint a narrow magenta brim across all
+        // four side faces (x 32-63, y 10-12) so it sits at brow height and is visible from any angle. A flattened
+        // import would fill this whole region with opaque black and encase the head in a block.
+        g.setColor(new Color(0, 0, 0, 0));
+        g.fillRect(32, 0, 32, 16);
+        g.setColor(new Color(0xCC, 0x22, 0x99));
+        g.fillRect(32, 10, 32, 3);
+        // Empty the outer arm columns the detector samples, which is what makes this skin slim.
+        g.setColor(new Color(0, 0, 0, 0));
+        g.fillRect(54, 20, 2, 12);
+        g.fillRect(46, 52, 2, 12);
+        g.dispose();
+        Path tmp = deterministicFixture("qs_e2e_skin_transparent.png");
+        ImageIO.write(img, "png", tmp.toFile());
+        return tmp;
+    }
+
     /**
      * A valid 64x32 opaque cape {@link BufferedImage} (the vanilla cape format; a 2:1 frame ratio so
      * {@code LocalAssetManager} accepts it). Distinctive colors so the cape is obvious in screenshots.
