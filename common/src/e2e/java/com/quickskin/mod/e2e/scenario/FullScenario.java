@@ -107,6 +107,9 @@ public final class FullScenario implements Scenario {
 
     private volatile String skinHash;        // set by step 2, reused by model + HUD steps
     private volatile String externalSkinHash; // set by the external-drop step (no import call)
+    private volatile String hdSkinHash;      // set by step "hd_skin_no_downscale"
+    private volatile String transparentSkinHash; // set by step "transparent_skin_layers"
+    private final AtomicReference<BufferedImage> transparentSkinStored = new AtomicReference<>();
     private volatile String hdCapeHash;      // set by step "hd_cape"
     private final AtomicReference<BufferedImage> hdCapeSource = new AtomicReference<>();
     private final AtomicReference<BufferedImage> hdCapePresentation = new AtomicReference<>();
@@ -348,6 +351,137 @@ public final class FullScenario implements Scenario {
                     } finally {
                         restoreModelEvidenceView(mc);
                     }
+                }));
+
+        // 3c. HD and transparent skins ------------------------------------------------------------
+        // Every other skin fixture is a deliberately opaque 64x64, which leaves the HD import path
+        // and the whole alpha path unexercised. These two checkpoints cover them, then restore the
+        // reference skin so no later cape checkpoint changes.
+        steps.add(Step.of("hd_skin_no_downscale")
+                .action(() -> {
+                    enterWorldView(mc);
+                    hdSkinHash = null;
+                    try {
+                        Path file = TestAssets.makeHdSkin(); // 256x256 == HD_256, kept verbatim
+                        AssetMetadata meta = SkinImporter.importSkin(file);
+                        if (meta == null) { E2ELog.warn("HD importSkin returned null"); return; }
+                        hdSkinHash = meta.hash();
+                        svc.applySkin(uuid, "local_skin:" + hdSkinHash, "auto");
+                        E2ELog.info("applied HD local_skin:" + hdSkinHash);
+                    } catch (Exception e) {
+                        E2ELog.error("hd_skin_no_downscale failed", e);
+                    }
+                })
+                .minTicks(40)
+                .ready(() -> hdSkinHash != null
+                        && LocalAssetManager.getInstance().getMetadata(hdSkinHash) != null
+                        && svc.getSkinLocation(uuid) != null)
+                .settleTicks(12)
+                .timeoutTicks(400)
+                .screenshot(prefix + "full_03c_hd_skin" + suffix)
+                .assertion(() -> {
+                    if (hdSkinHash == null) return Step.Result.fail("HD skin import failed (no hash)");
+                    AssetMetadata meta = LocalAssetManager.getInstance().getMetadata(hdSkinHash);
+                    if (meta == null) return Step.Result.fail("no metadata for HD skin");
+                    if (!meta.isSkin())
+                        return Step.Result.fail("metadata type=" + meta.type() + " expected skin");
+                    int w = meta.resolution().getWidth(), h = meta.resolution().getHeight();
+                    if (w != TestAssets.HD_SKIN_SIZE || h != TestAssets.HD_SKIN_SIZE)
+                        return Step.Result.fail("HD skin downscaled: resolution=" + w + "x" + h
+                                + " expected " + TestAssets.HD_SKIN_SIZE + "x" + TestAssets.HD_SKIN_SIZE);
+                    PlayerAppearance app = svc.getAppearance(uuid);
+                    String expected = "local_skin:" + hdSkinHash;
+                    if (app == null || !expected.equals(app.getSkinId()))
+                        return Step.Result.fail("skinId=" + (app == null ? "null" : app.getSkinId())
+                                + " expected " + expected);
+                    if (svc.getSkinLocation(uuid) == null)
+                        return Step.Result.fail("HD skin location did not resolve");
+                    return Step.Result.pass("HD skin preserved at " + w + "x" + h
+                            + " (no downscale) and selected as " + expected);
+                }));
+
+        steps.add(Step.of("transparent_skin_layers")
+                .action(() -> {
+                    enterWorldView(mc);
+                    transparentSkinHash = null;
+                    transparentSkinStored.set(null);
+                    try {
+                        Path file = TestAssets.makeTransparentLayerSkin();
+                        AssetMetadata meta = SkinImporter.importSkin(file);
+                        if (meta == null) { E2ELog.warn("transparent importSkin returned null"); return; }
+                        transparentSkinHash = meta.hash();
+                        byte[] stored = LocalAssetManager.getInstance()
+                                .loadTexture(transparentSkinHash, TextureQuality.FULL);
+                        transparentSkinStored.set(SafeImageReader.readPng(stored));
+                        // "auto" so the stored alpha, not a caller-supplied string, picks the model.
+                        svc.applySkin(uuid, "local_skin:" + transparentSkinHash, "auto");
+                        E2ELog.info("applied transparent local_skin:" + transparentSkinHash);
+                    } catch (Exception e) {
+                        E2ELog.error("transparent_skin_layers failed", e);
+                    }
+                })
+                .minTicks(40)
+                .ready(() -> transparentSkinHash != null
+                        && LocalAssetManager.getInstance().getMetadata(transparentSkinHash) != null
+                        && svc.getSkinLocation(uuid) != null)
+                .settleTicks(12)
+                .timeoutTicks(400)
+                .screenshot(prefix + "full_03d_transparent_skin" + suffix)
+                .assertion(() -> {
+                    if (transparentSkinHash == null)
+                        return Step.Result.fail("transparent skin import failed (no hash)");
+                    AssetMetadata meta = LocalAssetManager.getInstance().getMetadata(transparentSkinHash);
+                    if (meta == null) return Step.Result.fail("no metadata for transparent skin");
+                    if (!"slim".equals(meta.skinModel()))
+                        return Step.Result.fail("auto detection resolved skinModel="
+                                + meta.skinModel() + " expected slim from the empty arm columns");
+                    BufferedImage stored = transparentSkinStored.get();
+                    if (stored == null) return Step.Result.fail("stored transparent skin unreadable");
+                    if (stored.getWidth() < 64 || stored.getHeight() < 64)
+                        return Step.Result.fail("stored transparent skin is " + stored.getWidth()
+                                + "x" + stored.getHeight());
+                    int scale = stored.getWidth() / 64;
+                    int hatAlpha = (stored.getRGB(34 * scale, 2 * scale) >>> 24) & 0xFF;
+                    int armAlpha = (stored.getRGB(54 * scale, 20 * scale) >>> 24) & 0xFF;
+                    int brimAlpha = (stored.getRGB(34 * scale, 14 * scale) >>> 24) & 0xFF;
+                    if (hatAlpha != 0)
+                        return Step.Result.fail("hat overlay was flattened: alpha=" + hatAlpha);
+                    if (armAlpha != 0)
+                        return Step.Result.fail("outer arm column was flattened: alpha=" + armAlpha);
+                    if (brimAlpha != 255)
+                        return Step.Result.fail("hat brim lost its opacity: alpha=" + brimAlpha);
+                    PlayerAppearance app = svc.getAppearance(uuid);
+                    String expected = "local_skin:" + transparentSkinHash;
+                    if (app == null || !expected.equals(app.getSkinId()))
+                        return Step.Result.fail("skinId=" + (app == null ? "null" : app.getSkinId())
+                                + " expected " + expected);
+                    if (svc.getSkinLocation(uuid) == null)
+                        return Step.Result.fail("transparent skin location did not resolve");
+                    return Step.Result.pass("stored skin keeps a transparent hat overlay and empty"
+                            + " arm columns (alpha 0) with an opaque brim, and auto detection"
+                            + " resolved slim");
+                }));
+
+        // Restore the reference skin so every later checkpoint keeps its established appearance.
+        steps.add(Step.of("restore_reference_skin")
+                .action(() -> {
+                    enterWorldView(mc);
+                    if (skinHash != null) svc.applySkin(uuid, "local_skin:" + skinHash, "auto");
+                })
+                .minTicks(30)
+                .ready(() -> skinHash != null
+                        && svc.getAppearance(uuid) != null
+                        && ("local_skin:" + skinHash).equals(svc.getAppearance(uuid).getSkinId())
+                        && svc.getSkinLocation(uuid) != null)
+                .timeoutTicks(400)
+                .assertion(() -> {
+                    if (skinHash == null) return Step.Result.fail("no reference skin to restore");
+                    PlayerAppearance app = svc.getAppearance(uuid);
+                    String expected = "local_skin:" + skinHash;
+                    if (app == null || !expected.equals(app.getSkinId()))
+                        return Step.Result.fail("skinId=" + (app == null ? "null" : app.getSkinId())
+                                + " expected " + expected);
+                    return Step.Result.pass("reference skin restored as " + expected);
                 }));
 
         // 4. known cape ---------------------------------------------------------------------------
