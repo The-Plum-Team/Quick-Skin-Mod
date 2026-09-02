@@ -447,12 +447,12 @@ public final class TestAssets {
         g.setColor(new Color(0xE8, 0xB4, 0x8A));
         g.fillRect(8, 8, 8, 8);
         // Clear the whole head overlay (32-63, 0-15), then paint a narrow magenta brim across all
-        // four side faces (x 32-63, y 13-15) so it is visible from any camera angle. A flattened
+        // four side faces (x 32-63, y 10-12) so it sits at brow height and is visible from any angle. A flattened
         // import would fill this whole region with opaque black and encase the head in a block.
         g.setColor(new Color(0, 0, 0, 0));
         g.fillRect(32, 0, 32, 16);
         g.setColor(new Color(0xCC, 0x22, 0x99));
-        g.fillRect(32, 13, 32, 3);
+        g.fillRect(32, 10, 32, 3);
         // Empty the outer arm columns the detector samples, which is what makes this skin slim.
         g.setColor(new Color(0, 0, 0, 0));
         g.fillRect(54, 20, 2, 12);

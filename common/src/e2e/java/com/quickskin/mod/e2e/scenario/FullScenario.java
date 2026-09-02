@@ -443,7 +443,7 @@ public final class FullScenario implements Scenario {
                     int scale = stored.getWidth() / 64;
                     int hatAlpha = (stored.getRGB(34 * scale, 2 * scale) >>> 24) & 0xFF;
                     int armAlpha = (stored.getRGB(54 * scale, 20 * scale) >>> 24) & 0xFF;
-                    int brimAlpha = (stored.getRGB(34 * scale, 14 * scale) >>> 24) & 0xFF;
+                    int brimAlpha = (stored.getRGB(34 * scale, 11 * scale) >>> 24) & 0xFF;
                     if (hatAlpha != 0)
                         return Step.Result.fail("hat overlay was flattened: alpha=" + hatAlpha);
                     if (armAlpha != 0)
