@@ -37,7 +37,11 @@ from rotate_artifacts import (  # noqa: E402
     select_pages_run_transients,
 )
 import select_artifact  # noqa: E402
-from select_artifact import PROBE_NO_EVIDENCE_EXIT, select_source  # noqa: E402
+from select_artifact import (  # noqa: E402
+    PROBE_NO_EVIDENCE_EXIT,
+    resolve_evidence,
+    select_source,
+)
 from select_compatibility_artifact import (  # noqa: E402
     select_source as select_compatibility_source,
 )
@@ -103,6 +107,7 @@ class FakeApi:
         run_artifacts: dict[int, list[Artifact]] | None = None,
         branch_sha: str = TARGET_SHA,
         branch_shas: dict[str, str] | None = None,
+        branch_commits: list[str] | None = None,
         missing_on_delete: set[int] | None = None,
         artifact_overrides: dict[int, Artifact] | None = None,
     ) -> None:
@@ -112,6 +117,8 @@ class FakeApi:
         self.run_artifacts = run_artifacts or {}
         self.branch_sha = branch_sha
         self.branch_shas = branch_shas
+        self.branch_commits = branch_commits
+        self.commit_requests = 0
         self.missing_on_delete = missing_on_delete or set()
         self.deleted: list[int] = []
         self.artifacts_by_id = {
@@ -145,6 +152,13 @@ class FakeApi:
             return self.branch_shas[branch]
         self.assert_branch(branch)
         return self.branch_sha
+
+    def list_branch_commits(self, branch: str, limit: int) -> list[str]:
+        self.assert_branch(branch)
+        if self.branch_commits is None:
+            raise AssertionError("unexpected branch commit lookup")
+        self.commit_requests += 1
+        return list(self.branch_commits[:limit])
 
     def delete_artifact(self, artifact_id: int) -> None:
         if artifact_id in self.missing_on_delete:
@@ -720,6 +734,114 @@ class PagesArtifactRotationTest(unittest.TestCase):
         )
         self.assertEqual(selected, handoff)
         self.assertNotIn(901, api.runs)
+
+    def _continuation_api(self, *, commits: list[str]) -> "FakeApi":
+        """A branch whose head owns no evidence while its parent still does."""
+
+        cache = artifact(
+            410,
+            f"pages-cache-{BRANCH}--{OLD_PAGES_SHA}",
+            "2026-08-03T14:00:00Z",
+            run_id=902,
+            head_branch="master",
+            head_sha=OLD_PAGES_SHA,
+        )
+        return FakeApi(
+            keep=self.keep,
+            inventories={cache.name: [cache]},
+            runs={
+                902: run(
+                    902,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_run",
+                    branch="master",
+                    sha=OLD_PAGES_SHA,
+                )
+            },
+            branch_commits=commits,
+        )
+
+    def test_continuation_nominates_the_newest_ancestor_that_owns_evidence(self) -> None:
+        api = self._continuation_api(commits=[TARGET_SHA, OLD_PAGES_SHA])
+        evidence = resolve_evidence(
+            api,
+            repository=REPOSITORY,
+            branch=BRANCH,
+            current_sha=TARGET_SHA,
+            allow_continuation=True,
+        )
+        # The nomination reports the head the evidence was written for, never the current
+        # head, so the caller still validates provenance against the run that produced it.
+        self.assertEqual(evidence.sha, OLD_PAGES_SHA)
+        self.assertEqual(evidence.artifact.artifact_id, 410)
+        self.assertEqual(api.commit_requests, 1)
+
+    def test_continuation_refuses_a_head_the_branch_already_left(self) -> None:
+        api = self._continuation_api(commits=[PAGES_SHA, TARGET_SHA, OLD_PAGES_SHA])
+        with self.assertRaises(RotationError):
+            resolve_evidence(
+                api,
+                repository=REPOSITORY,
+                branch=BRANCH,
+                current_sha=TARGET_SHA,
+                allow_continuation=True,
+            )
+
+    def test_selection_never_continues_without_the_explicit_opt_in(self) -> None:
+        api = self._continuation_api(commits=[TARGET_SHA, OLD_PAGES_SHA])
+        with self.assertRaises(RotationError):
+            resolve_evidence(
+                api,
+                repository=REPOSITORY,
+                branch=BRANCH,
+                current_sha=TARGET_SHA,
+            )
+        self.assertEqual(api.commit_requests, 0)
+
+    def test_lossless_oracle_selection_never_continues(self) -> None:
+        api = self._continuation_api(commits=[TARGET_SHA, OLD_PAGES_SHA])
+        with self.assertRaises(RotationError):
+            resolve_evidence(
+                api,
+                repository=REPOSITORY,
+                branch=BRANCH,
+                current_sha=TARGET_SHA,
+                require_raw=True,
+                allow_continuation=True,
+            )
+        self.assertEqual(api.commit_requests, 0)
+
+    def test_exact_current_head_evidence_never_consults_the_lineage(self) -> None:
+        cache = artifact(
+            420,
+            f"pages-cache-{BRANCH}--{TARGET_SHA}",
+            "2026-08-03T15:00:00Z",
+            run_id=903,
+            head_branch="master",
+            head_sha=PAGES_SHA,
+        )
+        api = FakeApi(
+            keep=self.keep,
+            inventories={cache.name: [cache]},
+            runs={
+                903: run(
+                    903,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_run",
+                    branch="master",
+                    sha=PAGES_SHA,
+                )
+            },
+        )
+        evidence = resolve_evidence(
+            api,
+            repository=REPOSITORY,
+            branch=BRANCH,
+            current_sha=TARGET_SHA,
+            allow_continuation=True,
+        )
+        self.assertEqual(evidence.sha, TARGET_SHA)
+        self.assertEqual(evidence.artifact.artifact_id, 420)
 
     def test_source_selection_skips_invalid_owner_and_supports_legacy_fallback(self) -> None:
         legacy_name = f"pages-cache-{BRANCH}"
@@ -1473,6 +1595,7 @@ class SelectArtifactProbeTest(unittest.TestCase):
                     f"name=pages-cache-{BRANCH}--{TARGET_SHA}",
                     "run_id=900",
                     f"sha={TARGET_SHA}",
+                    f"head_sha={TARGET_SHA}",
                     "size_in_bytes=100",
                 ],
                 output.read_text(encoding="utf-8").splitlines(),
