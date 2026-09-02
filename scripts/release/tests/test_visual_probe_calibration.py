@@ -264,8 +264,10 @@ class VisualProbeCalibrationTest(unittest.TestCase):
         role = next(item for item in full["roles"] if item["role"] == "client_a")
         steps = {item["id"]: item for item in role["steps"]}
 
+        # The model-geometry section ends where the skin resolution/alpha checkpoints begin; those
+        # deliberately do not pin the close FOV-50 rear view, so they stay outside this count.
         model_section = source[source.index('Step.of("model_slim")'):
-                               source.index("// 4. known cape")]
+                               source.index("// 3c. HD and transparent skins")]
         self.assertEqual(2, model_section.count("prepareModelEvidenceView(mc);"))
         self.assertEqual(2, model_section.count(".settleTicks(12)"))
         self.assertIn("MODEL_EVIDENCE_FOV = 50", source)
