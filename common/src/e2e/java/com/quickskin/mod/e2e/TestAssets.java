@@ -368,6 +368,82 @@ public final class TestAssets {
         builder.getClass().getMethod(methodName, enumClass).invoke(builder, value);
     }
 
+    /** Exactly {@code SkinResolution.HD_256}, so the importer keeps it verbatim instead of resizing. */
+    public static final int HD_SKIN_SIZE = 256;
+
+    /** The 1x scale factor of {@link #HD_SKIN_SIZE}, used to place landmarks on the HD grid. */
+    public static final int HD_SKIN_SCALE = HD_SKIN_SIZE / 64;
+
+    /**
+     * A deliberately fully opaque <b>256x256</b> skin. 256x256 is exactly
+     * {@code SkinResolution.HD_256}, so {@code SkinImporter.importSkin} keeps the source resolution
+     * instead of snapping it to the nearest valid size — letting "HD skin import preserves source
+     * resolution (no downscale)" be asserted on the metadata. Opaque everywhere so the model stays
+     * classic and this checkpoint isolates resolution from {@link #makeTransparentLayerSkin()}.
+     */
+    public static Path makeHdSkin() throws Exception {
+        final int size = HD_SKIN_SIZE;
+        final int s = HD_SKIN_SCALE;
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        // Deep indigo body so the player reads as one solid custom skin at any distance.
+        g.setColor(new Color(0x2A, 0x2F, 0x8A));
+        g.fillRect(0, 0, size, size);
+        // Head front (8,8)-(16,16) at 1x: bright orange, the primary landmark in screenshots.
+        g.setColor(new Color(0xF0, 0x8A, 0x1E));
+        g.fillRect(8 * s, 8 * s, 8 * s, 8 * s);
+        // A fine 2px-at-4x checker inside the face that a downscale to 64x64 could not preserve.
+        g.setColor(new Color(0x10, 0x10, 0x18));
+        for (int y = 0; y < 8 * s; y += 2) {
+            for (int x = (y / 2) % 2 == 0 ? 0 : 2; x < 8 * s; x += 4) {
+                g.fillRect(8 * s + x, 8 * s + y, 2, 2);
+            }
+        }
+        // A cyan stripe across the body for orientation.
+        g.setColor(new Color(0x22, 0xCC, 0xCC));
+        g.fillRect(0, 20 * s, size, 4 * s);
+        g.dispose();
+        Path tmp = deterministicFixture("qs_e2e_skin_hd.png");
+        ImageIO.write(img, "png", tmp.toFile());
+        return tmp;
+    }
+
+    /**
+     * A 64x64 skin whose <b>outer</b> layer is genuinely transparent and whose outer arm columns are
+     * empty, so it exercises the two skin paths every other fixture deliberately avoids:
+     * <ul>
+     *   <li>{@code SkinModelDetector} reads the empty arm columns and auto-detects <b>slim</b>.</li>
+     *   <li>The hat overlay keeps real alpha, so a flattened import would wrap the head in an opaque
+     *       block instead of showing a narrow brim over the base face.</li>
+     * </ul>
+     */
+    public static Path makeTransparentLayerSkin() throws Exception {
+        BufferedImage img = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setComposite(AlphaComposite.Src);
+        // Opaque base everywhere: the body must stay solid even where the overlay is empty.
+        g.setColor(new Color(0x1E, 0x7A, 0x3C));
+        g.fillRect(0, 0, 64, 64);
+        // Base head front, a warm skin tone that must remain visible through the empty hat layer.
+        g.setColor(new Color(0xE8, 0xB4, 0x8A));
+        g.fillRect(8, 8, 8, 8);
+        // Clear the whole head overlay (32-63, 0-15), then paint a narrow magenta brim across all
+        // four side faces (x 32-63, y 13-15) so it is visible from any camera angle. A flattened
+        // import would fill this whole region with opaque black and encase the head in a block.
+        g.setColor(new Color(0, 0, 0, 0));
+        g.fillRect(32, 0, 32, 16);
+        g.setColor(new Color(0xCC, 0x22, 0x99));
+        g.fillRect(32, 13, 32, 3);
+        // Empty the outer arm columns the detector samples, which is what makes this skin slim.
+        g.setColor(new Color(0, 0, 0, 0));
+        g.fillRect(54, 20, 2, 12);
+        g.fillRect(46, 52, 2, 12);
+        g.dispose();
+        Path tmp = deterministicFixture("qs_e2e_skin_transparent.png");
+        ImageIO.write(img, "png", tmp.toFile());
+        return tmp;
+    }
+
     /**
      * A valid 64x32 opaque cape {@link BufferedImage} (the vanilla cape format; a 2:1 frame ratio so
      * {@code LocalAssetManager} accepts it). Distinctive colors so the cape is obvious in screenshots.
