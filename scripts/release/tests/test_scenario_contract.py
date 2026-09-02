@@ -43,6 +43,9 @@ EXPECTED_STEPS = {
         "external_skin_drop",
         "model_slim",
         "model_classic",
+        "hd_skin_no_downscale",
+        "transparent_skin_layers",
+        "restore_reference_skin",
         "cape_menu_screen",
         "known_cape_apply",
         "cape_adjust_screen",
@@ -119,7 +122,11 @@ EXPECTED_CAPTURES = {
     ("full", "client_a"): tuple(
         step
         for step in EXPECTED_STEPS[("full", "client_a")]
-        if step not in {"remove_cape_with_elytra", "bmo_render_parity"}
+        if step not in {
+            "remove_cape_with_elytra",
+            "bmo_render_parity",
+            "restore_reference_skin",
+        }
     ),
     ("mod-compatibility", "client_a"): (
         "baseline_with_mod",
@@ -341,7 +348,7 @@ class ScenarioContractTest(unittest.TestCase):
             for role in scenario["roles"]
             for step in role["steps"]
         )
-        self.assertEqual(50, authored_capture_count)
+        self.assertEqual(52, authored_capture_count)
         self.assertEqual(authored_capture_count, len(self.contract.captures))
 
     def test_capture_metadata_and_ids_are_derived_from_steps(self) -> None:
@@ -353,7 +360,7 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual(expected_ids, set(self.contract.capture_ids))
         self.assertEqual((1920, 1080), self.contract.screenshot_size)
         self.assertEqual(expected_ids, set(self.contract.review_regions))
-        self.assertEqual(50, len(expected_ids))
+        self.assertEqual(52, len(expected_ids))
         first = self.contract.capture_by_id("full.client_a.baseline")
         self.assertIs(
             first,

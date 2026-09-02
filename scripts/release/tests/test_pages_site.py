@@ -30,6 +30,8 @@ import evidence as evidence_module  # noqa: E402
 from evidence import (  # noqa: E402
     MAX_MANIFEST_BYTES,
     PublicEvidenceError,
+    bundle_coverage_sha,
+    carry_forward,
     compact_bundle,
     load_matrix_inventory,
     prepare,
@@ -543,7 +545,7 @@ class PagesSiteTest(unittest.TestCase):
             expected_target_sha="2" * 40,
         )
 
-        self.assertEqual(86, len(manifest["frames"]))
+        self.assertEqual(90, len(manifest["frames"]))
         self.assertEqual(8, len(manifest["lanes"]))
         self.assertEqual(
             self.catalog.contract_sha256,
@@ -551,6 +553,108 @@ class PagesSiteTest(unittest.TestCase):
         )
         self.assertEqual(2, len(list((self.evidence_root / branch / "images").glob("*.png"))))
         self.assertNotIn("source_path", json.dumps(manifest))
+
+    def test_coverage_defaults_to_the_head_the_packaged_run_actually_tested(self) -> None:
+        branch = "forge-and-fabric-1.20.1"
+        self.write_branch(branch, "1.20.1")
+
+        manifest = validate_bundle(self.evidence_root, branch)
+
+        # Evidence written before the field existed still validates, and every consumer
+        # reads the same answer it read before.
+        self.assertNotIn("coverage_sha", manifest["provenance"])
+        self.assertEqual("2" * 40, bundle_coverage_sha(manifest))
+
+    def test_carry_forward_rebinds_only_the_coverage_head(self) -> None:
+        branch = "forge-and-fabric-1.20.1"
+        self.write_branch(branch, "1.20.1")
+        carried_head = "9" * 40
+        output = self.evidence_root.parent / "carried"
+
+        carry_forward(
+            evidence_root=self.evidence_root,
+            output_root=output,
+            branch=branch,
+            coverage_sha=carried_head,
+            expected_repository="AkaNebur/Quick-Skin-Mod",
+        )
+
+        carried = validate_bundle(
+            output,
+            branch,
+            only_branch=True,
+            expected_repository="AkaNebur/Quick-Skin-Mod",
+            expected_coverage_sha=carried_head,
+        )
+        self.assertEqual(carried_head, carried["provenance"]["coverage_sha"])
+        # The packaged provenance must keep naming the run and commit that produced these
+        # pixels, so the published record never claims a run tested a head it did not.
+        self.assertEqual("2" * 40, carried["provenance"]["target"]["sha"])
+        self.assertEqual(carried_head, bundle_coverage_sha(carried))
+        self.assertEqual(
+            validate_bundle(self.evidence_root, branch)["frames"], carried["frames"]
+        )
+
+    def test_carry_forward_refuses_an_invalid_head_or_an_occupied_destination(self) -> None:
+        branch = "forge-and-fabric-1.20.1"
+        self.write_branch(branch, "1.20.1")
+        output = self.evidence_root.parent / "carried"
+
+        with self.assertRaises(PublicEvidenceError):
+            carry_forward(
+                evidence_root=self.evidence_root,
+                output_root=output,
+                branch=branch,
+                coverage_sha="not-a-commit",
+                expected_repository="AkaNebur/Quick-Skin-Mod",
+            )
+
+        carry_forward(
+            evidence_root=self.evidence_root,
+            output_root=output,
+            branch=branch,
+            coverage_sha="9" * 40,
+            expected_repository="AkaNebur/Quick-Skin-Mod",
+        )
+        with self.assertRaises(PublicEvidenceError):
+            carry_forward(
+                evidence_root=self.evidence_root,
+                output_root=output,
+                branch=branch,
+                coverage_sha="8" * 40,
+                expected_repository="AkaNebur/Quick-Skin-Mod",
+            )
+
+    def test_validation_rejects_a_malformed_or_unexpected_coverage_head(self) -> None:
+        branch = "forge-and-fabric-1.20.1"
+        self.write_branch(branch, "1.20.1")
+        manifest_path = self.evidence_root / branch / "manifest.json"
+        original = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        for provenance_patch in ({"coverage_sha": "nope"}, {"unknown": "1" * 40}):
+            manifest = json.loads(json.dumps(original))
+            manifest["provenance"].update(provenance_patch)
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            with self.assertRaises(PublicEvidenceError):
+                validate_bundle(self.evidence_root, branch)
+
+        manifest = json.loads(json.dumps(original))
+        manifest["provenance"]["coverage_sha"] = "9" * 40
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        with self.assertRaises(PublicEvidenceError):
+            validate_bundle(self.evidence_root, branch, expected_coverage_sha="8" * 40)
+        self.assertEqual(
+            "9" * 40,
+            bundle_coverage_sha(
+                validate_bundle(
+                    self.evidence_root, branch, expected_coverage_sha="9" * 40
+                )
+            ),
+        )
 
     def test_prepare_uses_the_complete_canonical_release_matrix_validator(self) -> None:
         branch = "forge-and-fabric-1.20.1"
@@ -924,7 +1028,7 @@ class PagesSiteTest(unittest.TestCase):
         )
 
         self.assertEqual(2, summary["versions"])
-        self.assertEqual(172, summary["frames"])
+        self.assertEqual(180, summary["frames"])
         self.assertTrue((output / ".nojekyll").is_file())
         self.assertTrue((output / "index.html").is_file())
         self.assertTrue((output / "e2e" / "index.html").is_file())
@@ -934,8 +1038,8 @@ class PagesSiteTest(unittest.TestCase):
             (output / "e2e" / "gallery-data.json").read_text(encoding="utf-8")
         )
         self.assertEqual(["1.21.1", "1.20.1"], [row["version"] for row in site_data["releases"]])
-        self.assertEqual(172, len(gallery["frames"]))
-        self.assertEqual(172, len({frame["frame_id"] for frame in gallery["frames"]}))
+        self.assertEqual(180, len(gallery["frames"]))
+        self.assertEqual(180, len({frame["frame_id"] for frame in gallery["frames"]}))
         sample = gallery["frames"][0]
         published = output / "e2e" / sample["image"]
         self.assertEqual(sample["published_file_sha256"], published.stem)
