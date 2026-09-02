@@ -234,7 +234,16 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   matrix-derived Fabric 1.20.1 visual anchor is retained losslessly and rotated as current state.
 - `scripts/pages/select_artifact.py` authenticates exact-current E2E handoffs and SHA-bound rolling
   caches, then selects the newest valid source. Its AI mode requires a raw handoff and refuses a
-  compact fallback. A branch-only cache name is migration fallback only.
+  compact fallback. A branch-only cache name is migration fallback only. Under
+  `--allow-continuation` it may additionally nominate the newest earlier head on the branch's
+  bounded commit page that still owns an authenticated bundle; it never decides that the range is
+  safe. Only the collector publishes such a nomination, and only after it independently proves strict
+  ancestry from the comparison API and reclassifies that exact bounded file inventory through
+  `scripts/ci/visual_review_impact.py`. It must never fetch the release branch: this job is
+  privileged on the default branch, so untrusted history cannot enter a workspace that can write
+  the Actions cache. `scripts/pages/evidence.py carry-forward` then records the
+  reached head in the optional `provenance.coverage_sha` while the packaged provenance keeps naming
+  the run and commit that produced the pixels.
 - `scripts/pages/rotate_artifacts.py` owns post-deployment retention. It may delete only exact
   Actions artifact IDs whose protected run provenance, branch, SHA, age, and successful replacement
   have all been revalidated, including Pages-run intermediates; it never implements screenshot or
