@@ -505,7 +505,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Python
@@ -605,11 +604,27 @@ jobs:
             --jq .commit.sha)"
           [[ "$current_sha" == "$HEAD_SHA" ]]
           if [[ "$EXPECTED_SHA" != "$HEAD_SHA" ]]; then
-            git fetch --no-tags origin "$EXPECTED_SHA" "$HEAD_SHA"
-            git merge-base --is-ancestor "$EXPECTED_SHA" "$HEAD_SHA"
+            # This job is privileged on the default branch, so the continuation is proved
+            # from the comparison API instead of fetching release-branch objects: untrusted
+            # history never reaches a workspace that can write the Actions cache.
+            # "ahead" with a base merge base is the only relation that proves the evidence
+            # head is a strict ancestor of the current head without divergence, and the
+            # bounded file count keeps a truncated inventory from reading as a complete one.
+            comparison="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/compare/$EXPECTED_SHA...$HEAD_SHA")"
+            jq -e --arg base "$EXPECTED_SHA" \
+              '.status == "ahead" and .behind_by == 0 and
+               .base_commit.sha == $base and .merge_base_commit.sha == $base and
+               (.total_commits | type) == "number" and .total_commits <= 20 and
+               (.files | type) == "array" and (.files | length) <= 100' \
+              <<< "$comparison" > /dev/null
+            jq -er '.files' <<< "$comparison" > compare-files.json
             classification="$(python3 scripts/ci/visual_review_impact.py \
-              --repository . --base "$EXPECTED_SHA" --head "$HEAD_SHA")"
+              --files compare-files.json \
+              --changed-files "$(jq -er 'length' compare-files.json)" \
+              --scope replicated-port)"
             [[ "$classification" == skip ]]
+            rm -f compare-files.json
           fi
 
       - name: Convert the validated handoff into an atomic compact bundle

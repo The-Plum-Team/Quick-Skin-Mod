@@ -236,9 +236,11 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   compact fallback. A branch-only cache name is migration fallback only. Under
   `--allow-continuation` it may additionally nominate the newest earlier head on the branch's
   bounded commit page that still owns an authenticated bundle; it never decides that the range is
-  safe. Only the collector publishes such a nomination, and only after it independently refetches
-  both commits, proves ancestry with `git merge-base`, and reclassifies the exact range through
-  `scripts/ci/visual_review_impact.py`. `scripts/pages/evidence.py carry-forward` then records the
+  safe. Only the collector publishes such a nomination, and only after it independently proves strict
+  ancestry from the comparison API and reclassifies that exact bounded file inventory through
+  `scripts/ci/visual_review_impact.py`. It must never fetch the release branch: this job is
+  privileged on the default branch, so untrusted history cannot enter a workspace that can write
+  the Actions cache. `scripts/pages/evidence.py carry-forward` then records the
   reached head in the optional `provenance.coverage_sha` while the packaged provenance keeps naming
   the run and commit that produced the pixels.
 - `scripts/pages/rotate_artifacts.py` owns post-deployment retention. It may delete only exact

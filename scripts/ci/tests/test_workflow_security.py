@@ -1592,12 +1592,19 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("api.list_branch_commits(branch, MAX_CONTINUATION_COMMITS)", selector)
         self.assertIn("if require_raw or not allow_continuation:", selector)
         self.assertIn("if not commits or commits[0] != current_sha:", selector)
-        self.assertIn("fetch-depth: 0", collect)
         self.assertIn('[[ "$current_sha" == "$HEAD_SHA" ]]', collect)
-        self.assertIn(
-            'git merge-base --is-ancestor "$EXPECTED_SHA" "$HEAD_SHA"', collect
-        )
+        # The privileged collector proves ancestry from the comparison API. Fetching the
+        # release branch would put untrusted history in a workspace that can write the
+        # Actions cache, which is exactly the cache-poisoning shape CodeQL rejects.
+        self.assertNotIn("git fetch", collect)
+        self.assertNotIn("fetch-depth", collect)
+        self.assertIn('/compare/$EXPECTED_SHA...$HEAD_SHA', collect)
+        self.assertIn('.status == "ahead" and .behind_by == 0', collect)
+        self.assertIn(".merge_base_commit.sha == $base", collect)
+        self.assertIn(".total_commits <= 20", collect)
+        self.assertIn("(.files | length) <= 100", collect)
         self.assertIn("scripts/ci/visual_review_impact.py", collect)
+        self.assertIn("--scope replicated-port", collect)
         self.assertIn('[[ "$classification" == skip ]]', collect)
         self.assertIn("scripts/pages/evidence.py carry-forward", collect)
         self.assertIn('--coverage-sha "$HEAD_SHA"', collect)

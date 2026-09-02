@@ -256,8 +256,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   into cache. That covered head is the packaged target head unless a protected carry-forward
   recorded an optional `provenance.coverage_sha`, which a non-visual synchronization port may
   advance because it deliberately never re-runs packaged Minecraft. Carrying evidence requires the
-  collector's own Git ancestry proof plus a fresh `replicated-port` impact classification of the
-  exact range, never a flag from the selector; the packaged provenance never moves, so a run can
+  collector's own strict-ancestry proof from the comparison API plus a fresh `replicated-port`
+  impact classification of that exact bounded inventory, never a flag from the selector and never
+  a fetch of untrusted release-branch history into this privileged workspace; the packaged provenance never moves, so a run can
   never appear to have tested a head it did not. The field stays optional until every release
   branch has republished, and the AI oracle never consumes a continued bundle.
 - Pages repository wakes and deploys use one shared publication concurrency group so a branch wave
