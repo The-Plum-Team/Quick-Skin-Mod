@@ -519,6 +519,13 @@ public class PlayerCapeMenuScreen extends Screen {
             return;
         }
 
+        // Every local tile below is a catalogue asset addressed by its SHA-256 primary, while the
+        // saved reference may still be a SHA-1 alias whose migration has not run yet. Compare the
+        // two in the catalogue's own vocabulary so the active cape is highlighted, previewed and
+        // retimed instead of silently reading as "no cape selected".
+        activeCapeId = com.quickskin.mod.client.services.CapeAnimationIds.canonicalCapeId(
+                activeCapeId, this::catalogPrimaryOf);
+
         // Find the matching cape in both lists and update preview
         for (CapeEntry cape : this.localCapes) {
             if (cape.getCapeId().equals(activeCapeId)) {
@@ -1955,17 +1962,17 @@ public class PlayerCapeMenuScreen extends Screen {
      * Shared by SpeedSlider, lazy registration, and render logic.
      */
     private String getAnimationIdForCape(String capeId) {
-        if (capeId == null) return null;
+        return com.quickskin.mod.client.services.CapeAnimationIds.deriveAnimationId(capeId);
+    }
 
-        if (capeId.startsWith("local_cape:")) {
-            String hash = capeId.substring("local_cape:".length());
-            return "cape_" + hash;
-        } else if (capeId.startsWith("known:")) {
-            String knownId = capeId.substring("known:".length());
-            return "cape_known_" + knownId;
-        }
-
-        return null;
+    /**
+     * Resolves a local content ID to its catalogue primary, or {@code null} when the catalogue
+     * does not hold it or deliberately refuses to resolve an ambiguous alias.
+     */
+    @Nullable
+    private String catalogPrimaryOf(String contentId) {
+        AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(contentId);
+        return metadata == null ? null : metadata.hash();
     }
 //? if <1.21.11 {
 //?} else if <26.1 {

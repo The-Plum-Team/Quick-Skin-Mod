@@ -388,10 +388,11 @@ public class AnimatedTextureManager {
     }
 
     private static boolean isCachedNetworkAnimation(String animationId, String capeId) {
-        if (capeId == null || !capeId.startsWith("local_cape:")) return false;
-        String hash = capeId.substring("local_cape:".length());
+        String hash = CapeAnimationIds.localHash(capeId);
+        if (hash == null) return false;
         return NetworkSecurity.isValidContentId(hash)
-                && ("cape_" + hash).equals(animationId)
+                && java.util.Objects.equals(
+                        CapeAnimationIds.deriveAnimationId(capeId), animationId)
                 && ClientAnimationMetadataCache.getInstance().hasMetadata(hash)
                 && NetworkTextureCache.getInstance().containsTexture(hash, "cape");
     }
