@@ -32,16 +32,7 @@ public final class CapeAnimationHelper {
      */
     @Nullable
     public static String deriveAnimationId(@Nullable String capeId) {
-        if (capeId == null || capeId.isEmpty()) {
-            return null;
-        }
-        if (capeId.startsWith("local_cape:")) {
-            return "cape_" + capeId.substring("local_cape:".length());
-        }
-        if (capeId.startsWith("known:")) {
-            return "cape_known_" + capeId.substring("known:".length());
-        }
-        return null;
+        return CapeAnimationIds.deriveAnimationId(capeId);
     }
 
     /** Marks a cape as rendered and starts a bounded network-animation activation if needed. */
@@ -50,8 +41,8 @@ public final class CapeAnimationHelper {
         if (animationId == null) return;
         AnimatedTextureManager manager = AnimatedTextureManager.getInstance();
         manager.markAnimationVisible(animationId);
-        if (capeId == null || !capeId.startsWith("local_cape:")) return;
-        String hash = capeId.substring("local_cape:".length());
+        String hash = CapeAnimationIds.localHash(capeId);
+        if (hash == null) return;
         boolean cachedNetworkCape = NetworkSecurity.isValidContentId(hash)
                 && NetworkTextureCache.getInstance().markTextureInUse(hash, "cape");
         boolean networkAnimation = cachedNetworkCape
@@ -109,8 +100,8 @@ public final class CapeAnimationHelper {
         if (visible && animationId != null) {
             markCapeVisible(capeId);
         }
-        if (animationId != null && capeId != null && capeId.startsWith("local_cape:")) {
-            String hash = capeId.substring("local_cape:".length());
+        String hash = CapeAnimationIds.localHash(capeId);
+        if (animationId != null && hash != null) {
             boolean networkAnimation = NetworkSecurity.isValidContentId(hash)
                     && ClientAnimationMetadataCache.getInstance().hasMetadata(hash)
                     && (visible
