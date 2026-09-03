@@ -772,6 +772,11 @@ public class PlayerSkinMenuScreen extends Screen {
         }
         // else: sub-screen navigation, skip restore
 
+        // The restore's resizeDisplay() has finished, so the guard is no longer needed. Leaving
+        // it latched would make a later setScreen(this) come back at the user's scale forever:
+        // a dialog that returns to this instance twice (callback plus its own onClose) hits the
+        // external-close branch above, and init() must be able to force the menu scale again.
+        isClosing = false;
         openingSubScreen = false;
     }
 
@@ -1349,16 +1354,10 @@ public class PlayerSkinMenuScreen extends Screen {
                 Component.empty(),
                 metadata.friendlyName(),
                 (newName) -> {
-                    // Rename the skin
+                    // Rename the skin. RenameScreen's Done button closes itself back to this
+                    // parent right after the callback, so returning here as well would set the
+                    // same screen twice and run removed() on the menu while it is being shown.
                     renameSkin(metadata, newName);
-                    // Return to skin menu screen
-                    if (minecraft != null) {
-//? if <26.2 {
-                        minecraft.setScreen(this);
-//?} else {
-                        minecraft.gui.setScreen(this);
-//?}
-                    }
                 }
         ));
     }
