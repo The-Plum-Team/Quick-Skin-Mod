@@ -563,9 +563,10 @@ public class PlayerSkinMenuScreen extends Screen {
     private void registerCapeAnimationIfNeeded(String capeId, Identifier capeLocation) {
 //?}
         // Determine animation ID from cape ID
-        if (capeId.startsWith("local_cape:")) {
-            String hash = capeId.substring("local_cape:".length());
-            String animationId = "cape_" + hash;
+        String hash = com.quickskin.mod.client.services.CapeAnimationIds.localHash(capeId);
+        if (hash != null) {
+            String animationId =
+                    com.quickskin.mod.client.services.CapeAnimationIds.deriveAnimationId(capeId);
 
 //? if <26.1.2 {
             // Check if this local cape has animation metadata
