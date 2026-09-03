@@ -155,12 +155,10 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
 
                 // If animated, ensure the animation is registered
                 if (capeService.isAnimated(capeId)) {
-                    String hash = null;
-                    String animationId = null;
+                    String hash = CapeAnimationIds.localHash(capeId);
 
-                    if (capeId.startsWith("local_cape:")) {
-                        hash = capeId.substring("local_cape:".length());
-                        animationId = "cape_" + hash;
+                    if (hash != null) {
+                        String animationId = CapeAnimationIds.deriveAnimationId(capeId);
 
                         AnimatedTextureManager.getInstance().registerAnimationAsync(
                                 animationId, capeId, capeLocation, hash);
