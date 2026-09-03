@@ -50,10 +50,25 @@ class StartAfter:
 
 
 @dataclass(frozen=True)
+class ServerConfigSeed:
+    """Exact Quick Skin dedicated-server configuration a scenario requires before launch."""
+
+    disable_skin_transparency: bool
+    skin_change_cooldown_seconds: int
+
+    def to_json_object(self) -> dict[str, Any]:
+        return {
+            "disableSkinTransparency": self.disable_skin_transparency,
+            "skinChangeCooldownSeconds": self.skin_change_cooldown_seconds,
+        }
+
+
+@dataclass(frozen=True)
 class Orchestration:
     mode: str
     role_order: tuple[str, ...] = ()
     start_after: StartAfter | None = None
+    server_config: ServerConfigSeed | None = None
 
     @property
     def two_clients(self) -> bool:
@@ -437,20 +452,25 @@ def _orchestration(value: Any, label: str, roles: tuple[str, ...]) -> Orchestrat
         value,
         label,
         frozenset({"mode"}),
-        frozenset({"role_order", "start_after"}),
+        frozenset({"role_order", "start_after", "server_config"}),
     )
     mode = _text(raw["mode"], f"{label}.mode")
     if mode not in ORCHESTRATION_MODES:
         raise ScenarioContractError(f"{label}.mode is unsupported: {mode!r}")
+    server_config = (
+        _server_config(raw["server_config"], f"{label}.server_config")
+        if "server_config" in raw
+        else None
+    )
     if mode == "single-client":
-        _object(raw, label, frozenset({"mode"}))
+        _object(raw, label, frozenset({"mode"}), frozenset({"server_config"}))
         if roles != ("client_a",):
             raise ScenarioContractError(f"{label} single-client mode requires only client_a")
-        return Orchestration(mode)
+        return Orchestration(mode, server_config=server_config)
     if roles != ("client_a", "client_b"):
         raise ScenarioContractError(f"{label} {mode} mode requires client_a then client_b")
     if mode == "sequential-two-client":
-        _object(raw, label, frozenset({"mode", "role_order"}))
+        _object(raw, label, frozenset({"mode", "role_order"}), frozenset({"server_config"}))
         order_values = _array(raw["role_order"], f"{label}.role_order", nonempty=True)
         role_order = tuple(
             _identifier(item, f"{label}.role_order[{index}]")
@@ -460,11 +480,11 @@ def _orchestration(value: Any, label: str, roles: tuple[str, ...]) -> Orchestrat
             raise ScenarioContractError(
                 f"{label}.role_order must list each scenario role exactly once in launch order"
             )
-        return Orchestration(mode, role_order=role_order)
+        return Orchestration(mode, role_order=role_order, server_config=server_config)
 
-    _object(raw, label, frozenset({"mode"}), frozenset({"start_after"}))
+    _object(raw, label, frozenset({"mode"}), frozenset({"start_after", "server_config"}))
     if "start_after" not in raw:
-        return Orchestration(mode)
+        return Orchestration(mode, server_config=server_config)
     start_raw = _object(
         raw["start_after"],
         f"{label}.start_after",
@@ -485,7 +505,36 @@ def _orchestration(value: Any, label: str, roles: tuple[str, ...]) -> Orchestrat
     )
     if start_after.role not in roles:
         raise ScenarioContractError(f"{label}.start_after.role is not a scenario role")
-    return Orchestration(mode, start_after=start_after)
+    return Orchestration(mode, start_after=start_after, server_config=server_config)
+
+
+def _server_config(value: Any, label: str) -> ServerConfigSeed:
+    """Validate the exact dedicated-server seed a scenario may request.
+
+    The keys mirror ``quickskin-server.json`` exactly so the packaged orchestrator can write the
+    object verbatim; unknown or missing keys fail closed so a scenario cannot request a policy
+    the server would silently ignore.
+    """
+
+    raw = _object(
+        value,
+        label,
+        frozenset({"disableSkinTransparency", "skinChangeCooldownSeconds"}),
+    )
+    seed = ServerConfigSeed(
+        _boolean(raw["disableSkinTransparency"], f"{label}.disableSkinTransparency"),
+        _integer(
+            raw["skinChangeCooldownSeconds"],
+            f"{label}.skinChangeCooldownSeconds",
+            minimum=0,
+            maximum=86400,
+        ),
+    )
+    if not seed.disable_skin_transparency and seed.skin_change_cooldown_seconds == 0:
+        raise ScenarioContractError(
+            f"{label} must request at least one non-default server policy"
+        )
+    return seed
 
 
 def _comparison(
