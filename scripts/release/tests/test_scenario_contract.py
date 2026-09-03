@@ -867,19 +867,19 @@ class ScenarioContractTest(unittest.TestCase):
                     "settings_screen",
                     "settings_keybind_capture",
                     0.00001,
-                    (0.31, 0.25, 0.69, 0.74),
+                    (0.16, 0.25, 0.28, 0.31),
                 ),
                 (
                     "settings_screen",
                     "settings_gui_edit_tab",
                     0.001,
-                    (0.31, 0.25, 0.69, 0.74),
+                    (0.12, 0.1, 0.78, 0.88),
                 ),
                 (
                     "settings_gui_edit_tab",
                     "settings_server_tab",
                     0.001,
-                    (0.31, 0.25, 0.69, 0.74),
+                    (0.12, 0.1, 0.78, 0.88),
                 ),
                 (
                     "skin_menu_screen",

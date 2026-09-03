@@ -2178,10 +2178,10 @@
               "second_step": "settings_keybind_capture",
               "minimum_changed_fraction": 1e-05,
               "region": [
-                0.31,
+                0.16,
                 0.25,
-                0.69,
-                0.74
+                0.28,
+                0.31
               ]
             },
             {
@@ -2189,10 +2189,10 @@
               "second_step": "settings_gui_edit_tab",
               "minimum_changed_fraction": 0.001,
               "region": [
-                0.31,
-                0.25,
-                0.69,
-                0.74
+                0.12,
+                0.1,
+                0.78,
+                0.88
               ]
             },
             {
@@ -2200,10 +2200,10 @@
               "second_step": "settings_server_tab",
               "minimum_changed_fraction": 0.001,
               "region": [
-                0.31,
-                0.25,
-                0.69,
-                0.74
+                0.12,
+                0.1,
+                0.78,
+                0.88
               ]
             },
             {
