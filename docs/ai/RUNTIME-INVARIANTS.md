@@ -52,6 +52,21 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Bare SHA-1 local IDs are read-only compatibility aliases. Publish and migrate an alias only after
   the complete bounded scan proves it resolves to one SHA-256 primary; an ambiguous alias must not
   resolve, select metadata, migrate a path, or be written back to configuration.
+- A cape animation is named by exactly one string, derived from the cape ID by
+  `CapeAnimationIds`. Never re-implement that split in a screen, widget, or service: two callers
+  that disagree register, retime, and unregister different animations for the same cape. The
+  derivation stays purely textual, and every producer registers under the cape ID it was handed
+  rather than a resolved primary. A `local_cape:` ID addresses a network-delivered cape as often
+  as a catalogued one, the network cape owns the content ID the server sent, and the renderer
+  derives its lookup from the same cape ID the caller holds; resolving one end alone either finds
+  no animation and exposes the stacked atlas, or leaves a second animation running beside it.
+- A legacy SHA-1 alias is folded onto its catalogue primary only where the cape ID is chosen, and
+  only where the value never leaves this client. `LocalContentIdMigration` owns the persisted
+  preference, including the animation-speed keys. A read-only local lookup, such as the cape
+  menu resolving which tile is active, may fold through the catalogue's own resolver so an absent
+  or ambiguous alias is left untouched. `PlayerAppearance`'s cape ID is not such a value:
+  `ClientNetworkHandler` advertises it through `NetworkSyncService.syncAppearance`, so it is wire
+  identity under the immutable v1 alias contract and must never be rewritten locally.
 - Client caches are keyed by both hash and texture type. The same PNG bytes may validly exist as a
   skin and a cape; never collapse typed keys back to a hash-only cache or resource path.
 - Renderer-confirmed skin/cape use receives only a short, bounded working-set preference. Cache
