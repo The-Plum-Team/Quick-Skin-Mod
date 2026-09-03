@@ -100,34 +100,34 @@ import javax.imageio.ImageIO;
 public final class FullScenario implements Scenario {
 
     /** A close but unclipped view makes the one-texture-pixel arm-width delta inspectable. */
-    private static final int MODEL_EVIDENCE_FOV = 50;
-    private volatile Integer modelEvidenceOriginalFov;
+    static final int MODEL_EVIDENCE_FOV = 50;
+    volatile Integer modelEvidenceOriginalFov;
     /** The HUD evidence offset is derived once from the first production-rendered geometry. */
     private boolean hudOverlayPositioned;
 
-    private volatile String skinHash;        // set by step 2, reused by model + HUD steps
-    private volatile String externalSkinHash; // set by the external-drop step (no import call)
-    private volatile String hdSkinHash;      // set by step "hd_skin_no_downscale"
-    private volatile String transparentSkinHash; // set by step "transparent_skin_layers"
-    private final AtomicReference<BufferedImage> transparentSkinStored = new AtomicReference<>();
-    private volatile String hdCapeHash;      // set by step "hd_cape"
-    private final AtomicReference<BufferedImage> hdCapeSource = new AtomicReference<>();
-    private final AtomicReference<BufferedImage> hdCapePresentation = new AtomicReference<>();
-    private volatile String gifCapeHash;     // set by the mandatory bundled-GIF checkpoint
+    volatile String skinHash;        // set by step 2, reused by model + HUD steps
+    volatile String externalSkinHash; // set by the external-drop step (no import call)
+    volatile String hdSkinHash;      // set by step "hd_skin_no_downscale"
+    volatile String transparentSkinHash; // set by step "transparent_skin_layers"
+    final AtomicReference<BufferedImage> transparentSkinStored = new AtomicReference<>();
+    volatile String hdCapeHash;      // set by step "hd_cape"
+    final AtomicReference<BufferedImage> hdCapeSource = new AtomicReference<>();
+    final AtomicReference<BufferedImage> hdCapePresentation = new AtomicReference<>();
+    volatile String gifCapeHash;     // set by the mandatory bundled-GIF checkpoint
     private volatile int animStartFrame = Integer.MIN_VALUE; // snapshot for the frame-advance check
     /** Frame held still for screenshot A, then advanced deterministically to screenshot B. */
     private static final int ANIMATED_EVIDENCE_FRAME_A = 0;
     private static final int ANIMATED_EVIDENCE_FRAME_B = 1;
     /** Previous-poll layout stamp of the open skin menu; {@code Long.MIN_VALUE} = not held yet. */
     private long skinMenuLayoutStamp = Long.MIN_VALUE;
-    private volatile String previewCapeHashA;  // set by the cape-preview steps (never applied)
-    private volatile String previewCapeHashB;
+    volatile String previewCapeHashA;  // set by the cape-preview steps (never applied)
+    volatile String previewCapeHashB;
     /** Rendered ticks a pushed preview cape must survive before its screenshot is captured. */
-    private static final int PREVIEW_HOLD_TICKS = 15;
+    static final int PREVIEW_HOLD_TICKS = 15;
     private final AtomicInteger previewHoldA = new AtomicInteger();
     private final AtomicInteger previewHoldB = new AtomicInteger();
     /** Loud enough that the filled window cannot be confused with the cape's own colours. */
-    private static final int OPAQUE_FILL_RGB = 0xFF00FF;
+    static final int OPAQUE_FILL_RGB = 0xFF00FF;
     private final AtomicInteger opaqueHoldOff = new AtomicInteger();
     private final AtomicInteger opaqueHoldOn = new AtomicInteger();
     /** Two slider positions far enough apart that the framing cannot look the same at both. */
@@ -148,7 +148,7 @@ public final class FullScenario implements Scenario {
     private final AtomicReference<BufferedImage> bundledBmoAtlas = new AtomicReference<>();
     private final AtomicReference<BufferedImage> adjustedBmoAtlas = new AtomicReference<>();
     private final AtomicInteger bmoAdjustHold = new AtomicInteger();
-    private volatile String adjustedBmoCapeHash;
+    volatile String adjustedBmoCapeHash;
 
     /** Screen-space tolerance for the redundant renderer-level BMO parity check. */
     private static final double BMO_RENDER_REGION_LEFT = 0.44;
@@ -159,9 +159,9 @@ public final class FullScenario implements Scenario {
     private static final int BMO_RENDER_CHANNEL_TOLERANCE = 12;
     private static final double BMO_RENDER_MAX_CHANGED_FRACTION = 0.10;
 
-    private final AtomicReference<BufferedImage> capeAdjustResult = new AtomicReference<>();
-    private volatile String renameResult;
-    private volatile Boolean deleteResult;
+    final AtomicReference<BufferedImage> capeAdjustResult = new AtomicReference<>();
+    volatile String renameResult;
+    volatile Boolean deleteResult;
 
     @Override
     public ScenarioId id() { return ScenarioId.FULL; }
@@ -179,6 +179,11 @@ public final class FullScenario implements Scenario {
         final String adjustedBmoCapeShot = prefix + "full_05l_bmo_adjusted_cape" + suffix;
         final String adjustedBmoElytraShot = prefix + "full_05m_bmo_adjusted_elytra" + suffix;
         final String removedBmoElytraShot = prefix + "full_05n_bmo_removed_vanilla_elytra" + suffix;
+        final CatalogSteps catalog = new CatalogSteps(this);
+        final SkinFidelitySteps skinFidelity = new SkinFidelitySteps(this);
+        final CapeEditorSteps capeEditor = new CapeEditorSteps(this);
+        final CapeMenuSteps capeMenu = new CapeMenuSteps(this);
+        final SettingsSteps settings = new SettingsSteps(this);
 
         List<Step> steps = new ArrayList<>();
 
@@ -316,11 +321,17 @@ public final class FullScenario implements Scenario {
                                 "open skin menu did not pick up externally dropped skin "
                                         + externalSkinHash);
                     }
-                    if (!(VanillaShim.currentScreen(mc) instanceof PlayerSkinMenuScreen)) {
+                    if (!(VanillaShim.currentScreen(mc) instanceof PlayerSkinMenuScreen screen)) {
                         return Step.Result.fail("skin menu closed during the poll: " + screenName(mc));
                     }
-                    return Step.Result.pass("externally dropped skin catalogued: " + externalSkinHash);
+                    String widgetProblem = CatalogSteps.listEntryProblem(screen, externalSkinHash);
+                    if (widgetProblem != null) return Step.Result.fail(widgetProblem);
+                    return Step.Result.pass("externally dropped skin catalogued and listed with a "
+                            + "face texture: " + externalSkinHash);
                 }));
+
+        // 2d-2h. catalog operations through the real rename/sort/own-skin/delete paths --------------
+        steps.addAll(catalog.buildCatalogOperations(mc, uuid, svc, prefix, suffix));
 
         // 3. model slim / classic -----------------------------------------------------------------
         steps.add(Step.of("model_slim")
@@ -352,6 +363,9 @@ public final class FullScenario implements Scenario {
                         restoreModelEvidenceView(mc);
                     }
                 }));
+
+        // 3c-3k. slim auto-detection, legacy/HD/odd-size skins, base-layer transparency -----------
+        steps.addAll(skinFidelity.build(mc, uuid, svc, prefix, suffix));
 
         // 3c. HD and transparent skins ------------------------------------------------------------
         // Every other skin fixture is a deliberately opaque 64x64, which leaves the HD import path
@@ -701,6 +715,9 @@ public final class FullScenario implements Scenario {
                                     + "the Elytra silhouette cutout");
                 }));
 
+        // 5e2. fill colour picker popover ----------------------------------------------------------
+        steps.add(capeEditor.buildFillColorPicker(mc, prefix, suffix));
+
         // 5f/5g. zoom slider ------------------------------------------------------------------------
         // One CapeAdjustScreen instance spans both steps and only the zoom moves between them. The
         // DISTINCT_SCREENSHOT_PAIRS entry is the frame-level proof that the change reached the
@@ -879,6 +896,9 @@ public final class FullScenario implements Scenario {
                             + "-step drag matched the jump exactly; a wheel notch moved the slider "
                             + "by " + expectedStep + "; applied == previewed");
                 }));
+
+        // 5g2-5g6. snap/mirror editing and the real GUI cape import path ---------------------------
+        steps.addAll(capeEditor.buildImportBlock(mc, uuid, svc, prefix, suffix));
 
         // 5h-5n. bundled BMO versus the same atlas recovered through the editor ------------------
         // The imported source is a 128x64 black canvas with the production 64x32 BMO atlas centred
@@ -1185,7 +1205,7 @@ public final class FullScenario implements Scenario {
                                 "Remove Cape did not synchronously clear config and service state");
                     }
                     return Step.Result.pass("real Remove Cape button cleared the active custom "
-                            + "cape while the elytra remained equipped");
+                            + "cape; the next checkpoint verifies the elytra is still equipped");
                 }));
 
         // The wings must keep rendering, but both custom texture inputs must disappear so
@@ -1239,10 +1259,15 @@ public final class FullScenario implements Scenario {
                         // The mod decodes the valid bundled GIF cape into an animated local cape.
                         // Missing evidence is fatal: a different fallback could satisfy the logical
                         // animation checks without proving the contracted red/blue render change.
-                        gifCapeHash = TestAssets.registerBundledGifCape();
-                        if (gifCapeHash == null) {
+                        String gifAlias = TestAssets.registerBundledGifCape();
+                        if (gifAlias == null) {
                             throw new IllegalStateException("bundled animated cape is missing");
                         }
+                        // Drive the animation under the catalog primary id, exactly as the cape
+                        // menu's tile click does, so the later menu checkpoints and this pinned
+                        // state share one AnimationState instead of an alias-keyed sibling.
+                        AssetMetadata gifMetadata = LocalAssetManager.getInstance().getMetadata(gifAlias);
+                        gifCapeHash = gifMetadata == null ? gifAlias : gifMetadata.hash();
                         svc.applyCape(uuid, "local_cape:" + gifCapeHash);
                         // Hold the initial frame while its screenshot settles. The follow-up
                         // step advances to an exact different frame, then freezes it as well.
@@ -1504,31 +1529,11 @@ public final class FullScenario implements Scenario {
                     }
                 }));
 
-        // 10a. settings: round-trip a flag through SettingsScreen.onClose -> ClientConfig ----------
-        steps.add(Step.of("settings_screen")
-                .action(() -> {
-                    ClientConfig c = ClientConfig.getInstance();
-                    c.showSkinPreviewOverlay = false; // known starting value; the screen will flip it
-                    c.save();
-                    VanillaShim.setScreen(mc, new SettingsScreen(null));
-                })
-                .minTicks(25)
-                .ready(() -> VanillaShim.currentScreen(mc) instanceof SettingsScreen)
-                .timeoutTicks(200)
-                .screenshot(prefix + "full_10a_settings" + suffix)
-                .assertion(() -> {
-                    if (!(VanillaShim.currentScreen(mc) instanceof SettingsScreen s))
-                        return Step.Result.fail("settings not open: " + screenName(mc));
-                    Object cbObj = screenField(s, "showOverlayCheckbox");
-                    if (!(cbObj instanceof Checkbox cb))
-                        return Step.Result.fail("showOverlayCheckbox not found/built");
-                    if (!cb.selected()) VanillaShim.press(cb); // flip false -> true via the real widget
-                    s.onClose();                       // persists checkbox states into ClientConfig + save()
-                    boolean now = ClientConfig.getInstance().showSkinPreviewOverlay;
-                    return now
-                            ? Step.Result.pass("SettingsScreen.onClose wrote showSkinPreviewOverlay=true to ClientConfig")
-                            : Step.Result.fail("ClientConfig.showSkinPreviewOverlay still false after onClose");
-                }));
+        // 9. cape menu with local capes: tile click, speed slider, tooltip, scroll, delete, None ---
+        steps.addAll(capeMenu.build(mc, uuid, svc, prefix, suffix));
+
+        // 10a. settings: every tab through the real tab buttons and checkboxes --------------------
+        steps.addAll(settings.build(mc, uuid, svc, prefix, suffix));
 
         // 10b. rename dialog (harness owns the result Consumer) -----------------------------------
         steps.add(Step.of("rename_dialog")
@@ -1582,6 +1587,9 @@ public final class FullScenario implements Scenario {
                             : Step.Result.fail("Delete callback got: " + deleteResult);
                 }));
 
+        // 10d. a saved skin id whose file vanished falls back to the vanilla default ---------------
+        steps.add(catalog.buildStaleSkinFallback(mc, uuid, svc, prefix, suffix));
+
         // 11. HUD preview overlay -----------------------------------------------------------------
         steps.add(Step.of("hud_preview_overlay")
                 .action(() -> {
@@ -1615,7 +1623,17 @@ public final class FullScenario implements Scenario {
                     if (geometryFailure != null)
                         return Step.Result.fail(geometryFailure);
                     Object loc = overlayCachedSkinLocation();
-                    return Step.Result.pass("HUD overlay rendered in lower-right evidence region; "
+                    Object expectedLoc = skinHash == null
+                            ? null
+                            : LocalAssetManager.getInstance().getTextureLocation(
+                                    skinHash, TextureQuality.FULL);
+                    if (expectedLoc == null || loc == null
+                            || !String.valueOf(expectedLoc).equals(String.valueOf(loc))) {
+                        return Step.Result.fail("HUD overlay cachedSkinLocation=" + loc
+                                + " expected custom skin " + expectedLoc);
+                    }
+                    return Step.Result.pass("HUD overlay rendered in the configured lower-right "
+                            + "evidence region wearing the custom skin; "
                             + overlayGeometryDescription(mc) + "; cachedSkinLocation=" + loc);
                 }));
 
@@ -1712,7 +1730,7 @@ public final class FullScenario implements Scenario {
      * geometry accessors are era-preprocessed and would not compile against every lane. Losing the
      * precondition resets the stamp, so a flickering layout is never reported settled.
      */
-    private boolean skinMenuLayoutSettled(Minecraft mc) {
+    boolean skinMenuLayoutSettled(Minecraft mc) {
         Screen sc = VanillaShim.currentScreen(mc);
         if (!(sc instanceof PlayerSkinMenuScreen)
                 || VanillaShim.guiScale(mc) != GuiScaleManager.getOptimalMenuScale()) {
@@ -1757,7 +1775,7 @@ public final class FullScenario implements Scenario {
      * only the glyph cores match; the panorama, the logo and the button chrome are all far away from
      * saturated yellow with no blue at all.
      */
-    private static boolean isSplashYellow(int argb) {
+    static boolean isSplashYellow(int argb) {
         int r = (argb >> 16) & 0xFF;
         int g = (argb >> 8) & 0xFF;
         int b = argb & 0xFF;
@@ -1835,7 +1853,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** The PNG a dispatched grab wrote, or {@code null} while the async write is still in flight. */
-    private static BufferedImage readShot(String name) {
+    static BufferedImage readShot(String name) {
         File file = new File(new File(System.getProperty("user.dir"), "screenshots"), name);
         if (!file.isFile() || file.length() < 1024L) return null;
         try {
@@ -1862,7 +1880,7 @@ public final class FullScenario implements Scenario {
      * lane, so only that deliberately broad area is eligible. Its pixels are then clustered into
      * bands, by row and then by column, and the densest eligible cluster wins.
      */
-    private int[] locateSplash(Minecraft mc, BufferedImage shot) {
+    int[] locateSplash(Minecraft mc, BufferedImage shot) {
         int height = shot.getHeight();
         int width = shot.getWidth();
         int scanTop = 0;
@@ -1911,7 +1929,7 @@ public final class FullScenario implements Scenario {
      * pixels away stays its own, much smaller, run. {@code null} when the winning run is too small
      * to be a splash.
      */
-    private static int[] densestCluster(int[] buckets) {
+    static int[] densestCluster(int[] buckets) {
         int bestStart = -1;
         int bestEnd = -1;
         int bestWeight = 0;
@@ -1942,7 +1960,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** Splash-coloured pixels inside a GUI-coordinate region of a captured frame. */
-    private int countSplashPixels(Minecraft mc, BufferedImage shot, int[] guiRegion) {
+    int countSplashPixels(Minecraft mc, BufferedImage shot, int[] guiRegion) {
         double scaleX = (double) shot.getWidth() / Math.max(1, mc.getWindow().getGuiScaledWidth());
         double scaleY = (double) shot.getHeight() / Math.max(1, mc.getWindow().getGuiScaledHeight());
         int px0 = Math.max(0, (int) Math.floor(guiRegion[0] * scaleX));
@@ -1983,7 +2001,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** The Quick Skin preview the mod injected into the open title screen, or {@code null}. */
-    private PlayerWidget titlePreviewWidget(Minecraft mc) {
+    PlayerWidget titlePreviewWidget(Minecraft mc) {
         Screen screen = VanillaShim.currentScreen(mc);
         if (screen == null) return null;
         for (GuiEventListener child : screen.children()) {
@@ -2062,7 +2080,7 @@ public final class FullScenario implements Scenario {
      * blue with almost no green. The band is wide enough to survive the model's directional GUI
      * lighting, which dims the cape without shifting its hue.
      */
-    private static boolean isProbeCapeMagenta(int argb) {
+    static boolean isProbeCapeMagenta(int argb) {
         int r = (argb >> 16) & 0xFF;
         int g = (argb >> 8) & 0xFF;
         int b = argb & 0xFF;
@@ -2319,7 +2337,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** The Quick Skin preview inside the open cape editor, or {@code null}. */
-    private PlayerWidget capeEditorPreviewWidget(Minecraft mc) {
+    PlayerWidget capeEditorPreviewWidget(Minecraft mc) {
         Screen screen = VanillaShim.currentScreen(mc);
         if (!(screen instanceof CapeAdjustScreen)) return null;
         for (GuiEventListener child : screen.children()) {
@@ -2328,7 +2346,7 @@ public final class FullScenario implements Scenario {
         return null;
     }
 
-    private static int clamp(int value, int min, int max) {
+    static int clamp(int value, int min, int max) {
         return value < min ? min : Math.min(value, max);
     }
 
@@ -2336,7 +2354,7 @@ public final class FullScenario implements Scenario {
 
     /** Reset the client singletons to a deterministic clean state between feature runs. */
     /** The cape menu's private preview widget, or {@code null} if that screen is not open. */
-    private Object capeMenuWidget(Minecraft mc) {
+    Object capeMenuWidget(Minecraft mc) {
         if (!(VanillaShim.currentScreen(mc) instanceof PlayerCapeMenuScreen screen)) return null;
         try {
             Field f = PlayerCapeMenuScreen.class.getDeclaredField("playerWidget");
@@ -2348,7 +2366,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** The cape location the preview widget is currently holding, or {@code null}. */
-    private Object previewCapeLocation(Minecraft mc) {
+    Object previewCapeLocation(Minecraft mc) {
         Object widget = capeMenuWidget(mc);
         if (widget == null) return null;
         try {
@@ -2368,7 +2386,7 @@ public final class FullScenario implements Scenario {
      * poll so the screen's own selection refresh cannot win the last write before the screenshot.
      * The texture type is era-specific, so the setter is invoked reflectively.
      */
-    private boolean pushPreviewCape(Minecraft mc, String capeId) {
+    boolean pushPreviewCape(Minecraft mc, String capeId) {
         Object widget = capeMenuWidget(mc);
         if (widget == null) return false;
         Object location = CapeService.getInstance().getCapeLocation(null, capeId);
@@ -2388,7 +2406,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** Asserts the preview shows the selected cape while the worn cape is untouched. */
-    private Step.Result previewCapeAssertion(
+    Step.Result previewCapeAssertion(
             Minecraft mc, PlayerAppearanceService svc, UUID uuid, String hash, String label) {
         if (hash == null) return Step.Result.fail("preview cape " + label + " was not catalogued");
         if (!(VanillaShim.currentScreen(mc) instanceof PlayerCapeMenuScreen))
@@ -2410,7 +2428,7 @@ public final class FullScenario implements Scenario {
         return Step.Result.pass("preview=" + expected + " worn=" + worn);
     }
 
-    private void resetState() {
+    void resetState() {
         try {
             PlayerAppearanceRepository.getInstance().clear();
             ModelService.getInstance().clearAll();
@@ -2427,7 +2445,7 @@ public final class FullScenario implements Scenario {
      * {@code composeCapeImage} is private and is what {@code applyAndClose} hands to {@code onApply},
      * so composing it directly asserts on the exact bytes the apply path would produce.
      */
-    private static BufferedImage composeCapeNow(Minecraft mc) {
+    static BufferedImage composeCapeNow(Minecraft mc) {
         return composeOnAdjustScreen(mc, "composeCapeImage");
     }
 
@@ -2440,7 +2458,7 @@ public final class FullScenario implements Scenario {
      *
      * @return null when the atlas is correct, otherwise the failure description
      */
-    private static String assertAnimatedAtlasIsFilled() {
+    static String assertAnimatedAtlasIsFilled() {
         try {
             BufferedImage src = TestAssets.makeTransparentAnimatedCapeImage();
             CapeAdjustScreen screen = new CapeAdjustScreen(null, src, 2, img -> { });
@@ -2481,7 +2499,7 @@ public final class FullScenario implements Scenario {
      * and registers it as the texture both the 2D thumbnails and {@code PlayerWidget.setCape} use.
      * Asserting on it is what proves the fill reached the preview path and not only the apply path.
      */
-    private static BufferedImage composePreviewFrameNow(Minecraft mc) {
+    static BufferedImage composePreviewFrameNow(Minecraft mc) {
         if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen s)) {
             return null;
         }
@@ -2501,7 +2519,7 @@ public final class FullScenario implements Scenario {
      * <p>Idempotent, so a {@code ready()} hold can call it on every rendered tick: setting the
      * position it already holds re-derives the same scale and the same offsets.
      */
-    private static boolean setZoomOnAdjustScreen(Minecraft mc, double position) {
+    static boolean setZoomOnAdjustScreen(Minecraft mc, double position) {
         if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen s)) {
             return false;
         }
@@ -2523,7 +2541,7 @@ public final class FullScenario implements Scenario {
      *
      * @return null when the two agree, otherwise the failure description
      */
-    private static String checkZoomSliderAgrees(Minecraft mc, double expectedPosition) {
+    static String checkZoomSliderAgrees(Minecraft mc, double expectedPosition) {
         double widget = doubleOnAdjustScreen(mc, "zoomSliderValue");
         double fromScale = doubleOnAdjustScreen(mc, "zoomPosition");
         if (Double.isNaN(widget) || Double.isNaN(fromScale)) {
@@ -2541,7 +2559,7 @@ public final class FullScenario implements Scenario {
         return null;
     }
 
-    private static double doubleOnAdjustScreen(Minecraft mc, String method) {
+    static double doubleOnAdjustScreen(Minecraft mc, String method) {
         if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen s)) {
             return Double.NaN;
         }
@@ -2555,7 +2573,7 @@ public final class FullScenario implements Scenario {
         }
     }
 
-    private static String stringOnAdjustScreen(Minecraft mc, String method) {
+    static String stringOnAdjustScreen(Minecraft mc, String method) {
         if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen s)) {
             return null;
         }
@@ -2579,7 +2597,7 @@ public final class FullScenario implements Scenario {
      * runtime — and its signature is era-branched, which this unpreprocessed source set could not
      * express anyway.
      */
-    private static boolean scrollOnGridCentre(Minecraft mc, boolean zoomIn) {
+    static boolean scrollOnGridCentre(Minecraft mc, boolean zoomIn) {
         if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen s)) {
             return false;
         }
@@ -2596,19 +2614,19 @@ public final class FullScenario implements Scenario {
         }
     }
 
-    private static int adjustScreenInt(CapeAdjustScreen screen, String name) throws Exception {
+    static int adjustScreenInt(CapeAdjustScreen screen, String name) throws Exception {
         return adjustScreenField(name).getInt(screen);
     }
 
-    private static double adjustScreenDouble(CapeAdjustScreen screen, String name) throws Exception {
+    static double adjustScreenDouble(CapeAdjustScreen screen, String name) throws Exception {
         return adjustScreenField(name).getDouble(screen);
     }
 
-    private static Object adjustScreenObject(CapeAdjustScreen screen, String name) throws Exception {
+    static Object adjustScreenObject(CapeAdjustScreen screen, String name) throws Exception {
         return adjustScreenField(name).get(screen);
     }
 
-    private static Field adjustScreenField(String name) throws Exception {
+    static Field adjustScreenField(String name) throws Exception {
         Field field = CapeAdjustScreen.class.getDeclaredField(name);
         field.setAccessible(true);
         return field;
@@ -2622,12 +2640,12 @@ public final class FullScenario implements Scenario {
      *
      * @return false when no enabled button carries that label
      */
-    private static boolean pressResolutionButton(Minecraft mc, String label) {
+    static boolean pressResolutionButton(Minecraft mc, String label) {
         return pressActiveButton(mc, label);
     }
 
     /** Press an enabled button on the current screen by its rendered, localized label. */
-    private static boolean pressActiveButton(Minecraft mc, String label) {
+    static boolean pressActiveButton(Minecraft mc, String label) {
         if (VanillaShim.currentScreen(mc) == null) return false;
         for (GuiEventListener child : VanillaShim.currentScreen(mc).children()) {
             if (child instanceof Button button
@@ -2639,7 +2657,7 @@ public final class FullScenario implements Scenario {
         return false;
     }
 
-    private static boolean hasExpectedCape(
+    static boolean hasExpectedCape(
             PlayerAppearanceService service, UUID uuid, String capeId) {
         PlayerAppearance appearance = service.getAppearance(uuid);
         return appearance != null
@@ -2649,7 +2667,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** Assert the shared render inputs for either a bundled or adjusted BMO cape route. */
-    private static Step.Result assertCapeRoute(
+    static Step.Result assertCapeRoute(
             Minecraft mc,
             PlayerAppearanceService service,
             UUID uuid,
@@ -2659,7 +2677,7 @@ public final class FullScenario implements Scenario {
         return assertCapeRoute(mc, service, uuid, capeId, expectElytra, true);
     }
 
-    private static Step.Result assertCapeRoute(
+    static Step.Result assertCapeRoute(
             Minecraft mc,
             PlayerAppearanceService service,
             UUID uuid,
@@ -2711,7 +2729,7 @@ public final class FullScenario implements Scenario {
                 : " with an empty chest slot"));
     }
 
-    private static String vanillaElytraFallbackProblem(
+    static String vanillaElytraFallbackProblem(
             Minecraft mc, PlayerAppearanceService service, UUID uuid) {
         if (mc.player == null) return "player is null";
         if (!mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)) {
@@ -2734,7 +2752,7 @@ public final class FullScenario implements Scenario {
         return null;
     }
 
-    private static Step.Result assertVanillaElytraAfterCapeRemoval(
+    static Step.Result assertVanillaElytraAfterCapeRemoval(
             Minecraft mc, PlayerAppearanceService service, UUID uuid) {
         if (mc.player == null) return Step.Result.fail("player null");
         if (!mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)) {
@@ -2776,12 +2794,12 @@ public final class FullScenario implements Scenario {
                 + "minecraft:textures/entity/elytra.png");
     }
 
-    private Step.Result assertAdjustedBmoRoute(
+    Step.Result assertAdjustedBmoRoute(
             Minecraft mc, PlayerAppearanceService service, UUID uuid, boolean expectElytra) {
         return assertAdjustedBmoRoute(mc, service, uuid, expectElytra, true);
     }
 
-    private Step.Result assertAdjustedBmoRoute(
+    Step.Result assertAdjustedBmoRoute(
             Minecraft mc,
             PlayerAppearanceService service,
             UUID uuid,
@@ -2903,7 +2921,7 @@ public final class FullScenario implements Scenario {
      * broken UV crop changes the BMO surface by far more and over far more than the allowed tenth
      * of this tightly bounded region. Exact atlas equality remains the primary, non-flaky oracle.
      */
-    private static RenderedDifference measureRenderedDifference(
+    static RenderedDifference measureRenderedDifference(
             BufferedImage first, BufferedImage second) {
         if (first == null || second == null
                 || first.getWidth() != second.getWidth()
@@ -2953,7 +2971,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** @return how many pixels differ, or -1 when the two atlases are not the same size */
-    private static long countDifferingPixels(BufferedImage first, BufferedImage second) {
+    static long countDifferingPixels(BufferedImage first, BufferedImage second) {
         if (first.getWidth() != second.getWidth() || first.getHeight() != second.getHeight()) {
             return -1;
         }
@@ -2968,7 +2986,7 @@ public final class FullScenario implements Scenario {
         return differing;
     }
 
-    private static BufferedImage composeOnAdjustScreen(Minecraft mc, String method) {
+    static BufferedImage composeOnAdjustScreen(Minecraft mc, String method) {
         if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen s)) {
             return null;
         }
@@ -2989,7 +3007,7 @@ public final class FullScenario implements Scenario {
      *
      * @return null when the landmark survived, otherwise the failure description
      */
-    private static String checkOpaqueLandmark(BufferedImage image, int yOffset, String label) {
+    static String checkOpaqueLandmark(BufferedImage image, int yOffset, String label) {
         int pixel = image.getRGB(TestAssets.OPAQUE_LANDMARK_X,
                 yOffset + TestAssets.OPAQUE_LANDMARK_Y);
         if (pixel != TestAssets.OPAQUE_LANDMARK_ARGB) {
@@ -3000,7 +3018,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** Close any open screen, switch to a fixed 3rd-person-back view, and pin the player's facing. */
-    private void enterWorldView(Minecraft mc) {
+    void enterWorldView(Minecraft mc) {
         try {
             VanillaShim.setScreen(mc, null);
             if (mc.options != null) {
@@ -3020,7 +3038,7 @@ public final class FullScenario implements Scenario {
      * Zoom only the two model checkpoints so the 3-pixel Alex and 4-pixel Steve arms are visible.
      * The original FOV is captured once and restored before any later scenario evidence.
      */
-    private void prepareModelEvidenceView(Minecraft mc) {
+    void prepareModelEvidenceView(Minecraft mc) {
         enterWorldView(mc);
         Integer current = VanillaShim.fieldOfView(mc);
         if (modelEvidenceOriginalFov == null && current != null) {
@@ -3031,7 +3049,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** Hold camera, pose, and renderer-facing geometry through the screenshot settle window. */
-    private boolean holdModelEvidenceView(Minecraft mc, String expectedModel) {
+    boolean holdModelEvidenceView(Minecraft mc, String expectedModel) {
         if (mc.player == null || mc.options == null) return false;
         VanillaShim.setScreen(mc, null);
         mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
@@ -3043,7 +3061,7 @@ public final class FullScenario implements Scenario {
                 && expectedModel.equals(VanillaShim.playerModel(mc.player));
     }
 
-    private Step.Result assertModelEvidence(
+    Step.Result assertModelEvidence(
             Minecraft mc, PlayerAppearanceService svc, UUID uuid, String expectedModel) {
         PlayerAppearance app = svc.getAppearance(uuid);
         if (app == null) return Step.Result.fail("no appearance");
@@ -3066,7 +3084,7 @@ public final class FullScenario implements Scenario {
                         + ", close rear FOV=" + MODEL_EVIDENCE_FOV);
     }
 
-    private void restoreModelEvidenceView(Minecraft mc) {
+    void restoreModelEvidenceView(Minecraft mc) {
         Integer original = modelEvidenceOriginalFov;
         if (original != null) {
             VanillaShim.setFieldOfView(mc, original);
@@ -3074,12 +3092,12 @@ public final class FullScenario implements Scenario {
         }
     }
 
-    private void equipElytra(Minecraft mc) {
+    void equipElytra(Minecraft mc) {
         setChestSlot(mc, new ItemStack(Items.ELYTRA));
     }
 
     /** Keep both elytra wings visually separated so semantic review cannot mistake them for a cape. */
-    private void poseElytraForEvidence(Minecraft mc) {
+    void poseElytraForEvidence(Minecraft mc) {
         equipElytra(mc);
         if (mc.options != null) mc.options.keyShift.setDown(true);
         if (mc.player != null) {
@@ -3097,7 +3115,7 @@ public final class FullScenario implements Scenario {
      * passed. Pin both current and previous rotations during the settle window so the captured
      * frame is a stable rear view rather than a transition between poses.
      */
-    private void pinRearEvidenceView(Minecraft mc) {
+    void pinRearEvidenceView(Minecraft mc) {
         if (mc.player == null) return;
         float yaw = 180f;
         DefaultSkinEvidenceView.pinStandingMotion(mc.player);
@@ -3111,20 +3129,20 @@ public final class FullScenario implements Scenario {
         mc.player.xRotO = 0f;
     }
 
-    private static boolean sameRotation(float left, float right) {
+    static boolean sameRotation(float left, float right) {
         return Math.abs(left - right) < 0.01f;
     }
 
-    private static boolean hasEmptyChest(Minecraft mc) {
+    static boolean hasEmptyChest(Minecraft mc) {
         return mc.player != null
                 && mc.player.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
     }
 
-    private String expectedAnimatedCapeId() {
+    String expectedAnimatedCapeId() {
         return gifCapeHash == null ? null : "local_cape:" + gifCapeHash;
     }
 
-    private String expectedAnimationId() {
+    String expectedAnimationId() {
         return gifCapeHash == null ? null : "cape_" + gifCapeHash;
     }
 
@@ -3134,7 +3152,7 @@ public final class FullScenario implements Scenario {
      * <p>The harness drives the real game, so it equips the way a player would; the production code
      * under test never writes here, which is the point of the probe that calls this.
      */
-    private void setChestSlot(Minecraft mc, ItemStack stack) {
+    void setChestSlot(Minecraft mc, ItemStack stack) {
         try {
             if (mc.player != null) {
                 mc.player.setItemSlot(EquipmentSlot.CHEST, stack);
@@ -3144,11 +3162,11 @@ public final class FullScenario implements Scenario {
         }
     }
 
-    private static String screenName(Minecraft mc) {
+    static String screenName(Minecraft mc) {
         return VanillaShim.currentScreen(mc) == null ? "<none>" : VanillaShim.currentScreen(mc).getClass().getName();
     }
 
-    private boolean pressLastButton(Minecraft mc) {
+    boolean pressLastButton(Minecraft mc) {
         if (VanillaShim.currentScreen(mc) == null) return false;
         Button last = null;
         for (GuiEventListener c : VanillaShim.currentScreen(mc).children()) {
@@ -3161,7 +3179,7 @@ public final class FullScenario implements Scenario {
     // ===== animation reflection ================================================================
 
     /** The registered state for the cape actually worn by this checkpoint, or {@code null}. */
-    private Object expectedAnimatedState() {
+    Object expectedAnimatedState() {
         try {
             AnimatedTextureManager mgr = AnimatedTextureManager.getInstance();
             Field f = AnimatedTextureManager.class.getDeclaredField("animations");
@@ -3176,17 +3194,17 @@ public final class FullScenario implements Scenario {
         return null;
     }
 
-    private int frameOf(Object state) {
+    int frameOf(Object state) {
         Object v2 = stateField(state, "currentFrame");
         return (v2 instanceof Integer i) ? i : -1;
     }
 
-    private AnimationMetadata metaOf(Object state) {
+    AnimationMetadata metaOf(Object state) {
         Object v2 = stateField(state, "metadata");
         return (v2 instanceof AnimationMetadata m) ? m : null;
     }
 
-    private static Object stateField(Object state, String name) {
+    static Object stateField(Object state, String name) {
         try {
             Field f = state.getClass().getDeclaredField(name);
             f.setAccessible(true);
@@ -3199,7 +3217,7 @@ public final class FullScenario implements Scenario {
 
     // ===== screen / overlay / config reflection ================================================
 
-    private static Object screenField(Object screen, String name) {
+    static Object screenField(Object screen, String name) {
         try {
             Field f = screen.getClass().getDeclaredField(name);
             f.setAccessible(true);
@@ -3211,7 +3229,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** {@code ClientConfig.activeSkinHash} is a public field; set reflectively to stay robust. */
-    private static void setActiveSkinHash(ClientConfig c, String hash) {
+    static void setActiveSkinHash(ClientConfig c, String hash) {
         try {
             Field f = ClientConfig.class.getField("activeSkinHash");
             f.set(c, hash);
@@ -3220,7 +3238,7 @@ public final class FullScenario implements Scenario {
         }
     }
 
-    private void overlayForceResolve() {
+    void overlayForceResolve() {
         try {
             Field f = Class.forName("com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay")
                     .getDeclaredField("lastCheckedSkinHash");
@@ -3232,7 +3250,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** Wait for production geometry, then move its centre into the stable authored review region. */
-    private boolean hudOverlayReady(Minecraft mc) {
+    boolean hudOverlayReady(Minecraft mc) {
         if (!overlayRendered()) return false;
         if (!hudOverlayPositioned) {
             if (!positionHudOverlayForEvidence(mc, ClientConfig.getInstance())) return false;
@@ -3261,7 +3279,7 @@ public final class FullScenario implements Scenario {
     }
 
     /** Return a fail-closed explanation when the renderer cached geometry outside its target. */
-    private String overlayGeometryFailure(Minecraft mc) {
+    String overlayGeometryFailure(Minecraft mc) {
         int centerX = overlayCachedInt("cachedModelCenterX");
         int centerY = overlayCachedInt("cachedModelCenterY");
         float scale = overlayCachedScale();
@@ -3285,14 +3303,14 @@ public final class FullScenario implements Scenario {
         return null;
     }
 
-    private String overlayGeometryDescription(Minecraft mc) {
+    String overlayGeometryDescription(Minecraft mc) {
         return "center=(" + overlayCachedInt("cachedModelCenterX") + ","
                 + overlayCachedInt("cachedModelCenterY") + ")/"
                 + mc.getWindow().getGuiScaledWidth() + "x"
                 + mc.getWindow().getGuiScaledHeight() + ", scale=" + overlayCachedScale();
     }
 
-    private int overlayCachedInt(String fieldName) {
+    int overlayCachedInt(String fieldName) {
         try {
             Field f = Class.forName("com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay")
                     .getDeclaredField(fieldName);
@@ -3303,7 +3321,7 @@ public final class FullScenario implements Scenario {
         }
     }
 
-    private float overlayCachedScale() {
+    float overlayCachedScale() {
         try {
             Field f = Class.forName("com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay")
                     .getDeclaredField("cachedScale");
@@ -3315,11 +3333,11 @@ public final class FullScenario implements Scenario {
     }
 
     /** True once {@code SkinPreviewOverlay.render} has executed at least once (cachedScale set). */
-    private boolean overlayRendered() {
+    boolean overlayRendered() {
         return overlayCachedScale() > 0f;
     }
 
-    private Object overlayCachedSkinLocation() {
+    Object overlayCachedSkinLocation() {
         try {
             Field f = Class.forName("com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay")
                     .getDeclaredField("cachedSkinLocation");
