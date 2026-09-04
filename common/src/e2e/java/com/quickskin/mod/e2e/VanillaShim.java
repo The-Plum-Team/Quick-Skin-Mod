@@ -14,6 +14,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -84,7 +85,8 @@ import java.util.function.Consumer;
  *   <li><b>mouse input</b>: {@code Screen.mouseClicked/mouseDragged/mouseReleased} take
  *       scalar coordinates before 1.21.9 and a {@code MouseButtonEvent} afterwards, so clicks fall
  *       back to {@code MouseHandler}'s GLFW callbacks, whose shape GLFW fixes; modern drags also
- *       flush the handler's accumulated movement before releasing the button.</li>
+ *       construct the runtime event record and invoke the public drag override, with the handler's
+ *       accumulated-movement route retained as a compatibility fallback.</li>
  * </ul>
  *
  * <p>GL-touching calls (screenshot) must run on the render thread, after at least one full frame.</p>
@@ -1302,6 +1304,23 @@ public final class VanillaShim {
                 return "Screen.mouseDragged failed: " + t;
             }
         }
+
+        Method modern = findModernMouseDrag(
+                screen.getClass(), "mouseDragged", "method_25403", "m_7979_");
+        if (modern != null) {
+            try {
+                modern.setAccessible(true);
+                Object event = newMouseButtonEvent(
+                        modern.getParameterTypes()[0], guiX, guiY, button);
+                Object handled = modern.invoke(
+                        screen, event, guiX - fromX, guiY - fromY);
+                return Boolean.FALSE.equals(handled)
+                        ? "screen " + screen.getClass().getSimpleName() + " ignored the drag"
+                        : null;
+            } catch (Throwable t) {
+                return "Screen.mouseDragged failed: " + t;
+            }
+        }
         return dispatchMove(mc, guiX, guiY);
     }
 
@@ -1359,6 +1378,58 @@ public final class VanillaShim {
                 owner,
                 new Class<?>[]{double.class, double.class, int.class, double.class, double.class},
                 names);
+    }
+
+    /** The event-record {@code mouseDragged} used by 1.21.9 and newer, or null. */
+    private static Method findModernMouseDrag(Class<?> owner, String... names) {
+        Set<String> wanted = Set.of(names);
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            Class<?>[] parameters = method.getParameterTypes();
+            if ((method.getReturnType() != boolean.class
+                    && method.getReturnType() != Boolean.class)
+                    || parameters.length != 3
+                    || parameters[0].isPrimitive()
+                    || parameters[1] != double.class
+                    || parameters[2] != double.class) {
+                continue;
+            }
+            if (wanted.contains(method.getName())) return method;
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
+    /** Builds the modern mouse event without importing types absent from older versions. */
+    private static Object newMouseButtonEvent(
+            Class<?> eventType, double guiX, double guiY, int button)
+            throws ReflectiveOperationException {
+        Constructor<?> eventConstructor = null;
+        for (Constructor<?> constructor : eventType.getDeclaredConstructors()) {
+            Class<?>[] parameters = constructor.getParameterTypes();
+            if (parameters.length != 3
+                    || parameters[0] != double.class
+                    || parameters[1] != double.class
+                    || parameters[2].isPrimitive()) {
+                continue;
+            }
+            if (eventConstructor != null) {
+                throw new NoSuchMethodException("ambiguous modern mouse event constructor");
+            }
+            eventConstructor = constructor;
+        }
+        if (eventConstructor == null) {
+            throw new NoSuchMethodException("modern mouse event constructor not found");
+        }
+
+        Class<?> buttonInfoType = eventConstructor.getParameterTypes()[2];
+        Constructor<?> buttonInfoConstructor =
+                buttonInfoType.getDeclaredConstructor(int.class, int.class);
+        buttonInfoConstructor.setAccessible(true);
+        Object buttonInfo = buttonInfoConstructor.newInstance(button, 0);
+        eventConstructor.setAccessible(true);
+        return eventConstructor.newInstance(guiX, guiY, buttonInfo);
     }
 
     private static Method findPublicMethod(Class<?> owner, Class<?>[] params, String... names) {
