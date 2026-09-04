@@ -207,6 +207,7 @@ class PagesArtifactRotationTest(unittest.TestCase):
         self.generation = BranchGeneration(
             branch=BRANCH,
             target_sha=TARGET_SHA,
+            coverage_sha=TARGET_SHA,
             target_run_id=800,
             keep=self.keep,
         )
@@ -291,10 +292,20 @@ class PagesArtifactRotationTest(unittest.TestCase):
         selected = select_old_caches(values, branch=BRANCH, keep=self.keep)
         self.assertEqual([item.artifact_id for item in selected], [100, 199])
 
-    def test_generation_requires_cache_name_bound_to_manifest_target_sha(self) -> None:
+    def test_generation_binds_cache_name_to_coverage_and_run_to_target(self) -> None:
         manifest = {
-            "provenance": {"target": {"sha": TARGET_SHA, "run_id": 800}}
+            "provenance": {
+                "target": {"sha": OLD_PAGES_SHA, "run_id": 800},
+                "coverage_sha": TARGET_SHA,
+            }
         }
+        expected = BranchGeneration(
+            branch=BRANCH,
+            target_sha=OLD_PAGES_SHA,
+            coverage_sha=TARGET_SHA,
+            target_run_id=800,
+            keep=self.keep,
+        )
         with tempfile.TemporaryDirectory() as temporary:
             evidence_root = Path(temporary)
             (evidence_root / BRANCH).mkdir()
@@ -306,11 +317,11 @@ class PagesArtifactRotationTest(unittest.TestCase):
                     pages_run_sha=PAGES_SHA,
                     trigger_artifacts=[self.keep],
                 )
-                self.assertEqual(generations, [self.generation])
+                self.assertEqual(generations, [expected])
 
                 mismatched = artifact(
                     201,
-                    f"pages-cache-{BRANCH}--{OLD_PAGES_SHA}",
+                    f"pages-cache-{BRANCH}--{PAGES_SHA}",
                     self.keep.created_at,
                     run_id=900,
                     head_branch="master",
@@ -360,6 +371,76 @@ class PagesArtifactRotationTest(unittest.TestCase):
                     trigger_artifacts=[self.compatibility_keep],
                 )
         self.assertEqual(generations, [self.compatibility_generation])
+
+    def test_carried_generation_rotates_at_coverage_head_and_consumes_target_handoff(
+        self,
+    ) -> None:
+        carried = BranchGeneration(
+            branch=BRANCH,
+            target_sha=OLD_PAGES_SHA,
+            coverage_sha=TARGET_SHA,
+            target_run_id=800,
+            keep=self.keep,
+        )
+        old_cache = artifact(
+            100,
+            f"pages-cache-{BRANCH}",
+            "2026-08-03T10:00:00Z",
+            run_id=700,
+            head_branch="master",
+            head_sha=OLD_PAGES_SHA,
+        )
+        consumed_handoff = artifact(
+            110,
+            f"pages-e2e-{BRANCH}",
+            "2026-08-03T11:00:00Z",
+            run_id=800,
+            head_branch=BRANCH,
+            head_sha=OLD_PAGES_SHA,
+        )
+        api = FakeApi(
+            keep=self.keep,
+            inventories={
+                old_cache.name: [old_cache, self.keep],
+                consumed_handoff.name: [consumed_handoff],
+            },
+            runs={
+                700: run(
+                    700,
+                    workflow=".github/workflows/pages.yml",
+                    event="schedule",
+                    branch="master",
+                    sha=OLD_PAGES_SHA,
+                ),
+                800: run(
+                    800,
+                    workflow=".github/workflows/on-demand-e2e.yml",
+                    event="workflow_dispatch",
+                    branch=BRANCH,
+                    sha=OLD_PAGES_SHA,
+                ),
+                900: run(
+                    900,
+                    workflow=".github/workflows/pages.yml",
+                    event="workflow_dispatch",
+                    branch="master",
+                    sha=PAGES_SHA,
+                )
+            },
+            branch_sha=TARGET_SHA,
+        )
+
+        deleted = rotate_branch(
+            api,
+            carried,
+            repository=REPOSITORY,
+            pages_run_id=900,
+            pages_run_sha=PAGES_SHA,
+            delete_delay_seconds=0,
+        )
+
+        self.assertEqual(deleted, [100, 110])
+        self.assertEqual(api.deleted, [100, 110])
 
     def test_compatibility_rotation_retires_only_older_authenticated_artifacts(self) -> None:
         cache_name = f"pages-mod-compatibility-cache-{BRANCH}"
@@ -772,7 +853,7 @@ class PagesArtifactRotationTest(unittest.TestCase):
         )
         # The nomination reports the head the evidence was written for, never the current
         # head, so the caller still validates provenance against the run that produced it.
-        self.assertEqual(evidence.sha, OLD_PAGES_SHA)
+        self.assertEqual(evidence.coverage_sha, OLD_PAGES_SHA)
         self.assertEqual(evidence.artifact.artifact_id, 410)
         self.assertEqual(api.commit_requests, 1)
 
@@ -840,7 +921,7 @@ class PagesArtifactRotationTest(unittest.TestCase):
             current_sha=TARGET_SHA,
             allow_continuation=True,
         )
-        self.assertEqual(evidence.sha, TARGET_SHA)
+        self.assertEqual(evidence.coverage_sha, TARGET_SHA)
         self.assertEqual(evidence.artifact.artifact_id, 420)
 
     def test_source_selection_skips_invalid_owner_and_supports_legacy_fallback(self) -> None:
@@ -1097,6 +1178,7 @@ class PagesArtifactRotationTest(unittest.TestCase):
         generation_other = BranchGeneration(
             branch=other_branch,
             target_sha=TARGET_SHA,
+            coverage_sha=TARGET_SHA,
             target_run_id=801,
             keep=keep_other,
         )
@@ -1594,7 +1676,7 @@ class SelectArtifactProbeTest(unittest.TestCase):
                     "artifact_id=200",
                     f"name=pages-cache-{BRANCH}--{TARGET_SHA}",
                     "run_id=900",
-                    f"sha={TARGET_SHA}",
+                    f"coverage_sha={TARGET_SHA}",
                     f"head_sha={TARGET_SHA}",
                     "size_in_bytes=100",
                 ],
