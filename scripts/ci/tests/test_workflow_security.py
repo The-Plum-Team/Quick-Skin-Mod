@@ -956,6 +956,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn(".source_sha == .target_sha", enumerate_review)
         self.assertIn("source_artifacts=", prepare)
+        self.assertIn("source_run_attempt", admit)
+        self.assertIn("SOURCE_RUN_ATTEMPT", prepare)
+        self.assertIn("sort_by(.id) | .[-1]", prepare)
+        self.assertIn("([.artifacts[].id] | unique | length)", prepare)
         self.assertIn("GH_TOKEN: ${{ github.token }}", plan_step)
         self.assertLess(
             plan_step.index("GH_TOKEN:"), plan_step.index("github_api_retry")
@@ -1420,6 +1424,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         prepare = job_block("mod-compatibility-e2e.yml", "prepare")
         inventory_block = prepare[prepare.index("baseline_artifacts=") :]
         match = re.search(
+            r'--argjson source_run_attempt "\$SOURCE_RUN_ATTEMPT" \\\n\s+'
             r'--argjson source_run_id "\$SOURCE_RUN_ID" \\\n\s+\'(?P<program>.*?)\' \\\n\s+"\$RUNNER_TEMP/mod-compatibility-plan\.json"',
             inventory_block,
             re.DOTALL,
@@ -1451,6 +1456,9 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "artifacts",
                 json.dumps({"artifacts": [artifact]}),
                 "--argjson",
+                "source_run_attempt",
+                "1",
+                "--argjson",
                 "source_run_id",
                 "123",
                 program,
@@ -1462,6 +1470,34 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
 
+        rerun_artifact = {
+            **artifact,
+            "id": 789,
+            "digest": "sha256:" + "b" * 64,
+        }
+        rerun = subprocess.run(
+            [
+                "jq",
+                "-e",
+                "--argjson",
+                "artifacts",
+                json.dumps({"artifacts": [artifact, rerun_artifact]}),
+                "--argjson",
+                "source_run_attempt",
+                "2",
+                "--argjson",
+                "source_run_id",
+                "123",
+                program,
+            ],
+            input=json.dumps(plan),
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertEqual(rerun.returncode, 0, rerun.stderr)
+        self.assertEqual(json.loads(rerun.stdout)[0]["id"], rerun_artifact["id"])
+
         duplicate = subprocess.run(
             [
                 "jq",
@@ -1469,6 +1505,9 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "--argjson",
                 "artifacts",
                 json.dumps({"artifacts": [artifact, artifact]}),
+                "--argjson",
+                "source_run_attempt",
+                "1",
                 "--argjson",
                 "source_run_id",
                 "123",
