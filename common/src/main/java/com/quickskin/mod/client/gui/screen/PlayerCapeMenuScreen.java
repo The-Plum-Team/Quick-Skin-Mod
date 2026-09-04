@@ -1811,7 +1811,8 @@ public class PlayerCapeMenuScreen extends Screen {
 //?} else {
             Identifier vanillaElytraTexture = Identifier.fromNamespaceAndPath("minecraft", texturePath);
 //?}
-            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(vanillaElytraTexture);
+            var resourceOptional = Minecraft.getInstance().getResourceManager()
+                    .getResource(vanillaElytraTexture);
             if (resourceOptional.isEmpty()) {
                 return null;
             }

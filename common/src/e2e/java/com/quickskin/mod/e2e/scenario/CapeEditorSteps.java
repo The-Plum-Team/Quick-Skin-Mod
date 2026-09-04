@@ -378,10 +378,12 @@ final class CapeEditorSteps {
                 record.expectedY = Math.round((record.startY + deltaY) / SNAP_TARGET) * SNAP_TARGET;
                 phase.set(1);
             }
+            double offsetX = FullScenario.adjustScreenDouble(s, "imgOffsetX");
+            double offsetY = FullScenario.adjustScreenDouble(s, "imgOffsetY");
             boolean stable = adjustBoolean(s, "mirrorFrontBack")
                     && snapSize(s) == SNAP_TARGET
-                    && FullScenario.adjustScreenDouble(s, "imgOffsetX") == record.expectedX
-                    && FullScenario.adjustScreenDouble(s, "imgOffsetY") == record.expectedY;
+                    && snappedOffsetAgrees(offsetX, record.expectedX)
+                    && snappedOffsetAgrees(offsetY, record.expectedY);
             if (!stable) {
                 hold.set(0);
                 return false;
@@ -413,9 +415,11 @@ final class CapeEditorSteps {
         if (offX == record.startX || offY == record.startY)
             return Step.Result.fail("the drag left an offset unchanged: start=(" + record.startX
                     + "," + record.startY + ") now=(" + offX + "," + offY + ")");
-        if (offX != record.expectedX || offY != record.expectedY)
+        if (!snappedOffsetAgrees(offX, record.expectedX)
+                || !snappedOffsetAgrees(offY, record.expectedY))
             return Step.Result.fail("snapped drag landed on (" + offX + "," + offY + ") expected ("
-                    + record.expectedX + "," + record.expectedY + ")");
+                    + record.expectedX + "," + record.expectedY + ") within one "
+                    + SNAP_TARGET + "px cursor-quantization cell");
         Button snapButton = findButton(mc, SNAP_TARGET_LABEL::equals);
         if (snapButton == null) return Step.Result.fail("no button reads '" + SNAP_TARGET_LABEL + "'");
 
@@ -492,6 +496,14 @@ final class CapeEditorSteps {
                 + offY + "); Mirror ON copied face (1,1)-(11,17) onto (12,1)-(22,17) changing "
                 + mirroredPixels + " pixels; Reset Position restored scale " + fmt(resetScale)
                 + " offsets (" + resetX + "," + resetY + "); Cancel closed without applying");
+    }
+
+    /**
+     * Modern mouse events read an integer GUI cursor pixel instead of the requested fractional
+     * coordinate. That sub-pixel loss can move the editor's nearest-grid rounding by one cell.
+     */
+    private static boolean snappedOffsetAgrees(double actual, double expected) {
+        return Math.abs(actual - expected) <= SNAP_TARGET;
     }
 
     // ----- cape_import_standard ------------------------------------------------------------------
