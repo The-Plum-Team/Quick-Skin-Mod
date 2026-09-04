@@ -57,6 +57,14 @@ MAX_AI_BLOBS_BYTES = 2 * 1024 * 1024
 BOT_NAME = "github-actions[bot]"
 BOT_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
 CONFLICT_MARKERS = (b"<<<<<<< ", b"||||||| ", b">>>>>>> ")
+VERIFICATION_METADATA_PATH = "gradle/verification-metadata.xml"
+VERIFICATION_COMPONENT_PATTERN = re.compile(
+    rb'      <component group="(?P<group>[^"<>\r\n]+)" '
+    rb'name="(?P<name>[^"<>\r\n]+)" '
+    rb'version="(?P<version>[^"<>\r\n]+)">\n'
+    rb'.*?^      </component>\n',
+    re.DOTALL | re.MULTILINE,
+)
 DATAPACK_FUNCTION_RENAMES = (
     (
         DATAPACK_FUNCTION_MIGRATION_TRIGGER,
@@ -88,6 +96,57 @@ NAMESPACED_GAME_RULES = {
 CPM_TRANSITION_POLICY_PATH = "scripts/release/tests/test_cpm_transition_policy.py"
 CPM_TRANSITION_POLICY_SHA256 = (
     "24201865fc492cb32844d5d9e73c4422a5bb03d13dc4f036e18024468f5b257c"
+)
+DEPENDENCY_SECURITY_POLICY_PATH = (
+    "scripts/release/tests/test_dependency_security.py"
+)
+DEPENDENCY_SECURITY_POLICY_SHA256 = (
+    "3943a99277b6954cf69787c5e90a64959c07facf2fdee1d94051e8cf9852bef0"
+)
+DEPENDENCY_SECURITY_EXPECTED_ANCHOR = b"        expected = {\n"
+DEPENDENCY_SECURITY_STONECUTTER_SETUP = (
+    b'        settings = (ROOT / "settings.gradle.kts").read_text(encoding="utf-8")\n'
+    b"        stonecutter_declaration = re.search(\n"
+    b'            r\'id\\("dev[.]kikugie[.]stonecutter"\\) version "([^\"]+)"\',\n'
+    b"            settings,\n"
+    b"        )\n"
+    b"        self.assertIsNotNone(stonecutter_declaration)\n"
+    b"        assert stonecutter_declaration is not None\n"
+    b"        stonecutter_version = stonecutter_declaration.group(1)\n"
+    b"\n"
+)
+DEPENDENCY_SECURITY_FIXED_STONECUTTER_LINE = (
+    b'            ("dev.kikugie", "stonecutter", "0.9.7"),\n'
+)
+DEPENDENCY_SECURITY_DYNAMIC_STONECUTTER_LINE = (
+    b'            ("dev.kikugie", "stonecutter", stonecutter_version),\n'
+)
+DEPENDENCY_SECURITY_ASSERTION_ANCHOR = (
+    b"        self.assertEqual(expected - coordinates, set())\n"
+)
+DEPENDENCY_SECURITY_STONECUTTER_ASSERTION = (
+    b"        self.assertEqual(\n"
+    b"            {\n"
+    b"                coordinate\n"
+    b"                for coordinate in coordinates\n"
+    b"                if coordinate[:2]\n"
+    b"                in {\n"
+    b'                    ("dev.kikugie", "stonecutter"),\n'
+    b"                    (\n"
+    b'                        "dev.kikugie.stonecutter",\n'
+    b'                        "dev.kikugie.stonecutter.gradle.plugin",\n'
+    b"                    ),\n"
+    b"                }\n"
+    b"            },\n"
+    b"            {\n"
+    b'                ("dev.kikugie", "stonecutter", stonecutter_version),\n'
+    b"                (\n"
+    b'                    "dev.kikugie.stonecutter",\n'
+    b'                    "dev.kikugie.stonecutter.gradle.plugin",\n'
+    b"                    stonecutter_version,\n"
+    b"                ),\n"
+    b"            },\n"
+    b"        )\n"
 )
 MIXIN_POLICY_PATH = "scripts/release/tests/test_mixin_policy.py"
 MIXIN_POLICY_SOURCE_FIXTURE_PATH = (
@@ -715,6 +774,66 @@ def _stages_payload(stages: Mapping[int, IndexEntry]) -> dict[str, Any]:
     }
 
 
+def _migrate_dependency_security_stonecutter(payload: bytes) -> bytes:
+    _validate_text_blob(payload, "target dependency-security policy", markers=True)
+    if len(payload) > MAX_PROTECTED_BLOB_BYTES:
+        raise VersionPortMergeError("target dependency-security policy is too large")
+    required_counts = (
+        (DEPENDENCY_SECURITY_EXPECTED_ANCHOR, 1, "expected-set anchor"),
+        (DEPENDENCY_SECURITY_FIXED_STONECUTTER_LINE, 1, "fixed Stonecutter entry"),
+        (DEPENDENCY_SECURITY_ASSERTION_ANCHOR, 1, "expected-set assertion"),
+        (DEPENDENCY_SECURITY_STONECUTTER_SETUP, 0, "dynamic Stonecutter setup"),
+        (
+            DEPENDENCY_SECURITY_DYNAMIC_STONECUTTER_LINE,
+            0,
+            "dynamic Stonecutter entry",
+        ),
+        (
+            DEPENDENCY_SECURITY_STONECUTTER_ASSERTION,
+            0,
+            "Stonecutter inventory assertion",
+        ),
+    )
+    for marker, expected, label in required_counts:
+        if payload.count(marker) != expected:
+            raise VersionPortMergeError(
+                f"target dependency-security policy has an invalid {label}"
+            )
+
+    payload = payload.replace(
+        DEPENDENCY_SECURITY_EXPECTED_ANCHOR,
+        DEPENDENCY_SECURITY_STONECUTTER_SETUP
+        + DEPENDENCY_SECURITY_EXPECTED_ANCHOR,
+        1,
+    )
+    payload = payload.replace(
+        DEPENDENCY_SECURITY_FIXED_STONECUTTER_LINE,
+        DEPENDENCY_SECURITY_DYNAMIC_STONECUTTER_LINE,
+        1,
+    )
+    payload = payload.replace(
+        DEPENDENCY_SECURITY_ASSERTION_ANCHOR,
+        DEPENDENCY_SECURITY_ASSERTION_ANCHOR
+        + DEPENDENCY_SECURITY_STONECUTTER_ASSERTION,
+        1,
+    )
+    migrated_counts = (
+        (DEPENDENCY_SECURITY_STONECUTTER_SETUP, 1),
+        (DEPENDENCY_SECURITY_DYNAMIC_STONECUTTER_LINE, 2),
+        (DEPENDENCY_SECURITY_STONECUTTER_ASSERTION, 1),
+    )
+    for marker, expected in migrated_counts:
+        if payload.count(marker) != expected:
+            raise VersionPortMergeError(
+                "dependency-security policy did not reach the dynamic Stonecutter policy"
+            )
+    if DEPENDENCY_SECURITY_FIXED_STONECUTTER_LINE in payload:
+        raise VersionPortMergeError(
+            "dependency-security policy retained the fixed Stonecutter version"
+        )
+    return payload
+
+
 def _policy_set_span(payload: bytes, name: str) -> tuple[int, int]:
     marker = f"{name} = {{\n".encode("ascii")
     if payload.count(marker) != 1:
@@ -869,6 +988,122 @@ def _index_entry_from_payload(
     )
 
 
+def _split_verification_metadata(
+    payload: bytes, label: str
+) -> tuple[bytes, dict[tuple[str, str, str], bytes], bytes]:
+    _validate_text_blob(payload, label, markers=True)
+    if b"\r" in payload:
+        raise VersionPortMergeError(f"{label} must use LF line endings")
+    opening = b"   <components>\n"
+    closing = b"   </components>\n"
+    if payload.count(opening) != 1 or payload.count(closing) != 1:
+        raise VersionPortMergeError(f"{label} has an invalid components section")
+    body_start = payload.index(opening) + len(opening)
+    body_end = payload.index(closing, body_start)
+    prefix = payload[:body_start]
+    body = payload[body_start:body_end]
+    suffix = payload[body_end:]
+    if suffix != closing + b"</verification-metadata>\n":
+        raise VersionPortMergeError(f"{label} has an invalid document suffix")
+
+    components: dict[tuple[str, str, str], bytes] = {}
+    position = 0
+    while position < len(body):
+        match = VERIFICATION_COMPONENT_PATTERN.match(body, position)
+        if match is None:
+            raise VersionPortMergeError(
+                f"{label} has content outside a canonical component block"
+            )
+        block = match.group(0)
+        if block.count(b"<component ") != 1 or block.count(b"</component>") != 1:
+            raise VersionPortMergeError(f"{label} has a nested component block")
+        key = (
+            match.group("group").decode("utf-8"),
+            match.group("name").decode("utf-8"),
+            match.group("version").decode("utf-8"),
+        )
+        if key in components:
+            raise VersionPortMergeError(
+                f"{label} repeats verification component {':'.join(key)!r}"
+            )
+        components[key] = block
+        position = match.end()
+    if not components:
+        raise VersionPortMergeError(f"{label} has no verification components")
+    if tuple(components) != tuple(sorted(components)):
+        raise VersionPortMergeError(
+            f"{label} verification components are not strictly sorted"
+        )
+    return prefix, components, suffix
+
+
+def _merge_verification_metadata_payloads(
+    base: bytes, target: bytes, source: bytes
+) -> bytes:
+    base_prefix, base_components, base_suffix = _split_verification_metadata(
+        base, "base verification metadata"
+    )
+    target_prefix, target_components, target_suffix = _split_verification_metadata(
+        target, "target verification metadata"
+    )
+    source_prefix, source_components, source_suffix = _split_verification_metadata(
+        source, "source verification metadata"
+    )
+    if target_prefix == source_prefix or base_prefix == source_prefix:
+        merged_prefix = target_prefix
+    elif base_prefix == target_prefix:
+        merged_prefix = source_prefix
+    else:
+        raise VersionPortMergeError(
+            "verification metadata configuration changed incompatibly"
+        )
+    if target_suffix == source_suffix or base_suffix == source_suffix:
+        merged_suffix = target_suffix
+    elif base_suffix == target_suffix:
+        merged_suffix = source_suffix
+    else:
+        raise VersionPortMergeError(
+            "verification metadata document suffix changed incompatibly"
+        )
+
+    merged: dict[tuple[str, str, str], bytes] = {}
+    keys = sorted(
+        set(base_components) | set(target_components) | set(source_components)
+    )
+    for key in keys:
+        base_block = base_components.get(key)
+        target_block = target_components.get(key)
+        source_block = source_components.get(key)
+        if target_block == source_block:
+            chosen = target_block
+        elif base_block == target_block:
+            chosen = source_block
+        elif base_block == source_block:
+            chosen = target_block
+        elif (
+            base_block is not None
+            and target_block is None
+            and source_block is not None
+        ):
+            # The release branch no longer resolves this dependency. Keep its deletion instead of
+            # importing new hashes for a component that is absent from that branch's graph.
+            chosen = None
+        else:
+            raise VersionPortMergeError(
+                "verification component changed incompatibly: " + ":".join(key)
+            )
+        if chosen is not None:
+            merged[key] = chosen
+
+    result = (
+        merged_prefix
+        + b"".join(merged[key] for key in sorted(merged))
+        + merged_suffix
+    )
+    _split_verification_metadata(result, "merged verification metadata")
+    return result
+
+
 def _resolve_source_path(
     repository: Path,
     path: str,
@@ -896,6 +1131,50 @@ def _resolve_source_path(
         )
         _validate_text_blob(payload, f"{label} blob for {path}", markers=False)
         inputs[stage] = payload
+
+    if path == DEPENDENCY_SECURITY_POLICY_PATH:
+        if hashlib.sha256(inputs[3]).hexdigest() != DEPENDENCY_SECURITY_POLICY_SHA256:
+            raise VersionPortMergeError(
+                "source dependency-security policy is not the audited Stonecutter policy"
+            )
+        migrated = _migrate_dependency_security_stonecutter(inputs[2])
+        result = _index_entry_from_payload(
+            repository,
+            path,
+            stages[2].mode,
+            migrated,
+            merge_files,
+            "migrated target dependency-security policy",
+            oid_length,
+        )
+        _install_index_entry(repository, result)
+        return result, {
+            "path": path,
+            "policy": "migrate-dynamic-stonecutter-security-policy",
+            "stages": _stages_payload(stages),
+            "result": result.object_payload(),
+        }
+
+    if path == VERIFICATION_METADATA_PATH:
+        merged = _merge_verification_metadata_payloads(
+            inputs[1], inputs[2], inputs[3]
+        )
+        result = _index_entry_from_payload(
+            repository,
+            path,
+            stages[2].mode,
+            merged,
+            merge_files,
+            "merged verification metadata",
+            oid_length,
+        )
+        _install_index_entry(repository, result)
+        return result, {
+            "path": path,
+            "policy": "merge-gradle-verification-metadata",
+            "stages": _stages_payload(stages),
+            "result": result.object_payload(),
+        }
 
     if (
         path == MIXIN_POLICY_PATH
