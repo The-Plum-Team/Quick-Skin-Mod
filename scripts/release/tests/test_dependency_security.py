@@ -66,7 +66,7 @@ class DependencySecurityPolicyTest(unittest.TestCase):
         self.assertIsNotNone(distribution_hash)
         assert distribution_hash is not None
         distribution_sidecar = (
-            ROOT / "gradle" / "wrapper" / "gradle-9.6.1-bin.zip.sha256"
+            ROOT / "gradle" / "wrapper" / "gradle-9.7.1-bin.zip.sha256"
         ).read_text(encoding="utf-8").strip()
         self.assertEqual(distribution_hash.group(1), distribution_sidecar)
 
