@@ -1604,6 +1604,14 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("github.ref == 'refs/heads/master'", discover)
         self.assertIn("scripts/pages/evidence.py validate", collect)
         self.assertIn("--only-branch", collect)
+        self.assertIn("steps.artifact.outputs.coverage_sha", collect)
+        self.assertNotIn("steps.artifact.outputs.sha", collect)
+        self.assertIn(
+            'target_sha="$(jq -er .provenance.target.sha "$manifest")"', collect
+        )
+        self.assertIn('--target-sha "$target_sha"', collect)
+        self.assertIn('--coverage-sha "$COVERAGE_SHA"', collect)
+        self.assertIn('--arg sha "$target_sha"', collect)
         self.assertIn("source_run_id", collect)
         self.assertIn("target_run_id", collect)
         self.assertIn("digest-mismatch: error", collect)
@@ -1644,6 +1652,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("pages: write", refresh)
         self.assertIn("api.list_artifacts(handoff_name)", selector)
         self.assertIn("api.list_artifacts(cache_name)", selector)
+        self.assertIn("coverage_sha={evidence.coverage_sha}", selector)
         self.assertIn("--require-hashes", build)
         self.assertIn("scripts/pages/requirements.txt", build)
 
@@ -1661,7 +1670,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         # Actions cache, which is exactly the cache-poisoning shape CodeQL rejects.
         self.assertNotIn("git fetch", collect)
         self.assertNotIn("fetch-depth", collect)
-        self.assertIn('/compare/$EXPECTED_SHA...$HEAD_SHA', collect)
+        self.assertIn('/compare/$COVERAGE_SHA...$HEAD_SHA', collect)
+        self.assertNotIn('/compare/$EXPECTED_SHA...$HEAD_SHA', collect)
         self.assertIn('.status == "ahead" and .behind_by == 0', collect)
         self.assertIn(".merge_base_commit.sha == $base", collect)
         self.assertIn(".total_commits <= 20", collect)
@@ -1746,6 +1756,165 @@ class WorkflowSecurityTest(unittest.TestCase):
             )
             self.assertNotEqual(stale.returncode, 0)
             self.assertIn("moved from covered SHA", stale.stderr)
+
+    def test_pages_collector_extends_coverage_instead_of_rebinding_target(self) -> None:
+        script = step_script(
+            "pages.yml", "collect", "Validate the curated bundle and recheck its branch head"
+        )
+        # GitHub's runner uses Bash 5. macOS Bash 3.2 applies nounset to an empty array
+        # expansion differently, so keep this test focused on the identity contract.
+        script = script.replace("set -euo pipefail", "set -eo pipefail", 1)
+        branch = "fabric-and-neoforge-26.2"
+        source_branch = "forge-and-fabric-1.20.1"
+        source_sha = "d" * 40
+        target_sha = "a" * 40
+        coverage_sha = "b" * 40
+        head_sha = "c" * 40
+        source_created_at = "2026-08-01T10:00:00Z"
+        target_created_at = "2026-08-01T11:00:00Z"
+        source_run_id = 101
+        target_run_id = 202
+        source_run = json.dumps(
+            {
+                "status": "completed",
+                "conclusion": "success",
+                "event": "workflow_dispatch",
+                "head_branch": source_branch,
+                "head_sha": source_sha,
+                "created_at": source_created_at,
+                "path": ".github/workflows/on-demand-e2e.yml",
+                "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"},
+            },
+            separators=(",", ":"),
+        )
+        target_run = json.dumps(
+            {
+                "status": "completed",
+                "conclusion": "success",
+                "event": "workflow_dispatch",
+                "head_branch": branch,
+                "head_sha": target_sha,
+                "created_at": target_created_at,
+                "path": ".github/workflows/on-demand-e2e.yml",
+                "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"},
+            },
+            separators=(",", ":"),
+        )
+        comparison = json.dumps(
+            {
+                "status": "ahead",
+                "behind_by": 0,
+                "base_commit": {"sha": coverage_sha},
+                "merge_base_commit": {"sha": coverage_sha},
+                "total_commits": 1,
+                "files": [{"filename": ".github/workflows/pages.yml"}],
+            },
+            separators=(",", ":"),
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            manifest = temp / "selected-evidence" / branch / "manifest.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "provenance": {
+                            "source": {
+                                "run_id": source_run_id,
+                                "branch": source_branch,
+                                "sha": source_sha,
+                                "created_at": source_created_at,
+                            },
+                            "target": {
+                                "run_id": target_run_id,
+                                "branch": branch,
+                                "sha": target_sha,
+                                "created_at": target_created_at,
+                            },
+                            "coverage_sha": coverage_sha,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            api_calls = temp / "api-calls"
+            retry_helper = temp / "scripts" / "ci" / "github_api_retry.sh"
+            retry_helper.parent.mkdir(parents=True)
+            retry_helper.write_text(
+                textwrap.dedent(
+                    f"""
+                    github_api_retry() {{
+                      printf '%s\\n' "$1" >> "$API_CALLS"
+                      case "$1" in
+                        */actions/runs/{source_run_id}) printf '%s\\n' '{source_run}' ;;
+                        */actions/runs/{target_run_id}) printf '%s\\n' '{target_run}' ;;
+                        */branches/{branch}) printf '%s\\n' '{head_sha}' ;;
+                        */compare/{coverage_sha}...{head_sha}) printf '%s\\n' '{comparison}' ;;
+                        *) printf 'unexpected API call: %s\\n' "$1" >&2; return 90 ;;
+                      esac
+                    }}
+                    """
+                ).lstrip(),
+                encoding="utf-8",
+            )
+            validate_arguments = temp / "validate-arguments"
+            fake_python = temp / "python3"
+            fake_python.write_text(
+                textwrap.dedent(
+                    """
+                    #!/usr/bin/env bash
+                    set -euo pipefail
+                    if [[ "$1" == scripts/pages/evidence.py ]]; then
+                      printf '%s\n' "$@" > "$VALIDATE_ARGUMENTS"
+                    elif [[ "$1" == scripts/ci/visual_review_impact.py ]]; then
+                      printf 'skip\n'
+                    else
+                      printf 'unexpected Python call: %s\n' "$1" >&2
+                      exit 91
+                    fi
+                    """
+                ).lstrip(),
+                encoding="utf-8",
+            )
+            fake_python.chmod(0o755)
+            environment = os.environ.copy()
+            environment.pop("BASH_ENV", None)
+            environment.pop("ENV", None)
+            environment.update(
+                {
+                    "API_CALLS": str(api_calls),
+                    "ARTIFACT_NAME": f"pages-cache-{branch}--{coverage_sha}",
+                    "BRANCH": branch,
+                    "COVERAGE_SHA": coverage_sha,
+                    "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
+                    "HEAD_SHA": head_sha,
+                    "OWNER_RUN_ID": "303",
+                    "PATH": f"{temp}{os.pathsep}{environment.get('PATH', '')}",
+                    "VALIDATE_ARGUMENTS": str(validate_arguments),
+                }
+            )
+
+            completed = subprocess.run(
+                ["bash", "-c", script],
+                cwd=temp,
+                env=environment,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            arguments = validate_arguments.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(arguments[arguments.index("--target-sha") + 1], target_sha)
+            self.assertEqual(
+                arguments[arguments.index("--coverage-sha") + 1], coverage_sha
+            )
+            calls = api_calls.read_text(encoding="utf-8").splitlines()
+            self.assertIn(
+                f"repos/The-Plum-Team/Quick-Skin-Mod/compare/{coverage_sha}...{head_sha}",
+                calls,
+            )
 
     def test_mod_compatibility_pages_publication_reuses_only_complete_clean_reports(self) -> None:
         review_workflow = (
