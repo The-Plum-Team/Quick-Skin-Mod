@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -80,15 +80,45 @@ class PackagedRuntimeReportContractTest(unittest.TestCase):
                 role,
             )
         if scenario == "propagation-live" and role == "client_b":
-            compare.assert_called_once_with(
-                (self.game_dir / "screenshots" / "observe_before.png").resolve(),
-                (
-                    self.game_dir
-                    / "screenshots"
-                    / "await_live_change.png"
-                ).resolve(),
-                0.03,
-                (0.30, 0.28, 0.60, 0.85),
+            screenshots = self.game_dir / "screenshots"
+            region = (0.30, 0.28, 0.60, 0.85)
+            # Every contracted observer comparison runs, in contract order, with its exact
+            # threshold and region. A literal list is deliberate: the observer chain is the
+            # runtime evidence for the live animation, elytra, HD cape and removal steps.
+            self.assertEqual(
+                [
+                    call(
+                        (screenshots / "observe_before.png").resolve(),
+                        (screenshots / "await_live_change.png").resolve(),
+                        0.03,
+                        region,
+                    ),
+                    call(
+                        (screenshots / "await_live_change.png").resolve(),
+                        (screenshots / "observe_animation_frame.png").resolve(),
+                        0.002,
+                        region,
+                    ),
+                    call(
+                        (screenshots / "observe_animation_frame.png").resolve(),
+                        (screenshots / "observe_remote_elytra.png").resolve(),
+                        0.005,
+                        region,
+                    ),
+                    call(
+                        (screenshots / "observe_remote_elytra.png").resolve(),
+                        (screenshots / "observe_hd_cape.png").resolve(),
+                        0.005,
+                        region,
+                    ),
+                    call(
+                        (screenshots / "observe_hd_cape.png").resolve(),
+                        (screenshots / "observe_cape_removed.png").resolve(),
+                        0.005,
+                        region,
+                    ),
+                ],
+                compare.call_args_list,
             )
         return validated
 
@@ -98,11 +128,25 @@ class PackagedRuntimeReportContractTest(unittest.TestCase):
         validated = self.validate("propagation-live", "client_b")
 
         self.assertEqual(
-            {"observe_before->await_live_change"},
-            set(validated["pixel_validation"]["comparisons"]),
+            [
+                "observe_before->await_live_change",
+                "await_live_change->observe_animation_frame",
+                "observe_animation_frame->observe_remote_elytra",
+                "observe_remote_elytra->observe_hd_cape",
+                "observe_hd_cape->observe_cape_removed",
+            ],
+            list(validated["pixel_validation"]["comparisons"]),
         )
         self.assertEqual(
-            {"baseline", "observe_before", "await_live_change"},
+            {
+                "baseline",
+                "observe_before",
+                "await_live_change",
+                "observe_animation_frame",
+                "observe_remote_elytra",
+                "observe_hd_cape",
+                "observe_cape_removed",
+            },
             set(validated["pixel_validation"]["screenshots"]),
         )
 
