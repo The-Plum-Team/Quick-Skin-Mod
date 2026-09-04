@@ -167,9 +167,19 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         drag = shim[shim.index("private static String dispatchMove"):]
         drag = drag[: drag.index("private static Method findGlfwCallback")]
         self.assertIn(
+            '"onMove", "method_1600", "m_91561_"', drag
+        )
+        self.assertNotIn('"method_1602", "m_91565_"', drag)
+        self.assertIn(
             '"handleAccumulatedMovement", "method_55793"', drag
         )
         self.assertLess(drag.index("onMove.invoke"), drag.index("movement.invoke"))
+
+        resolver = shim[shim.index("private static Method findGlfwCallback"):]
+        resolver = resolver[: resolver.index("public static int guiMouseX")]
+        self.assertIn("boolean ambiguousShape = false;", resolver)
+        self.assertIn("ambiguousShape = true;", resolver)
+        self.assertIn("return ambiguousShape ? null : shapeMatch;", resolver)
 
     def test_speed_probe_accounts_for_modern_gui_pixel_quantization(self) -> None:
         """A real 192px slider track cannot represent every whole percentage exactly."""
