@@ -528,13 +528,8 @@ public class PlayerWidget extends AbstractWidget {
         // Ensure cape animation is registered before rendering
         if (previewData.getCapeId() != null && previewData.getCapeLocation() != null) {
             String capeId = previewData.getCapeId();
-            String animationId = null;
-
-            if (capeId.startsWith("local_cape:")) {
-                animationId = "cape_" + capeId.substring("local_cape:".length());
-            } else if (capeId.startsWith("known:")) {
-                animationId = "cape_known_" + capeId.substring("known:".length());
-            }
+            String animationId =
+                com.quickskin.mod.client.services.CapeAnimationIds.deriveAnimationId(capeId);
 
             // Check if animation should exist but isn't registered yet
             if (animationId != null) {
