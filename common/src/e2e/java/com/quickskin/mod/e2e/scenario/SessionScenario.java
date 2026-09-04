@@ -555,6 +555,13 @@ public final class SessionScenario implements Scenario {
         String problem = skinLocationProblem(mc, infoSkin, String.valueOf(serviceSkin), cpm, "PlayerInfo skin");
         if (problem != null) return problem;
         String rendererSkin = VanillaShim.skinTexture(mc.player);
+        if (cpm) {
+            if (!String.valueOf(serviceSkin).equals(rendererSkin)) {
+                return "renderer skin=" + rendererSkin + " expected Quick Skin location " + serviceSkin
+                        + " while PlayerInfo exposes the CPM bridge " + infoSkin;
+            }
+            return null;
+        }
         if (infoSkin == null || !infoSkin.equals(rendererSkin)) {
             return "renderer skin=" + rendererSkin + " differs from PlayerInfo skin=" + infoSkin;
         }
@@ -563,10 +570,16 @@ public final class SessionScenario implements Scenario {
 
     private static String describePaperDoll(Minecraft mc, PlayerAppearanceService svc, UUID uuid, boolean cpm) {
         Object info = mc.getConnection() == null ? null : mc.getConnection().getPlayerInfo(uuid);
-        return "PlayerInfo skin=" + playerInfoSkinTexture(info)
-                + (cpm ? " (CPM bridge; vanilla default=" + VanillaShim.expectedDefaultSkinTexture(mc.player) + ")"
-                : " == Quick Skin location " + svc.getSkinLocation(uuid))
-                + ", renderer skin=" + VanillaShim.skinTexture(mc.player);
+        String infoSkin = playerInfoSkinTexture(info);
+        String rendererSkin = VanillaShim.skinTexture(mc.player);
+        Object serviceSkin = svc.getSkinLocation(uuid);
+        if (cpm) {
+            return "PlayerInfo skin=" + infoSkin + " (CPM bridge; vanilla default="
+                    + VanillaShim.expectedDefaultSkinTexture(mc.player) + "), renderer skin="
+                    + rendererSkin + " == Quick Skin location " + serviceSkin;
+        }
+        return "PlayerInfo skin=" + infoSkin + " == renderer skin=" + rendererSkin
+                + " == Quick Skin location " + serviceSkin;
     }
 
     private static String tabListProblem(Minecraft mc, PlayerAppearanceService svc, UUID uuid, boolean cpm) {
