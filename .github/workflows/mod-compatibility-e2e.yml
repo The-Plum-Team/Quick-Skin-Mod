@@ -35,6 +35,7 @@ jobs:
     outputs:
       base_matrix_kind: ${{ steps.admit.outputs.base_matrix_kind }}
       source_branch: ${{ steps.admit.outputs.source_branch }}
+      source_run_attempt: ${{ steps.admit.outputs.source_run_attempt }}
       source_run_id: ${{ steps.admit.outputs.source_run_id }}
       source_sha: ${{ steps.admit.outputs.source_sha }}
       target_branch: ${{ steps.admit.outputs.target_branch }}
@@ -105,6 +106,9 @@ jobs:
             pull_request|workflow_dispatch) base_matrix_kind=pr-anchors ;;
             *) exit 1 ;;
           esac
+          source_run_attempt="$(jq -er \
+            '.run_attempt | select(type == "number" and floor == . and . >= 1)' \
+            <<< "$source_run")"
 
           [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$TARGET_BRANCH" \
             --jq .commit.sha)" == "$TARGET_SHA" ]]
@@ -232,6 +236,8 @@ jobs:
 
           printf 'base_matrix_kind=%s\n' "$base_matrix_kind" >> "$GITHUB_OUTPUT"
           printf 'source_branch=%s\n' "$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
+          printf 'source_run_attempt=%s\n' \
+            "$source_run_attempt" >> "$GITHUB_OUTPUT"
           printf 'source_run_id=%s\n' "$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
           printf 'source_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
           printf 'target_branch=%s\n' "$TARGET_BRANCH" >> "$GITHUB_OUTPUT"
@@ -272,6 +278,7 @@ jobs:
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           SOURCE_BRANCH: ${{ needs.admit.outputs.source_branch }}
+          SOURCE_RUN_ATTEMPT: ${{ needs.admit.outputs.source_run_attempt }}
           SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
           SOURCE_SHA: ${{ needs.admit.outputs.source_sha }}
           TARGET_BRANCH: ${{ needs.admit.outputs.target_branch }}
@@ -282,9 +289,18 @@ jobs:
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
           [[ "$BASE_MATRIX_KIND" == pr-anchors || \
              "$BASE_MATRIX_KIND" == native-anchors ]]
+          [[ "$SOURCE_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
 
           source_artifacts="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+          jq -e '
+            (.total_count | type == "number" and . >= 0 and floor == .) and
+            (.artifacts | type == "array") and
+            .total_count == (.artifacts | length) and
+            .total_count <= 100 and
+            ([.artifacts[].id] | length) ==
+              ([.artifacts[].id] | unique | length)
+          ' <<< "$source_artifacts" > /dev/null
           bundle="$(jq -cer \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             '[.artifacts[] | select(
@@ -383,8 +399,12 @@ jobs:
                    else endswith("--scheduled-behavior") end)) and
                 .compatibility_contract_sha256 == $lock))' \
              "$RUNNER_TEMP/mod-compatibility-plan.json" > /dev/null
+          # Failed-only reruns retain immutable artifacts from earlier attempts. Bound each
+          # same-name set by the authenticated source attempt and select its newest identity,
+          # matching the visual reviewer that certified these exact baseline bytes.
           baseline_artifacts="$(jq -cer \
             --argjson artifacts "$source_artifacts" \
+            --argjson source_run_attempt "$SOURCE_RUN_ATTEMPT" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             '([.runnable[].base_evidence_name] | unique) as $names |
              [$names[] as $name |
@@ -396,10 +416,11 @@ jobs:
                   test("^sha256:[0-9a-f]{64}$")) and
                  ((.size_in_bytes | type) == "number" and
                   .size_in_bytes > 0 and .size_in_bytes <= 536870912))] |
-                if length == 1 then .[0] |
+                if length >= 1 and length <= $source_run_attempt then
+                  sort_by(.id) | .[-1] |
                   {id,name,size_in_bytes,digest,expired,
                    workflow_run:{id:.workflow_run.id}}
-                else error("baseline artifact identity is not unique") end)]' \
+                else error("baseline artifact attempt set is invalid") end)]' \
             "$RUNNER_TEMP/mod-compatibility-plan.json")"
           # Keep the original authenticated ZIP bytes inside the shared input bundle. This avoids
           # one cross-run REST download per mod lane without weakening digest or extraction checks.
