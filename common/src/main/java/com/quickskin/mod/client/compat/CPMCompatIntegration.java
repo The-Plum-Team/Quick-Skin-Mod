@@ -572,8 +572,8 @@ public final class CPMCompatIntegration {
             schedulePlayerCacheInvalidation();
         }
 
-        // 1.20.1 also needs vanilla PlayerInfo to invoke registerSkins again so
-        // CPM can read the newly installed file-backed texture.
+        // 1.20.1 also needs vanilla PlayerInfo to invoke registerSkins again so CPM can read a
+        // newly installed file-backed texture or discard one when the UUID default is restored.
         //? if <1.21 {
         if (!isAvailable()) {
             return;
