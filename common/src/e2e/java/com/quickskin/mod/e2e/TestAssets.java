@@ -94,6 +94,258 @@ public final class TestAssets {
         return tmp;
     }
 
+    // ===== derived skin fixtures ===============================================================
+    // Every variant below is derived from the same plaid skin so the contract's colour vocabulary
+    // (brown hair, charcoal plaid, blue trousers) keeps holding while exactly one property changes.
+
+    /** The bundled plaid skin decoded as a fresh INT_ARGB image, or the synthetic fallback. */
+    public static BufferedImage loadPlaidSkinImage() throws Exception {
+        try (InputStream in = TestAssets.class.getResourceAsStream(BUNDLED_SKIN)) {
+            if (in != null) {
+                BufferedImage bundled = ImageIO.read(in);
+                if (bundled != null && bundled.getWidth() == 64 && bundled.getHeight() == 64) {
+                    return copyArgb(bundled);
+                }
+            }
+        }
+        E2ELog.warn("bundled skin unavailable; deriving fixtures from the synthetic magenta skin");
+        return copyArgb(ImageIO.read(makeSyntheticMagentaSkin().toFile()));
+    }
+
+    /** X of the fully transparent window {@link #makeTransparentSkin()} punches into the torso back. */
+    public static final int TRANSPARENT_SKIN_WINDOW_X = 34;
+    /** Y of that window (the torso back base face spans x 32..39, y 20..31). */
+    public static final int TRANSPARENT_SKIN_WINDOW_Y = 23;
+    public static final int TRANSPARENT_SKIN_WINDOW_W = 4;
+    public static final int TRANSPARENT_SKIN_WINDOW_H = 6;
+    /** Alpha applied to both arm back base faces by {@link #makeTransparentSkin()}. */
+    public static final int TRANSLUCENT_SLEEVE_ALPHA = 128;
+    /** One pixel inside the right arm back base face (x 52..55, y 20..31). */
+    public static final int TRANSLUCENT_SLEEVE_PROBE_X = 53;
+    public static final int TRANSLUCENT_SLEEVE_PROBE_Y = 25;
+
+    /**
+     * The plaid skin with base-layer transparency: a fully transparent window in the torso back and
+     * half-transparent arm backs. Hat/jacket/sleeve overlay layers are untouched, so the only alpha
+     * below 255 on a base face is the one this fixture introduced.
+     */
+    public static Path makeTransparentSkin() throws Exception {
+        BufferedImage img = loadPlaidSkinImage();
+        for (int y = TRANSPARENT_SKIN_WINDOW_Y; y < TRANSPARENT_SKIN_WINDOW_Y + TRANSPARENT_SKIN_WINDOW_H; y++) {
+            for (int x = TRANSPARENT_SKIN_WINDOW_X; x < TRANSPARENT_SKIN_WINDOW_X + TRANSPARENT_SKIN_WINDOW_W; x++) {
+                img.setRGB(x, y, 0);
+            }
+        }
+        setAlpha(img, 52, 20, 4, 12, TRANSLUCENT_SLEEVE_ALPHA); // right arm back (base layer)
+        setAlpha(img, 44, 52, 4, 12, TRANSLUCENT_SLEEVE_ALPHA); // left arm back (base layer)
+        Path tmp = deterministicFixture("qs_e2e_skin_transparent.png");
+        writePng(img, tmp);
+        return tmp;
+    }
+
+    /**
+     * The plaid skin re-laid out for 3-pixel (slim/Alex) arms. Each arm block keeps its right side,
+     * the first three columns of its front, its left side and the first three columns of its back,
+     * packed left so the detector columns (x 54..55 for the right arm, x 46..47 for the left arm)
+     * become transparent in both the base and the overlay layer.
+     */
+    public static Path makeSlimSkin() throws Exception {
+        BufferedImage img = loadPlaidSkinImage();
+        toSlimArm(img, 40, 16); // right arm base
+        toSlimArm(img, 40, 32); // right arm overlay
+        toSlimArm(img, 32, 48); // left arm base
+        toSlimArm(img, 48, 48); // left arm overlay
+        Path tmp = deterministicFixture("qs_e2e_skin_slim.png");
+        writePng(img, tmp);
+        return tmp;
+    }
+
+    /** Opaque RGB painted over both right limbs of {@link #makeLegacySkin()}. */
+    public static final int LEGACY_LIMB_RGB = 0x0000FF;
+
+    /**
+     * A 64x32 legacy skin: the top half of the plaid skin whose right arm and right leg blocks are a
+     * flat bright blue and whose hat layer is solid black. Legacy conversion must mirror both blue
+     * limbs onto the left side and clear the all-black hat instead of drawing a black box.
+     */
+    public static Path makeLegacySkin() throws Exception {
+        BufferedImage plaid = loadPlaidSkinImage();
+        BufferedImage legacy = new BufferedImage(64, 32, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 32; y++) {
+            for (int x = 0; x < 64; x++) {
+                legacy.setRGB(x, y, plaid.getRGB(x, y));
+            }
+        }
+        fillArgb(legacy, 40, 16, 16, 16, 0xFF000000 | LEGACY_LIMB_RGB); // right arm block
+        fillArgb(legacy, 0, 16, 16, 16, 0xFF000000 | LEGACY_LIMB_RGB);  // right leg block
+        fillArgb(legacy, 32, 0, 32, 16, 0xFF000000);                     // hat layer solid black
+        Path tmp = deterministicFixture("qs_e2e_skin_legacy.png");
+        writePng(legacy, tmp);
+        return tmp;
+    }
+
+    /** An opaque 96x96 image: not a valid skin resolution, so the mod must snap it to the nearest one. */
+    public static Path makeOddSizedSkin() throws Exception {
+        BufferedImage img = new BufferedImage(96, 96, BufferedImage.TYPE_INT_ARGB);
+        fillArgb(img, 0, 0, 96, 96, 0xFFFF8800);
+        fillArgb(img, 12, 12, 12, 12, 0xFF2244CC);
+        Path tmp = deterministicFixture("qs_e2e_skin_odd96.png");
+        writePng(img, tmp);
+        return tmp;
+    }
+
+    /** An opaque 96x48 2:1 image: a cape ratio at a non-standard size, so the folder scan resizes it. */
+    public static Path makeOddSizedCape() throws Exception {
+        BufferedImage img = new BufferedImage(96, 48, BufferedImage.TYPE_INT_ARGB);
+        fillArgb(img, 0, 0, 96, 48, 0xFF227788);
+        fillArgb(img, 2, 2, 14, 24, 0xFFEE8811);
+        Path tmp = deterministicFixture("qs_e2e_cape_odd96.png");
+        writePng(img, tmp);
+        return tmp;
+    }
+
+    /** An opaque 100x60 image whose ratio is not 2:1, so the cape folder scan must ignore it. */
+    public static Path makeNonCapeRatioImage() throws Exception {
+        BufferedImage img = new BufferedImage(100, 60, BufferedImage.TYPE_INT_ARGB);
+        fillArgb(img, 0, 0, 100, 60, 0xFF884422);
+        Path tmp = deterministicFixture("qs_e2e_cape_badratio.png");
+        writePng(img, tmp);
+        return tmp;
+    }
+
+    /** Alpha of the teal interior of {@link #makeTranslucentCapeImage()}. */
+    public static final int TRANSLUCENT_CAPE_ALPHA = 128;
+    /** One pixel inside the half-transparent teal interior of the visible cape face. */
+    public static final int TRANSLUCENT_CAPE_PROBE_X = 5;
+    public static final int TRANSLUCENT_CAPE_PROBE_Y = 8;
+    /** One pixel on the opaque yellow border of the visible cape face. */
+    public static final int TRANSLUCENT_CAPE_BORDER_X = 1;
+    public static final int TRANSLUCENT_CAPE_BORDER_Y = 8;
+    /** One pixel inside the cape's elytra area, transparent in the source. */
+    public static final int TRANSLUCENT_CAPE_ELYTRA_X = 40;
+    public static final int TRANSLUCENT_CAPE_ELYTRA_Y = 8;
+
+    /**
+     * A realistic user cape PNG: only the 22x17 cape net is painted (dark opaque with a visible face
+     * whose interior is half-transparent teal inside an opaque yellow border); the elytra area and
+     * every other pixel are fully transparent. This is the shape the GUI import path must composite
+     * the vanilla elytra into and keep translucent in-world.
+     */
+    public static BufferedImage makeTranslucentCapeImage() {
+        BufferedImage img = new BufferedImage(64, 32, BufferedImage.TYPE_INT_ARGB);
+        fillArgb(img, 0, 0, 22, 17, 0xFF121622);
+        for (int y = 1; y <= 16; y++) {
+            for (int x = 1; x <= 10; x++) {
+                boolean border = x == 1 || x == 10 || y == 1 || y == 16;
+                img.setRGB(x, y, border
+                        ? 0xFFEECC22
+                        : (TRANSLUCENT_CAPE_ALPHA << 24) | 0x1199AA);
+            }
+        }
+        return img;
+    }
+
+    /** {@link #makeTranslucentCapeImage()} written to its deterministic E2E PNG file. */
+    public static Path makeTranslucentCape() throws Exception {
+        Path tmp = deterministicFixture("qs_e2e_cape_translucent.png");
+        writePng(makeTranslucentCapeImage(), tmp);
+        return tmp;
+    }
+
+    /** Opaque RGB of the hat-layer headband painted by {@link #makeHatLayerSkin()}. */
+    public static final int HAT_BAND_ARGB = 0xFFFF2020;
+
+    /**
+     * The plaid skin plus an opaque two-row red headband across every side face of the hat overlay
+     * layer (x 32..63, y 9..10), so a 3D-layer renderer has voxels to extrude around the head.
+     */
+    public static Path makeHatLayerSkin() throws Exception {
+        BufferedImage img = loadPlaidSkinImage();
+        fillArgb(img, 32, 9, 32, 2, HAT_BAND_ARGB);
+        Path tmp = deterministicFixture("qs_e2e_skin_hatband.png");
+        writePng(img, tmp);
+        return tmp;
+    }
+
+    /** The Ears "magic" pixel value at (0,32) that enables Ears feature parsing. */
+    public static final int EARS_MAGIC_ARGB = 0xFF3F23D8;
+
+    /**
+     * The plaid skin carrying the Ears magic pixel at (0,32) and an ears-mode pixel at (1,32) in the
+     * unused net corner, so the Ears mod parses ear features from it while nothing visible on the
+     * base model changes.
+     */
+    public static Path makeEarsSkin(int earsModeArgb) throws Exception {
+        BufferedImage img = loadPlaidSkinImage();
+        img.setRGB(0, 32, EARS_MAGIC_ARGB);
+        img.setRGB(1, 32, earsModeArgb);
+        Path tmp = deterministicFixture("qs_e2e_skin_ears.png");
+        writePng(img, tmp);
+        return tmp;
+    }
+
+    /** Re-pack one 16x16 arm block from the classic 4-pixel to the slim 3-pixel face layout. */
+    private static void toSlimArm(BufferedImage img, int ox, int oy) {
+        int[][] block = new int[16][16];
+        for (int y = 0; y < 16; y++) {
+            for (int x = 0; x < 16; x++) {
+                block[y][x] = img.getRGB(ox + x, oy + y);
+            }
+        }
+        for (int y = 0; y < 16; y++) {
+            for (int x = 0; x < 16; x++) {
+                img.setRGB(ox + x, oy + y, 0);
+            }
+        }
+        // Top (4..7 -> 4..6) and bottom (8..11 -> 7..9) faces, rows 0..3.
+        for (int y = 0; y < 4; y++) {
+            for (int x = 0; x < 3; x++) {
+                img.setRGB(ox + 4 + x, oy + y, block[y][4 + x]);
+                img.setRGB(ox + 7 + x, oy + y, block[y][8 + x]);
+            }
+        }
+        // Right side 0..3, front 4..6 (of 4..7), left side 7..10 (of 8..11), back 11..13 (of 12..15).
+        for (int y = 4; y < 16; y++) {
+            for (int x = 0; x < 4; x++) img.setRGB(ox + x, oy + y, block[y][x]);
+            for (int x = 0; x < 3; x++) img.setRGB(ox + 4 + x, oy + y, block[y][4 + x]);
+            for (int x = 0; x < 4; x++) img.setRGB(ox + 7 + x, oy + y, block[y][8 + x]);
+            for (int x = 0; x < 3; x++) img.setRGB(ox + 11 + x, oy + y, block[y][12 + x]);
+        }
+    }
+
+    private static void setAlpha(BufferedImage img, int x0, int y0, int w, int h, int alpha) {
+        for (int y = y0; y < y0 + h; y++) {
+            for (int x = x0; x < x0 + w; x++) {
+                img.setRGB(x, y, (img.getRGB(x, y) & 0x00FFFFFF) | (alpha << 24));
+            }
+        }
+    }
+
+    private static void fillArgb(BufferedImage img, int x0, int y0, int w, int h, int argb) {
+        for (int y = y0; y < y0 + h; y++) {
+            for (int x = x0; x < x0 + w; x++) {
+                img.setRGB(x, y, argb);
+            }
+        }
+    }
+
+    private static BufferedImage copyArgb(BufferedImage source) {
+        BufferedImage copy = new BufferedImage(
+                source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < source.getHeight(); y++) {
+            for (int x = 0; x < source.getWidth(); x++) {
+                copy.setRGB(x, y, source.getRGB(x, y));
+            }
+        }
+        return copy;
+    }
+
+    private static void writePng(BufferedImage image, Path target) throws Exception {
+        if (!ImageIO.write(image, "png", target.toFile())) {
+            throw new IllegalStateException("no PNG writer for " + target.getFileName());
+        }
+    }
+
     /**
      * A second, deliberately <em>different</em> valid 64x64 skin, for the scenario that copies a file
      * straight into the uploads folder while a menu is open. Its content hash must not collide with
