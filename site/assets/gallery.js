@@ -48,7 +48,10 @@ function friendlyScenario(value) {
     "phase0-smoke": "Smoke",
     "propagation": "Propagation",
     "propagation-live": "Live propagation",
-    "full": "Full suite"
+    "full": "Full suite",
+    "server-policy": "Server policy",
+    "session": "Session",
+    "mod-compatibility": "Mod compatibility"
   }[value] || value;
 }
 

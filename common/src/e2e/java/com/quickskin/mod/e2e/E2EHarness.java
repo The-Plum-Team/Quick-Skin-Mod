@@ -8,6 +8,8 @@ import com.quickskin.mod.e2e.scenario.ModCompatibilityRemoteScenario;
 import com.quickskin.mod.e2e.scenario.Phase0Smoke;
 import com.quickskin.mod.e2e.scenario.PropagationLiveScenario;
 import com.quickskin.mod.e2e.scenario.PropagationScenario;
+import com.quickskin.mod.e2e.scenario.SessionScenario;
+import com.quickskin.mod.e2e.scenario.ServerPolicyScenario;
 import com.quickskin.mod.e2e.generated.ScenarioContract;
 import com.quickskin.mod.e2e.generated.ScenarioContract.ScenarioId;
 import dev.architectury.event.events.client.ClientGuiEvent;
@@ -149,6 +151,8 @@ public final class E2EHarness {
             case MOD_COMPATIBILITY -> new ModCompatibilityScenario();
             case MOD_COMPATIBILITY_LATE_JOIN -> new ModCompatibilityLateJoinScenario();
             case MOD_COMPATIBILITY_REMOTE -> new ModCompatibilityRemoteScenario();
+            case SESSION -> new SessionScenario();
+            case SERVER_POLICY -> new ServerPolicyScenario();
             case PHASE0_SMOKE -> new Phase0Smoke();
         };
         if (scenario.id() != selected) {
