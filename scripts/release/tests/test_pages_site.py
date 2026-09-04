@@ -294,9 +294,15 @@ class PagesSiteTest(unittest.TestCase):
                 for role in roles:
                     role_contract = self.catalog.contract.role(scenario, role)
                     pairs = role_contract.comparisons
-                    second_steps = {
-                        comparison.second_step for comparison in pairs
+                    # Two fixture images cover every contracted comparison: a capture that is
+                    # the second step of a comparison takes the variant its first step did not.
+                    # Comparison chains (observer A -> B -> C) therefore alternate, while every
+                    # unpaired capture shares variant 0 so image deduplication stays exercised.
+                    first_step_of = {
+                        comparison.second_step: comparison.first_step
+                        for comparison in pairs
                     }
+                    variants: dict[str, int] = {}
                     steps = []
                     metrics = {}
                     screenshots = profile / role / "screenshots"
@@ -305,9 +311,19 @@ class PagesSiteTest(unittest.TestCase):
                         screenshot = None
                         if step_contract.capture is not None:
                             screenshot = f"{step_contract.id}.png"
+                            first_step = first_step_of.get(step_contract.id)
                             variant = (
-                                1 if step_contract.id in second_steps else 0
+                                1 - variants[first_step]
+                                if first_step is not None
+                                else 0
                             )
+                            for comparison in pairs:
+                                if comparison.second_step == step_contract.id:
+                                    assert variants[comparison.first_step] != variant, (
+                                        "fixture cannot satisfy every comparison of "
+                                        f"{scenario}.{role}.{step_contract.id}"
+                                    )
+                            variants[step_contract.id] = variant
                             (screenshots / screenshot).write_bytes(PNGS[variant])
                             metrics[step_contract.id] = dict(
                                 PIXEL_METRICS[variant]
@@ -545,8 +561,10 @@ class PagesSiteTest(unittest.TestCase):
             expected_target_sha="2" * 40,
         )
 
-        self.assertEqual(90, len(manifest["frames"]))
-        self.assertEqual(8, len(manifest["lanes"]))
+        # 85 pr-profile captures (88 contract captures minus the 3 compatibility-only
+        # frames) for each of the two 1.20.1 loaders; 6 pr scenarios per loader.
+        self.assertEqual(170, len(manifest["frames"]))
+        self.assertEqual(12, len(manifest["lanes"]))
         self.assertEqual(
             self.catalog.contract_sha256,
             manifest["contract_sha256"],
@@ -1028,7 +1046,7 @@ class PagesSiteTest(unittest.TestCase):
         )
 
         self.assertEqual(2, summary["versions"])
-        self.assertEqual(180, summary["frames"])
+        self.assertEqual(340, summary["frames"])
         self.assertTrue((output / ".nojekyll").is_file())
         self.assertTrue((output / "index.html").is_file())
         self.assertTrue((output / "e2e" / "index.html").is_file())
@@ -1038,8 +1056,8 @@ class PagesSiteTest(unittest.TestCase):
             (output / "e2e" / "gallery-data.json").read_text(encoding="utf-8")
         )
         self.assertEqual(["1.21.1", "1.20.1"], [row["version"] for row in site_data["releases"]])
-        self.assertEqual(180, len(gallery["frames"]))
-        self.assertEqual(180, len({frame["frame_id"] for frame in gallery["frames"]}))
+        self.assertEqual(340, len(gallery["frames"]))
+        self.assertEqual(340, len({frame["frame_id"] for frame in gallery["frames"]}))
         sample = gallery["frames"][0]
         published = output / "e2e" / sample["image"]
         self.assertEqual(sample["published_file_sha256"], published.stem)

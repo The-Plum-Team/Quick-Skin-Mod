@@ -519,6 +519,13 @@ public class PlayerCapeMenuScreen extends Screen {
             return;
         }
 
+        // Every local tile below is a catalogue asset addressed by its SHA-256 primary, while the
+        // saved reference may still be a SHA-1 alias whose migration has not run yet. Compare the
+        // two in the catalogue's own vocabulary so the active cape is highlighted, previewed and
+        // retimed instead of silently reading as "no cape selected".
+        activeCapeId = com.quickskin.mod.client.services.CapeAnimationIds.canonicalCapeId(
+                activeCapeId, this::catalogPrimaryOf);
+
         // Find the matching cape in both lists and update preview
         for (CapeEntry cape : this.localCapes) {
             if (cape.getCapeId().equals(activeCapeId)) {
@@ -1765,19 +1772,39 @@ public class PlayerCapeMenuScreen extends Screen {
         startCapeImports(validFiles);
     }
 
+    /**
+     * The vanilla elytra atlas that {@code CapeImportProcessor} composites underneath an imported
+     * cape whose elytra UVs are transparent.
+     *
+     * <p>Minecraft has served that art from two resource paths across the supported generations, so
+     * this resolves the historical location first — every version that still ships it keeps loading
+     * exactly the same bytes — and only then the equipment-asset location. A {@code null} here is
+     * not cosmetic: the composite is optional, so the import silently saves the source unchanged and
+     * the cape renders with a hole where the worn elytra should be. That is why an exhausted lookup
+     * is logged rather than swallowed.</p>
+     */
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
-        try {
 //? if <1.21 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", "textures/entity/elytra.png");
+        List<ResourceLocation> candidates = List.of(
+                new ResourceLocation("minecraft", "textures/entity/elytra.png"),
+                new ResourceLocation("minecraft", "textures/entity/equipment/wings/elytra.png"));
 //?} else if <1.21.11 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+        List<ResourceLocation> candidates = List.of(
+                ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"),
+                ResourceLocation.fromNamespaceAndPath(
+                        "minecraft", "textures/entity/equipment/wings/elytra.png"));
 //?} else {
-            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+        List<Identifier> candidates = List.of(
+                Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"),
+                Identifier.fromNamespaceAndPath(
+                        "minecraft", "textures/entity/equipment/wings/elytra.png"));
 //?}
-            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
+        for (var texture : candidates) {
+            var resourceOptional =
+                    Minecraft.getInstance().getResourceManager().getResource(texture);
             if (resourceOptional.isEmpty()) {
-                return null;
+                continue;
             }
             try (InputStream stream = resourceOptional.get().open()) {
 //? if <26.1 {
@@ -1788,14 +1815,13 @@ public class PlayerCapeMenuScreen extends Screen {
                         (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
                 return com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
 //?}
+            } catch (IOException e) {
+                QuickSkin.LOGGER.warn("Unable to decode the vanilla elytra texture {}", texture, e);
             }
-        } catch (IOException e) {
-//? if <26.1 {
-//?} else {
-            QuickSkin.LOGGER.debug("Unable to load the vanilla elytra texture", e);
-//?}
-            return null;
         }
+        QuickSkin.LOGGER.warn("No vanilla elytra texture resource is available; an imported cape "
+                + "with a transparent elytra area will keep that area transparent");
+        return null;
     }
 
     @Override
@@ -1955,17 +1981,17 @@ public class PlayerCapeMenuScreen extends Screen {
      * Shared by SpeedSlider, lazy registration, and render logic.
      */
     private String getAnimationIdForCape(String capeId) {
-        if (capeId == null) return null;
+        return com.quickskin.mod.client.services.CapeAnimationIds.deriveAnimationId(capeId);
+    }
 
-        if (capeId.startsWith("local_cape:")) {
-            String hash = capeId.substring("local_cape:".length());
-            return "cape_" + hash;
-        } else if (capeId.startsWith("known:")) {
-            String knownId = capeId.substring("known:".length());
-            return "cape_known_" + knownId;
-        }
-
-        return null;
+    /**
+     * Resolves a local content ID to its catalogue primary, or {@code null} when the catalogue
+     * does not hold it or deliberately refuses to resolve an ambiguous alias.
+     */
+    @Nullable
+    private String catalogPrimaryOf(String contentId) {
+        AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(contentId);
+        return metadata == null ? null : metadata.hash();
     }
 //? if <1.21.11 {
 //?} else if <26.1 {
