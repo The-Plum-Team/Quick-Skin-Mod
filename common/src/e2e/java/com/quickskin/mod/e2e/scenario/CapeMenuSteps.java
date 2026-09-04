@@ -54,7 +54,7 @@ final class CapeMenuSteps {
     private static final double SPEED_MAX = 3.0;
     private static final double TARGET_SPEED = 2.0;
     private static final double DEFAULT_SPEED = 1.0;
-    /** Half a displayed percentage point absorbs the modern cursor's GUI-pixel quantization. */
+    /** Tight tolerance for config/live-state agreement after accounting for click quantization. */
     private static final double SPEED_TOLERANCE = 5.0e-3;
     /** Mirrors the screen's private delete-button geometry (ACTION_BUTTON_SIZE, margin). */
     private static final int ACTION_BUTTON_SIZE = 11;
@@ -269,16 +269,26 @@ final class CapeMenuSteps {
                     String message = speedSlider(screen).getMessage().getString();
                     float configured = ClientConfig.getInstance().getCapeAnimationSpeed(gifId);
                     float live = animationSpeed();
-                    // Put the real control back to 100% after the capture so later menu state is
-                    // the default; going through the same click path is itself a second check.
+                    // Exercise the real control near 100% after the capture. Modern mouse events
+                    // expose one GUI-pixel steps, so 100% is not necessarily representable on a
+                    // 192px track (this layout lands at 99%). Validate that quantized click, then
+                    // restore the exact default through production config for later checkpoints.
                     String restore = clickSliderToSpeed(mc, screen, DEFAULT_SPEED);
                     if (restore != null) return Step.Result.fail("restoring 100%: " + restore);
                     String restored = speedAgrees(screen, gifId, DEFAULT_SPEED);
                     if (restored != null) return Step.Result.fail("restoring 100%: " + restored);
+                    String restoredMessage = speedSlider(screen).getMessage().getString();
+                    float restoredClickSpeed = ClientConfig.getInstance()
+                            .getCapeAnimationSpeed(gifId);
+                    String exactDefault = restoreExactDefaultSpeed(screen, gifId);
+                    if (exactDefault != null) {
+                        return Step.Result.fail("restoring exact default: " + exactDefault);
+                    }
                     return Step.Result.pass("slider click set \"" + message + "\"; config speed("
                             + gifId + ")=" + configured + "; AnimationState.speedMultiplier("
                             + menuAnimationId() + ")=" + live
-                            + "; restored to 100% afterwards");
+                            + "; restore click targeted 100% and settled at \"" + restoredMessage
+                            + "\" / " + restoredClickSpeed + "; exact 100% default reloaded afterwards");
                 }));
 
         // 9c. hover the HD tile with the real mouse position so render() draws the tooltip -------
@@ -951,6 +961,19 @@ final class CapeMenuSteps {
         return Math.sqrt((speed - SPEED_MIN) / (SPEED_MAX - SPEED_MIN));
     }
 
+    /** Maximum speed error introduced by one integer GUI pixel on this quadratic slider. */
+    private static double sliderClickTolerance(AbstractSliderButton slider, double speed) {
+        double target = sliderValueForSpeed(speed);
+        double step = 1.0 / Math.max(1, slider.getWidth() - 8);
+        double below = SPEED_MIN
+                + Math.max(0.0, target - step) * Math.max(0.0, target - step)
+                * (SPEED_MAX - SPEED_MIN);
+        double above = SPEED_MIN
+                + Math.min(1.0, target + step) * Math.min(1.0, target + step)
+                * (SPEED_MAX - SPEED_MIN);
+        return Math.max(Math.abs(speed - below), Math.abs(above - speed));
+    }
+
     /**
      * Press and release the slider track at the point that maps to {@code speed}, through the
      * screen's public mouse handlers so {@code AbstractSliderButton.onClick} sets the value,
@@ -1016,18 +1039,43 @@ final class CapeMenuSteps {
     private String speedAgrees(PlayerCapeMenuScreen screen, String capeId, double speed) {
         AbstractSliderButton slider = speedSlider(screen);
         if (slider == null) return "animation speed slider missing";
-        String message = slider.getMessage().getString();
-        String percent = Math.round(speed * 100) + "%";
-        if (!message.contains(percent)) return "slider reads \"" + message + "\" expected " + percent;
         float configured = ClientConfig.getInstance().getCapeAnimationSpeed(capeId);
-        if (Math.abs(configured - speed) > SPEED_TOLERANCE)
-            return "config speed(" + capeId + ")=" + configured + " expected " + speed;
+        double clickTolerance = Math.max(
+                SPEED_TOLERANCE, sliderClickTolerance(slider, speed));
+        if (Math.abs(configured - speed) > clickTolerance)
+            return "config speed(" + capeId + ")=" + configured + " expected " + speed
+                    + " within one GUI-pixel step (" + clickTolerance + ")";
+        String message = slider.getMessage().getString();
+        String percent = Math.round(configured * 100) + "%";
+        if (!message.contains(percent)) {
+            return "slider reads \"" + message + "\" expected its configured " + percent;
+        }
         float live = animationSpeed();
         if (Float.isNaN(live))
             return "animation " + menuAnimationId() + " is not registered";
-        if (Math.abs(live - speed) > SPEED_TOLERANCE)
-            return "AnimationState.speedMultiplier=" + live + " expected " + speed;
+        if (Math.abs(live - configured) > SPEED_TOLERANCE)
+            return "AnimationState.speedMultiplier=" + live + " expected configured " + configured;
         return null;
+    }
+
+    /** Restore the exact default after the quantized real-click assertion. */
+    private String restoreExactDefaultSpeed(PlayerCapeMenuScreen screen, String capeId) {
+        try {
+            ClientConfig config = ClientConfig.getInstance();
+            config.setCapeAnimationSpeed(capeId, (float) DEFAULT_SPEED);
+            config.save();
+            String animationId = menuAnimationId();
+            if (animationId == null) return "animated cape has no primary animation id";
+            AnimatedTextureManager.getInstance().setAnimationSpeed(
+                    animationId, (float) DEFAULT_SPEED);
+            Method reload = PlayerCapeMenuScreen.class.getDeclaredMethod(
+                    "updateSpeedSliderVisibility");
+            reload.setAccessible(true);
+            reload.invoke(screen);
+            return speedAgrees(screen, capeId, DEFAULT_SPEED);
+        } catch (Throwable t) {
+            return "could not reload the default speed: " + t;
+        }
     }
 
     /** True once neither the alias nor the recorded primary of the contrast cape resolves. */

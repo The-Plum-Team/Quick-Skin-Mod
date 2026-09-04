@@ -78,13 +78,13 @@ import java.util.function.Consumer;
  *       {@code SplashRenderer(Component)}, plus its remapped private field on {@code TitleScreen}.</li>
  *   <li><b>transient overlays</b>: toast/chat access through {@code Minecraft}/{@code Gui}
  *       (1.20.1..26.1.x) vs {@code Gui.toastManager()}/{@code Gui.hud.getChat()} (26.2).</li>
- *   <li><b>disconnect to title</b>: {@code Level.disconnect()} and
- *       {@code Minecraft.clearLevel()} before 1.21.8 vs
- *       {@code Level.disconnect(Component)} and {@code Minecraft.clearClientLevel(Screen)} in
- *       later versions.</li>
+ *   <li><b>disconnect to title</b>: {@code Level.disconnect()} vs
+ *       {@code Level.disconnect(Component)}, followed by the loader-observable
+ *       {@code Minecraft.disconnect} boundary (or its legacy no-arg form).</li>
  *   <li><b>mouse input</b>: {@code Screen.mouseClicked/mouseDragged/mouseReleased} take
- *       {@code (double,double,int)} before 1.21.11 and a {@code MouseButtonEvent} afterwards, so
- *       clicks fall back to {@code MouseHandler}'s GLFW callbacks, whose shape GLFW fixes.</li>
+ *       scalar coordinates before 1.21.9 and a {@code MouseButtonEvent} afterwards, so clicks fall
+ *       back to {@code MouseHandler}'s GLFW callbacks, whose shape GLFW fixes; modern drags also
+ *       flush the handler's accumulated movement before releasing the button.</li>
  * </ul>
  *
  * <p>GL-touching calls (screenshot) must run on the render thread, after at least one full frame.</p>
@@ -813,11 +813,13 @@ public final class VanillaShim {
      * Leave the current server the way vanilla's pause-menu Disconnect does and land on a fresh
      * {@link TitleScreen}.
      *
-     * <p>Vanilla first disconnects the level, then clears the client level and installs the next
-     * screen. Both operations changed shape across the supported range: the level disconnect gained
-     * a reason component, while the no-arg {@code clearLevel()} became
-     * {@code clearClientLevel(Screen)}. The loader's player-quit event fires within this sequence,
-     * which is where Quick Skin ends its session.</p>
+     * <p>Vanilla first disconnects the level, then enters {@code Minecraft.disconnect}, which
+     * clears the client level and installs the next screen. Both operations changed shape across
+     * the supported range: the level disconnect gained a reason component, while the Minecraft
+     * boundary gained a screen and resource-pack flag. Architectury's player-quit event fires from
+     * that Minecraft boundary, which is where Quick Skin ends its session; calling
+     * {@code clearClientLevel(Screen)} directly would clear vanilla state while silently bypassing
+     * the product callback.</p>
      *
      * @return {@code null} on success, otherwise a bounded fail-closed diagnostic.
      */
@@ -841,19 +843,28 @@ public final class VanillaShim {
             }
 
             TitleScreen title = new TitleScreen();
-            Method clearClientLevel = findPublicMethod(
-                    mc.getClass(), new Class<?>[]{Screen.class},
-                    "clearClientLevel", "method_52703");
-            if (clearClientLevel != null) {
-                clearClientLevel.invoke(mc, title);
+            Method disconnectClient = findPublicMethod(
+                    mc.getClass(), new Class<?>[]{Screen.class, boolean.class},
+                    "disconnect", "method_18096", "method_76795");
+            if (disconnectClient != null) {
+                disconnectClient.invoke(mc, title, false);
             } else {
-                Method clearLevel = findNoArg(
-                        mc.getClass(), "clearLevel", "method_18099", "m_91399_");
-                if (clearLevel == null) {
-                    return "Minecraft has no supported client-level clearing method";
+                Method disconnectClientWithEngineReset = findPublicMethod(
+                        mc.getClass(),
+                        new Class<?>[]{Screen.class, boolean.class, boolean.class},
+                        "disconnect", "method_18096");
+                if (disconnectClientWithEngineReset != null) {
+                    disconnectClientWithEngineReset.invoke(mc, title, false, true);
+                } else {
+                    Method legacyDisconnect = findNoArg(
+                            mc.getClass(), "clearLevel", "disconnect",
+                            "method_18099", "m_91399_");
+                    if (legacyDisconnect == null) {
+                        return "Minecraft has no supported disconnect method";
+                    }
+                    legacyDisconnect.invoke(mc);
+                    if (!setScreen(mc, title)) return "could not open the title screen";
                 }
-                clearLevel.invoke(mc);
-                if (!setScreen(mc, title)) return "could not open the title screen";
             }
             if (mc.level != null || mc.player != null) {
                 return "level/player survived the disconnect: level=" + mc.level
@@ -1291,8 +1302,6 @@ public final class VanillaShim {
                 return "Screen.mouseDragged failed: " + t;
             }
         }
-        String positioned = moveMouseTo(mc, guiX, guiY);
-        if (positioned != null) return positioned;
         return dispatchMove(mc, guiX, guiY);
     }
 
@@ -1468,9 +1477,37 @@ public final class VanillaShim {
                 "onMove", "method_1602", "m_91565_");
         if (onMove == null) return "MouseHandler has no (long,double,double) GLFW move callback";
         try {
+            var window = mc.getWindow();
+            int screenW = window.getScreenWidth();
+            int screenH = window.getScreenHeight();
+            int guiW = window.getGuiScaledWidth();
+            int guiH = window.getGuiScaledHeight();
+            if (screenW <= 0 || screenH <= 0 || guiW <= 0 || guiH <= 0) {
+                return "window geometry unavailable: " + screenW + "x" + screenH
+                        + " gui " + guiW + "x" + guiH;
+            }
+            int targetX = (int) Math.floor(guiX);
+            int targetY = (int) Math.floor(guiY);
+            double px = (targetX + 0.5) * screenW / guiW;
+            double py = (targetY + 0.5) * screenH / guiH;
             onMove.setAccessible(true);
-            onMove.invoke(handler, windowHandle(mc),
-                    mc.mouseHandler.xpos(), mc.mouseHandler.ypos());
+            onMove.invoke(handler, windowHandle(mc), px, py);
+
+            // Since 1.21.9 onMove only accumulates a delta; the render loop normally drains it
+            // later. The E2E gesture releases synchronously, so drain it now while activeButton is
+            // still set or the screen never receives mouseDragged.
+            Method movement = findNoArg(
+                    handler.getClass(), "handleAccumulatedMovement", "method_55793");
+            if (movement == null) {
+                return "MouseHandler has no accumulated-movement drain";
+            }
+            movement.invoke(handler);
+            int actualX = guiMouseX(mc);
+            int actualY = guiMouseY(mc);
+            if (actualX != targetX || actualY != targetY) {
+                return "mouse drag landed at gui (" + actualX + "," + actualY
+                        + ") expected (" + targetX + "," + targetY + ")";
+            }
             return null;
         } catch (Throwable t) {
             return "MouseHandler." + onMove.getName() + " failed: " + t;
