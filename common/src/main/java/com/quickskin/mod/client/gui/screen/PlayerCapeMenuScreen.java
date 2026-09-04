@@ -1780,7 +1780,7 @@ public class PlayerCapeMenuScreen extends Screen {
 //?} else if <1.21.11 {
             ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
 //?} else {
-            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            Identifier VANILLA_ELYTRA_TEXTURE = resolveVanillaElytraTexture();
 //?}
             var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
             if (resourceOptional.isEmpty()) {
@@ -1804,6 +1804,33 @@ public class PlayerCapeMenuScreen extends Screen {
             return null;
         }
     }
+
+//? if <1.21.11 {
+//?} else {
+    /** Where Minecraft's equipment textures keep the wings. */
+    private static final String EQUIPMENT_ELYTRA_TEXTURE =
+            "textures/entity/equipment/wings/elytra.png";
+    /** Where they lived before the equipment rework. */
+    private static final String LEGACY_ELYTRA_TEXTURE = "textures/entity/elytra.png";
+
+    /**
+     * Resolves the vanilla wing texture this runtime actually serves.
+     *
+     * <p>Pinning one layout makes {@link #getVanillaElytraImage()} return null on a runtime that
+     * moved the file, and a null composite source is not an error anywhere: the import silently
+     * saves a cape whose transparent wing area never receives the vanilla elytra. The legacy
+     * location stays the fallback so the caller's own empty-resource branch keeps owning the case
+     * where no vanilla elytra is served at all.</p>
+     */
+    private Identifier resolveVanillaElytraTexture() {
+        Identifier equipment =
+                Identifier.fromNamespaceAndPath("minecraft", EQUIPMENT_ELYTRA_TEXTURE);
+        if (Minecraft.getInstance().getResourceManager().getResource(equipment).isPresent()) {
+            return equipment;
+        }
+        return Identifier.fromNamespaceAndPath("minecraft", LEGACY_ELYTRA_TEXTURE);
+    }
+//?}
 
     @Override
     public boolean isPauseScreen() {
