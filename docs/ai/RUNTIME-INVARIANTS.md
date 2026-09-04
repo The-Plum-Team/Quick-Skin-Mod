@@ -52,6 +52,21 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Bare SHA-1 local IDs are read-only compatibility aliases. Publish and migrate an alias only after
   the complete bounded scan proves it resolves to one SHA-256 primary; an ambiguous alias must not
   resolve, select metadata, migrate a path, or be written back to configuration.
+- A cape animation is named by exactly one string, derived from the cape ID by
+  `CapeAnimationIds`. Never re-implement that split in a screen, widget, or service: two callers
+  that disagree register, retime, and unregister different animations for the same cape. The
+  derivation stays purely textual, and every producer registers under the cape ID it was handed
+  rather than a resolved primary. A `local_cape:` ID addresses a network-delivered cape as often
+  as a catalogued one, the network cape owns the content ID the server sent, and the renderer
+  derives its lookup from the same cape ID the caller holds; resolving one end alone either finds
+  no animation and exposes the stacked atlas, or leaves a second animation running beside it.
+- A legacy SHA-1 alias is folded onto its catalogue primary only where the cape ID is chosen, and
+  only where the value never leaves this client. `LocalContentIdMigration` owns the persisted
+  preference, including the animation-speed keys. A read-only local lookup, such as the cape
+  menu resolving which tile is active, may fold through the catalogue's own resolver so an absent
+  or ambiguous alias is left untouched. `PlayerAppearance`'s cape ID is not such a value:
+  `ClientNetworkHandler` advertises it through `NetworkSyncService.syncAppearance`, so it is wire
+  identity under the immutable v1 alias contract and must never be rewritten locally.
 - Client caches are keyed by both hash and texture type. The same PNG bytes may validly exist as a
   skin and a cape; never collapse typed keys back to a hash-only cache or resource path.
 - Renderer-confirmed skin/cape use receives only a short, bounded working-set preference. Cache
@@ -215,6 +230,51 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Require persisted, service, cloak, and profile-elytra inputs to be empty so the renderer is forced
   onto Minecraft's vanilla elytra texture; compare the bounded player region against the custom
   wings so a stale custom surface cannot pass on state assertions alone.
+- Skin-fidelity evidence derives every variant from the one plaid fixture so exactly one property
+  changes per checkpoint: a 3-pixel arm layout applied with the `auto` model must be detected,
+  stored, and rendered as slim without a manual override; a 64x32 legacy import must catalogue as
+  the 64x64 layout with mirrored left limbs and a cleared all-black hat; a 128x128 import must keep
+  its resolution and its one-pixel checker on the rendered torso; a base-layer transparent window
+  and half-transparent sleeves must show through the model, and enabling Disable Skin Transparency
+  through the real settings checkbox must reload the same skin as opaque black. Each assertion
+  decodes the bytes the client registered for that hash rather than the source file, and the block
+  restores the plaid classic skin before any cape checkpoint.
+- Catalog evidence drives the real rename, sort, own-skin, and delete paths of the skin menu,
+  never the service alone. The protected own-skin row must be pinned first, highlighted purple,
+  and refuse deletion with the real error toast; a stale saved skin id whose file vanished must
+  fall back to the vanilla default without a manual reset. The menu instance that returns from a
+  Rename or Delete dialog must still hold its forced menu scale: a dialog returns to its parent
+  exactly once, and `removed()` never leaves the close guard latched, so the catalog checkpoints
+  settle only at that scale rather than tolerating the user's scale.
+- GUI cape import evidence must go through `CapeImportWorkflow` from the real drop entry point:
+  a translucent user cape with a transparent elytra area must be saved with the vanilla elytra
+  composited in, keep its half-transparent face in-world and on the equipped wings, and the menu
+  must show its import, cancel, batch-limit, and delete messages. Cape-menu evidence must click
+  real tiles through the screen's mouse handlers so selection, the None tile, the speed slider,
+  the GIF badge, the scrollbar, the tooltip, and Hide Built-in Capes are exercised as a user does.
+- Settings evidence must show every tab through the real tab buttons, the keybind capture state,
+  the non-admin server notice with inactive server controls, and styled buttons over the vanilla
+  in-world background; the captured tab must be the tab whose controls the assertion toggles.
+- The `server-policy` scenario is the only place a non-default `quickskin-server.json` exists. Its
+  seed comes solely from the contract's `orchestration.server_config`; the orchestrator writes it
+  verbatim before the server starts. Evidence must prove the server override reached the client,
+  that the server policy flattens transparency even when the client allows it, that the second
+  skin change stays unacknowledged behind the real cooldown button, and that a cape change during
+  the cooldown is still acknowledged.
+- The `session` scenario proves the vanilla pause menu, inventory paper doll, player-list head,
+  and the post-disconnect title preview all consume the saved Quick Skin look, and that the
+  client session state is cleared after disconnecting. It must branch on Essential exactly like
+  the title checkpoint and accept the CPM texture bridge where CPM owns `PlayerInfo`.
+- Live propagation must witness more than one transition from a single fixed rear vantage: the
+  animated cape's two pinned frames, the subject's server-synchronized elytra textured by that
+  network cape, the 256x128 HD cape decoded from the network cache, and the empty cape after
+  removal. Each phase is released by an explicit observer acknowledgement relayed through the
+  server, never by wall-clock timing. The sequential propagation subject wears the auto-detected
+  slim skin plus a bundled cape id so model propagation and id-only capes are both covered.
+- Every optional-mod lane ends with one lane-specific `integration_visual` checkpoint from the same
+  FOV-50 rear view. Lanes with a distinctive contribution (Ears features, 3D hat layer, the CPM
+  texture bridge) must assert that integration state; coexistence lanes assert the unchanged plaid
+  skin. The reviewer receives per-mod expectation overrides for that one capture id.
 - Every orchestrator invocation writes into a fresh owned workspace and promotes only its bounded
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's
@@ -249,6 +309,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   path component against the resolved root, never by string prefix, which would admit a sibling
   whose name merely extends the root. Install a leased blob under its real artifact name, because
   loaders discover only `*.jar`; the store's digest name is not an installable identity.
+- The harness never calls a Minecraft GUI input method whose signature drifts between supported
+  versions. `Screen.mouseClicked`, `mouseDragged` and `mouseReleased` take `(double,double,int)`
+  before 1.21.11 and a `MouseButtonEvent` afterwards, and the harness is one unpreprocessed source
+  tree compiled against every version, so it cannot spell both. Drive a click through
+  `VanillaShim`, which calls the old signature where it exists and otherwise dispatches
+  `MouseHandler`'s GLFW button and move callbacks, whose `(long,int,int,int)` and
+  `(long,double,double)` shapes GLFW itself fixes. Resolve those callbacks by
+  named/intermediary/SRG name first and fall back to the unique matching shape.
 - The shared Java harness must reference a drifting Minecraft type as a class literal so the
   harness jar's remapper rewrites it. Resolving a Minecraft name from a string resolves only on
   Mojang-mapped loaders and fails on Fabric's intermediary runtime, so a string lookup additionally
