@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
+MATRIX = json.loads(
+    (ROOT / "release" / "release-matrix.json").read_text(encoding="utf-8")
+)
 PLAYER_APPEARANCE_SERVICE = (
     ROOT
     / "common"
@@ -17,6 +21,18 @@ PLAYER_APPEARANCE_SERVICE = (
     / "client"
     / "services"
     / "PlayerAppearanceService.java"
+)
+LEGACY_PLAYER_INFO_MIXIN = (
+    ROOT
+    / "common"
+    / "src"
+    / "legacy1_20_1"
+    / "java"
+    / "com"
+    / "quickskin"
+    / "mod"
+    / "mixin"
+    / "PlayerInfoMixin.java"
 )
 SESSION_SCENARIO = (
     ROOT
@@ -59,6 +75,33 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
             "the CPM refresh must remain outside the nullable skin-location block",
         )
         self.assertIn("A cleared skin has no location", apply_look)
+
+    def test_legacy_player_info_discards_stale_skin_before_reregistering(self) -> None:
+        active_common_overlays = frozenset(
+            MATRIX["source_overlays"]["common"].values()
+        )
+        if "legacy1_20_1" not in active_common_overlays:
+            self.assertFalse(LEGACY_PLAYER_INFO_MIXIN.exists())
+            return
+
+        self.assertTrue(LEGACY_PLAYER_INFO_MIXIN.is_file())
+        source = LEGACY_PLAYER_INFO_MIXIN.read_text(encoding="utf-8")
+        refresh = source[
+            source.index("public void quickskin$forceReRegisterSkins()") : source.index(
+                "/**", source.index("public void quickskin$forceReRegisterSkins()")
+            )
+        ]
+
+        skin_clear = refresh.index(
+            "textureLocations.remove(MinecraftProfileTexture.Type.SKIN);"
+        )
+        model_clear = refresh.index("skinModel = null;")
+        pending_reset = refresh.index("pendingTextures = false;")
+        reregister = refresh.index("registerTextures();")
+        self.assertLess(skin_clear, model_clear)
+        self.assertLess(model_clear, pending_reset)
+        self.assertLess(pending_reset, reregister)
+        self.assertNotIn("textureLocations.clear()", refresh)
 
     def test_session_surfaces_allow_cpm_player_info_to_use_its_bridge(self) -> None:
         source = SESSION_SCENARIO.read_text(encoding="utf-8")
