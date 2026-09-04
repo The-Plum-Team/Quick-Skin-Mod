@@ -9,58 +9,856 @@
     900
   ],
   "review_regions": {
-    "phase0-smoke.client_a.baseline": [[0.42, 0.34, 0.58, 0.86]],
-    "phase0-smoke.client_a.apply_local_skin": [[0.7, 0.42, 1.0, 0.98]],
-    "propagation.client_a.baseline": [[0.42, 0.34, 0.58, 0.86]],
-    "propagation.client_a.apply_local_look": [[0.7, 0.42, 1.0, 0.98]],
-    "propagation.client_b.baseline": [[0.42, 0.34, 0.58, 0.86]],
-    "propagation.client_b.observe_a": [[0.38, 0.25, 0.62, 0.9]],
-    "propagation-live.client_a.baseline": [[0.42, 0.34, 0.58, 0.86]],
-    "propagation-live.client_a.apply_live": [[0.7, 0.42, 1.0, 0.98]],
-    "propagation-live.client_b.baseline": [[0.42, 0.34, 0.58, 0.86]],
-    "propagation-live.client_b.observe_before": [[0.38, 0.25, 0.62, 0.9]],
-    "propagation-live.client_b.await_live_change": [[0.38, 0.25, 0.62, 0.9]],
-    "full.client_a.baseline": [[0.42, 0.34, 0.58, 0.86]],
-    "full.client_a.local_skin_apply": [[0.42, 0.34, 0.58, 0.86]],
-    "full.client_a.skin_menu_screen": [[0.34, 0.09, 0.66, 0.91]],
-    "full.client_a.external_skin_drop": [[0.34, 0.09, 0.66, 0.91]],
-    "full.client_a.model_slim": [[0.42, 0.34, 0.58, 0.86]],
-    "full.client_a.model_classic": [[0.42, 0.34, 0.58, 0.86]],
-    "full.client_a.hd_skin_no_downscale": [[0.42, 0.34, 0.58, 0.86]],
-    "full.client_a.transparent_skin_layers": [[0.42, 0.34, 0.58, 0.86]],
-    "full.client_a.cape_menu_screen": [[0.12, 0.07, 0.7, 0.91]],
-    "full.client_a.known_cape_apply": [[0.4, 0.32, 0.6, 0.88]],
-    "full.client_a.cape_adjust_screen": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.cape_preview_selected_a": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.cape_preview_selected_b": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.cape_adjust_opaque_off": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.cape_adjust_opaque_on": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.cape_adjust_zoom_out": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.cape_adjust_zoom_in": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.bundled_bmo_cape": [[0.4, 0.32, 0.6, 0.88]],
-    "full.client_a.bundled_bmo_elytra": [[0.36, 0.28, 0.64, 0.9]],
-    "full.client_a.bmo_padded_source_screen": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.bmo_adjust_screen": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.adjusted_bmo_cape": [[0.4, 0.32, 0.6, 0.88]],
-    "full.client_a.adjusted_bmo_elytra": [[0.36, 0.28, 0.64, 0.9]],
-    "full.client_a.vanilla_elytra_after_cape_removal": [[0.36, 0.28, 0.64, 0.9]],
-    "full.client_a.animated_cape_apply": [[0.4, 0.32, 0.6, 0.88]],
-    "full.client_a.animated_cape_advance": [[0.4, 0.32, 0.6, 0.88]],
-    "full.client_a.hd_cape_no_downscale": [[0.4, 0.32, 0.6, 0.88]],
-    "full.client_a.elytra_hides_cape": [[0.36, 0.28, 0.64, 0.9]],
-    "full.client_a.cape_editor_ignores_elytra": [[0.01, 0.04, 0.74, 0.78], [0.37, 0.93, 0.57, 0.99]],
-    "full.client_a.settings_screen": [[0.31, 0.25, 0.69, 0.74]],
-    "full.client_a.rename_dialog": [[0.36, 0.34, 0.64, 0.66]],
-    "full.client_a.delete_dialog": [[0.36, 0.34, 0.64, 0.66]],
-    "full.client_a.hud_preview_overlay": [[0.82, 0.72, 0.96, 0.99]],
-    "full.client_a.title_screen_splash_order": [[0.4, 0.04, 0.72, 0.55]],
-    "mod-compatibility.client_a.baseline_with_mod": [[0.42, 0.34, 0.58, 0.86]],
-    "mod-compatibility.client_a.apply_local_skin_with_mod": [[0.7, 0.42, 1.0, 0.98]],
-    "mod-compatibility-remote.client_b.observe_remote_baseline": [[0.32, 0.05, 0.68, 0.95]],
-    "mod-compatibility-remote.client_b.observe_remote_applied": [[0.32, 0.05, 0.68, 0.95]],
-    "mod-compatibility-late-join.client_b.observe_late_join_state": [[0.32, 0.05, 0.68, 0.95]],
-    "mod-compatibility-cpm-first-person.client_a.first_person_hand_initial": [[0.58, 0.3, 1.0, 1.0]],
-    "mod-compatibility-cpm-first-person.client_a.first_person_hand_after_10_seconds": [[0.58, 0.3, 1.0, 1.0]]
+    "full.client_a.adjusted_bmo_cape": [
+      [
+        0.4,
+        0.32,
+        0.6,
+        0.88
+      ]
+    ],
+    "full.client_a.adjusted_bmo_elytra": [
+      [
+        0.36,
+        0.28,
+        0.64,
+        0.9
+      ]
+    ],
+    "full.client_a.animated_cape_advance": [
+      [
+        0.4,
+        0.32,
+        0.6,
+        0.88
+      ]
+    ],
+    "full.client_a.animated_cape_apply": [
+      [
+        0.4,
+        0.32,
+        0.6,
+        0.88
+      ]
+    ],
+    "full.client_a.base_layer_transparency": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.base_layer_transparency_first_person": [
+      [
+        0.7,
+        0.42,
+        1.0,
+        0.98
+      ]
+    ],
+    "full.client_a.baseline": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.bmo_adjust_screen": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.bmo_padded_source_screen": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.bundled_bmo_cape": [
+      [
+        0.4,
+        0.32,
+        0.6,
+        0.88
+      ]
+    ],
+    "full.client_a.bundled_bmo_elytra": [
+      [
+        0.36,
+        0.28,
+        0.64,
+        0.9
+      ]
+    ],
+    "full.client_a.cape_adjust_opaque_off": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_adjust_opaque_on": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_adjust_screen": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_adjust_zoom_in": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_adjust_zoom_out": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_delete_local": [
+      [
+        0.12,
+        0.07,
+        0.7,
+        0.91
+      ],
+      [
+        0.72,
+        0.18,
+        0.96,
+        0.9
+      ]
+    ],
+    "full.client_a.cape_editor_ignores_elytra": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_editor_snap_mirror": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_fill_color_picker": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_import_standard": [
+      [
+        0.12,
+        0.07,
+        0.7,
+        0.91
+      ],
+      [
+        0.72,
+        0.18,
+        0.96,
+        0.9
+      ]
+    ],
+    "full.client_a.cape_menu_hidden_builtin": [
+      [
+        0.12,
+        0.07,
+        0.7,
+        0.91
+      ],
+      [
+        0.72,
+        0.18,
+        0.96,
+        0.9
+      ]
+    ],
+    "full.client_a.cape_menu_local_capes": [
+      [
+        0.12,
+        0.07,
+        0.7,
+        0.91
+      ],
+      [
+        0.72,
+        0.18,
+        0.96,
+        0.9
+      ]
+    ],
+    "full.client_a.cape_menu_screen": [
+      [
+        0.12,
+        0.07,
+        0.7,
+        0.91
+      ]
+    ],
+    "full.client_a.cape_none_selected": [
+      [
+        0.12,
+        0.07,
+        0.7,
+        0.91
+      ],
+      [
+        0.72,
+        0.18,
+        0.96,
+        0.9
+      ]
+    ],
+    "full.client_a.cape_preview_selected_a": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_preview_selected_b": [
+      [
+        0.01,
+        0.04,
+        0.74,
+        0.78
+      ],
+      [
+        0.37,
+        0.93,
+        0.57,
+        0.99
+      ]
+    ],
+    "full.client_a.cape_speed_slider": [
+      [
+        0.12,
+        0.07,
+        0.7,
+        0.91
+      ],
+      [
+        0.72,
+        0.18,
+        0.96,
+        0.9
+      ]
+    ],
+    "full.client_a.cape_tile_tooltip": [
+      [
+        0.12,
+        0.07,
+        0.7,
+        0.91
+      ],
+      [
+        0.72,
+        0.18,
+        0.96,
+        0.9
+      ]
+    ],
+    "full.client_a.catalog_delete": [
+      [
+        0.34,
+        0.09,
+        0.66,
+        0.91
+      ]
+    ],
+    "full.client_a.catalog_delete_protected": [
+      [
+        0.34,
+        0.09,
+        0.66,
+        0.91
+      ]
+    ],
+    "full.client_a.catalog_own_skin": [
+      [
+        0.34,
+        0.09,
+        0.66,
+        0.91
+      ]
+    ],
+    "full.client_a.catalog_rename": [
+      [
+        0.34,
+        0.09,
+        0.66,
+        0.91
+      ]
+    ],
+    "full.client_a.catalog_sort": [
+      [
+        0.34,
+        0.09,
+        0.66,
+        0.91
+      ]
+    ],
+    "full.client_a.delete_dialog": [
+      [
+        0.36,
+        0.34,
+        0.64,
+        0.66
+      ]
+    ],
+    "full.client_a.elytra_hides_cape": [
+      [
+        0.36,
+        0.28,
+        0.64,
+        0.9
+      ]
+    ],
+    "full.client_a.external_skin_drop": [
+      [
+        0.34,
+        0.09,
+        0.66,
+        0.91
+      ]
+    ],
+    "full.client_a.hd_cape_no_downscale": [
+      [
+        0.4,
+        0.32,
+        0.6,
+        0.88
+      ]
+    ],
+    "full.client_a.hd_skin_no_downscale": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.hud_preview_overlay": [
+      [
+        0.82,
+        0.72,
+        0.96,
+        0.99
+      ]
+    ],
+    "full.client_a.known_cape_apply": [
+      [
+        0.4,
+        0.32,
+        0.6,
+        0.88
+      ]
+    ],
+    "full.client_a.legacy_skin_apply": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.local_skin_apply": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.model_classic": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.model_slim": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.no_cape_after_removal": [
+      [
+        0.4,
+        0.32,
+        0.6,
+        0.88
+      ]
+    ],
+    "full.client_a.rename_dialog": [
+      [
+        0.36,
+        0.34,
+        0.64,
+        0.66
+      ]
+    ],
+    "full.client_a.settings_gui_edit_tab": [
+      [
+        0.31,
+        0.25,
+        0.69,
+        0.74
+      ]
+    ],
+    "full.client_a.settings_keybind_capture": [
+      [
+        0.31,
+        0.25,
+        0.69,
+        0.74
+      ]
+    ],
+    "full.client_a.settings_modpack_tab": [
+      [
+        0.31,
+        0.25,
+        0.69,
+        0.74
+      ]
+    ],
+    "full.client_a.settings_screen": [
+      [
+        0.31,
+        0.25,
+        0.69,
+        0.74
+      ]
+    ],
+    "full.client_a.settings_server_tab": [
+      [
+        0.31,
+        0.25,
+        0.69,
+        0.74
+      ]
+    ],
+    "full.client_a.skin_menu_screen": [
+      [
+        0.34,
+        0.09,
+        0.66,
+        0.91
+      ]
+    ],
+    "full.client_a.slim_skin_auto_detect": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.stale_skin_fallback": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.styled_buttons_vanilla_background": [
+      [
+        0.03,
+        0.09,
+        0.97,
+        0.91
+      ]
+    ],
+    "full.client_a.title_screen_splash_order": [
+      [
+        0.4,
+        0.04,
+        0.72,
+        0.55
+      ]
+    ],
+    "full.client_a.translucent_cape_elytra": [
+      [
+        0.36,
+        0.28,
+        0.64,
+        0.9
+      ]
+    ],
+    "full.client_a.translucent_cape_worn": [
+      [
+        0.4,
+        0.32,
+        0.6,
+        0.88
+      ]
+    ],
+    "full.client_a.transparency_disabled": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.transparent_skin_layers": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "full.client_a.vanilla_elytra_after_cape_removal": [
+      [
+        0.36,
+        0.28,
+        0.64,
+        0.9
+      ]
+    ],
+    "mod-compatibility-cpm-first-person.client_a.first_person_hand_after_10_seconds": [
+      [
+        0.58,
+        0.3,
+        1.0,
+        1.0
+      ]
+    ],
+    "mod-compatibility-cpm-first-person.client_a.first_person_hand_initial": [
+      [
+        0.58,
+        0.3,
+        1.0,
+        1.0
+      ]
+    ],
+    "mod-compatibility-late-join.client_b.observe_late_join_state": [
+      [
+        0.32,
+        0.05,
+        0.68,
+        0.95
+      ]
+    ],
+    "mod-compatibility-remote.client_b.observe_remote_applied": [
+      [
+        0.32,
+        0.05,
+        0.68,
+        0.95
+      ]
+    ],
+    "mod-compatibility-remote.client_b.observe_remote_baseline": [
+      [
+        0.32,
+        0.05,
+        0.68,
+        0.95
+      ]
+    ],
+    "mod-compatibility.client_a.apply_local_skin_with_mod": [
+      [
+        0.7,
+        0.42,
+        1.0,
+        0.98
+      ]
+    ],
+    "mod-compatibility.client_a.baseline_with_mod": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "phase0-smoke.client_a.apply_local_skin": [
+      [
+        0.7,
+        0.42,
+        1.0,
+        0.98
+      ]
+    ],
+    "phase0-smoke.client_a.baseline": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "propagation-live.client_a.apply_live": [
+      [
+        0.7,
+        0.42,
+        1.0,
+        0.98
+      ]
+    ],
+    "propagation-live.client_a.baseline": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "propagation-live.client_b.await_live_change": [
+      [
+        0.38,
+        0.25,
+        0.62,
+        0.9
+      ]
+    ],
+    "propagation-live.client_b.baseline": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "propagation-live.client_b.observe_animation_frame": [
+      [
+        0.38,
+        0.25,
+        0.62,
+        0.9
+      ]
+    ],
+    "propagation-live.client_b.observe_before": [
+      [
+        0.38,
+        0.25,
+        0.62,
+        0.9
+      ]
+    ],
+    "propagation-live.client_b.observe_cape_removed": [
+      [
+        0.38,
+        0.25,
+        0.62,
+        0.9
+      ]
+    ],
+    "propagation-live.client_b.observe_hd_cape": [
+      [
+        0.38,
+        0.25,
+        0.62,
+        0.9
+      ]
+    ],
+    "propagation-live.client_b.observe_remote_elytra": [
+      [
+        0.38,
+        0.25,
+        0.62,
+        0.9
+      ]
+    ],
+    "propagation.client_a.apply_local_look": [
+      [
+        0.7,
+        0.42,
+        1.0,
+        0.98
+      ]
+    ],
+    "propagation.client_a.baseline": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "propagation.client_b.baseline": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "propagation.client_b.observe_a": [
+      [
+        0.38,
+        0.25,
+        0.62,
+        0.9
+      ]
+    ],
+    "server-policy.client_a.baseline": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "server-policy.client_a.cape_change_during_cooldown": [
+      [
+        0.4,
+        0.32,
+        0.6,
+        0.88
+      ]
+    ],
+    "server-policy.client_a.cooldown_skin_menu": [
+      [
+        0.34,
+        0.09,
+        0.66,
+        0.91
+      ]
+    ],
+    "server-policy.client_a.transparent_skin_server_policy": [
+      [
+        0.42,
+        0.34,
+        0.58,
+        0.86
+      ]
+    ],
+    "session.client_a.inventory_paper_doll": [
+      [
+        0.3,
+        0.12,
+        0.7,
+        0.88
+      ]
+    ],
+    "session.client_a.pause_menu_preview": [
+      [
+        0.2,
+        0.08,
+        0.85,
+        0.95
+      ]
+    ],
+    "session.client_a.quit_to_title": [
+      [
+        0.4,
+        0.04,
+        0.72,
+        0.55
+      ]
+    ],
+    "session.client_a.tab_list_head": [
+      [
+        0.25,
+        0.0,
+        0.75,
+        0.25
+      ]
+    ]
   },
   "scenarios": [
     {
@@ -141,7 +939,7 @@
               "capture": {
                 "title": "Propagation subject applied",
                 "review_tier": "all",
-                "expectation": "The subject remains in first person while the lower-right player arm wears the custom skin's dark charcoal-and-gray plaid sleeve with a brown hand.",
+                "expectation": "The subject remains in first person while the lower-right player arm wears the custom skin's dark charcoal-and-gray plaid sleeve with a brown hand on the narrow slim arm.",
                 "probes": []
               }
             }
@@ -181,7 +979,7 @@
               "capture": {
                 "title": "Propagation observed remotely",
                 "review_tier": "key",
-                "expectation": "A fixed rear view shows Alice facing away from the observer: the plain brown back of her head, dark charcoal-and-gray plaid shoulders and sleeves, and blue trousers remain correctly oriented while an orange cape with a green stripe hangs from her back. Her eyes and chest must not face the camera, and the cape must not cross the front of her torso.",
+                "expectation": "A fixed rear view shows Alice facing away from the observer: the plain brown back of her head, dark charcoal-and-gray plaid shoulders and blue trousers remain correctly oriented on the narrow slim Alex arms that were auto-detected from her 3-pixel skin layout, while the bundled gold-and-orange test cape hangs from her back. Her eyes and chest must not face the camera, and the cape must not cross the front of her torso.",
                 "probes": []
               }
             }
@@ -237,6 +1035,30 @@
                 "expectation": "The subject's first-person view includes the newly applied custom skin on the lower-right player arm: a dark charcoal-and-gray plaid sleeve with a brown hand.",
                 "probes": []
               }
+            },
+            {
+              "id": "await_frames_observed",
+              "assertion_required": true
+            },
+            {
+              "id": "equip_elytra_live",
+              "assertion_required": true
+            },
+            {
+              "id": "await_elytra_observed",
+              "assertion_required": true
+            },
+            {
+              "id": "apply_hd_cape_live",
+              "assertion_required": true
+            },
+            {
+              "id": "await_hd_observed",
+              "assertion_required": true
+            },
+            {
+              "id": "remove_cape_live",
+              "assertion_required": true
             }
           ],
           "comparisons": [
@@ -280,7 +1102,47 @@
               "capture": {
                 "title": "Live observer after",
                 "review_tier": "key",
-                "expectation": "From the same fixed rear view, Alice still faces away from the observer and has changed to the custom skin: the plain brown back of her head, dark charcoal-and-gray plaid shoulders and sleeves, and blue trousers are visible while an orange cape with a green stripe hangs from her back. Her eyes and chest must not face the camera, and the cape must not cross the front of her torso.",
+                "expectation": "From the same fixed rear view, Alice still faces away from the observer and has changed to the custom skin: the plain brown back of her head, dark charcoal-and-gray plaid shoulders and sleeves, and blue trousers are visible while a dark animated cape whose light face contains a complete red vertical motif hangs from her back. Her eyes and chest must not face the camera, and the cape must not cross the front of her torso.",
+                "probes": []
+              }
+            },
+            {
+              "id": "observe_animation_frame",
+              "assertion_required": true,
+              "capture": {
+                "title": "Live observer animated frame B",
+                "review_tier": "key",
+                "expectation": "From the same fixed rear view, Alice's dark animated cape shows its second frozen frame: the complete motif has changed from red to blue and moved horizontally while remaining fully inside the cape surface received over the network.",
+                "probes": []
+              }
+            },
+            {
+              "id": "observe_remote_elytra",
+              "assertion_required": true,
+              "capture": {
+                "title": "Live observer remote elytra",
+                "review_tier": "key",
+                "expectation": "From the same fixed rear view, the crouching Alice wears two separated elytra wings textured by her dark animated network cape instead of a flat cape; no flat cape panel hangs behind her.",
+                "probes": []
+              }
+            },
+            {
+              "id": "observe_hd_cape",
+              "assertion_required": true,
+              "capture": {
+                "title": "Live observer HD cape",
+                "review_tier": "key",
+                "expectation": "From the same fixed rear view, standing Alice wears a crisp HD cape received over the network with a bright magenta front panel crossed by a yellow stripe over a teal base.",
+                "probes": []
+              }
+            },
+            {
+              "id": "observe_cape_removed",
+              "assertion_required": true,
+              "capture": {
+                "title": "Live observer cape removed",
+                "review_tier": "key",
+                "expectation": "From the same fixed rear view, Alice still wears the custom plaid skin but no cape hangs from her back after the live removal propagated.",
                 "probes": []
               }
             }
@@ -290,6 +1152,50 @@
               "first_step": "observe_before",
               "second_step": "await_live_change",
               "minimum_changed_fraction": 0.03,
+              "region": [
+                0.3,
+                0.28,
+                0.6,
+                0.85
+              ]
+            },
+            {
+              "first_step": "await_live_change",
+              "second_step": "observe_animation_frame",
+              "minimum_changed_fraction": 0.002,
+              "region": [
+                0.3,
+                0.28,
+                0.6,
+                0.85
+              ]
+            },
+            {
+              "first_step": "observe_animation_frame",
+              "second_step": "observe_remote_elytra",
+              "minimum_changed_fraction": 0.005,
+              "region": [
+                0.3,
+                0.28,
+                0.6,
+                0.85
+              ]
+            },
+            {
+              "first_step": "observe_remote_elytra",
+              "second_step": "observe_hd_cape",
+              "minimum_changed_fraction": 0.005,
+              "region": [
+                0.3,
+                0.28,
+                0.6,
+                0.85
+              ]
+            },
+            {
+              "first_step": "observe_hd_cape",
+              "second_step": "observe_cape_removed",
+              "minimum_changed_fraction": 0.005,
               "region": [
                 0.3,
                 0.28,
@@ -392,6 +1298,56 @@
               }
             },
             {
+              "id": "catalog_rename",
+              "assertion_required": true,
+              "capture": {
+                "title": "Catalog rename",
+                "review_tier": "key",
+                "expectation": "The skin menu lists the externally dropped skin under its new name qs_e2e_renamed after the real rename dialog was confirmed; both catalog rows keep a face thumbnail and a model label, and no row still shows the original dropped filename.",
+                "probes": []
+              }
+            },
+            {
+              "id": "catalog_sort",
+              "assertion_required": true,
+              "capture": {
+                "title": "Catalog sorted latest first",
+                "review_tier": "all",
+                "expectation": "The skin menu's sort button now shows the Latest First arrow icon and the renamed external skin row is listed above the imported plaid skin row.",
+                "probes": []
+              }
+            },
+            {
+              "id": "catalog_own_skin",
+              "assertion_required": true,
+              "capture": {
+                "title": "Own skin protected",
+                "review_tier": "key",
+                "expectation": "The imported plaid skin is marked as the player's own skin: its selected row is pinned to the top of the catalog and highlighted purple instead of blue, with no delete, rename or upload buttons on the row.",
+                "probes": []
+              }
+            },
+            {
+              "id": "catalog_delete_protected",
+              "assertion_required": true,
+              "capture": {
+                "title": "Own skin deletion refused",
+                "review_tier": "all",
+                "expectation": "A red error toast reading Cannot delete your own skin! is visible over the skin menu while the protected purple own-skin row remains in the catalog.",
+                "probes": []
+              }
+            },
+            {
+              "id": "catalog_delete",
+              "assertion_required": true,
+              "capture": {
+                "title": "External skin deleted",
+                "review_tier": "key",
+                "expectation": "After the real delete confirmation, the renamed external skin row is gone; the catalog shows only the protected purple own-skin row above the drop-zone instructions.",
+                "probes": []
+              }
+            },
+            {
               "id": "model_slim",
               "assertion_required": true,
               "capture": {
@@ -410,6 +1366,64 @@
                 "expectation": "A stable FOV-50 rear view shows the complete custom dark charcoal-and-gray plaid jacket and blue trousers on the classic Steve renderer; each arm has the wider silhouette produced by 4-pixel base geometry beneath the inflated jacket outer layer.",
                 "probes": []
               }
+            },
+            {
+              "id": "slim_skin_auto_detect",
+              "assertion_required": true,
+              "capture": {
+                "title": "Slim auto-detected",
+                "review_tier": "key",
+                "expectation": "A stable FOV-50 rear view shows the same plaid palette on a skin whose 3-pixel arm layout was auto-detected as slim with no manual model override: each arm has the narrow Alex silhouette, visibly thinner than the classic Steve arms of the preceding checkpoint.",
+                "probes": []
+              }
+            },
+            {
+              "id": "legacy_skin_apply",
+              "assertion_required": true,
+              "capture": {
+                "title": "Legacy skin converted",
+                "review_tier": "key",
+                "expectation": "A stable FOV-50 rear view shows a legacy 64x32 skin converted to the modern layout: both arms and both legs are textured with the same bright blue limb colour because the left limbs are mirrored copies of the right ones, the torso keeps the plaid palette, and no black box surrounds the head.",
+                "probes": []
+              }
+            },
+            {
+              "id": "folder_asset_normalization",
+              "assertion_required": true
+            },
+            {
+              "id": "base_layer_transparency",
+              "assertion_required": true,
+              "capture": {
+                "title": "Transparent skin base layer",
+                "review_tier": "key",
+                "expectation": "A stable FOV-50 rear view of the plaid skin whose torso back has a fully transparent rectangular window: instead of plaid, the hole shows the inside of the model, so the cyan accent of the torso front face appears through it, and both sleeves are half-transparent so the background shows faintly through them.",
+                "probes": []
+              }
+            },
+            {
+              "id": "base_layer_transparency_first_person",
+              "assertion_required": true,
+              "capture": {
+                "title": "Translucent first-person arm",
+                "review_tier": "all",
+                "expectation": "A normal first-person world view whose lower-right player arm is the half-transparent plaid sleeve: the world shows faintly through the sleeve while the brown hand stays solid.",
+                "probes": []
+              }
+            },
+            {
+              "id": "transparency_disabled",
+              "assertion_required": true,
+              "capture": {
+                "title": "Transparency disabled",
+                "review_tier": "key",
+                "expectation": "From the same FOV-50 rear view, after Disable Skin Transparency was enabled through the real settings checkbox, the former torso window is filled with opaque black and both sleeves are fully solid; nothing shows through the model.",
+                "probes": []
+              }
+            },
+            {
+              "id": "restore_classic_skin",
+              "assertion_required": true
             },
             {
               "id": "hd_skin_no_downscale",
@@ -556,6 +1570,16 @@
               }
             },
             {
+              "id": "cape_fill_color_picker",
+              "assertion_required": true,
+              "capture": {
+                "title": "Fill colour picker",
+                "review_tier": "all",
+                "expectation": "The cape editor shows its fill-colour popover open beside the enabled opaque toggle: red, green and blue channel sliders, a hex field reading FF00FF and a magenta swatch.",
+                "probes": []
+              }
+            },
+            {
               "id": "cape_adjust_zoom_out",
               "assertion_required": true,
               "capture": {
@@ -574,6 +1598,50 @@
                 "expectation": "The cape editor preview shows a visibly different crop at the high zoom position.",
                 "probes": []
               }
+            },
+            {
+              "id": "cape_editor_snap_mirror",
+              "assertion_required": true,
+              "capture": {
+                "title": "Editor snap and mirror",
+                "review_tier": "all",
+                "expectation": "The cape editor shows the night-sky source shifted off-centre by a snapped drag, the Snap button reading a non-default grid size and the Mirror button reading ON, so the cape back art is copied onto the front thumbnail.",
+                "probes": []
+              }
+            },
+            {
+              "id": "cape_import_standard",
+              "assertion_required": true,
+              "capture": {
+                "title": "Cape imported through the menu",
+                "review_tier": "key",
+                "expectation": "The cape menu shows the green \u2713 Imported cape message above its buttons and a new My Capes tile for a teal-and-yellow cape imported through the real import workflow.",
+                "probes": []
+              }
+            },
+            {
+              "id": "translucent_cape_worn",
+              "assertion_required": true,
+              "capture": {
+                "title": "Translucent cape worn",
+                "review_tier": "key",
+                "expectation": "The player is seen from behind wearing the imported cape whose visible face is half-transparent teal inside an opaque yellow border: the plaid back of the skin shows faintly through the cape surface.",
+                "probes": []
+              }
+            },
+            {
+              "id": "translucent_cape_elytra",
+              "assertion_required": true,
+              "capture": {
+                "title": "Imported cape elytra fallback",
+                "review_tier": "key",
+                "expectation": "The crouching player wears two separated elytra wings using Minecraft's ordinary gray-brown vanilla elytra texture that the import composited into the cape's transparent elytra area; no teal cape surface is visible on the wings.",
+                "probes": []
+              }
+            },
+            {
+              "id": "cape_import_cancel",
+              "assertion_required": true
             },
             {
               "id": "bundled_bmo_cape",
@@ -729,6 +1797,80 @@
               }
             },
             {
+              "id": "cape_menu_local_capes",
+              "assertion_required": true,
+              "capture": {
+                "title": "Cape menu with local capes",
+                "review_tier": "key",
+                "expectation": "The cape menu's My Capes section lists the imported local capes with purple custom markers: the animated GIF tile carries a cyan GIF badge and the yellow selection outline after being clicked, the HD cape tile sits beside it, the Animation Speed slider is visible below the grid, and a scrollbar runs along the overflowing built-in cape section.",
+                "probes": []
+              }
+            },
+            {
+              "id": "cape_speed_slider",
+              "assertion_required": true,
+              "capture": {
+                "title": "Cape animation speed",
+                "review_tier": "all",
+                "expectation": "The cape menu's Animation Speed slider reads 200% for the selected animated GIF cape while the rest of the menu is unchanged.",
+                "probes": []
+              }
+            },
+            {
+              "id": "cape_tile_tooltip",
+              "assertion_required": true,
+              "capture": {
+                "title": "Cape tile tooltip",
+                "review_tier": "all",
+                "expectation": "A tooltip over the HD cape tile lists the cape name, Static cape, Resolution: CAPE_256 and Click to preview.",
+                "probes": []
+              }
+            },
+            {
+              "id": "cape_scroll",
+              "assertion_required": true
+            },
+            {
+              "id": "cape_delete_local",
+              "assertion_required": true,
+              "capture": {
+                "title": "Local cape deleted",
+                "review_tier": "key",
+                "expectation": "The cape menu shows the green \u2713 Deleted cape message after the real delete confirmation removed the red-and-white contrast cape tile from My Capes.",
+                "probes": []
+              }
+            },
+            {
+              "id": "cape_none_selected",
+              "assertion_required": true,
+              "capture": {
+                "title": "None tile selected",
+                "review_tier": "all",
+                "expectation": "The cape menu's None tile carries the yellow selection outline after being clicked, the 3D preview wears no cape, and the Animation Speed slider is hidden.",
+                "probes": []
+              }
+            },
+            {
+              "id": "no_cape_after_removal",
+              "assertion_required": true,
+              "capture": {
+                "title": "No cape after removal",
+                "review_tier": "key",
+                "expectation": "The player is seen from behind wearing the custom plaid skin with no cape or elytra on the back.",
+                "probes": []
+              }
+            },
+            {
+              "id": "cape_menu_hidden_builtin",
+              "assertion_required": true,
+              "capture": {
+                "title": "Built-in capes hidden",
+                "review_tier": "all",
+                "expectation": "With Hide Built-in Capes enabled, the cape menu shows only the My Capes section with the None tile and the local capes; no built-in cape section and no scrollbar is visible.",
+                "probes": []
+              }
+            },
+            {
               "id": "settings_screen",
               "assertion_required": true,
               "capture": {
@@ -752,6 +1894,56 @@
               }
             },
             {
+              "id": "settings_keybind_capture",
+              "assertion_required": true,
+              "capture": {
+                "title": "Keybind capture",
+                "review_tier": "all",
+                "expectation": "The settings Client tab's keybind button reads > ??? < with yellow question marks while it waits for a new key to be pressed.",
+                "probes": []
+              }
+            },
+            {
+              "id": "settings_gui_edit_tab",
+              "assertion_required": true,
+              "capture": {
+                "title": "GUI Edit tab",
+                "review_tier": "all",
+                "expectation": "The settings GUI Edit tab lists five checkboxes: mini player preview, styled buttons, preview customization, hide built-in capes and vanilla background; the mini preview, styled buttons and vanilla background boxes are checked and the other two are clear.",
+                "probes": []
+              }
+            },
+            {
+              "id": "settings_modpack_tab",
+              "assertion_required": true,
+              "capture": {
+                "title": "Modpack tab",
+                "review_tier": "all",
+                "expectation": "The settings Modpack tab shows the single Enable Player's Own Skin System checkbox.",
+                "probes": []
+              }
+            },
+            {
+              "id": "settings_server_tab",
+              "assertion_required": true,
+              "capture": {
+                "title": "Server tab as non-admin",
+                "review_tier": "all",
+                "expectation": "The settings Server tab shows a greyed-out Disable Skin Transparency (Server) checkbox and cooldown text box, plus the yellow notice Only server admins can change these settings near the bottom of the dialog.",
+                "probes": []
+              }
+            },
+            {
+              "id": "styled_buttons_vanilla_background",
+              "assertion_required": true,
+              "capture": {
+                "title": "Styled buttons over vanilla background",
+                "review_tier": "key",
+                "expectation": "The skin menu is open with frosted-glass styled buttons and Minecraft's translucent in-world overlay instead of the starred background: the daytime world is dimly visible behind the panel and no star pattern is drawn.",
+                "probes": []
+              }
+            },
+            {
               "id": "rename_dialog",
               "assertion_required": true,
               "capture": {
@@ -768,6 +1960,16 @@
                 "title": "Delete confirmation",
                 "review_tier": "all",
                 "expectation": "A compact delete-confirmation dialog is open with cancel and delete controls.",
+                "probes": []
+              }
+            },
+            {
+              "id": "stale_skin_fallback",
+              "assertion_required": true,
+              "capture": {
+                "title": "Stale skin falls back",
+                "review_tier": "all",
+                "expectation": "A centered third-person view shows the intact UUID-selected vanilla default skin again because the saved active skin id pointed at a file that no longer exists; no custom plaid texture and no cape are worn.",
                 "probes": []
               }
             },
@@ -861,6 +2063,322 @@
                 0.96,
                 0.99
               ]
+            },
+            {
+              "first_step": "external_skin_drop",
+              "second_step": "catalog_delete",
+              "minimum_changed_fraction": 0.002,
+              "region": [
+                0.34,
+                0.09,
+                0.66,
+                0.91
+              ]
+            },
+            {
+              "first_step": "model_classic",
+              "second_step": "slim_skin_auto_detect",
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.38,
+                0.18,
+                0.62,
+                0.96
+              ]
+            },
+            {
+              "first_step": "model_classic",
+              "second_step": "legacy_skin_apply",
+              "minimum_changed_fraction": 0.002,
+              "region": [
+                0.38,
+                0.18,
+                0.62,
+                0.96
+              ]
+            },
+            {
+              "first_step": "base_layer_transparency",
+              "second_step": "transparency_disabled",
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.44,
+                0.4,
+                0.56,
+                0.7
+              ]
+            },
+            {
+              "first_step": "cape_adjust_zoom_in",
+              "second_step": "cape_editor_snap_mirror",
+              "minimum_changed_fraction": 1e-05
+            },
+            {
+              "first_step": "known_cape_apply",
+              "second_step": "translucent_cape_worn",
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.44,
+                0.45,
+                0.56,
+                0.78
+              ]
+            },
+            {
+              "first_step": "translucent_cape_worn",
+              "second_step": "translucent_cape_elytra",
+              "minimum_changed_fraction": 0.005,
+              "region": [
+                0.4,
+                0.35,
+                0.6,
+                0.9
+              ]
+            },
+            {
+              "first_step": "cape_menu_screen",
+              "second_step": "cape_menu_local_capes",
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.12,
+                0.07,
+                0.7,
+                0.91
+              ]
+            },
+            {
+              "first_step": "cape_menu_local_capes",
+              "second_step": "cape_speed_slider",
+              "minimum_changed_fraction": 1e-05
+            },
+            {
+              "first_step": "hd_cape_no_downscale",
+              "second_step": "no_cape_after_removal",
+              "minimum_changed_fraction": 0.005,
+              "region": [
+                0.44,
+                0.45,
+                0.56,
+                0.78
+              ]
+            },
+            {
+              "first_step": "cape_menu_local_capes",
+              "second_step": "cape_menu_hidden_builtin",
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.12,
+                0.07,
+                0.7,
+                0.91
+              ]
+            },
+            {
+              "first_step": "settings_screen",
+              "second_step": "settings_keybind_capture",
+              "minimum_changed_fraction": 1e-05,
+              "region": [
+                0.16,
+                0.25,
+                0.28,
+                0.31
+              ]
+            },
+            {
+              "first_step": "settings_screen",
+              "second_step": "settings_gui_edit_tab",
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.12,
+                0.1,
+                0.78,
+                0.88
+              ]
+            },
+            {
+              "first_step": "settings_gui_edit_tab",
+              "second_step": "settings_server_tab",
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.12,
+                0.1,
+                0.78,
+                0.88
+              ]
+            },
+            {
+              "first_step": "skin_menu_screen",
+              "second_step": "styled_buttons_vanilla_background",
+              "minimum_changed_fraction": 0.02,
+              "region": [
+                0.03,
+                0.2,
+                0.2,
+                0.8
+              ]
+            },
+            {
+              "first_step": "local_skin_apply",
+              "second_step": "stale_skin_fallback",
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.42,
+                0.34,
+                0.58,
+                0.86
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "server-policy",
+      "execution_profiles": [
+        "pr",
+        "release"
+      ],
+      "orchestration": {
+        "mode": "single-client",
+        "server_config": {
+          "disableSkinTransparency": true,
+          "skinChangeCooldownSeconds": 600
+        }
+      },
+      "roles": [
+        {
+          "role": "client_a",
+          "steps": [
+            {
+              "id": "baseline",
+              "assertion_required": true,
+              "capture": {
+                "title": "Server-policy baseline",
+                "review_tier": "all",
+                "expectation": "A centered complete player model in a stable third-person flat daytime world view has the intact UUID-selected vanilla default skin before any custom appearance; modern defaults such as Noor with a red top and green trousers are valid and must not be mistaken for a custom skin.",
+                "probes": []
+              }
+            },
+            {
+              "id": "transparent_skin_server_policy",
+              "assertion_required": true,
+              "capture": {
+                "title": "Server transparency policy enforced",
+                "review_tier": "key",
+                "expectation": "A stable FOV-50 rear view of the transparent-window plaid skin on a server whose policy disables skin transparency: even though the client setting allows transparency, the torso window is filled with opaque black and both sleeves are fully solid.",
+                "probes": []
+              }
+            },
+            {
+              "id": "cooldown_skin_menu",
+              "assertion_required": true,
+              "capture": {
+                "title": "Skin change on cooldown",
+                "review_tier": "key",
+                "expectation": "The Quick Skin skin menu is open with its full-width Done button disabled and reading On Cooldown followed by a remaining-seconds countdown, because the server enforces a skin-change cooldown after the first change.",
+                "probes": []
+              }
+            },
+            {
+              "id": "cape_change_during_cooldown",
+              "assertion_required": true,
+              "capture": {
+                "title": "Cape change during cooldown",
+                "review_tier": "key",
+                "expectation": "The player is seen from behind wearing the bundled gold-and-orange test cape over the black-windowed plaid skin: the cape change was accepted by the server while the second skin change stayed on cooldown.",
+                "probes": []
+              }
+            }
+          ],
+          "comparisons": [
+            {
+              "first_step": "baseline",
+              "second_step": "transparent_skin_server_policy",
+              "minimum_changed_fraction": 1e-05
+            },
+            {
+              "first_step": "transparent_skin_server_policy",
+              "second_step": "cape_change_during_cooldown",
+              "minimum_changed_fraction": 0.001,
+              "region": [
+                0.4,
+                0.32,
+                0.6,
+                0.88
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "session",
+      "execution_profiles": [
+        "pr",
+        "release"
+      ],
+      "orchestration": {
+        "mode": "single-client"
+      },
+      "roles": [
+        {
+          "role": "client_a",
+          "steps": [
+            {
+              "id": "apply_look",
+              "assertion_required": true
+            },
+            {
+              "id": "pause_menu_preview",
+              "assertion_required": true,
+              "capture": {
+                "title": "Pause menu preview",
+                "review_tier": "key",
+                "expectation": "The vanilla pause menu is open over the world with the Quick Skin Change Skin button beside the widest vanilla button and a 3D player preview above it wearing the custom plaid skin and the bundled gold test cape.",
+                "probes": []
+              }
+            },
+            {
+              "id": "inventory_paper_doll",
+              "assertion_required": true,
+              "capture": {
+                "title": "Inventory paper doll",
+                "review_tier": "key",
+                "expectation": "The vanilla inventory screen is open on the packaged creative server (its creative Inventory tab, which is the tab that draws the paper doll) and the paper-doll player model in its upper-left frame wears the custom plaid skin with brown hair and blue trousers rather than the vanilla default skin.",
+                "probes": []
+              }
+            },
+            {
+              "id": "tab_list_head",
+              "assertion_required": true,
+              "capture": {
+                "title": "Tab list head",
+                "review_tier": "all",
+                "expectation": "The vanilla player list overlay is held open at the top of the in-world view and the single Alice row shows a small face icon taken from the custom plaid skin.",
+                "probes": []
+              }
+            },
+            {
+              "id": "quit_to_title",
+              "assertion_required": true,
+              "capture": {
+                "title": "Title preview after disconnect",
+                "review_tier": "key",
+                "expectation": "After disconnecting from the server, the Minecraft title screen shows the Quick Skin 3D preview next to the Change Skin button still wearing the saved plaid skin and gold test cape restored from configuration with no world loaded.",
+                "probes": []
+              }
+            }
+          ],
+          "comparisons": [
+            {
+              "first_step": "pause_menu_preview",
+              "second_step": "inventory_paper_doll",
+              "minimum_changed_fraction": 1e-05
+            },
+            {
+              "first_step": "pause_menu_preview",
+              "second_step": "quit_to_title",
+              "minimum_changed_fraction": 1e-05
             }
           ]
         }
