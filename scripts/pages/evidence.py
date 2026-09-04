@@ -1198,6 +1198,7 @@ def compact_bundle(
     expected_source_run_id: str | None = None,
     expected_target_run_id: str | None = None,
     expected_target_sha: str | None = None,
+    expected_coverage_sha: str | None = None,
     catalog_path: Path = DEFAULT_CATALOG,
 ) -> Path:
     """Atomically copy or convert one validated bundle into the compact cache schema."""
@@ -1213,6 +1214,7 @@ def compact_bundle(
         expected_source_run_id=expected_source_run_id,
         expected_target_run_id=expected_target_run_id,
         expected_target_sha=expected_target_sha,
+        expected_coverage_sha=expected_coverage_sha,
         catalog_path=catalog_path,
     )
     destination_root = output_root.resolve()
@@ -1336,6 +1338,7 @@ def compact_bundle(
             expected_source_run_id=expected_source_run_id,
             expected_target_run_id=expected_target_run_id,
             expected_target_sha=expected_target_sha,
+            expected_coverage_sha=expected_coverage_sha,
             catalog_path=catalog_path,
         )
         os.replace(staged_bundle, destination)
@@ -1434,6 +1437,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     compact_parser.add_argument("--source-run-id")
     compact_parser.add_argument("--target-run-id")
     compact_parser.add_argument("--target-sha")
+    compact_parser.add_argument("--coverage-sha")
     compact_parser.add_argument(
         "--contract",
         "--catalog",
@@ -1507,6 +1511,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_source_run_id=args.source_run_id,
                 expected_target_run_id=args.target_run_id,
                 expected_target_sha=args.target_sha,
+                expected_coverage_sha=args.coverage_sha,
                 catalog_path=args.catalog,
             )
             print(bundle)
