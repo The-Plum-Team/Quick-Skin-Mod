@@ -1780,27 +1780,45 @@ public class PlayerCapeMenuScreen extends Screen {
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
         try {
+            // Minecraft moved the Elytra out of textures/entity and under the equipment asset tree
+            // during the 1.21 line, so ask for the modern location first and keep the historical one
+            // behind it. Selecting by resource presence keeps this the same fact on every supported
+            // version; a missing texture silently skips the composite and saves the source unchanged.
 //? if <1.21 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", "textures/entity/elytra.png");
+            var elytraCandidates = List.of(
+                    new ResourceLocation("minecraft", "textures/entity/equipment/wings/elytra.png"),
+                    new ResourceLocation("minecraft", "textures/entity/elytra.png"));
 //?} else if <1.21.11 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            var elytraCandidates = List.of(
+                    ResourceLocation.fromNamespaceAndPath(
+                            "minecraft", "textures/entity/equipment/wings/elytra.png"),
+                    ResourceLocation.fromNamespaceAndPath(
+                            "minecraft", "textures/entity/elytra.png"));
 //?} else {
-            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            var elytraCandidates = List.of(
+                    Identifier.fromNamespaceAndPath(
+                            "minecraft", "textures/entity/equipment/wings/elytra.png"),
+                    Identifier.fromNamespaceAndPath(
+                            "minecraft", "textures/entity/elytra.png"));
 //?}
-            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
-            if (resourceOptional.isEmpty()) {
-                return null;
-            }
-            try (InputStream stream = resourceOptional.get().open()) {
+            for (var elytraTexture : elytraCandidates) {
+                var resourceOptional =
+                        Minecraft.getInstance().getResourceManager().getResource(elytraTexture);
+                if (resourceOptional.isEmpty()) {
+                    continue;
+                }
+                try (InputStream stream = resourceOptional.get().open()) {
 //? if <26.1.2 {
-                return SafeImageReader.readPng(stream);
+                    return SafeImageReader.readPng(stream);
 //?} else {
-                byte[] encoded = com.quickskin.mod.common.util.BoundedFileReader.readBytes(
-                        stream,
-                        (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
-                return com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
+                    byte[] encoded = com.quickskin.mod.common.util.BoundedFileReader.readBytes(
+                            stream,
+                            (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
+                    return com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
 //?}
+                }
             }
+            return null;
         } catch (IOException e) {
 //? if <26.1.2 {
 //?} else {
