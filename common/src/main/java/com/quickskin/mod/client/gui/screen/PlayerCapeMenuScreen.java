@@ -1774,17 +1774,48 @@ public class PlayerCapeMenuScreen extends Screen {
         startCapeImports(validFiles);
     }
 
+    /**
+     * Vanilla Elytra texture candidates for this Minecraft version, most specific first.
+     *
+     * <p>Minecraft 1.21.4 moved equipment textures under
+     * {@code textures/entity/equipment/<layer type>/}, so the flat pre-1.21.4 path no longer
+     * resolves. An unresolvable texture makes the import skip the composite and save the source
+     * cape unchanged, which leaves the Elytra face fully transparent on the equipped wings. The
+     * flat path is kept as a fallback for resource packs that still ship it.</p>
+     */
+//? if <1.21.4 {
+    private static final String[] VANILLA_ELYTRA_TEXTURE_PATHS = {
+            "textures/entity/elytra.png"
+    };
+//?} else {
+    private static final String[] VANILLA_ELYTRA_TEXTURE_PATHS = {
+            "textures/entity/equipment/wings/elytra.png",
+            "textures/entity/elytra.png"
+    };
+//?}
+
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
+        for (String texturePath : VANILLA_ELYTRA_TEXTURE_PATHS) {
+            java.awt.image.BufferedImage elytra = readVanillaElytraImage(texturePath);
+            if (elytra != null) {
+                return elytra;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private java.awt.image.BufferedImage readVanillaElytraImage(String texturePath) {
         try {
 //? if <1.21 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", "textures/entity/elytra.png");
+            ResourceLocation vanillaElytraTexture = new ResourceLocation("minecraft", texturePath);
 //?} else if <1.21.11 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            ResourceLocation vanillaElytraTexture = ResourceLocation.fromNamespaceAndPath("minecraft", texturePath);
 //?} else {
-            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            Identifier vanillaElytraTexture = Identifier.fromNamespaceAndPath("minecraft", texturePath);
 //?}
-            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
+            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(vanillaElytraTexture);
             if (resourceOptional.isEmpty()) {
                 return null;
             }
