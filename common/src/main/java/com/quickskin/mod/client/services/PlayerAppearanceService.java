@@ -117,11 +117,13 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
 
                 // Notify CustomNPCs integration (if available) to handle any skin cache invalidation
                 CustomNPCsIntegration.onSkinApplied(playerId, skinLocation);
-
-                // Force CPM to switch to skin mode and re-read skin data.
-                CPMCompatIntegration.forceReRegisterSkins(playerId);
-                associateEarsFeatures(playerId, skinLocation);
             }
+
+            // A cleared skin has no location, but CPM 1.20.1 still needs PlayerInfo to rebuild its
+            // cached bridge texture and return to the vanilla skin selected for this UUID.
+            CPMCompatIntegration.forceReRegisterSkins(playerId);
+
+            if (skinLocation != null) associateEarsFeatures(playerId, skinLocation);
         } else if (model != null) {
             // Model-only updates should not require re-selecting the current skin.
             String resolvedModel = modelService.getModelType(
@@ -155,12 +157,10 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
 
                 // If animated, ensure the animation is registered
                 if (capeService.isAnimated(capeId)) {
-                    String hash = null;
-                    String animationId = null;
+                    String hash = CapeAnimationIds.localHash(capeId);
 
-                    if (capeId.startsWith("local_cape:")) {
-                        hash = capeId.substring("local_cape:".length());
-                        animationId = "cape_" + hash;
+                    if (hash != null) {
+                        String animationId = CapeAnimationIds.deriveAnimationId(capeId);
 
                         AnimatedTextureManager.getInstance().registerAnimationAsync(
                                 animationId, capeId, capeLocation, hash);
