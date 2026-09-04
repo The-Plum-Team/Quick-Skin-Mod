@@ -556,6 +556,41 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
         self.assertIsNone(config_path)
         self.assertFalse(game_dir.exists())
 
+    def test_server_config_is_seeded_only_from_the_contract_policy(self) -> None:
+        server = self.root / "server"
+
+        # Scenarios without an authored seed leave Quick Skin's server defaults untouched.
+        for scenario in ("phase0-smoke", "propagation", "propagation-live", "full", "session"):
+            with self.subTest(scenario=scenario):
+                self.assertIsNone(packaged_runtime.write_server_config(server, scenario))
+                self.assertFalse((server / "config").exists())
+
+        config_path = packaged_runtime.write_server_config(server, "server-policy")
+
+        self.assertEqual(server / "config" / "quickskin-server.json", config_path)
+        assert config_path is not None
+        self.assertEqual(
+            '{\n  "disableSkinTransparency": true,\n  "skinChangeCooldownSeconds": 600\n}\n',
+            config_path.read_text(encoding="utf-8"),
+        )
+        seed = packaged_runtime.SCENARIO_CONTRACT.orchestration_for("server-policy").server_config
+        assert seed is not None
+        self.assertEqual(
+            seed.to_json_object(), json.loads(config_path.read_text(encoding="utf-8"))
+        )
+
+        # The seed is the only writer of that file: a pre-existing config is never overwritten.
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure, "server config must start absent"
+        ):
+            packaged_runtime.write_server_config(server, "server-policy")
+        self.assertEqual(
+            seed.to_json_object(), json.loads(config_path.read_text(encoding="utf-8"))
+        )
+
+        with self.assertRaises(Exception):
+            packaged_runtime.write_server_config(server, "not-a-scenario")
+
     def test_replaymod_compatibility_config_enables_deterministic_recording(self) -> None:
         game_dir = self.root / "replaymod-game"
 

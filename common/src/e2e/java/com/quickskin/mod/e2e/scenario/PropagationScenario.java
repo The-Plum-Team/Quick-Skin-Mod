@@ -1,6 +1,8 @@
 package com.quickskin.mod.e2e.scenario;
 
 import com.quickskin.mod.client.gui.util.SkinImporter;
+import com.quickskin.mod.client.services.CapeService;
+import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.client.storage.NetworkTextureCache;
 import com.quickskin.mod.common.data.AssetMetadata;
@@ -24,42 +26,53 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Phase 1 scenario: prove that a custom skin+cape applied by player A (subject) actually propagates
- * over the network and is <em>rendered</em> by player B (observer).
+ * Phase 1 scenario: prove that a custom skin plus a bundled cape applied by player A (subject)
+ * actually propagates over the network and is <em>rendered</em> by player B (observer) with the
+ * auto-detected slim model.
  *
  * <p>This is the most important property the whole suite exists to verify and the hardest to eyeball
  * by hand. One scenario id ({@code "propagation"}) drives both clients; the role is selected by
  * {@code -Dquickskin.e2e.role} ({@code client_a} vs {@code client_b}).</p>
  *
  * <h3>Subject (A)</h3>
- * Imports a local skin (real {@code SkinImporter}) and registers a local cape headlessly, then applies
- * both with {@code local_skin:}/{@code local_cape:} ids — the only ids whose texture <em>bytes</em>
- * flow over the wire. Applying to the local UUID makes {@code PlayerAppearanceService.applyLook} call
- * {@code NetworkSyncService.syncAppearance}, uploading the bytes (TEXTURE_CHUNK) and metadata
- * (UPDATE_APPEARANCE) to the server. A then idles, staying connected so B can observe it.
+ * Imports the 3-pixel-arm plaid skin ({@link TestAssets#makeSlimSkin()}) through the real
+ * {@code SkinImporter} and applies it with model {@code auto} together with the bundled cape id
+ * {@code known:test}. Only the skin <em>bytes</em> flow over the wire ({@code local_skin:}); the cape
+ * is resolved on every client from its bundled resource, so the observer must reach it by id alone.
+ * {@code auto} must resolve to {@code slim} from the importer's metadata, and that resolved model is
+ * what {@code PlayerAppearanceService.applyLook} hands to {@code NetworkSyncService.syncAppearance}
+ * (TEXTURE_CHUNK for the skin, UPDATE_APPEARANCE for skin id, cape id and model). A then idles,
+ * staying connected so B can observe it.
  *
  * <h3>Observer (B)</h3>
  * <ol>
- *   <li><b>confirm_self</b> — sends one C2S packet ({@code syncAppearance(B,"","","classic")}) so the
+ *   <li><b>confirm_self</b> - sends one C2S packet ({@code syncAppearance(B,"","","classic")}) so the
  *       server confirms the exact connection's negotiated or legacy protocol session; only then
  *       does it relay other players' appearances to B (and back-fill A's applied look).</li>
- *   <li><b>await_propagation</b> — waits (tick timeout, never wall-clock) until B has received A's
- *       appearance + texture bytes and the render path resolves to the network location.</li>
- *   <li><b>observe_a</b> — frames A in B's camera and screenshots it, re-asserting the full check.</li>
+ *   <li><b>await_propagation</b> - waits (tick timeout, never wall-clock) until B has received A's
+ *       appearance + skin bytes and the render path resolves the skin to the network location, the
+ *       cloak to the bundled {@code known:test} resource, and the renderer-facing model to
+ *       {@code slim}.</li>
+ *   <li><b>observe_a</b> - frames A in B's camera from a fixed rear vantage and screenshots it,
+ *       re-asserting the full check.</li>
  * </ol>
  * The render-truthful assertion casts A's entity to {@link AbstractClientPlayer} and checks
- * {@code getSkinTextureLocation()}/{@code getCloakTextureLocation()} both equal
- * {@code quickskin:network/<hash>} (the location {@code NetworkTextureCache} registers received bytes
- * under). Compared via {@code ResourceLocation.toString()} so it stays version-agnostic.
+ * {@code getSkinTextureLocation()} equals {@code quickskin:network/skin/<hash>} (the location
+ * {@code NetworkTextureCache} registers received bytes under), {@code getCloakTextureLocation()}
+ * equals {@code CapeService.getCapeLocation(null, "known:test")}, and {@code getModelName()}
+ * normalizes to {@code slim}. Compared via {@code ResourceLocation.toString()} so it stays
+ * version-agnostic.
  */
 public final class PropagationScenario implements Scenario {
 
     /** Fixed subject pose used to make the remote cape checkpoint an unambiguous rear view. */
     private static final float SUBJECT_REAR_YAW = 180.0f;
 
+    /** The bundled cape the subject selects by id; no cape bytes travel over the network. */
+    private static final String BUNDLED_CAPE_ID = "known:test";
+
     /** Set by A's apply action; read by A's ready/assert. */
     private volatile String skinHash;
-    private volatile String capeHash;
 
     /** B's cached observation vantage (computed once from A's pose) + walk/settle bookkeeping. */
     private double tgtX, tgtY, tgtZ;
@@ -89,7 +102,7 @@ public final class PropagationScenario implements Scenario {
                 .action(() -> {
                     DefaultSkinEvidenceView.enterFirstPerson(mc);
                     try {
-                        Path skinFile = TestAssets.makeClassicSkin();
+                        Path skinFile = TestAssets.makeSlimSkin();
                         AssetMetadata skinMeta = SkinImporter.importSkin(skinFile);
                         if (skinMeta == null) {
                             E2ELog.warn("SkinImporter.importSkin returned null");
@@ -97,23 +110,17 @@ public final class PropagationScenario implements Scenario {
                         }
                         skinHash = skinMeta.hash();
 
-                        Path capeFile = TestAssets.makeClassicCape();
-                        String ch = TestAssets.registerLocalCape(capeFile);
-                        if (ch == null) {
-                            E2ELog.warn("registerLocalCape returned null");
-                            return;
-                        }
-                        capeHash = ch;
-
-                        // One call applies BOTH and (local player) uploads both textures to the server.
-                        appearance.applyLook(uuid, "local_skin:" + skinHash, "local_cape:" + capeHash, "auto");
-                        E2ELog.info("A applied+synced local_skin:" + skinHash + " local_cape:" + capeHash);
+                        // One call applies BOTH; for the local player it uploads the skin bytes and
+                        // syncs skin id, bundled cape id and the auto-resolved model to the server.
+                        appearance.applyLook(uuid, "local_skin:" + skinHash, BUNDLED_CAPE_ID, "auto");
+                        E2ELog.info("A applied+synced local_skin:" + skinHash + " cape=" + BUNDLED_CAPE_ID
+                                + " model=auto (importer detected " + skinMeta.skinModel() + ")");
                     } catch (Exception e) {
                         E2ELog.error("apply_local_look action failed", e);
                     }
                 })
                 .minTicks(40)
-                .ready(() -> skinHash != null && capeHash != null
+                .ready(() -> skinHash != null
                         && appearance.getAppearance(uuid) != null
                         && appearance.getSkinLocation(uuid) != null
                         && appearance.getCapeLocation(uuid) != null)
@@ -121,20 +128,29 @@ public final class PropagationScenario implements Scenario {
                 .screenshot(v + "_03_propagation_applied_" + role + ".png")
                 .assertion(() -> {
                     if (skinHash == null) return Step.Result.fail("skin import failed (no hash)");
-                    if (capeHash == null) return Step.Result.fail("cape register failed (no hash)");
                     PlayerAppearance app = appearance.getAppearance(uuid);
                     if (app == null) return Step.Result.fail("no local appearance");
                     String es = "local_skin:" + skinHash;
-                    String ec = "local_cape:" + capeHash;
                     if (!es.equals(app.getSkinId()))
                         return Step.Result.fail("skinId=" + app.getSkinId() + " expected " + es);
-                    if (!ec.equals(app.getCapeId()))
-                        return Step.Result.fail("capeId=" + app.getCapeId() + " expected " + ec);
+                    if (!BUNDLED_CAPE_ID.equals(app.getCapeId()))
+                        return Step.Result.fail("capeId=" + app.getCapeId() + " expected " + BUNDLED_CAPE_ID);
+                    AssetMetadata meta = LocalAssetManager.getInstance().getMetadata(skinHash);
+                    if (meta == null) return Step.Result.fail("no local metadata for imported skin " + skinHash);
+                    if (!"slim".equals(meta.skinModel()))
+                        return Step.Result.fail("importer detected skinModel=" + meta.skinModel()
+                                + " expected slim for the 3-pixel arm layout");
+                    if (!"slim".equals(app.getModel()))
+                        return Step.Result.fail("auto model resolved to " + app.getModel() + " expected slim");
+                    String rendered = VanillaShim.playerModel(mc.player);
+                    if (!"slim".equals(rendered))
+                        return Step.Result.fail("renderer model=" + rendered + " expected slim");
                     if (appearance.getSkinLocation(uuid) == null)
                         return Step.Result.fail("skin ResourceLocation did not resolve");
                     if (appearance.getCapeLocation(uuid) == null)
                         return Step.Result.fail("cape ResourceLocation did not resolve");
-                    return Step.Result.pass("A applied+synced skin=" + es + " cape=" + ec);
+                    return Step.Result.pass("A applied+synced skin=" + es + " cape=" + BUNDLED_CAPE_ID
+                            + " model=auto->slim (metadata skinModel=slim, renderer model=slim)");
                 }));
 
         // After this the harness idles in DONE, keeping A connected so B can observe it.
@@ -232,9 +248,11 @@ public final class PropagationScenario implements Scenario {
 
     /**
      * The full A->B check, reused as both the ready predicate and the recorded assertion: A's entity
-     * present, its appearance received with network ids, its texture bytes cached on B, and — the
-     * render-truthful part — A's {@link AbstractClientPlayer} skin/cape locations resolving to
-     * {@code quickskin:network/<hash>}.
+     * present, its appearance received with the network skin id, the bundled cape id and the slim
+     * model, its skin bytes cached on B, and - the render-truthful part - A's
+     * {@link AbstractClientPlayer} skin location resolving to {@code quickskin:network/skin/<hash>},
+     * its cloak resolving to the bundled {@code known:test} resource, and its renderer-facing model
+     * name normalizing to {@code slim}.
      */
     private Step.Result checkPropagation(Minecraft mc) {
         if (mc.player == null || mc.level == null) return Step.Result.fail("not in world");
@@ -249,26 +267,33 @@ public final class PropagationScenario implements Scenario {
         String capeId = app.getCapeId();
         if (skinId == null || !skinId.startsWith("local_skin:"))
             return Step.Result.fail("A skinId not a network skin: " + skinId);
-        if (capeId == null || !capeId.startsWith("local_cape:"))
-            return Step.Result.fail("A capeId not a network cape: " + capeId);
+        if (!BUNDLED_CAPE_ID.equals(capeId))
+            return Step.Result.fail("A capeId=" + capeId + " expected bundled " + BUNDLED_CAPE_ID);
+        if (!"slim".equals(app.getModel()))
+            return Step.Result.fail("A model received as " + app.getModel() + " expected slim");
         String skinHash = skinId.substring("local_skin:".length());
-        String capeHash = capeId.substring("local_cape:".length());
 
         NetworkTextureCache cache = NetworkTextureCache.getInstance();
         if (!cache.hasTexture(skinHash, "skin")) return Step.Result.fail("skin bytes not cached on B: " + skinHash);
-        if (!cache.hasTexture(capeHash, "cape")) return Step.Result.fail("cape bytes not cached on B: " + capeHash);
+
+        Object bundledCape = CapeService.getInstance().getCapeLocation(null, BUNDLED_CAPE_ID);
+        if (bundledCape == null) return Step.Result.fail("bundled cape " + BUNDLED_CAPE_ID + " has no resource location");
 
         String skinLoc = VanillaShim.skinTexture(a);
         String cloakLoc = VanillaShim.cloakTexture(a);
         String expectedSkin = "quickskin:network/skin/" + skinHash;
-        String expectedCape = "quickskin:network/cape/" + capeHash;
+        String expectedCape = bundledCape.toString();
         if (skinLoc == null || !expectedSkin.equals(skinLoc))
             return Step.Result.fail("render skin=" + skinLoc + " expected " + expectedSkin);
         if (cloakLoc == null || !expectedCape.equals(cloakLoc))
             return Step.Result.fail("render cape=" + cloakLoc + " expected " + expectedCape);
+        String renderedModel = VanillaShim.playerModel(a);
+        if (!"slim".equals(renderedModel))
+            return Step.Result.fail("render model=" + renderedModel + " expected slim (auto-detected on A)");
 
         return Step.Result.pass("A(" + VanillaShim.playerName(a) + ") observed: skin=" + expectedSkin
-                + " cape=" + expectedCape + "; bytes cached + render-truthful");
+                + " cape=" + BUNDLED_CAPE_ID + "->" + expectedCape + " model=slim (renderer-facing)"
+                + "; skin bytes cached + render-truthful");
     }
 
     /** The single other player in B's world (the subject A); null if not yet loaded. */
@@ -285,7 +310,7 @@ public final class PropagationScenario implements Scenario {
 
     /**
      * Best-effort gallery framing: walk B toward a 3/4-rear vantage of A (behind + to the side, using
-     * A's facing) so A's full body — custom skin and the propagated cape — is in frame, aiming B's
+     * A's facing) so A's full body - custom skin and the propagated cape - is in frame, aiming B's
      * camera at A's torso each tick. Movement is capped to a small per-tick step so the server treats it
      * as normal walking (a single big teleport gets position-corrected mid-frame, which framed A point
      * blank). The programmatic assertion does not depend on any of this.
@@ -358,13 +383,14 @@ public final class PropagationScenario implements Scenario {
             double ah = Math.sqrt(ax * ax + az * az);
             double faceCos = ah < 1e-6 ? 0 : (lx * ax + lz * az) / ah;
             E2ELog.info(String.format(
-                    "observe: Bpos=(%.1f,%.1f,%.1f) Apos=(%.1f,%.1f,%.1f) dist=%.2f yaw=%.0f pitch=%.0f faceCos=%.2f aAlive=%b aInvis=%b Bskin=%s Askin=%s Acloak=%s",
+                    "observe: Bpos=(%.1f,%.1f,%.1f) Apos=(%.1f,%.1f,%.1f) dist=%.2f yaw=%.0f pitch=%.0f faceCos=%.2f aAlive=%b aInvis=%b Bskin=%s Askin=%s Acloak=%s Amodel=%s",
                     mc.player.getX(), mc.player.getY(), mc.player.getZ(),
                     a.getX(), a.getY(), a.getZ(), mc.player.distanceTo(a),
                     mc.player.getYRot(), mc.player.getXRot(), faceCos, a.isAlive(), a.isInvisible(),
                     VanillaShim.skinTextureStr(mc.player),
                     VanillaShim.skinTextureStr(a),
-                    VanillaShim.cloakTextureStr(a)));
+                    VanillaShim.cloakTextureStr(a),
+                    VanillaShim.playerModel(a)));
         } catch (Throwable ignored) {
         }
     }
