@@ -869,15 +869,23 @@ jobs:
             test -f "$manifest"
             found=$((found + 1))
             branch="$(basename "$(dirname "$manifest")")"
-            expected_sha="$(jq -er .provenance.target.sha "$manifest")"
-            [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$branch" \
-              --jq .commit.sha)" == "$expected_sha" ]]
+            target_sha="$(jq -er .provenance.target.sha "$manifest")"
+            coverage_sha="$(jq -er \
+              '.provenance.coverage_sha // .provenance.target.sha' "$manifest")"
+            current_sha="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/branches/$branch" --jq .commit.sha)"
+            if [[ "$current_sha" != "$coverage_sha" ]]; then
+              printf 'Branch %s moved from covered SHA %s to %s before rendering.\n' \
+                "$branch" "$coverage_sha" "$current_sha" >&2
+              exit 1
+            fi
             python3 scripts/pages/evidence.py validate \
               --evidence-root public-evidence \
               --branch "$branch" \
               --kind compact \
               --repository "$GITHUB_REPOSITORY" \
-              --target-sha "$expected_sha"
+              --target-sha "$target_sha" \
+              --coverage-sha "$coverage_sha"
           done
           [[ "$found" -gt 0 ]]
 
