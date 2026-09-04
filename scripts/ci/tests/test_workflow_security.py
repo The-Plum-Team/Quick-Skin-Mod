@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -2356,7 +2359,13 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("needs.authorize.result == 'success'", publish)
         self.assertIn("Build one immutable settled validation index", authorize)
         self.assertIn("jobs?filter=latest&per_page=100", authorize)
-        self.assertEqual(authorize.count("jobs?filter=latest&per_page=100"), 2)
+        self.assertEqual(authorize.count("jobs?filter=latest&per_page=100"), 1)
+        self.assertIn("for inventory_attempt in {1..12}", authorize)
+        self.assertIn("if (( inventory_attempt < 12 ))", authorize)
+        self.assertIn("inventory_settled=true", authorize)
+        self.assertIn("inventory did not settle within 60s", authorize)
+        self.assertEqual(authorize.count("sleep 5"), 1)
+        self.assertGreaterEqual(authorize.count('.status == "completed"'), 2)
         self.assertIn(".conclusion == \"success\"", authorize)
         self.assertIn(".run_id == ($run_id | tonumber)", authorize)
         self.assertIn(".head_sha == $source_sha", authorize)
@@ -2376,6 +2385,83 @@ class WorkflowSecurityTest(unittest.TestCase):
             publish.index("Require this target's centrally authorized validation"),
             publish.index("Download the immutable validated proposal"),
         )
+
+    def test_port_authorizer_waits_for_the_rest_inventory_to_settle(self) -> None:
+        authorize = job_block("sync-version-branches.yml", "authorize")
+        marker = "        run: |\n"
+        script_start = authorize.index(marker) + len(marker)
+        script_lines: list[str] = []
+        for line in authorize[script_start:].splitlines():
+            if line.startswith("          "):
+                script_lines.append(line[10:])
+            elif not line:
+                script_lines.append(line)
+            else:
+                break
+        script = "sleep() { :; }\n" + "\n".join(script_lines)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            calls = temp / "inventory-calls"
+            output = temp / "github-output"
+            fake_gh = temp / "gh"
+            fake_gh.write_text(
+                "#!/usr/bin/env bash\n"
+                + textwrap.dedent(
+                    """
+                    attempts=0
+                    [[ -f "$INVENTORY_TEST_CALLS" ]] && \
+                      attempts="$(<"$INVENTORY_TEST_CALLS")"
+                    attempts=$((attempts + 1))
+                    printf '%s' "$attempts" > "$INVENTORY_TEST_CALLS"
+                    if (( attempts == 1 )); then
+                      status=in_progress
+                      conclusion=null
+                    else
+                      status=completed
+                      conclusion='"success"'
+                    fi
+                    printf '[{"jobs":[{"name":"Validate port to fabric-and-neoforge-26.1 without credentials","status":"%s","conclusion":%s,"run_id":123,"head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","run_attempt":1}]}]\\n' \
+                      "$status" "$conclusion"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            environment = os.environ.copy()
+            environment.pop("BASH_ENV", None)
+            environment.pop("ENV", None)
+            environment.update(
+                {
+                    "EXPECTED_TARGETS": '["fabric-and-neoforge-26.1"]',
+                    "GITHUB_OUTPUT": str(output),
+                    "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
+                    "GITHUB_RUN_ATTEMPT": "1",
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_SHA": "a" * 40,
+                    "INVENTORY_TEST_CALLS": str(calls),
+                    "PATH": f"{temp}{os.pathsep}{environment.get('PATH', '')}",
+                    "RUNNER_TEMP": str(temp),
+                }
+            )
+            completed = subprocess.run(
+                ["bash", "-c", script],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(calls.read_text(encoding="utf-8"), "2")
+            self.assertIn("inventory is not settled", completed.stderr)
+            payload = output.read_text(encoding="utf-8").removeprefix("value=")
+            index = json.loads(payload)
+            self.assertEqual(
+                index["successful_targets"], ["fabric-and-neoforge-26.1"]
+            )
 
     def test_version_sync_accepts_only_master_as_its_source(self) -> None:
         discover = job_block("sync-version-branches.yml", "discover")
