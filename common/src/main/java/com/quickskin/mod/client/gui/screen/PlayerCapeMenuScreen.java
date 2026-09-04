@@ -1774,35 +1774,44 @@ public class PlayerCapeMenuScreen extends Screen {
 
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
-        try {
 //? if <1.21 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", "textures/entity/elytra.png");
+        List<ResourceLocation> vanillaElytraTextures = List.of(
+                new ResourceLocation("minecraft", "textures/entity/elytra.png"));
 //?} else if <1.21.11 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+        List<ResourceLocation> vanillaElytraTextures = List.of(
+                ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"));
 //?} else {
-            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+        // 1.21.11 serves the wings from the equipment asset tree. The pre-equipment location stays
+        // behind it as a fallback, so a runtime that still ships it composites the same image and
+        // an import can never silently save a cape without the vanilla Elytra envelope.
+        List<Identifier> vanillaElytraTextures = List.of(
+                Identifier.fromNamespaceAndPath("minecraft", "textures/entity/equipment/wings/elytra.png"),
+                Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"));
 //?}
-            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
-            if (resourceOptional.isEmpty()) {
-                return null;
-            }
-            try (InputStream stream = resourceOptional.get().open()) {
+        for (var vanillaElytraTexture : vanillaElytraTextures) {
+            try {
+                var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(vanillaElytraTexture);
+                if (resourceOptional.isEmpty()) {
+                    continue;
+                }
+                try (InputStream stream = resourceOptional.get().open()) {
 //? if <26.1.2 {
-                return SafeImageReader.readPng(stream);
+                    return SafeImageReader.readPng(stream);
 //?} else {
-                byte[] encoded = com.quickskin.mod.common.util.BoundedFileReader.readBytes(
-                        stream,
-                        (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
-                return com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
+                    byte[] encoded = com.quickskin.mod.common.util.BoundedFileReader.readBytes(
+                            stream,
+                            (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
+                    return com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
 //?}
-            }
-        } catch (IOException e) {
+                }
+            } catch (IOException e) {
 //? if <26.1.2 {
 //?} else {
-            QuickSkin.LOGGER.debug("Unable to load the vanilla elytra texture", e);
+                QuickSkin.LOGGER.debug("Unable to load the vanilla elytra texture", e);
 //?}
-            return null;
+            }
         }
+        return null;
     }
 
     @Override
