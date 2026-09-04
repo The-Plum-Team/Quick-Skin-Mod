@@ -145,10 +145,10 @@ def select_source(
 
 @dataclass(frozen=True)
 class Evidence:
-    """One authenticated bundle plus the exact release-branch head it was written for."""
+    """One authenticated bundle plus the exact release-branch head it covers."""
 
     artifact: Artifact
-    sha: str
+    coverage_sha: str
 
 
 def resolve_evidence(
@@ -266,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
                 return PROBE_NO_EVIDENCE_EXIT
             print(
                 f"Pages evidence probe: {evidence.artifact.name} covers {branch} "
-                f"at {evidence.sha}"
+                f"at {evidence.coverage_sha}"
             )
             return 0
         evidence = resolve_evidence(
@@ -282,7 +282,7 @@ def main(argv: list[str] | None = None) -> int:
             output.write(f"artifact_id={selected.artifact_id}\n")
             output.write(f"name={selected.name}\n")
             output.write(f"run_id={selected.run_id}\n")
-            output.write(f"sha={evidence.sha}\n")
+            output.write(f"coverage_sha={evidence.coverage_sha}\n")
             output.write(f"head_sha={current_sha}\n")
             output.write(f"size_in_bytes={selected.size_in_bytes}\n")
         return 0
