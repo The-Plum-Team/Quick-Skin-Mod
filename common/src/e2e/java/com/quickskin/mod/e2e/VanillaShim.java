@@ -78,8 +78,10 @@ import java.util.function.Consumer;
  *       {@code SplashRenderer(Component)}, plus its remapped private field on {@code TitleScreen}.</li>
  *   <li><b>transient overlays</b>: toast/chat access through {@code Minecraft}/{@code Gui}
  *       (1.20.1..26.1.x) vs {@code Gui.toastManager()}/{@code Gui.hud.getChat()} (26.2).</li>
- *   <li><b>disconnect to title</b>: {@code Level.disconnect()} plus the no-arg
- *       {@code Minecraft.clearLevel()} resolved by named/intermediary/SRG names.</li>
+ *   <li><b>disconnect to title</b>: {@code Level.disconnect()} and
+ *       {@code Minecraft.clearLevel()} before 1.21.8 vs
+ *       {@code Level.disconnect(Component)} and {@code Minecraft.clearClientLevel(Screen)} in
+ *       later versions.</li>
  *   <li><b>mouse input</b>: {@code Screen.mouseClicked/mouseDragged/mouseReleased} take
  *       {@code (double,double,int)} before 1.21.11 and a {@code MouseButtonEvent} afterwards, so
  *       clicks fall back to {@code MouseHandler}'s GLFW callbacks, whose shape GLFW fixes.</li>
@@ -811,12 +813,11 @@ public final class VanillaShim {
      * Leave the current server the way vanilla's pause-menu Disconnect does and land on a fresh
      * {@link TitleScreen}.
      *
-     * <p>1.20.1's {@code PauseScreen} runs {@code minecraft.level.disconnect()}, then the no-arg
-     * {@code Minecraft.clearLevel()}, then {@code setScreen(new TitleScreen())} (vanilla wraps the
-     * title in the multiplayer screen for a dedicated server; the harness lands on the title itself).
-     * {@code Level.disconnect()} and the no-arg {@code clearLevel()} are resolved by named,
-     * intermediary and SRG names so the same jar runs on both loaders. The loader's player-quit
-     * event fires inside {@code clearLevel}, which is where Quick Skin ends its session.</p>
+     * <p>Vanilla first disconnects the level, then clears the client level and installs the next
+     * screen. Both operations changed shape across the supported range: the level disconnect gained
+     * a reason component, while the no-arg {@code clearLevel()} became
+     * {@code clearClientLevel(Screen)}. The loader's player-quit event fires within this sequence,
+     * which is where Quick Skin ends its session.</p>
      *
      * @return {@code null} on success, otherwise a bounded fail-closed diagnostic.
      */
@@ -826,19 +827,39 @@ public final class VanillaShim {
             Object level = mc.level;
             if (level == null) return "no level is loaded; nothing to disconnect from";
             Method disconnect = findNoArg(level.getClass(), "disconnect", "method_8525", "m_7462_");
-            if (disconnect == null) return "ClientLevel.disconnect() is unavailable on this runtime";
-            disconnect.invoke(level);
+            Component reason = Component.literal("Quick Skin E2E disconnect");
+            if (disconnect != null) {
+                disconnect.invoke(level);
+            } else {
+                disconnect = findPublicVoidOneArg(
+                        level.getClass(), Component.class,
+                        "disconnect", "method_8525", "m_7462_");
+                if (disconnect == null) {
+                    return "ClientLevel.disconnect() is unavailable on this runtime";
+                }
+                disconnect.invoke(level, reason);
+            }
 
-            Method clearLevel = findNoArg(mc.getClass(), "clearLevel", "method_18099", "m_91399_");
-            if (clearLevel == null) return "Minecraft.clearLevel() is unavailable on this runtime";
-            clearLevel.invoke(mc);
+            TitleScreen title = new TitleScreen();
+            Method clearClientLevel = findPublicMethod(
+                    mc.getClass(), new Class<?>[]{Screen.class},
+                    "clearClientLevel", "method_52703");
+            if (clearClientLevel != null) {
+                clearClientLevel.invoke(mc, title);
+            } else {
+                Method clearLevel = findNoArg(
+                        mc.getClass(), "clearLevel", "method_18099", "m_91399_");
+                if (clearLevel == null) {
+                    return "Minecraft has no supported client-level clearing method";
+                }
+                clearLevel.invoke(mc);
+                if (!setScreen(mc, title)) return "could not open the title screen";
+            }
             if (mc.level != null || mc.player != null) {
-                return "level/player survived Minecraft.clearLevel(): level=" + mc.level
+                return "level/player survived the disconnect: level=" + mc.level
                         + " player=" + mc.player;
             }
 
-            // Class literal: the harness jar's remapper rewrites it for Fabric's intermediary runtime.
-            if (!setScreen(mc, new TitleScreen())) return "could not open the title screen";
             Screen current = currentScreen(mc);
             if (!(current instanceof TitleScreen)) {
                 return "title screen did not become current: "
@@ -1087,9 +1108,23 @@ public final class VanillaShim {
         try {
             return Class.forName(namedClass);
         } catch (ClassNotFoundException namedMissing) {
+            String intermediaryClass = null;
             if (namedClass.equals("net.minecraft.client.Screenshot")) {
+                intermediaryClass = "net.minecraft.class_318";
+            } else if (namedClass.equals("net.minecraft.server.permissions.Permission")) {
+                intermediaryClass = "net.minecraft.class_12087";
+            } else if (namedClass.equals(
+                    "net.minecraft.server.permissions.Permission$HasCommandLevel")) {
+                intermediaryClass = "net.minecraft.class_12087$class_12089";
+            } else if (namedClass.equals(
+                    "net.minecraft.server.permissions.PermissionLevel")) {
+                intermediaryClass = "net.minecraft.class_12094";
+            } else if (namedClass.equals("net.minecraft.server.permissions.PermissionSet")) {
+                intermediaryClass = "net.minecraft.class_12096";
+            }
+            if (intermediaryClass != null) {
                 try {
-                    return Class.forName("net.minecraft.class_318");
+                    return Class.forName(intermediaryClass);
                 } catch (ClassNotFoundException intermediaryMissing) {
                     namedMissing.addSuppressed(intermediaryMissing);
                 }
@@ -1328,6 +1363,80 @@ public final class VanillaShim {
         return null;
     }
 
+    private static Method findPublicVoidOneArg(
+            Class<?> owner, Class<?> parameter, String... names) {
+        Method named = findPublicMethod(owner, new Class<?>[]{parameter}, names);
+        if (named != null && named.getReturnType() == void.class) return named;
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            if (method.getReturnType() != void.class
+                    || !java.util.Arrays.equals(
+                    method.getParameterTypes(), new Class<?>[]{parameter})) {
+                continue;
+            }
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
+    private static Method findPublicNoArgReturning(
+            Class<?> owner, Class<?> returnType, String... names) {
+        Method named = findPublicNoArg(owner, names);
+        if (named != null && returnType.isAssignableFrom(named.getReturnType())) return named;
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            if (method.getParameterCount() != 0
+                    || !returnType.isAssignableFrom(method.getReturnType())) {
+                continue;
+            }
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
+    private static Method findPublicStaticIntFactory(Class<?> owner, String... names) {
+        Method named = findPublicMethod(owner, new Class<?>[]{int.class}, names);
+        if (named != null && Modifier.isStatic(named.getModifiers())
+                && owner.isAssignableFrom(named.getReturnType())) {
+            return named;
+        }
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            if (!Modifier.isStatic(method.getModifiers())
+                    || !owner.isAssignableFrom(method.getReturnType())
+                    || !java.util.Arrays.equals(
+                    method.getParameterTypes(), new Class<?>[]{int.class})) {
+                continue;
+            }
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
+    private static Method findPublicBooleanOneArg(
+            Class<?> owner, Class<?> parameter, String... names) {
+        Method named = findPublicMethod(owner, new Class<?>[]{parameter}, names);
+        if (named != null && (named.getReturnType() == boolean.class
+                || named.getReturnType() == Boolean.class)) {
+            return named;
+        }
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            if ((method.getReturnType() != boolean.class
+                    && method.getReturnType() != Boolean.class)
+                    || !java.util.Arrays.equals(
+                    method.getParameterTypes(), new Class<?>[]{parameter})) {
+                continue;
+            }
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
     /**
      * Drives one press/release pair through {@code MouseHandler}'s GLFW button callback.
      *
@@ -1494,7 +1603,8 @@ public final class VanillaShim {
     /** The GLFW window handle; {@code Window.getWindow()} is remapped per era. */
     private static long windowHandle(Minecraft mc) throws Exception {
         Object window = mc.getWindow();
-        Method handle = findPublicNoArg(window.getClass(), "getWindow", "method_4490", "m_85439_");
+        Method handle = findPublicNoArg(
+                window.getClass(), "getWindow", "handle", "method_4490", "m_85439_");
         if (handle == null) throw new NoSuchMethodException("Window GLFW handle accessor not found");
         return ((Number) handle.invoke(window)).longValue();
     }
@@ -1609,10 +1719,35 @@ public final class VanillaShim {
         if (player == null) return null;
         Method has = findPublicMethod(
                 player.getClass(), new Class<?>[]{int.class},
-                "hasPermissions", "hasPermission", "method_5687", "m_20310_");
-        if (has == null) return null;
+                "hasPermissions", "hasPermission", "method_5687", "method_64475", "m_20310_");
         try {
-            return (Boolean) has.invoke(player, level);
+            if (has != null) return (Boolean) has.invoke(player, level);
+
+            Class<?> permissionSetType = loadNamedClass(
+                    "net.minecraft.server.permissions.PermissionSet");
+            Method permissions = findPublicNoArgReturning(
+                    player.getClass(), permissionSetType, "permissions");
+            Object permissionSet = permissions == null ? null : permissions.invoke(player);
+            if (permissionSet == null) return null;
+
+            Class<?> permissionLevelType = loadNamedClass(
+                    "net.minecraft.server.permissions.PermissionLevel");
+            Method byId = findPublicStaticIntFactory(permissionLevelType, "byId");
+            Object permissionLevel = byId == null ? null : byId.invoke(null, level);
+            if (permissionLevel == null) return null;
+
+            Class<?> permissionType = loadNamedClass(
+                    "net.minecraft.server.permissions.Permission");
+            Class<?> commandLevelType = loadNamedClass(
+                    "net.minecraft.server.permissions.Permission$HasCommandLevel");
+            Object permission = commandLevelType
+                    .getConstructor(permissionLevelType)
+                    .newInstance(permissionLevel);
+            Method hasPermission = findPublicBooleanOneArg(
+                    permissionSetType, permissionType, "hasPermission");
+            return hasPermission == null
+                    ? null
+                    : (Boolean) hasPermission.invoke(permissionSet, permission);
         } catch (Throwable t) {
             E2ELog.warn("hasPermissionLevel: " + t);
             return null;
