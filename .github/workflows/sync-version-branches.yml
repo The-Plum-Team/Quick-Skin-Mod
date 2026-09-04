@@ -1112,16 +1112,48 @@ jobs:
             . == (sort | unique)
           ' <<< "$EXPECTED_TARGETS" > /dev/null
           jobs_file="$(mktemp "$RUNNER_TEMP/version-port-jobs.XXXXXX")"
-          # One settled inventory read replaces up to twelve polls in every parallel writer.
-          if ! gh api --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100" \
-              > "$jobs_file"; then
-            # A settled matrix remains safe to retry: no writer can start without this index.
-            # Retry only the single centralized inventory read, never once per target.
-            sleep 5
-            gh api --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100" \
-              > "$jobs_file"
+          # `needs` may settle a matrix a few seconds before the run-jobs REST inventory does.
+          # Poll only this central reader, never once per parallel writer, and authorize nothing
+          # until every expected validation has an immutable terminal identity.
+          inventory_settled=false
+          for inventory_attempt in {1..12}; do
+            if gh api --paginate --slurp \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100" \
+                > "$jobs_file" && \
+              jq -en \
+                --arg run_id "$GITHUB_RUN_ID" \
+                --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+                --arg source_sha "$GITHUB_SHA" \
+                --argjson expected_targets "$EXPECTED_TARGETS" \
+                --slurpfile pages "$jobs_file" '
+                  def job_name($target):
+                    "Validate port to " + $target + " without credentials";
+                  ($expected_targets | map(job_name(.))) as $expected_names |
+                  ([$pages[0][]?.jobs[]? |
+                    select(.name as $name |
+                      $expected_names | index($name))]) as $jobs |
+                  ($jobs | length) == ($expected_targets | length) and
+                  ($jobs | map(.name) | sort | unique) ==
+                    ($expected_names | sort) and
+                  all($jobs[];
+                    .status == "completed" and
+                    (.conclusion | type == "string" and length > 0) and
+                    .run_id == ($run_id | tonumber) and
+                    .head_sha == $source_sha and
+                    (.run_attempt | type == "number" and . > 0 and
+                      floor == . and . <= ($run_attempt | tonumber)))
+                ' > /dev/null; then
+              inventory_settled=true
+              break
+            fi
+            if (( inventory_attempt < 12 )); then
+              printf 'Version-port validation inventory is not settled; retrying in 5s.\n' >&2
+              sleep 5
+            fi
+          done
+          if [[ "$inventory_settled" != true ]]; then
+            printf 'Version-port validation inventory did not settle within 60s.\n' >&2
+            exit 1
           fi
           index_dir="$(mktemp -d \
             "$RUNNER_TEMP/version-port-validation-index.XXXXXX")"
