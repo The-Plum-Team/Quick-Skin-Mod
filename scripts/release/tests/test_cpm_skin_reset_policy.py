@@ -18,6 +18,18 @@ PLAYER_APPEARANCE_SERVICE = (
     / "services"
     / "PlayerAppearanceService.java"
 )
+LEGACY_PLAYER_INFO_MIXIN = (
+    ROOT
+    / "common"
+    / "src"
+    / "legacy1_20_1"
+    / "java"
+    / "com"
+    / "quickskin"
+    / "mod"
+    / "mixin"
+    / "PlayerInfoMixin.java"
+)
 SESSION_SCENARIO = (
     ROOT
     / "common"
@@ -59,6 +71,25 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
             "the CPM refresh must remain outside the nullable skin-location block",
         )
         self.assertIn("A cleared skin has no location", apply_look)
+
+    def test_legacy_player_info_discards_stale_skin_before_reregistering(self) -> None:
+        source = LEGACY_PLAYER_INFO_MIXIN.read_text(encoding="utf-8")
+        refresh = source[
+            source.index("public void quickskin$forceReRegisterSkins()") : source.index(
+                "/**", source.index("public void quickskin$forceReRegisterSkins()")
+            )
+        ]
+
+        skin_clear = refresh.index(
+            "textureLocations.remove(MinecraftProfileTexture.Type.SKIN);"
+        )
+        model_clear = refresh.index("skinModel = null;")
+        pending_reset = refresh.index("pendingTextures = false;")
+        reregister = refresh.index("registerTextures();")
+        self.assertLess(skin_clear, model_clear)
+        self.assertLess(model_clear, pending_reset)
+        self.assertLess(pending_reset, reregister)
+        self.assertNotIn("textureLocations.clear()", refresh)
 
     def test_session_surfaces_allow_cpm_player_info_to_use_its_bridge(self) -> None:
         source = SESSION_SCENARIO.read_text(encoding="utf-8")

@@ -1,6 +1,7 @@
 package com.quickskin.mod.mixin;
 
 import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import com.quickskin.mod.QuickSkin;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.services.LocalAssetManager;
@@ -20,6 +21,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.Map;
+
 /**
  * Mixin to intercept PlayerInfo texture and model lookups
  * Allows QuickSkin to override player skins, capes, and models
@@ -34,14 +37,21 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
     private GameProfile profile;
 
     @Shadow
+    @Final
+    private Map<MinecraftProfileTexture.Type, ResourceLocation> textureLocations;
+
+    @Shadow
     private boolean pendingTextures;
+
+    @Shadow
+    private String skinModel;
 
     @Shadow
     private void registerTextures() {}
 
     /**
      * Force re-registration of skin textures.
-     * Resets pendingTextures and directly calls registerTextures() so that
+     * Clears the cached skin, resets pendingTextures, and directly calls registerTextures() so that
      * registerSkins() fires immediately through MixinSkinManager,
      * updating CPM's skin data with the new HttpTexture bridge.
      *
@@ -51,6 +61,12 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
      */
     @Override
     public void quickskin$forceReRegisterSkins() {
+        // registerTextures() only adds callback results to this map. If the replacement is an
+        // offline/default skin, no SKIN callback arrives and the previous Quick Skin location
+        // otherwise survives forever. Remove it first so getSkinLocation() can use its UUID
+        // default while CPM rebuilds the player definition.
+        this.textureLocations.remove(MinecraftProfileTexture.Type.SKIN);
+        this.skinModel = null;
         this.pendingTextures = false;
         this.registerTextures();
     }
