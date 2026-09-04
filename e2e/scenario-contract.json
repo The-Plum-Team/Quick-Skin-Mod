@@ -1576,7 +1576,20 @@
                 "title": "Fill colour picker",
                 "review_tier": "all",
                 "expectation": "The cape editor shows its fill-colour popover open beside the enabled opaque toggle: red, green and blue channel sliders, a hex field reading FF00FF and a magenta swatch.",
-                "probes": []
+                "probes": [
+                  {
+                    "kind": "required-gui-text",
+                    "label": "fill colour hex value",
+                    "box": [
+                      79,
+                      543,
+                      220,
+                      576
+                    ],
+                    "minimum_luma_exclusive": 175,
+                    "minimum_pixels": 380
+                  }
+                ]
               }
             },
             {
@@ -1823,7 +1836,20 @@
                 "title": "Cape tile tooltip",
                 "review_tier": "all",
                 "expectation": "A tooltip over the HD cape tile lists the cape name, Static cape, Resolution: CAPE_256 and Click to preview.",
-                "probes": []
+                "probes": [
+                  {
+                    "kind": "required-gui-text",
+                    "label": "cape tile tooltip copy",
+                    "box": [
+                      765,
+                      190,
+                      1040,
+                      345
+                    ],
+                    "minimum_luma_exclusive": 159,
+                    "minimum_pixels": 2500
+                  }
+                ]
               }
             },
             {
@@ -1930,7 +1956,32 @@
                 "title": "Server tab as non-admin",
                 "review_tier": "all",
                 "expectation": "The settings Server tab shows a greyed-out Disable Skin Transparency (Server) checkbox and cooldown text box, plus the yellow notice Only server admins can change these settings near the bottom of the dialog.",
-                "probes": []
+                "probes": [
+                  {
+                    "kind": "required-gui-text",
+                    "label": "server transparency setting label",
+                    "box": [
+                      305,
+                      234,
+                      780,
+                      268
+                    ],
+                    "minimum_luma_exclusive": 175,
+                    "minimum_pixels": 1300
+                  },
+                  {
+                    "kind": "required-gui-text",
+                    "label": "non-admin server notice",
+                    "box": [
+                      495,
+                      655,
+                      1105,
+                      688
+                    ],
+                    "minimum_luma_exclusive": 175,
+                    "minimum_pixels": 1700
+                  }
+                ]
               }
             },
             {
@@ -2276,7 +2327,20 @@
                 "title": "Skin change on cooldown",
                 "review_tier": "key",
                 "expectation": "The Quick Skin skin menu is open with its full-width Done button disabled and reading On Cooldown followed by a remaining-seconds countdown, because the server enforces a skin-change cooldown after the first change.",
-                "probes": []
+                "probes": [
+                  {
+                    "kind": "required-gui-text",
+                    "label": "cooldown button label",
+                    "box": [
+                      712,
+                      770,
+                      889,
+                      798
+                    ],
+                    "minimum_luma_exclusive": 127,
+                    "minimum_pixels": 240
+                  }
+                ]
               }
             },
             {
