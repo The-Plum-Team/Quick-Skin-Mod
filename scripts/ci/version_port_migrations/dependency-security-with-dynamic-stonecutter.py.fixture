@@ -124,7 +124,7 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ("net.minecraft", "minecraft-merged-bdabb3aae4"),
             ("net.minecraft", "forge-1.20.1-47.4.9-minecraft-merged"),
             ("net.minecraft", "neoforge-21.11.38-beta-minecraft-merged"),
-            ("net.minecraft", "neoforge-26.2.0.10-beta-minecraft-merged-deobf"),
+            ("net.minecraft", "neoforge-26.2.0.6-beta-minecraft-merged-deobf"),
             ("net.minecraftforge." + "a" * 64, "fmlloader"),
         )
         rejected = (
@@ -134,9 +134,8 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ("loom", "mappings-extra"),
             ("net.minecraft.evil", "minecraft-merged-bdabb3aae4"),
             ("net.minecraft", "minecraft"),
-            ("net.minecraft", "neoforged-21.11.38-beta-minecraft-merged"),
             ("net.minecraft", "forge-1.20.1-47.4.9-minecraft-merged-deobf-extra"),
-            ("net.minecraft", "neoforged-26.2.0.10-beta-minecraft-merged-deobf"),
+            ("net.minecraft", "neoforged-26.2.0.6-beta-minecraft-merged-deobf"),
             ("net.minecraftforge." + "a" * 63, "fmlloader"),
             ("net.minecraftforge." + "g" * 64, "fmlloader"),
             ("net.minecraftforge." + "a" * 64, "forge"),
@@ -172,7 +171,6 @@ class DependencySecurityPolicyTest(unittest.TestCase):
                 key, value = line.split("=", 1)
                 properties[key] = value
 
-        matrix = json.loads((ROOT / "release" / "release-matrix.json").read_text())
         settings = (ROOT / "settings.gradle.kts").read_text(encoding="utf-8")
         stonecutter_declaration = re.search(
             r'id\("dev[.]kikugie[.]stonecutter"\) version "([^"]+)"',
@@ -183,6 +181,23 @@ class DependencySecurityPolicyTest(unittest.TestCase):
         stonecutter_version = stonecutter_declaration.group(1)
 
         expected = {
+            ("net.fabricmc", "fabric-loader", properties["fabric_loader_version_1_20_1"]),
+            (
+                "net.fabricmc.fabric-api",
+                "fabric-api",
+                properties["fabric_api_version_1_20_1"],
+            ),
+            ("net.minecraftforge", "forge", properties["forge_version_1_20_1"]),
+            (
+                "dev.architectury",
+                "architectury-fabric",
+                properties["architectury_api_version_1_20_1"],
+            ),
+            (
+                "dev.architectury",
+                "architectury-forge",
+                properties["architectury_api_version_1_20_1"],
+            ),
             ("org.sejda.imageio", "webp-imageio", "0.1.6"),
             ("org.junit.jupiter", "junit-jupiter", "5.13.4"),
             ("dev.architectury", "architectury-loom", "1.17.480"),
@@ -190,32 +205,6 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ("com.gradleup.shadow", "shadow-gradle-plugin", "8.3.11"),
             ("org.gradle.toolchains", "foojay-resolver", "1.0.0"),
         }
-        for version in {artifact["artifact_version"] for artifact in matrix["artifacts"]}:
-            suffix = version.replace(".", "_")
-            expected.add(
-                ("dev.architectury", "architectury", properties[f"architectury_api_version_{suffix}"])
-            )
-            expected.add(
-                ("net.fabricmc", "fabric-loader", properties[f"fabric_loader_version_{suffix}"])
-            )
-
-        loader_coordinates = {
-            "fabric": ("net.fabricmc.fabric-api", "fabric-api", "fabric_api_version"),
-            "forge": ("net.minecraftforge", "forge", "forge_version"),
-            "neoforge": ("net.neoforged", "neoforge", "neoforge_version"),
-        }
-        for artifact in matrix["artifacts"]:
-            loader = artifact["loader"]
-            suffix = artifact["artifact_version"].replace(".", "_")
-            group, name, property_name = loader_coordinates[loader]
-            expected.add((group, name, properties[f"{property_name}_{suffix}"]))
-            expected.add(
-                (
-                    "dev.architectury",
-                    f"architectury-{loader}",
-                    properties[f"architectury_api_version_{suffix}"],
-                )
-            )
         self.assertEqual(expected - coordinates, set())
         self.assertEqual(
             {
@@ -285,11 +274,7 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, policy)
 
-        matrix = json.loads((ROOT / "release" / "release-matrix.json").read_text())
-        active_modules = {"common"} | {
-            artifact["loader"] for artifact in matrix["artifacts"]
-        }
-        for module in sorted(active_modules):
+        for module in ("common", "fabric", "forge"):
             script = (ROOT / module / "build.gradle.kts").read_text(encoding="utf-8")
             self.assertIn(
                 'apply(from = rootProject.file("gradle/repository-policy.gradle.kts"))',
@@ -308,18 +293,6 @@ class DependencySecurityPolicyTest(unittest.TestCase):
                 workflows_and_build_logic,
             )
         )
-
-    def test_mojang_patched_lwjgl_route_is_exact_and_exclusive(self) -> None:
-        policy = (ROOT / "gradle" / "repository-policy.gradle.kts").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn('maven("https://libraries.minecraft.net/")', policy)
-        self.assertIn('name = "MojangPatchedLwjglRepository"', policy)
-        self.assertIn("exclusiveContent", policy)
-        exact_route = 'includeVersion("org.lwjgl", "lwjgl-freetype", "3.3.3")'
-        self.assertEqual(policy.count(exact_route), 2)
-        self.assertNotIn('includeGroup("org.lwjgl")', policy)
-        self.assertNotIn('includeGroupByRegex("org\\.lwjgl', policy)
 
     def test_only_active_shadow_bundles_are_locked_outside_generated_trees(self) -> None:
         matrix = json.loads((ROOT / "release" / "release-matrix.json").read_text())

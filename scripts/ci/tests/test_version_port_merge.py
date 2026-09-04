@@ -159,6 +159,33 @@ class VersionPortMergeTest(unittest.TestCase):
             indent=2,
         ) + "\n"
 
+    @staticmethod
+    def verification_metadata(
+        components: dict[tuple[str, str, str], str],
+        *,
+        verify_signatures: bool = False,
+    ) -> str:
+        signatures = str(verify_signatures).lower()
+        payload = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<verification-metadata xmlns="https://schema.gradle.org/dependency-verification">\n'
+            "   <configuration>\n"
+            "      <verify-metadata>true</verify-metadata>\n"
+            f"      <verify-signatures>{signatures}</verify-signatures>\n"
+            "   </configuration>\n"
+            "   <components>\n"
+        )
+        for (group, name, version), digest in sorted(components.items()):
+            payload += (
+                f'      <component group="{group}" name="{name}" '
+                f'version="{version}">\n'
+                f'         <artifact name="{name}-{version}.jar">\n'
+                f'            <sha256 value="{digest}"/>\n'
+                "         </artifact>\n"
+                "      </component>\n"
+            )
+        return payload + "   </components>\n</verification-metadata>\n"
+
     def commit(self, message: str) -> None:
         self.git(
             "-c",
@@ -505,6 +532,148 @@ class VersionPortMergeTest(unittest.TestCase):
         self.assertEqual(evidence["protected_resolutions"], [])
         self.assertFalse((self.repository / "clean-source.txt").exists())
         self.assert_clean_target()
+
+    def test_verification_metadata_merges_global_and_branch_components(self) -> None:
+        metadata_path = version_port_merge.VERIFICATION_METADATA_PATH
+        shared = ("example", "shared", "1")
+        removed = ("net.fabricmc.fabric-api", "old-module", "1")
+        global_addition = ("dev.kikugie", "stonecutter", "0.9.8")
+        branch_addition = ("net.neoforged", "neoforge", "26.2")
+        base_components = {
+            shared: "a" * 64,
+            removed: "b" * 64,
+        }
+
+        self.git("switch", "--create", "metadata-base", self.base)
+        self.write(metadata_path, self.verification_metadata(base_components))
+        self.git("add", "--all")
+        self.commit("add verification metadata")
+        metadata_base = self.sha("HEAD")
+
+        source_components = {
+            shared: "a" * 64,
+            removed: "c" * 64,
+            global_addition: "d" * 64,
+        }
+        self.git("switch", "--create", "metadata-source", metadata_base)
+        self.write(metadata_path, self.verification_metadata(source_components))
+        self.git("add", "--all")
+        self.commit("update global verification components")
+        source = self.sha("HEAD")
+
+        target_components = {
+            shared: "a" * 64,
+            branch_addition: "e" * 64,
+        }
+        self.git("switch", "--create", "metadata-target", metadata_base)
+        self.write(
+            metadata_path,
+            self.verification_metadata(target_components, verify_signatures=True),
+        )
+        self.git("add", "--all")
+        self.commit("update branch verification components")
+        target = self.sha("HEAD")
+
+        evidence = version_port_merge.reproduce_merge(
+            self.repository,
+            target,
+            source,
+            mode="prepare",
+        )
+
+        self.assertEqual(evidence["conflicts"], [metadata_path])
+        self.assertEqual(evidence["ai_conflicts"], [])
+        self.assertIn(
+            "merge-gradle-verification-metadata",
+            [item["policy"] for item in evidence["protected_resolutions"]],
+        )
+        self.assertEqual(
+            (self.repository / metadata_path).read_text(encoding="utf-8"),
+            self.verification_metadata(
+                {
+                    shared: "a" * 64,
+                    global_addition: "d" * 64,
+                    branch_addition: "e" * 64,
+                },
+                verify_signatures=True,
+            ),
+        )
+
+    def test_verification_metadata_concurrent_component_change_fails_closed(
+        self,
+    ) -> None:
+        metadata_path = version_port_merge.VERIFICATION_METADATA_PATH
+        component = {("example", "shared", "1"): "a" * 64}
+        self.git("switch", "--create", "metadata-base", self.base)
+        self.write(metadata_path, self.verification_metadata(component))
+        self.git("add", "--all")
+        self.commit("add verification metadata")
+        metadata_base = self.sha("HEAD")
+
+        self.git("switch", "--create", "metadata-source", metadata_base)
+        self.write(
+            metadata_path,
+            self.verification_metadata({("example", "shared", "1"): "b" * 64}),
+        )
+        self.git("add", "--all")
+        self.commit("change source verification component")
+        source = self.sha("HEAD")
+
+        self.git("switch", "--create", "metadata-target", metadata_base)
+        self.write(
+            metadata_path,
+            self.verification_metadata({("example", "shared", "1"): "c" * 64}),
+        )
+        self.git("add", "--all")
+        self.commit("change target verification component")
+        target = self.sha("HEAD")
+
+        with self.assertRaisesRegex(
+            version_port_merge.VersionPortMergeError,
+            "verification component changed incompatibly",
+        ):
+            version_port_merge.reproduce_merge(
+                self.repository,
+                target,
+                source,
+                mode="probe",
+            )
+        self.assert_clean_at(target)
+
+    def test_dependency_security_migration_installs_dynamic_stonecutter_policy(
+        self,
+    ) -> None:
+        canonical = (
+            ROOT
+            / version_port_merge.DEPENDENCY_SECURITY_POLICY_SOURCE_FIXTURE_PATH
+        ).read_bytes()
+        self.assertEqual(
+            hashlib.sha256(canonical).hexdigest(),
+            version_port_merge.DEPENDENCY_SECURITY_POLICY_SHA256,
+        )
+        legacy = canonical.replace(
+            version_port_merge.DEPENDENCY_SECURITY_STONECUTTER_SETUP,
+            b"",
+            1,
+        ).replace(
+            version_port_merge.DEPENDENCY_SECURITY_STONECUTTER_ASSERTION,
+            b"",
+            1,
+        ).replace(
+            version_port_merge.DEPENDENCY_SECURITY_DYNAMIC_STONECUTTER_LINE,
+            version_port_merge.DEPENDENCY_SECURITY_FIXED_STONECUTTER_LINE,
+            1,
+        )
+
+        self.assertEqual(
+            version_port_merge._migrate_dependency_security_stonecutter(legacy),
+            canonical,
+        )
+        with self.assertRaisesRegex(
+            version_port_merge.VersionPortMergeError,
+            "invalid fixed Stonecutter entry",
+        ):
+            version_port_merge._migrate_dependency_security_stonecutter(canonical)
 
     def test_common_hand_renderer_uses_the_audited_source_across_versions(
         self,
