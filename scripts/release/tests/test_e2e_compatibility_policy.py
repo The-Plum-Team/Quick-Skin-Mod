@@ -160,10 +160,22 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         )
         self.assertNotIn("clearClientLevel.invoke", body)
 
-    def test_modern_drag_flushes_accumulated_movement_before_release(self) -> None:
-        """The 1.21.9+ mouse callback defers drag delivery until its accumulator drains."""
+    def test_modern_drag_uses_public_event_before_accumulated_fallback(self) -> None:
+        """An unfocused Xvfb window must not suppress the 1.21.9+ drag."""
 
         shim = SHIM.read_text(encoding="utf-8")
+        entry = shim[shim.index("public static String mouseDragTo"):]
+        entry = entry[: entry.index("public static String mouseRelease")]
+        self.assertIn("findModernMouseDrag", entry)
+        self.assertIn("newMouseButtonEvent", entry)
+        self.assertLess(entry.index("findModernMouseDrag"), entry.index("dispatchMove"))
+
+        event = shim[shim.index("private static Object newMouseButtonEvent"):]
+        event = event[: event.index("private static Method findPublicMethod")]
+        self.assertIn("eventType.getDeclaredConstructors()", event)
+        self.assertIn("getDeclaredConstructor(int.class, int.class)", event)
+        self.assertIn("eventConstructor.newInstance(guiX, guiY, buttonInfo)", event)
+
         drag = shim[shim.index("private static String dispatchMove"):]
         drag = drag[: drag.index("private static Method findGlfwCallback")]
         self.assertIn(
