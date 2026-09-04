@@ -20,18 +20,20 @@ This `fabric-and-neoforge-26.1.1` release branch exercises the following exact p
 
 | Artifact | Minecraft | Loader | Java | Contract scenarios |
 |---|---:|---|---:|---:|
-| `fabric-26.1.1` | `26.1.1` | Fabric | `25` | `8` |
-| `neoforge-26.1.1` | `26.1.1` | NeoForge | `25` | `8` |
+| `fabric-26.1.1` | `26.1.1` | Fabric | `25` | `10` |
+| `neoforge-26.1.1` | `26.1.1` | NeoForge | `25` | `10` |
 
-Scenario contract SHA-256: `0b887d1b5c6884124dce3c8ff02870dba6345d66cf8b6b7a88decf0619691f54`
-Contract totals: `72` ordered steps, `52` captures.
+Scenario contract SHA-256: `dfbe373a3489262db39a167ed5ad42b275a814df2b8e7cf86a51f6aa02fb4ef3`
+Contract totals: `123` ordered steps, `92` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
-| `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `7` | `5` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `37` | `34` |
+| `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `17` | `9` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `69` | `62` |
+| `server-policy` | `pr`, `release` | `single-client` | `client_a` | `4` | `4` |
+| `session` | `pr`, `release` | `single-client` | `client_a` | `5` | `4` |
 | `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
 | `mod-compatibility-remote` | `compatibility-remote` | `concurrent-two-client` | `client_a`, `client_b` | `8` | `2` |
 | `mod-compatibility-late-join` | `compatibility-remote` | `sequential-two-client` | `client_a`, `client_b` | `5` | `1` |
@@ -237,6 +239,35 @@ Minecraft's complete Elytra alpha envelope—including the transparent inner 10x
 that no other source pixel changed. Its crouching world capture holds both custom wings apart, so
 an opaque full-atlas rectangle cannot hide behind an overlapping standing pose or a tapered 2D
 editor preview.
+
+The `full` scenario continues with skin-fidelity checkpoints derived from the same plaid fixture:
+an auto-detected slim layout, a converted 64x32 legacy skin with mirrored blue limbs, a 128x128
+HD skin whose one-pixel torso checker must survive rendering, and a base-layer transparent skin
+captured before and after the real Disable Skin Transparency checkbox flattens it. Catalog
+checkpoints rename, sort, protect, and delete entries through the real skin-menu paths and show
+the own-skin deletion toast and the stale-id fallback. Cape checkpoints import a translucent cape
+through the real drop workflow (vanilla elytra composited into its transparent elytra area), open
+the fill-colour picker, snap-and-mirror the editor, and drive the cape menu with real tile clicks:
+selection outline, GIF badge, speed slider, tooltip, scrollbar, delete, the None tile, and Hide
+Built-in Capes. Settings checkpoints capture every tab, the keybind capture state, the non-admin
+server notice, and styled buttons over the vanilla in-world background.
+
+Two single-client scenarios complement it. `server-policy` is the only lane whose dedicated server
+starts with a non-default `quickskin-server.json`; the seed is declared in the contract's
+`orchestration.server_config` and written verbatim by the orchestrator. It proves the server
+override reaches the client, that the server transparency policy wins over the client setting,
+that a second skin change stays on the real cooldown button and unacknowledged, and that a cape
+change during the cooldown is still accepted. `session` proves the pause menu, inventory paper
+doll, player-list head, and the post-disconnect title preview all consume the saved look and that
+the client session state is cleared after leaving the server.
+
+`propagation` now propagates an auto-detected slim skin plus a bundled cape id, while
+`propagation-live` witnesses four further live transitions from the same fixed rear vantage: both
+pinned frames of the animated cape, the subject's server-synchronized elytra textured by that
+network cape, the 256x128 HD cape decoded from the network cache, and the empty cape after
+removal. Each phase is released by an explicit observer acknowledgement relayed through the
+server. Every optional-mod lane ends with a lane-specific `integration_visual` checkpoint whose
+reviewer expectation is overridden per mod.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves

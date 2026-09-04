@@ -7,13 +7,16 @@ import net.minecraft.client.gui.components.SplashRenderer;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
@@ -21,6 +24,8 @@ import java.nio.channels.SelectionKey;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -29,8 +34,9 @@ import java.util.function.Consumer;
  * Isolates the handful of vanilla calls whose signature drifts across Minecraft versions, so the rest
  * of the harness stays a single version-agnostic source set. Everything here is reflection-based and
  * returns only version-stable types ({@link String}, {@link Screen}), importing no type that was
- * renamed/moved across versions. {@link SplashRenderer} and {@link DefaultPlayerSkin} are the two
- * deliberate class-literal exceptions: their packages are identical on every supported version,
+ * renamed/moved across versions. {@link SplashRenderer}, {@link DefaultPlayerSkin} and
+ * {@link TitleScreen} are the deliberate class-literal exceptions: their packages are identical on
+ * every supported version,
  * and the harness jar's remapper must rewrite them for Fabric's intermediary runtime. Resolving a
  * Minecraft name as a string only works on Mojang-mapped loaders, so keep string lookups for
  * classes that genuinely move.
@@ -73,6 +79,14 @@ import java.util.function.Consumer;
  *       {@code SplashRenderer(Component)}, plus its remapped private field on {@code TitleScreen}.</li>
  *   <li><b>transient overlays</b>: toast/chat access through {@code Minecraft}/{@code Gui}
  *       (1.20.1..26.1.x) vs {@code Gui.toastManager()}/{@code Gui.hud.getChat()} (26.2).</li>
+ *   <li><b>disconnect to title</b>: {@code Level.disconnect()} vs
+ *       {@code Level.disconnect(Component)}, followed by the loader-observable
+ *       {@code Minecraft.disconnect} boundary (or its legacy no-arg form).</li>
+ *   <li><b>mouse input</b>: {@code Screen.mouseClicked/mouseDragged/mouseReleased} take
+ *       scalar coordinates before 1.21.9 and a {@code MouseButtonEvent} afterwards, so clicks fall
+ *       back to {@code MouseHandler}'s GLFW callbacks, whose shape GLFW fixes; modern drags also
+ *       construct the runtime event record and invoke the public drag override, with the handler's
+ *       accumulated-movement route retained as a compatibility fallback.</li>
  * </ul>
  *
  * <p>GL-touching calls (screenshot) must run on the render thread, after at least one full frame.</p>
@@ -798,6 +812,82 @@ public final class VanillaShim {
     }
 
     /**
+     * Leave the current server the way vanilla's pause-menu Disconnect does and land on a fresh
+     * {@link TitleScreen}.
+     *
+     * <p>Vanilla first disconnects the level, then enters {@code Minecraft.disconnect}, which
+     * clears the client level and installs the next screen. Both operations changed shape across
+     * the supported range: the level disconnect gained a reason component, while the Minecraft
+     * boundary gained a screen and resource-pack flag. Architectury's player-quit event fires from
+     * that Minecraft boundary, which is where Quick Skin ends its session; calling
+     * {@code clearClientLevel(Screen)} directly would clear vanilla state while silently bypassing
+     * the product callback.</p>
+     *
+     * @return {@code null} on success, otherwise a bounded fail-closed diagnostic.
+     */
+    public static String disconnectToTitle(Minecraft mc) {
+        if (mc == null) return "disconnect requires the Minecraft instance";
+        try {
+            Object level = mc.level;
+            if (level == null) return "no level is loaded; nothing to disconnect from";
+            Method disconnect = findNoArg(level.getClass(), "disconnect", "method_8525", "m_7462_");
+            Component reason = Component.literal("Quick Skin E2E disconnect");
+            if (disconnect != null) {
+                disconnect.invoke(level);
+            } else {
+                disconnect = findPublicVoidOneArg(
+                        level.getClass(), Component.class,
+                        "disconnect", "method_8525", "m_7462_");
+                if (disconnect == null) {
+                    return "ClientLevel.disconnect() is unavailable on this runtime";
+                }
+                disconnect.invoke(level, reason);
+            }
+
+            TitleScreen title = new TitleScreen();
+            Method disconnectClient = findPublicMethod(
+                    mc.getClass(), new Class<?>[]{Screen.class, boolean.class},
+                    "disconnect", "method_18096", "method_76795");
+            if (disconnectClient != null) {
+                disconnectClient.invoke(mc, title, false);
+            } else {
+                Method disconnectClientWithEngineReset = findPublicMethod(
+                        mc.getClass(),
+                        new Class<?>[]{Screen.class, boolean.class, boolean.class},
+                        "disconnect", "method_18096");
+                if (disconnectClientWithEngineReset != null) {
+                    disconnectClientWithEngineReset.invoke(mc, title, false, true);
+                } else {
+                    Method legacyDisconnect = findNoArg(
+                            mc.getClass(), "clearLevel", "disconnect",
+                            "method_18099", "m_91399_");
+                    if (legacyDisconnect == null) {
+                        return "Minecraft has no supported disconnect method";
+                    }
+                    legacyDisconnect.invoke(mc);
+                    if (!setScreen(mc, title)) return "could not open the title screen";
+                }
+            }
+            if (mc.level != null || mc.player != null) {
+                return "level/player survived the disconnect: level=" + mc.level
+                        + " player=" + mc.player;
+            }
+
+            Screen current = currentScreen(mc);
+            if (!(current instanceof TitleScreen)) {
+                return "title screen did not become current: "
+                        + (current == null ? "<none>" : current.getClass().getName());
+            }
+            return null;
+        } catch (Throwable failure) {
+            Throwable cause = failure instanceof InvocationTargetException invocation
+                    && invocation.getCause() != null ? invocation.getCause() : failure;
+            return "could not disconnect to the title screen: "
+                    + cause.getClass().getSimpleName() + ": " + cause.getMessage();
+        }
+    }
+
+    /**
      * Remove vanilla's transient chat and toast overlays before a contract screenshot.
      *
      * <p>Secure-chat and social-interaction notices are connection timing artifacts, not Quick
@@ -1031,9 +1121,23 @@ public final class VanillaShim {
         try {
             return Class.forName(namedClass);
         } catch (ClassNotFoundException namedMissing) {
+            String intermediaryClass = null;
             if (namedClass.equals("net.minecraft.client.Screenshot")) {
+                intermediaryClass = "net.minecraft.class_318";
+            } else if (namedClass.equals("net.minecraft.server.permissions.Permission")) {
+                intermediaryClass = "net.minecraft.class_12087";
+            } else if (namedClass.equals(
+                    "net.minecraft.server.permissions.Permission$HasCommandLevel")) {
+                intermediaryClass = "net.minecraft.class_12087$class_12089";
+            } else if (namedClass.equals(
+                    "net.minecraft.server.permissions.PermissionLevel")) {
+                intermediaryClass = "net.minecraft.class_12094";
+            } else if (namedClass.equals("net.minecraft.server.permissions.PermissionSet")) {
+                intermediaryClass = "net.minecraft.class_12096";
+            }
+            if (intermediaryClass != null) {
                 try {
-                    return Class.forName("net.minecraft.class_318");
+                    return Class.forName(intermediaryClass);
                 } catch (ClassNotFoundException intermediaryMissing) {
                     namedMissing.addSuppressed(intermediaryMissing);
                 }
@@ -1144,5 +1248,643 @@ public final class VanillaShim {
         if (matchedField == null) return null;
         Object fieldValue = matchedField.get(owner);
         return fieldValue == null ? null : matchedAccessor.invoke(fieldValue);
+    }
+
+    // =============================================================================================
+    // Mouse input
+    // =============================================================================================
+
+    /** {@code MouseHandler} cursor position, by named/intermediary/SRG name. */
+    private static final Set<String> MOUSE_X_FIELDS = Set.of("xpos", "field_1795", "f_91507_");
+    private static final Set<String> MOUSE_Y_FIELDS = Set.of("ypos", "field_1794", "f_91508_");
+    private static final int GLFW_PRESS = 1;
+    private static final int GLFW_RELEASE = 0;
+
+    /**
+     * Presses and releases a mouse button over the current screen at a GUI-space point, exactly as
+     * a user would.
+     *
+     * <p>Minecraft changed this boundary at 1.21.11: {@code Screen.mouseClicked(double,double,int)}
+     * became {@code mouseClicked(MouseButtonEvent, boolean)}. The harness is one unpreprocessed
+     * source tree compiled against every supported version, so it cannot spell both signatures.
+     * Where the old one exists it is called directly and its verdict returned. Otherwise the click
+     * is driven through {@code MouseHandler}'s GLFW button callback, whose
+     * {@code (long, int, int, int)} shape is fixed by GLFW itself and therefore identical on every
+     * version; Minecraft then builds whatever event object that version expects and dispatches it
+     * through the same screen path. That callback returns nothing, so the caller must assert on the
+     * resulting state rather than on a boolean.</p>
+     *
+     * @return {@code null} on success, or a message describing why the click could not be dispatched
+     */
+    public static String clickAt(Minecraft mc, double guiX, double guiY, int button) {
+        String pressed = mousePress(mc, guiX, guiY, button);
+        return pressed != null ? pressed : mouseRelease(mc, guiX, guiY, button);
+    }
+
+    /** Presses a mouse button over the current screen at a GUI-space point. */
+    public static String mousePress(Minecraft mc, double guiX, double guiY, int button) {
+        return dispatch(mc, guiX, guiY, button, "press");
+    }
+
+    /** Moves the held cursor to a GUI-space point, producing the era's drag dispatch. */
+    public static String mouseDragTo(
+            Minecraft mc, double guiX, double guiY, int button, double fromX, double fromY) {
+        Screen screen = currentScreen(mc);
+        if (screen == null) return "no screen is open";
+        Method legacy = findMouseMethod6(screen.getClass(), "mouseDragged", "method_25403", "m_7979_");
+        if (legacy != null) {
+            try {
+                legacy.setAccessible(true);
+                Object handled = legacy.invoke(
+                        screen, guiX, guiY, button, guiX - fromX, guiY - fromY);
+                return Boolean.FALSE.equals(handled)
+                        ? "screen " + screen.getClass().getSimpleName() + " ignored the drag"
+                        : null;
+            } catch (Throwable t) {
+                return "Screen.mouseDragged failed: " + t;
+            }
+        }
+
+        Method modern = findModernMouseDrag(
+                screen.getClass(), "mouseDragged", "method_25403", "m_7979_");
+        if (modern != null) {
+            try {
+                modern.setAccessible(true);
+                Object event = newMouseButtonEvent(
+                        modern.getParameterTypes()[0], guiX, guiY, button);
+                Object handled = modern.invoke(
+                        screen, event, guiX - fromX, guiY - fromY);
+                return Boolean.FALSE.equals(handled)
+                        ? "screen " + screen.getClass().getSimpleName() + " ignored the drag"
+                        : null;
+            } catch (Throwable t) {
+                return "Screen.mouseDragged failed: " + t;
+            }
+        }
+        return dispatchMove(mc, guiX, guiY);
+    }
+
+    /** Releases a mouse button over the current screen at a GUI-space point. */
+    public static String mouseRelease(Minecraft mc, double guiX, double guiY, int button) {
+        return dispatch(mc, guiX, guiY, button, "release");
+    }
+
+    private static String dispatch(
+            Minecraft mc, double guiX, double guiY, int button, String action) {
+        Screen screen = currentScreen(mc);
+        if (screen == null) return "no screen is open";
+        Method legacy = "press".equals(action)
+                ? findMouseMethod(screen.getClass(), "mouseClicked", "method_25402", "m_6375_")
+                : findMouseMethod(screen.getClass(), "mouseReleased", "method_25406", "m_6348_");
+        if (legacy != null) {
+            // The old signature carries the point, so pass it through untouched. Snapping it to
+            // the cursor's integer GUI pixel would move a fractional target such as a slider
+            // handle and silently change the value the widget computes.
+            try {
+                legacy.setAccessible(true);
+                Object handled = legacy.invoke(screen, guiX, guiY, button);
+                if ("press".equals(action) && Boolean.FALSE.equals(handled)) {
+                    return "screen " + screen.getClass().getSimpleName()
+                            + " did not handle the click at gui (" + guiX + "," + guiY + ")";
+                }
+                return null;
+            } catch (Throwable t) {
+                return "Screen.mouse" + action + " failed: " + t;
+            }
+        }
+        // The newer callback reads the point from the cursor instead, so place it first.
+        String positioned = moveMouseTo(mc, guiX, guiY);
+        if (positioned != null) return positioned;
+        return dispatchThroughMouseHandler(
+                mc, button, "press".equals(action) ? GLFW_PRESS : GLFW_RELEASE);
+    }
+
+
+    /**
+     * The {@code (double,double,int)} form of a screen mouse method, or null on newer versions.
+     *
+     * <p>Resolved against the concrete screen class with {@code getMethod}, because these are
+     * public and, on several versions, inherited as {@code ContainerEventHandler} default methods
+     * rather than declared anywhere in the class hierarchy. Walking superclasses alone silently
+     * misses them and sends every click down the newer-era path.</p>
+     */
+    private static Method findMouseMethod(Class<?> owner, String... names) {
+        return findPublicMethod(owner, new Class<?>[]{double.class, double.class, int.class}, names);
+    }
+
+    /** The six-argument {@code mouseDragged} of the pre-1.21.11 era, or null on newer versions. */
+    private static Method findMouseMethod6(Class<?> owner, String... names) {
+        return findPublicMethod(
+                owner,
+                new Class<?>[]{double.class, double.class, int.class, double.class, double.class},
+                names);
+    }
+
+    /** The event-record {@code mouseDragged} used by 1.21.9 and newer, or null. */
+    private static Method findModernMouseDrag(Class<?> owner, String... names) {
+        Set<String> wanted = Set.of(names);
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            Class<?>[] parameters = method.getParameterTypes();
+            if ((method.getReturnType() != boolean.class
+                    && method.getReturnType() != Boolean.class)
+                    || parameters.length != 3
+                    || parameters[0].isPrimitive()
+                    || parameters[1] != double.class
+                    || parameters[2] != double.class) {
+                continue;
+            }
+            if (wanted.contains(method.getName())) return method;
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
+    /** Builds the modern mouse event without importing types absent from older versions. */
+    private static Object newMouseButtonEvent(
+            Class<?> eventType, double guiX, double guiY, int button)
+            throws ReflectiveOperationException {
+        Constructor<?> eventConstructor = null;
+        for (Constructor<?> constructor : eventType.getDeclaredConstructors()) {
+            Class<?>[] parameters = constructor.getParameterTypes();
+            if (parameters.length != 3
+                    || parameters[0] != double.class
+                    || parameters[1] != double.class
+                    || parameters[2].isPrimitive()) {
+                continue;
+            }
+            if (eventConstructor != null) {
+                throw new NoSuchMethodException("ambiguous modern mouse event constructor");
+            }
+            eventConstructor = constructor;
+        }
+        if (eventConstructor == null) {
+            throw new NoSuchMethodException("modern mouse event constructor not found");
+        }
+
+        Class<?> buttonInfoType = eventConstructor.getParameterTypes()[2];
+        Constructor<?> buttonInfoConstructor =
+                buttonInfoType.getDeclaredConstructor(int.class, int.class);
+        buttonInfoConstructor.setAccessible(true);
+        Object buttonInfo = buttonInfoConstructor.newInstance(button, 0);
+        eventConstructor.setAccessible(true);
+        return eventConstructor.newInstance(guiX, guiY, buttonInfo);
+    }
+
+    private static Method findPublicMethod(Class<?> owner, Class<?>[] params, String... names) {
+        for (String name : names) {
+            try {
+                return owner.getMethod(name, params);
+            } catch (NoSuchMethodException ignored) {
+                // try the next mapping name
+            }
+        }
+        return null;
+    }
+
+    private static Method findPublicVoidOneArg(
+            Class<?> owner, Class<?> parameter, String... names) {
+        Method named = findPublicMethod(owner, new Class<?>[]{parameter}, names);
+        if (named != null && named.getReturnType() == void.class) return named;
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            if (method.getReturnType() != void.class
+                    || !java.util.Arrays.equals(
+                    method.getParameterTypes(), new Class<?>[]{parameter})) {
+                continue;
+            }
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
+    private static Method findPublicNoArgReturning(
+            Class<?> owner, Class<?> returnType, String... names) {
+        Method named = findPublicNoArg(owner, names);
+        if (named != null && returnType.isAssignableFrom(named.getReturnType())) return named;
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            if (method.getParameterCount() != 0
+                    || !returnType.isAssignableFrom(method.getReturnType())) {
+                continue;
+            }
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
+    private static Method findPublicStaticIntFactory(Class<?> owner, String... names) {
+        Method named = findPublicMethod(owner, new Class<?>[]{int.class}, names);
+        if (named != null && Modifier.isStatic(named.getModifiers())
+                && owner.isAssignableFrom(named.getReturnType())) {
+            return named;
+        }
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            if (!Modifier.isStatic(method.getModifiers())
+                    || !owner.isAssignableFrom(method.getReturnType())
+                    || !java.util.Arrays.equals(
+                    method.getParameterTypes(), new Class<?>[]{int.class})) {
+                continue;
+            }
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
+    private static Method findPublicBooleanOneArg(
+            Class<?> owner, Class<?> parameter, String... names) {
+        Method named = findPublicMethod(owner, new Class<?>[]{parameter}, names);
+        if (named != null && (named.getReturnType() == boolean.class
+                || named.getReturnType() == Boolean.class)) {
+            return named;
+        }
+        Method shapeMatch = null;
+        for (Method method : owner.getMethods()) {
+            if ((method.getReturnType() != boolean.class
+                    && method.getReturnType() != Boolean.class)
+                    || !java.util.Arrays.equals(
+                    method.getParameterTypes(), new Class<?>[]{parameter})) {
+                continue;
+            }
+            if (shapeMatch != null) return null;
+            shapeMatch = method;
+        }
+        return shapeMatch;
+    }
+
+    /**
+     * Drives one press/release pair through {@code MouseHandler}'s GLFW button callback.
+     *
+     * <p>The callback is resolved by named/intermediary/SRG name first; a version whose name is not
+     * in that set still resolves because the GLFW callback is the only {@code (long,int,int,int)}
+     * void method on the class.</p>
+     */
+    private static String dispatchThroughMouseHandler(Minecraft mc, int button, int action) {
+        Object handler = mc.mouseHandler;
+        if (handler == null) return "mouseHandler is null";
+        Method onPress = findGlfwCallback(
+                handler, new Class<?>[]{long.class, int.class, int.class, int.class},
+                "onPress", "method_1611", "m_91530_");
+        if (onPress == null) return "MouseHandler has no (long,int,int,int) GLFW button callback";
+        try {
+            onPress.setAccessible(true);
+            onPress.invoke(handler, windowHandle(mc), button, action, 0);
+            return null;
+        } catch (Throwable t) {
+            return "MouseHandler." + onPress.getName() + " failed: " + t;
+        }
+    }
+
+    private static String dispatchMove(Minecraft mc, double guiX, double guiY) {
+        Object handler = mc.mouseHandler;
+        if (handler == null) return "mouseHandler is null";
+        Method onMove = findGlfwCallback(
+                handler, new Class<?>[]{long.class, double.class, double.class},
+                "onMove", "method_1600", "m_91561_");
+        if (onMove == null) return "MouseHandler has no (long,double,double) GLFW move callback";
+        try {
+            var window = mc.getWindow();
+            int screenW = window.getScreenWidth();
+            int screenH = window.getScreenHeight();
+            int guiW = window.getGuiScaledWidth();
+            int guiH = window.getGuiScaledHeight();
+            if (screenW <= 0 || screenH <= 0 || guiW <= 0 || guiH <= 0) {
+                return "window geometry unavailable: " + screenW + "x" + screenH
+                        + " gui " + guiW + "x" + guiH;
+            }
+            int targetX = (int) Math.floor(guiX);
+            int targetY = (int) Math.floor(guiY);
+            double px = (targetX + 0.5) * screenW / guiW;
+            double py = (targetY + 0.5) * screenH / guiH;
+            onMove.setAccessible(true);
+            onMove.invoke(handler, windowHandle(mc), px, py);
+
+            // Since 1.21.9 onMove only accumulates a delta; the render loop normally drains it
+            // later. The E2E gesture releases synchronously, so drain it now while activeButton is
+            // still set or the screen never receives mouseDragged.
+            Method movement = findNoArg(
+                    handler.getClass(), "handleAccumulatedMovement", "method_55793");
+            if (movement == null) {
+                return "MouseHandler has no accumulated-movement drain";
+            }
+            movement.invoke(handler);
+            int actualX = guiMouseX(mc);
+            int actualY = guiMouseY(mc);
+            if (actualX != targetX || actualY != targetY) {
+                return "mouse drag landed at gui (" + actualX + "," + actualY
+                        + ") expected (" + targetX + "," + targetY + ")";
+            }
+            return null;
+        } catch (Throwable t) {
+            return "MouseHandler." + onMove.getName() + " failed: " + t;
+        }
+    }
+
+    /**
+     * Resolves a GLFW callback by named/intermediary/SRG name, falling back to the only method of
+     * that exact shape when a future mapping renames it. Several callbacks can share a GLFW shape,
+     * so an ambiguous shape-only lookup fails closed instead of invoking an unrelated callback.
+     */
+    private static Method findGlfwCallback(Object owner, Class<?>[] params, String... names) {
+        Set<String> wanted = Set.of(names);
+        Method shapeMatch = null;
+        boolean ambiguousShape = false;
+        for (Class<?> type = owner.getClass(); type != null && type != Object.class;
+             type = type.getSuperclass()) {
+            for (Method method : type.getDeclaredMethods()) {
+                if (method.getReturnType() != void.class) continue;
+                if (!java.util.Arrays.equals(method.getParameterTypes(), params)) continue;
+                if (wanted.contains(method.getName())) return method;
+                if (shapeMatch == null) {
+                    shapeMatch = method;
+                } else {
+                    ambiguousShape = true;
+                }
+            }
+        }
+        return ambiguousShape ? null : shapeMatch;
+    }
+
+    public static int guiMouseX(Minecraft mc) {
+        var window = mc.getWindow();
+        return (int) (mc.mouseHandler.xpos() * (double) window.getGuiScaledWidth()
+                / (double) window.getScreenWidth());
+    }
+
+    public static int guiMouseY(Minecraft mc) {
+        var window = mc.getWindow();
+        return (int) (mc.mouseHandler.ypos() * (double) window.getGuiScaledHeight()
+                / (double) window.getScreenHeight());
+    }
+
+    /**
+     * Put the real mouse at a GUI coordinate so the next {@code Screen.render(mouseX, mouseY)}
+     * sees it there (tooltips, hover highlights).
+     *
+     * <p>First asks GLFW to warp the cursor to the matching physical pixel. GLFW deliberately does
+     * not synthesise a cursor-position event for its own warps, and it ignores the request entirely
+     * when the window is unfocused (the Xvfb case), so if {@code MouseHandler} still reports the old
+     * position afterwards the handler's private {@code xpos}/{@code ypos} are written directly:
+     * that pair is exactly what the render loop reads, and it is what the GLFW callback would have
+     * stored. Minecraft field names are looked up as named + intermediary + SRG.
+     *
+     * @return null on success, otherwise the failure description
+     */
+    public static String moveMouseTo(Minecraft mc, double guiX, double guiY) {
+        try {
+            var window = mc.getWindow();
+            int screenW = window.getScreenWidth();
+            int screenH = window.getScreenHeight();
+            int guiW = window.getGuiScaledWidth();
+            int guiH = window.getGuiScaledHeight();
+            if (screenW <= 0 || screenH <= 0 || guiW <= 0 || guiH <= 0) {
+                return "window geometry unavailable: " + screenW + "x" + screenH
+                        + " gui " + guiW + "x" + guiH;
+            }
+            int targetX = (int) Math.floor(guiX);
+            int targetY = (int) Math.floor(guiY);
+            // Aim at the middle of the GUI pixel so the truncating back-conversion lands on it.
+            double px = (targetX + 0.5) * screenW / guiW;
+            double py = (targetY + 0.5) * screenH / guiH;
+
+            String warp = warpCursor(windowHandle(mc), px, py);
+            if (guiMouseX(mc) != targetX || guiMouseY(mc) != targetY) {
+                String forced = forceMouseHandlerPosition(mc, px, py);
+                if (forced != null) {
+                    return forced + (warp == null ? "" : "; cursor warp: " + warp);
+                }
+            }
+            int gx = guiMouseX(mc);
+            int gy = guiMouseY(mc);
+            if (gx != targetX || gy != targetY) {
+                return "mouse is at gui (" + gx + "," + gy + ") expected (" + targetX + ","
+                        + targetY + "); handler=(" + mc.mouseHandler.xpos() + ","
+                        + mc.mouseHandler.ypos() + ") wanted (" + px + "," + py + ")";
+            }
+            return null;
+        } catch (Throwable t) {
+            return "moveMouseTo failed: " + t;
+        }
+    }
+
+    /** Best-effort {@code GLFW.glfwSetCursorPos}, resolved reflectively so the harness compiles without LWJGL. */
+    private static String warpCursor(long windowHandle, double px, double py) {
+        try {
+            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+            Method set = glfw.getMethod("glfwSetCursorPos", long.class, double.class, double.class);
+            set.invoke(null, windowHandle, px, py);
+            return null;
+        } catch (Throwable t) {
+            return t.toString();
+        }
+    }
+
+    private static String forceMouseHandlerPosition(Minecraft mc, double px, double py) {
+        Object handler = mc.mouseHandler;
+        if (handler == null) return "mouseHandler is null";
+        Field xField = null;
+        Field yField = null;
+        List<String> doubles = new ArrayList<>();
+        for (Class<?> type = handler.getClass(); type != null && type != Object.class;
+             type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers()) || field.getType() != double.class) continue;
+                doubles.add(field.getName());
+                if (xField == null && MOUSE_X_FIELDS.contains(field.getName())) xField = field;
+                if (yField == null && MOUSE_Y_FIELDS.contains(field.getName())) yField = field;
+            }
+        }
+        if (xField == null || yField == null) {
+            return "MouseHandler xpos/ypos fields not found among " + doubles;
+        }
+        try {
+            xField.setAccessible(true);
+            yField.setAccessible(true);
+            xField.setDouble(handler, px);
+            yField.setDouble(handler, py);
+            return null;
+        } catch (Throwable t) {
+            return "could not write MouseHandler position: " + t;
+        }
+    }
+
+    /** The GLFW window handle; {@code Window.getWindow()} is remapped per era. */
+    private static long windowHandle(Minecraft mc) throws Exception {
+        Object window = mc.getWindow();
+        Method handle = findPublicNoArg(
+                window.getClass(), "getWindow", "handle", "method_4490", "m_85439_");
+        if (handle == null) throw new NoSuchMethodException("Window GLFW handle accessor not found");
+        return ((Number) handle.invoke(window)).longValue();
+    }
+
+    private static Method findPublicNoArg(Class<?> owner, String... names) {
+        for (String name : names) {
+            try {
+                return owner.getMethod(name);
+            } catch (NoSuchMethodException ignored) {
+                // try the next mapping name
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Scrolls the wheel over the current screen. {@code mouseScrolled} gained a horizontal axis at
+     * 1.21.11, so both arities are resolved and the older one simply drops it.
+     */
+    public static String scrollAt(Minecraft mc, double guiX, double guiY, double notches) {
+        Screen screen = currentScreen(mc);
+        if (screen == null) return "no screen is open";
+        String[] names = {"mouseScrolled", "method_25401", "m_6050_"};
+        Method four = findPublicMethod(
+                screen.getClass(),
+                new Class<?>[]{double.class, double.class, double.class, double.class}, names);
+        Method three = findPublicMethod(
+                screen.getClass(),
+                new Class<?>[]{double.class, double.class, double.class}, names);
+        try {
+            Object handled = four != null
+                    ? four.invoke(screen, guiX, guiY, 0.0D, notches)
+                    : three != null ? three.invoke(screen, guiX, guiY, notches) : null;
+            if (four == null && three == null) return "Screen has no mouseScrolled overload";
+            return Boolean.FALSE.equals(handled)
+                    ? "screen " + screen.getClass().getSimpleName() + " ignored the scroll"
+                    : null;
+        } catch (Throwable t) {
+            return "Screen.mouseScrolled failed: " + t;
+        }
+    }
+
+    /**
+     * Presses and releases a key over the current screen. {@code Screen.keyPressed} took
+     * {@code (int,int,int)} before 1.21.11 and a {@code KeyEvent} afterwards, so the newer era is
+     * driven through {@code KeyboardHandler}'s GLFW callback, whose shape GLFW fixes.
+     *
+     * @return {@code null} when the screen consumed the key, or a message explaining why not
+     */
+    public static String pressKey(Minecraft mc, int keyCode, int scanCode, int modifiers) {
+        Screen screen = currentScreen(mc);
+        if (screen == null) return "no screen is open";
+        Method legacy = findPublicMethod(
+                screen.getClass(), new Class<?>[]{int.class, int.class, int.class},
+                "keyPressed", "method_25404", "m_7933_");
+        if (legacy != null) {
+            try {
+                Object handled = legacy.invoke(screen, keyCode, scanCode, modifiers);
+                return Boolean.FALSE.equals(handled)
+                        ? "screen " + screen.getClass().getSimpleName()
+                                + " did not consume key " + keyCode
+                        : null;
+            } catch (Throwable t) {
+                return "Screen.keyPressed failed: " + t;
+            }
+        }
+        Object handler = mc.keyboardHandler;
+        if (handler == null) return "keyboardHandler is null";
+        Method keyPress = findGlfwCallback(
+                handler,
+                new Class<?>[]{long.class, int.class, int.class, int.class, int.class},
+                "keyPress", "method_1466", "m_90893_");
+        if (keyPress == null) return "KeyboardHandler has no GLFW key callback";
+        try {
+            keyPress.setAccessible(true);
+            long window = windowHandle(mc);
+            keyPress.invoke(handler, window, keyCode, scanCode, GLFW_PRESS, modifiers);
+            keyPress.invoke(handler, window, keyCode, scanCode, GLFW_RELEASE, modifiers);
+            return null;
+        } catch (Throwable t) {
+            return "KeyboardHandler." + keyPress.getName() + " failed: " + t;
+        }
+    }
+
+    /**
+     * One packed pixel of a {@code NativeImage}. The accessor is renamed per era and its channel
+     * order is not stable across those renames, so callers must compare packed values (opaque
+     * black is {@code 0xFF000000} in every order) rather than unpack named channels.
+     *
+     * @return the packed pixel, or {@code null} when no accessor resolves
+     */
+    public static Integer nativeImagePixel(Object nativeImage, int x, int y) {
+        if (nativeImage == null) return null;
+        Method pixel = findPublicMethod(
+                nativeImage.getClass(), new Class<?>[]{int.class, int.class},
+                "getPixelRGBA", "getPixelABGR", "getPixel", "method_4315", "m_84985_");
+        if (pixel == null) return null;
+        try {
+            return ((Number) pixel.invoke(nativeImage, x, y)).intValue();
+        } catch (Throwable t) {
+            E2ELog.warn("nativeImagePixel: " + t);
+            return null;
+        }
+    }
+
+    /**
+     * Whether the player holds at least the given operator level.
+     *
+     * @return the verdict, or {@code null} when no accessor resolves in this runtime
+     */
+    public static Boolean hasPermissionLevel(Object player, int level) {
+        if (player == null) return null;
+        Method has = findPublicMethod(
+                player.getClass(), new Class<?>[]{int.class},
+                "hasPermissions", "hasPermission", "method_5687", "method_64475", "m_20310_");
+        try {
+            if (has != null) return (Boolean) has.invoke(player, level);
+
+            Class<?> permissionSetType = loadNamedClass(
+                    "net.minecraft.server.permissions.PermissionSet");
+            Method permissions = findPublicNoArgReturning(
+                    player.getClass(), permissionSetType, "permissions");
+            Object permissionSet = permissions == null ? null : permissions.invoke(player);
+            if (permissionSet == null) return null;
+
+            Class<?> permissionLevelType = loadNamedClass(
+                    "net.minecraft.server.permissions.PermissionLevel");
+            Method byId = findPublicStaticIntFactory(permissionLevelType, "byId");
+            Object permissionLevel = byId == null ? null : byId.invoke(null, level);
+            if (permissionLevel == null) return null;
+
+            Class<?> permissionType = loadNamedClass(
+                    "net.minecraft.server.permissions.Permission");
+            Class<?> commandLevelType = loadNamedClass(
+                    "net.minecraft.server.permissions.Permission$HasCommandLevel");
+            Object permission = commandLevelType
+                    .getConstructor(permissionLevelType)
+                    .newInstance(permissionLevel);
+            Method hasPermission = findPublicBooleanOneArg(
+                    permissionSetType, permissionType, "hasPermission");
+            return hasPermission == null
+                    ? null
+                    : (Boolean) hasPermission.invoke(permissionSet, permission);
+        } catch (Throwable t) {
+            E2ELog.warn("hasPermissionLevel: " + t);
+            return null;
+        }
+    }
+
+    /** Unwraps a registry lookup that became {@code Optional<Holder.Reference<T>>} in newer eras. */
+    public static Object unwrapRegistryValue(Object looked) {
+        Object value = looked;
+        for (int hop = 0; hop < 4 && value != null; hop++) {
+            if (value instanceof java.util.Optional<?> optional) {
+                value = optional.orElse(null);
+                continue;
+            }
+            Method unwrap = findPublicNoArg(value.getClass(), "value", "comp_349", "get");
+            if (unwrap == null || unwrap.getReturnType() == void.class) return value;
+            try {
+                Object next = unwrap.invoke(value);
+                if (next == null || next == value) return value;
+                value = next;
+            } catch (Throwable t) {
+                return value;
+            }
+        }
+        return value;
     }
 }
