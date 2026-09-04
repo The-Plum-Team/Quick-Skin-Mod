@@ -32,6 +32,23 @@ def job_block(workflow: str, job: str) -> str:
     return match.group(0)
 
 
+def step_script(workflow: str, job: str, step: str) -> str:
+    block = job_block(workflow, job)
+    step_marker = f"      - name: {step}\n"
+    step_start = block.index(step_marker)
+    run_marker = "        run: |\n"
+    script_start = block.index(run_marker, step_start) + len(run_marker)
+    script_lines: list[str] = []
+    for line in block[script_start:].splitlines():
+        if line.startswith("          "):
+            script_lines.append(line[10:])
+        elif not line:
+            script_lines.append(line)
+        else:
+            break
+    return "\n".join(script_lines)
+
+
 def upload_artifact_steps() -> list[tuple[str, str, str]]:
     """Return every named workflow step that uploads an Actions artifact."""
 
@@ -1594,6 +1611,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("needs.discover.outputs.branches", build)
         self.assertIn("--expected-branches-json", build)
         self.assertIn("Recheck every branch immediately before rendering", build)
+        self.assertIn(".provenance.coverage_sha // .provenance.target.sha", build)
+        self.assertIn('--target-sha "$target_sha"', build)
+        self.assertIn('--coverage-sha "$coverage_sha"', build)
+        self.assertIn('[[ "$current_sha" != "$coverage_sha" ]]', build)
         self.assertIn("name: github-pages", deploy)
         self.assertIn("pages: write", deploy)
         self.assertIn("id-token: write", deploy)
@@ -1650,6 +1671,81 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('[[ "$classification" == skip ]]', collect)
         self.assertIn("scripts/pages/evidence.py carry-forward", collect)
         self.assertIn('--coverage-sha "$HEAD_SHA"', collect)
+
+    def test_pages_render_recheck_accepts_exact_carried_coverage(self) -> None:
+        script = step_script(
+            "pages.yml", "build", "Recheck every branch immediately before rendering"
+        )
+        target_sha = "a" * 40
+        coverage_sha = "b" * 40
+
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            branch = "fabric-and-neoforge-26.2"
+            manifest = temp / "public-evidence" / branch / "manifest.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "provenance": {
+                            "target": {"sha": target_sha},
+                            "coverage_sha": coverage_sha,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            retry_helper = temp / "scripts" / "ci" / "github_api_retry.sh"
+            retry_helper.parent.mkdir(parents=True)
+            retry_helper.write_text(
+                "github_api_retry() { printf '%s\\n' \"$CURRENT_SHA\"; }\n",
+                encoding="utf-8",
+            )
+            arguments = temp / "validate-arguments"
+            fake_python = temp / "python3"
+            fake_python.write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$VALIDATE_ARGUMENTS\"\n",
+                encoding="utf-8",
+            )
+            fake_python.chmod(0o755)
+            environment = os.environ.copy()
+            environment.pop("BASH_ENV", None)
+            environment.pop("ENV", None)
+            environment.update(
+                {
+                    "CURRENT_SHA": coverage_sha,
+                    "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
+                    "PATH": f"{temp}{os.pathsep}{environment.get('PATH', '')}",
+                    "VALIDATE_ARGUMENTS": str(arguments),
+                }
+            )
+
+            accepted = subprocess.run(
+                ["bash", "-c", script],
+                cwd=temp,
+                env=environment,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            validate_arguments = arguments.read_text(encoding="utf-8").splitlines()
+            target_index = validate_arguments.index("--target-sha")
+            coverage_index = validate_arguments.index("--coverage-sha")
+            self.assertEqual(validate_arguments[target_index + 1], target_sha)
+            self.assertEqual(validate_arguments[coverage_index + 1], coverage_sha)
+
+            environment["CURRENT_SHA"] = target_sha
+            stale = subprocess.run(
+                ["bash", "-c", script],
+                cwd=temp,
+                env=environment,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertIn("moved from covered SHA", stale.stderr)
 
     def test_mod_compatibility_pages_publication_reuses_only_complete_clean_reports(self) -> None:
         review_workflow = (
