@@ -519,6 +519,13 @@ public class PlayerCapeMenuScreen extends Screen {
             return;
         }
 
+        // Every local tile below is a catalogue asset addressed by its SHA-256 primary, while the
+        // saved reference may still be a SHA-1 alias whose migration has not run yet. Compare the
+        // two in the catalogue's own vocabulary so the active cape is highlighted, previewed and
+        // retimed instead of silently reading as "no cape selected".
+        activeCapeId = com.quickskin.mod.client.services.CapeAnimationIds.canonicalCapeId(
+                activeCapeId, this::catalogPrimaryOf);
+
         // Find the matching cape in both lists and update preview
         for (CapeEntry cape : this.localCapes) {
             if (cape.getCapeId().equals(activeCapeId)) {
@@ -1767,17 +1774,48 @@ public class PlayerCapeMenuScreen extends Screen {
         startCapeImports(validFiles);
     }
 
+    /**
+     * Vanilla Elytra texture candidates for this Minecraft version, most specific first.
+     *
+     * <p>Minecraft 1.21.4 moved equipment textures under
+     * {@code textures/entity/equipment/<layer type>/}, so the flat pre-1.21.4 path no longer
+     * resolves. An unresolvable texture makes the import skip the composite and save the source
+     * cape unchanged, which leaves the Elytra face fully transparent on the equipped wings. The
+     * flat path is kept as a fallback for resource packs that still ship it.</p>
+     */
+//? if <1.21.4 {
+    private static final String[] VANILLA_ELYTRA_TEXTURE_PATHS = {
+            "textures/entity/elytra.png"
+    };
+//?} else {
+    private static final String[] VANILLA_ELYTRA_TEXTURE_PATHS = {
+            "textures/entity/equipment/wings/elytra.png",
+            "textures/entity/elytra.png"
+    };
+//?}
+
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
+        for (String texturePath : VANILLA_ELYTRA_TEXTURE_PATHS) {
+            java.awt.image.BufferedImage elytra = readVanillaElytraImage(texturePath);
+            if (elytra != null) {
+                return elytra;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private java.awt.image.BufferedImage readVanillaElytraImage(String texturePath) {
         try {
 //? if <1.21 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", "textures/entity/elytra.png");
+            ResourceLocation vanillaElytraTexture = new ResourceLocation("minecraft", texturePath);
 //?} else if <1.21.11 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            ResourceLocation vanillaElytraTexture = ResourceLocation.fromNamespaceAndPath("minecraft", texturePath);
 //?} else {
-            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            Identifier vanillaElytraTexture = Identifier.fromNamespaceAndPath("minecraft", texturePath);
 //?}
-            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
+            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(vanillaElytraTexture);
             if (resourceOptional.isEmpty()) {
                 return null;
             }
@@ -1963,17 +2001,17 @@ public class PlayerCapeMenuScreen extends Screen {
      * Shared by SpeedSlider, lazy registration, and render logic.
      */
     private String getAnimationIdForCape(String capeId) {
-        if (capeId == null) return null;
+        return com.quickskin.mod.client.services.CapeAnimationIds.deriveAnimationId(capeId);
+    }
 
-        if (capeId.startsWith("local_cape:")) {
-            String hash = capeId.substring("local_cape:".length());
-            return "cape_" + hash;
-        } else if (capeId.startsWith("known:")) {
-            String knownId = capeId.substring("known:".length());
-            return "cape_known_" + knownId;
-        }
-
-        return null;
+    /**
+     * Resolves a local content ID to its catalogue primary, or {@code null} when the catalogue
+     * does not hold it or deliberately refuses to resolve an ambiguous alias.
+     */
+    @Nullable
+    private String catalogPrimaryOf(String contentId) {
+        AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(contentId);
+        return metadata == null ? null : metadata.hash();
     }
 //? if <1.21.11 {
 //?} else if <26.1.2 {

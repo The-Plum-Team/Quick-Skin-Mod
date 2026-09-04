@@ -145,6 +145,42 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn('findNoArg(gui.getClass(), "toastManager")', shim)
         self.assertIn('invokeUniqueNoArgOnFieldValue(gui, "getChat")', shim)
 
+    def test_disconnect_adapter_crosses_the_loader_observable_boundary(self) -> None:
+        """Clearing the level directly skips Architectury's client-player quit callback."""
+
+        shim = SHIM.read_text(encoding="utf-8")
+        body = shim[shim.index("public static String disconnectToTitle"):]
+        body = body[: body.index("public static String clearTransientOverlays")]
+        self.assertIn(
+            '"disconnect", "method_18096", "method_76795"', body
+        )
+        self.assertIn("disconnectClient.invoke(mc, title, false);", body)
+        self.assertIn(
+            "disconnectClientWithEngineReset.invoke(mc, title, false, true);", body
+        )
+        self.assertNotIn("clearClientLevel.invoke", body)
+
+    def test_modern_drag_flushes_accumulated_movement_before_release(self) -> None:
+        """The 1.21.9+ mouse callback defers drag delivery until its accumulator drains."""
+
+        shim = SHIM.read_text(encoding="utf-8")
+        drag = shim[shim.index("private static String dispatchMove"):]
+        drag = drag[: drag.index("private static Method findGlfwCallback")]
+        self.assertIn(
+            '"handleAccumulatedMovement", "method_55793"', drag
+        )
+        self.assertLess(drag.index("onMove.invoke"), drag.index("movement.invoke"))
+
+    def test_speed_probe_accounts_for_modern_gui_pixel_quantization(self) -> None:
+        """A real 192px slider track cannot represent every whole percentage exactly."""
+
+        steps = (
+            E2E_JAVA / "scenario" / "CapeMenuSteps.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn("sliderClickTolerance", steps)
+        self.assertIn("Math.round(configured * 100)", steps)
+        self.assertIn("restoreExactDefaultSpeed", steps)
+
     def test_visual_review_receives_passed_runtime_assertion_evidence(self) -> None:
         evidence = (ROOT / "e2e/visual_evidence.py").read_text(encoding="utf-8")
         review = (ROOT / "e2e/visual_review.py").read_text(encoding="utf-8")
