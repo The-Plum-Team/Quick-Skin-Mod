@@ -1777,12 +1777,17 @@ public class PlayerCapeMenuScreen extends Screen {
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
         try {
+            // Minecraft 1.21.2 moved the wearable textures under textures/entity/equipment. An
+            // import that keeps looking for the pre-1.21.2 path finds no resource, composites no
+            // elytra, and silently saves a cape whose elytra faces stay transparent.
 //? if <1.21 {
             ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", "textures/entity/elytra.png");
-//?} else if <1.21.11 {
+//?} else if <1.21.2 {
             ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+//?} else if <1.21.11 {
+            ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/equipment/wings/elytra.png");
 //?} else {
-            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/equipment/wings/elytra.png");
 //?}
             var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
             if (resourceOptional.isEmpty()) {
