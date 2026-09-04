@@ -1774,23 +1774,22 @@ public class PlayerCapeMenuScreen extends Screen {
 
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
-//? if <1.21 {
-        List<ResourceLocation> vanillaElytraTextures = List.of(
-                new ResourceLocation("minecraft", "textures/entity/elytra.png"));
-//?} else if <1.21.11 {
-        List<ResourceLocation> vanillaElytraTextures = List.of(
-                ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"));
-//?} else {
-        // 1.21.11 serves the wings from the equipment asset tree. The pre-equipment location stays
-        // behind it as a fallback, so a runtime that still ships it composites the same image and
-        // an import can never silently save a cape without the vanilla Elytra envelope.
-        List<Identifier> vanillaElytraTextures = List.of(
-                Identifier.fromNamespaceAndPath("minecraft", "textures/entity/equipment/wings/elytra.png"),
-                Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"));
-//?}
-        for (var vanillaElytraTexture : vanillaElytraTextures) {
+        // Newer runtimes serve the wings from the equipment asset tree. The pre-equipment location
+        // stays behind it as a fallback, so a runtime that still ships it composites the same image
+        // and an import can never silently save a cape without the vanilla Elytra envelope.
+        for (String texturePath : List.of(
+                "textures/entity/equipment/wings/elytra.png",
+                "textures/entity/elytra.png")) {
             try {
-                var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(vanillaElytraTexture);
+//? if <1.21 {
+                ResourceLocation vanillaElytraTexture = new ResourceLocation("minecraft", texturePath);
+//?} else if <1.21.11 {
+                ResourceLocation vanillaElytraTexture = ResourceLocation.fromNamespaceAndPath("minecraft", texturePath);
+//?} else {
+                Identifier vanillaElytraTexture = Identifier.fromNamespaceAndPath("minecraft", texturePath);
+//?}
+                var resourceOptional = Minecraft.getInstance().getResourceManager()
+                        .getResource(vanillaElytraTexture);
                 if (resourceOptional.isEmpty()) {
                     continue;
                 }
