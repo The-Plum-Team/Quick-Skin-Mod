@@ -54,7 +54,8 @@ final class CapeMenuSteps {
     private static final double SPEED_MAX = 3.0;
     private static final double TARGET_SPEED = 2.0;
     private static final double DEFAULT_SPEED = 1.0;
-    private static final double SPEED_TOLERANCE = 1.0e-3;
+    /** Half a displayed percentage point absorbs the modern cursor's GUI-pixel quantization. */
+    private static final double SPEED_TOLERANCE = 5.0e-3;
     /** Mirrors the screen's private delete-button geometry (ACTION_BUTTON_SIZE, margin). */
     private static final int ACTION_BUTTON_SIZE = 11;
     private static final int ACTION_BUTTON_MARGIN = 2;
