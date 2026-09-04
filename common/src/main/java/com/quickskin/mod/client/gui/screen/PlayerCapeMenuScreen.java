@@ -1774,17 +1774,43 @@ public class PlayerCapeMenuScreen extends Screen {
         startCapeImports(validFiles);
     }
 
+    /**
+     * Vanilla Elytra texture paths, in probe order.
+     *
+     * <p>Minecraft moved the wings texture under the equipment asset tree during the 1.21 series,
+     * so the historic path resolves on the older lanes and the equipment path on the newer ones.
+     * Probing the resource manager keeps this one shared import routine correct on every supported
+     * version without adding a second version inventory: the vanilla Elytra is whichever entry the
+     * running client actually ships. Losing it is what silently turns "import a translucent cape"
+     * into "save the source unchanged", because the composite below is skipped when it is absent.
+     * </p>
+     */
+    private static final List<String> VANILLA_ELYTRA_TEXTURE_PATHS = List.of(
+            "textures/entity/elytra.png",
+            "textures/entity/equipment/wings/elytra.png");
+
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
+        for (String texturePath : VANILLA_ELYTRA_TEXTURE_PATHS) {
+            java.awt.image.BufferedImage elytra = readVanillaElytraImage(texturePath);
+            if (elytra != null) {
+                return elytra;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private java.awt.image.BufferedImage readVanillaElytraImage(String texturePath) {
         try {
 //? if <1.21 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", "textures/entity/elytra.png");
+            ResourceLocation vanillaElytraTexture = new ResourceLocation("minecraft", texturePath);
 //?} else if <1.21.11 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            ResourceLocation vanillaElytraTexture = ResourceLocation.fromNamespaceAndPath("minecraft", texturePath);
 //?} else {
-            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+            Identifier vanillaElytraTexture = Identifier.fromNamespaceAndPath("minecraft", texturePath);
 //?}
-            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
+            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(vanillaElytraTexture);
             if (resourceOptional.isEmpty()) {
                 return null;
             }
