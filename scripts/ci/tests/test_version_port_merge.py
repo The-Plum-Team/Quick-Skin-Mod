@@ -644,7 +644,8 @@ class VersionPortMergeTest(unittest.TestCase):
         self,
     ) -> None:
         canonical = (
-            ROOT / version_port_merge.DEPENDENCY_SECURITY_POLICY_PATH
+            ROOT
+            / version_port_merge.DEPENDENCY_SECURITY_POLICY_SOURCE_FIXTURE_PATH
         ).read_bytes()
         self.assertEqual(
             hashlib.sha256(canonical).hexdigest(),
