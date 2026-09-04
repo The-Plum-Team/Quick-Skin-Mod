@@ -100,6 +100,10 @@ CPM_TRANSITION_POLICY_SHA256 = (
 DEPENDENCY_SECURITY_POLICY_PATH = (
     "scripts/release/tests/test_dependency_security.py"
 )
+DEPENDENCY_SECURITY_POLICY_SOURCE_FIXTURE_PATH = (
+    "scripts/ci/version_port_migrations/"
+    "dependency-security-with-dynamic-stonecutter.py.fixture"
+)
 DEPENDENCY_SECURITY_POLICY_SHA256 = (
     "3943a99277b6954cf69787c5e90a64959c07facf2fdee1d94051e8cf9852bef0"
 )
