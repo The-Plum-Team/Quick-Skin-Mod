@@ -1029,6 +1029,31 @@ def write_server_files(server: Path, port: int, template_root: Path) -> None:
     shutil.copytree(template_root / "datapack", datapack, dirs_exist_ok=True)
 
 
+def write_server_config(server: Path, scenario: str) -> Path | None:
+    """Seed the dedicated server's Quick Skin policy exactly as the scenario contract requests.
+
+    Most scenarios run against Quick Skin's default server configuration, so no file is written
+    and the mod creates its own defaults.  A scenario whose contract declares
+    ``orchestration.server_config`` gets that object written verbatim to
+    ``config/quickskin-server.json`` before the server starts, which is the only file
+    ``ServerConfig`` reads.  The contract validator already rejected unknown keys, so this cannot
+    silently request a policy the server would ignore.
+    """
+
+    seed = SCENARIO_CONTRACT.orchestration_for(scenario).server_config
+    if seed is None:
+        return None
+    config_path = server / "config" / "quickskin-server.json"
+    if config_path.exists() or config_path.is_symlink():
+        raise RuntimeFailure(f"server config must start absent: {config_path}")
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        json.dumps(seed.to_json_object(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return config_path
+
+
 def write_e2e_client_config(game_dir: Path) -> Path:
     """Seed a clean Quick Skin profile before client initialization.
 
@@ -2299,6 +2324,7 @@ def run_packaged_row(
                 server_install_log,
             )
             write_server_files(server, port, repo / "e2e" / "server-template")
+            write_server_config(server, scenario)
             install_dir, version_id = prepare_client_install(
                 matrix, row, runtime_session, java
             )
