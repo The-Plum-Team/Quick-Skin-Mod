@@ -1474,7 +1474,7 @@ public final class VanillaShim {
         if (handler == null) return "mouseHandler is null";
         Method onMove = findGlfwCallback(
                 handler, new Class<?>[]{long.class, double.class, double.class},
-                "onMove", "method_1602", "m_91565_");
+                "onMove", "method_1600", "m_91561_");
         if (onMove == null) return "MouseHandler has no (long,double,double) GLFW move callback";
         try {
             var window = mc.getWindow();
@@ -1516,22 +1516,27 @@ public final class VanillaShim {
 
     /**
      * Resolves a GLFW callback by named/intermediary/SRG name, falling back to the only method of
-     * that exact shape when a future mapping renames it. GLFW fixes these signatures, so the shape
-     * is a stable discriminator where the name is not.
+     * that exact shape when a future mapping renames it. Several callbacks can share a GLFW shape,
+     * so an ambiguous shape-only lookup fails closed instead of invoking an unrelated callback.
      */
     private static Method findGlfwCallback(Object owner, Class<?>[] params, String... names) {
         Set<String> wanted = Set.of(names);
         Method shapeMatch = null;
+        boolean ambiguousShape = false;
         for (Class<?> type = owner.getClass(); type != null && type != Object.class;
              type = type.getSuperclass()) {
             for (Method method : type.getDeclaredMethods()) {
                 if (method.getReturnType() != void.class) continue;
                 if (!java.util.Arrays.equals(method.getParameterTypes(), params)) continue;
                 if (wanted.contains(method.getName())) return method;
-                if (shapeMatch == null) shapeMatch = method;
+                if (shapeMatch == null) {
+                    shapeMatch = method;
+                } else {
+                    ambiguousShape = true;
+                }
             }
         }
-        return shapeMatch;
+        return ambiguousShape ? null : shapeMatch;
     }
 
     public static int guiMouseX(Minecraft mc) {

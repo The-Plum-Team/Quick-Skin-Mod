@@ -935,7 +935,7 @@ class ScenarioContractTest(unittest.TestCase):
     def test_visual_probes_remain_bound_to_their_capture_step(self) -> None:
         self.assertEqual((1600, 900), self.contract.gui_text_reference_size)
         probes = self.contract.probes_for("full", "client_a")
-        self.assertEqual(10, len(probes))
+        self.assertEqual(14, len(probes))
         self.assertEqual(
             probes,
             self.contract.capture(
@@ -948,10 +948,19 @@ class ScenarioContractTest(unittest.TestCase):
                 "full", "client_a", "cape_adjust_screen"
             ).probes
             + self.contract.capture(
+                "full", "client_a", "cape_fill_color_picker"
+            ).probes
+            + self.contract.capture(
                 "full", "client_a", "bmo_padded_source_screen"
             ).probes
             + self.contract.capture(
+                "full", "client_a", "cape_tile_tooltip"
+            ).probes
+            + self.contract.capture(
                 "full", "client_a", "settings_screen"
+            ).probes
+            + self.contract.capture(
+                "full", "client_a", "settings_server_tab"
             ).probes,
         )
         opaque = probes[0]
@@ -1021,6 +1030,13 @@ class ScenarioContractTest(unittest.TestCase):
                     900,
                 ),
                 (
+                    "cape_fill_color_picker",
+                    "fill colour hex value",
+                    (79, 543, 220, 576),
+                    175,
+                    380,
+                ),
+                (
                     "bmo_padded_source_screen",
                     "BMO source dimensions",
                     (45, 100, 250, 140),
@@ -1035,11 +1051,32 @@ class ScenarioContractTest(unittest.TestCase):
                     120,
                 ),
                 (
+                    "cape_tile_tooltip",
+                    "cape tile tooltip copy",
+                    (765, 190, 1040, 345),
+                    159,
+                    2500,
+                ),
+                (
                     "settings_screen",
                     "Open Skin Menu setting label",
                     (445, 235, 655, 265),
                     175,
                     300,
+                ),
+                (
+                    "settings_server_tab",
+                    "server transparency setting label",
+                    (305, 234, 780, 268),
+                    175,
+                    1300,
+                ),
+                (
+                    "settings_server_tab",
+                    "non-admin server notice",
+                    (495, 655, 1105, 688),
+                    175,
+                    1700,
                 ),
             ],
             text_values,
@@ -1049,6 +1086,12 @@ class ScenarioContractTest(unittest.TestCase):
             self.contract.probes_for(
                 "full", "client_a", "skin_menu_screen"
             ),
+        )
+        self.assertEqual(
+            self.contract.capture(
+                "server-policy", "client_a", "cooldown_skin_menu"
+            ).probes,
+            self.contract.probes_for("server-policy", "client_a"),
         )
 
     def test_sha_is_the_exact_validated_file_bytes(self) -> None:
