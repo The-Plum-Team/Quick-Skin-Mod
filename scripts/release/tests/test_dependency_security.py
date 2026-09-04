@@ -171,6 +171,15 @@ class DependencySecurityPolicyTest(unittest.TestCase):
                 key, value = line.split("=", 1)
                 properties[key] = value
 
+        settings = (ROOT / "settings.gradle.kts").read_text(encoding="utf-8")
+        stonecutter_declaration = re.search(
+            r'id\("dev[.]kikugie[.]stonecutter"\) version "([^"]+)"',
+            settings,
+        )
+        self.assertIsNotNone(stonecutter_declaration)
+        assert stonecutter_declaration is not None
+        stonecutter_version = stonecutter_declaration.group(1)
+
         expected = {
             ("net.fabricmc", "fabric-loader", properties["fabric_loader_version_1_20_1"]),
             (
@@ -192,11 +201,33 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ("org.sejda.imageio", "webp-imageio", "0.1.6"),
             ("org.junit.jupiter", "junit-jupiter", "5.13.4"),
             ("dev.architectury", "architectury-loom", "1.17.480"),
-            ("dev.kikugie", "stonecutter", "0.9.7"),
+            ("dev.kikugie", "stonecutter", stonecutter_version),
             ("com.gradleup.shadow", "shadow-gradle-plugin", "8.3.11"),
             ("org.gradle.toolchains", "foojay-resolver", "1.0.0"),
         }
         self.assertEqual(expected - coordinates, set())
+        self.assertEqual(
+            {
+                coordinate
+                for coordinate in coordinates
+                if coordinate[:2]
+                in {
+                    ("dev.kikugie", "stonecutter"),
+                    (
+                        "dev.kikugie.stonecutter",
+                        "dev.kikugie.stonecutter.gradle.plugin",
+                    ),
+                }
+            },
+            {
+                ("dev.kikugie", "stonecutter", stonecutter_version),
+                (
+                    "dev.kikugie.stonecutter",
+                    "dev.kikugie.stonecutter.gradle.plugin",
+                    stonecutter_version,
+                ),
+            },
+        )
 
     def test_shadow_marker_pom_trusts_only_the_verified_repository_variants(
         self,
