@@ -57,6 +57,9 @@ class GenerateContractJavaTest(unittest.TestCase):
         self.assertIn("public enum ScenarioId {", source)
         self.assertIn('PHASE0_SMOKE("phase0-smoke")', source)
         self.assertIn('PROPAGATION_LIVE("propagation-live")', source)
+        self.assertIn('SERVER_POLICY("server-policy")', source)
+        self.assertIn('SESSION("session")', source)
+        self.assertIn('MOD_COMPATIBILITY("mod-compatibility")', source)
         self.assertIn(
             'MOD_COMPATIBILITY_LATE_JOIN("mod-compatibility-late-join")',
             source,

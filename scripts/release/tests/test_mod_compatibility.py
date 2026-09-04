@@ -202,7 +202,14 @@ class ModCompatibilityContractTest(unittest.TestCase):
             )
             self.assertEqual(expected_prefix, scenarios[:len(expected_prefix)])
             self.assertEqual(
-                ["phase0-smoke", "propagation", "propagation-live", "full"],
+                [
+                    "phase0-smoke",
+                    "propagation",
+                    "propagation-live",
+                    "full",
+                    "server-policy",
+                    "session",
+                ],
                 scenarios[len(expected_prefix):],
             )
             self.assertTrue(lane["base_evidence_name"].startswith("packaged-e2e-"))

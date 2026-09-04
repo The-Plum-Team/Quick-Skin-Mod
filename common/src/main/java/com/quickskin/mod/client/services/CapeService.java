@@ -124,8 +124,13 @@ public class CapeService implements ICapeService {
             // Check if this cape is animated and register it if not already running.
             AssetMetadata assetMeta = localMetadata;
             if (assetMeta != null && assetMeta.isAnimated()) {
-                String animationId = "cape_" + hash;
-                String capeId = "local_cape:" + hash;
+                // Register under the content ID we were handed, never a resolved primary: the
+                // renderer derives its animation ID from the same cape ID the caller holds, so
+                // rewriting it here would leave a second animation running beside the one the
+                // renderer looks up. Aliases are folded onto their primary where the cape ID is
+                // chosen, not where it is loaded.
+                String capeId = CapeAnimationIds.LOCAL_PREFIX + hash;
+                String animationId = CapeAnimationIds.deriveAnimationId(capeId);
                 AnimatedTextureManager animManager = AnimatedTextureManager.getInstance();
 
                 if (!animManager.isAnimated(animationId)) {
@@ -159,7 +164,8 @@ public class CapeService implements ICapeService {
 
         if (cape != null && !cape.isNoCape()) {
             if (cape.isAnimated()) {
-                String animationId = "cape_known_" + capeId;
+                String animationId = CapeAnimationIds.deriveAnimationId(
+                        CapeAnimationIds.KNOWN_PREFIX + capeId);
                 AnimatedTextureManager animManager = AnimatedTextureManager.getInstance();
 
                 // Only register the animation if it's not already running
