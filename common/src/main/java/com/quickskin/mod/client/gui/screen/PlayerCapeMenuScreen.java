@@ -1785,18 +1785,19 @@ public class PlayerCapeMenuScreen extends Screen {
      */
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
-        for (String texturePath : new String[]{
+        for (String texturePath : List.of(
                 "textures/entity/equipment/wings/elytra.png",
-                "textures/entity/elytra.png"}) {
+                "textures/entity/elytra.png")) {
             try {
 //? if <1.21 {
-                ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", texturePath);
+                ResourceLocation vanillaElytraTexture = new ResourceLocation("minecraft", texturePath);
 //?} else if <1.21.11 {
-                ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", texturePath);
+                ResourceLocation vanillaElytraTexture = ResourceLocation.fromNamespaceAndPath("minecraft", texturePath);
 //?} else {
-                Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", texturePath);
+                Identifier vanillaElytraTexture = Identifier.fromNamespaceAndPath("minecraft", texturePath);
 //?}
-                var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
+                var resourceOptional = Minecraft.getInstance().getResourceManager()
+                        .getResource(vanillaElytraTexture);
                 if (resourceOptional.isEmpty()) {
                     continue;
                 }
