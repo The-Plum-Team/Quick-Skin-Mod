@@ -1779,17 +1779,31 @@ public class PlayerCapeMenuScreen extends Screen {
 
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
-        try {
+        // Minecraft's equipment-model migration republished the wings texture under
+        // textures/entity/equipment/wings/, while older runtimes ship only the historical
+        // textures/entity/ path. Ask for both, in order, so an imported cape whose Elytra faces
+        // are transparent still receives the vanilla composite on every supported version. A
+        // missing texture must stay a silent local degradation, never an import failure.
 //? if <1.21 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", "textures/entity/elytra.png");
+        List<ResourceLocation> candidates = List.of(
+                new ResourceLocation("minecraft", "textures/entity/elytra.png"),
+                new ResourceLocation("minecraft", "textures/entity/equipment/wings/elytra.png"));
 //?} else if <1.21.11 {
-            ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+        List<ResourceLocation> candidates = List.of(
+                ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"),
+                ResourceLocation.fromNamespaceAndPath(
+                        "minecraft", "textures/entity/equipment/wings/elytra.png"));
 //?} else {
-            Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+        List<Identifier> candidates = List.of(
+                Identifier.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png"),
+                Identifier.fromNamespaceAndPath(
+                        "minecraft", "textures/entity/equipment/wings/elytra.png"));
 //?}
-            var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
+        for (var candidate : candidates) {
+            var resourceOptional =
+                    Minecraft.getInstance().getResourceManager().getResource(candidate);
             if (resourceOptional.isEmpty()) {
-                return null;
+                continue;
             }
             try (InputStream stream = resourceOptional.get().open()) {
 //? if <26.1.2 {
@@ -1800,14 +1814,13 @@ public class PlayerCapeMenuScreen extends Screen {
                         (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
                 return com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
 //?}
+            } catch (IOException e) {
+                QuickSkin.LOGGER.debug("Unable to load the vanilla elytra texture {}", candidate, e);
             }
-        } catch (IOException e) {
-//? if <26.1.2 {
-//?} else {
-            QuickSkin.LOGGER.debug("Unable to load the vanilla elytra texture", e);
-//?}
-            return null;
         }
+        QuickSkin.LOGGER.debug(
+                "No vanilla elytra texture resolved; imported capes keep their own Elytra faces");
+        return null;
     }
 
     @Override
