@@ -610,7 +610,9 @@ public final class SessionScenario implements Scenario {
             }
             Method getSkin = findNoArg(info.getClass(), "getSkin", "method_52810");
             Object skin = getSkin == null ? null : getSkin.invoke(info);
-            Method texture = skin == null ? null : findNoArg(skin.getClass(), "texture", "comp_1626");
+            Method texture = skin == null
+                    ? null
+                    : findNoArg(skin.getClass(), "texture", "body", "comp_1626");
             Object value = texture == null ? null : texture.invoke(skin);
             if (value == null) return null;
             Method texturePath = findNoArg(value.getClass(), "texturePath", "comp_3627");
