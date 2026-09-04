@@ -1807,12 +1807,12 @@ public class PlayerCapeMenuScreen extends Screen {
             }
             try (InputStream stream = resourceOptional.get().open()) {
 //? if <26.1.2 {
-                return SafeImageReader.readPng(stream);
+                    return SafeImageReader.readPng(stream);
 //?} else {
-                byte[] encoded = com.quickskin.mod.common.util.BoundedFileReader.readBytes(
-                        stream,
-                        (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
-                return com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
+                    byte[] encoded = com.quickskin.mod.common.util.BoundedFileReader.readBytes(
+                            stream,
+                            (int) com.quickskin.mod.common.util.SafeImageReader.MAX_ENCODED_BYTES);
+                    return com.quickskin.mod.common.util.SafeImageReader.readPng(encoded);
 //?}
             } catch (IOException e) {
                 QuickSkin.LOGGER.debug("Unable to load the vanilla elytra texture {}", candidate, e);
