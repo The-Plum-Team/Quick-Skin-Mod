@@ -1780,30 +1780,18 @@ public class PlayerCapeMenuScreen extends Screen {
     @Nullable
     private java.awt.image.BufferedImage getVanillaElytraImage() {
         try {
-            // Minecraft moved the Elytra out of textures/entity and under the equipment asset tree
-            // during the 1.21 line, so ask for the modern location first and keep the historical one
-            // behind it. Selecting by resource presence keeps this the same fact on every supported
-            // version; a missing texture silently skips the composite and saves the source unchanged.
+            for (String texturePath : List.of(
+                    "textures/entity/equipment/wings/elytra.png",
+                    "textures/entity/elytra.png")) {
 //? if <1.21 {
-            var elytraCandidates = List.of(
-                    new ResourceLocation("minecraft", "textures/entity/equipment/wings/elytra.png"),
-                    new ResourceLocation("minecraft", "textures/entity/elytra.png"));
+                ResourceLocation vanillaElytraTexture = new ResourceLocation("minecraft", texturePath);
 //?} else if <1.21.11 {
-            var elytraCandidates = List.of(
-                    ResourceLocation.fromNamespaceAndPath(
-                            "minecraft", "textures/entity/equipment/wings/elytra.png"),
-                    ResourceLocation.fromNamespaceAndPath(
-                            "minecraft", "textures/entity/elytra.png"));
+                ResourceLocation vanillaElytraTexture = ResourceLocation.fromNamespaceAndPath("minecraft", texturePath);
 //?} else {
-            var elytraCandidates = List.of(
-                    Identifier.fromNamespaceAndPath(
-                            "minecraft", "textures/entity/equipment/wings/elytra.png"),
-                    Identifier.fromNamespaceAndPath(
-                            "minecraft", "textures/entity/elytra.png"));
+                Identifier vanillaElytraTexture = Identifier.fromNamespaceAndPath("minecraft", texturePath);
 //?}
-            for (var elytraTexture : elytraCandidates) {
-                var resourceOptional =
-                        Minecraft.getInstance().getResourceManager().getResource(elytraTexture);
+                var resourceOptional = Minecraft.getInstance().getResourceManager()
+                        .getResource(vanillaElytraTexture);
                 if (resourceOptional.isEmpty()) {
                     continue;
                 }
