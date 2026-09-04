@@ -1797,13 +1797,14 @@ public class PlayerCapeMenuScreen extends Screen {
         try {
             for (String elytraTexturePath : VANILLA_ELYTRA_TEXTURE_PATHS) {
 //? if <1.21 {
-                ResourceLocation VANILLA_ELYTRA_TEXTURE = new ResourceLocation("minecraft", elytraTexturePath);
+                ResourceLocation vanillaElytraTexture = new ResourceLocation("minecraft", elytraTexturePath);
 //?} else if <1.21.11 {
-                ResourceLocation VANILLA_ELYTRA_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", elytraTexturePath);
+                ResourceLocation vanillaElytraTexture = ResourceLocation.fromNamespaceAndPath("minecraft", elytraTexturePath);
 //?} else {
-                Identifier VANILLA_ELYTRA_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", elytraTexturePath);
+                Identifier vanillaElytraTexture = Identifier.fromNamespaceAndPath("minecraft", elytraTexturePath);
 //?}
-                var resourceOptional = Minecraft.getInstance().getResourceManager().getResource(VANILLA_ELYTRA_TEXTURE);
+                var resourceOptional = Minecraft.getInstance().getResourceManager()
+                        .getResource(vanillaElytraTexture);
                 if (resourceOptional.isEmpty()) {
                     continue;
                 }
