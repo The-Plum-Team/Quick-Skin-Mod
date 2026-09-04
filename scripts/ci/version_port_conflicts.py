@@ -33,7 +33,9 @@ SOURCE_PATHS = frozenset(
         "docs/ai/WORKFLOW.md",
         "e2e/README.md",
         "e2e/packaged_runtime.py",
+        "gradle/verification-metadata.xml",
         "scripts/release/tests/test_cpm_transition_policy.py",
+        "scripts/release/tests/test_dependency_security.py",
         "scripts/release/tests/test_mixin_policy.py",
     }
 )
