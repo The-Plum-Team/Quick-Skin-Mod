@@ -40,12 +40,32 @@ TEXT_CANARY = {
         # so the responsive union still fails closed when the hint itself is absent.
         ("cape editor instructions", (300, 624, 780, 672), 75, 900),
     ),
+    # The Fabric and Forge 1920x1080 anchor frames both retain 540 glyph pixels above
+    # this threshold after the production 1600x900 resize.
+    ("full", "client_a", "cape_fill_color_picker"): (
+        ("fill colour hex value", (79, 543, 220, 576), 175, 380),
+    ),
+    # Both anchor lanes retain 3,560 bright tooltip pixels in this box.
+    ("full", "client_a", "cape_tile_tooltip"): (
+        ("cape tile tooltip copy", (765, 190, 1040, 345), 159, 2500),
+    ),
     ("full", "client_a", "bmo_padded_source_screen"): (
         ("BMO source dimensions", (45, 100, 250, 140), 75, 120),
         ("BMO output dimensions", (1035, 100, 1255, 140), 75, 120),
     ),
     ("full", "client_a", "settings_screen"): (
         ("Open Skin Menu setting label", (445, 235, 655, 265), 175, 300),
+    ),
+    # The two anchor lanes are pixel-identical here: 1,752 label pixels and 2,270
+    # notice pixels remain above the threshold after resizing.
+    ("full", "client_a", "settings_server_tab"): (
+        ("server transparency setting label", (305, 234, 780, 268), 175, 1300),
+        ("non-admin server notice", (495, 655, 1105, 688), 175, 1700),
+    ),
+    # The disabled label is dimmer than ordinary GUI text; both lanes retain 342
+    # glyph pixels above luma 127 for the observed three-digit countdown.
+    ("server-policy", "client_a", "cooldown_skin_menu"): (
+        ("cooldown button label", (712, 770, 889, 798), 127, 240),
     ),
 }
 
@@ -131,6 +151,30 @@ class VisualProbeCalibrationTest(unittest.TestCase):
             packaged_runtime.validate_opaque_stars_background(
                 bright_path, packaged_runtime.OPAQUE_STARS_PROBES[key]
             )
+
+    def test_each_text_probe_fails_closed_when_its_glyphs_are_absent(self) -> None:
+        for frame_index, (key, probes) in enumerate(TEXT_CANARY.items()):
+            for missing_index, (missing_label, _box, _luma, _pixels) in enumerate(probes):
+                with self.subTest(key=key, missing=missing_label):
+                    image = Image.new("RGB", (1600, 900), (12, 14, 18))
+                    draw = ImageDraw.Draw(image)
+                    for probe_index, (_label, box, _threshold, minimum_pixels) in enumerate(probes):
+                        if probe_index == missing_index:
+                            continue
+                        left, top, right, _bottom = box
+                        width = max(1, right - left - 8)
+                        rows = minimum_pixels // width + 2
+                        draw.rectangle(
+                            (left + 4, top + 4, right - 5, top + 4 + rows),
+                            fill=(255, 255, 255),
+                        )
+                    path = self.root / f"text-missing-{frame_index}-{missing_index}.png"
+                    image.save(path, format="PNG")
+                    with self.assertRaisesRegex(
+                        packaged_runtime.RuntimeFailure,
+                        "required GUI text is missing or unreadable",
+                    ):
+                        packaged_runtime.validate_required_gui_text(path, *key)
 
     def test_cape_editor_hint_probe_covers_both_real_layouts_but_not_controls(self) -> None:
         key = ("full", "client_a", "cape_adjust_screen")
