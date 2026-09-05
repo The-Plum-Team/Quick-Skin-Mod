@@ -306,13 +306,14 @@ inside Minecraft modules. Existing source scanners, AI repair paths, release wor
 evidence consumers and version-port automation still need the complete modular contract migration;
 passing their current tests does not certify those stages.
 
-The active matrix now imports nine targets through 1.21.8 from the pinned migration inputs.
-The remaining seven pinned targets and fourteen artifact lanes still require full-mod
+The active matrix now imports twelve targets through 1.21.11 from the pinned migration inputs.
+The remaining four pinned targets and eight artifact lanes still require full-mod
 source/matrix consolidation and validation. The isolated sixteen-version native-API compilation
 probe is not full-mod or runtime evidence for those targets. Keep target publication independent
 while migrating branch-discovery consumers to the central matrix.
-Measure Gradle configuration cost when all target versions are registered; target-specific CI
-tasks should not eagerly configure or resolve every unrelated Minecraft module/version node.
+The complete build now uses `scripts/release/build_matrix.py`: a separate sequential Gradle
+process per target bounds both project configuration and remapping memory. The target-specific
+tasks do not configure or resolve unrelated Minecraft module/version nodes.
 
 - Git selection admission now passes twelve bounded Git-fixture tests, including a runtime
   integration test that binds the checkout, launch properties and report to the outer admission
@@ -432,3 +433,20 @@ tasks should not eagerly configure or resolve every unrelated Minecraft module/v
   retains 264 passing JUnit tests; 483 release-policy tests and 24 affected GUI/CPM policy tests
   pass. Earlier failed port/build attempts and bytecode audits remain in the checkpoint diagnostics.
   No image E2E was launched for this family; the full GitHub visual gate remains outstanding.
+- Imported 1.21.9, 1.21.10 and 1.21.11 from pinned source, runtime and dependency inputs, adding
+  232 portable dependency components. All three share one render-state preview backend and no new
+  source overlays. Native skin/cape lookups use the actual ClientAsset boundary at 1.21.9; the
+  texture-file compatibility bridge remains present in the feature API and returns no file where
+  that legacy bridge is unavailable. NeoForge's native collector already renders translucent
+  hands; only the older native helper implementations require the redundant redirect.
+- The twelve-target single-JVM aggregate exhausted its 2 GiB heap during remapping, after the
+  individual targets had compiled successfully. That failed diagnostic is retained. The full build
+  entry point now validates the complete matrix, starts each target sequentially with `--no-daemon
+  --no-parallel`, records every exit and expected production/harness hash, and verifies earlier
+  outputs survived later targets. Any failure invalidates the aggregate result. `--clean` and
+  `--rerun-tasks` reach every target; `--target` explicitly reports partial coverage. Native Gradle
+  aggregate tasks reject a multi-target matrix with the coordinator command. Build, on-demand E2E
+  and release workflow build steps use it; protected publication/governance migration remains
+  unfinished. Nine coordinator tests cover complete/partial coverage, invalid unselected lanes,
+  failures, missing outputs, matrix mutation and output replacement. The complete release-policy
+  suite passes 493 tests and the CI-policy suite passes 301 tests.

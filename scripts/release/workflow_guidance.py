@@ -73,9 +73,11 @@ def render_guidance(
 ) -> str:
     version = branch_version(data, profile_branch=profile_branch)
     matches = COMMON_TEST_TASK.findall(guidance)
-    if len(matches) != EXPECTED_TASK_OCCURRENCES or len(set(matches)) != 1:
+    expected = 1 if "scripts/release/build_matrix.py" in guidance else EXPECTED_TASK_OCCURRENCES
+    if len(matches) != expected or len(set(matches)) != 1:
         raise WorkflowGuidanceError(
-            "workflow guide must contain exactly two identical common test task anchors"
+            "workflow guide must contain exactly "
+            + ("one common test task anchor" if expected == 1 else "two identical common test task anchors")
         )
     return COMMON_TEST_TASK.sub(f":common:{version}:test", guidance)
 

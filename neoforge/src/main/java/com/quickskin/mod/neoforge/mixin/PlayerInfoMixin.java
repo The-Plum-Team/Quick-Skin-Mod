@@ -299,7 +299,7 @@ public abstract class PlayerInfoMixin {
                 capeTexture = currentCapeLocation;
                 // An active Quick Skin cape owns the profile Elytra input too; vanilla gives that
                 // dedicated field priority and would otherwise keep only the worn wings vanilla.
-                //? if <1.21.11 {
+                //? if <1.21.9 {
                 elytraTexture = currentCapeLocation;
                 //?} else {
                 elytraTexture = new ClientAsset.ResourceTexture(
@@ -394,7 +394,7 @@ public abstract class PlayerInfoMixin {
             capeTexture = com.quickskin.mod.client.services.CapeService.getInstance()
                     .getCapeLocation(null, config.activeCapeHash);
             if (capeTexture != null) {
-                //? if <1.21.11 {
+                //? if <1.21.9 {
                 elytraTexture = capeTexture;
                 //?} else {
                 elytraTexture = new ClientAsset.ResourceTexture(capeTexture, capeTexture);

@@ -183,7 +183,7 @@ public abstract class PlayerInfoMixin {
         if (hasCustomCape) {
             if (currentCapeLocation != null) {
                 capeTexture = currentCapeLocation;
-//? if <1.21.11 {
+//? if <1.21.9 {
                 elytraTexture = currentCapeLocation;
 //?} else {
                 elytraTexture = new ClientAsset.ResourceTexture(
@@ -280,7 +280,7 @@ public abstract class PlayerInfoMixin {
             capeTexture = com.quickskin.mod.client.services.CapeService.getInstance()
                     .getCapeLocation(null, config.activeCapeHash);
             if (capeTexture != null) {
-//? if <1.21.11 {
+//? if <1.21.9 {
                 elytraTexture = capeTexture;
 //?} else {
                 elytraTexture = new ClientAsset.ResourceTexture(capeTexture, capeTexture);

@@ -251,7 +251,7 @@ public abstract class MixinAbstractClientPlayer {
                 capeTexture = customCape;
                 // An active Quick Skin cape owns the profile Elytra input too; vanilla gives that
                 // dedicated field priority and would otherwise keep only the worn wings vanilla.
-                //? if <1.21.11 {
+                //? if <1.21.9 {
                 elytraTexture = customCape;
                 //?} else {
                 elytraTexture = new ClientAsset.ResourceTexture(customCape, customCape);

@@ -122,9 +122,7 @@ The active common test lane:
 Full production and packaged-harness gate:
 
 ```powershell
-.\gradlew.bat --no-daemon --no-parallel clean `
-  :common:1.20.1:test `
-  buildAllLanes buildAllE2EHarnesses
+python scripts/release/build_matrix.py --clean
 ```
 
 Stage and verify the exact release outputs:
@@ -169,7 +167,12 @@ development runs for packaged-JAR E2E evidence. Gradle and Stonecutter must them
 JDK 21 or newer; shared CI installs JDK 17, JDK 21, and JDK 25 so each version branch can select
 its matrix-declared toolchain.
 
-Release automation always rebuilds `buildAllLanes buildAllE2EHarnesses` with `--rerun-tasks` and
+The full build coordinator runs one Gradle process per matrix target sequentially; it includes
+that target's unit tests, production JARs, and packaged harnesses. Never nest Gradle processes or
+combine every Minecraft target's remapping tasks in one JVM. Use `--target <minecraft>` for an
+explicitly partial build. A successful build report does not replace artifact staging or E2E.
+
+Release automation always rebuilds `scripts/release/build_matrix.py` with `--rerun-tasks` and
 requires every production and harness SHA-256 to equal the first build. When determinism is in
 scope locally, use `scripts/release/verify_reproducibility.py` against the first staged manifest.
 
@@ -192,7 +195,7 @@ scope locally, use `scripts/release/verify_reproducibility.py` against the first
 - Keep the marked packaged-E2E profile aligned through `scripts/release/e2e_readme.py`. It derives
   scenario facts from the contract and lane/version/Java facts from the active matrix; the
   synchronizer regenerates both marked profiles for every release branch.
-- Keep the two active-common test task anchors in this imported guide aligned through
+- Keep the active-common test task anchor in this imported guide aligned through
   `scripts/release/workflow_guidance.py`; their Minecraft version comes from the branch matrix.
 - Keep the generated README status block aligned through `scripts/release/status_table.py`; never
   hand-maintain its version rows.

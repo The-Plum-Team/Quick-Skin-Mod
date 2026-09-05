@@ -120,7 +120,7 @@ public abstract class MixinAbstractClientPlayer {
 //?}
                 if (customCape != null) {
                     capeTexture = customCape;
-//? if <1.21.11 {
+//? if <1.21.9 {
                     elytraTexture = customCape;
 //?} else {
                     elytraTexture = new ClientAsset.ResourceTexture(customCape, customCape);
@@ -214,7 +214,7 @@ public abstract class MixinAbstractClientPlayer {
                             .getCapeLocation(null, config.activeCapeHash);
                     if (capeLoc != null) {
                         capeTexture = capeLoc;
-//? if <1.21.11 {
+//? if <1.21.9 {
                         elytraTexture = capeLoc;
 //?} else {
                         elytraTexture = new ClientAsset.ResourceTexture(capeLoc, capeLoc);

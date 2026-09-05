@@ -23,6 +23,9 @@ Features and compatibility adapters compile as separate Gradle modules. The sele
 | `1.21.6` | Fabric + NeoForge | `21` |
 | `1.21.7` | Fabric + NeoForge | `21` |
 | `1.21.8` | Fabric + NeoForge | `21` |
+| `1.21.9` | Fabric + NeoForge | `21` |
+| `1.21.10` | Fabric + NeoForge | `21` |
+| `1.21.11` | Fabric + NeoForge | `21` |
 
 All targets build from the same source revision. Publication identity remains per Minecraft version (`mc<version>-v<mod_version>`); the complete build bundle is not a publishable release. Dependency ranges remain in the matrix and generated JAR metadata.
 
@@ -180,20 +183,24 @@ When CPM is installed, standalone models live under `.minecraft/player_models/` 
 
 ## Building
 
-Build every matrix-declared production artifact in one serial Gradle invocation:
+Build every matrix-declared production artifact and E2E harness, with unit tests:
 
 ```bash
-./gradlew --no-parallel buildAllLanes
+python3 scripts/release/build_matrix.py
 ```
 
 On Windows:
 
 ```powershell
-.\gradlew.bat --no-parallel buildAllLanes
+python scripts/release/build_matrix.py
 ```
 
 Launch Gradle with JDK 21 or newer because the Stonecutter build plugin requires it. Each produced
 JAR targets the Java version declared for its artifact through Gradle's Java toolchain.
+The coordinator starts one Gradle process per target, sequentially, to bound remapping memory.
+Use `--clean` for a clean build or `--rerun-tasks` for the reproducibility rebuild. It does not
+launch the image E2E suite. Build results are recorded in `build/matrix-build/results.json`;
+stage and verify the JARs separately with `scripts/release/verify_release.py`.
 
 To work on one Minecraft target, register only that target's modules and loaders:
 

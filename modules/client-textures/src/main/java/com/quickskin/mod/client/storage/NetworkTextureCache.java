@@ -10,9 +10,7 @@ import com.quickskin.mod.common.util.PngAnimationIdentity;
 import com.quickskin.mod.networking.NetworkSecurity;
 import com.quickskin.mod.networking.TextureRequestCoordinator;
 import com.quickskin.mod.networking.TextureTransferLimits;
-//? if >=1.21 {
 import com.quickskin.mod.platform.PlatformHelper;
-//?}
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -26,19 +24,16 @@ import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-//? if <26.2 {
-import com.quickskin.mod.platform.PlatformHelper;
-//?}
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 //? if <1.21.11 {
 import java.nio.file.Files;
-import java.nio.file.Path;
 //?}
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -517,9 +512,9 @@ public class NetworkTextureCache {
         return present;
     }
 
-    //? if <1.21.11 {
     @Nullable
     public Path getOrCreateTempFile(String hash, String textureType) {
+        //? if <1.21.11 {
         if (!NetworkSecurity.isValidContentId(hash) || !"skin".equals(textureType)) return null;
         TextureKey key = new TextureKey(hash, textureType);
         Path existing = tempFileCache.get(key);
@@ -541,8 +536,10 @@ public class NetworkTextureCache {
             LOGGER.warn("Unable to create CPM network texture cache file for {}", hash, e);
             return null;
         }
+        //?} else {
+        return null;
+        //?}
     }
-    //?}
     /**
      * Clear all cached network textures
      */

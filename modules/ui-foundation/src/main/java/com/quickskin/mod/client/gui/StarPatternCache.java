@@ -189,8 +189,6 @@ public class StarPatternCache {
         if (cachedTexture != null) {
             cachedTexture.setFilter(true, false);
         }
-        //?} else {
-        // 1.21.11: setFilter() removed, filtering handled at GpuSampler level
         //?}
     }
 

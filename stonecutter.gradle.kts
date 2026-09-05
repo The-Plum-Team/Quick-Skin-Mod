@@ -28,6 +28,7 @@ val releaseArtifacts = matrixState["quickSkinReleaseArtifacts"] as List<Map<*, *
 @Suppress("UNCHECKED_CAST")
 val buildArtifacts = matrixState["quickSkinBuildArtifacts"] as List<Map<*, *>>
 val buildTarget = providers.gradleProperty("quickskinTarget").orNull
+val singleVersionInventory = releaseArtifacts.map { it["artifact_version"] }.distinct().size == 1
 val releaseLaneCount = (releaseMatrix["lane_count"] as? Number)?.toInt()
     ?: error("Missing lane_count in $releaseMatrixFile")
 val unitTestVersion = releaseMatrix["unit_test_version"]?.toString()
@@ -133,15 +134,23 @@ tasks.register("check") {
 tasks.register("buildAllLanes") {
     group = "build"
     description = "Builds all $releaseLaneCount production artifacts from the release matrix."
-    dependsOn(validateReleaseLaneInventory)
-    if (buildTarget == null) dependsOn(testStableLane, releaseArtifactTasks)
+    if (singleVersionInventory) {
+        dependsOn(validateReleaseLaneInventory)
+        if (buildTarget == null) dependsOn(testStableLane, releaseArtifactTasks)
+    } else {
+        doFirst { error("Build the complete matrix with python scripts/release/build_matrix.py; each target needs a separate Gradle process.") }
+    }
 }
 
 tasks.register("buildAllE2EHarnesses") {
     group = "verification"
     description = "Builds all $releaseLaneCount packaged-runtime E2E harnesses from the release matrix."
-    dependsOn(validateReleaseLaneInventory)
-    if (buildTarget == null) dependsOn(releaseHarnessTasks)
+    if (singleVersionInventory) {
+        dependsOn(validateReleaseLaneInventory)
+        if (buildTarget == null) dependsOn(releaseHarnessTasks)
+    } else {
+        doFirst { error("Build the complete matrix with python scripts/release/build_matrix.py; each target needs a separate Gradle process.") }
+    }
 }
 
 val validateTargetLaneInventory = tasks.register("validateTargetLaneInventory") {

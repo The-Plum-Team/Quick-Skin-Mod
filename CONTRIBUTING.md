@@ -206,8 +206,7 @@ Changes to build routing, loaders, resources, overlays, networking boundaries, o
 need the aggregate gate:
 
 ```bash
-./gradlew --no-daemon --no-parallel clean \
-  buildAllLanes buildAllE2EHarnesses
+python3 scripts/release/build_matrix.py --clean
 ```
 
 The unit suites can be entirely green while a packaged scenario is broken, because they stand in

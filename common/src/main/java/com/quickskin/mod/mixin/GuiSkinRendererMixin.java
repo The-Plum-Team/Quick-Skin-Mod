@@ -31,6 +31,9 @@ import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 //?}
 import net.minecraft.client.renderer.texture.OverlayTexture;
+//? if >=1.21.11 {
+import net.minecraft.resources.Identifier;
+//?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

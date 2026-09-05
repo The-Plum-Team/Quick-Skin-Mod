@@ -105,17 +105,12 @@ import net.minecraft.client.renderer.entity.state.PlayerRenderState;
 import net.minecraft.world.entity.Entity;
     //?}
 //?} else {
-import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.world.entity.Entity;
     //? if <1.21.11 {
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
     //?} else {
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.resources.Identifier;
     //?}
 //?}
@@ -132,9 +127,8 @@ import java.util.UUID;
 /**
  * NeoForge-specific mixin to enable transparent arm rendering in first-person view.
  *
- * In 1.21.9 the immediate MultiBufferSource was removed and AvatarRenderer.renderHand submits the arm
- * via SubmitNodeCollector.submitModelPart(...). We redirect that submit to force entityTranslucent
- * when the player's skin has transparent pixels (mirrors the common ItemInHandRendererMixin).
+ * The immediate renderer needs the transparent arm buffer bridge. From 1.21.9 vanilla already
+ * submits the arm with entityTranslucent; retain only the appearance visibility hook for that family.
  */
 //? if <1.21.9 {
 @Mixin(value = PlayerRenderer.class, priority = 1100)
@@ -206,49 +200,24 @@ public class PlayerRendererMixin {
 //?}
     }
 
+//? if <1.21.2 {
     /**
      * Redirects the getBuffer call within AvatarRenderer's renderHand method.
      * This allows us to switch from RenderTypes.entitySolid to RenderTypes.entityTranslucent
      * when the player's skin has transparent pixels.
      */
     @Redirect(
-//? if <1.21.6 {
             method = "renderHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/player/AbstractClientPlayer;Lnet/minecraft/client/model/geom/ModelPart;Lnet/minecraft/client/model/geom/ModelPart;)V",
-//?} else if <1.21.9 {
-            method = "renderHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/resources/ResourceLocation;Lnet/minecraft/client/model/geom/ModelPart;Z)V",
-//?} else if <1.21.11 {
-            method = "renderHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/resources/ResourceLocation;Lnet/minecraft/client/model/geom/ModelPart;Z)V",
-//?} else {
-            method = "renderHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/resources/Identifier;Lnet/minecraft/client/model/geom/ModelPart;Z)V",
-//?}
             at = @At(
                     value = "INVOKE",
-//? if <1.21.9 {
                     target = "Lnet/minecraft/client/renderer/MultiBufferSource;getBuffer(Lnet/minecraft/client/renderer/RenderType;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
-//?} else if <1.21.11 {
-                    target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModelPart(Lnet/minecraft/client/model/geom/ModelPart;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/RenderType;IILnet/minecraft/client/renderer/texture/TextureAtlasSprite;)V"
-//?} else {
-                    target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModelPart(Lnet/minecraft/client/model/geom/ModelPart;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IILnet/minecraft/client/renderer/texture/TextureAtlasSprite;)V"
-//?}
             ),
             require = 0,
-//? if <1.21.6 {
             expect = 2,
             allow = 2
-//?} else {
-            expect = 1,
-            allow = 1
-//?}
     )
-//? if <1.21.6 {
     private VertexConsumer quickskin$redirectRenderHandBuffer(MultiBufferSource instance, RenderType renderType,
                                                               PoseStack poseStack, MultiBufferSource buffer, int packedLight, AbstractClientPlayer player, ModelPart arm, ModelPart sleeve) {
-//?} else if <1.21.9 {
-    private VertexConsumer quickskin$redirectRenderHandBuffer(MultiBufferSource instance, RenderType renderType,
-                                                              PoseStack poseStack, MultiBufferSource buffer, int packedLight,
-                                                              ResourceLocation skinTexture, ModelPart arm, boolean slim) {
-//?}
-//? if <1.21.9 {
         // When CPM has a bound player, it manages the texture pipeline and already converts
         // entitySolidâ†’entityTranslucent when needed. Overriding the RenderType here would
         // use a different ResourceLocation, causing first-person arm texture artifacts.
@@ -260,83 +229,71 @@ public class PlayerRendererMixin {
         if (ClientConfig.getInstance().shouldDisableSkinTransparency()) {
             return instance.getBuffer(renderType);
         }
-//?} else if <1.21.11 {
-    private void quickskin$redirectSubmitModelPart(SubmitNodeCollector collector, ModelPart part,
-                                                    PoseStack poseStack, RenderType renderType,
-                                                    int packedLight, int overlay, TextureAtlasSprite sprite,
-                                                    // Injected arguments from renderHand:
-                                                    PoseStack poseStackOuter, SubmitNodeCollector bufferOuter,
-                                                    int packedLightOuter, ResourceLocation skinTexture,
-                                                    ModelPart arm, boolean slim) {
-        if (CPMCompatIntegration.shouldDeferToCPM()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-//?} else {
-    private void quickskin$redirectSubmitModelPart(SubmitNodeCollector collector, ModelPart part,
-                                                    PoseStack poseStack, RenderType renderType,
-                                                    int packedLight, int overlay, TextureAtlasSprite sprite,
-                                                    // Injected arguments from renderHand:
-                                                    PoseStack poseStackOuter, SubmitNodeCollector bufferOuter,
-                                                    int packedLightOuter, Identifier skinTexture,
-                                                    ModelPart arm, boolean slim) {
-        if (CPMCompatIntegration.shouldDeferToCPM()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-//?}
 
-//? if <1.21.6 {
         ResourceLocation skinTexture = player.getSkin().texture();
-//?}
-//? if <1.21.9 {
         if (skinTexture == null) {
             return instance.getBuffer(renderType);
         }
 
         // Determine if the skin needs a translucent render type
-//?} else {
-        if (CPMCompatIntegration.isCPMActivelyRendering()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-
-        if (ClientConfig.getInstance().shouldDisableSkinTransparency()) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-
-        if (skinTexture == null) {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-            return;
-        }
-
-//?}
         boolean needsTranslucent = TextureAlphaDetector.hasTransparency(skinTexture);
 
         if (needsTranslucent) {
-//? if <1.21.9 {
             // The vanilla method calls getBuffer for both the solid arm and the translucent sleeve.
             // By forcing entityTranslucent here, we correctly render the arm with transparency.
             return instance.getBuffer(RenderType.entityTranslucent(skinTexture));
-//?} else if <1.21.11 {
-            RenderType translucentType = RenderType.entityTranslucent(skinTexture);
-            collector.submitModelPart(part, poseStack, translucentType, packedLight, overlay, sprite);
-        } else {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-//?} else {
-            RenderType translucentType = RenderTypes.entityTranslucent(skinTexture);
-            collector.submitModelPart(part, poseStack, translucentType, packedLight, overlay, sprite);
-        } else {
-            collector.submitModelPart(part, poseStack, renderType, packedLight, overlay, sprite);
-//?}
         }
-//? if <1.21.9 {
 
         // If no transparency is needed, use the original render type provided by the vanilla method.
         return instance.getBuffer(renderType);
-//?} else {
-//?}
     }
+//?} else if <1.21.9 {
+    /**
+     * Redirects the getBuffer call within AvatarRenderer's renderHand method.
+     * This allows us to switch from RenderTypes.entitySolid to RenderTypes.entityTranslucent
+     * when the player's skin has transparent pixels.
+     */
+    @Redirect(
+            method = "renderHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/resources/ResourceLocation;Lnet/minecraft/client/model/geom/ModelPart;Z)V",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/renderer/MultiBufferSource;getBuffer(Lnet/minecraft/client/renderer/RenderType;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+            ),
+            require = 0,
+            expect = 1,
+            allow = 1
+    )
+    private VertexConsumer quickskin$redirectRenderHandBuffer(MultiBufferSource instance, RenderType renderType,
+                                                              PoseStack poseStack, MultiBufferSource buffer, int packedLight,
+                                                              ResourceLocation skinTexture, ModelPart arm, boolean slim) {
+        // When CPM has a bound player, it manages the texture pipeline and already converts
+        // entitySolidâ†’entityTranslucent when needed. Overriding the RenderType here would
+        // use a different ResourceLocation, causing first-person arm texture artifacts.
+        if (CPMCompatIntegration.shouldPreserveFirstPersonHandRenderType()) {
+            return instance.getBuffer(renderType);
+        }
+
+        // Check if transparency is disabled globally by config
+        if (ClientConfig.getInstance().shouldDisableSkinTransparency()) {
+            return instance.getBuffer(renderType);
+        }
+
+        if (skinTexture == null) {
+            return instance.getBuffer(renderType);
+        }
+
+        // Determine if the skin needs a translucent render type
+        boolean needsTranslucent = TextureAlphaDetector.hasTransparency(skinTexture);
+
+        if (needsTranslucent) {
+            // The vanilla method calls getBuffer for both the solid arm and the translucent sleeve.
+            // By forcing entityTranslucent here, we correctly render the arm with transparency.
+            return instance.getBuffer(RenderType.entityTranslucent(skinTexture));
+        }
+
+        // If no transparency is needed, use the original render type provided by the vanilla method.
+        return instance.getBuffer(renderType);
+    }
+//?}
 }
 //?}

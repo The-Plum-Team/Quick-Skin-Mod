@@ -44,6 +44,14 @@ class WorkflowGuidanceTest(unittest.TestCase):
             render_guidance(source, self.matrix("1.20.1"), profile_branch="master"),
         )
 
+    def test_coordinator_guide_retains_one_direct_unit_task(self) -> None:
+        source = ":common:1.20.1:test\npython scripts/release/build_matrix.py --clean\n"
+        rendered = render_guidance(source, self.matrix(), profile_branch="master")
+        self.assertIn(":common:1.21.11:test", rendered)
+        self.assertIn("scripts/release/build_matrix.py --clean", rendered)
+        with self.assertRaises(WorkflowGuidanceError):
+            render_guidance(source + ":common:1.20.1:test\n", self.matrix(), profile_branch="master")
+
     def test_shared_matrix_uses_its_unit_lane_independently_of_artifact_order(self) -> None:
         data = release_matrix.load_matrix(ROOT / "release/release-matrix.json")
         data["artifacts"].reverse()
