@@ -21,7 +21,11 @@ from typing import Any, Protocol
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "release"))
 
-from evidence import PublicEvidenceError, validate_bundle  # noqa: E402
+from evidence import (  # noqa: E402
+    PublicEvidenceError,
+    bundle_coverage_sha,
+    validate_bundle,
+)
 from compatibility_evidence import (  # noqa: E402
     CompatibilityEvidenceError,
     validate_bundle as validate_compatibility_bundle,
@@ -111,6 +115,7 @@ class Artifact:
 class BranchGeneration:
     branch: str
     target_sha: str
+    coverage_sha: str
     target_run_id: int
     keep: Artifact
 
@@ -486,7 +491,7 @@ def _validate_keep(
     pages_run_id: int,
     pages_run_sha: str,
 ) -> None:
-    if api.get_branch_sha(generation.branch) != generation.target_sha:
+    if api.get_branch_sha(generation.branch) != generation.coverage_sha:
         raise RotationError(f"release head changed while rotating {generation.branch}")
     keep = api.get_artifact(generation.keep.artifact_id)
     if keep != generation.keep or keep.expired:
@@ -566,7 +571,7 @@ def rotate_branch(
 ) -> list[int]:
     if deletion_budget is not None:
         deletion_budget.begin_scope()
-    if api.get_branch_sha(generation.branch) != generation.target_sha:
+    if api.get_branch_sha(generation.branch) != generation.coverage_sha:
         print(f"head changed; rotation skipped for {generation.branch}")
         return []
 
@@ -936,10 +941,13 @@ def load_generations(
             raise RotationError(str(exc)) from exc
         provenance = manifest["provenance"]["target"]
         target_sha = _commit(provenance.get("sha"), "manifest.provenance.target.sha")
+        coverage_sha = _commit(
+            bundle_coverage_sha(manifest), "manifest.provenance.coverage_sha"
+        )
         target_run_id = _positive_int(
             provenance.get("run_id"), "manifest.provenance.target.run_id"
         )
-        expected_name = f"pages-cache-{branch}--{target_sha}"
+        expected_name = f"pages-cache-{branch}--{coverage_sha}"
         matching = [
             artifact
             for artifact in trigger_artifacts
@@ -957,6 +965,7 @@ def load_generations(
             BranchGeneration(
                 branch=branch,
                 target_sha=target_sha,
+                coverage_sha=coverage_sha,
                 target_run_id=target_run_id,
                 keep=matching[0],
             )
