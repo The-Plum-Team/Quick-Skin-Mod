@@ -42,10 +42,16 @@ and must never absorb the harness. The common test task also runs its extracted 
 The version-3 scenario contract declares each step's module/binding coverage, earlier action
 prerequisites, and earlier captures consumed by assertions. Coordinated multiplayer scenarios
 retain all clients and actions through `execution_scope: scenario`. `e2e/selection.py` computes
-the separate execution/capture closures and comparison partners. Its current CLI emits local
-path previews only: protected Git-diff admission, selective AI curation and retained unaffected
-evidence are still being migrated. CI continues to require complete profiles. A selected runtime
-report carries its exact selection SHA and must be rejected by a consumer expecting full evidence.
+the separate execution/capture closures and comparison partners. Its CLI emits local path previews.
+`scripts/ci/e2e_selection.py` independently derives an admission from immutable Git objects and
+the executing protected policy. Runtime and visual consumers recompute that admission from caller
+supplied commits and require its outer hash on every selected report. `project_contract` supplies
+their shared exact view of the authored assertions/captures; its contract hash remains unchanged,
+so selection identity must be checked separately. Unknown impact forces every scenario in the
+profile. Selected curation emits a distinct scope proof and cannot certify a full semantic anchor.
+CI still requires complete profiles while GitHub/baseline authentication, selective certification
+and retained unaffected evidence are migrated. A consumer expecting full evidence must reject a
+selected report, including a selected report that happens to contain all authored steps.
 
 `PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
 after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in

@@ -14,7 +14,8 @@ sys.path.insert(0, str(ROOT / "scripts" / "architecture"))
 
 from module_graph import Module, ModuleGraph, load_graph
 from scenario_contract import ScenarioContractError, default_contract, load_contract
-from selection import SelectionError, load_selection, select
+from selection import SelectionError, load_selection, project_contract, select
+from dataclasses import replace
 import packaged_runtime
 
 
@@ -62,6 +63,32 @@ class E2ESelectionTest(unittest.TestCase):
         self.assertNotIn("base_layer_transparency_first_person", role.captures)
         self.assertLess(len(role.captures), len(self.contract.expected_capture_steps("full", "client_a")))
         self.assertEqual(3, len(result.role("feature-navigation", "client_a").captures))
+
+    def test_projected_contract_keeps_assertions_and_hash_but_only_selected_images(self):
+        plan = select(self.contract, self.graph, [self.editor_path])
+        projected = project_contract(self.contract, plan)
+        self.assertEqual(self.contract.sha256, projected.sha256)
+        self.assertEqual(45, len(projected.captures))
+        self.assertEqual(68, len(projected.expected_steps("full", "client_a")))
+        self.assertEqual(plan.role("full", "client_a").captures,
+                         projected.expected_capture_steps("full", "client_a"))
+        self.assertEqual(set(projected.capture_ids), set(projected.review_regions))
+        for run in plan.runs:
+            for role in run.roles:
+                self.assertTrue(all(step.assertion_required for step in projected.role(run.scenario, role.role).steps))
+
+    def test_projection_rejects_missing_prerequisites_and_malformed_roles(self):
+        plan = select(self.contract, self.graph, [self.editor_path])
+        run = plan.runs[0]
+        role = run.roles[0]
+        variants = [replace(plan, contract_sha256="0" * 64), replace(plan, runs=()),
+                    replace(plan, runs=(run, run)),
+                    replace(plan, runs=(replace(run, roles=()),)),
+                    replace(plan, runs=(replace(run, roles=(replace(role, steps=role.steps[1:]),)),)),
+                    replace(plan, runs=(replace(run, roles=(replace(role, captures=role.captures[1:]),)),))]
+        for candidate in variants:
+            with self.subTest(candidate=candidate.runs[:1]), self.assertRaises(SelectionError):
+                project_contract(self.contract, candidate)
 
     def test_unknown_build_resource_policy_and_assembly_paths_force_full(self):
         for path in ("unowned/A.java", "architecture/modules.json", "e2e/scenario-contract.json",

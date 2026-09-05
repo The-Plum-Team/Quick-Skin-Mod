@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import ExitStack, contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO
 
@@ -38,7 +38,7 @@ from runtime_store import (
     StoreCorruptionError,
 )
 from scenario_contract import OpaqueStarsProbe, RequiredGuiTextProbe, default_contract
-from selection import Selection
+from selection import SelectionPlan, project_contract
 from mod_compatibility import CompatibilityLane
 
 
@@ -1176,7 +1176,7 @@ def client_command(
     port: int,
     java: str,
     compatibility_mod: str | None = None,
-    selection: Selection | None = None,
+    selection: SelectionPlan | None = None,
 ) -> list[str]:
     import minecraft_launcher_lib.command  # type: ignore[import-not-found]
     import minecraft_launcher_lib.utils  # type: ignore[import-not-found]
@@ -1878,7 +1878,7 @@ def compare_screenshots(
 
 
 def validate_report(game_dir: Path, row: dict[str, Any], scenario: str, role: str,
-                    selection: Selection | None = None) -> dict[str, Any]:
+                    selection: SelectionPlan | None = None) -> dict[str, Any]:
     report_path = game_dir / "e2e-report" / "report.json"
     if not report_path.is_file():
         raise RuntimeFailure(f"missing {role} report: {report_path}")
@@ -1897,12 +1897,7 @@ def validate_report(game_dir: Path, row: dict[str, Any], scenario: str, role: st
         if (report.get("selection_sha256") != selection.sha256
                 or selection.contract_sha256 != SCENARIO_CONTRACT.sha256):
             raise RuntimeFailure("report selection identity mismatch")
-        selected = selection.role(scenario, role)
-        role_contract = replace(role_contract,
-            steps=tuple(replace(step, capture=step.capture if step.id in selected.captures else None)
-                        for step in role_contract.steps if step.id in selected.steps),
-            comparisons=tuple(pair for pair in role_contract.comparisons
-                              if pair.first_step in selected.captures or pair.second_step in selected.captures))
+        role_contract = project_contract(SCENARIO_CONTRACT, selection).role(scenario, role)
     expected_steps = list(role_contract.step_ids)
     if report.get("contract_sha256") != SCENARIO_CONTRACT.sha256:
         raise RuntimeFailure(
@@ -2273,7 +2268,7 @@ def run_packaged_row(
     *,
     compatibility_lane: CompatibilityLane | None = None,
     compatibility_files: tuple[Path, ...] = (),
-    selection: Selection | None = None,
+    selection: SelectionPlan | None = None,
 ) -> dict[str, Any]:
     port = allocate_port()
     compatibility_suffix = (

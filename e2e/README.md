@@ -68,8 +68,28 @@ assembly edits or missing module/binding coverage select the complete profile.
 This command previews supplied paths; it does not authenticate a Git diff. The runner recomputes
 the entire manifest against the current module graph and scenario contract and records its hash
 in every selected report. These reports are local evidence and are rejected by current full-profile
-CI/AI consumers. Selective protected CI, compatibility reference provenance and reuse of unaffected
-evidence remain in progress in [the rework plan](../docs/architecture/MODULAR-REWORK.md).
+CI/AI consumers.
+
+`scripts/ci/e2e_selection.py` also derives a Git admission from independently supplied exact base,
+head and protected-policy commits. It reads committed objects, expands moves into both paths,
+and verifies that the executing selector, graph, matrix and contract match the policy commit and
+remain unchanged across the diff. A missing baseline, unknown ownership or policy change keeps
+the complete profile. Candidate files and Git external diff hooks are never executed by this reader.
+The caller still has to authenticate those commits against its GitHub event and baseline evidence;
+the admission file cannot supply that authority itself.
+
+The orchestrator accepts `--selection-admission`, `--selection-base` and `--selection-policy` and
+independently checks its actual source commit. Curation accepts the same arguments plus the
+independently expected `--selection-head` and `--selection-repository`. Both recompute the admission;
+its outer Git-bound hash, rather than the nested local preview hash, identifies every report.
+Selected curation requires `--all` within that scope, and `--validate-row-json` emits a schema-2
+scope proof carrying the selection hash. It cannot certify a complete semantic anchor. The default
+full-profile validators continue to reject selected reports. A disabled Git admission requires all
+scenarios in its profile, even if a caller attempts to supply a smaller scenario list.
+
+Protected workflow activation, compatibility reference provenance and reuse of unaffected evidence
+remain in progress in [the rework plan](../docs/architecture/MODULAR-REWORK.md). The local path
+preview remains available while these workflow contracts are migrated together.
 
 Build and stage the production jars plus separate remapped automation mods:
 

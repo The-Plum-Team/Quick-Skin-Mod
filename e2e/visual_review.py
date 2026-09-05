@@ -23,6 +23,7 @@ from pathlib import Path
 
 RELEASE_SCRIPTS = Path(__file__).resolve().parents[1] / "scripts" / "release"
 sys.path.insert(0, str(RELEASE_SCRIPTS))
+sys.path.insert(0, str(RELEASE_SCRIPTS.parent / "ci"))
 
 from matrix import MatrixError, load_matrix  # noqa: E402
 
@@ -35,6 +36,8 @@ from visual_evidence import (
     load_catalog,
 )
 from visual_similarity import SimilarityError, analyze_png_payloads
+from selection import SelectionPlan
+from e2e_selection import verify as verify_selection_admission
 
 
 MAX_REVIEW_FRAMES = 512
@@ -115,8 +118,11 @@ def build_manifest(
     include_all: bool,
     combos: set[tuple[str, str]] | None,
     reference_frames: dict[str, dict[str, object]] | None = None,
+    selection: SelectionPlan | None = None,
 ) -> list[dict[str, object]]:
-    catalog = load_catalog(catalog_path)
+    if selection is not None and not include_all:
+        raise VisualEvidenceError("selected review must include every admitted capture")
+    catalog = load_catalog(catalog_path, **({"selection": selection} if selection is not None else {}))
     _, frames, _ = collect_evidence(e2e_root, catalog)
     anchor_frames: dict[tuple[str, str], dict[str, object]] = {}
     for frame in frames:
@@ -581,6 +587,7 @@ def validate_expected_row(
     e2e_root: Path,
     catalog_path: Path,
     row: object,
+    *, selection: SelectionPlan | None = None,
 ) -> dict[str, object]:
     """Bind one artifact's complete evidence to one protected matrix row."""
 
@@ -606,7 +613,9 @@ def validate_expected_row(
     ):
         raise VisualEvidenceError("expected matrix row has invalid scenario coverage")
 
-    catalog = load_catalog(catalog_path)
+    catalog = load_catalog(catalog_path, **({"selection": selection} if selection is not None else {}))
+    if selection is not None and scenarios != tuple(run.scenario for run in selection.runs):
+        raise VisualEvidenceError("matrix row does not declare the exact admitted scenarios")
     lanes, _frames, _comparisons = collect_evidence(e2e_root, catalog)
     observed = {
         (
@@ -631,7 +640,7 @@ def validate_expected_row(
             f"artifact evidence uses multiple production JARs for matrix row {row_id}"
         )
     return {
-        "schema_version": 1,
+        "schema_version": 2 if selection is not None else 1,
         "row_id": row_id,
         "artifact_node": artifact_node,
         "runtime_version": runtime_version,
@@ -639,6 +648,7 @@ def validate_expected_row(
         "scenarios": list(scenarios),
         "lane_count": len(lanes),
         "jar_sha256": next(iter(jar_digests)),
+        **({"selection_sha256": selection.sha256} if selection is not None else {}),
     }
 
 
@@ -844,6 +854,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--e2e-root", type=Path, default=REPO / "e2e-out")
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
+    parser.add_argument("--selection-admission", type=Path)
+    parser.add_argument("--selection-base")
+    parser.add_argument("--selection-head")
+    parser.add_argument("--selection-policy")
+    parser.add_argument("--selection-repository", type=Path, default=REPO)
     parser.add_argument(
         "--matrix",
         type=Path,
@@ -877,6 +892,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
+        selection = None
+        admission_arguments = (args.selection_admission, args.selection_base,
+                               args.selection_head, args.selection_policy)
+        if any(value is not None for value in admission_arguments):
+            if args.selection_admission is None or args.selection_head is None or args.selection_policy is None:
+                raise VisualEvidenceError("selected curation requires an admission and independent head/policy commits")
+            selection = verify_selection_admission(args.selection_admission, args.selection_repository,
+                base=args.selection_base, head=args.selection_head, policy=args.selection_policy, profile="pr")
+            selection.require_selection()
+            if args.reference_identity or args.reference_retention_days or args.semantic_anchor:
+                raise VisualEvidenceError("selection cannot certify a complete semantic anchor or change reference inventory metadata")
         reference_arguments = (
             args.reference_evidence_root,
             args.reference_branch,
@@ -948,7 +974,8 @@ def main(argv: list[str] | None = None) -> int:
                 row = json.loads(args.validate_row_json)
             except json.JSONDecodeError as exc:
                 raise VisualEvidenceError(f"invalid expected matrix row JSON: {exc}") from exc
-            validated = validate_expected_row(args.e2e_root, args.catalog, row)
+            validated = validate_expected_row(args.e2e_root, args.catalog, row,
+                **({"selection": selection} if selection is not None else {}))
             print(json.dumps(validated, sort_keys=True, separators=(",", ":")))
             return 0
         reference_frames = None
@@ -973,6 +1000,7 @@ def main(argv: list[str] | None = None) -> int:
             include_all=args.all,
             combos=parse_combos(args.combos),
             reference_frames=reference_frames,
+            **({"selection": selection} if selection is not None else {}),
         )
         if args.semantic_anchor:
             manifest = validate_semantic_anchor_manifest(manifest)
@@ -983,7 +1011,7 @@ def main(argv: list[str] | None = None) -> int:
                 "review manifests must use --curate-output so 1920x1080 semantic "
                 "fingerprints are validated before model admission"
             )
-    except VisualEvidenceError as exc:
+    except (VisualEvidenceError, ValueError, OSError) as exc:
         parser.error(str(exc))
     json.dump(manifest, sys.stdout, indent=2, ensure_ascii=False)
     print()

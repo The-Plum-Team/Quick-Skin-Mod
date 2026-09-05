@@ -143,12 +143,23 @@ Java rejection canaries. The 462 release-policy and 289 CI tests pass with the n
 scenario inventory and updated gallery fixtures. Existing full-profile visual consumers explicitly
 reject selection-labelled results, even if their listed steps happen to be complete.
 
-This is a local execution milestone, not completion of stage 4 or authorization to reduce CI/AI
-coverage. Next: authenticated base/head diff admission and policy fingerprints; selective protected
-job/evidence/curation/AI contracts; compatibility clean-reference obligations; reuse of unaffected
-evidence with original provenance. Missing coverage and unknown source/resource/assembly changes
-still fall back to full. Shell/resource extraction and the remaining version/loader imports remain
-part of the active goal.
+The Git-object admission and selective curation primitives now exist. The admission binds exact
+base/head/policy commits and trees, the complete raw diff and all executing selection-policy bytes.
+Its hash, including that provenance, travels through launcher properties and reports. Runtime and
+curation callers independently recompute it; the nested local path-plan hash cannot substitute for
+it. A shared contract projection preserves required actions, images and comparisons. Disabled
+admissions require the entire profile, including when a caller supplies a shorter scenario list.
+Selected row proofs use a distinct schema and selected curation cannot certify a complete semantic
+anchor. These capabilities do not yet authorize reduced workflow coverage: GitHub event/run
+authentication, verified baseline evidence, protected job/capsule/certificate consumers,
+compatibility clean-reference obligations and reuse of unaffected evidence remain pending.
+
+Local curation of the preserved Fabric/Forge editor runs produced 90 review entries, backed by
+66 distinct normalized PNGs, against 176 entries for their complete PR profiles. The model-input
+validator accepts the exact curated directory. This is a local preview with the original local
+selection hash, not Git-admitted CI evidence or an AI verdict. Missing coverage and unknown
+source/resource/assembly changes still fall back to full. Shell/resource extraction and the
+remaining version/loader imports remain part of the active goal.
 
 Run Gradle serially; Architectury's transform state is JVM-global. Start with targeted
 checks and reuse successful evidence until another change invalidates it. Preserve wire
@@ -299,3 +310,12 @@ All 16 pinned release branches still require source/matrix/CI consolidation and 
 active 1.20.1 matrix and local development runs are not evidence for the other 30 artifact lanes.
 Measure Gradle configuration cost when all target versions are registered; target-specific CI
 tasks should not eagerly configure or resolve every unrelated Minecraft module/version node.
+
+- Git selection admission now passes twelve bounded Git-fixture tests, including a runtime
+  integration test that binds the checkout, launch properties and report to the outer admission
+  hash. Temporary fixture commits live only in disposable bare test repositories. The implementation
+  worktree remains uncommitted. Selected evidence/curation has 42 passing tests; the complete release
+  suite has 465 passing tests, and the architecture/selector suite has 37. The CI suite exercised
+  301 tests: its new integration fixture initially used an unlocked player name; after correction,
+  all twelve admission tests pass, including the added full-profile fallback check. The other 300
+  CI tests passed in the aggregate run. No production or harness bytecode changed in this milestone.

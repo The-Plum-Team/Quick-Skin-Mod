@@ -92,6 +92,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "gradle/wrapper",
     "gradlew",
     "scripts/ci/e2e_impact.py",
+    "scripts/ci/e2e_selection.py",
     "scripts/architecture/module_graph.py",
     "scripts/ci/e2e_job_graph.py",
     "scripts/ci/visual_anchor_certification.py",

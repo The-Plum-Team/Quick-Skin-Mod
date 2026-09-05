@@ -11,9 +11,9 @@ import hashlib
 import json
 import re
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Protocol
 
 from scenario_contract import ScenarioContract, default_contract
 
@@ -42,6 +42,22 @@ class RoleSelection:
 class ScenarioSelection:
     scenario: str
     roles: tuple[RoleSelection, ...]
+
+
+class SelectionPlan(Protocol):
+    """Common consumer API for an explicit local preview or a verified Git admission."""
+    @property
+    def sha256(self) -> str: ...
+    @property
+    def contract_sha256(self) -> str: ...
+    @property
+    def profile(self) -> str: ...
+    @property
+    def runs(self) -> tuple[ScenarioSelection, ...]: ...
+    @property
+    def reference_captures(self) -> tuple[str, ...]: ...
+    def role(self, scenario: str, role: str) -> RoleSelection: ...
+    def to_bytes(self) -> bytes: ...
 
 
 @dataclass(frozen=True)
@@ -84,6 +100,54 @@ def validate_coverage(contract: ScenarioContract, graph: ModuleGraph) -> None:
             for step in role.steps:
                 if set(step.modules) - graph.by_id.keys() or set(step.bindings) - bindings:
                     raise SelectionError(f"unknown module/binding coverage at {scenario.scenario}/{role.role}/{step.id}")
+
+
+def project_contract(contract: ScenarioContract, selected: SelectionPlan) -> ScenarioContract:
+    """Derive the exact contract view consumed by runtime and visual validators.
+
+    The raw contract hash remains its authored identity. Consumers must separately require
+    selected.sha256 on every report; this view alone never certifies complete coverage.
+    """
+    if contract.sha256 != selected.contract_sha256:
+        raise SelectionError("selection belongs to another scenario contract")
+    scenarios = []
+    seen_scenarios: set[str] = set()
+    for run in selected.runs:
+        scenario = contract.scenario(run.scenario)
+        if run.scenario in seen_scenarios or selected.profile not in scenario.execution_profiles:
+            raise SelectionError("duplicate or out-of-profile selected scenario")
+        seen_scenarios.add(run.scenario)
+        if tuple(role.role for role in run.roles) != contract.expected_roles(run.scenario):
+            raise SelectionError("selection must retain exactly the authored scenario roles")
+        roles = []
+        for chosen in run.roles:
+            role = contract.role(run.scenario, chosen.role)
+            steps = tuple(step for step in role.steps if step.id in chosen.steps)
+            captures = tuple(step.id for step in steps if step.capture is not None and step.id in chosen.captures)
+            if (not steps or tuple(step.id for step in steps) != chosen.steps
+                    or captures != chosen.captures or not set(chosen.targets) <= set(chosen.steps)):
+                raise SelectionError("selection has unknown, duplicate or out-of-order step/capture identities")
+            if scenario.execution_scope == "scenario" and chosen.steps != role.step_ids:
+                raise SelectionError("selection omitted coordinated client actions")
+            for step in steps:
+                if not set(step.requires) <= set(chosen.steps) or not set(step.requires_captures) <= set(chosen.captures):
+                    raise SelectionError("selection omitted an action or image prerequisite")
+            comparisons = tuple(pair for pair in role.comparisons
+                                if {pair.first_step, pair.second_step} & set(chosen.captures))
+            if any(not {pair.first_step, pair.second_step} <= set(chosen.captures) for pair in comparisons):
+                raise SelectionError("selection omitted a screenshot comparison partner")
+            roles.append(replace(role, steps=tuple(replace(step, capture=step.capture
+                                                       if step.id in chosen.captures else None)
+                                                  for step in steps), comparisons=comparisons))
+        scenarios.append(replace(scenario, roles=tuple(roles)))
+    if not scenarios:
+        raise SelectionError("selection cannot produce an empty contract view")
+    capture_ids = {step.capture.capture_id for scenario in scenarios for role in scenario.roles
+                   for step in role.steps if step.capture is not None}
+    return ScenarioContract(schema_version=contract.schema_version, screenshot_size=contract.screenshot_size,
+                            gui_text_reference_size=contract.gui_text_reference_size,
+                            review_regions={key: value for key, value in contract.review_regions.items() if key in capture_ids},
+                            scenarios=tuple(scenarios), sha256=contract.sha256)
 
 
 def select(contract: ScenarioContract, graph: ModuleGraph, paths: Iterable[str],
