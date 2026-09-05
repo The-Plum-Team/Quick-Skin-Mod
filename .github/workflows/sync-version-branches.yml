@@ -1,6 +1,8 @@
 name: Sync version branches
 
-# Shared changes land on master. Every automatic generation first ports only the matrix-derived
+# Historical branch-layout matrices port shared changes from master. A shared-source matrix
+# resolves no port targets, including delayed continuations and manual recovery requests.
+# Every historical automatic generation first ports only the matrix-derived
 # Minecraft 1.20.1 anchor. A protected semantic certificate, or an independently revalidated
 # nonvisual continuation after full anchor E2E, releases the remaining discovered branches. Each
 # target keeps its own matrix authoritative; no workflow stores a version list.
@@ -73,6 +75,14 @@ jobs:
           REQUESTED_TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
+          source_mode="$(python3 scripts/release/release_sources.py --kind mode)"
+          if [[ "$source_mode" == shared ]]; then
+            printf 'value=[]\n' >> "$GITHUB_OUTPUT"
+            printf 'Shared source builds every target directly; version-branch porting is retired.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [[ "$source_mode" == version-branches ]]
           source scripts/ci/github_api_retry.sh
           [[ "$(git rev-parse --is-shallow-repository)" == false ]]
           reference_identity="$(python3 e2e/visual_review.py \

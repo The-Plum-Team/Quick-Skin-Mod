@@ -2324,9 +2324,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("git push origin HEAD:master", workflow)
         for prefix in ("fabric-and-neoforge-*", "forge-and-fabric-*"):
             self.assertIn(prefix, build)
-        for prefix in ("fabric-and-neoforge-", "forge-and-fabric-"):
-            self.assertIn(f"startsWith(github.event.ref, '{prefix}')", workflow)
-        self.assertNotIn("github.event.ref_type == 'branch'\n", workflow)
+        self.assertIn("github.event_name == 'push' && github.ref == 'refs/heads/master'", workflow)
+        self.assertIn("--matrix release/release-matrix.json", workflow)
+        self.assertNotIn("scripts/release/version_branches.py", workflow)
+        self.assertNotIn("/branches?per_page=", workflow)
 
     def test_release_test_jobs_install_locked_pages_dependency(self) -> None:
         for workflow, job in (

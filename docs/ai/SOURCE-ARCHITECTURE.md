@@ -177,6 +177,13 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 
 ## Version-port control plane
 
+The shared-source schema-3 matrix retires automatic version ports. `release_sources.py` validates
+the complete matrix before resolving `master` as the only source branch and an empty port list.
+The sync workflow exits before Git/GitHub work; delayed port results must pass a protected layout
+job before candidate inspection or repair. Existing historical refs remain untouched and do not
+declare active support. README status uses `status_table.py --matrix` directly. The following
+controllers remain for historical schema-2 evidence and explicit recovery, not shared-source work.
+
 - `scripts/ci/version_port_merge.py` is the sole protected owner of version-port Git merge
   semantics. Given exact clean target/source commits, it runs a hook-free no-commit merge,
   authenticates `MERGE_HEAD`, snapshots the complete original index, applies the classifier's

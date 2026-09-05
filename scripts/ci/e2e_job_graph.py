@@ -106,6 +106,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "scripts/release/generate_sbom.py",
     "scripts/release/matrix.py",
     "scripts/release/release_identity.py",
+    "scripts/release/release_sources.py",
     "scripts/release/verify_reproducibility.py",
     "scripts/release/version_branches.py",
     "scripts/release/workflow_guidance.py",

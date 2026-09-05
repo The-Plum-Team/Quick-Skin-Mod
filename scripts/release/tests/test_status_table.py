@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import sys
+import copy
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "release"))
 
 import status_table  # noqa: E402
+import matrix as release_matrix  # noqa: E402
 
 
 def matrix_for(version: str, loaders: tuple[str, ...], java: int) -> dict[str, object]:
@@ -25,6 +29,39 @@ def matrix_for(version: str, loaders: tuple[str, ...], java: int) -> dict[str, o
 
 
 class ReleaseStatusTableTest(unittest.TestCase):
+    def test_shared_source_lists_exact_matrix_targets_with_shared_badges_and_independent_tags(self):
+        path = ROOT / "release/release-matrix.json"
+        data = release_matrix.load_matrix(path)
+        version = release_matrix.read_mod_version(path, data)
+        section = status_table.render_shared_status_section(data,
+            repository="The-Plum-Team/Quick-Skin-Mod", mod_version=version)
+        targets = {row["artifact_version"] for row in data["artifacts"]}
+        rows = [line.split(" | ")[0][2:] for line in section.splitlines() if line.startswith("| ")][1:]
+        self.assertEqual(sorted(targets, key=lambda value: tuple(map(int, value.split("."))), reverse=True), rows)
+        self.assertEqual(2, section.count("/badge.svg?branch=master"))
+        self.assertNotIn("fabric-and-neoforge-", section)
+        self.assertNotIn("forge-and-fabric-", section)
+        for target in targets:
+            self.assertIn(f"/releases/tag/mc{target}-v{version}", section)
+        invalid = copy.deepcopy(data)
+        invalid["artifacts"][-1]["java"] = 0
+        with self.assertRaises(release_matrix.MatrixError):
+            status_table.render_shared_status_section(invalid,
+                repository="The-Plum-Team/Quick-Skin-Mod", mod_version=version)
+
+    def test_shared_cli_does_not_discover_or_read_historical_refs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            readme = Path(temporary) / "README.md"
+            readme.write_text("before\n" + status_table.START_MARKER + "\nold\n"
+                              + status_table.END_MARKER + "\nafter\n")
+            arguments = ["--matrix", str(ROOT / "release/release-matrix.json"),
+                         "--repository", "The-Plum-Team/Quick-Skin-Mod", "--readme", str(readme)]
+            with patch.object(status_table, "load_discovered_matrices", side_effect=AssertionError("read historical refs")):
+                self.assertEqual(0, status_table.main([*arguments, "--write"]))
+                self.assertEqual(0, status_table.main([*arguments, "--check"]))
+            self.assertTrue(readme.read_text().startswith("before\n"))
+            self.assertTrue(readme.read_text().endswith("\nafter\n"))
+
     def test_renders_newest_first_with_branch_specific_badges(self) -> None:
         section = status_table.render_status_section(
             {

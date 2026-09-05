@@ -1,6 +1,6 @@
 # ADR 0001: Postpone consolidation of the Minecraft 1.21 release branches
 
-- Status: Accepted — consolidation postponed
+- Status: Superseded by [ADR 0003](0003-shared-source-with-independent-target-releases.md)
 - Date: 2026-08-02
 - Scope: `fabric-and-neoforge-1.21.1` and `fabric-and-neoforge-1.21.11`
 

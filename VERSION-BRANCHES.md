@@ -1,5 +1,12 @@
 # Version branches
 
+This document preserves the historical schema-2 branch delivery and evidence flow. The current
+schema-3 release matrix builds all targets from shared source; `release_sources.py` resolves no
+version-port work, including delayed/manual recovery events. Existing refs and evidence remain
+historical inputs. See [ADR 0003](docs/architecture/decisions/0003-shared-source-with-independent-target-releases.md)
+and [Releasing Quick Skin](RELEASING.md) for the new source and publication contracts. The remaining
+Pages/selective-evidence migration is tracked in `docs/architecture/MODULAR-REWORK.md`.
+
 Quick Skin keeps shared development on `master` and one independently buildable release branch for
 each Minecraft version. A release branch name describes its active loader pair and exact Minecraft
 version, for example `forge-and-fabric-1.20.1`.

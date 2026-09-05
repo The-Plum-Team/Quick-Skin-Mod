@@ -509,3 +509,13 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   or GitHub workflow was executed. Final policy suites pass 497 release and 301 CI tests.
   Protected selective review/baseline evidence, remaining API/feature boundaries, release
   governance/status/Pages and complete final reproducibility/visual acceptance remain pending.
+- Shared-source status and governance now consume the validated matrix. README status lists
+  every target with its canonical tag and uses the shared source's checks; the old branch-port
+  producer and result handler stop before legacy discovery or candidate checkout on schema 3.
+  The release environment plan retains human approval, admits canonical target tags, and retires
+  only the explicitly declared legacy branch deployment pattern. Historical branch rulesets are
+  not managed or deleted. A stateful local API fixture proves plan/apply convergence, exact source
+  SHA pinning and rejection of unknown or ambiguous policies. No remote governance was applied.
+  All 507 release-policy and 303 CI-policy tests pass. This control-plane checkpoint reuses the
+  preceding 64 verified JARs: no Java, resource, matrix or build input changed. Pages and protected
+  selective review still require their shared-source migration.

@@ -1,11 +1,15 @@
 name: Refresh release status table
 
-# The README status inventory is generated from live release branches and the matrix committed to
-# each branch. Branch events keep it current; the schedule repairs missed events. Changes travel
+# The README status inventory comes from the complete shared-source matrix. Source changes and
+# the scheduled recovery refresh keep it current. Changes travel
 # through one reusable automation PR so master can remain PR-only with no workflow bypass.
 on:
-  create:
-  delete:
+  push:
+    branches: [master]
+    paths:
+      - release/release-matrix.json
+      - gradle.properties
+      - scripts/release/status_table.py
   workflow_dispatch:
   schedule:
     - cron: "23 4 * * 1"
@@ -25,9 +29,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'schedule' ||
-      (github.event.ref_type == 'branch' &&
-        (startsWith(github.event.ref, 'fabric-and-neoforge-') ||
-         startsWith(github.event.ref, 'forge-and-fabric-')))
+      (github.event_name == 'push' && github.ref == 'refs/heads/master')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
@@ -51,34 +53,18 @@ jobs:
           --require-hashes
           --requirement scripts/pages/requirements.txt
 
-      - name: Discover branches and fetch their authoritative matrices
-        id: branches
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          branches="$(gh api --paginate \
-            "repos/$GITHUB_REPOSITORY/branches?per_page=100" --jq '.[].name' \
-            | python3 scripts/release/version_branches.py --exclude master)"
-          [[ "$branches" != '[]' ]]
-          while IFS= read -r branch; do
-            git fetch --no-tags origin \
-              "refs/heads/${branch}:refs/remotes/origin/${branch}"
-          done < <(jq -r '.[]' <<< "$branches")
-          printf 'value=%s\n' "$branches" >> "$GITHUB_OUTPUT"
+      - name: Validate the authoritative shared-source matrix
+        run: python3 scripts/release/matrix.py --matrix release/release-matrix.json > /dev/null
 
       - name: Generate the deterministic README candidate
         id: candidate
         shell: bash
-        env:
-          BRANCHES: ${{ steps.branches.outputs.value }}
         run: |
           set -euo pipefail
-          jq -r '.[]' <<< "$BRANCHES" \
-            | python3 scripts/release/status_table.py \
-                --repository "$GITHUB_REPOSITORY" \
-                --readme README.md \
+          python3 scripts/release/status_table.py \
+            --matrix release/release-matrix.json \
+            --repository "$GITHUB_REPOSITORY" \
+            --readme README.md \
             > "$RUNNER_TEMP/generated-README.md"
           if cmp --silent README.md "$RUNNER_TEMP/generated-README.md"; then
             printf 'changed=false\n' >> "$GITHUB_OUTPUT"
@@ -154,7 +140,7 @@ jobs:
               --base master \
               --head "$AUTOMATION_BRANCH" \
               --title 'docs: refresh release status table' \
-              --body 'Automated deterministic refresh generated from the live version branches and each branch-owned release matrix.')"
+              --body 'Automated deterministic refresh generated from the authoritative shared-source release matrix.')"
           fi
 
           # Gate dispatch is keyed to the current automation head, not to whether this run

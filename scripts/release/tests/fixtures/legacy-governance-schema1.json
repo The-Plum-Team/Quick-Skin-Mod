@@ -1,11 +1,13 @@
 {
-  "schema": 2,
+  "schema": 1,
   "api_version": "2026-03-10",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "managed_rulesets": {
     "default_branch": "Quick Skin default branch",
+    "release_branches": "Quick Skin release branches",
     "release_tags": "Quick Skin immutable release tags"
   },
+  "release_branch_pattern": "*-and-*-*",
   "release_tag_pattern": "mc*-v*",
   "required_checks": [
     "Build and verify",
@@ -22,14 +24,12 @@
     "prevent_self_review": false,
     "deployment_policies": [
       {
-        "type": "tag",
-        "name": "mc*-v*"
-      }
-    ],
-    "retired_deployment_policies": [
-      {
         "type": "branch",
         "name": "*-and-*-*"
+      },
+      {
+        "type": "tag",
+        "name": "mc*-v*"
       }
     ]
   },
@@ -50,20 +50,12 @@
         "gh pr create"
       ]
     },
-    "release_source": {
+    "release_branches": {
       ".github/workflows/release.yml": [
         "environment: release",
         "github_release.py stage",
-        "github_release.py publish",
-        "--event-target",
-        "--target \"$RELEASE_TARGET\"",
-        "release-target: ${{ needs.build.outputs.target }}"
-      ],
-      ".github/workflows/sync-version-branches.yml": [
-        "scripts/release/release_sources.py --kind mode",
-        "version-branch porting is retired"
+        "github_release.py publish"
       ]
     }
-  },
-  "source_matrix": "release/release-matrix.json"
+  }
 }

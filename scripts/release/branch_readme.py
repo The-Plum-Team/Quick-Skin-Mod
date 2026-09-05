@@ -24,6 +24,7 @@ START_MARKER = "<!-- branch-profile:start -->"
 END_MARKER = "<!-- branch-profile:end -->"
 LEGACY_HEADER = "# Quick Skin\n\n"
 LEGACY_END = "\n## Verified releases\n"
+SHARED_STATUS_END = "\n## Release status\n"
 GITHUB_SOURCES = re.compile(
     r"^https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/?$"
 )
@@ -360,9 +361,9 @@ def render_unified_profile(data: Mapping[str, Any], *, profile_branch: str) -> s
         "Minecraft version (`mc<version>-v<mod_version>`); the complete build bundle is not "
         "a publishable release. Dependency ranges remain in the matrix and generated JAR metadata.",
         "",
-        "The [migration plan](docs/architecture/MODULAR-REWORK.md) records the remaining target "
-        "imports, CI and publication work. Existing published releases and their remote evidence "
-        "remain listed below during migration.",
+        "The [migration plan](docs/architecture/MODULAR-REWORK.md) records remaining API, selective "
+        "CI, governance and evidence work. The status table derives target release identities "
+        "from this same matrix.",
         END_MARKER,
     ])
     return "\n".join(lines)
@@ -384,8 +385,9 @@ def replace_profile_section(
         owns_header = (
             readme.startswith(LEGACY_HEADER)
             and start == len(LEGACY_HEADER)
-            and readme.count(LEGACY_END) == 1
-            and readme[end:].startswith("\n\n## Verified releases\n")
+            and sum(readme.count(boundary) for boundary in (LEGACY_END, SHARED_STATUS_END)) == 1
+            and any(readme[end:].startswith("\n" + boundary)
+                    for boundary in (LEGACY_END, SHARED_STATUS_END))
         )
         if not owns_header:
             if bootstrap:
