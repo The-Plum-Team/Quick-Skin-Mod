@@ -856,7 +856,14 @@ interface ModCompatibilityFeature {
     }
 
     final class CustomNpcsFeature extends BaseFeature {
+        private static final String BASELINE_NPC_SKIN =
+                "customnpcs:textures/entity/humanmale/steve.png";
+        private static final String CHANGED_NPC_SKIN =
+                "customnpcs:textures/entity/humanmale/firesteve.png";
+
         private volatile Entity npc;
+        private int baselineReadinessPolls;
+        private int appliedReadinessPolls;
 
         CustomNpcsFeature(Minecraft minecraft) {
             super(minecraft);
@@ -864,31 +871,54 @@ interface ModCompatibilityFeature {
 
         @Override
         public void prepareBaseline() {
+            baselineReadinessPolls = 0;
             npc = findCustomNpc();
+            if (npc != null) applyNpcSkin(BASELINE_NPC_SKIN);
             holdNpcView();
         }
 
         @Override
         public boolean baselineReady() {
             npc = findCustomNpc();
-            return npc != null && holdNpcView();
+            String displayTexture = npcSkinTexture();
+            if (failure == null && npc != null && !BASELINE_NPC_SKIN.equals(displayTexture)) {
+                applyNpcSkin(BASELINE_NPC_SKIN);
+                displayTexture = npcSkinTexture();
+            }
+            String rendererTexture = npcRendererTexture();
+            boolean viewReady = holdNpcView();
+            logNpcReadiness("baseline", ++baselineReadinessPolls,
+                    displayTexture, rendererTexture, viewReady, false);
+            if (failure != null) return true;
+            return npc != null
+                    && BASELINE_NPC_SKIN.equals(displayTexture)
+                    && BASELINE_NPC_SKIN.equals(rendererTexture)
+                    && viewReady;
         }
 
         @Override
         public Step.Result assertBaseline() {
+            if (failure != null) return Step.Result.fail(failure);
             npc = findCustomNpc();
             if (npc == null) {
                 return Step.Result.fail("dedicated server supplied no real CustomNPC entity");
             }
+            if (!npcSkinReady(BASELINE_NPC_SKIN)) {
+                return Step.Result.fail("CustomNPCs control skin did not reach its renderer; "
+                        + npcSkinDiagnostic());
+            }
             var type = BuiltInRegistries.ENTITY_TYPE.getKey(npc.getType());
-            return Step.Result.pass("real server-owned " + type + " entity is rendered beside "
-                    + "Quick Skin's untouched local player");
+            return Step.Result.pass("real server-owned " + type + " entity renders CustomNPCs "
+                    + "display skin " + BASELINE_NPC_SKIN
+                    + " beside Quick Skin's untouched local player");
         }
 
         @Override
         public void applyQuickSkinFeature() {
+            appliedReadinessPolls = 0;
             try {
                 importAndApply(TestAssets.makeClassicSkin());
+                if (failure == null) applyNpcSkin(CHANGED_NPC_SKIN);
             } catch (Exception exception) {
                 failure = "CustomNPCs skin fixture failed: " + concise(exception);
             }
@@ -898,7 +928,18 @@ interface ModCompatibilityFeature {
         @Override
         public boolean quickSkinFeatureReady() {
             npc = findCustomNpc();
-            return failure == null && npc != null && activeSkinReady() && holdNpcView();
+            String displayTexture = npcSkinTexture();
+            String rendererTexture = npcRendererTexture();
+            boolean playerSkinReady = activeSkinReady();
+            boolean viewReady = holdNpcView();
+            logNpcReadiness("applied", ++appliedReadinessPolls,
+                    displayTexture, rendererTexture, viewReady, playerSkinReady);
+            if (failure != null) return true;
+            return npc != null
+                    && playerSkinReady
+                    && CHANGED_NPC_SKIN.equals(displayTexture)
+                    && CHANGED_NPC_SKIN.equals(rendererTexture)
+                    && viewReady;
         }
 
         @Override
@@ -906,6 +947,10 @@ interface ModCompatibilityFeature {
             if (failure != null) return Step.Result.fail(failure);
             npc = findCustomNpc();
             if (npc == null) return Step.Result.fail("CustomNPC disappeared after skin apply");
+            if (!npcSkinReady(CHANGED_NPC_SKIN)) {
+                return Step.Result.fail("CustomNPCs changed skin did not reach its renderer; "
+                        + npcSkinDiagnostic());
+            }
             var actual = appearances.getSkinLocation(playerId);
             Boolean activeConflict = detectsSkinConflict(actual);
             if (activeConflict == null) return Step.Result.fail(failure);
@@ -921,8 +966,91 @@ interface ModCompatibilityFeature {
                 return Step.Result.fail("CustomNPCs conflict tracker did not retain the applied skin");
             }
             var type = BuiltInRegistries.ENTITY_TYPE.getKey(npc.getType());
-            return activeSkinAssertion("real " + type + " content remains rendered while the "
-                    + "CustomNPCs bridge retains Quick Skin's renderer-facing texture");
+            return activeSkinAssertion("real " + type + " changed its CustomNPCs display skin "
+                    + "from " + BASELINE_NPC_SKIN + " to " + CHANGED_NPC_SKIN
+                    + " while the CustomNPCs bridge retained Quick Skin's renderer-facing "
+                    + "player texture");
+        }
+
+        private void applyNpcSkin(String skinTexture) {
+            Object display = customNpcDisplay();
+            if (display == null) return;
+            try {
+                display.getClass().getMethod("setSkinTexture", String.class)
+                        .invoke(display, skinTexture);
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "CustomNPCs display API could not set NPC skin: " + concise(exception);
+            }
+        }
+
+        private boolean npcSkinReady(String expectedTexture) {
+            return expectedTexture.equals(npcSkinTexture())
+                    && expectedTexture.equals(npcRendererTexture());
+        }
+
+        private String npcSkinDiagnostic() {
+            return "displayTexture=" + npcSkinTexture()
+                    + "; rendererTexture=" + npcRendererTexture();
+        }
+
+        private String npcSkinTexture() {
+            Object display = customNpcDisplay();
+            if (display == null) return null;
+            try {
+                Object texture = display.getClass().getMethod("getSkinTexture").invoke(display);
+                return texture instanceof String value ? value : null;
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "CustomNPCs display API could not read NPC skin: " + concise(exception);
+                return null;
+            }
+        }
+
+        private String npcRendererTexture() {
+            if (npc == null) return null;
+            try {
+                Object texture = npc.getClass().getField("textureLocation").get(npc);
+                return texture == null ? null : texture.toString();
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "CustomNPCs renderer texture could not be inspected: "
+                        + concise(exception);
+                return null;
+            }
+        }
+
+        /**
+         * Client entities deliberately have no server-side {@code wrappedNPC}. Their public
+         * display component implements {@code INPCDisplay} and owns the texture consumed by the
+         * renderer, so the E2E crosses that client-observable API boundary directly.
+         */
+        private Object customNpcDisplay() {
+            if (npc == null) return null;
+            try {
+                Object display = npc.getClass().getField("display").get(npc);
+                if (display == null) {
+                    failure = "CustomNPCs client entity exposed no display component";
+                }
+                return display;
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "CustomNPCs display API could not be inspected: " + concise(exception);
+                return null;
+            }
+        }
+
+        private void logNpcReadiness(
+                String phase,
+                int poll,
+                String displayTexture,
+                String rendererTexture,
+                boolean viewReady,
+                boolean playerSkinReady) {
+            if (poll != 1 && poll % 100 != 0 && failure == null) return;
+            E2ELog.info("CustomNPCs " + phase + " readiness: npc="
+                    + (npc == null ? "<missing>" : npc.getClass().getName())
+                    + ", displayTexture=" + displayTexture
+                    + ", rendererTexture=" + rendererTexture
+                    + ", playerSkin=" + playerSkinReady
+                    + ", view=" + viewReady
+                    + ", failure=" + (failure == null ? "<none>" : failure));
         }
 
         private Boolean detectsSkinConflict(Object location) {

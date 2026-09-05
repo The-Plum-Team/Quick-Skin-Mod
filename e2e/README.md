@@ -449,8 +449,10 @@ workflow for each locked mod:
   injected-ModelPart seam to replace the six flat outer parts, while 26.2 retains the injection
   through deferred submission; visual review rejects any voxel cluster that is detached from or
   aligned to the wrong anatomical part.
-- CustomNPCs summons a real server-owned `customnpcs:*` entity and keeps it visible beside the
-  local player while Quick Skin changes only the player's renderer-facing texture.
+- CustomNPCs summons a real server-owned `customnpcs:*` entity, fixes its control skin through the
+  mod's public display API, and then changes that same NPC to its fire-themed skin while Quick Skin
+  changes the local player's renderer-facing texture. Both the display value and CustomNPCs'
+  renderer-resolved texture must reach the requested skin.
 - Essential keeps ownership of its title player model, anchors exactly one Quick Skin action to
   the bottom of Essential's right-hand action rail, suppresses Quick Skin's duplicate preview, and
   verifies Essential retained the selected appearance.
