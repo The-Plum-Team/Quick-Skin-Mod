@@ -399,8 +399,13 @@ tasks should not eagerly configure or resolve every unrelated Minecraft module/v
   static inspector that did not understand bounded API-family conditions. Its five tests now pass,
   including boundary selection and rejection of unsupported syntax. Ten protected bootstrap tests
   pass. New visual E2E runs are deferred to GitHub under the maintainer's instruction.
-- Follow up the pinned 1.21.5 Replay improvement before declaring migration acceptance: its
-  `PlayerAppearanceService.applyLookFromNetwork` notifies Replay of the authoritative subject,
-  and its rewritten watcher re-applies a look after that entity spawns. Port that behavior through
-  the client event/API boundary; do not reintroduce an `appearance-services -> replay-integration`
-  compilation cycle. Preserve the current bounded per-tick watcher and cached optional reflection.
+- The pinned 1.21.5 Replay improvement now crosses a typed `NetworkAppearanceAppliedEvent` in the
+  client foundation. Client composition connects that event to Replay; appearance services do not
+  import the optional integration. The watcher remembers the authoritative subject before entity
+  spawn, re-applies its complete look once present, and waits for its actual texture. It runs once
+  per tick, expires after a bounded appearance/startup budget, preserves cached optional reflection,
+  and suppresses its own re-application when counting recorded payloads. Session reset clears the
+  subject and counters; the client lifecycle owns the event subscription. All six target builds
+  and all 483 release-policy tests pass after this change. The twelve production JARs and twelve
+  harnesses are staged and independently verified again. Replay playback evidence remains a
+  GitHub acceptance obligation.

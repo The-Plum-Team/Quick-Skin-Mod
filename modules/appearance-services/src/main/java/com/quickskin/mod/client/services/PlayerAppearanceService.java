@@ -8,6 +8,7 @@ import com.quickskin.mod.common.data.PlayerAppearance;
 import com.quickskin.mod.platform.MinecraftTextures;
 import com.quickskin.mod.common.data.PlayerAppearanceRepository;
 import com.quickskin.mod.common.event.InternalEventBus;
+import com.quickskin.mod.common.event.NetworkAppearanceAppliedEvent;
 import com.quickskin.mod.common.event.PlayerAppearanceUpdateEvent;
 import com.quickskin.mod.common.event.SkinTexturesReloadedEvent;
 import net.fabricmc.api.EnvType;
@@ -392,6 +393,9 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
         applyingNetworkUpdate = true;
         try {
             applyLook(playerId, skinId, capeId, model);
+            if (playerId != null) {
+                eventBus.post(new NetworkAppearanceAppliedEvent(playerId));
+            }
         } finally {
             applyingNetworkUpdate = previous;
         }

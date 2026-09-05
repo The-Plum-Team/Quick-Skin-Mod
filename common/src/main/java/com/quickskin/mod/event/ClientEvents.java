@@ -756,6 +756,11 @@ public class ClientEvents {
         INTERNAL_SUBSCRIPTIONS.add(eventBus.register(
                 ServerConfigSyncEvent.class,
                 ClientEvents::onServerConfigSynced));
+        //? if >=1.21 {
+        INTERNAL_SUBSCRIPTIONS.add(eventBus.register(
+                com.quickskin.mod.common.event.NetworkAppearanceAppliedEvent.class,
+                event -> com.quickskin.mod.client.compat.ReplayModHelper.noteNetworkAppearance(event.playerId())));
+        //?}
     }
 
     private static void onPlayerAppearanceUpdated(PlayerAppearanceUpdateEvent event) {

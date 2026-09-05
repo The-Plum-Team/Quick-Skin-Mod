@@ -4,8 +4,6 @@ package com.quickskin.mod.client.compat;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.PlayerAppearance;
-import com.quickskin.mod.common.event.InternalEventBus;
-import com.quickskin.mod.common.event.PlayerAppearanceUpdateEvent;
 import com.quickskin.mod.platform.PlatformHelper;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -50,7 +48,11 @@ public final class ReplayModHelper {
     private static final AtomicBoolean WATCHER_ACTIVE = new AtomicBoolean();
     private static final AtomicInteger INTERCEPTED_PAYLOADS = new AtomicInteger();
     private static final int MAX_STARTUP_TICKS = 20 * 30;
+    private static final int MAX_APPEARANCE_TICKS = 20 * 60;
     private static int startupTicks;
+    private static int appearanceTicks;
+    private static boolean reapplying;
+    private static boolean pendingAppearance;
 
     private static boolean modAvailable;
     private static boolean modChecked;
@@ -62,9 +64,7 @@ public final class ReplayModHelper {
     private static Method replayHandlerAccessor;
 
     @Nullable
-    private static InternalEventBus.Subscription subscription;
-    @Nullable
-    private static volatile String appliedSkinId;
+    private static volatile UUID observedPlayerId;
 
     private static volatile boolean sawReplay;
     private static volatile boolean skinApplied;
@@ -123,6 +123,10 @@ public final class ReplayModHelper {
      */
     @Nullable
     public static UUID getTargetPlayerUUID() {
+        UUID observed = observedPlayerId;
+        if (observed != null) {
+            return observed;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.level == null) {
             return null;
@@ -163,13 +167,15 @@ public final class ReplayModHelper {
      * no executor task or recursive Minecraft.execute call is scheduled.
      */
     public static void startReplayPlayerWatcher() {
+        if (!isAvailable()) {
+            return;
+        }
         synchronized (WATCHER_LOCK) {
             if (!WATCHER_ACTIVE.compareAndSet(false, true)) {
                 return;
             }
             startupTicks = 0;
-            subscription = InternalEventBus.getInstance().register(
-                    PlayerAppearanceUpdateEvent.class, ReplayModHelper::onAppearanceUpdate);
+            appearanceTicks = 0;
         }
     }
 
@@ -192,34 +198,38 @@ public final class ReplayModHelper {
     public static void resetReplayEvidenceState() {
         stopWatcher();
         INTERCEPTED_PAYLOADS.set(0);
-        appliedSkinId = null;
+        observedPlayerId = null;
+        pendingAppearance = false;
+        reapplying = false;
         skinApplied = false;
         sawReplay = false;
     }
 
     private static void stopWatcher() {
-        InternalEventBus.Subscription active;
         synchronized (WATCHER_LOCK) {
             WATCHER_ACTIVE.set(false);
-            active = subscription;
-            subscription = null;
-        }
-        if (active != null) {
-            active.close();
         }
     }
 
-    private static void onAppearanceUpdate(PlayerAppearanceUpdateEvent event) {
-        if (!WATCHER_ACTIVE.get() || !isInReplay()) {
+    /** Receives the production S2C application event, independently of entity spawn order. */
+    public static void noteNetworkAppearance(@Nullable UUID playerId) {
+        if (playerId == null || reapplying || !isInReplay()) {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft != null && minecraft.player != null
-                && minecraft.player.getUUID().equals(event.playerId())) {
+        if (minecraft == null || !minecraft.isSameThread()) {
+            return;
+        }
+        if (minecraft.player != null && minecraft.player.getUUID().equals(playerId)) {
             // ReplayMod's camera entity is not a recorded participant.
             return;
         }
+        observedPlayerId = playerId;
+        pendingAppearance = true;
+        skinApplied = false;
+        appearanceTicks = 0;
         INTERCEPTED_PAYLOADS.incrementAndGet();
+        startReplayPlayerWatcher();
     }
 
     /** One bounded pass, called on the Minecraft thread by the client composition root. */
@@ -229,6 +239,10 @@ public final class ReplayModHelper {
         }
         try {
             if (isInReplay()) {
+                if (++appearanceTicks >= MAX_APPEARANCE_TICKS) {
+                    stopWatcher();
+                    return;
+                }
                 applyRecordedAppearance();
             } else if (sawReplay || ++startupTicks >= MAX_STARTUP_TICKS) {
                 stopWatcher();
@@ -240,22 +254,33 @@ public final class ReplayModHelper {
     }
 
     private static void applyRecordedAppearance() {
-        UUID target = getTargetPlayerUUID();
-        if (target == null) {
+        UUID target = observedPlayerId;
+        if (target == null || getPlayerByUUID(target) == null) {
             return;
         }
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
         PlayerAppearance appearance = service.getAppearance(target);
-        String skinId = appearance == null ? null : appearance.getSkinId();
-        if (skinId == null || skinId.isEmpty() || service.getSkinLocation(target) == null) {
+        if (appearance == null) {
             return;
         }
-        // Only re-drive the renderer when the recorded look actually changed.
-        if (!skinId.equals(appliedSkinId)) {
-            appliedSkinId = skinId;
-            service.refreshPlayerRenderer(target);
+        if (pendingAppearance) {
+            reapplying = true;
+            try {
+                service.applyLookFromNetwork(target, appearance.getSkinId(),
+                        appearance.getCapeId(), appearance.getModel());
+                pendingAppearance = false;
+            } finally {
+                reapplying = false;
+            }
         }
-        skinApplied = true;
+        String skinId = appearance.getSkinId();
+        if (skinId == null || skinId.isEmpty()) {
+            stopWatcher();
+        } else if (service.getSkinLocation(target) != null) {
+            service.refreshPlayerRenderer(target);
+            skinApplied = true;
+            stopWatcher();
+        }
     }
 
     private static boolean hasResolvedSkin(UUID playerId) {

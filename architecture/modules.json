@@ -588,7 +588,6 @@
       "implementation": [
         "appearance-data",
         "appearance-services",
-        "client-foundation",
         "configuration",
         "platform-api",
         "asset-catalog"
