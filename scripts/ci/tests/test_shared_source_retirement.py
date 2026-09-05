@@ -20,6 +20,69 @@ from matrix import gha_matrix, load_matrix, read_mod_version  # noqa: E402
 
 
 class SharedSourceRetirementTest(unittest.TestCase):
+    def test_shared_runtime_wakes_visual_review_only_for_the_current_protected_commit(self):
+        script = step_script("on-demand-e2e.yml", "notify-shared-review",
+                             "Wake visual review for the completed shared generation")
+        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            python = folder / "python3"
+            python.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + ' "$@"\n')
+            python.chmod(0o755)
+            fixture = folder / "api.py"
+            fixture.write_text('''import json,os,sys
+from pathlib import Path
+args=sys.argv[1:]
+endpoint=next((arg for arg in args if arg.startswith("repos/")), "")
+if args[0] != "api": raise SystemExit("Unexpected command")
+if endpoint.endswith("/branches/master"):
+ print(os.environ["FIXTURE_LIVE_SHA"])
+elif endpoint.endswith("/dispatches") and "POST" in args:
+ payload=Path(args[args.index("--input")+1]).read_text()
+ Path(os.environ["FIXTURE_SENT"]).write_text(payload)
+else: raise SystemExit("Unexpected API endpoint")
+''')
+            gh = folder / "gh"
+            gh.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + " " + shlex.quote(str(fixture)) + ' "$@"\n')
+            gh.chmod(0o755)
+            for case in ("current", "advanced", "checkout-advanced", "wrong-event", "wrong-ref", "wrong-id"):
+                with self.subTest(case=case):
+                    sent = folder / "sent.json"
+                    sent.unlink(missing_ok=True)
+                    env = {"PATH": str(folder) + os.pathsep + "/opt/homebrew/bin" + os.pathsep + os.defpath,
+                           "GITHUB_EVENT_NAME": "push" if case == "wrong-event" else "workflow_dispatch",
+                           "GITHUB_REF": "refs/heads/topic" if case == "wrong-ref" else "refs/heads/master",
+                           "GITHUB_SHA": "b" * 40 if case == "checkout-advanced" else sha,
+                           "GITHUB_RUN_ID": "true" if case == "wrong-id" else "55",
+                           "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod", "RUNNER_TEMP": str(folder),
+                           "FIXTURE_LIVE_SHA": "b" * 40 if case == "advanced" else sha,
+                           "FIXTURE_SENT": str(sent), "GH_TOKEN": "local-fixture"}
+                    result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
+                                            cwd=ROOT, env=env, text=True, capture_output=True, timeout=20)
+                    self.assertEqual(case == "current", sent.exists(), result.stderr[:1000])
+                    self.assertEqual(case in {"current", "advanced", "checkout-advanced"}, result.returncode == 0)
+                    if sent.exists():
+                        self.assertEqual({"event_type": "visual-review-requested", "client_payload": {
+                            "source_repository": "The-Plum-Team/Quick-Skin-Mod", "source_run_id": "55",
+                            "source_sha": sha, "source_branch": "master"}}, json.loads(sent.read_bytes()))
+
+    def test_visual_consumer_rejects_a_stale_or_foreign_shared_dispatch_before_curation(self):
+        script = step_script("visual-review.yml", "authenticate", "Resolve the exact trusted source run")
+        start = script.index('if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then',
+                             script.index('source_run_attempt='))
+        excerpt = 'set -euo pipefail\n' + script[start:script.index('# A PR targeting master', start)]
+        sha = "a" * 40
+        for branch, source, event in (("master", sha, "workflow_dispatch"), ("master", "b" * 40, "workflow_dispatch"),
+                                      ("feature/example", sha, "workflow_dispatch"), ("master", sha, "pull_request")):
+            with self.subTest(branch=branch, source=source, event=event):
+                env = {"PATH": "/opt/homebrew/bin" + os.pathsep + os.defpath,
+                       "GITHUB_EVENT_NAME": "repository_dispatch", "GITHUB_SHA": sha,
+                       "source_run": json.dumps({"event": event}), "source_branch": branch, "source_sha": source}
+                result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", excerpt],
+                                        cwd=ROOT, env=env, text=True, capture_output=True, timeout=10)
+                self.assertEqual(branch == "master" and source == sha and event == "workflow_dispatch",
+                                 result.returncode == 0, result.stderr[:1000])
+
     def test_large_shared_pr_defers_before_the_bounded_release_diff_reader(self):
         authenticate = step_script("visual-review.yml", "authenticate", "Resolve the exact trusted source run")
         start = authenticate.index('source_pr="$(github_api_retry')

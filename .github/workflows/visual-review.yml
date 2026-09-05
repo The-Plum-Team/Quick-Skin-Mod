@@ -134,8 +134,20 @@ jobs:
           ' <<< "$source_run")"
 
           if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
-            [[ "$(jq -r .event <<< "$source_run")" == workflow_dispatch ]]
-            [[ "$source_branch" == automation/sync/* ]]
+            if [[ "$(jq -r .event <<< "$source_run")" != workflow_dispatch ]]; then
+              printf 'Review dispatch must authenticate a dispatched runtime source.\n' >&2
+              exit 1
+            fi
+            if [[ "$source_branch" == master ]]; then
+              if [[ "$(jq -r .schema_version release/release-matrix.json)" != 3 ||
+                    "$source_sha" != "$GITHUB_SHA" ]]; then
+                printf 'Shared review dispatch must name the current protected source.\n' >&2
+                exit 1
+              fi
+            elif [[ "$source_branch" != automation/sync/* ]]; then
+              printf 'Review dispatch has no supported protected source identity.\n' >&2
+              exit 1
+            fi
           fi
 
           # A PR targeting master is a deterministic preview only. If it merges, the protected

@@ -685,6 +685,56 @@ jobs:
             "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" \
             > /dev/null
 
+  notify-shared-review:
+    name: Wake shared-source visual review (advisory)
+    needs:
+      - required-gate
+      - prepare-pages-evidence
+      - notify-pages
+    if: >-
+      always() && needs.required-gate.result == 'success' &&
+      github.event_name == 'workflow_dispatch' && inputs.attest_run_id == '' &&
+      github.ref == 'refs/heads/master'
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the current protected notification policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          persist-credentials: false
+      - name: Wake visual review for the completed shared generation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" != workflow_dispatch || "$GITHUB_REF" != refs/heads/master ||
+                ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ || ! "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            printf 'Shared review wake requires a canonical master runtime generation.\n' >&2
+            exit 1
+          fi
+          if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ||
+                "$(python3 scripts/release/release_sources.py --kind mode)" != shared ]]; then
+            printf 'This runtime generation no longer owns the protected shared source.\n'
+            exit 0
+          fi
+          source scripts/ci/github_api_retry.sh
+          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            printf 'Shared source advanced before its visual-review wake.\n'
+            exit 0
+          fi
+          payload="$RUNNER_TEMP/shared-visual-review-request.json"
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" \
+            --arg sha "$GITHUB_SHA" \
+            '{event_type:"visual-review-requested",client_payload:{source_repository:$repository,
+              source_run_id:$run_id,source_sha:$sha,source_branch:"master"}}' > "$payload"
+          github_api_retry --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" > /dev/null
+
   notify-version-port:
     name: Notify version port controller
     # Wait only for local advisory handoff jobs, never for the separate AI review workflow. This

@@ -64,6 +64,11 @@ bundle after its existing source, matrix and byte checks. Historical source layo
 their original scheduler. Shared-source PRs defer model review before the bounded direct-release
 PR file reader, including PRs with more than 100 changed files.
 
+The completed runtime generation also sends an explicit visual-review wake after its local
+handoff jobs settle. Both notifier and protected consumer bind the real `master` commit; an
+advanced head or a foreign dispatch cannot start curation. This supplies the token-created
+workflow path without relying only on a recursive completion event.
+
 These producer, consumer, rotation, review and scheduling paths pass local API/shell fixtures.
 Optional-mod wave admission and selective healthy-baseline reuse still require migration. No
 successful GitHub deployment, model review or new Minecraft visual acceptance is claimed by

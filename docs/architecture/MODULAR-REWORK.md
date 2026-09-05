@@ -576,3 +576,7 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   separate bounded release-PR diff reader. Eight local shell/API fixture tests and all 321
   CI-policy tests pass; fourteen workflow/action YAML files parse. The running GitHub checks
   still belong to the previous checkpoint, so they do not yet validate this scheduler change.
+- Added the explicit shared-source visual-review wake at the settled end of Packaged E2E.
+  The notifier checks the protected checkout and live `master` SHA; its consumer reauthenticates
+  the source run and rejects stale or foreign shared dispatches before curation. All ten
+  shared-source retirement, scheduling, notification and Pages policy tests pass.
