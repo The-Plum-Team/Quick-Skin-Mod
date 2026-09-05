@@ -23,7 +23,7 @@ This `master` integration baseline exercises the following exact packaged lanes:
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `10` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `10` |
 
-Scenario contract SHA-256: `0607f2a1f06cdefb0a676f91467e02717ac5d4f3b1d223abfbdfa1941cdd09f0`
+Scenario contract SHA-256: `dfbe373a3489262db39a167ed5ad42b275a814df2b8e7cf86a51f6aa02fb4ef3`
 Contract totals: `123` ordered steps, `92` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -442,8 +442,10 @@ workflow for each locked mod:
   injected-ModelPart seam to replace the six flat outer parts, while 26.2 retains the injection
   through deferred submission; visual review rejects any voxel cluster that is detached from or
   aligned to the wrong anatomical part.
-- CustomNPCs summons a real server-owned `customnpcs:*` entity and keeps it visible beside the
-  local player while Quick Skin changes only the player's renderer-facing texture.
+- CustomNPCs summons a real server-owned `customnpcs:*` entity, fixes its control skin through the
+  mod's public display API, and then changes that same NPC to its fire-themed skin while Quick Skin
+  changes the local player's renderer-facing texture. Both the display value and CustomNPCs'
+  renderer-resolved texture must reach the requested skin.
 - Essential keeps ownership of its title player model, anchors exactly one Quick Skin action to
   the bottom of Essential's right-hand action rail, suppresses Quick Skin's duplicate preview, and
   verifies Essential retained the selected appearance.

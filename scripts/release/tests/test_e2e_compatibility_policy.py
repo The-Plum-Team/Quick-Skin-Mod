@@ -367,6 +367,22 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             with self.subTest(custom_npcs_bridge_proof=custom_npcs_bridge_proof):
                 self.assertIn(custom_npcs_bridge_proof, feature)
 
+        for custom_npcs_skin_change_proof in (
+            "BASELINE_NPC_SKIN",
+            "CHANGED_NPC_SKIN",
+            'getField("display")',
+            'getMethod("setSkinTexture", String.class)',
+            'getMethod("getSkinTexture")',
+            'getField("textureLocation")',
+            "npcSkinReady(CHANGED_NPC_SKIN)",
+            'logNpcReadiness("baseline"',
+            'logNpcReadiness("applied"',
+        ):
+            with self.subTest(
+                custom_npcs_skin_change_proof=custom_npcs_skin_change_proof
+            ):
+                self.assertIn(custom_npcs_skin_change_proof, feature)
+
         for window_handle_accessor in (
             '"getWindow"',
             '"handle"',
