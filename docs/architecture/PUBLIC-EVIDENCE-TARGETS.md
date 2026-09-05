@@ -57,7 +57,14 @@ while a confirmed defect can still stop its source generation. Exact wakes query
 marker names and retain numeric-ID cleanup. Each successful curator sibling can publish its own
 wake after the matrix settles, including when another target failed to produce a capsule.
 
-These producer, consumer, rotation and review paths pass local API/shell fixtures. Automatic
-shared-source post-merge scheduling, optional-mod wave admission and selective healthy-baseline
-reuse still require migration. No successful GitHub deployment, model review or new Minecraft
-visual acceptance is claimed by these fixtures.
+After a successful shared-source `master` push, Build gate requests one `workflow_dispatch`
+Packaged E2E generation. The scheduler checks the live source twice and suppresses a duplicate
+active or successful exact-source run. The child can reuse that successful push's staged build
+bundle after its existing source, matrix and byte checks. Historical source layouts retain
+their original scheduler. Shared-source PRs defer model review before the bounded direct-release
+PR file reader, including PRs with more than 100 changed files.
+
+These producer, consumer, rotation, review and scheduling paths pass local API/shell fixtures.
+Optional-mod wave admission and selective healthy-baseline reuse still require migration. No
+successful GitHub deployment, model review or new Minecraft visual acceptance is claimed by
+these fixtures.

@@ -210,6 +210,69 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
+  request-shared-e2e:
+    name: Request packaged E2E for shared source
+    needs: build
+    if: >-
+      needs.build.result == 'success' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Check out the exact successful source inventory
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Request one current shared-source runtime generation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" != push || "$GITHUB_REF" != refs/heads/master ||
+                "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
+            printf 'Shared runtime dispatch requires the exact successful master push.\n' >&2
+            exit 1
+          fi
+          mode="$(python3 scripts/release/release_sources.py --kind mode)"
+          if [[ "$mode" != shared ]]; then
+            printf 'Historical source layout retains its existing runtime scheduler.\n'
+            exit 0
+          fi
+          source scripts/ci/github_api_retry.sh
+          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            printf 'A newer source commit owns the next runtime generation.\n'
+            exit 0
+          fi
+          runs="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/on-demand-e2e.yml/runs?event=workflow_dispatch&branch=master&head_sha=$GITHUB_SHA&per_page=100")"
+          existing="$(jq -er --arg sha "$GITHUB_SHA" --arg repository "$GITHUB_REPOSITORY" \
+            'select(.total_count | type == "number" and . >= 0 and . <= 100) |
+              select(.total_count == (.workflow_runs | length)) |
+              .workflow_runs | select(type == "array" and length <= 100) |
+              [.[] | select(.head_sha == $sha and .head_branch == "master" and
+                .head_repository.full_name == $repository and
+                .path == ".github/workflows/on-demand-e2e.yml" and .event == "workflow_dispatch" and
+                ((.status == "completed" and .conclusion == "success") or
+                 (.status as $status | ["queued","in_progress","requested","waiting","pending"] |
+                   index($status)) != null))] |
+              length' <<< "$runs")"
+          if [[ "$existing" != 0 ]]; then
+            printf 'This exact source already has an active or successful runtime generation.\n'
+            exit 0
+          fi
+          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            printf 'Shared source advanced before dispatch; its newer Build owns the request.\n'
+            exit 0
+          fi
+          gh workflow run on-demand-e2e.yml --ref master
+
   attest:
     name: Attest tested build on release branch
     if: >-

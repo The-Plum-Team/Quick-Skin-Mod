@@ -273,17 +273,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          build_event=workflow_dispatch
+          if [[ "$GITHUB_REF_NAME" == master &&
+                "$(python3 scripts/release/release_sources.py --kind mode)" == shared ]]; then
+            build_event=push
+          fi
           run_json="$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/build-gate.yml/runs?event=workflow_dispatch&status=success&head_sha=$GITHUB_SHA&per_page=1" \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/build-gate.yml/runs?event=$build_event&status=success&head_sha=$GITHUB_SHA&per_page=1" \
             --jq '.workflow_runs[0] // empty')"
           [[ -n "$run_json" ]]
           jq -e \
             --arg branch "$GITHUB_REF_NAME" \
             --arg head "$GITHUB_SHA" \
             --arg repository "$GITHUB_REPOSITORY" \
-            '.status == "completed" and .conclusion == "success" and .event == "workflow_dispatch" and .path == ".github/workflows/build-gate.yml" and .head_branch == $branch and .head_sha == $head and .head_repository.full_name == $repository' \
+            --arg event "$build_event" \
+            '.status == "completed" and .conclusion == "success" and .event == $event and .path == ".github/workflows/build-gate.yml" and .head_branch == $branch and .head_sha == $head and .head_repository.full_name == $repository' \
             <<< "$run_json" > /dev/null
-          run_id="$(jq -r .id <<< "$run_json")"
+          run_id="$(jq -er '.id | select(type == "number" and . > 0 and . == floor)' <<< "$run_json")"
           [[ "$run_id" =~ ^[0-9]+$ ]]
           printf 'run_id=%s\n' "$run_id" >> "$GITHUB_OUTPUT"
 

@@ -560,3 +560,19 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   compiled outputs. Shared post-merge scheduling, optional-mod wave admission and protected
   selective healthy-baseline coverage remain unfinished; no new Minecraft or model execution
   is claimed by the local fixtures.
+- 2026-09-06: Published the preserved implementation checkpoints as draft PR #1925 from
+  `7b8f29ea25c5f5a666ad6c8bea595daa4ae0fbf7`. GitHub Build and Packaged E2E are running the
+  complete matrix. Local forced rebuilding initially exhausted the disk after six targets;
+  `RuntimeStore.gc` removed only unleased downloadable runtime cache records and recovered
+  about 3 GB. The remaining ten targets were then rebuilt sequentially with `--rerun-tasks`.
+  All 64 current production/harness hashes match the preserved menu/HUD checkpoint exactly.
+  `shared-complete-rebuild-recovered.json` records both phases and the final rehash;
+  `shared-complete-reproducibility.log` records the independent complete comparison.
+  No new local Minecraft/image run was needed.
+- Shared-source post-merge scheduling now requests Packaged E2E only after a successful current
+  `master` Build, suppresses existing active/successful generations and checks the live head
+  again immediately before dispatch. The child authenticates and reuses the exact successful
+  push build when available. Shared PR model deferral accepts large refactors before the
+  separate bounded release-PR diff reader. Eight local shell/API fixture tests and all 321
+  CI-policy tests pass; fourteen workflow/action YAML files parse. The running GitHub checks
+  still belong to the previous checkpoint, so they do not yet validate this scheduler change.

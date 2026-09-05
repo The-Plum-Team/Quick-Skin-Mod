@@ -139,8 +139,8 @@ jobs:
           fi
 
           # A PR targeting master is a deterministic preview only. If it merges, the protected
-          # synchronizer necessarily exercises the cumulative generation through the 1.20.1
-          # anchor, so reviewing the same source head here would duplicate Claude work. Direct
+          # post-merge scheduler exercises the cumulative generation, so reviewing the same
+          # source head here would duplicate Claude work. Direct
           # release-branch PRs have no guaranteed post-merge anchor and retain the narrower
           # fail-closed source-PR classifier below.
           if [[ "$(jq -r .event <<< "$source_run")" == pull_request ]]; then
@@ -193,7 +193,7 @@ jobs:
                .head.repo.full_name == $repository and
                .base.repo.full_name == $repository and
                (.base.ref | type == "string" and length > 0) and
-               (.changed_files | type == "number" and . > 0 and . <= 100)' \
+               (.changed_files | type == "number" and . > 0 and . == floor)' \
               <<< "$source_pr" > /dev/null
             source_pr_base="$(jq -er .base.ref <<< "$source_pr")"
             if [[ "$source_pr_base" == master ]]; then
@@ -201,7 +201,9 @@ jobs:
                 "$source_pr_number"
               exit 0
             fi
-            jq -e '.state == "open" and .merged == false' \
+            # Only direct release PRs enumerate changed files for model applicability.
+            # Large shared-source PRs can defer without reading that file inventory.
+            jq -e '.state == "open" and .merged == false and .changed_files <= 100' \
               <<< "$source_pr" > /dev/null
             changed_files="$(jq -r .changed_files <<< "$source_pr")"
             source_pr_files="$(github_api_retry \

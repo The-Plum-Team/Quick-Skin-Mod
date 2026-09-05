@@ -20,6 +20,127 @@ from matrix import gha_matrix, load_matrix, read_mod_version  # noqa: E402
 
 
 class SharedSourceRetirementTest(unittest.TestCase):
+    def test_large_shared_pr_defers_before_the_bounded_release_diff_reader(self):
+        authenticate = step_script("visual-review.yml", "authenticate", "Resolve the exact trusted source run")
+        start = authenticate.index('source_pr="$(github_api_retry')
+        stop = authenticate.index('changed_files="$(jq -r .changed_files', start)
+        script = 'set -euo pipefail\ngithub_api_retry() { cat "$FIXTURE_PR"; }\n' + authenticate[start:stop]
+        original = {"number": 1925, "state": "open", "merged": False,
+                    "head": {"ref": "refactor/example", "sha": "a" * 40,
+                             "repo": {"full_name": "The-Plum-Team/Quick-Skin-Mod"}},
+                    "base": {"ref": "master", "repo": {"full_name": "The-Plum-Team/Quick-Skin-Mod"}}}
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary) / "pr.json"
+            for base, count in (("master", 1), ("master", 492), ("master", 0),
+                                ("master", True), ("master", 1.5), ("master", None),
+                                ("forge-and-fabric-1.20.1", 100), ("forge-and-fabric-1.20.1", 101)):
+                with self.subTest(base=base, count=count):
+                    data = {**original, "changed_files": count,
+                            "base": {**original["base"], "ref": base}}
+                    fixture.write_text(json.dumps(data))
+                    env = {"PATH": "/opt/homebrew/bin" + os.pathsep + os.defpath,
+                           "FIXTURE_PR": str(fixture), "source_pr_number": "1925",
+                           "source_branch": "refactor/example", "source_sha": "a" * 40,
+                           "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod"}
+                    result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
+                                            cwd=ROOT, env=env, text=True, capture_output=True, timeout=10)
+                    valid = type(count) is int and count > 0 and (base == "master" or count <= 100)
+                    self.assertEqual(valid, result.returncode == 0, result.stderr[:1500])
+                    self.assertEqual(valid and base == "master", "Deferring PR" in result.stdout)
+
+    def test_shared_build_requests_one_runtime_run_without_reopening_version_ports(self):
+        script = step_script("build-gate.yml", "request-shared-e2e", "Request one current shared-source runtime generation")
+        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            python = folder / "python3"
+            python.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + ' "$@"\n')
+            python.chmod(0o755)
+            fixture = folder / "api.py"
+            fixture.write_text('''import json,os,sys
+from pathlib import Path
+args=sys.argv[1:]; case=os.environ["FIXTURE_CASE"]; sha=os.environ["FIXTURE_SHA"]
+calls=Path(os.environ["FIXTURE_CALLS"])
+previous=calls.read_text().splitlines()
+with calls.open("a") as output: output.write(json.dumps(args)+"\\n")
+if args == ["workflow","run","on-demand-e2e.yml","--ref","master"]: raise SystemExit(0)
+if not args or args[0] != "api": raise SystemExit("Unexpected fixture mutation")
+endpoint=next((arg for arg in args if arg.startswith("repos/")), "")
+if endpoint.endswith("/branches/master"):
+ branch_reads=sum("/branches/master" in line for line in previous)
+ print("b"*40 if case == "advanced" or (case == "advanced-late" and branch_reads) else sha)
+elif "/actions/workflows/on-demand-e2e.yml/runs?" in endpoint:
+ if "head_sha="+sha not in endpoint: raise SystemExit("Missing exact source query")
+ run={"id":42,"head_sha":sha,"head_branch":"master",
+      "head_repository":{"full_name":"The-Plum-Team/Quick-Skin-Mod"},
+      "path":".github/workflows/on-demand-e2e.yml","event":"workflow_dispatch",
+      "status":"completed","conclusion":"success"}
+ if case == "active": run.update(status="in_progress",conclusion=None)
+ if case == "failed": run["conclusion"]="failure"
+ runs=[] if case in {"empty","advanced-late","too-many","incomplete"} else [run]
+ total=101 if case == "too-many" else 1 if case == "incomplete" else len(runs)
+ print(json.dumps({"total_count":total,"workflow_runs":runs}))
+else: raise SystemExit("Unexpected fixture API endpoint")
+''')
+            gh = folder / "gh"
+            gh.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + " " + shlex.quote(str(fixture)) + ' "$@"\n')
+            gh.chmod(0o755)
+            for case in ("empty", "active", "success", "failed", "advanced", "advanced-late", "too-many", "incomplete", "wrong-event"):
+                with self.subTest(case=case):
+                    calls = folder / "calls"
+                    calls.write_text("")
+                    env = {"PATH": str(folder) + os.pathsep + "/opt/homebrew/bin" + os.pathsep + os.defpath,
+                           "GITHUB_REF": "refs/heads/master", "GITHUB_SHA": sha,
+                           "GITHUB_EVENT_NAME": "workflow_dispatch" if case == "wrong-event" else "push",
+                           "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod", "GH_TOKEN": "local-fixture",
+                           "FIXTURE_CASE": case, "FIXTURE_SHA": sha, "FIXTURE_CALLS": str(calls)}
+                    result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
+                                            cwd=ROOT, env=env, text=True, capture_output=True, timeout=20)
+                    dispatched = [json.loads(line) for line in calls.read_text().splitlines()
+                                  if json.loads(line)[:2] == ["workflow", "run"]]
+                    self.assertEqual(1 if case in {"empty", "failed"} else 0, len(dispatched), result.stderr[:1500])
+                    self.assertEqual(case not in {"too-many", "incomplete", "wrong-event"}, result.returncode == 0,
+                                     result.stderr[:1500])
+
+    def test_shared_runtime_reuses_only_the_exact_successful_master_push_build(self):
+        script = step_script("on-demand-e2e.yml", "build", "Discover the exact-head Build gate staged bundle")
+        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            python = folder / "python3"
+            python.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + ' "$@"\n')
+            python.chmod(0o755)
+            fixture = folder / "api.py"
+            fixture.write_text('''import json,os,sys
+from pathlib import Path
+args=sys.argv[1:]; sha=os.environ["FIXTURE_SHA"]
+endpoint=next((arg for arg in args if arg.startswith("repos/")), "")
+if not args or args[0] != "api" or "event=push" not in endpoint or "head_sha="+sha not in endpoint:
+ raise SystemExit("Unexpected build-reuse API query")
+print(Path(os.environ["FIXTURE_RUN"]).read_text())
+''')
+            gh = folder / "gh"
+            gh.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + " " + shlex.quote(str(fixture)) + ' "$@"\n')
+            gh.chmod(0o755)
+            original = {"id": 42, "status": "completed", "conclusion": "success", "event": "push",
+                        "path": ".github/workflows/build-gate.yml", "head_branch": "master", "head_sha": sha,
+                        "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"}}
+            for field, value in ((None, None), ("event", "pull_request"), ("head_sha", "b" * 40),
+                                 ("head_branch", "feature/elsewhere"), ("conclusion", "failure"), ("id", True)):
+                with self.subTest(field=field):
+                    run = dict(original)
+                    if field is not None: run[field] = value
+                    fixture_run, output = folder / "run.json", folder / "output"
+                    fixture_run.write_text(json.dumps(run)); output.write_text("")
+                    env = {"PATH": str(folder) + os.pathsep + "/opt/homebrew/bin" + os.pathsep + os.defpath,
+                           "GITHUB_REF_NAME": "master", "GITHUB_SHA": sha,
+                           "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod", "GITHUB_OUTPUT": str(output),
+                           "FIXTURE_SHA": sha, "FIXTURE_RUN": str(fixture_run)}
+                    result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
+                                            cwd=ROOT, env=env, text=True, capture_output=True, timeout=20)
+                    self.assertEqual(field is None, result.returncode == 0, result.stderr[:1500])
+                    self.assertEqual("run_id=42\n" if field is None else "", output.read_text())
+
     def test_sync_exits_before_git_or_github_even_for_delayed_and_manual_targets(self):
         script = step_script("sync-version-branches.yml", "discover", "Resolve targets from GitHub")
         with tempfile.TemporaryDirectory() as temporary:
