@@ -273,8 +273,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   slim skin plus a bundled cape id so model propagation and id-only capes are both covered.
 - Every optional-mod lane ends with one lane-specific `integration_visual` checkpoint from the same
   FOV-50 rear view. Lanes with a distinctive contribution (Ears features, 3D hat layer, the CPM
-  texture bridge) must assert that integration state; coexistence lanes assert the unchanged plaid
-  skin. The reviewer receives per-mod expectation overrides for that one capture id.
+  texture bridge, or the CustomNPCs display-skin transition) must assert that integration state;
+  coexistence lanes assert the unchanged plaid skin. The reviewer receives per-mod expectation
+  overrides for that one capture id.
 - Every orchestrator invocation writes into a fresh owned workspace and promotes only its bounded
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's
