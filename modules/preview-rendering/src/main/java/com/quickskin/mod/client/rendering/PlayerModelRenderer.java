@@ -1,7 +1,7 @@
 package com.quickskin.mod.client.rendering;
 
 import com.mojang.blaze3d.platform.Lighting;
-//? if <1.21.11 {
+//? if <1.21.6 {
 import com.mojang.blaze3d.systems.RenderSystem;
 //?} else {
 //?}
@@ -56,17 +56,15 @@ import net.minecraft.world.item.ItemStack;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 
-//? if <1.21.11 {
-//?} else if <26.2 {
+//? if >=1.21.6 {
+import java.util.Map;
+    //? if <26.2 {
 import java.util.LinkedHashMap;
-//?} else {
+    //?} else {
 import java.util.IdentityHashMap;
+    //?}
 //?}
 import java.util.Locale;
-//? if <1.21.11 {
-//?} else {
-import java.util.Map;
-//?}
 
 /**
  * Utility for rendering player models in GUI using vanilla Minecraft rendering
@@ -87,7 +85,7 @@ public class PlayerModelRenderer {
     }
 
 //? if <1.21 {
-    private static PlayerModel<?>  classicModel;
+    private static PlayerModel<?> classicModel;
     private static PlayerModel<?> slimModel;
 
     // Animation frequency optimization - update at 30 FPS instead of 60+ FPS
@@ -100,14 +98,14 @@ public class PlayerModelRenderer {
     // Grass block caching - cache is built on first use
     private static boolean grassBlockCacheBuilt = false;
 //?} else if <1.21.2 {
-    private static PlayerModel<?>  classicModel;
+    private static PlayerModel<?> classicModel;
     private static PlayerModel<?> slimModel;
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
     private static PlayerModel classicModel;
     private static PlayerModel slimModel;
     private static PlayerCapeModel<?> capeModel;
 //?} else if <26.2 {
-    private static PlayerModel  classicModel;
+    private static PlayerModel classicModel;
     private static PlayerModel slimModel;
     private static PlayerCapeModel capeModel;
 
@@ -117,18 +115,32 @@ public class PlayerModelRenderer {
     private static final int MAX_PENDING_CAPES = 128;
 
     public record PreviewCapeState(
+//? if <1.21.11 {
+            ResourceLocation texture, PlayerModel bodyModel, PlayerCapeModel capeModel) {
+//?} else {
             Identifier texture, PlayerModel bodyModel, PlayerCapeModel capeModel) {
+//?}
     }
 
     private record PreviewCapeKey(
+//? if <1.21.11 {
+            PlayerModel model, ResourceLocation skin, float rotationX, float rotationY, float pivotY,
+//?} else {
             PlayerModel model, Identifier skin, float rotationX, float rotationY, float pivotY,
+//?}
             int x0, int y0, int x1, int y1, float scale) {
     }
 
     private static void registerPendingCape(
+//? if <1.21.11 {
+            PlayerModel bodyModel, ResourceLocation skin, float rotationX, float rotationY, float pivotY,
+            int x0, int y0, int x1, int y1, float scale,
+            ResourceLocation texture, PlayerCapeModel playerCapeModel) {
+//?} else {
             PlayerModel bodyModel, Identifier skin, float rotationX, float rotationY, float pivotY,
             int x0, int y0, int x1, int y1, float scale,
             Identifier texture, PlayerCapeModel playerCapeModel) {
+//?}
         synchronized (PENDING_CAPES) {
             PreviewCapeKey key = new PreviewCapeKey(
                     bodyModel, skin, rotationX, rotationY, pivotY, x0, y0, x1, y1, scale);
@@ -141,7 +153,11 @@ public class PlayerModelRenderer {
     }
 
     public static PreviewCapeState consumePendingCape(
+//? if <1.21.11 {
+            PlayerModel bodyModel, ResourceLocation skin, float rotationX, float rotationY, float pivotY,
+//?} else {
             PlayerModel bodyModel, Identifier skin, float rotationX, float rotationY, float pivotY,
+//?}
             int x0, int y0, int x1, int y1, float scale) {
         synchronized (PENDING_CAPES) {
             return PENDING_CAPES.remove(new PreviewCapeKey(
@@ -155,7 +171,7 @@ public class PlayerModelRenderer {
         }
     }
 //?} else {
-    private static PlayerModel  classicModel;
+    private static PlayerModel classicModel;
     private static PlayerModel slimModel;
     private static PlayerCapeModel capeModel;
 
@@ -230,14 +246,14 @@ public class PlayerModelRenderer {
 
             // In MC 1.21.2+, the cape is a separate model (PlayerCapeModel).
             ModelPart capeRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_CAPE);
-            //? if <1.21.11 {
+//? if <1.21.6 {
             capeModel = new PlayerCapeModel<>(capeRoot);
-            //?} else {
+//?} else {
             capeModel = new PlayerCapeModel(capeRoot);
-            //?}
+//?}
 //?}
         }
-//? if <1.21.11 {
+//? if <1.21.6 {
 //?} else if <26.2 {
     }
 
@@ -290,20 +306,23 @@ public class PlayerModelRenderer {
     // CapeLayer is handed makes the selection authoritative for that draw alone; the same player
     // rendered in the world behind the screen carries no binding and keeps its applied cape.
     //
-    // The key differs by era because the render timing does. Before 1.21.11 the GUI entity render
+    // The key differs by era because the render timing does. Before 1.21.6 the GUI entity render
     // runs inline inside InventoryScreen.renderEntityInInventory, so the previewed entity is the
-    // key and the binding is released in a finally. From 1.21.11 the render is deferred to the
+    // key and the binding is released in a finally. From 1.21.6 the render is deferred to the
     // picture-in-picture pass, so a flag around the submit call would already be cleared by the
     // time the layer runs; the key is instead the render state, which is allocated fresh per call
-    // and threaded unchanged through to CapeLayer.submit.
+    // and threaded unchanged through to the cape layer's render or submit method.
 //? if <1.21.11 {
     private static final PreviewCapeBindings<Object, ResourceLocation> PREVIEW_CAPE_BINDINGS =
             new PreviewCapeBindings<>();
-    /** Inline 1.20.1-1.21.10 renders may replace the entity with a render state before CapeLayer. */
+//? if <1.21.6 {
+    /** Inline rendering may replace the entity with a render state before reaching CapeLayer. */
     private static final ThreadLocal<Object> ACTIVE_PREVIEW_CAPE_KEY = new ThreadLocal<>();
+//?}
 
     /** Resolve and release the preview cape bound to {@code renderKey}, for the cape layer. */
     public static PreviewCapeBindings.Resolution<ResourceLocation> consumePreviewCape(Object renderKey) {
+//? if <1.21.6 {
         PreviewCapeBindings.Resolution<ResourceLocation> resolution =
                 PREVIEW_CAPE_BINDINGS.consume(renderKey);
         if (resolution.decision() == PreviewCapeBindings.Decision.WORN) {
@@ -316,6 +335,9 @@ public class PlayerModelRenderer {
             ACTIVE_PREVIEW_CAPE_KEY.remove();
         }
         return resolution;
+//?} else {
+        return PREVIEW_CAPE_BINDINGS.consume(renderKey);
+//?}
     }
 
     private static void bindPreviewCape(Object renderKey, PreviewPlayerData playerData) {
@@ -326,7 +348,9 @@ public class PlayerModelRenderer {
         PREVIEW_CAPE_BINDINGS.bind(renderKey, capeAtlas == null
                 ? null
                 : CapeAnimationHelper.resolveVisibleFrame(capeAtlas, playerData.getCapeId()));
+//? if <1.21.6 {
         ACTIVE_PREVIEW_CAPE_KEY.set(renderKey);
+//?}
     }
 //?} else {
     private static final PreviewCapeBindings<Object, Identifier> PREVIEW_CAPE_BINDINGS =
@@ -350,7 +374,7 @@ public class PlayerModelRenderer {
 
     private static void unbindPreviewCape(Object renderKey) {
         PREVIEW_CAPE_BINDINGS.unbind(renderKey);
-//? if <1.21.11 {
+//? if <1.21.6 {
         if (ACTIVE_PREVIEW_CAPE_KEY.get() == renderKey) {
             ACTIVE_PREVIEW_CAPE_KEY.remove();
         }
@@ -359,7 +383,7 @@ public class PlayerModelRenderer {
 
     private static void clearPreviewCapes() {
         PREVIEW_CAPE_BINDINGS.clear();
-//? if <1.21.11 {
+//? if <1.21.6 {
         ACTIVE_PREVIEW_CAPE_KEY.remove();
 //?}
     }
@@ -378,7 +402,7 @@ public class PlayerModelRenderer {
     // Lighting, the outline colour and the shadow are already normalised at the submit sites below.
     //
     // The seam differs by era because the render timing does, exactly as the preview cape binding
-    // above. From 1.21.11 the mod builds the entity render state itself, so the equipment is blanked
+    // above. From 1.21.6 the mod builds the entity render state itself, so the equipment is blanked
     // on that state before it is submitted - which is what vanilla does for its own smithing-table
     // preview. Before that there is no render state: the layers read the entity while the render
     // runs inline, so the scope below answers those reads as empty for the length of that call.
@@ -397,7 +421,7 @@ public class PlayerModelRenderer {
     /**
      * Whether {@code player}'s {@code slot} must read as empty because a preview is drawing it.
      *
-     * <p>Called from the equipment-read hook before 1.21.11, where the layers read the live entity.
+     * <p>Called from the equipment-read hook before 1.21.6, where the layers read the live entity.
      * The scope is thread confined and identity keyed, so it can only ever answer for the entity
      * being previewed on the thread drawing it; every other caller, including the integrated
      * server's own copy of the player, gets the real equipment.
@@ -422,7 +446,7 @@ public class PlayerModelRenderer {
         if (slot == EquipmentSlot.OFFHAND) return PreviewEquipmentPolicy.Slot.OFF_HAND;
         return null;
     }
-//? if <1.21.11 {
+//? if <1.21.6 {
 //?} else {
 
     /**
@@ -452,12 +476,17 @@ public class PlayerModelRenderer {
         if (state instanceof net.minecraft.client.renderer.entity.state.ArmedEntityRenderState armed) {
             if (PreviewEquipmentPolicy.suppresses(PreviewEquipmentPolicy.Slot.MAIN_HAND)
                     || PreviewEquipmentPolicy.suppresses(PreviewEquipmentPolicy.Slot.OFF_HAND)) {
+//? if <1.21.11 {
+                armed.rightHandItem.clear();
+                armed.leftHandItem.clear();
+//?} else {
                 armed.rightHandItemStack = ItemStack.EMPTY;
                 armed.leftHandItemStack = ItemStack.EMPTY;
                 armed.rightHandItemState.clear();
                 armed.leftHandItemState.clear();
+//?}
                 // The arm pose is derived from the held item, so it has to follow it down; before
-                // 1.21.11 the same thing happens on its own, because the pose is computed from the
+                // 1.21.9 the same thing happens on its own, because the pose is computed from the
                 // read the scope above already answers as empty.
                 armed.rightArmPose = net.minecraft.client.model.HumanoidModel.ArmPose.EMPTY;
                 armed.leftArmPose = net.minecraft.client.model.HumanoidModel.ArmPose.EMPTY;
@@ -477,11 +506,19 @@ public class PlayerModelRenderer {
                 humanoid.feetEquipment = ItemStack.EMPTY;
             }
         }
+//? if <1.21.9 {
+        if (state instanceof net.minecraft.client.renderer.entity.state.PlayerRenderState player) {
+            if (PreviewEquipmentPolicy.suppresses(PreviewEquipmentPolicy.Slot.MAIN_HAND)) {
+                // Carried-on-head item; the item-in-hand layer draws it from its own baked state.
+                player.heldOnHead.clear();
+            }
+//?} else {
         if (state instanceof net.minecraft.client.renderer.entity.state.AvatarRenderState avatar) {
             if (PreviewEquipmentPolicy.suppresses(PreviewEquipmentPolicy.Slot.MAIN_HAND)) {
                 // Carried-on-head item; the item-in-hand layer draws it from its own baked state.
                 avatar.heldOnHead.clear();
             }
+//?}
         }
     }
 //?}
@@ -634,15 +671,15 @@ public class PlayerModelRenderer {
             // Render grass block if sitting animation is active AND we're not in a world
             // When in-game, animations are controlled by the game, so don't render the custom grass block
             if ("sit".equals(playerData.getCurrentAnimation() != null ? playerData.getCurrentAnimation().toLowerCase(Locale.ROOT) : null) && mc.level == null) {
-//? if <1.21.11 {
+//? if <1.21.6 {
                 PoseStack poseStack = graphics.pose();
                 MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
 //?} else if <26.2 {
-                // In 1.21.11, graphics.pose() returns Matrix3x2fStack, use new PoseStack for 3D transforms
+                // In 1.21.6+, graphics.pose() returns Matrix3x2fStack; use a 3D PoseStack.
                 PoseStack poseStack = new PoseStack();
                 MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
 //?} else {
-                // In 1.21.11, graphics.pose() returns Matrix3x2fStack, use new PoseStack for 3D transforms
+                // In 1.21.6+, graphics.pose() returns Matrix3x2fStack; use a 3D PoseStack.
                 PoseStack poseStack = new PoseStack();
 //?}
 
@@ -682,7 +719,7 @@ public class PlayerModelRenderer {
                     x,
                     y,
                     (int)scale,
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
             // The entity render runs inline, so the previewed entity keys the preview cape and the
             // binding is released as soon as the call returns. Equipment suppression is scoped the
             // same way: the layers read the live entity during this call and nowhere else.
@@ -697,7 +734,7 @@ public class PlayerModelRenderer {
                     new org.joml.Vector3f(0, 0, 0),  // translation offset
 //?} else if <26.1.2 {
             ensureModelsLoaded();
-            // 1.21.11: renderEntityInInventory removed. We call submitEntityRenderState directly
+            // 1.21.6+: submit the extracted state directly so preview-only state can be scrubbed.
             // to preserve our own rotation (renderEntityInInventoryFollowsMouse overrides rotation).
             int halfWidth = (int)(scale * 0.6f);
             // Shift box center UP by ~bbHeight/2 in screen space to keep feet at y
@@ -712,9 +749,11 @@ public class PlayerModelRenderer {
             var dispatcher = mc.getEntityRenderDispatcher();
             var renderer = dispatcher.getRenderer(playerToRender);
             var renderState = renderer.createRenderState(playerToRender, 1.0f);
+//? if >=1.21.9 {
             renderState.lightCoords = 15728880; // full bright
             renderState.shadowPieces.clear();
             renderState.outlineColor = 0;
+//?}
 
             // createRenderState already copied the entity's rotation (set at lines 157-161),
             // so we only need to normalize bounding box for scale=1
@@ -829,13 +868,13 @@ public class PlayerModelRenderer {
 //?}
                     quaternionXZ,
                     quaternionY,
-//? if <1.21.11 {
+//? if <1.21.6 {
                     playerToRender
 //?} else {
                     x1, y1, x2, y2
 //?}
             );
-//? if <1.21.11 {
+//? if <1.21.6 {
             } finally {
                 endPreviewEquipment(playerToRender);
                 unbindPreviewCape(playerToRender);
@@ -877,7 +916,7 @@ public class PlayerModelRenderer {
     /**
      * Manually render player model without requiring a player entity
      * Used on title screen where no world/player exists
-     * In 1.21.11+, all GUI 3D rendering must go through the PiP system.
+     * In 1.21.6+, all GUI 3D rendering must go through the PiP system.
      * Cape rendering is handled by GuiSkinRendererMixin which renders the cape
      * inside renderToTexture(), using the shared buffer source.
      */
@@ -899,8 +938,8 @@ public class PlayerModelRenderer {
         ensureModelsLoaded();
 
         // Select model based on type
-//? if <1.21.2 {
-        PlayerModel<?> model = "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null) ? slimModel : classicModel;
+//? if <1.21.11 {
+        PlayerModel model = "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null) ? slimModel : classicModel;
 //?} else {
         PlayerModel model = "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null) ? slimModel : classicModel;
 //?}
@@ -940,7 +979,7 @@ public class PlayerModelRenderer {
         }
 
         // Get Minecraft instance for tick count
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
         PoseStack poseStack = graphics.pose();
         poseStack.pushPose();
 
@@ -975,7 +1014,7 @@ public class PlayerModelRenderer {
 //?} else {
 //?}
         Minecraft mc = Minecraft.getInstance();
-//? if <1.21.11 {
+//? if <1.21.6 {
 
         // Get buffer source
         MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
@@ -1018,7 +1057,7 @@ public class PlayerModelRenderer {
         }
 
         // Render cape AFTER model if present
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
         // Render the model with skin texture
         RenderType renderType = RenderType.entityTranslucent(playerData.getSkinLocation());
         var vertexConsumer = bufferSource.getBuffer(renderType);
@@ -1044,12 +1083,15 @@ public class PlayerModelRenderer {
         }
 
         // Render cape AFTER model if present
+//?} else if <1.21.11 {
+        // Set cape data for the GuiSkinRendererMixin to pick up during renderToTexture.
+        ResourceLocation capeTexture = null;
 //?} else {
         // Set cape data for the GuiSkinRendererMixin to pick up during renderToTexture
         Identifier capeTexture = null;
 //?}
         if (playerData.getCapeLocation() != null) {
-//? if <1.21.11 {
+//? if <1.21.6 {
             ResourceLocation capeAtlasLocation = playerData.getCapeLocation();
 //?} else {
             capeTexture = CapeAnimationHelper.resolveVisibleFrame(
@@ -1057,12 +1099,12 @@ public class PlayerModelRenderer {
 //?}
             String capeId = playerData.getCapeId();
 
-//? if <1.21.11 {
+//? if <1.21.6 {
             ResourceLocation finalCapeTexture = CapeAnimationHelper.resolveVisibleFrame(
                     capeAtlasLocation, capeId);
 //?} else {
 //?}
-//? if <1.21 {
+//? if <1.21.2 {
 
             if (finalCapeTexture != null) {
                 // Now render the cape using the final texture
@@ -1083,27 +1125,7 @@ public class PlayerModelRenderer {
 
                 poseStack.popPose();
             }
-//?} else if <1.21.2 {
-
-            if (finalCapeTexture != null) {
-                // Now render the cape using the final texture
-                RenderType capeRenderType = RenderType.entityTranslucent(finalCapeTexture);
-                var capeVertexConsumer = bufferSource.getBuffer(capeRenderType);
-
-                poseStack.pushPose();
-                // Position the cloak correctly relative to the body
-                model.body.translateAndRotate(poseStack);
-                poseStack.translate(0.0, 0.0, 0.125); // Move behind the player
-
-                // Add some basic swing/angle to make it look like a cape
-                poseStack.mulPose(Axis.XP.rotationDegrees(6.0F));
-                poseStack.mulPose(Axis.YP.rotationDegrees(180.0F)); // The cloak model part is drawn facing backwards
-
-                MinecraftCompat.INSTANCE.renderCloak(model, poseStack, capeVertexConsumer, 15728880, OverlayTexture.NO_OVERLAY);
-
-                poseStack.popPose();
-            }
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
 
             if (finalCapeTexture != null) {
                 RenderType capeRenderType = RenderType.entityTranslucent(finalCapeTexture);
@@ -1120,7 +1142,7 @@ public class PlayerModelRenderer {
 //?} else {
 //?}
         }
-//? if <1.21.11 {
+//? if <1.21.6 {
 //?} else if <26.2 {
         // Force PiP cache invalidation when cape changes by adding imperceptible scale nudge
         int capeHash = capeTexture != null ? capeTexture.hashCode() : 0;
@@ -1132,7 +1154,7 @@ public class PlayerModelRenderer {
         float scaleNudge = 0.000001f * (capeHash & 0xFF);
 //?}
 
-//? if <1.21.11 {
+//? if <1.21.6 {
         // Flush buffers - matches guiGraphics.flush() in InventoryScreen
         bufferSource.endBatch();
 //?} else {
@@ -1145,7 +1167,7 @@ public class PlayerModelRenderer {
         poseStack.popPose();
 
         // Don't restore lighting - let next render set what it needs (optimization)
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
         poseStack.popPose();
 
         // Lighting.setupFor3DItems();
@@ -1205,7 +1227,7 @@ public class PlayerModelRenderer {
 //?}
     }
 
-//? if <1.21.11 {
+//? if <1.21.6 {
     /**
      * Legacy method for backwards compatibility - forwards to new GuiGraphics version
      */
@@ -1228,6 +1250,28 @@ public class PlayerModelRenderer {
                 (MultiBufferSource.BufferSource)buffer : mc.renderBuffers().bufferSource());
 
         // Forward to new method
+        renderPlayerModel(graphics, x, y, scale, yRotation, playerData, mouseX, mouseY, followMouse);
+    }
+//?} else if <1.21.11 {
+    /**
+     * Legacy method for backwards compatibility - forwards to the PiP-aware GuiGraphics version.
+     */
+    @Deprecated
+    public static void renderPlayerModel(
+            PoseStack poseStack,
+            MultiBufferSource buffer,
+            int x,
+            int y,
+            float scale,
+            float yRotation,
+            PreviewPlayerData playerData,
+            int mouseX,
+            int mouseY,
+            boolean followMouse
+    ) {
+        Minecraft mc = Minecraft.getInstance();
+        GuiGraphics graphics = new GuiGraphics(
+                mc, new net.minecraft.client.gui.render.state.GuiRenderState());
         renderPlayerModel(graphics, x, y, scale, yRotation, playerData, mouseX, mouseY, followMouse);
     }
 //?} else if <26.1.2 {
@@ -1294,20 +1338,11 @@ public class PlayerModelRenderer {
         return current + (target - current) * factor;
     }
 
-//? if <1.21.2 {
+//? if <1.21.11 {
     /**
      * Render cape layer similar to vanilla CapeLayer
      * This is called AFTER the player model is rendered
      */
-    private static void renderCapeLayer(
-            PoseStack poseStack,
-            MultiBufferSource.BufferSource bufferSource,
-            ResourceLocation capeTexture,
-            PlayerModel<?> model
-    ) {
-        poseStack.pushPose();
-//?} else if <1.21.11 {
-    /** Render a cape layer using the immediate 1.21.2-1.21.5 model pipeline. */
     private static void renderCapeLayer(
             PoseStack poseStack,
             MultiBufferSource.BufferSource bufferSource,
@@ -1405,7 +1440,11 @@ public class PlayerModelRenderer {
 
         // DEBUG: Render a GIANT bright magenta rectangle that's impossible to miss
         // This will help us see exactly where the cape is being rendered
+//? if <1.21.6 {
         RenderType debugRenderType = RenderType.gui();
+//?} else {
+        RenderType debugRenderType = RenderType.debugFilledBox();
+//?}
         var debugConsumer = bufferSource.getBuffer(debugRenderType);
         PoseStack.Pose debugPose = poseStack.last();
         Matrix4f debugMatrix = debugPose.pose();
@@ -1448,7 +1487,11 @@ public class PlayerModelRenderer {
         poseStack.mulPose(Axis.XP.rotationDegrees(capeSwing * 10.0f));
 
         // Get render type and vertex consumer
+//? if <1.21.6 {
         RenderType renderType = RenderType.entityTranslucent(capeLocation);
+//?} else {
+        RenderType renderType = RenderType.entityTranslucent(capeLocation);
+//?}
         var vertexConsumer = bufferSource.getBuffer(renderType);
 
         // Get matrices
@@ -1575,7 +1618,11 @@ public class PlayerModelRenderer {
 
         // DEBUG: Render a GIANT bright magenta rectangle that's impossible to miss
         // This will help us see exactly where the cape is being rendered
+//? if <1.21.6 {
         RenderType debugRenderType = RenderType.gui();
+//?} else {
+        RenderType debugRenderType = RenderType.debugFilledBox();
+//?}
         var debugConsumer = bufferSource.getBuffer(debugRenderType);
         PoseStack.Pose debugPose = poseStack.last();
         Matrix4f debugMatrix = debugPose.pose();
@@ -1622,7 +1669,11 @@ public class PlayerModelRenderer {
         poseStack.mulPose(Axis.XP.rotationDegrees(capeSwing * 10.0f));
 
         // Get render type and vertex consumer
+//? if <1.21.6 {
         RenderType renderType = RenderType.entityTranslucent(capeLocation);
+//?} else {
+        RenderType renderType = RenderType.entityTranslucent(capeLocation);
+//?}
         var vertexConsumer = bufferSource.getBuffer(renderType);
 
         // Get matrices
@@ -1857,8 +1908,8 @@ public class PlayerModelRenderer {
      * Supports idle, walk, run, sneak, sit, jump animations
      */
     private static void setupModelPoseWithAnimation(
-//? if <1.21.2 {
-            PlayerModel<?> model,
+//? if <1.21.11 {
+            PlayerModel model,
 //?} else {
             PlayerModel model,
 //?}
@@ -1936,18 +1987,20 @@ public class PlayerModelRenderer {
 //? if <1.21.6 {
         // Hat layer (outer layer of head) follows head rotation
         model.hat.copyFrom(model.head);
+//?} else {
+        // In MC 1.21.6+, outer layers inherit their parent transforms.
+        resetOuterLayerTransforms(model);
+    }
+//?}
+
+//? if <1.21.6 {
+        // Setup arm rendering
         model.leftSleeve.copyFrom(model.leftArm);
         model.rightSleeve.copyFrom(model.rightArm);
         model.leftPants.copyFrom(model.leftLeg);
         model.rightPants.copyFrom(model.rightLeg);
         model.jacket.copyFrom(model.body);
 //?} else {
-        // In MC 1.21.6+, outer layers inherit their parent transforms.
-        resetOuterLayerTransforms(model);
-//?}
-    }
-
-//? if >=1.21.2 {
     /**
      * Restore the baked local transforms of child outer layers.
      * In MC 1.21.6+, hat, sleeves, pants, and jacket are children of their corresponding body
@@ -1960,14 +2013,14 @@ public class PlayerModelRenderer {
         model.leftPants.resetPose();
         model.rightPants.resetPose();
         model.jacket.resetPose();
-    }
 //?}
+    }
 
     /**
      * Setup idle pose with subtle bounce animation
      */
-//? if <1.21.2 {
-    private static void setupIdlePose(PlayerModel<?> model, float t, float lerpFactor) {
+//? if <1.21.11 {
+    private static void setupIdlePose(PlayerModel model, float t, float lerpFactor) {
 //?} else {
     private static void setupIdlePose(PlayerModel model, float t, float lerpFactor) {
 //?}
@@ -2046,7 +2099,7 @@ public class PlayerModelRenderer {
      * Setup walking pose with natural body movements
      */
 //? if <1.21 {
-    private static void setupWalkingPose(PlayerModel<?> model, float t, float lerpFactor) {
+    private static void setupWalkingPose(PlayerModel model, float t, float lerpFactor) {
         MinecraftCompat.INSTANCE.setYoung(model, false);
         MinecraftCompat.INSTANCE.setCrouching(model, false);
         MinecraftCompat.INSTANCE.setRiding(model, false);
@@ -2106,7 +2159,7 @@ public class PlayerModelRenderer {
      * Setup sitting pose with subtle idle movements
      */
 //? if <1.21 {
-    private static void setupSittingPose(PlayerModel<?> model, float t, float lerpFactor) {
+    private static void setupSittingPose(PlayerModel model, float t, float lerpFactor) {
         MinecraftCompat.INSTANCE.setYoung(model, false);
         MinecraftCompat.INSTANCE.setCrouching(model, false);
         MinecraftCompat.INSTANCE.setRiding(model, true); // Enable riding flag for sitting pose
@@ -2361,7 +2414,7 @@ public class PlayerModelRenderer {
     /**
      * Render a debug cube at the chest position to show rotation center
      */
-    private static void renderDebugCube(PoseStack poseStack, MultiBufferSource buffer, PlayerModel<?> model) {
+    private static void renderDebugCube(PoseStack poseStack, MultiBufferSource buffer, PlayerModel model) {
         poseStack.pushPose();
 
         // Get chest position from the model's body part
@@ -2754,7 +2807,7 @@ public class PlayerModelRenderer {
             brightness = 1.2f + ((normalizedRotation - 270.0f) / 90.0f) * 0.225f;
         }
 
-//? if <1.21.11 {
+//? if <1.21.6 {
         // Setup shader lights with custom light vector
         // Standard light direction (from top-left-front)
         org.joml.Vector3f lightDirection = new org.joml.Vector3f(0.2f, 1.0f, -0.7f).normalize();
@@ -2764,7 +2817,7 @@ public class PlayerModelRenderer {
                 new org.joml.Vector3f(lightDirection).mul(brightness * 0.5f)
         );
 //?} else if <26.2 {
-        // 1.21.11: RenderSystem.setShaderLights now takes GpuBufferSlice instead of Vector3f.
+        // 1.21.6+: RenderSystem.setShaderLights now takes GpuBufferSlice instead of Vector3f.
         // Use Lighting.Entry-based API instead. This method is currently unused.
         Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
 //?} else {
@@ -2874,7 +2927,7 @@ public class PlayerModelRenderer {
      */
     public static void clearGrassBlockCache() {
         grassBlockCacheBuilt = false;
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
 //?} else {
         clearPendingCapes();
 //?}

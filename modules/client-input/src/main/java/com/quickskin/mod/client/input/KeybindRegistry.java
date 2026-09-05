@@ -8,7 +8,9 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-//? if >=1.21.11 {
+//? if >=1.21.9 && <1.21.11 {
+import net.minecraft.resources.ResourceLocation;
+//?} else if >=1.21.11 {
 import net.minecraft.resources.Identifier;
 //?}
 import org.lwjgl.glfw.GLFW;
@@ -21,8 +23,11 @@ import org.lwjgl.glfw.GLFW;
 public class KeybindRegistry {
 
     // Keybind category
-    //? if <1.21.11 {
+    //? if <1.21.9 {
     private static final String CATEGORY = "key.categories." + QuickSkinInfo.MOD_ID;
+    //?} else if <1.21.11 {
+    private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(
+            ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "keybinds"));
     //?} else {
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(
             Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "keybinds"));

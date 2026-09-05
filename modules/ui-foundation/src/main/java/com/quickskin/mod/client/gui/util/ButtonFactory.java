@@ -73,7 +73,7 @@ public class ButtonFactory {
         } else {
             // Create vanilla button with custom large rotation symbol rendering
             Component buttonText = Component.literal("↺");
-            //? if <1.21.11 {
+            //? if <1.21.6 {
             return new Button(x, y, size, size, buttonText, onPress, Supplier::get) {
                 @Override
                 public void renderString(GuiGraphics pGuiGraphics, Font pFont, int pColor) {

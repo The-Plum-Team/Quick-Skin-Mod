@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.gui.widget;
 
-//? if <1.21.11 {
+//? if <1.21.6 {
 import com.mojang.blaze3d.systems.RenderSystem;
 //?}
 import com.quickskin.mod.client.gui.GuiCompat;
@@ -53,7 +53,9 @@ public class IconActionButton extends Button {
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
         //?}
+        //? if <1.21.6 {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, this.alpha);
+        //?}
     //?} else {
         //? if <26.1.2 {
     protected void renderContents(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {

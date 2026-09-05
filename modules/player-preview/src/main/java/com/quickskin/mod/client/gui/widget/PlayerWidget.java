@@ -4,13 +4,7 @@ package com.quickskin.mod.client.gui.widget;
 //?} else {
 import com.quickskin.mod.client.gui.GuiCompat;
 //?}
-//? if <1.21 {
 import com.quickskin.mod.client.rendering.PreviewRenderBackend;
-//?} else if <1.21.11 {
-import com.quickskin.mod.client.rendering.PlayerModelRenderer;
-//?} else {
-import com.quickskin.mod.client.rendering.PreviewRenderBackend;
-//?}
 import com.quickskin.mod.client.rendering.PreviewCompositeOrder;
 import com.quickskin.mod.client.rendering.PreviewPlayerData;
 import net.fabricmc.api.EnvType;
@@ -642,12 +636,9 @@ public class PlayerWidget extends AbstractWidget {
         float previewScale = cachedScale;
 
         // Render the player model
-//? if <1.21 {
-        // Use GuiGraphics directly for vanilla rendering method
+//? if <1.21.9 {
+        // Use the era-specific immediate or picture-in-picture backend.
         PreviewRenderBackend.INSTANCE.renderPlayerModel(
-//?} else if <1.21.11 {
-        // Use GuiGraphics directly for vanilla rendering method
-        PlayerModelRenderer.renderPlayerModel(
 //?} else if <26.1.2 {
         // Use GuiGraphics directly for vanilla rendering method
         PreviewRenderBackend.INSTANCE.renderPlayerModel(
@@ -839,7 +830,7 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     @Override
-//? if <1.21.11 {
+//? if <1.21.9 {
     public void onClick(double mouseX, double mouseY) {
 //?} else {
     public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean focused) {
@@ -854,7 +845,7 @@ public class PlayerWidget extends AbstractWidget {
         // let that widget handle it instead
         if (isOverPriorityWidget(mouseX, mouseY)) {
             return false; // Don't consume the event, let the button handle it
-//?} else if <1.21.11 {
+//?} else if <1.21.9 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Check if customization feature is enabled and left click
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
@@ -948,7 +939,7 @@ public class PlayerWidget extends AbstractWidget {
                 activeInteractionWidget = null; // Clear active widget
             }
             handled = true;
-//?} else if <1.21.11 {
+//?} else if <1.21.9 {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (!isDragging || button != 0) {
             return false;
@@ -999,7 +990,7 @@ public class PlayerWidget extends AbstractWidget {
             // Save the new offsets to config
             savePositionOffsetsToConfig(newOffsetX, newOffsetY);
             return true;
-//?} else if <1.21.11 {
+//?} else if <1.21.9 {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (!isDragging || button != 0) {
             return false;

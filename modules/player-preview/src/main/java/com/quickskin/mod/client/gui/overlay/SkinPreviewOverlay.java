@@ -119,7 +119,7 @@ public class SkinPreviewOverlay {
                 }
             } else {
                 // Use vanilla skin
-                //? if <1.21.11 {
+                //? if <1.21.9 {
                     //? if <1.21 {
                 cachedSkinLocation = player.getSkinTextureLocation();
                 cachedModelType = player.getModelName(); // "default" or "slim"
@@ -139,7 +139,7 @@ public class SkinPreviewOverlay {
 
         // Fallback if cached skin is somehow still null
         if (cachedSkinLocation == null) {
-            //? if <1.21.11 {
+            //? if <1.21.9 {
                 //? if <1.21 {
             cachedSkinLocation = player.getSkinTextureLocation();
                 //?} else {
@@ -291,10 +291,10 @@ public class SkinPreviewOverlay {
         previewData.setCapeLocation(null); // No cape for HUD preview
         previewData.setModelType(modelType);
 
-        //? if <1.21.11 {
+        //? if <1.21.6 {
         PoseStack poseStack = graphics.pose();
         //?} else {
-        // Save graphics state - use new PoseStack since graphics.pose() returns Matrix3x2fStack in 1.21.11
+        // 1.21.6+: graphics.pose() is a Matrix3x2fStack; the renderer owns its 3D PoseStack.
         PoseStack poseStack = new PoseStack();
         //?}
         poseStack.pushPose();

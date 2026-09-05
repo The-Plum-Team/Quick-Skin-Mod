@@ -4,7 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 //? if >=1.21 {
 import net.minecraft.client.player.AbstractClientPlayer;
-    //? if <1.21.11 {
+    //? if <1.21.9 {
 import net.minecraft.client.resources.PlayerSkin;
     //?} else {
 import net.minecraft.world.entity.player.PlayerSkin;

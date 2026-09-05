@@ -73,8 +73,10 @@ public class SkinService implements ISkinService {
             // using the PlayerInfo or SkinManager to get the actual player skin
             //? if <1.21 {
             ResourceLocation defaultSkin = DefaultPlayerSkin.getDefaultSkin(uuid);
-            //?} else if <1.21.11 {
+            //?} else if <1.21.9 {
             ResourceLocation defaultSkin = DefaultPlayerSkin.get(uuid).texture();
+            //?} else if <1.21.11 {
+            ResourceLocation defaultSkin = DefaultPlayerSkin.get(uuid).body().texturePath();
             //?} else {
             Identifier defaultSkin = DefaultPlayerSkin.get(uuid).body().texturePath();
             //?}

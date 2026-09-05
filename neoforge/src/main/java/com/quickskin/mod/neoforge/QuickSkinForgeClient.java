@@ -13,7 +13,7 @@ import net.neoforged.neoforge.event.GameShuttingDownEvent;
  * NeoForge client entry point for QuickSkin
  * This class is only loaded on NeoForge clients (not dedicated servers)
  */
-//? if <1.21.11 {
+//? if <1.21.6 {
 @EventBusSubscriber(modid = QuickSkinInfo.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 //?} else {
 @EventBusSubscriber(modid = QuickSkinInfo.MOD_ID, value = Dist.CLIENT)
@@ -29,7 +29,7 @@ public class QuickSkinForgeClient {
     }
 
     // Close client resources from the game-bus lifecycle hook.
-//? if <1.21.11 {
+//? if <1.21.6 {
     @EventBusSubscriber(modid = QuickSkinInfo.MOD_ID, bus = EventBusSubscriber.Bus.GAME,
             value = Dist.CLIENT)
     public static final class Shutdown {

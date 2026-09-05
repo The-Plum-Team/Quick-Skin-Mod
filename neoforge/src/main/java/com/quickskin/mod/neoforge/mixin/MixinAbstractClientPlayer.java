@@ -133,10 +133,20 @@ package com.quickskin.mod.neoforge.mixin;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.AbstractClientPlayer;
+//? if <1.21.9 {
+import net.minecraft.client.resources.PlayerSkin;
+import net.minecraft.resources.ResourceLocation;
+//?} else if <1.21.11 {
+import net.minecraft.core.ClientAsset;
+import net.minecraft.world.entity.player.PlayerModelType;
+import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.resources.ResourceLocation;
+//?} else {
 import net.minecraft.core.ClientAsset;
 import net.minecraft.world.entity.player.PlayerModelType;
 import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.resources.Identifier;
+//?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -158,7 +168,14 @@ public abstract class MixinAbstractClientPlayer {
     @Unique
     private static boolean quickskin$fieldSearched = false;
 
-    @Inject(method = "getSkin", at = @At("HEAD"), cancellable = true)
+    @Inject(
+            method = "getSkin",
+            at = @At("HEAD"),
+            cancellable = true,
+            require = 1,
+            expect = 1,
+            allow = 1
+    )
     private void quickskin$overrideSkinAtHead(CallbackInfoReturnable<PlayerSkin> cir) {
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
         if (service == null) {
@@ -185,12 +202,29 @@ public abstract class MixinAbstractClientPlayer {
             return;
         }
 
+        //? if <1.21.9 {
+        ResourceLocation skinTexture = originalSkin.texture();
+        PlayerSkin.Model skinModel = originalSkin.model();
+        ResourceLocation capeTexture = originalSkin.capeTexture();
+        ResourceLocation elytraTexture = originalSkin.elytraTexture();
+        //?} else if <1.21.11 {
+        ResourceLocation skinTexture = originalSkin.body().texturePath();
+        PlayerModelType skinModel = originalSkin.model();
+        ResourceLocation capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+        ClientAsset.Texture elytraTexture = originalSkin.elytra();
+        //?} else {
         Identifier skinTexture = originalSkin.body().texturePath();
         PlayerModelType skinModel = originalSkin.model();
         Identifier capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+        ClientAsset.Texture elytraTexture = originalSkin.elytra();
+        //?}
 
         if (hasCustomSkin) {
+            //? if <1.21.11 {
+            ResourceLocation customSkin = service.getSkinLocation(self.getUUID());
+            //?} else {
             Identifier customSkin = service.getSkinLocation(self.getUUID());
+            //?}
             if (customSkin != null) {
                 skinTexture = customSkin;
             }
@@ -199,25 +233,49 @@ public abstract class MixinAbstractClientPlayer {
         if (hasCustomSkin || hasModelOverride) {
             String customModel = service.getModelName(self.getUUID());
             if (customModel != null) {
+                //? if <1.21.9 {
+                skinModel = "slim".equals(customModel) ? PlayerSkin.Model.SLIM : PlayerSkin.Model.WIDE;
+                //?} else {
                 skinModel = "slim".equals(customModel) ? PlayerModelType.SLIM : PlayerModelType.WIDE;
+                //?}
             }
         }
 
         if (hasCustomCape) {
+            //? if <1.21.11 {
+            ResourceLocation customCape = service.getCapeLocation(self.getUUID());
+            //?} else {
             Identifier customCape = service.getCapeLocation(self.getUUID());
+            //?}
             if (customCape != null) {
                 capeTexture = customCape;
+                // An active Quick Skin cape owns the profile Elytra input too; vanilla gives that
+                // dedicated field priority and would otherwise keep only the worn wings vanilla.
+                //? if <1.21.11 {
+                elytraTexture = customCape;
+                //?} else {
+                elytraTexture = new ClientAsset.ResourceTexture(customCape, customCape);
+                //?}
             } else {
                 // Pending network animations intentionally resolve to null until their bounded
-                // first-frame texture exists. Never publish the stacked atlas to other mods.
+                // first-frame texture exists. Never publish the stacked atlas to other mods or
+                // leave an unrelated profile Elytra beside a pending custom cape.
                 capeTexture = null;
+                elytraTexture = null;
             }
         }
 
         PlayerSkin customSkin = new PlayerSkin(
+            //? if <1.21.9 {
+            skinTexture,
+            originalSkin.textureUrl(),
+            capeTexture,
+            elytraTexture,
+            //?} else {
             new ClientAsset.ResourceTexture(skinTexture, skinTexture),
             capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : null,
-            originalSkin.elytra(),
+            elytraTexture,
+            //?}
             skinModel,
             originalSkin.secure()
         );

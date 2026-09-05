@@ -5,6 +5,7 @@ import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.platform.MinecraftCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import com.quickskin.mod.platform.MinecraftTextureUploads;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
@@ -76,11 +77,7 @@ public class StarPatternCache {
             cachedTextureHeight = cachedImage.getHeight();
 
             // Upload to GPU
-            //? if <1.21.5 {
-            cachedTexture = new DynamicTexture(cachedImage);
-            //?} else {
-            cachedTexture = new DynamicTexture(() -> "quickskin_star_cache", cachedImage);
-            //?}
+            cachedTexture = MinecraftTextureUploads.create(() -> "quickskin_star_cache", cachedImage);
             //? if <1.21.4 {
             cachedTextureLocation = mc.getTextureManager().register("quickskin_star_cache", cachedTexture);
             //?} else if <1.21.11 {
@@ -163,11 +160,7 @@ public class StarPatternCache {
 
             cachedTextureWidth = size;
             cachedTextureHeight = size;
-            //? if <1.21.5 {
-            cachedTexture = new DynamicTexture(fallbackImage);
-            //?} else {
-            cachedTexture = new DynamicTexture(() -> "quickskin_star_cache_fallback", fallbackImage);
-            //?}
+            cachedTexture = MinecraftTextureUploads.create(() -> "quickskin_star_cache_fallback", fallbackImage);
             //? if <1.21.4 {
             cachedTextureLocation = mc.getTextureManager().register("quickskin_star_cache_fallback", cachedTexture);
             //?} else if <1.21.11 {

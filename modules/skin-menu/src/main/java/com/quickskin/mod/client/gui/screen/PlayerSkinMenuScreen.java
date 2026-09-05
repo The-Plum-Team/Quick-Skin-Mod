@@ -699,7 +699,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         );
 
 //? if <1.21 {
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
         // Push pose
         graphics.pose().pushPose();
 
@@ -711,7 +711,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Render widgets (buttons, etc.)
 //? if <1.21 {
         super.render(graphics, mouseX, mouseY, partialTick);
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
         super.render(graphics, mouseX, mouseY, partialTick);
 
         // Pop pose
@@ -823,14 +823,12 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
 //? if <1.21 {
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-//?} else if <1.21.11 {
-    //? if <1.21.2 {
+//?} else if <1.21.6 {
+//? if <1.21.2 {
     public void renderBlurredBackground(float partialTick) {
-    //?} else if <1.21.6 {
+//?} else {
     protected void renderBlurredBackground() {
-    //?} else {
-    protected void renderBlurredBackground(net.minecraft.client.gui.GuiGraphics guiGraphics) {
-    //?}
+//?}
         // Disable the default blur effect - we have our own custom background
     }
 
@@ -852,10 +850,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     @Override
+//? if <1.21.9 {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+//?} else {
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
         int keyCode = event.key();
         int scanCode = event.scancode();
         int modifiers = event.modifiers();
+//?}
 //?} else {
     protected void extractBlurredBackground(net.minecraft.client.gui.GuiGraphicsExtractor guiGraphics) {
         // Disable the default blur effect - we have our own custom background
@@ -877,7 +879,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             this.onClose();
             return true;
         }
-//? if <1.21.11 {
+//? if <1.21.9 {
         return super.keyPressed(keyCode, scanCode, modifiers);
 //?} else {
         return super.keyPressed(event);
@@ -887,7 +889,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
 //? if <1.21 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-//?} else if <1.21.11 {
+//?} else if <1.21.9 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Give PlayerWidget input priority for its customization feature
         if (playerPreviewPanel != null) {
@@ -940,7 +942,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (com.quickskin.mod.client.rendering.PlayerModelRenderer.handleDebugMousePressed((int)mouseX, (int)mouseY, button)) {
             return true;
         }
-//? if <1.21.11 {
+//? if <1.21.9 {
         return super.mouseClicked(mouseX, mouseY, button);
 //?} else {
         return super.mouseClicked(event, focused);
@@ -948,7 +950,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     @Override
-//? if <1.21.11 {
+//? if <1.21.9 {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
 //?} else if <26.1.2 {
     public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dragX, double dragY) {
@@ -965,7 +967,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (com.quickskin.mod.client.rendering.PlayerModelRenderer.handleDebugMouseDragged((int)mouseX, (int)mouseY, button)) {
             return true;
         }
-//? if <1.21.11 {
+//? if <1.21.9 {
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
 //?} else {
         return super.mouseDragged(event, dragX, dragY);
@@ -973,7 +975,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     @Override
-//? if <1.21.11 {
+//? if <1.21.9 {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
 //?} else if <26.1.2 {
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
@@ -992,7 +994,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 //? if <1.21 {
         return super.mouseReleased(mouseX, mouseY, button);
-//?} else if <1.21.11 {
+//?} else if <1.21.9 {
         return super.mouseReleased(mouseX, mouseY, button);
     }
 

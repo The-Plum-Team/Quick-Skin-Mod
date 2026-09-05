@@ -39,7 +39,7 @@ public class CapeTransparencyEvents implements PreparableReloadListener {
     @Override
     //? if <1.21.2 {
     public final CompletableFuture<Void> reload(PreparationBarrier preparationBarrier, ResourceManager resourceManager, ProfilerFiller preparationsProfiler, ProfilerFiller reloadProfiler, Executor backgroundExecutor, Executor gameExecutor) {
-    //?} else if <1.21.11 {
+    //?} else if <1.21.9 {
     public final CompletableFuture<Void> reload(PreparationBarrier preparationBarrier, ResourceManager resourceManager, Executor backgroundExecutor, Executor gameExecutor) {
     //?} else {
     public final CompletableFuture<Void> reload(PreparableReloadListener.SharedState sharedState, Executor backgroundExecutor, PreparableReloadListener.PreparationBarrier preparationBarrier, Executor gameExecutor) {

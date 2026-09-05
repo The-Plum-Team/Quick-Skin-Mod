@@ -306,8 +306,8 @@ inside Minecraft modules. Existing source scanners, AI repair paths, release wor
 evidence consumers and version-port automation still need the complete modular contract migration;
 passing their current tests does not certify those stages.
 
-The active matrix now imports six targets through 1.21.5 from the pinned migration inputs.
-The remaining ten pinned targets and twenty artifact lanes still require full-mod
+The active matrix now imports nine targets through 1.21.8 from the pinned migration inputs.
+The remaining seven pinned targets and fourteen artifact lanes still require full-mod
 source/matrix consolidation and validation. The isolated sixteen-version native-API compilation
 probe is not full-mod or runtime evidence for those targets. Keep target publication independent
 while migrating branch-discovery consumers to the central matrix.
@@ -409,3 +409,26 @@ tasks should not eagerly configure or resolve every unrelated Minecraft module/v
   and all 483 release-policy tests pass after this change. The twelve production JARs and twelve
   harnesses are staged and independently verified again. Replay playback evidence remains a
   GitHub acceptance obligation.
+- Imported 1.21.6, 1.21.7 and 1.21.8 from their pinned matrices, dependency locks and native
+  source trees. They share the pipeline-family preview backend and the existing payload transport;
+  no per-version source overlay was added. Dependency verification gains 173 portable components.
+  Three imported Loom-transformed loader records were omitted because those local outputs already
+  belong to the exact locally generated namespace policy; their upstream inputs remain verified.
+- Reconciled older API boundaries against the previously built sources: player/cape model generics,
+  render-state lookup and preview identity, PostChain and background overrides, blend calls,
+  scrollbar methods, resource reload signatures and CPM's degraded embedded-PNG capability.
+  Texture construction now has one client-only `MinecraftTextureUploads` adapter, shared by the
+  catalog, network and animation caches, star background and cape editor. All eight call sites
+  preserve their image ownership and exact texture identities. Settings modal pose push/pop now
+  use the same immediate-rendering boundary.
+- Pinned vanilla and NeoForge bytecode confirms different skin-lookup multiplicities: the pipeline
+  family's synchronous method has two returns in vanilla and one in NeoForge. The mixin handlers
+  preserve that loader distinction. NeoForge's event-subscriber bus attribute is also bounded at
+  1.21.6. The late session-user bootstrap and per-candidate vanilla Elytra fallback from the 1.21.8
+  input are retained; Replay keeps the shared subject event and bounded watcher already integrated.
+- All nine targets build together with `buildAllLanes buildAllE2EHarnesses --no-parallel`: the final
+  build succeeds in 114 seconds across 1,376 tasks (314 executed). All eighteen production JARs and
+  eighteen harnesses are staged and independently verified with their SBOM. The stable unit gate
+  retains 264 passing JUnit tests; 483 release-policy tests and 24 affected GUI/CPM policy tests
+  pass. Earlier failed port/build attempts and bytecode audits remain in the checkpoint diagnostics.
+  No image E2E was launched for this family; the full GitHub visual gate remains outstanding.

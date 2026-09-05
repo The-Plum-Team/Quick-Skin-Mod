@@ -72,7 +72,7 @@ public class LinkButtonsPanel extends AbstractWidget {
             Component.translatable("quickskin.button.settings")
         ) {
             @Override
-            //? if <1.21.11 {
+            //? if <1.21.9 {
             public void onPress() {
             //?} else {
             public void onPress(net.minecraft.client.input.InputWithModifiers input) {

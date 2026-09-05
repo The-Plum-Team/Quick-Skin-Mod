@@ -24,6 +24,7 @@ import net.fabricmc.api.Environment;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import com.quickskin.mod.platform.MinecraftTextureUploads;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
@@ -1804,11 +1805,7 @@ public class LocalAssetManager {
             }
 
             // Create dynamic texture
-//? if <1.21.5 {
-            dynamicTexture = new DynamicTexture(nativeImage);
-//?} else {
-            dynamicTexture = new DynamicTexture(() -> "quickskin_local_" + primary, nativeImage);
-//?}
+            dynamicTexture = MinecraftTextureUploads.create(() -> "quickskin_local_" + primary, nativeImage);
 
             // Register with texture manager
 //? if <1.21 {

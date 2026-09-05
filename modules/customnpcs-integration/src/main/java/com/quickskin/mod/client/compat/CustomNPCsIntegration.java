@@ -8,8 +8,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 //? if <1.21 {
 import net.minecraft.resources.ResourceLocation;
-//?} else if <1.21.11 {
+//?} else if <1.21.9 {
 import net.minecraft.client.resources.PlayerSkin;
+import net.minecraft.resources.ResourceLocation;
+//?} else if <1.21.11 {
+import net.minecraft.world.entity.player.PlayerModelType;
+import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.core.ClientAsset;
 import net.minecraft.resources.ResourceLocation;
 //?} else {
 import net.minecraft.world.entity.player.PlayerModelType;
@@ -245,7 +250,7 @@ public class CustomNPCsIntegration {
     }
 
 //? if <1.21 {
-//?} else if <1.21.11 {
+//?} else if <1.21.9 {
     /**
      * Gets the Quick-Skin-Mod PlayerSkin, ensuring CustomNPCs doesn't override it.
      * This is the 1.21.1 version that works with the PlayerSkin record.
@@ -336,13 +341,25 @@ public class CustomNPCsIntegration {
             return originalSkin;
         }
 
+        //? if <1.21.11 {
+        ResourceLocation skinTexture = originalSkin.body().texturePath();
+        //?} else {
         Identifier skinTexture = originalSkin.body().texturePath();
+        //?}
         PlayerModelType skinModel = originalSkin.model();
+        //? if <1.21.11 {
+        ResourceLocation capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+        //?} else {
         Identifier capeTexture = originalSkin.cape() != null ? originalSkin.cape().texturePath() : null;
+        //?}
 
         // Override skin texture
         if (hasCustomSkin) {
+            //? if <1.21.11 {
+            ResourceLocation customSkin = service.getSkinLocation(playerId);
+            //?} else {
             Identifier customSkin = service.getSkinLocation(playerId);
+            //?}
             if (customSkin != null) {
                 skinTexture = customSkin;
             }
@@ -358,7 +375,11 @@ public class CustomNPCsIntegration {
 
         // Override cape
         if (hasCustomCape) {
+            //? if <1.21.11 {
+            ResourceLocation customCape = service.getCapeLocation(playerId);
+            //?} else {
             Identifier customCape = service.getCapeLocation(playerId);
+            //?}
             if (customCape != null) {
                 capeTexture = customCape;
             } else {

@@ -8,16 +8,22 @@ import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
-//? if <1.21.11 {
+//? if <1.21.9 {
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.resources.ResourceLocation;
+    //? if >=1.21.2 {
+import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+import net.minecraft.world.entity.Entity;
+    //?}
 //?} else {
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-import net.minecraft.resources.Identifier;
-//?}
-//? if >=1.21.2 {
 import net.minecraft.world.entity.Entity;
+    //? if <1.21.11 {
+import net.minecraft.resources.ResourceLocation;
+    //?} else {
+import net.minecraft.resources.Identifier;
+    //?}
 //?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -26,7 +32,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 //? if >=1.21.2 {
 import java.util.UUID;
-
 //?}
 /**
  * Mixin on AvatarRenderer to intercept skin texture lookups at the renderer level.
@@ -36,7 +41,7 @@ import java.util.UUID;
  * doesn't fire for those subclasses, but getTextureLocation() on the renderer is always
  * called regardless of the entity's class hierarchy.
  */
-//? if <1.21.11 {
+//? if <1.21.9 {
 @Mixin(PlayerRenderer.class)
 //?} else {
 @Mixin(AvatarRenderer.class)
@@ -45,8 +50,10 @@ public class PlayerRendererMixin {
 
 //? if <1.21.2 {
     @Inject(method = "getTextureLocation(Lnet/minecraft/client/player/AbstractClientPlayer;)Lnet/minecraft/resources/ResourceLocation;",
-//?} else if <1.21.11 {
+//?} else if <1.21.9 {
     @Inject(method = "getTextureLocation(Lnet/minecraft/client/renderer/entity/state/PlayerRenderState;)Lnet/minecraft/resources/ResourceLocation;",
+//?} else if <1.21.11 {
+    @Inject(method = "getTextureLocation(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)Lnet/minecraft/resources/ResourceLocation;",
 //?} else {
     @Inject(method = "getTextureLocation(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)Lnet/minecraft/resources/Identifier;",
 //?}
@@ -57,9 +64,10 @@ public class PlayerRendererMixin {
             allow = 1)
 //? if <1.21.2 {
     private void quickskin$overrideTextureLocation(AbstractClientPlayer player, CallbackInfoReturnable<ResourceLocation> cir) {
+//?} else if <1.21.9 {
+    private void quickskin$overrideTextureLocation(PlayerRenderState renderState, CallbackInfoReturnable<ResourceLocation> cir) {
 //?} else if <1.21.11 {
-    private void quickskin$overrideTextureLocation(net.minecraft.client.renderer.entity.state.PlayerRenderState renderState,
-                                                   CallbackInfoReturnable<ResourceLocation> cir) {
+    private void quickskin$overrideTextureLocation(AvatarRenderState renderState, CallbackInfoReturnable<ResourceLocation> cir) {
 //?} else {
     private void quickskin$overrideTextureLocation(AvatarRenderState renderState, CallbackInfoReturnable<Identifier> cir) {
 //?}
@@ -68,7 +76,8 @@ public class PlayerRendererMixin {
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
         if (service == null) return;
 
-//? if >=1.21.2 {
+//? if <1.21.2 {
+//?} else {
         // Look up the actual player entity from the render state to get UUID
         UUID playerUUID = null;
         Minecraft mc = Minecraft.getInstance();
@@ -79,9 +88,11 @@ public class PlayerRendererMixin {
             }
         }
 
+//? if <1.21.6 {
         if (playerUUID == null && mc.level == null) {
             playerUUID = mc.getUser().getProfileId();
         }
+//?}
         if (playerUUID == null) return;
 
 //?}

@@ -15,6 +15,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import com.quickskin.mod.platform.MinecraftTextureUploads;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
@@ -107,12 +108,7 @@ public class AnimatedTextureManager {
             boolean registered = false;
             try {
                 copyFrameTo(framePixels, 0);
-                //? if <1.21.5 {
-                createdTexture = new DynamicTexture(framePixels);
-                //?} else {
-                createdTexture = new DynamicTexture(
-                        () -> "quickskin_anim_" + animationId, framePixels);
-                //?}
+                createdTexture = MinecraftTextureUploads.create(() -> "quickskin_anim_" + animationId, framePixels);
 
                 String texturePath = "animated/"
                         + animationId.replaceAll("[^a-zA-Z0-9/._-]", "_");
@@ -253,12 +249,7 @@ public class AnimatedTextureManager {
             //?}
             boolean registered = false;
             try {
-                //? if <1.21.5 {
-                createdTexture = new DynamicTexture(firstFramePixels);
-                //?} else {
-                createdTexture = new DynamicTexture(
-                        () -> "quickskin_static_anim_" + animationId, firstFramePixels);
-                //?}
+                createdTexture = MinecraftTextureUploads.create(() -> "quickskin_static_anim_" + animationId, firstFramePixels);
                 String texturePath = "animated_static/"
                         + animationId.replaceAll("[^a-zA-Z0-9/._-]", "_");
                 //? if <1.21.4 {

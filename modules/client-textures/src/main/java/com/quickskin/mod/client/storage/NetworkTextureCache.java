@@ -17,6 +17,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import com.quickskin.mod.platform.MinecraftTextureUploads;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
@@ -354,11 +355,7 @@ public class NetworkTextureCache {
             }
 
             // Create dynamic texture
-            //? if <1.21.5 {
-            dynamicTexture = new DynamicTexture(nativeImage);
-            //?} else {
-            dynamicTexture = new DynamicTexture(() -> "quickskin_network_" + hash, nativeImage);
-            //?}
+            dynamicTexture = MinecraftTextureUploads.create(() -> "quickskin_network_" + hash, nativeImage);
 
             // Register with texture manager
             //? if <1.21.11 {

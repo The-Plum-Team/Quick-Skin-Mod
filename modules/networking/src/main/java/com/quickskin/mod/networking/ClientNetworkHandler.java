@@ -32,7 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Client-side network packet handlers (Architectury 14.x for MC 1.21.2)
+ * Client-side network packet handlers (Architectury 13.x for MC 1.21.1)
  * Handles all S2C (Server to Client) packets using CustomPacketPayload
  */
 @Environment(EnvType.CLIENT)

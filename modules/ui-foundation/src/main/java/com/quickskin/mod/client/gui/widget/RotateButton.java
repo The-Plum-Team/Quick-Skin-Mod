@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.gui.widget;
 
-//? if <1.21.11 {
+//? if <1.21.6 {
 import com.mojang.blaze3d.vertex.PoseStack;
 //?}
 import net.fabricmc.api.EnvType;
@@ -36,7 +36,7 @@ public class RotateButton extends Button {
         //?}
     //?}
         Component message = this.getMessage();
-        //? if <1.21.11 {
+        //? if <1.21.6 {
         PoseStack poseStack = pGuiGraphics.pose();
         poseStack.pushPose();
         //?} else {
@@ -49,7 +49,7 @@ public class RotateButton extends Button {
         float textWidth = pFont.width(message);
 
         // Translate to the center of the button to scale from that point
-        //? if <1.21.11 {
+        //? if <1.21.6 {
         poseStack.translate(this.getX() + this.getWidth() / 1.8F, this.getY() + this.getHeight() / 4F, 0);
         poseStack.scale(scale, scale, 1.0F);
         //?} else {
@@ -68,7 +68,7 @@ public class RotateButton extends Button {
             //?}
         //?}
 
-        //? if <1.21.11 {
+        //? if <1.21.6 {
         poseStack.popPose();
         //?} else {
         pose.popMatrix();
@@ -76,13 +76,13 @@ public class RotateButton extends Button {
     }
 
     @Override
-    //? if <1.21.11 {
+    //? if <1.21.9 {
     protected boolean isValidClickButton(int button) {
     //?} else {
     protected boolean isValidClickButton(net.minecraft.client.input.MouseButtonInfo buttonInfo) {
     //?}
         // Only allow left-click
-        //? if <1.21.11 {
+        //? if <1.21.9 {
         return button == 0;
         //?} else {
         return buttonInfo.button() == 0;

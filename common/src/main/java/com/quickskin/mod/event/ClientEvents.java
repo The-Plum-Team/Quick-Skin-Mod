@@ -50,6 +50,7 @@ public class ClientEvents {
     private static boolean initialized;
     private static volatile boolean closed;
     private static java.util.concurrent.CompletableFuture<?> playerOwnSkinTask;
+    private static volatile boolean playerOwnSkinBootstrapped;
 
     private static int tickCounter = 0;
     private static PlayerWidget playerWidget;
@@ -98,6 +99,10 @@ public class ClientEvents {
 
         // Client tick (fires every game tick, ~20 times per second)
         ClientTickEvent.CLIENT_POST.register(client -> {
+            // The session user is not readable from every platform's client entry point, so retry
+            // the own-skin bootstrap from the first tick that runs. It disarms itself once started.
+            ensurePlayerOwnSkinExists();
+
             com.quickskin.mod.client.compat.CPMCompatIntegration
                     .prepareForBackgroundModelLoading();
             // This also ensures the singleton instance is created.
@@ -112,7 +117,7 @@ public class ClientEvents {
 
             // Handle HUD overlay dragging only when a GUI is open (cursor is visible)
             if (!client.mouseHandler.isMouseGrabbed()) {
-                //? if <1.21.11 {
+                //? if <1.21.9 {
                 boolean leftMouseDown = GLFW.glfwGetMouseButton(client.getWindow().getWindow(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
                 boolean rightMouseDown = GLFW.glfwGetMouseButton(client.getWindow().getWindow(), GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
                 //?} else {
@@ -156,7 +161,8 @@ public class ClientEvents {
             }
         });
 
-        // Download player's own skin on startup (async, won't block)
+        // Download player's own skin on startup (async, won't block). Platforms whose client entry
+        // point runs before Minecraft exists retry this from the client tick registered above.
         ensurePlayerOwnSkinExists();
 
         // Player joins world (client-side)
@@ -452,7 +458,7 @@ public class ClientEvents {
 
                 // Second priority: Use current player skin (when in-game)
                 if (skinLocation == null && player != null) {
-                    //? if <1.21.11 {
+                    //? if <1.21.9 {
                         //? if <1.21 {
                     skinLocation = player.getSkinTextureLocation();
                         //?} else {
@@ -474,7 +480,7 @@ public class ClientEvents {
                             modelType = metadata.skinModel();
                         } else {
                             // Fallback: detect from the vanilla player's model
-                            //? if <1.21.11 {
+                            //? if <1.21.9 {
                                 //? if <1.21 {
                             modelType = player.getModelName(); // "default" or "slim"
                                 //?} else {
@@ -489,7 +495,7 @@ public class ClientEvents {
                         }
                     } else if ("auto".equals(modelType)) {
                         // No custom skin active, use vanilla player's model
-                        //? if <1.21.11 {
+                        //? if <1.21.9 {
                             //? if <1.21 {
                         modelType = player.getModelName(); // "default" or "slim"
                             //?} else {
@@ -655,7 +661,7 @@ public class ClientEvents {
                 com.quickskin.mod.client.gui.widget.PlayerWidget.getActiveInteractionWidget();
         //?} else {
         // Debug screen toggle (F3)
-            //? if <1.21.11 {
+            //? if <1.21.9 {
         ClientScreenInputEvent.KEY_PRESSED_PRE.register((client, screen, keyCode, scanCode, modifiers) -> {
             //?} else {
         ClientScreenInputEvent.KEY_PRESSED_PRE.register((client, screen, keyEvent) -> {
@@ -675,7 +681,7 @@ public class ClientEvents {
             }
             //?} else {
         // Raw input (for global keybinds outside of screens)
-            //? if <1.21.11 {
+            //? if <1.21.9 {
         ClientRawInputEvent.KEY_PRESSED.register((client, keyCode, scanCode, action, modifiers) -> {
             //?} else {
         ClientRawInputEvent.KEY_PRESSED.register((client, action, keyEvent) -> {
@@ -882,19 +888,39 @@ public class ClientEvents {
      * Ensure player's own skin exists in the list
      * Downloads it from Mojang if not present
      * Can be called at any time (even before joining a world)
+     *
+     * <p>Idempotent and cheap to call repeatedly: it runs at most one bootstrap per client
+     * session. Client entry points do not agree on when the session user becomes readable -
+     * FML constructs mods before {@link Minecraft} exists, so the very first attempt has no
+     * user to look up - therefore the attempt stays pending instead of being consumed, and the
+     * client tick retries it as soon as the session is available.
      */
     private static void ensurePlayerOwnSkinExists() {
+        if (playerOwnSkinBootstrapped || closed) {
+            return;
+        }
+        startPlayerOwnSkinBootstrap();
+    }
+
+    private static synchronized void startPlayerOwnSkinBootstrap() {
+        if (playerOwnSkinBootstrapped || closed) {
+            return;
+        }
+
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
         if (!config.enablePlayerOwnSkinSystem) {
+            playerOwnSkinBootstrapped = true;
             return;
         }
 
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.getUser() == null) {
+            // No session yet; leave the bootstrap pending for the next client tick.
             return;
         }
 
         String playerName = minecraft.getUser().getName();
+        playerOwnSkinBootstrapped = true;
 
         // Check if we already have the player's skin hash and it exists
         if (!config.playerOwnSkinHash.isEmpty()) {

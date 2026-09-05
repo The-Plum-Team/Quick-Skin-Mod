@@ -236,7 +236,7 @@ public class EarsCompatIntegration {
     /**
      * Get the skin Identifier from a player object using reflection.
      * Used by the mixin to handle different mapping schemes.
-     * In 1.21.1, uses peer.getSkin().texture().
+     * In 1.21.9+, uses peer.getSkin().body().texturePath().
      */
     //? if <1.21.11 {
     public static ResourceLocation getSkinLocationFromPlayer(Object player) {
@@ -250,20 +250,29 @@ public class EarsCompatIntegration {
             //? if <1.21 {
             Method getSkinTexture = player.getClass().getMethod("getSkinTexture");
             return (ResourceLocation) getSkinTexture.invoke(player);
-            //?} else if <1.21.11 {
+            //?} else if <1.21.9 {
             Method getSkin = player.getClass().getMethod("getSkin");
             Object playerSkin = getSkin.invoke(player);
             if (playerSkin != null) {
                 Method texture = playerSkin.getClass().getMethod("texture");
                 return (ResourceLocation) texture.invoke(playerSkin);
             }
-            //?} else {
-            // 1.21.1 API: getSkin() returns PlayerSkin, then .texture() returns Identifier
+            //?} else if <1.21.11 {
             Method getSkin = player.getClass().getMethod("getSkin");
             Object playerSkin = getSkin.invoke(player);
             if (playerSkin != null) {
-                Method texture = playerSkin.getClass().getMethod("texture");
-                return (Identifier) texture.invoke(playerSkin);
+                Object body = playerSkin.getClass().getMethod("body").invoke(playerSkin);
+                return body == null ? null :
+                        (ResourceLocation) body.getClass().getMethod("texturePath").invoke(body);
+            }
+            //?} else {
+            // Identifier-era PlayerSkin keeps the same ClientAsset.Texture shape.
+            Method getSkin = player.getClass().getMethod("getSkin");
+            Object playerSkin = getSkin.invoke(player);
+            if (playerSkin != null) {
+                Object body = playerSkin.getClass().getMethod("body").invoke(playerSkin);
+                return body == null ? null :
+                        (Identifier) body.getClass().getMethod("texturePath").invoke(body);
             }
             //?}
         } catch (Exception e) {

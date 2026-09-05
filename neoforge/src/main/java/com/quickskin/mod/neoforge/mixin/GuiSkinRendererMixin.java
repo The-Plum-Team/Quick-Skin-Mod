@@ -24,13 +24,13 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.state.gui.pip.GuiSkinRenderState;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 //?}
+//? if <1.21.11 {
+import net.minecraft.client.renderer.RenderType;
+//?} else {
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-//? if <26.2 {
-import net.minecraft.resources.Identifier;
-//?} else {
 //?}
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -50,6 +50,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class GuiSkinRendererMixin {
 
     @Inject(
+            require = 0,
+            expect = 1,
+            allow = 1,
 //? if <26.2 {
             method = "renderToTexture(Lnet/minecraft/client/gui/render/state/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
             at = @At(
@@ -89,7 +92,10 @@ public class GuiSkinRendererMixin {
 //?} else {
     @Inject(
             method = "renderToTexture(Lnet/minecraft/client/renderer/state/gui/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;)V",
-            at = @At("TAIL")
+            at = @At("TAIL"),
+            require = 0,
+            expect = 1,
+            allow = 1
     )
     private void quickskin$renderCapeInPiP(GuiSkinRenderState state, PoseStack poseStack, SubmitNodeCollector collector, CallbackInfo ci) {
 //?}
@@ -107,7 +113,11 @@ public class GuiSkinRendererMixin {
             return;
         }
 
+//? if <1.21.11 {
+        RenderType capeRenderType = RenderType.entityTranslucent(cape.texture());
+//?} else {
         RenderType capeRenderType = RenderTypes.entityTranslucent(cape.texture());
+//?}
 //? if <26.2 {
         VertexConsumer capeConsumer = bufferSource.getBuffer(capeRenderType);
 //?} else {

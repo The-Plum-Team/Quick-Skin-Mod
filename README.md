@@ -20,6 +20,9 @@ Features and compatibility adapters compile as separate Gradle modules. The sele
 | `1.21.3` | Fabric + NeoForge | `21` |
 | `1.21.4` | Fabric + NeoForge | `21` |
 | `1.21.5` | Fabric + NeoForge | `21` |
+| `1.21.6` | Fabric + NeoForge | `21` |
+| `1.21.7` | Fabric + NeoForge | `21` |
+| `1.21.8` | Fabric + NeoForge | `21` |
 
 All targets build from the same source revision. Publication identity remains per Minecraft version (`mc<version>-v<mod_version>`); the complete build bundle is not a publishable release. Dependency ranges remain in the matrix and generated JAR metadata.
 

@@ -23,7 +23,7 @@ public class QuickSkinForge {
      * Common setup event handler (runs on both client and server)
      * Uses @EventBusSubscriber to ensure it's called properly
      */
-//? if <1.21.11 {
+//? if <1.21.6 {
     @EventBusSubscriber(modid = QuickSkinInfo.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 //?} else {
     @EventBusSubscriber(modid = QuickSkinInfo.MOD_ID)

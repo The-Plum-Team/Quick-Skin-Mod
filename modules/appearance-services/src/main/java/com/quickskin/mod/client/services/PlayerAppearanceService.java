@@ -425,7 +425,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
         if (mc.level != null) {
             net.minecraft.world.entity.player.Player player = mc.level.getPlayerByUUID(playerId);
             if (player != null) {
-                //? if <1.21.11 {
+                //? if <1.21.9 {
                 return player.getGameProfile().getName();
                 //?} else {
                 return player.getGameProfile().name();

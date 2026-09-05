@@ -9,8 +9,13 @@ import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
-//? if <1.21.11 {
+//? if <1.21.9 {
 import net.minecraft.client.resources.PlayerSkin;
+import net.minecraft.resources.ResourceLocation;
+//?} else if <1.21.11 {
+import net.minecraft.world.entity.player.PlayerModelType;
+import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.core.ClientAsset;
 import net.minecraft.resources.ResourceLocation;
 //?} else {
 import net.minecraft.world.entity.player.PlayerModelType;
@@ -83,7 +88,7 @@ public abstract class PlayerInfoMixin {
             return;
         }
 
-//? if <1.21.11 {
+//? if <1.21.9 {
         boolean hasCustomSkin = service.hasActiveSkin(this.profile.getId());
         boolean hasCustomCape = service.hasActiveCape(this.profile.getId());
         boolean hasModelOverride = service.hasModelOverride(this.profile.getId());
@@ -114,10 +119,14 @@ public abstract class PlayerInfoMixin {
         }
 
         // Get current Quick-Skin data
-//? if <1.21.11 {
+//? if <1.21.9 {
         ResourceLocation currentSkinLocation = hasCustomSkin ? service.getSkinLocation(this.profile.getId()) : null;
         ResourceLocation currentCapeLocation = hasCustomCape ? service.getCapeLocation(this.profile.getId()) : null;
         String currentModelName = (hasCustomSkin || hasModelOverride) ? service.getModelName(this.profile.getId()) : null;
+//?} else if <1.21.11 {
+        ResourceLocation currentSkinLocation = hasCustomSkin ? service.getSkinLocation(this.profile.id()) : null;
+        ResourceLocation currentCapeLocation = hasCustomCape ? service.getCapeLocation(this.profile.id()) : null;
+        String currentModelName = (hasCustomSkin || hasModelOverride) ? service.getModelName(this.profile.id()) : null;
 //?} else {
         Identifier currentSkinLocation = hasCustomSkin ? service.getSkinLocation(this.profile.id()) : null;
         Identifier currentCapeLocation = hasCustomCape ? service.getCapeLocation(this.profile.id()) : null;
@@ -126,7 +135,7 @@ public abstract class PlayerInfoMixin {
 
         // FAST PATH: Check if we can use cached result
         if (quickskin$cachedSkin != null &&
-//? if <1.21.11 {
+//? if <1.21.9 {
             java.util.Objects.equals(quickskin$cachedOriginalTexture, original.texture()) &&
 //?} else {
             java.util.Objects.equals(quickskin$cachedOriginalTexture, original.body().texturePath()) &&
@@ -139,11 +148,16 @@ public abstract class PlayerInfoMixin {
         }
 
         // SLOW PATH: Cache miss, need to rebuild
-//? if <1.21.11 {
+//? if <1.21.9 {
         ResourceLocation skinTexture = original.texture();
         PlayerSkin.Model skinModel = original.model();
         ResourceLocation capeTexture = original.capeTexture();
         ResourceLocation elytraTexture = original.elytraTexture();
+//?} else if <1.21.11 {
+        ResourceLocation skinTexture = original.body().texturePath();
+        PlayerModelType skinModel = original.model();
+        ResourceLocation capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+        ClientAsset.Texture elytraTexture = original.elytra();
 //?} else {
         Identifier skinTexture = original.body().texturePath();
         PlayerModelType skinModel = original.model();
@@ -158,7 +172,7 @@ public abstract class PlayerInfoMixin {
 
         // Override model
         if ((hasCustomSkin || hasModelOverride) && currentModelName != null) {
-//? if <1.21.11 {
+//? if <1.21.9 {
             skinModel = "slim".equals(currentModelName) ? PlayerSkin.Model.SLIM : PlayerSkin.Model.WIDE;
 //?} else {
             skinModel = "slim".equals(currentModelName) ? PlayerModelType.SLIM : PlayerModelType.WIDE;
@@ -186,7 +200,7 @@ public abstract class PlayerInfoMixin {
 
         // Create new PlayerSkin with our custom values
         PlayerSkin customSkin = new PlayerSkin(
-//? if <1.21.11 {
+//? if <1.21.9 {
             skinTexture,
             original.textureUrl(),
             capeTexture,
@@ -202,7 +216,7 @@ public abstract class PlayerInfoMixin {
 
         // Cache the result
         quickskin$cachedSkin = customSkin;
-//? if <1.21.11 {
+//? if <1.21.9 {
         quickskin$cachedOriginalTexture = original.texture();
 //?} else {
         quickskin$cachedOriginalTexture = original.body().texturePath();
@@ -229,11 +243,16 @@ public abstract class PlayerInfoMixin {
         }
 
         LocalAssetManager assetManager = LocalAssetManager.getInstance();
-//? if <1.21.11 {
+//? if <1.21.9 {
         ResourceLocation skinTexture = null;
         PlayerSkin.Model skinModel = (original != null) ? original.model() : PlayerSkin.Model.WIDE;
         ResourceLocation capeTexture = null;
         ResourceLocation elytraTexture = null;
+//?} else if <1.21.11 {
+        ResourceLocation skinTexture = null;
+        PlayerModelType skinModel = (original != null) ? original.model() : PlayerModelType.WIDE;
+        ResourceLocation capeTexture = null;
+        ClientAsset.Texture elytraTexture = null;
 //?} else {
         Identifier skinTexture = null;
         PlayerModelType skinModel = (original != null) ? original.model() : PlayerModelType.WIDE;
@@ -250,7 +269,7 @@ public abstract class PlayerInfoMixin {
                     modelType = metadata.skinModel();
                 }
             }
-//? if <1.21.11 {
+//? if <1.21.9 {
             skinModel = "slim".equals(modelType) ? PlayerSkin.Model.SLIM : PlayerSkin.Model.WIDE;
 //?} else {
             skinModel = "slim".equals(modelType) ? PlayerModelType.SLIM : PlayerModelType.WIDE;
@@ -274,13 +293,12 @@ public abstract class PlayerInfoMixin {
         }
 
         if (original != null) {
-//? if <1.21.11 {
-//?} else {
+//? if >=1.21.9 {
             ClientAsset.Texture skinAsset = skinTexture != null ? new ClientAsset.ResourceTexture(skinTexture, skinTexture) : original.body();
             ClientAsset.Texture capeAsset = capeTexture != null ? new ClientAsset.ResourceTexture(capeTexture, capeTexture) : original.cape();
 //?}
             return new PlayerSkin(
-//? if <1.21.11 {
+//? if <1.21.9 {
                 skinTexture != null ? skinTexture : original.texture(),
                 original.textureUrl(),
                 capeTexture != null ? capeTexture : original.capeTexture(),
@@ -297,7 +315,7 @@ public abstract class PlayerInfoMixin {
 
         // Last resort: build with just our textures
         return new PlayerSkin(
-//? if <1.21.11 {
+//? if <1.21.9 {
             skinTexture, null, capeTexture, elytraTexture, skinModel, false
 //?} else {
             skinTexture != null ? new ClientAsset.ResourceTexture(skinTexture, skinTexture) : null,

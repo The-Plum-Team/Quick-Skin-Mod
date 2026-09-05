@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.gui.widget;
 
-//? if <1.21.11 {
+//? if <1.21.6 {
 import com.mojang.blaze3d.systems.RenderSystem;
 //?}
 import com.quickskin.mod.client.gui.GuiCompat;
@@ -66,7 +66,9 @@ public class LinkButton extends Button {
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
         //?}
+        //? if <1.21.6 {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, this.alpha);
+        //?}
     //?} else {
         //? if <26.1.2 {
     protected void renderContents(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
@@ -94,13 +96,13 @@ public class LinkButton extends Button {
     }
 
     @Override
-    //? if <1.21.11 {
+    //? if <1.21.9 {
     protected boolean isValidClickButton(int button) {
     //?} else {
     protected boolean isValidClickButton(net.minecraft.client.input.MouseButtonInfo buttonInfo) {
     //?}
         // Only allow left-click
-        //? if <1.21.11 {
+        //? if <1.21.9 {
         return button == 0;
         //?} else {
         return buttonInfo.button() == 0;

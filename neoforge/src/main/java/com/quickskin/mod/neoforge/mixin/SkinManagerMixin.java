@@ -213,7 +213,7 @@ public class SkinManagerMixin {
 package com.quickskin.mod.neoforge.mixin;
 
 import com.mojang.authlib.GameProfile;
-//? if <1.21.11 {
+//? if <1.21.4 {
 import com.quickskin.mod.platform.QuickSkinInfo;
 //?} else {
 //?}
@@ -223,8 +223,10 @@ import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
-//? if <1.21.11 {
+//? if <1.21.4 {
 import net.minecraft.client.renderer.texture.HttpTexture;
+//?}
+//? if <1.21.9 {
 import net.minecraft.client.resources.PlayerSkin;
 //?} else {
 import net.minecraft.core.ClientAsset;
@@ -243,16 +245,17 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-//? if <1.21.11 {
+//? if <1.21.4 {
 import java.io.File;
 import java.nio.file.Path;
 import java.util.Map;
-//?} else {
+//?}
+//? if >=1.21.4 {
 import java.util.Optional;
 //?}
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-//? if <1.21.11 {
+//? if <1.21.4 {
 import java.util.concurrent.ConcurrentHashMap;
 //?} else {
 //?}
@@ -264,9 +267,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * This catches ALL skin lookups including those by mods like Essential that bypass
  * AbstractClientPlayer.getSkin() and PlayerRenderer.getTextureLocation() entirely.
  *
- * Two injection points:
- * - getInsecureSkin(GameProfile) — synchronous, used by vanilla code paths
- * - getOrLoad(GameProfile) — async (CompletableFuture), used by Essential's FallbackPlayer on 1.20.2+
+ * Two injection points, whose names and return types changed in 1.21.9:
+ * - getInsecureSkin / createLookup — synchronous lookup construction
+ * - getOrLoad / get — async loading
  *
  * Essential for MC >= 1.20.2 uses FallbackPlayer which calls getOrLoad() directly,
  * bypassing getInsecureSkin(). The getOrLoad mixin wraps the future with thenApply
@@ -274,7 +277,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Mixin(SkinManager.class)
 public class SkinManagerMixin {
-//? if <1.21.11 {
+//? if <1.21.4 {
 
     // Cache for HttpTexture-backed ResourceLocations (for CPM compat)
     @Unique
@@ -284,7 +287,7 @@ public class SkinManagerMixin {
 
     /**
      * Shared helper that applies QuickSkin overrides to a PlayerSkin.
-     * Used by both getInsecureSkin and getOrLoad mixin handlers.
+     * Used by both synchronous and asynchronous lookup mixin handlers.
      */
     @Unique
     private static PlayerSkin quickskin$applyOverrides(PlayerSkin original, UUID uuid, String profileName) {
@@ -299,11 +302,16 @@ public class SkinManagerMixin {
 
         // Try service-based overrides
         if (hasCustomSkin || hasCustomCape || hasModelOverride) {
-//? if <1.21.11 {
+//? if <1.21.9 {
             ResourceLocation skinTexture = original.texture();
             PlayerSkin.Model skinModel = original.model();
             ResourceLocation capeTexture = original.capeTexture();
             ResourceLocation elytraTexture = original.elytraTexture();
+//?} else if <1.21.11 {
+            ResourceLocation skinTexture = original.body().texturePath();
+            PlayerModelType skinModel = original.model();
+            ResourceLocation capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+            ClientAsset.Texture elytraTexture = original.elytra();
 //?} else {
             Identifier skinTexture = original.body().texturePath();
             PlayerModelType skinModel = original.model();
@@ -313,7 +321,7 @@ public class SkinManagerMixin {
             boolean anyOverride = false;
 
             if (hasCustomSkin) {
-//? if <1.21.11 {
+//? if <1.21.4 {
                 ResourceLocation customSkin;
                 if (CPMCompatIntegration.isAvailable()) {
                     // When CPM is installed, register skin as HttpTexture so CPM can read pixel data
@@ -321,6 +329,11 @@ public class SkinManagerMixin {
                 } else {
                     customSkin = service.getSkinLocation(uuid);
                 }
+//?} else if <1.21.11 {
+                // Minecraft 1.21.4+ removed HttpTexture. Keep the regular
+                // ResourceLocation and surface the explicit degraded capability.
+                CPMCompatIntegration.isAvailable();
+                ResourceLocation customSkin = service.getSkinLocation(uuid);
 //?} else if <26.2 {
                 // CPM 1.21.11+ bypasses registered player textures. Activate the
                 // degraded-capability log, then keep QuickSkin's normal texture.
@@ -342,7 +355,7 @@ public class SkinManagerMixin {
             if (hasCustomSkin || hasModelOverride) {
                 String customModel = service.getModelName(uuid);
                 if (customModel != null) {
-//? if <1.21.11 {
+//? if <1.21.9 {
                     skinModel = "slim".equals(customModel) ? PlayerSkin.Model.SLIM : PlayerSkin.Model.WIDE;
 //?} else {
                     skinModel = "slim".equals(customModel) ? PlayerModelType.SLIM : PlayerModelType.WIDE;
@@ -359,7 +372,7 @@ public class SkinManagerMixin {
 //?}
                 if (customCape != null) {
                     capeTexture = customCape;
-//? if <1.21.11 {
+//? if <1.21.9 {
                     elytraTexture = customCape;
 //?} else {
                     elytraTexture = new ClientAsset.ResourceTexture(customCape, customCape);
@@ -376,7 +389,7 @@ public class SkinManagerMixin {
 
             if (anyOverride) {
                 return new PlayerSkin(
-//? if <1.21.11 {
+//? if <1.21.9 {
                         skinTexture,
                         original.textureUrl(),
                         capeTexture,
@@ -392,7 +405,7 @@ public class SkinManagerMixin {
             }
         }
 
-//? if <1.21.11 {
+//? if <1.21.9 {
         // Title screen config fallback
         if (Minecraft.getInstance().level == null) {
 //?} else {
@@ -405,11 +418,16 @@ public class SkinManagerMixin {
             boolean hasCape = !config.activeCapeHash.isEmpty();
 
             if (hasSkin || hasCape) {
-//? if <1.21.11 {
+//? if <1.21.9 {
                 ResourceLocation skinTexture = original.texture();
                 PlayerSkin.Model skinModel = original.model();
                 ResourceLocation capeTexture = original.capeTexture();
                 ResourceLocation elytraTexture = original.elytraTexture();
+//?} else if <1.21.11 {
+                ResourceLocation skinTexture = original.body().texturePath();
+                PlayerModelType skinModel = original.model();
+                ResourceLocation capeTexture = original.cape() != null ? original.cape().texturePath() : null;
+                ClientAsset.Texture elytraTexture = original.elytra();
 //?} else {
                 Identifier skinTexture = original.body().texturePath();
                 PlayerModelType skinModel = original.model();
@@ -434,7 +452,7 @@ public class SkinManagerMixin {
                                 modelType = metadata.skinModel();
                             }
                         }
-//? if <1.21.11 {
+//? if <1.21.9 {
                         skinModel = "slim".equals(modelType) ? PlayerSkin.Model.SLIM : PlayerSkin.Model.WIDE;
 //?} else {
                         skinModel = "slim".equals(modelType) ? PlayerModelType.SLIM : PlayerModelType.WIDE;
@@ -452,7 +470,7 @@ public class SkinManagerMixin {
                             .getCapeLocation(null, config.activeCapeHash);
                     if (capeLoc != null) {
                         capeTexture = capeLoc;
-//? if <1.21.11 {
+//? if <1.21.9 {
                         elytraTexture = capeLoc;
 //?} else {
                         elytraTexture = new ClientAsset.ResourceTexture(capeLoc, capeLoc);
@@ -463,7 +481,7 @@ public class SkinManagerMixin {
 
                 if (anyOverride) {
                     return new PlayerSkin(
-//? if <1.21.11 {
+//? if <1.21.9 {
                             skinTexture,
                             original.textureUrl(),
                             capeTexture,
@@ -484,11 +502,11 @@ public class SkinManagerMixin {
     }
 
     /**
-     * Intercept createLookup (26.2 synchronous path; renamed from getInsecureSkin).
-     * In 26.2 SkinManager.createLookup(GameProfile, boolean) returns a Supplier&lt;PlayerSkin&gt; instead of
+     * Intercept the synchronous lookup path. In 1.21.9,
+     * SkinManager.createLookup(GameProfile, boolean) returns a Supplier&lt;PlayerSkin&gt; instead of
      * a resolved PlayerSkin, so we wrap the supplier to apply QuickSkin overrides on resolution.
      */
-//? if <1.21.11 {
+//? if <1.21.4 {
     @Unique
     private static ResourceLocation quickskin$getOrRegisterHttpTexture(UUID uuid, PlayerAppearanceService service) {
         com.quickskin.mod.common.data.PlayerAppearance appearance = service.getAppearance(uuid);
@@ -562,47 +580,43 @@ public class SkinManagerMixin {
     /**
      * Intercept getInsecureSkin (synchronous path).
      * Used by vanilla code and any mod that calls SkinManager.getInsecureSkin() directly.
+     * NeoForge's patched target has two RETURNs before 1.21.6 and one from 1.21.6 through 1.21.8.
      */
+//?}
+
+//? if <1.21.9 {
     @Inject(
             method = "getInsecureSkin",
             at = @At("RETURN"),
             cancellable = true,
             require = 1,
-            // Minecraft 1.21.1 has two RETURN opcodes in getInsecureSkin; both must be wrapped.
+//? if <1.21.6 {
             expect = 2,
-            allow = 2)
-    private void quickskin$modifyInsecureSkinLegacy(GameProfile profile, CallbackInfoReturnable<PlayerSkin> cir) {
-        UUID uuid = profile.getId();
-//?} else if <26.2 {
-    @Inject(
-            method = "getInsecureSkin",
-            at = @At("RETURN"),
-            cancellable = true,
-            require = 1,
+            allow = 2
+//?} else {
+            // NeoForge patches this method to a single RETURN in the pipeline family.
             expect = 1,
-            allow = 1)
+            allow = 1
+//?}
+    )
     private void quickskin$modifyInsecureSkin(GameProfile profile, CallbackInfoReturnable<PlayerSkin> cir) {
-        UUID uuid = profile.id();
+        UUID uuid = profile.getId();
 //?} else {
     @Inject(
             method = "createLookup",
             at = @At("RETURN"),
             cancellable = true,
             require = 1,
-            expect = 1,
-            allow = 1)
-    private void quickskin$modifyInsecureSkin(GameProfile profile, boolean secure, CallbackInfoReturnable<java.util.function.Supplier<PlayerSkin>> cir) {
+            expect = 3,
+            allow = 3
+    )
+    private void quickskin$modifyCreateLookup(GameProfile profile, boolean secure, CallbackInfoReturnable<java.util.function.Supplier<PlayerSkin>> cir) {
         UUID uuid = profile.id();
 //?}
         if (uuid == null) return;
 
-//? if <1.21.11 {
+//? if <1.21.9 {
         PlayerSkin result = quickskin$applyOverrides(cir.getReturnValue(), uuid, profile.getName());
-        if (result != cir.getReturnValue()) {
-            cir.setReturnValue(result);
-        }
-//?} else if <26.2 {
-        PlayerSkin result = quickskin$applyOverrides(cir.getReturnValue(), uuid, profile.name());
         if (result != cir.getReturnValue()) {
             cir.setReturnValue(result);
         }
@@ -615,41 +629,44 @@ public class SkinManagerMixin {
     }
 
     /**
-     * Intercept getOrLoad (async path returning CompletableFuture).
+     * Intercept the async loading path returning a CompletableFuture.
      *
      * Essential for MC >= 1.20.2 uses FallbackPlayer which calls getOrLoad() directly,
      * bypassing getInsecureSkin(). We wrap the returned future with thenApply to apply
      * QuickSkin overrides when the future resolves.
      */
-//? if <1.21.11 {
+//? if <1.21.4 {
     @Inject(
             method = "getOrLoad",
             at = @At("RETURN"),
             cancellable = true,
             require = 1,
             expect = 1,
-            allow = 1)
+            allow = 1
+    )
     private void quickskin$modifyGetOrLoad(GameProfile profile, CallbackInfoReturnable<CompletableFuture<PlayerSkin>> cir) {
         UUID uuid = profile.getId();
-//?} else if <26.2 {
+//?} else if <1.21.9 {
     @Inject(
             method = "getOrLoad",
             at = @At("RETURN"),
             cancellable = true,
             require = 1,
             expect = 1,
-            allow = 1)
+            allow = 1
+    )
     private void quickskin$modifyGetOrLoad(GameProfile profile, CallbackInfoReturnable<CompletableFuture<Optional<PlayerSkin>>> cir) {
-        UUID uuid = profile.id();
+        UUID uuid = profile.getId();
 //?} else {
     @Inject(
             method = "get",
             at = @At("RETURN"),
             cancellable = true,
             require = 1,
-            expect = 1,
-            allow = 1)
-    private void quickskin$modifyGetOrLoad(GameProfile profile, CallbackInfoReturnable<CompletableFuture<Optional<PlayerSkin>>> cir) {
+            expect = 2,
+            allow = 2
+    )
+    private void quickskin$modifyGet(GameProfile profile, CallbackInfoReturnable<CompletableFuture<Optional<PlayerSkin>>> cir) {
         UUID uuid = profile.id();
 //?}
         if (uuid == null) return;
@@ -664,7 +681,7 @@ public class SkinManagerMixin {
                     || service.hasModelOverride(uuid);
         }
 
-//? if <1.21.11 {
+//? if <1.21.9 {
         if (!hasServiceOverrides && Minecraft.getInstance().level == null) {
 //?} else {
         boolean isLocalPlayer = uuid.equals(Minecraft.getInstance().getUser().getProfileId());
@@ -677,11 +694,16 @@ public class SkinManagerMixin {
         // Only wrap the future if we actually have overrides to apply
         if (!hasServiceOverrides && !hasTitleScreenFallback) return;
 
-//? if <1.21.11 {
+//? if <1.21.4 {
         String profileName = profile.getName();
         CompletableFuture<PlayerSkin> original = cir.getReturnValue();
         CompletableFuture<PlayerSkin> modified = original.thenApply(skin ->
             quickskin$applyOverrides(skin, uuid, profileName)
+//?} else if <1.21.9 {
+        String profileName = profile.getName();
+        CompletableFuture<Optional<PlayerSkin>> original = cir.getReturnValue();
+        CompletableFuture<Optional<PlayerSkin>> modified = original.thenApply(optSkin ->
+            optSkin.map(skin -> quickskin$applyOverrides(skin, uuid, profileName))
 //?} else {
         String profileName = profile.name();
         CompletableFuture<Optional<PlayerSkin>> original = cir.getReturnValue();

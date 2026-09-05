@@ -32,7 +32,7 @@ import net.minecraft.client.renderer.PanoramaRenderer;
 //?} else {
 import net.minecraft.client.renderer.Panorama;
 //?}
-//? if >=1.21.11 {
+//? if >=1.21.6 {
 import net.minecraft.client.renderer.RenderPipelines;
 //?} else if >=1.21.2 {
 import net.minecraft.client.renderer.RenderType;
@@ -124,7 +124,7 @@ public class BackgroundRenderer {
         //?}
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.disableBlend();
-        //?} else if <1.21.11 {
+        //?} else if <1.21.6 {
         // GuiGraphics is batched from 1.21.2 onward, so keep the tint on each queued vertex.
         int vignetteColor = 0xBF000000;
         graphics.blit(RenderType::guiTextured, VIGNETTE_LOCATION, 0, 0, 0.0f, 0.0f,
@@ -226,7 +226,7 @@ public class BackgroundRenderer {
         pose.popPose();
         RenderSystem.disableBlend();
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-        //?} else if <1.21.11 {
+        //?} else if <1.21.6 {
         // Keep the black fill, stars, and vignette in GuiGraphics' ordered buffer.
         graphics.blit(RenderType::guiTextured, starTexture, 0, 0, (float) offsetX, 0.0f,
                 screen.width, screen.height, cacheWidth, cacheHeight, argbColor);
@@ -269,8 +269,10 @@ public class BackgroundRenderer {
 
             //? if <1.21 {
             GuiCompat.renderPanorama(panoramaRenderer, panoramaPartialTick);
-            //?} else if <1.21.11 {
+            //?} else if <1.21.6 {
             panoramaRenderer.render(graphics, screen.width, screen.height, 1.0F, panoramaPartialTick);
+            //?} else if <1.21.11 {
+            panoramaRenderer.render(graphics, screen.width, screen.height, true);
             //?} else {
                 //? if <26.1.2 {
             GuiCompat.renderPanorama(panoramaRenderer, graphics, screen.width, screen.height);
