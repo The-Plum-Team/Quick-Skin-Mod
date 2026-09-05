@@ -954,6 +954,52 @@ class PagesSiteTest(unittest.TestCase):
         }
         self.assertEqual(first_files, second_files)
 
+    def test_compacting_a_carried_cache_binds_target_and_coverage_separately(
+        self,
+    ) -> None:
+        branch = "forge-and-fabric-1.20.1"
+        self.write_branch(branch, "1.20.1")
+        compact = self.root / "compact-before-carry"
+        carried = self.root / "carried-compact"
+        accepted = self.root / "accepted-carried-compact"
+        rejected = self.root / "rejected-carried-compact"
+        target_sha = "2" * 40
+        coverage_sha = "9" * 40
+        compact_bundle(self.evidence_root, compact, branch)
+        carry_forward(
+            evidence_root=compact,
+            output_root=carried,
+            branch=branch,
+            coverage_sha=coverage_sha,
+            expected_repository="AkaNebur/Quick-Skin-Mod",
+        )
+
+        compact_bundle(
+            carried,
+            accepted,
+            branch,
+            expected_repository="AkaNebur/Quick-Skin-Mod",
+            expected_target_sha=target_sha,
+            expected_coverage_sha=coverage_sha,
+        )
+        validate_bundle(
+            accepted,
+            branch,
+            expected_kind="compact",
+            expected_target_sha=target_sha,
+            expected_coverage_sha=coverage_sha,
+        )
+
+        with self.assertRaisesRegex(PublicEvidenceError, "coverage SHA mismatch"):
+            compact_bundle(
+                carried,
+                rejected,
+                branch,
+                expected_target_sha=target_sha,
+                expected_coverage_sha="8" * 40,
+            )
+        self.assertFalse((rejected / branch).exists())
+
     def test_raw_handoff_contract_rejects_a_precompacted_bundle(self) -> None:
         branch = "forge-and-fabric-1.20.1"
         self.write_branch(branch, "1.20.1")
