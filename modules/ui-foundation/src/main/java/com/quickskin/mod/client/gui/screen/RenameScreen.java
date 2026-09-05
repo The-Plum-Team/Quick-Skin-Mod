@@ -5,7 +5,7 @@ import com.quickskin.mod.client.gui.effect.BlurHandler;
 import com.quickskin.mod.client.gui.util.ButtonFactory;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -141,14 +141,14 @@ public class RenameScreen extends Screen {
     }
 
     @Override
-    //? if <26.1.2 {
+    //? if <26.1 {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
     //?} else {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTicks) {
     //?}
         // Render parent screen in background
         if (this.parent != null) {
-            //? if <26.1.2 {
+            //? if <26.1 {
             this.parent.render(graphics, -1, -1, partialTicks);
             //?} else {
             GuiCompat.extractParent(this.parent, graphics, partialTicks);
@@ -192,7 +192,7 @@ public class RenameScreen extends Screen {
 
         // Draw title (centered)
         int titleY = this.panelY + 20;
-        //? if <26.1.2 {
+        //? if <26.1 {
         graphics.drawCenteredString(this.font, this.title,
         //?} else {
         graphics.centeredText(this.font, this.title,
@@ -203,7 +203,7 @@ public class RenameScreen extends Screen {
         // Draw message if it exists
         if (!this.message.getString().isEmpty()) {
             int messageY = this.panelY + 45;
-            //? if <26.1.2 {
+            //? if <26.1 {
             graphics.drawCenteredString(this.font, this.message,
             //?} else {
             graphics.centeredText(this.font, this.message,
@@ -213,7 +213,7 @@ public class RenameScreen extends Screen {
         }
 
         // Render text box and buttons
-        //? if <26.1.2 {
+        //? if <26.1 {
         super.render(graphics, mouseX, mouseY, partialTicks);
         //?} else {
         super.extractRenderState(graphics, mouseX, mouseY, partialTicks);
@@ -262,14 +262,14 @@ public class RenameScreen extends Screen {
             //?}
         }
     }
-    //? if >=1.21 {
+    //? if >=1.21 && <26.1 {
         //? if <1.21.2 {
     @Override
     public void renderBlurredBackground(float partialTick) {
         //?} else if <1.21.6 {
     @Override
     protected void renderBlurredBackground() {
-        //?} else if <26.1.2 {
+        //?} else if <26.1 {
     @Override
     protected void renderBlurredBackground(net.minecraft.client.gui.GuiGraphics guiGraphics) {
         //?}
@@ -282,16 +282,7 @@ public class RenameScreen extends Screen {
     }
         //?}
     //?}
-    //? if >=26.1.2 {
-
-    private void hidePlayerWidgets(boolean hide) {
-        if (this.parent == null) return;
-        for (var child : this.parent.children()) {
-            if (child instanceof com.quickskin.mod.client.gui.widget.PlayerWidget pw) {
-                pw.visible = !hide;
-            }
-        }
-    }
+    //? if >=26.1 {
 
     @Override
     public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {

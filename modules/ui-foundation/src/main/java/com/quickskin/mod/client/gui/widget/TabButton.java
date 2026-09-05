@@ -2,7 +2,7 @@ package com.quickskin.mod.client.gui.widget;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -44,7 +44,7 @@ public class TabButton extends Button {
     //? if <1.21.11 {
     public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
     //?} else {
-        //? if <26.1.2 {
+        //? if <26.1 {
     protected void renderContents(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         //?} else {
     protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTicks) {
@@ -93,7 +93,7 @@ public class TabButton extends Button {
         }
 
         // Draw centered text
-        //? if <26.1.2 {
+        //? if <26.1 {
         graphics.drawCenteredString(
         //?} else {
         graphics.centeredText(

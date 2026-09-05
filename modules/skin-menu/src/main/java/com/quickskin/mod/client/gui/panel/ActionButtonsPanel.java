@@ -1,7 +1,7 @@
 package com.quickskin.mod.client.gui.panel;
 
 import com.quickskin.mod.client.gui.util.ButtonFactory;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -92,7 +92,7 @@ public class ActionButtonsPanel extends AbstractWidget {
     }
 
     @Override
-    //? if <26.1.2 {
+    //? if <26.1 {
     protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
     //?} else {
     protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {

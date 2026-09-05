@@ -7,7 +7,7 @@ import dev.architectury.event.EventResult;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -69,7 +69,7 @@ public class SkinPreviewOverlay {
      * Render the skin preview overlay
      */
     @SuppressWarnings("unused")
-    //? if <26.1.2 {
+    //? if <26.1 {
     public static void render(GuiGraphics guiGraphics, float tickDelta) {
     //?} else {
     public static void render(GuiGraphicsExtractor guiGraphics, float tickDelta) {
@@ -208,7 +208,7 @@ public class SkinPreviewOverlay {
         }
     }
 
-    //? if <26.1.2 {
+    //? if <26.1 {
     private static void renderModelBorder(GuiGraphics graphics, int centerX, int centerY, float scale) {
     //?} else {
     private static void renderModelBorder(GuiGraphicsExtractor graphics, int centerX, int centerY, float scale) {
@@ -225,7 +225,7 @@ public class SkinPreviewOverlay {
         int textX = centerX - textWidth / 2;
         int textY = top - 12;
         int textColor = 0xFFFFFFFF;
-        //? if <26.1.2 {
+        //? if <26.1 {
         graphics.drawString(font, instructionText, textX, textY, textColor, true);
         //?} else {
         graphics.text(font, instructionText, textX, textY, textColor, true);
@@ -269,7 +269,7 @@ public class SkinPreviewOverlay {
      * Render the player model preview
      */
     private static void renderPlayerPreview(
-            //? if <26.1.2 {
+            //? if <26.1 {
             GuiGraphics graphics,
             //?} else {
             GuiGraphicsExtractor graphics,

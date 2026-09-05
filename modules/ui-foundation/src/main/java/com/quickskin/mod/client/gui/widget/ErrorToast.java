@@ -3,7 +3,7 @@ package com.quickskin.mod.client.gui.widget;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -36,7 +36,7 @@ public class ErrorToast {
      * Render the toast
      * @return true if still visible, false if expired
      */
-    //? if <26.1.2 {
+    //? if <26.1 {
     public boolean render(GuiGraphics guiGraphics, int screenWidth) {
     //?} else {
     public boolean render(GuiGraphicsExtractor guiGraphics, int screenWidth) {
@@ -86,7 +86,7 @@ public class ErrorToast {
             text = mc.font.plainSubstrByWidth(text, maxTextWidth - mc.font.width("...")) + "...";
         }
 
-        //? if <26.1.2 {
+        //? if <26.1 {
         guiGraphics.drawString(mc.font, text, messageX, messageY, textColor, false);
         //?} else {
         guiGraphics.text(mc.font, text, messageX, messageY, textColor, false);

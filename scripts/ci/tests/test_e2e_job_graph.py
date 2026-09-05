@@ -31,6 +31,7 @@ class E2EJobGraphTest(unittest.TestCase):
 
     def test_protected_controller_covers_both_required_gate_implementations(self) -> None:
         protected = set(graph.PROTECTED_CONTROLLER_PATHS)
+        self.assertIn("scripts/release/build_matrix.py", protected)
         self.assertIn(".github/workflows/build-gate.yml", protected)
         self.assertIn(".github/workflows/on-demand-e2e.yml", protected)
         self.assertIn(".github/actions/run-packaged-e2e", protected)

@@ -32,6 +32,15 @@ val buildArtifacts = if (buildTarget == null) artifacts else {
         check(it.isNotEmpty()) { "Unknown quickskinTarget '$buildTarget' in $matrixFile" }
     }
 }
+// Reject the obsolete multi-version command before configuring Loom or executing clean.
+// The external coordinator owns process isolation; no Gradle process launches another.
+if (artifacts.map { it["artifact_version"] }.distinct().size > 1) {
+    val aggregateTasks = setOf("buildAllLanes", "buildAllE2EHarnesses")
+    check(gradle.startParameter.taskNames.none { it.substringAfterLast(':') in aggregateTasks }) {
+        "Build the complete matrix with python scripts/release/build_matrix.py; " +
+            "each target needs a separate Gradle process."
+    }
+}
 
 gradle.extensions.extraProperties.apply {
     set("quickSkinReleaseMatrixFile", matrixFile)

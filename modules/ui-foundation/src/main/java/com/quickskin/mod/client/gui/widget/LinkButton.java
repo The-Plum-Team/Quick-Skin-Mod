@@ -9,7 +9,7 @@ import net.minecraft.Util;
 //?} else {
 import net.minecraft.util.Util;
 //?}
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -70,7 +70,7 @@ public class LinkButton extends Button {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, this.alpha);
         //?}
     //?} else {
-        //? if <26.1.2 {
+        //? if <26.1 {
     protected void renderContents(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         renderDefaultSprite(graphics);
         //?} else {

@@ -5,7 +5,7 @@ import com.quickskin.mod.client.gui.util.ButtonFactory;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
 import com.quickskin.mod.client.gui.widget.RotateButton;
 import com.quickskin.mod.common.data.AssetMetadata;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -419,7 +419,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
     }
 
     @Override
-    //? if <26.1.2 {
+    //? if <26.1 {
     protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         updateCpmWearingState();
         if (cpmIconLocation != null) {

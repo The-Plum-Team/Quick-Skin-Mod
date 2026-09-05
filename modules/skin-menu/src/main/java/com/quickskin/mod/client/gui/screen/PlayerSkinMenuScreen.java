@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.gui.screen;
 
-//? if <26.1.2 {
+//? if <26.1 {
 //?} else {
 import com.quickskin.mod.client.gui.GuiCompat;
 //?}
@@ -37,7 +37,7 @@ import com.quickskin.mod.common.data.SkinSortMode;
 import com.quickskin.mod.common.data.TextureQuality;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -572,7 +572,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             String animationId =
                     com.quickskin.mod.client.services.CapeAnimationIds.deriveAnimationId(capeId);
 
-//? if <26.1.2 {
+//? if <26.1 {
             // Check if this local cape has animation metadata
             com.quickskin.mod.common.data.AnimationMetadata metadata =
                     LocalAssetManager.getInstance().getAnimationMetadata(hash);
@@ -661,7 +661,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
      * Renders a moving star pattern background similar to the effect on the example website.
      * This includes a tiled, scrolling texture and a vignette overlay for depth.
      */
-//? if <26.1.2 {
+//? if <26.1 {
     private void renderBackgroundEffects(GuiGraphics graphics, float partialTick) {
 //?} else {
     private void renderBackgroundEffects(GuiGraphicsExtractor graphics, float partialTick) {
@@ -670,7 +670,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     @Override
-//? if <26.1.2 {
+//? if <26.1 {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 //?} else {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
@@ -682,7 +682,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         renderPanel(graphics);
 
         // Render title
-//? if <26.1.2 {
+//? if <26.1 {
         graphics.drawCenteredString(
 //?} else {
         graphics.centeredText(
@@ -716,7 +716,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // Pop pose
         graphics.pose().popPose();
-//?} else if <26.1.2 {
+//?} else if <26.1 {
         super.render(graphics, mouseX, mouseY, partialTick);
 
         // Pop pose
@@ -735,7 +735,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     /**
      * Render the main panel with frosted glass effect
      */
-//? if <26.1.2 {
+//? if <26.1 {
     private void renderPanel(GuiGraphics graphics) {
 //?} else {
     private void renderPanel(GuiGraphicsExtractor graphics) {
@@ -839,7 +839,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-//?} else if <26.1.2 {
+//?} else if <26.1 {
     protected void renderBlurredBackground(net.minecraft.client.gui.GuiGraphics guiGraphics) {
         // Disable the default blur effect - we have our own custom background
     }
@@ -903,7 +903,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             }
         }
 
-//?} else if <26.1.2 {
+//?} else if <26.1 {
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean focused) {
         double mouseX = event.x();
         double mouseY = event.y();
@@ -952,7 +952,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
 //? if <1.21.9 {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-//?} else if <26.1.2 {
+//?} else if <26.1 {
     public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dragX, double dragY) {
         double mouseX = event.x();
         double mouseY = event.y();
@@ -977,7 +977,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
 //? if <1.21.9 {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-//?} else if <26.1.2 {
+//?} else if <26.1 {
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
         double mouseX = event.x();
         double mouseY = event.y();
@@ -1308,7 +1308,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     /**
      * Render error toasts
      */
-//? if <26.1.2 {
+//? if <26.1 {
     private void renderErrorToasts(GuiGraphics graphics) {
 //?} else {
     private void renderErrorToasts(GuiGraphicsExtractor graphics) {

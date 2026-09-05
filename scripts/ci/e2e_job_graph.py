@@ -102,6 +102,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "scripts/ci/version_port_conflicts.py",
     "scripts/ci/version_port_merge.py",
     "scripts/release/artifact_manifest.py",
+    "scripts/release/build_matrix.py",
     "scripts/release/generate_sbom.py",
     "scripts/release/matrix.py",
     "scripts/release/release_identity.py",

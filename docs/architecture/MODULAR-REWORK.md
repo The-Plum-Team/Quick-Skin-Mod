@@ -306,11 +306,11 @@ inside Minecraft modules. Existing source scanners, AI repair paths, release wor
 evidence consumers and version-port automation still need the complete modular contract migration;
 passing their current tests does not certify those stages.
 
-The active matrix now imports twelve targets through 1.21.11 from the pinned migration inputs.
-The remaining four pinned targets and eight artifact lanes still require full-mod
-source/matrix consolidation and validation. The isolated sixteen-version native-API compilation
-probe is not full-mod or runtime evidence for those targets. Keep target publication independent
-while migrating branch-discovery consumers to the central matrix.
+The active matrix now imports all sixteen targets through 26.2 from the pinned migration inputs.
+Every target has compiled its full mod and packaged harnesses in isolation. Integrated validation
+of the final tree and the publication/governance/Pages migration remain separate obligations;
+compilation is not runtime evidence. Keep target publication independent while migrating
+branch-discovery consumers to the central matrix.
 The complete build now uses `scripts/release/build_matrix.py`: a separate sequential Gradle
 process per target bounds both project configuration and remapping memory. The target-specific
 tasks do not configure or resolve unrelated Minecraft module/version nodes.
@@ -450,3 +450,33 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   unfinished. Nine coordinator tests cover complete/partial coverage, invalid unselected lanes,
   failures, missing outputs, matrix mutation and output replacement. The complete release-policy
   suite passes 493 tests and the CI-policy suite passes 301 tests.
+- The collector checkpoint preserves all twelve successful target builds (202 seconds combined),
+  24 verified production JARs and 24 verified harnesses. A real clean rebuild of 1.20.1 passes in
+  24 seconds; a subsequent complete output comparison confirms every staged hash still matches.
+  This is a clean-scope check, not a second rebuild of the other eleven targets. The checkpoint
+  retains the failed single-JVM build and the final serial build separately.
+- Imported 26.1, 26.1.1, 26.1.2 and 26.2 with their pinned matrices, locks and 271 portable
+  dependency components. The GUI extraction boundary starts at 26.1, and the three 26.1 targets
+  share one preview backend. Their existing NeoForge handler package/return-site boundaries and
+  profile Elytra ownership are preserved. API-family module dependencies now select Java variants
+  when the matrix declares `no_remap`, rather than requesting an absent Loom `namedElements`.
+- One NeoForge overlay, routed only to 26.1 and 26.1.1, contains the exact upstream BreakEvent
+  compatibility shim, mixin registration and Screen access transformer. The eight original
+  bytecode/access tests pass on each of those targets, including rejection of malformed frames
+  and unexpected handlers; no compatibility code or test is selected for 26.1.2 or 26.2.
+  Module compilation also exposed unused preview-widget helpers in generic dialogs/settings;
+  those helpers were removed instead of introducing feature dependency cycles. Three old blur
+  override blocks are now wholly bounded before GUI extraction. All four imported targets
+  compile production and harnesses independently; the complete final-tree gate follows.
+- The complete sixteen-target serial gate passes in 311 seconds. All 32 production JARs and
+  32 harnesses are staged and independently verified with their SBOM. A packaged-class audit
+  proves that each production JAR contains exactly its one native API adapter and one preview
+  backend, and that the Architectury shim/configuration/access transformer exist only in NeoForge
+  26.1 and 26.1.1. The stable module unit gate has 264 passing tests; the shim adds eight passing
+  tests on each affected target. The complete policy suites pass 493 release and 301 CI tests.
+  Ten controller tests also pass after sealing the new build coordinator as protected CI input.
+  A real invocation of the retired aggregate command, including `clean`, is rejected before
+  project configuration or any task; all 64 build-output hashes remain unchanged afterward.
+  No new Minecraft/image E2E was launched. Full reproducibility, remaining feature/API ownership,
+  selective CI/evidence, publication/governance/Pages and the prepared GitHub visual gate remain
+  outstanding.

@@ -141,6 +141,15 @@ val e2eSourceSet = sourceSets.create("e2e") {
     runtimeClasspath += output + compileClasspath
 }
 
+sourceSets.test {
+    java.setSrcDirs(listOf(rootProject.file("neoforge/src/test/java")))
+    resources.setSrcDirs(listOf(rootProject.file("neoforge/src/test/resources")))
+    if (overlayDirectory != null) {
+        java.srcDir(rootProject.file("neoforge/src/$overlayDirectory/test/java"))
+        resources.srcDir(rootProject.file("neoforge/src/$overlayDirectory/test/resources"))
+    }
+}
+
 configurations {
     create("common")
     create("shadowBundle")
@@ -173,6 +182,9 @@ dependencies {
     "common"(project.files(commonProject.tasks.named("jar")))
     "shadowBundle"(project.files(commonProject.tasks.named("transformProductionNeoForge")))
     "shadowBundle"("org.sejda.imageio:webp-imageio:0.1.6")
+
+    "testImplementation"("org.junit.jupiter:junit-jupiter:5.13.4")
+    "testRuntimeOnly"("org.junit.platform:junit-platform-launcher:1.13.4")
 }
 
 val javaVersion = versionProp("java_version").toInt()
@@ -185,6 +197,19 @@ java {
 
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(javaVersion)
+}
+
+tasks.test {
+    useJUnitPlatform()
+    systemProperty("java.awt.headless", "true")
+    testLogging {
+        events("failed", "skipped")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}
+
+tasks.named("shadowJar") {
+    dependsOn(tasks.named("test"))
 }
 
 if (isNoRemap) {

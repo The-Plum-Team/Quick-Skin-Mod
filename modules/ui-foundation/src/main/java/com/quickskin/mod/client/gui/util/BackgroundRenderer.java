@@ -20,14 +20,14 @@ import com.quickskin.mod.common.data.BackgroundStyle;
 //?} else {
 //?}
 import net.minecraft.client.Minecraft;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 //?}
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.CubeMap;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.renderer.PanoramaRenderer;
 //?} else {
 import net.minecraft.client.renderer.Panorama;
@@ -60,7 +60,7 @@ public class BackgroundRenderer {
     //?}
 
     // Panorama renderer instance (reused across renders)
-    //? if <26.1.2 {
+    //? if <26.1 {
     private static PanoramaRenderer panoramaRenderer = null;
     //?} else {
     private static Panorama panoramaRenderer = null;
@@ -82,7 +82,7 @@ public class BackgroundRenderer {
      * @param graphics Graphics context
      * @param partialTick Partial tick for animations
      */
-    //? if <26.1.2 {
+    //? if <26.1 {
     public static void renderBackground(Screen screen, GuiGraphics graphics, float partialTick) {
     //?} else {
     public static void renderBackground(Screen screen, GuiGraphicsExtractor graphics, float partialTick) {
@@ -102,7 +102,7 @@ public class BackgroundRenderer {
     /**
      * Renders opaque black background with star pattern and vignette (current default)
      */
-    //? if <26.1.2 {
+    //? if <26.1 {
     private static void renderOpaqueStarsBackground(Screen screen, GuiGraphics graphics, float partialTick) {
     //?} else {
     private static void renderOpaqueStarsBackground(Screen screen, GuiGraphicsExtractor graphics, float partialTick) {
@@ -140,7 +140,7 @@ public class BackgroundRenderer {
     /**
      * Renders scrolling star pattern overlay
      */
-    //? if <26.1.2 {
+    //? if <26.1 {
     private static void renderStarPattern(Screen screen, GuiGraphics graphics, float partialTick) {
     //?} else {
     private static void renderStarPattern(Screen screen, GuiGraphicsExtractor graphics, float partialTick) {
@@ -242,7 +242,7 @@ public class BackgroundRenderer {
      * Renders vanilla-style background - shows panorama on title screen,
      * or transparent overlay when in-game to show the world behind
      */
-    //? if <26.1.2 {
+    //? if <26.1 {
     private static void renderBlurredBackground(Screen screen, GuiGraphics graphics, float partialTick) {
     //?} else {
     private static void renderBlurredBackground(Screen screen, GuiGraphicsExtractor graphics, float partialTick) {
@@ -256,7 +256,7 @@ public class BackgroundRenderer {
         } else {
             // Title screen: render the panorama background
             if (panoramaRenderer == null) {
-                //? if <26.1.2 {
+                //? if <26.1 {
                 panoramaRenderer = new PanoramaRenderer(PANORAMA_CUBE_MAP);
                 //?} else {
                 panoramaRenderer = new Panorama();
@@ -274,7 +274,7 @@ public class BackgroundRenderer {
             //?} else if <1.21.11 {
             panoramaRenderer.render(graphics, screen.width, screen.height, true);
             //?} else {
-                //? if <26.1.2 {
+                //? if <26.1 {
             GuiCompat.renderPanorama(panoramaRenderer, graphics, screen.width, screen.height);
                 //?} else {
             GuiCompat.extractPanorama(panoramaRenderer, graphics, screen.width, screen.height);

@@ -26,7 +26,7 @@ public final class CpmCapabilities {
         MC_1_21_8("1.21.8", RenderPipeline.RENDER_STATE),
         MC_1_21_10("1.21.10", RenderPipeline.RENDER_STATE),
         MC_1_21_11("1.21.11", RenderPipeline.RENDER_STATE),
-        MC_26_1_2("26.1.2", RenderPipeline.EXTRACTOR),
+        MC_26_1("26.1", RenderPipeline.EXTRACTOR),
         MC_26_2("26.2", RenderPipeline.DEFERRED_COLLECTOR);
 
         private final String displayName;
@@ -78,7 +78,7 @@ public final class CpmCapabilities {
         matrix.put(Band.MC_1_21_8, availableWithDegradedEmbeddedBridge(Band.MC_1_21_8));
         matrix.put(Band.MC_1_21_10, availableWithDegradedEmbeddedBridge(Band.MC_1_21_10));
         matrix.put(Band.MC_1_21_11, availableWithDegradedEmbeddedBridge(Band.MC_1_21_11));
-        matrix.put(Band.MC_26_1_2, availableWithDegradedEmbeddedBridge(Band.MC_26_1_2));
+        matrix.put(Band.MC_26_1, availableWithDegradedEmbeddedBridge(Band.MC_26_1));
         matrix.put(Band.MC_26_2, availableWithDegradedEmbeddedBridge(Band.MC_26_2));
         MATRIX = Collections.unmodifiableMap(matrix);
     }
@@ -105,10 +105,10 @@ public final class CpmCapabilities {
         return Band.MC_1_21_8;
         //?} else if <1.21.11 {
         return Band.MC_1_21_10;
-        //?} else if <26.1.2 {
+        //?} else if <26.1 {
         return Band.MC_1_21_11;
         //?} else if <26.2 {
-        return Band.MC_26_1_2;
+        return Band.MC_26_1;
         //?} else {
         return Band.MC_26_2;
         //?}

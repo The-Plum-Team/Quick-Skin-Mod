@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "com.quickskin.mod.neoforge.mixin.compat",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "plugin": "com.quickskin.mod.neoforge.mixin.compat.ArchitecturyCompatMixinPlugin",
+  "mixins": [
+    "ArchitecturyEventHandlerCompatMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

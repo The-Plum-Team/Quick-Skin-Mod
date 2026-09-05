@@ -5,7 +5,7 @@ import net.minecraft.Util;
 //?} else {
 import net.minecraft.util.Util;
 //?}
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.renderer.PanoramaRenderer;
 //?} else {
 import net.minecraft.client.renderer.Panorama;
@@ -51,7 +51,7 @@ public class PanoramaTimeSync {
 
         try {
             List<Field> motionFields = new ArrayList<>();
-            //? if <26.1.2 {
+            //? if <26.1 {
             for (Field field : PanoramaRenderer.class.getDeclaredFields()) {
             //?} else {
             // Find the time field in Panorama (first non-static float)
@@ -74,7 +74,7 @@ public class PanoramaTimeSync {
     /**
      * Sets the time on a Panorama instance to the global time.
      */
-    //? if <26.1.2 {
+    //? if <26.1 {
     public static void syncPanoramaRenderer(PanoramaRenderer renderer) {
     //?} else {
     public static void syncPanoramaRenderer(Panorama renderer) {

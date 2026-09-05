@@ -22,6 +22,8 @@ val libraries = graph["libraries"] as Map<String, String>
 @Suppress("UNCHECKED_CAST")
 val releaseArtifacts = gradle.extensions.extraProperties["quickSkinReleaseArtifacts"]
     as List<Map<*, *>>
+val noRemap = isMinecraftModule && releaseArtifacts.filter { it["artifact_version"] == moduleVersion }
+    .map { it["no_remap"] as Boolean }.distinct().single()
 // A version-independent module uses the lowest supported bytecode level.
 val javaVersion = if (isMinecraftModule) {
     releaseArtifacts.filter { it["artifact_version"] == moduleVersion }
@@ -81,7 +83,7 @@ dependencyConfigurations
     .forEach { (key, configuration) ->
         (definition[key] as List<*>).forEach { dependency ->
             val moduleId = dependency.toString()
-            val selected = if (byId.getValue(moduleId)["kind"] == "minecraft") {
+            val selected = if (byId.getValue(moduleId)["kind"] == "minecraft" && !noRemap) {
                 dependencies.project(mapOf("path" to modulePath(moduleId), "configuration" to "namedElements"))
             } else project(modulePath(moduleId))
             dependencies.add(configuration, selected)

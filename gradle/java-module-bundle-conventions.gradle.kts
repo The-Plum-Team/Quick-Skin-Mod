@@ -5,6 +5,10 @@ val definitions = (gradle.extensions.extraProperties["quickSkinModules"]
     as List<Map<String, Any>>).associateBy { it["id"].toString() }
 val owner = project.path.split(':').first { it.isNotEmpty() }
 val definition = definitions.getValue(owner)
+@Suppress("UNCHECKED_CAST")
+val releaseArtifacts = gradle.extensions.extraProperties["quickSkinReleaseArtifacts"] as List<Map<*, *>>
+val noRemap = releaseArtifacts.filter { it["artifact_version"] == project.name }
+    .map { it["no_remap"] as Boolean }.distinct().single()
 val dependencyKinds = mapOf(
     "api" to "implementation", "implementation" to "implementation", "runtime_only" to "runtimeOnly",
 )
@@ -13,7 +17,7 @@ fun modulePath(moduleId: String): String =
     if (definitions.getValue(moduleId)["kind"] == "java-library") ":modules:$moduleId"
     else ":$moduleId:${project.name}"
 fun moduleConfiguration(moduleId: String): String =
-    if (definitions.getValue(moduleId)["kind"] == "java-library") "runtimeElements"
+    if (definitions.getValue(moduleId)["kind"] == "java-library" || noRemap) "runtimeElements"
     else "namedElements"
 fun collectDependencies(moduleId: String) {
     dependencyKinds.keys.forEach { key ->
@@ -28,7 +32,7 @@ collectDependencies(owner)
 dependencyKinds.forEach { (key, configuration) ->
     (definition[key] as List<*>).forEach { dependency ->
         val moduleId = dependency.toString()
-        val selected = if (definitions.getValue(moduleId)["kind"] == "minecraft") {
+        val selected = if (definitions.getValue(moduleId)["kind"] == "minecraft" && !noRemap) {
             dependencies.project(mapOf("path" to modulePath(moduleId), "configuration" to "namedElements"))
         } else project(modulePath(moduleId))
         dependencies.add(configuration, selected)

@@ -15,7 +15,7 @@ public interface NetworkTransport {
     //? if <1.21 {
     NetworkTransport INSTANCE = new ModNetworking();
     //?} else {
-        //? if <26.1.2 {
+        //? if <26.1 {
     NetworkTransport INSTANCE = new PayloadNetworkTransport();
         //?} else {
     NetworkTransport INSTANCE = new ModNetworking();

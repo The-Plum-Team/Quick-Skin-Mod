@@ -5,7 +5,7 @@ import com.quickskin.mod.common.data.AssetMetadata;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -110,7 +110,7 @@ public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
     }
 
     @Override
-        //? if <26.1.2 {
+        //? if <26.1 {
     public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         super.renderWidget(graphics, mouseX, mouseY, partialTicks);
         //?} else {
@@ -168,13 +168,13 @@ public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
                 int subColor = isHovering ? 0xFFB0B0B0 : 0xFF909090;
                 //?}
 
-                //? if <26.1.2 {
+                //? if <26.1 {
                 graphics.drawCenteredString(mc.font, mainMessage,
                 //?} else {
                 graphics.centeredText(mc.font, mainMessage,
                 //?}
                     centerX, centerY - mc.font.lineHeight - 2, mainColor);
-                //? if <26.1.2 {
+                //? if <26.1 {
                 graphics.drawCenteredString(mc.font, subMessage,
                 //?} else {
                 graphics.centeredText(mc.font, subMessage,
@@ -187,7 +187,7 @@ public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
     /**
      * Draws a dashed border around the drop zone
      */
-    //? if <26.1.2 {
+    //? if <26.1 {
     private void drawDashedBorder(GuiGraphics graphics, int x, int y, int width, int height, boolean highlight) {
     //?} else {
     private void drawDashedBorder(GuiGraphicsExtractor graphics, int x, int y, int width, int height, boolean highlight) {

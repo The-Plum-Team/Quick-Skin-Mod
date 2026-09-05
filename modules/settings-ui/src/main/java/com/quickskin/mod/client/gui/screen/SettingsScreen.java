@@ -17,7 +17,7 @@ import net.fabricmc.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -336,13 +336,13 @@ public class SettingsScreen extends Screen {
 
         clientSettingWidgets.add(new AbstractWidget(leftColumnX + keybindButtonWidth + keybindButtonSpacing, currentLeftY, 100, 20, Component.translatable("quickskin.settings.keybind_label")) {
             @Override
-            //? if <26.1.2 {
+            //? if <26.1 {
             public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
             //?} else {
             public void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
             //?}
                 // Draw the string vertically centered with the standard UI text color.
-                //? if <26.1.2 {
+                //? if <26.1 {
                 guiGraphics.drawString(
                 //?} else {
                 guiGraphics.text(
@@ -452,7 +452,7 @@ public class SettingsScreen extends Screen {
         );
         skinChangeCooldownEditBox.setValue(String.valueOf(config.skinChangeCooldownSeconds));
         skinChangeCooldownEditBox.setMaxLength(5);
-        //? if <26.1.2 {
+        //? if <26.1 {
         skinChangeCooldownEditBox.setFilter(text -> text.isEmpty() || text.matches("\\d+"));
         //?}
         skinChangeCooldownEditBox.active = isAdmin;
@@ -461,7 +461,7 @@ public class SettingsScreen extends Screen {
         // Label for cooldown EditBox
         serverSettingWidgets.add(new AbstractWidget(leftColumnX + editBoxWidth + editBoxSpacing, currentY, 200, 20, Component.translatable("quickskin.settings.cooldown_seconds")) {
             @Override
-            //? if <26.1.2 {
+            //? if <26.1 {
             public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
                 guiGraphics.drawString(
             //?} else {
@@ -501,7 +501,7 @@ public class SettingsScreen extends Screen {
         //? if <1.21 {
         int checkboxSize = 20;
         //?} else if >=1.21.11 {
-            //? if <26.1.2 {
+            //? if <26.1 {
         int checkboxSize = 20;
             //?}
         //?}
@@ -571,14 +571,14 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    //? if <26.1.2 {
+    //? if <26.1 {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
     //?} else {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         // Render parent screen in background
     //?}
         if (this.parent != null) {
-            //? if <26.1.2 {
+            //? if <26.1 {
             GuiCompat.renderParent(this.parent, graphics, partialTick);
             //?} else {
             GuiCompat.extractParent(this.parent, graphics, partialTick);
@@ -621,7 +621,7 @@ public class SettingsScreen extends Screen {
         drawPanelOutline(graphics, dialogX, contentPanelY, dialogWidth, contentPanelHeight, PANEL_OUTLINE);
 
         // Render widgets (buttons, tabs, etc.) - this ensures they render AFTER everything above
-        //? if <26.1.2 {
+        //? if <26.1 {
         super.render(graphics, mouseX, mouseY, partialTick);
         //?} else {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
@@ -639,7 +639,7 @@ public class SettingsScreen extends Screen {
                 int noticeY = dialogY + dialogHeight - 55;
                 Component notice = Component.translatable("quickskin.settings.server_notice");
                 int noticeWidth = this.font.width(notice);
-                //? if <26.1.2 {
+                //? if <26.1 {
                 graphics.drawString(this.font, notice, dialogX + (dialogWidth - noticeWidth) / 2, noticeY, 0xFFFFCC00, false);
                 //?} else {
                 graphics.text(this.font, notice, dialogX + (dialogWidth - noticeWidth) / 2, noticeY, 0xFFFFCC00, false);
@@ -657,7 +657,7 @@ public class SettingsScreen extends Screen {
     /**
      * Draws outline around the specified rectangular area
      */
-    //? if <26.1.2 {
+    //? if <26.1 {
     private void drawPanelOutline(GuiGraphics graphics, int x, int y, int width, int height, int color) {
     //?} else {
     private void drawPanelOutline(GuiGraphicsExtractor graphics, int x, int y, int width, int height, int color) {
@@ -788,7 +788,7 @@ public class SettingsScreen extends Screen {
     @Override
     protected void renderBlurredBackground() {
         // Disable the default Minecraft blur effect - we handle blur manually
-        //?} else if <26.1.2 {
+        //?} else if <26.1 {
     }
 
     @Override
@@ -796,21 +796,12 @@ public class SettingsScreen extends Screen {
         // Disable the default Minecraft blur effect - we handle blur manually
         //?}
     //?}
-    //? if >=26.1.2 {
+    //? if >=26.1 {
     }
 
     @Override
     public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         // Disable the default background (panorama) - we render the parent screen's background manually
-    }
-
-    private void hidePlayerWidgets(boolean hide) {
-        if (this.parent == null) return;
-        for (var child : this.parent.children()) {
-            if (child instanceof com.quickskin.mod.client.gui.widget.PlayerWidget pw) {
-                pw.visible = !hide;
-            }
-        }
     }
 
     @Override
