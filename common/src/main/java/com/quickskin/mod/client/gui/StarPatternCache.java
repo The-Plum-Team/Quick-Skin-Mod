@@ -1,7 +1,7 @@
 package com.quickskin.mod.client.gui;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 //? if <1.21.11 {
@@ -22,12 +22,12 @@ import java.io.InputStream;
 public class StarPatternCache {
     //? if <1.21.11 {
         //? if <1.21 {
-    private static final ResourceLocation STAR_PATTERN_CACHE = new ResourceLocation(QuickSkin.MOD_ID, "textures/gui/background/star_pattern_cache_generated.png");
+    private static final ResourceLocation STAR_PATTERN_CACHE = new ResourceLocation(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern_cache_generated.png");
         //?} else {
-    private static final ResourceLocation STAR_PATTERN_CACHE = ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "textures/gui/background/star_pattern_cache_generated.png");
+    private static final ResourceLocation STAR_PATTERN_CACHE = ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern_cache_generated.png");
         //?}
     //?} else {
-    private static final Identifier STAR_PATTERN_CACHE = Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "textures/gui/background/star_pattern_cache_generated.png");
+    private static final Identifier STAR_PATTERN_CACHE = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern_cache_generated.png");
     //?}
     private static final int TILE_SIZE = 55; // Match the original tile size
     private static final int CACHE_TILES_WIDTH = 64; // Pre-generated texture has 64 tiles width
@@ -80,7 +80,7 @@ public class StarPatternCache {
             cachedTextureLocation = mc.getTextureManager().register("quickskin_star_cache", cachedTexture);
             //?} else {
             cachedTexture = new DynamicTexture(() -> "quickskin_star_cache", cachedImage);
-            cachedTextureLocation = Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "star_cache");
+            cachedTextureLocation = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "star_cache");
             mc.getTextureManager().register(cachedTextureLocation, cachedTexture);
 
             // 1.21.11: setFilter() removed from DynamicTexture, filtering handled at GpuSampler level

@@ -1,10 +1,13 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.quickskin.mod.platform.MinecraftCompat;
+import com.quickskin.mod.platform.MinecraftGifDecoder;
+
 //? if <1.21.11 {
 import com.mojang.blaze3d.systems.RenderSystem;
 //?} else {
 //?}
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.gui.GuiTextColor;
 //? if <26.1.2 {
 import com.quickskin.mod.client.gui.util.BackgroundRenderer;
@@ -30,7 +33,6 @@ import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 //? if <1.21 {
 //?} else if <1.21.11 {
-import com.quickskin.mod.platform.PlatformHelper;
 //?} else if <26.1.2 {
 import com.quickskin.mod.client.gui.GuiCompat;
 //?} else {
@@ -87,13 +89,13 @@ public class PlayerCapeMenuScreen extends Screen {
 
     // Background textures
 //? if <1.21 {
-    private static final ResourceLocation STAR_PATTERN_TEXTURE = new ResourceLocation(QuickSkin.MOD_ID, "textures/gui/background/star_pattern.png");
+    private static final ResourceLocation STAR_PATTERN_TEXTURE = new ResourceLocation(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern.png");
     private static final ResourceLocation VIGNETTE_LOCATION = new ResourceLocation("textures/misc/vignette.png");
 //?} else if <1.21.11 {
-    private static final ResourceLocation STAR_PATTERN_TEXTURE = ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "textures/gui/background/star_pattern.png");
+    private static final ResourceLocation STAR_PATTERN_TEXTURE = ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern.png");
     private static final ResourceLocation VIGNETTE_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/vignette.png");
 //?} else {
-    private static final Identifier STAR_PATTERN_TEXTURE = Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "textures/gui/background/star_pattern.png");
+    private static final Identifier STAR_PATTERN_TEXTURE = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern.png");
     private static final Identifier VIGNETTE_LOCATION = Identifier.withDefaultNamespace("textures/misc/vignette.png");
 //?}
 
@@ -635,6 +637,7 @@ public class PlayerCapeMenuScreen extends Screen {
                 assets.getCapesDirectory(),
                 assets.getCacheDirectory(),
                 getVanillaElytraImage(),
+                MinecraftGifDecoder.INSTANCE,
                 client::execute,
 //? if <26.1.2 {
                 (prepared, apply, cancel) -> client.setScreen(new CapeAdjustScreen(
@@ -1291,7 +1294,7 @@ public class PlayerCapeMenuScreen extends Screen {
         GuiCompat.blit(graphics, texture,
                 0, 0, 10, 16, u, v, uWidth, vHeight, textureWidth, textureHeight);
 //?} else if <1.21.11 {
-        PlatformHelper.blit(graphics, texture, 0, 0, 10, 16, u, v, uWidth, vHeight, textureWidth, textureHeight);
+        MinecraftCompat.INSTANCE.blit(graphics, texture, 0, 0, 10, 16, u, v, uWidth, vHeight, textureWidth, textureHeight);
 //?} else {
         GuiCompat.blit(graphics, texture, 0, 0, 10, 16, u, v, uWidth, vHeight, textureWidth, textureHeight);
 //?}
@@ -1805,7 +1808,7 @@ public class PlayerCapeMenuScreen extends Screen {
         } catch (IOException e) {
 //? if <26.1.2 {
 //?} else {
-            QuickSkin.LOGGER.debug("Unable to load the vanilla elytra texture", e);
+            QuickSkinInfo.LOGGER.debug("Unable to load the vanilla elytra texture", e);
 //?}
             return null;
         }

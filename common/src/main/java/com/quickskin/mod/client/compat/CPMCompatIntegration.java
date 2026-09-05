@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.compat;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.platform.PlatformHelper;
@@ -862,10 +862,10 @@ public final class CPMCompatIntegration {
 
         File skinFile = sourcePath.toFile();
         //? if <1.21 {
-        ResourceLocation location = new ResourceLocation(QuickSkin.MOD_ID, "cpm_bridge/" + hash);
+        ResourceLocation location = new ResourceLocation(QuickSkinInfo.MOD_ID, "cpm_bridge/" + hash);
         ResourceLocation fallback = new ResourceLocation("textures/entity/player/wide/steve.png");
         //?} else {
-        ResourceLocation location = ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "cpm_bridge/" + hash);
+        ResourceLocation location = ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "cpm_bridge/" + hash);
         ResourceLocation fallback = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/steve.png");
         //?}
         HttpTexture httpTexture = new HttpTexture(

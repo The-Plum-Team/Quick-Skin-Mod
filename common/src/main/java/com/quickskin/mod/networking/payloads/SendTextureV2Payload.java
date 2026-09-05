@@ -1,7 +1,7 @@
 package com.quickskin.mod.networking.payloads;
 
 //? if >=1.21 {
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -16,9 +16,9 @@ public record SendTextureV2Payload(String textureType, String contentId, byte[] 
         implements CustomPacketPayload {
     public static final Type<SendTextureV2Payload> TYPE = new Type<>(
             //? if <1.21.11 {
-            ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "send_texture_v2")
+            ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "send_texture_v2")
             //?} else {
-            Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "send_texture_v2")
+            Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "send_texture_v2")
             //?}
     );
     public static final StreamCodec<ByteBuf, SendTextureV2Payload> CODEC = StreamCodec.of(

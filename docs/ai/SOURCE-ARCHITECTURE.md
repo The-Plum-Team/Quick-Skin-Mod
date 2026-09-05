@@ -6,14 +6,51 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 These are the primary implementation trees:
 
-- `common/src/main`: shared client, server, networking, storage, and compatibility code.
+- `modules/<module>/src/main`: independently compiled modules declared by
+  `architecture/modules.json`. Java libraries own content/protocol values, stable loader and
+  texture-reference APIs, appearance data, bounded image processing, configuration, transfer
+  validation, server appearance storage, client infrastructure, and cape imports. Minecraft modules own version-sensitive adapters
+  and compile separately for each matrix target. Regression tests live in each module's `src/test`.
+- `common/src/main`: the remaining client features, Minecraft networking/mixin bridges, and
+  client/server lifecycle composition. Feature extraction from this transitional module continues.
 - `fabric/src/main`: canonical Fabric entry points and loader integration.
 - `forge/src/main`: the active Forge 1.20.1 integration.
 - `common/src/e2e` plus each loader's `src/e2e`: the separate packaged-runtime test mod.
 - `common/src/test`: loader-independent JUnit regression tests compiled against the common 1.20.1
   node.
 
-Stonecutter preprocesses each canonical `src/main` tree into detached generated sources. Never edit
+`architecture/modules.json` is the module dependency authority. Its typed reader,
+`scripts/architecture/module_graph.py`, rejects unknown/duplicate dependencies, cycles,
+overlapping ownership, and client/server environment leaks. Gradle creates Java-library
+projects from this graph and verifies their declared dependencies before compilation. External
+libraries use the graph's pinned coordinate catalog and explicit scopes. Minecraft framework
+dependencies come from the release matrix through `gradle/minecraft-module-framework.gradle.kts`;
+module builds must not add hidden project, Maven, or file dependencies. Stable Java libraries
+cannot depend on Minecraft modules. `api` exposes a dependency to consumers; `implementation`
+keeps it out of their compile API.
+The common JAR bundles the internal module closure before the existing Architectury and loader
+transforms, preserving one production JAR per release artifact. It must reject duplicate entries
+and must never absorb the harness. The common test task also runs its extracted libraries' tests.
+
+`PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
+after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in
+`minecraft-adapter`. `QuickSkinInfo` owns diagnostics/identity without initializing either runtime.
+`QuickSkin` retains public aliases for compatibility, but internal services use the API directly.
+`PlayerAppearance` retains opaque `TextureReference` values; `MinecraftTextures` performs the
+native conversion and preserves the allocation-free cached lookup. Server stores accept a world
+`Path` supplied by `ServerRuntime`, without importing `MinecraftServer`.
+`cape-import` receives a `GifDecoder` through its workflow constructor. Its API returns a bounded
+ARGB atlas and animation metadata; `MinecraftGifDecoder` in the adapter owns native decoding,
+channel conversion, and native-frame disposal. Keep native image objects out of import processing.
+
+Module ownership is transitional while the rework proceeds: the remaining `common` tree is one
+mixed runtime module, and loader/build/policy paths outside this graph have unknown ownership.
+The graph alone does not authorize selective E2E. Until scenario prerequisites, module coverage,
+and authenticated selection/evidence are implemented together, existing full-suite policies remain
+in effect. Follow `docs/architecture/MODULAR-REWORK.md` for the recoverable migration state.
+
+Stonecutter preprocesses common, loader, and Minecraft-module canonical `src/main` trees into
+detached generated sources. Stable Java-library sources compile directly without preprocessing. Never edit
 generated or staged output under `common/versions`, `fabric/versions`, `forge/versions`, any
 `build/` directory, `.gradle/`, `.architectury-transformer/`, `e2e-out/`, or `build/release/`. Fix
 the tracked canonical source or active overlay instead.

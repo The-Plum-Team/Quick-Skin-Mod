@@ -1,5 +1,7 @@
 package com.quickskin.mod.e2e;
 
+import com.quickskin.mod.platform.MinecraftGifDecoder;
+
 import com.quickskin.mod.client.gui.util.CapeImportProcessor;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AssetMetadata;
@@ -1040,7 +1042,7 @@ public final class TestAssets {
     public static CapeImportProcessor.PreparedCape prepareBundledGifCape() throws Exception {
         Path gif = makeGifCape();
         if (gif == null) return null;
-        CapeImportProcessor.PreparedCape prepared = CapeImportProcessor.prepare(gif);
+        CapeImportProcessor.PreparedCape prepared = CapeImportProcessor.prepare(gif, MinecraftGifDecoder.INSTANCE);
         if (!prepared.gif()
                 || !prepared.standardFormat()
                 || prepared.atlas().getWidth() != ANIMATED_CAPE_FRAME_WIDTH

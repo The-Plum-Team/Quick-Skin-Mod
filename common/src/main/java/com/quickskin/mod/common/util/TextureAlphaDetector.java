@@ -1,6 +1,6 @@
 package com.quickskin.mod.common.util;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import net.minecraft.client.Minecraft;
 //? if <1.21.11 {
@@ -119,7 +119,7 @@ public class TextureAlphaDetector {
                 if (minecraft != null) {
                     minecraft.execute(() -> putBounded(textureLocation, true));
                 }
-                QuickSkin.LOGGER.debug("Unable to schedule texture alpha analysis for {}",
+                QuickSkinInfo.LOGGER.debug("Unable to schedule texture alpha analysis for {}",
                         textureLocation, error);
             }
         });

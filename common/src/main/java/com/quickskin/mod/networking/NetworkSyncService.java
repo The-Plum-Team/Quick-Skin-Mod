@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AnimationMetadata;
@@ -194,7 +194,7 @@ public class NetworkSyncService {
                 desired.skinId, desired.capeId, desired.model, desired.protocolProfile))
                 .whenComplete((prepared, error) -> {
                     if (error != null) {
-                        QuickSkin.LOGGER.warn("Unable to prepare appearance network sync", error);
+                        QuickSkinInfo.LOGGER.warn("Unable to prepare appearance network sync", error);
                     }
                     Minecraft minecraft = Minecraft.getInstance();
                     if (minecraft == null) return;
@@ -350,7 +350,7 @@ public class NetworkSyncService {
             try {
                 sendTextureChunk(upload, sync.chunkIndex, chunk);
             } catch (RuntimeException | LinkageError error) {
-                QuickSkin.LOGGER.warn("Unable to send texture upload chunk", error);
+                QuickSkinInfo.LOGGER.warn("Unable to send texture upload chunk", error);
                 activeSync = null;
                 scheduleRetry();
                 return;
@@ -376,7 +376,7 @@ public class NetworkSyncService {
                 try {
                     sendAnimationMetadata(sync.metadata, sync.protocolProfile);
                 } catch (RuntimeException | LinkageError error) {
-                    QuickSkin.LOGGER.warn("Unable to send animation metadata", error);
+                    QuickSkinInfo.LOGGER.warn("Unable to send animation metadata", error);
                     activeSync = null;
                     scheduleRetry();
                     return;
@@ -392,7 +392,7 @@ public class NetworkSyncService {
         try {
             sendAppearance(sync);
         } catch (RuntimeException | LinkageError error) {
-            QuickSkin.LOGGER.warn("Unable to send appearance update", error);
+            QuickSkinInfo.LOGGER.warn("Unable to send appearance update", error);
         }
         activeSync = null;
     }
@@ -418,7 +418,7 @@ public class NetworkSyncService {
                     new ProtocolHelloPayload(hello.nonce(), hello.offer()));
             //?}
         } catch (RuntimeException | LinkageError error) {
-            QuickSkin.LOGGER.debug("Unable to send QuickSkin protocol hello", error);
+            QuickSkinInfo.LOGGER.debug("Unable to send QuickSkin protocol hello", error);
         }
         protocolHelloAttempts++;
         protocolHelloRetryAtMillis = now + PROTOCOL_HELLO_RETRY_MILLIS;
@@ -464,7 +464,7 @@ public class NetworkSyncService {
                             snapshotPlayerId, snapshotRequestId));
             //?}
         } catch (RuntimeException | LinkageError error) {
-            QuickSkin.LOGGER.debug("Unable to request the paced appearance snapshot", error);
+            QuickSkinInfo.LOGGER.debug("Unable to request the paced appearance snapshot", error);
         }
         snapshotRetryAtMillis = now + SNAPSHOT_REQUEST_RETRY_MILLIS;
     }

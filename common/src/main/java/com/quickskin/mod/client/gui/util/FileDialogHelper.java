@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.gui.util;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -49,7 +49,7 @@ public class FileDialogHelper {
                     dispatch(onFileSelected, Path.of(file));
                 }
             } catch (Exception e) {
-                QuickSkin.LOGGER.warn("Unable to open the skin file dialog", e);
+                QuickSkinInfo.LOGGER.warn("Unable to open the skin file dialog", e);
             } finally {
                 DIALOG_OPEN.set(false);
             }
@@ -82,7 +82,7 @@ public class FileDialogHelper {
                     dispatch(onFileSelected, Path.of(file));
                 }
             } catch (Exception e) {
-                QuickSkin.LOGGER.warn("Unable to open the cape file dialog", e);
+                QuickSkinInfo.LOGGER.warn("Unable to open the cape file dialog", e);
             } finally {
                 DIALOG_OPEN.set(false);
             }
@@ -114,7 +114,7 @@ public class FileDialogHelper {
                     // TinyFileDialogs returns multiple files separated by |
                     String[] filePaths = files.split("\\|", 257);
                     if (filePaths.length > 256) {
-                        QuickSkin.LOGGER.warn("Ignoring a file dialog result with more than 256 files");
+                        QuickSkinInfo.LOGGER.warn("Ignoring a file dialog result with more than 256 files");
                         return;
                     }
                     Path[] paths = new Path[filePaths.length];
@@ -124,7 +124,7 @@ public class FileDialogHelper {
                     dispatch(onFilesSelected, paths);
                 }
             } catch (Exception e) {
-                QuickSkin.LOGGER.warn("Unable to open the multi-file dialog", e);
+                QuickSkinInfo.LOGGER.warn("Unable to open the multi-file dialog", e);
             } finally {
                 DIALOG_OPEN.set(false);
             }
@@ -141,7 +141,7 @@ public class FileDialogHelper {
     private static void resetAfterSubmissionFailure(Throwable error) {
         if (error != null) {
             DIALOG_OPEN.set(false);
-            QuickSkin.LOGGER.warn("Unable to schedule a file dialog", error);
+            QuickSkinInfo.LOGGER.warn("Unable to schedule a file dialog", error);
         }
     }
 }

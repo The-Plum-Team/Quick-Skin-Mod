@@ -4,7 +4,7 @@ import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.storage.ClientAnimationMetadataCache;
 import com.quickskin.mod.client.storage.NetworkTextureCache;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.config.ClientConfig;
@@ -523,7 +523,7 @@ public class AnimatedTextureManager {
                                 animationId, textureLocation, finalAtlas, finalFirstFrame,
                                 fw, fh, fm, sm, retainStaticFirstFrame);
                     } catch (RuntimeException | LinkageError e) {
-                        QuickSkin.LOGGER.warn(
+                        QuickSkinInfo.LOGGER.warn(
                                 "Unable to commit animated texture {}", animationId, e);
                     } finally {
                         pendingRegistrations.remove(animationId, registrationToken);
@@ -557,7 +557,7 @@ public class AnimatedTextureManager {
             if (error != null) {
                 releaseReservation.run();
                 pendingRegistrations.remove(animationId, registrationToken);
-                QuickSkin.LOGGER.warn("Unable to schedule animated texture {}", animationId, error);
+                QuickSkinInfo.LOGGER.warn("Unable to schedule animated texture {}", animationId, error);
             }
         });
     }
@@ -690,7 +690,7 @@ public class AnimatedTextureManager {
                     frameWidth, frameHeight, metadata, speedMultiplier);
         } catch (RuntimeException | LinkageError error) {
             atlasPixels.close();
-            QuickSkin.LOGGER.warn("Unable to create animated texture {}", animationId, error);
+            QuickSkinInfo.LOGGER.warn("Unable to create animated texture {}", animationId, error);
             return;
         }
         boolean committed = false;
@@ -708,7 +708,7 @@ public class AnimatedTextureManager {
                 try {
                     state.cleanup();
                 } catch (RuntimeException | LinkageError cleanupError) {
-                    QuickSkin.LOGGER.warn("Unable to roll back animated texture {}", animationId,
+                    QuickSkinInfo.LOGGER.warn("Unable to roll back animated texture {}", animationId,
                             cleanupError);
                 }
             }
@@ -753,7 +753,7 @@ public class AnimatedTextureManager {
             atlasToAnimId.put(textureLocation, animationId);
             retainedStaticFramePixels += state.pixels;
         } catch (RuntimeException | LinkageError error) {
-            QuickSkin.LOGGER.warn(
+            QuickSkinInfo.LOGGER.warn(
                     "Unable to create static first frame for animation {}", animationId, error);
         }
     }
@@ -780,7 +780,7 @@ public class AnimatedTextureManager {
         try {
             removed.cleanup();
         } catch (RuntimeException | LinkageError error) {
-            QuickSkin.LOGGER.warn("Unable to release animated texture {}", animationId, error);
+            QuickSkinInfo.LOGGER.warn("Unable to release animated texture {}", animationId, error);
         }
     }
 
@@ -795,7 +795,7 @@ public class AnimatedTextureManager {
         try {
             removed.cleanup();
         } catch (RuntimeException | LinkageError error) {
-            QuickSkin.LOGGER.warn(
+            QuickSkinInfo.LOGGER.warn(
                     "Unable to release static animation frame {}", animationId, error);
         }
     }
@@ -809,7 +809,7 @@ public class AnimatedTextureManager {
             try {
                 state.cleanup();
             } catch (RuntimeException | LinkageError error) {
-                QuickSkin.LOGGER.warn("Unable to release an animated texture", error);
+                QuickSkinInfo.LOGGER.warn("Unable to release an animated texture", error);
             }
         }
         animations.clear();
@@ -817,7 +817,7 @@ public class AnimatedTextureManager {
             try {
                 state.cleanup();
             } catch (RuntimeException | LinkageError error) {
-                QuickSkin.LOGGER.warn("Unable to release a static animation frame", error);
+                QuickSkinInfo.LOGGER.warn("Unable to release a static animation frame", error);
             }
         }
         staticFirstFrames.clear();

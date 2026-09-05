@@ -1,6 +1,7 @@
 package com.quickskin.mod.networking;
 
 import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.packets.PacketHelper;
 import com.quickskin.mod.networking.protocol.ProtocolAcknowledgement;
 import com.quickskin.mod.networking.protocol.ProtocolOffer;
@@ -22,73 +23,73 @@ public class ModNetworking implements NetworkTransport {
 
     // Client to Server packets (C2S)
     public static final ResourceLocation UPLOAD_SKIN =
-        new ResourceLocation(QuickSkin.MOD_ID, "upload_skin");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "upload_skin");
 
     public static final ResourceLocation UPLOAD_CAPE =
-        new ResourceLocation(QuickSkin.MOD_ID, "upload_cape");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "upload_cape");
 
     public static final ResourceLocation UPDATE_APPEARANCE =
-        new ResourceLocation(QuickSkin.MOD_ID, "update_appearance");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "update_appearance");
 
     public static final ResourceLocation REQUEST_TEXTURE =
-        new ResourceLocation(QuickSkin.MOD_ID, "request_texture");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "request_texture");
 
     public static final ResourceLocation REQUEST_APPEARANCE_SNAPSHOT =
-        new ResourceLocation(QuickSkin.MOD_ID, "request_appearance_snapshot");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "request_appearance_snapshot");
 
     public static final ResourceLocation TEXTURE_CHUNK =
-        new ResourceLocation(QuickSkin.MOD_ID, "texture_chunk");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "texture_chunk");
 
     public static final ResourceLocation UPLOAD_ANIMATION_METADATA =
-        new ResourceLocation(QuickSkin.MOD_ID, "upload_animation_metadata");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "upload_animation_metadata");
 
     public static final ResourceLocation UPDATE_SERVER_CONFIG =
-        new ResourceLocation(QuickSkin.MOD_ID, "update_server_config");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "update_server_config");
 
     // Negotiation and hash-bearing v2 packets. Historical IDs above remain unchanged.
     public static final ResourceLocation PROTOCOL_HELLO =
-        new ResourceLocation(QuickSkin.MOD_ID, "protocol_hello");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "protocol_hello");
     public static final ResourceLocation UPDATE_APPEARANCE_V2 =
-        new ResourceLocation(QuickSkin.MOD_ID, "update_appearance_v2");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "update_appearance_v2");
     public static final ResourceLocation REQUEST_TEXTURE_V2 =
-        new ResourceLocation(QuickSkin.MOD_ID, "request_texture_v2");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "request_texture_v2");
     public static final ResourceLocation TEXTURE_CHUNK_V2 =
-        new ResourceLocation(QuickSkin.MOD_ID, "texture_chunk_v2");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "texture_chunk_v2");
     public static final ResourceLocation UPLOAD_ANIMATION_METADATA_V2 =
-        new ResourceLocation(QuickSkin.MOD_ID, "upload_animation_metadata_v2");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "upload_animation_metadata_v2");
 
     // Server to Client packets (S2C)
     public static final ResourceLocation SYNC_APPEARANCE =
-        new ResourceLocation(QuickSkin.MOD_ID, "sync_appearance");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "sync_appearance");
 
     public static final ResourceLocation SEND_TEXTURE =
-        new ResourceLocation(QuickSkin.MOD_ID, "send_texture");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "send_texture");
 
     public static final ResourceLocation SEND_TEXTURE_CHUNK =
-        new ResourceLocation(QuickSkin.MOD_ID, "send_texture_chunk");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "send_texture_chunk");
 
     public static final ResourceLocation SEND_ANIMATION_METADATA =
-        new ResourceLocation(QuickSkin.MOD_ID, "send_animation_metadata");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "send_animation_metadata");
 
     public static final ResourceLocation SYNC_SERVER_CONFIG =
-        new ResourceLocation(QuickSkin.MOD_ID, "sync_server_config");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "sync_server_config");
 
     public static final ResourceLocation COOLDOWN_UPDATE =
-        new ResourceLocation(QuickSkin.MOD_ID, "cooldown_update");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "cooldown_update");
 
     public static final ResourceLocation APPEARANCE_SNAPSHOT_COMPLETE =
-        new ResourceLocation(QuickSkin.MOD_ID, "appearance_snapshot_complete");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "appearance_snapshot_complete");
 
     public static final ResourceLocation PROTOCOL_ACK =
-        new ResourceLocation(QuickSkin.MOD_ID, "protocol_ack");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "protocol_ack");
     public static final ResourceLocation SYNC_APPEARANCE_V2 =
-        new ResourceLocation(QuickSkin.MOD_ID, "sync_appearance_v2");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "sync_appearance_v2");
     public static final ResourceLocation SEND_TEXTURE_V2 =
-        new ResourceLocation(QuickSkin.MOD_ID, "send_texture_v2");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "send_texture_v2");
     public static final ResourceLocation SEND_TEXTURE_CHUNK_V2 =
-        new ResourceLocation(QuickSkin.MOD_ID, "send_texture_chunk_v2");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "send_texture_chunk_v2");
     public static final ResourceLocation SEND_ANIMATION_METADATA_V2 =
-        new ResourceLocation(QuickSkin.MOD_ID, "send_animation_metadata_v2");
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "send_animation_metadata_v2");
 
     /**
      * Initializes networking (registers server-side receivers)

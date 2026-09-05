@@ -1,7 +1,7 @@
 package com.quickskin.mod.client.storage;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.common.data.ContentId;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.common.util.SafeImageReader;
@@ -370,7 +370,7 @@ public class NetworkTextureCache {
             //?} else {
             location = Identifier.fromNamespaceAndPath(
             //?}
-                    QuickSkin.MOD_ID,
+                    QuickSkinInfo.MOD_ID,
                     "network/" + textureType + "/" + hash
             );
 

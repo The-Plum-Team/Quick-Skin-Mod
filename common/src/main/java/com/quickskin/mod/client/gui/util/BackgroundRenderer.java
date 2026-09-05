@@ -1,5 +1,7 @@
 package com.quickskin.mod.client.gui.util;
 
+import com.quickskin.mod.platform.MinecraftCompat;
+
 //? if <1.21.11 {
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.quickskin.mod.QuickSkin;
@@ -16,7 +18,6 @@ import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.common.data.BackgroundStyle;
 //? if <1.21 {
 //?} else if <1.21.11 {
-import com.quickskin.mod.platform.PlatformHelper;
 //?} else {
 //?}
 import net.minecraft.client.Minecraft;
@@ -118,7 +119,7 @@ public class BackgroundRenderer {
         //? if <1.21 {
         GuiCompat.blit(graphics, VIGNETTE_LOCATION, 0, 0, 0, 0.0f, 0.0f, screen.width, screen.height, screen.width, screen.height);
         //?} else {
-        PlatformHelper.blit(graphics, VIGNETTE_LOCATION, 0, 0, 0, 0.0f, 0.0f, screen.width, screen.height, screen.width, screen.height);
+        MinecraftCompat.INSTANCE.blit(graphics, VIGNETTE_LOCATION, 0, 0, 0, 0.0f, 0.0f, screen.width, screen.height, screen.width, screen.height);
         //?}
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.disableBlend();

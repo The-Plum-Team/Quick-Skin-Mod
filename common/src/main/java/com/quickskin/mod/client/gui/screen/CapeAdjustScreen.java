@@ -4,7 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 //? if <1.21.11 {
 import com.mojang.blaze3d.systems.RenderSystem;
 //?}
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
@@ -205,7 +205,7 @@ public class CapeAdjustScreen extends Screen {
                 .register("quickskin/cape_adjust_source", sourceDynTexture);
         //?} else {
         sourceDynTexture = new DynamicTexture(() -> "quickskin_cape_adjust_source", nativeImage);
-        sourceTextureLocation = Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "cape_adjust_source");
+        sourceTextureLocation = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "cape_adjust_source");
         Minecraft.getInstance().getTextureManager().register(sourceTextureLocation, sourceDynTexture);
         //?}
 
@@ -1587,7 +1587,7 @@ public class CapeAdjustScreen extends Screen {
                 .register("quickskin/cape_adjust_preview", previewDynTexture);
         //?} else {
         previewDynTexture = new DynamicTexture(() -> "quickskin_cape_adjust_preview", ni);
-        previewTextureLocation = Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "cape_adjust_preview");
+        previewTextureLocation = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "cape_adjust_preview");
         Minecraft.getInstance().getTextureManager().register(previewTextureLocation, previewDynTexture);
         //?}
     }

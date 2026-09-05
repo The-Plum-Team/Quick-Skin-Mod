@@ -2,7 +2,7 @@ package com.quickskin.mod.client.storage;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.common.data.ContentId;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.networking.NetworkSecurity;
@@ -145,7 +145,7 @@ public class LocalAppearanceStorage {
         try {
             long size = Files.size(storageFile);
             if (size <= 0 || size > MAX_PREFERENCES_BYTES) {
-                QuickSkin.LOGGER.warn("Ignoring oversized local appearance preferences {}", storageFile);
+                QuickSkinInfo.LOGGER.warn("Ignoring oversized local appearance preferences {}", storageFile);
                 return new PreferencesData();
             }
             String json = BoundedFileReader.readUtf8(storageFile, MAX_PREFERENCES_BYTES);
@@ -156,7 +156,7 @@ public class LocalAppearanceStorage {
             normalize(data);
             return data;
         } catch (IOException | RuntimeException e) {
-            QuickSkin.LOGGER.warn("Unable to load local appearance preferences {}", storageFile, e);
+            QuickSkinInfo.LOGGER.warn("Unable to load local appearance preferences {}", storageFile, e);
             return new PreferencesData();
         }
     }
@@ -176,7 +176,7 @@ public class LocalAppearanceStorage {
             String json = GSON.toJson(data);
             byte[] encoded = json.getBytes(StandardCharsets.UTF_8);
             if (encoded.length > MAX_PREFERENCES_BYTES) {
-                QuickSkin.LOGGER.error("Refusing to save oversized local appearance preferences {}",
+                QuickSkinInfo.LOGGER.error("Refusing to save oversized local appearance preferences {}",
                         storageFile);
                 return false;
             }
@@ -190,14 +190,14 @@ public class LocalAppearanceStorage {
             atomicReplace(temporary, storageFile);
             return true;
         } catch (IOException e) {
-            QuickSkin.LOGGER.error("Unable to save local appearance preferences {}", storageFile, e);
+            QuickSkinInfo.LOGGER.error("Unable to save local appearance preferences {}", storageFile, e);
             return false;
         } finally {
             if (temporary != null) {
                 try {
                     Files.deleteIfExists(temporary);
                 } catch (IOException cleanupError) {
-                    QuickSkin.LOGGER.debug("Unable to remove local appearance temp file {}",
+                    QuickSkinInfo.LOGGER.debug("Unable to remove local appearance temp file {}",
                             temporary, cleanupError);
                 }
             }

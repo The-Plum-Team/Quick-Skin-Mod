@@ -1,7 +1,7 @@
 package com.quickskin.mod.client.input;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import dev.architectury.event.events.client.ClientTickEvent;
 import dev.architectury.registry.client.keymappings.KeyMappingRegistry;
 import net.fabricmc.api.EnvType;
@@ -22,10 +22,10 @@ public class KeybindRegistry {
 
     // Keybind category
     //? if <1.21.11 {
-    private static final String CATEGORY = "key.categories." + QuickSkin.MOD_ID;
+    private static final String CATEGORY = "key.categories." + QuickSkinInfo.MOD_ID;
     //?} else {
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(
-            Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "keybinds"));
+            Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "keybinds"));
     //?}
 
     // Keybind definitions
@@ -38,7 +38,7 @@ public class KeybindRegistry {
     public static void init() {
         // Create keybind for opening skin menu (default: none)
         OPEN_SKIN_MENU = new KeyMapping(
-            "key." + QuickSkin.MOD_ID + ".open_menu",
+            "key." + QuickSkinInfo.MOD_ID + ".open_menu",
             InputConstants.Type.KEYSYM,
             InputConstants.UNKNOWN.getValue(),
             CATEGORY

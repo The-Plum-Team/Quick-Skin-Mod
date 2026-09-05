@@ -1,7 +1,7 @@
 package com.quickskin.mod.networking.payloads;
 
 //? if >=1.21 {
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.protocol.ProtocolAcknowledgement;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -17,9 +17,9 @@ public record ProtocolAckPayload(long nonce, ProtocolAcknowledgement acknowledge
         implements CustomPacketPayload {
     public static final Type<ProtocolAckPayload> TYPE = new Type<>(
             //? if <1.21.11 {
-            ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "protocol_ack")
+            ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "protocol_ack")
             //?} else {
-            Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "protocol_ack")
+            Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "protocol_ack")
             //?}
     );
     public static final StreamCodec<ByteBuf, ProtocolAckPayload> CODEC = StreamCodec.of(

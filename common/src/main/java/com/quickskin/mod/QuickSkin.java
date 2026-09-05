@@ -3,17 +3,17 @@ package com.quickskin.mod;
 import com.quickskin.mod.event.CommonEvents;
 import com.quickskin.mod.networking.NetworkTransport;
 import com.quickskin.mod.runtime.ServerRuntime;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Main entry point for QuickSkin mod (common initialization)
  * This runs on both Fabric and Forge
  */
 public class QuickSkin {
-    public static final String MOD_ID = "quickskin";
-    public static final String MOD_NAME = "QuickSkin";
-    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_NAME);
+    public static final String MOD_ID = QuickSkinInfo.MOD_ID;
+    public static final String MOD_NAME = QuickSkinInfo.MOD_NAME;
+    public static final Logger LOGGER = QuickSkinInfo.LOGGER;
 
     private static final ServerRuntime SERVER_RUNTIME = ServerRuntime.getInstance();
     private static boolean initialized;

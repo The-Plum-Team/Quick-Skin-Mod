@@ -1,7 +1,7 @@
 package com.quickskin.mod.networking.payloads;
 
 //? if >=1.21 {
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -16,9 +16,9 @@ public record SendAnimationMetadataV2Payload(String contentId, String metadataJs
         implements CustomPacketPayload {
     public static final Type<SendAnimationMetadataV2Payload> TYPE = new Type<>(
             //? if <1.21.11 {
-            ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "send_animation_metadata_v2")
+            ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "send_animation_metadata_v2")
             //?} else {
-            Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "send_animation_metadata_v2")
+            Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "send_animation_metadata_v2")
             //?}
     );
     public static final StreamCodec<ByteBuf, SendAnimationMetadataV2Payload> CODEC = StreamCodec.of(

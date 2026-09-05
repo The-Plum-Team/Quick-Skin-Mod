@@ -122,7 +122,6 @@ val canonicalOnlyAfterLegacyByVersion = mapOf(
             "com/quickskin/mod/networking/payloads/UpdateServerConfigPayload.java",
             "com/quickskin/mod/networking/payloads/UploadAnimationMetadataPayload.java",
             "com/quickskin/mod/networking/payloads/UploadTexturePayload.java",
-            "com/quickskin/mod/platform/MinecraftCompat26_2.java",
     ),
 )
 check(canonicalOnlyAfterLegacyByVersion.keys == declaredLegacyVersions) {
@@ -241,6 +240,8 @@ tasks.test {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
+
+apply(from = rootProject.file("gradle/java-module-bundle-conventions.gradle.kts"))
 
 // Keep the production transform identity independent from checkout paths. Loader branches share
 // this transform seam; NeoForge does not consume classic refmap/SRG properties.

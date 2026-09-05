@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -19,9 +19,9 @@ public record SyncServerConfigPayload(String configJson) implements CustomPacket
 
     public static final Type<SyncServerConfigPayload> TYPE = new Type<>(
         //? if <1.21.11 {
-        ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "sync_server_config")
+        ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "sync_server_config")
         //?} else {
-        Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "sync_server_config")
+        Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "sync_server_config")
         //?}
     );
 

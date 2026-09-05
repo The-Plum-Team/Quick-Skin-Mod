@@ -1,7 +1,7 @@
 package com.quickskin.mod.networking.payloads;
 
 //? if >=1.21 {
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.protocol.ProtocolOffer;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -16,9 +16,9 @@ import net.minecraft.resources.Identifier;
 public record ProtocolHelloPayload(long nonce, ProtocolOffer offer) implements CustomPacketPayload {
     public static final Type<ProtocolHelloPayload> TYPE = new Type<>(
             //? if <1.21.11 {
-            ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "protocol_hello")
+            ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "protocol_hello")
             //?} else {
-            Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "protocol_hello")
+            Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "protocol_hello")
             //?}
     );
     public static final StreamCodec<ByteBuf, ProtocolHelloPayload> CODEC = StreamCodec.of(

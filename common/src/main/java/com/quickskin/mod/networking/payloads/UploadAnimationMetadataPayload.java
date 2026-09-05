@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -19,9 +19,9 @@ public record UploadAnimationMetadataPayload(String hash, String metadataJson) i
 
     public static final Type<UploadAnimationMetadataPayload> TYPE = new Type<>(
         //? if <1.21.11 {
-        ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "upload_animation_metadata")
+        ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "upload_animation_metadata")
         //?} else {
-        Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "upload_animation_metadata")
+        Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "upload_animation_metadata")
         //?}
     );
 

@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -21,9 +21,9 @@ public record RequestTexturePayload(UUID playerId, String textureType, String ha
 
     public static final Type<RequestTexturePayload> TYPE = new Type<>(
         //? if <1.21.11 {
-        ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "request_texture")
+        ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "request_texture")
         //?} else {
-        Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "request_texture")
+        Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "request_texture")
         //?}
     );
 

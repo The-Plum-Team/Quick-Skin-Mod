@@ -4,6 +4,7 @@ import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.compat.CustomNPCsIntegration;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
 import com.quickskin.mod.common.data.PlayerAppearance;
+import com.quickskin.mod.platform.MinecraftTextures;
 import com.quickskin.mod.common.data.PlayerAppearanceRepository;
 import com.quickskin.mod.common.event.InternalEventBus;
 import com.quickskin.mod.common.event.PlayerAppearanceUpdateEvent;
@@ -110,7 +111,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
             Identifier skinLocation = skinService.getSkinLocation(playerId, skinId);
             //?}
             if (skinLocation != null) {
-                appearance.setSkinLocation(skinLocation);
+                appearance.setSkinLocation(MinecraftTextures.reference(skinLocation));
 
                 // Trigger async transparency analysis for the skin texture
                 com.quickskin.mod.common.util.TextureAlphaDetector.analyzeTextureAsync(skinLocation);
@@ -150,7 +151,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
             Identifier capeLocation = capeService.getCapeLocation(playerId, capeId);
             //?}
             if (capeLocation != null) {
-                appearance.setCapeLocation(capeLocation);
+                appearance.setCapeLocation(MinecraftTextures.reference(capeLocation));
 
                 // Trigger async transparency analysis for the cape texture
                 com.quickskin.mod.common.util.TextureAlphaDetector.analyzeTextureAsync(capeLocation);
@@ -283,7 +284,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
 
         // If the location is already cached, return it.
         if (appearance.getSkinLocation() != null) {
-            return appearance.getSkinLocation();
+            return MinecraftTextures.location(appearance.getSkinLocation());
         }
 
         // SLOW PATH - LOG THIS!
@@ -297,7 +298,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
             Identifier location = skinService.getSkinLocation(playerId, appearance.getSkinId());
             //?}
             if (location != null) {
-                appearance.setSkinLocation(location); // Cache it for next time
+                appearance.setSkinLocation(MinecraftTextures.reference(location)); // Cache it for next time
 
                 // Trigger async transparency analysis for the skin texture
                 com.quickskin.mod.common.util.TextureAlphaDetector.analyzeTextureAsync(location);
@@ -341,7 +342,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
             // Resolve animation frame at source level so any mod reading
             // capeTexture (e.g. WaveyCapes) gets the current frame, not the atlas.
             return CapeAnimationHelper.resolveCurrentFrame(
-                    appearance.getCapeLocation(), appearance.getCapeId());
+                    MinecraftTextures.location(appearance.getCapeLocation()), appearance.getCapeId());
         }
 
         // If not cached, try to resolve it now.
@@ -352,7 +353,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService {
             Identifier location = capeService.getCapeLocation(playerId, appearance.getCapeId());
             //?}
             if (location != null) {
-                appearance.setCapeLocation(location); // Cache it for next time
+                appearance.setCapeLocation(MinecraftTextures.reference(location)); // Cache it for next time
 
                 // Trigger async transparency analysis for the cape texture
                 com.quickskin.mod.common.util.TextureAlphaDetector.analyzeTextureAsync(location);

@@ -5,7 +5,7 @@ package com.quickskin.mod.client.gui.screen;
 import com.quickskin.mod.client.gui.GuiCompat;
 //?}
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.gui.panel.ActionButtonsPanel;
 import com.quickskin.mod.client.gui.panel.LinkButtonsPanel;
@@ -27,7 +27,6 @@ import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.MojangApiService;
 //? if <1.21 {
 //?} else {
-import com.quickskin.mod.platform.PlatformHelper;
 //?}
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
@@ -107,13 +106,13 @@ public class PlayerSkinMenuScreen extends Screen {
 
     // --- NEW ---: Constants for the background effect
 //? if <1.21 {
-    private static final ResourceLocation STAR_PATTERN_TEXTURE = new ResourceLocation(QuickSkin.MOD_ID, "textures/gui/background/star_pattern.png");
+    private static final ResourceLocation STAR_PATTERN_TEXTURE = new ResourceLocation(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern.png");
     private static final ResourceLocation VIGNETTE_LOCATION = new ResourceLocation("textures/misc/vignette.png");
 //?} else if <1.21.11 {
-    private static final ResourceLocation STAR_PATTERN_TEXTURE = ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "textures/gui/background/star_pattern.png");
+    private static final ResourceLocation STAR_PATTERN_TEXTURE = ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern.png");
     private static final ResourceLocation VIGNETTE_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/vignette.png");
 //?} else {
-    private static final Identifier STAR_PATTERN_TEXTURE = Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "textures/gui/background/star_pattern.png");
+    private static final Identifier STAR_PATTERN_TEXTURE = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern.png");
     private static final Identifier VIGNETTE_LOCATION = Identifier.withDefaultNamespace("textures/misc/vignette.png");
 //?}
 
@@ -309,7 +308,7 @@ public class PlayerSkinMenuScreen extends Screen {
                 button -> cycleSortMode()
         );
         sortButton.setTooltip(Tooltip.create(
-                Component.translatable("quickskin.tooltip.sorting", getCurrentSortMode().getDisplayName())
+                Component.translatable("quickskin.tooltip.sorting", Component.translatable(getCurrentSortMode().getTranslationKey()))
         ));
         addRenderableWidget(sortButton);
 
@@ -1630,7 +1629,7 @@ public class PlayerSkinMenuScreen extends Screen {
         // Update button appearance
         sortButton.setMessage(Component.literal(nextMode.getIcon()));
         sortButton.setTooltip(Tooltip.create(
-                Component.translatable("quickskin.tooltip.sorting", nextMode.getDisplayName())
+                Component.translatable("quickskin.tooltip.sorting", Component.translatable(nextMode.getTranslationKey()))
         ));
 
         // Refresh the skin list with new sorting

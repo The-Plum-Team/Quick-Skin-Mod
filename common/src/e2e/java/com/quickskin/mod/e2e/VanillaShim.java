@@ -1713,6 +1713,33 @@ public final class VanillaShim {
         }
     }
 
+    /** Actual rendered pixels, independent of the desktop's logical window size or DPI scale. */
+    public static int[] framebufferSize(Minecraft mc) throws Exception {
+        int[] width = new int[1];
+        int[] height = new int[1];
+        Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+        glfw.getMethod("glfwGetFramebufferSize", long.class, int[].class, int[].class)
+                .invoke(null, windowHandle(mc), width, height);
+        return new int[] {width[0], height[0]};
+    }
+
+    /** Resize the game itself; evidence PNGs must never be resized to satisfy their contract. */
+    public static void requestFramebufferSize(Minecraft mc, int targetWidth, int targetHeight)
+            throws Exception {
+        long handle = windowHandle(mc);
+        int[] pixels = framebufferSize(mc);
+        int[] width = new int[1];
+        int[] height = new int[1];
+        Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+        glfw.getMethod("glfwGetWindowSize", long.class, int[].class, int[].class)
+                .invoke(null, handle, width, height);
+        if (pixels[0] < 1 || pixels[1] < 1 || width[0] < 1 || height[0] < 1) return;
+        int logicalWidth = Math.max(1, (int) Math.round((double) width[0] * targetWidth / pixels[0]));
+        int logicalHeight = Math.max(1, (int) Math.round((double) height[0] * targetHeight / pixels[1]));
+        glfw.getMethod("glfwSetWindowSize", long.class, int.class, int.class)
+                .invoke(null, handle, logicalWidth, logicalHeight);
+    }
+
     /** The GLFW window handle; {@code Window.getWindow()} is remapped per era. */
     private static long windowHandle(Minecraft mc) throws Exception {
         Object window = mc.getWindow();

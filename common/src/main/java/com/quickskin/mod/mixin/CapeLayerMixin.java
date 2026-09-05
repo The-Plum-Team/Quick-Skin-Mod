@@ -1,6 +1,6 @@
 package com.quickskin.mod.mixin;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
@@ -233,7 +233,7 @@ public class CapeLayerMixin {
 
         // If the texture is from our mod (local, network, animated, or known),
         // always use the translucent render type to correctly handle transparency.
-        if (finalTexture.getNamespace().equals(QuickSkin.MOD_ID)) {
+        if (finalTexture.getNamespace().equals(QuickSkinInfo.MOD_ID)) {
 //? if <1.21.11 {
             renderType = RenderType.entityTranslucentCull(finalTexture);
 //?} else {

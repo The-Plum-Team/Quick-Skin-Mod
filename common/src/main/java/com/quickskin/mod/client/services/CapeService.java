@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.services;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.KnownCapes;
@@ -206,7 +206,7 @@ public class CapeService implements ICapeService {
                             }
                         }
                     } catch (Exception e) {
-                        QuickSkin.LOGGER.warn("Unable to load known animated cape {}", capeId, e);
+                        QuickSkinInfo.LOGGER.warn("Unable to load known animated cape {}", capeId, e);
                     }
                 }
             }

@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.gui.util;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.SkinResolution;
@@ -79,7 +79,7 @@ public class SkinImporter {
             }
 
         } catch (IOException | RuntimeException e) {
-            QuickSkin.LOGGER.warn("Unable to import skin {}", sourcePath, e);
+            QuickSkinInfo.LOGGER.warn("Unable to import skin {}", sourcePath, e);
         }
         return null;
     }
@@ -109,7 +109,7 @@ public class SkinImporter {
                 return assetManager.getMetadata(hash);
             }
         } catch (IOException | RuntimeException e) {
-            QuickSkin.LOGGER.warn("Unable to import CPM model {}", sourcePath, e);
+            QuickSkinInfo.LOGGER.warn("Unable to import CPM model {}", sourcePath, e);
         }
 
         return null;
@@ -179,7 +179,7 @@ public class SkinImporter {
                     sanitizeBaseName(username, "skin"), ".png", encoded);
 
         } catch (IOException | RuntimeException e) {
-            QuickSkin.LOGGER.warn("Unable to save downloaded skin for {}", username, e);
+            QuickSkinInfo.LOGGER.warn("Unable to save downloaded skin for {}", username, e);
             return null;
         }
     }

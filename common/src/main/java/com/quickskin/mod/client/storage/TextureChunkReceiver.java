@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.storage;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.networking.NetworkSecurity;
 import com.quickskin.mod.networking.ClientTextureIngressLimiter;
@@ -106,7 +106,7 @@ public class TextureChunkReceiver {
                         generation, hash, textureType, completeData))
                 .whenComplete((prepared, error) -> {
                     if (error != null) {
-                        QuickSkin.LOGGER.warn("Unable to process chunked network texture {}", hash, error);
+                        QuickSkinInfo.LOGGER.warn("Unable to process chunked network texture {}", hash, error);
                     } else if (prepared != null) {
                         Minecraft minecraft = Minecraft.getInstance();
                         if (minecraft != null) {

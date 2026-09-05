@@ -1,5 +1,7 @@
 package com.quickskin.mod.e2e.scenario;
 
+import com.quickskin.mod.platform.MinecraftGifDecoder;
+
 import com.quickskin.mod.client.gui.screen.CapeAdjustScreen;
 import com.quickskin.mod.client.gui.screen.DeletionConfirmScreen;
 import com.quickskin.mod.client.gui.screen.PlayerCapeMenuScreen;
@@ -955,7 +957,7 @@ public final class FullScenario implements Scenario {
                     try {
                         Path source = TestAssets.makePaddedBmoCapeSource();
                         CapeImportProcessor.PreparedCape prepared =
-                                CapeImportProcessor.prepare(source);
+                                CapeImportProcessor.prepare(source, MinecraftGifDecoder.INSTANCE);
                         bmoPreparedCape.set(prepared);
                         bundledBmoAtlas.set(TestAssets.makeBundledBmoCapeImage());
                         Consumer<BufferedImage> onApply = capeAdjustResult::set;

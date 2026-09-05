@@ -1,7 +1,7 @@
 package com.quickskin.mod.client.rendering;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.TextureQuality;
 //? if <26.2 {
@@ -1160,7 +1160,7 @@ public final class SkinLayers3DIntegration {
     private static NativeImage getQuickSkinLocalTexture(Identifier skinLocation) {
 //?}
         if (skinLocation == null
-                || !QuickSkin.MOD_ID.equals(skinLocation.getNamespace())) {
+                || !QuickSkinInfo.MOD_ID.equals(skinLocation.getNamespace())) {
             return null;
         }
         String path = skinLocation.getPath();

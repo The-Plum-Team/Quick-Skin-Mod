@@ -1,6 +1,6 @@
 package com.quickskin.mod.event;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.client.gui.util.DebugOffsetManager;
@@ -830,7 +830,7 @@ public class ClientEvents {
             try {
                 subscription.close();
             } catch (RuntimeException error) {
-                QuickSkin.LOGGER.warn("Failed to unregister a QuickSkin internal event listener", error);
+                QuickSkinInfo.LOGGER.warn("Failed to unregister a QuickSkin internal event listener", error);
             }
         }
         INTERNAL_SUBSCRIPTIONS.clear();
@@ -924,7 +924,7 @@ public class ClientEvents {
                     Throwable cause = throwable instanceof java.util.concurrent.CompletionException
                             && throwable.getCause() != null ? throwable.getCause() : throwable;
                     if (!(cause instanceof java.util.concurrent.CancellationException)) {
-                        QuickSkin.LOGGER.warn("Could not download the local player's Mojang skin", throwable);
+                        QuickSkinInfo.LOGGER.warn("Could not download the local player's Mojang skin", throwable);
                     }
                     return null;
                 });
@@ -973,7 +973,7 @@ public class ClientEvents {
                 // Reload assets to recognize the new file.
                 assetManager.reload();
                 if (assetManager.getMetadata(finalHash) == null) {
-                    QuickSkin.LOGGER.warn("Downloaded Mojang skin was saved with an unexpected content hash");
+                    QuickSkinInfo.LOGGER.warn("Downloaded Mojang skin was saved with an unexpected content hash");
                     return;
                 }
             }
@@ -1002,7 +1002,7 @@ public class ClientEvents {
             config.save();
 
         } catch (Exception e) {
-            QuickSkin.LOGGER.error("Could not import the local player's Mojang skin", e);
+            QuickSkinInfo.LOGGER.error("Could not import the local player's Mojang skin", e);
         }
     }
 

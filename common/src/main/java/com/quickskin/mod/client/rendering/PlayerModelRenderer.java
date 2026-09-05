@@ -12,7 +12,6 @@ import com.quickskin.mod.client.services.CapeAnimationHelper;
 //? if <1.21 {
 import com.quickskin.mod.platform.MinecraftCompat;
 //?} else if <1.21.11 {
-import com.quickskin.mod.platform.PlatformHelper;
 //?} else {
 import com.quickskin.mod.platform.MinecraftCompat;
 //?}
@@ -1073,7 +1072,7 @@ public class PlayerModelRenderer {
                 poseStack.mulPose(Axis.XP.rotationDegrees(6.0F));
                 poseStack.mulPose(Axis.YP.rotationDegrees(180.0F)); // The cloak model part is drawn facing backwards
 
-                PlatformHelper.renderCloak(model, poseStack, capeVertexConsumer, 15728880, OverlayTexture.NO_OVERLAY);
+                MinecraftCompat.INSTANCE.renderCloak(model, poseStack, capeVertexConsumer, 15728880, OverlayTexture.NO_OVERLAY);
 
                 poseStack.popPose();
             }
@@ -1931,10 +1930,10 @@ public class PlayerModelRenderer {
         MinecraftCompat.INSTANCE.setRiding(model, false);
         MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
 //?} else if <1.21.11 {
-        PlatformHelper.setYoung(model, false);
-        PlatformHelper.setCrouching(model, false);
-        PlatformHelper.setRiding(model, false);
-        PlatformHelper.setAttackTime(model, 0.0f);
+        MinecraftCompat.INSTANCE.setYoung(model, false);
+        MinecraftCompat.INSTANCE.setCrouching(model, false);
+        MinecraftCompat.INSTANCE.setRiding(model, false);
+        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
 //?} else {
         MinecraftCompat.INSTANCE.setYoung(model, false);
         MinecraftCompat.INSTANCE.setCrouching(model, false);
@@ -2006,10 +2005,10 @@ public class PlayerModelRenderer {
         MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
 //?} else if <1.21.11 {
     private static void setupWalkingPose(PlayerModel<?> model, float t, float lerpFactor) {
-        PlatformHelper.setYoung(model, false);
-        PlatformHelper.setCrouching(model, false);
-        PlatformHelper.setRiding(model, false);
-        PlatformHelper.setAttackTime(model, 0.0f);
+        MinecraftCompat.INSTANCE.setYoung(model, false);
+        MinecraftCompat.INSTANCE.setCrouching(model, false);
+        MinecraftCompat.INSTANCE.setRiding(model, false);
+        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
 //?} else {
     private static void setupWalkingPose(PlayerModel model, float t, float lerpFactor) {
         MinecraftCompat.INSTANCE.setYoung(model, false);
@@ -2066,10 +2065,10 @@ public class PlayerModelRenderer {
         MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
 //?} else if <1.21.11 {
     private static void setupSittingPose(PlayerModel<?> model, float t, float lerpFactor) {
-        PlatformHelper.setYoung(model, false);
-        PlatformHelper.setCrouching(model, false);
-        PlatformHelper.setRiding(model, true); // Enable riding flag for sitting pose
-        PlatformHelper.setAttackTime(model, 0.0f);
+        MinecraftCompat.INSTANCE.setYoung(model, false);
+        MinecraftCompat.INSTANCE.setCrouching(model, false);
+        MinecraftCompat.INSTANCE.setRiding(model, true); // Enable riding flag for sitting pose
+        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
 //?} else {
     private static void setupSittingPose(PlayerModel model, float t, float lerpFactor) {
         MinecraftCompat.INSTANCE.setYoung(model, false);

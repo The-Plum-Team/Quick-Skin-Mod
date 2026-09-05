@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.services;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.ContentId;
@@ -303,7 +303,7 @@ public class LocalAssetManager {
             Files.createDirectories(capesDirectory);
             Files.createDirectories(cacheDirectory);
         } catch (IOException e) {
-            QuickSkin.LOGGER.error("Unable to create QuickSkin local asset directories", e);
+            QuickSkinInfo.LOGGER.error("Unable to create QuickSkin local asset directories", e);
         }
 
         // Load skin preferences
@@ -368,7 +368,7 @@ public class LocalAssetManager {
             List<Path> candidates = paths.limit(MAX_SCAN_CANDIDATES)
                     .filter(Files::isRegularFile).toList();
             if (candidates.size() == MAX_SCAN_CANDIDATES) {
-                QuickSkin.LOGGER.warn("CPM model scan reached the {} file cap in {}", MAX_SCAN_CANDIDATES, modelsDir);
+                QuickSkinInfo.LOGGER.warn("CPM model scan reached the {} file cap in {}", MAX_SCAN_CANDIDATES, modelsDir);
             }
             for (Path path : candidates) {
                 String fileName = path.getFileName().toString();
@@ -399,12 +399,12 @@ public class LocalAssetManager {
                     }
                 } catch (Exception e) {
                     // Skip invalid files
-                    QuickSkin.LOGGER.debug("Skipping invalid CPM model {}", path, e);
+                    QuickSkinInfo.LOGGER.debug("Skipping invalid CPM model {}", path, e);
                 }
             }
         } catch (IOException e) {
             // Directory walk failed
-            QuickSkin.LOGGER.warn("Unable to scan CPM model directory {}", modelsDir, e);
+            QuickSkinInfo.LOGGER.warn("Unable to scan CPM model directory {}", modelsDir, e);
         }
 //?} else {
 //?}
@@ -425,7 +425,7 @@ public class LocalAssetManager {
             List<Path> candidates = paths.limit(MAX_SCAN_CANDIDATES)
                     .filter(Files::isRegularFile).toList();
             if (candidates.size() == MAX_SCAN_CANDIDATES) {
-                QuickSkin.LOGGER.warn("Local asset scan reached the {} file cap in {}", MAX_SCAN_CANDIDATES, directory);
+                QuickSkinInfo.LOGGER.warn("Local asset scan reached the {} file cap in {}", MAX_SCAN_CANDIDATES, directory);
             }
             if ("cape".equals(type)) {
                 preflightCapeAliases(candidates, scanned);
@@ -460,7 +460,7 @@ public class LocalAssetManager {
                 }
             }
         } catch (IOException e) {
-            QuickSkin.LOGGER.warn("Unable to scan QuickSkin asset directory {}", directory, e);
+            QuickSkinInfo.LOGGER.warn("Unable to scan QuickSkin asset directory {}", directory, e);
         }
 
         return count;
@@ -480,7 +480,7 @@ public class LocalAssetManager {
             List<Path> candidates = paths.limit(MAX_SCAN_CANDIDATES)
                     .filter(Files::isRegularFile).toList();
             if (candidates.size() == MAX_SCAN_CANDIDATES) {
-                QuickSkin.LOGGER.warn("CPM model scan reached the {} file cap in {}", MAX_SCAN_CANDIDATES, modelsDirectory);
+                QuickSkinInfo.LOGGER.warn("CPM model scan reached the {} file cap in {}", MAX_SCAN_CANDIDATES, modelsDirectory);
             }
             for (Path path : candidates) {
                 String fileName = path.getFileName().toString();
@@ -491,12 +491,12 @@ public class LocalAssetManager {
                     scanCpmModel(path, fileName, scanned);
                 } catch (IOException | RuntimeException ignored) {
                     // Skip only the unreadable candidate and continue the recursive scan.
-                    QuickSkin.LOGGER.debug("Skipping invalid CPM model {}", path, ignored);
+                    QuickSkinInfo.LOGGER.debug("Skipping invalid CPM model {}", path, ignored);
                 }
             }
         } catch (IOException ignored) {
             // An unreadable optional directory must not affect normal skins/capes.
-            QuickSkin.LOGGER.warn("Unable to scan CPM model directory {}", modelsDirectory, ignored);
+            QuickSkinInfo.LOGGER.warn("Unable to scan CPM model directory {}", modelsDirectory, ignored);
         }
     }
 
@@ -829,7 +829,7 @@ public class LocalAssetManager {
                             MinecraftCompat.INSTANCE.setPixel(
                                     atlas, x, i * height + y, MinecraftCompat.INSTANCE.getPixel(frame, x, y));
 //?} else if <1.21.11 {
-                            PlatformHelper.setPixel(atlas, x, i * height + y, PlatformHelper.getPixel(frame, x, y));
+                            MinecraftCompat.INSTANCE.setPixel(atlas, x, i * height + y, MinecraftCompat.INSTANCE.getPixel(frame, x, y));
 //?} else {
                             MinecraftCompat.INSTANCE.setPixel(atlas, x, i * height + y, MinecraftCompat.INSTANCE.getPixel(frame, x, y));
 //?}
@@ -1054,7 +1054,7 @@ public class LocalAssetManager {
             // The strong destination is now an independently verified byte-for-byte copy.
             Files.deleteIfExists(legacyPath);
         } catch (IOException | RuntimeException error) {
-            QuickSkin.LOGGER.debug(
+            QuickSkinInfo.LOGGER.debug(
                     "Retaining legacy local cache entry {} after migration failure",
                     legacyPath, error);
         }
@@ -1334,7 +1334,7 @@ public class LocalAssetManager {
             }
             return sourceBytes;
         } catch (IOException | RuntimeException error) {
-            QuickSkin.LOGGER.warn("Unable to load canonical {} texture {}", textureType, primary, error);
+            QuickSkinInfo.LOGGER.warn("Unable to load canonical {} texture {}", textureType, primary, error);
             return null;
         }
     }
@@ -1420,7 +1420,7 @@ public class LocalAssetManager {
                     try {
                         Minecraft.getInstance().getTextureManager().release(location);
                     } catch (RuntimeException ignored) {
-                        QuickSkin.LOGGER.debug("Unable to release deleted local texture {}", location, ignored);
+                        QuickSkinInfo.LOGGER.debug("Unable to release deleted local texture {}", location, ignored);
                     }
                 }
             }
@@ -1433,7 +1433,7 @@ public class LocalAssetManager {
                     Files.deleteIfExists(getCpmIconPath(primary));
 //?}
                 } catch (IOException ignored) {
-                    QuickSkin.LOGGER.warn("Unable to delete CPM icon for {}", primary, ignored);
+                    QuickSkinInfo.LOGGER.warn("Unable to delete CPM icon for {}", primary, ignored);
                 }
             }
 
@@ -1793,7 +1793,7 @@ public class LocalAssetManager {
                                 MinecraftCompat.INSTANCE.setPixel(
                                         firstFrame, x, y, MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y));
 //?} else if <1.21.11 {
-                                PlatformHelper.setPixel(firstFrame, x, y, PlatformHelper.getPixel(nativeImage, x, y));
+                                MinecraftCompat.INSTANCE.setPixel(firstFrame, x, y, MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y));
 //?} else {
                                 MinecraftCompat.INSTANCE.setPixel(firstFrame, x, y, MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y));
 //?}
@@ -1823,7 +1823,7 @@ public class LocalAssetManager {
 //?} else {
             location = Identifier.fromNamespaceAndPath(
 //?}
-                    QuickSkin.MOD_ID,
+                    QuickSkinInfo.MOD_ID,
                     "local/" + primary + "_" + quality.name().toLowerCase(Locale.ROOT)
             );
 
@@ -1838,7 +1838,7 @@ public class LocalAssetManager {
 //? if <1.21 {
                     int pixel = MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y);
 //?} else if <1.21.11 {
-                    int pixel = PlatformHelper.getPixel(nativeImage, x, y);
+                    int pixel = MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y);
 //?} else {
                     int pixel = MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y);
 //?}
@@ -1875,13 +1875,13 @@ public class LocalAssetManager {
                     try {
                         Minecraft.getInstance().getTextureManager().release(location);
                     } catch (RuntimeException ignored) {
-                        QuickSkin.LOGGER.debug("Unable to release failed local texture {}", location, ignored);
+                        QuickSkinInfo.LOGGER.debug("Unable to release failed local texture {}", location, ignored);
                     }
                 } else if (dynamicTexture != null) {
                     try {
                         dynamicTexture.close();
                     } catch (RuntimeException ignored) {
-                        QuickSkin.LOGGER.debug("Unable to close failed local texture {}", primary, ignored);
+                        QuickSkinInfo.LOGGER.debug("Unable to close failed local texture {}", primary, ignored);
                     }
                 } else if (nativeImage != null) {
                     nativeImage.close();
@@ -1990,7 +1990,7 @@ public class LocalAssetManager {
 //? if <1.21 {
                 MinecraftCompat.INSTANCE.setPixel(nativeImage, x, y, abgr);
 //?} else if <1.21.11 {
-                PlatformHelper.setPixel(nativeImage, x, y, abgr);
+                MinecraftCompat.INSTANCE.setPixel(nativeImage, x, y, abgr);
 //?} else {
                 MinecraftCompat.INSTANCE.setPixel(nativeImage, x, y, abgr);
 //?}

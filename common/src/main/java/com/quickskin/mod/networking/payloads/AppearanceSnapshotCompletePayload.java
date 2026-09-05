@@ -1,7 +1,7 @@
 package com.quickskin.mod.networking.payloads;
 
 //? if >=1.21 {
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -15,9 +15,9 @@ import net.minecraft.resources.Identifier;
 public record AppearanceSnapshotCompletePayload(long requestId) implements CustomPacketPayload {
     public static final Type<AppearanceSnapshotCompletePayload> TYPE = new Type<>(
             //? if <1.21.11 {
-            ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "appearance_snapshot_complete")
+            ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "appearance_snapshot_complete")
             //?} else {
-            Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "appearance_snapshot_complete")
+            Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "appearance_snapshot_complete")
             //?}
     );
 

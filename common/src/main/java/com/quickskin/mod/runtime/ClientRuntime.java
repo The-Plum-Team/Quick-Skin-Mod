@@ -1,6 +1,6 @@
 package com.quickskin.mod.runtime;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.compat.CustomNPCsIntegration;
@@ -109,12 +109,12 @@ public final class ClientRuntime implements AutoCloseable {
     /** Persists local preferences and releases all connection-owned state. */
     public synchronized boolean endSession(UUID localPlayerId, Object sessionIdentity) {
         if (activeSessionIdentity != null && activeSessionIdentity != sessionIdentity) {
-            QuickSkin.LOGGER.warn("Ignoring a stale QuickSkin client-disconnect callback");
+            QuickSkinInfo.LOGGER.warn("Ignoring a stale QuickSkin client-disconnect callback");
             return false;
         }
         if (activePlayerId != null && localPlayerId != null
                 && !activePlayerId.equals(localPlayerId)) {
-            QuickSkin.LOGGER.warn("Ignoring a mismatched QuickSkin client-disconnect player");
+            QuickSkinInfo.LOGGER.warn("Ignoring a mismatched QuickSkin client-disconnect player");
             return false;
         }
         UUID playerIdToSave = localPlayerId != null ? localPlayerId : activePlayerId;
@@ -155,7 +155,7 @@ public final class ClientRuntime implements AutoCloseable {
         try {
             action.run();
         } catch (RuntimeException | LinkageError error) {
-            QuickSkin.LOGGER.warn("Failed to {} while resetting the QuickSkin client session", operation, error);
+            QuickSkinInfo.LOGGER.warn("Failed to {} while resetting the QuickSkin client session", operation, error);
         }
     }
 

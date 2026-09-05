@@ -98,10 +98,22 @@ val validateReleaseLaneInventory = tasks.register("validateReleaseLaneInventory"
     }
 }
 
+val testModuleGraph = tasks.register<Exec>("testModuleGraph") {
+    group = "verification"
+    description = "Verifies module-boundary and transitive-impact policy."
+    workingDir(rootProject.projectDir)
+    val defaultPython = if (System.getProperty("os.name").startsWith("Windows", true))
+        "python" else "python3"
+    commandLine(
+        providers.environmentVariable("QUICKSKIN_PYTHON").orElse(defaultPython).get(),
+        "-m", "unittest", "discover", "-s", "scripts/architecture/tests", "-p", "test_*.py",
+    )
+}
+
 val testStableLane = tasks.register("testStableLane") {
     group = "verification"
     description = "Runs loader-independent JUnit tests on common $unitTestVersion."
-    dependsOn(":common:$unitTestVersion:test")
+    dependsOn(testModuleGraph, ":common:$unitTestVersion:test")
 }
 
 tasks.register("check") {

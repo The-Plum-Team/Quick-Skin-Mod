@@ -2,7 +2,7 @@ package com.quickskin.mod.client.services;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.common.util.SafeImageReader;
 import net.fabricmc.api.EnvType;
@@ -75,7 +75,7 @@ public final class MojangApiService {
                     return UUID.fromString(formattedUuid);
                 }
             } catch (Exception e) {
-                QuickSkin.LOGGER.debug("Unable to resolve Mojang profile for {}", username, e);
+                QuickSkinInfo.LOGGER.debug("Unable to resolve Mojang profile for {}", username, e);
             } finally {
                 if (connection != null) connection.disconnect();
             }
@@ -134,7 +134,7 @@ public final class MojangApiService {
                     }
                 }
             } catch (Exception e) {
-                QuickSkin.LOGGER.debug("Unable to resolve Mojang skin texture for {}", uuid, e);
+                QuickSkinInfo.LOGGER.debug("Unable to resolve Mojang skin texture for {}", uuid, e);
             } finally {
                 if (connection != null) connection.disconnect();
             }
@@ -159,7 +159,7 @@ public final class MojangApiService {
                     return SafeImageReader.readSkin(readBody(connection, MAX_SKIN_BYTES));
                 }
             } catch (Exception e) {
-                QuickSkin.LOGGER.debug("Unable to download Mojang skin texture", e);
+                QuickSkinInfo.LOGGER.debug("Unable to download Mojang skin texture", e);
             } finally {
                 if (connection != null) connection.disconnect();
             }

@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "libraries": {
+    "architectury-injectables": "dev.architectury:architectury-injectables:1.0.10",
+    "json": "com.google.code.gson:gson:2.10",
+    "logging-api": "org.slf4j:slf4j-api:2.0.1",
+    "webp-imageio": "org.sejda.imageio:webp-imageio:0.1.6",
+    "annotations": "org.jetbrains:annotations:26.0.2",
+    "fabric-environment": "net.fabricmc:fabric-loader:0.17.3"
+  },
+  "modules": [
+    {
+      "id": "content-core",
+      "path": "modules/content-core",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "protocol-core",
+      "path": "modules/protocol-core",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "platform-api",
+      "path": "modules/platform-api",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only_api": [
+          "logging-api"
+        ],
+        "compile_only": [
+          "architectury-injectables"
+        ],
+        "test_runtime_only": [
+          "logging-api"
+        ]
+      }
+    },
+    {
+      "id": "appearance-data",
+      "path": "modules/appearance-data",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [
+        "platform-api"
+      ],
+      "implementation": [
+        "content-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "json",
+          "annotations"
+        ],
+        "test_runtime_only": [
+          "json"
+        ]
+      }
+    },
+    {
+      "id": "image-core",
+      "path": "modules/image-core",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "content-core",
+        "protocol-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "test_runtime_only": [
+          "webp-imageio"
+        ]
+      }
+    },
+    {
+      "id": "configuration",
+      "path": "modules/configuration",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [
+        "content-core",
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "json"
+        ],
+        "test_runtime_only": [
+          "json",
+          "logging-api"
+        ]
+      }
+    },
+    {
+      "id": "transfer-core",
+      "path": "modules/transfer-core",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "content-core",
+        "protocol-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "test_runtime_only": [
+          "json"
+        ]
+      }
+    },
+    {
+      "id": "server-appearance",
+      "path": "modules/server-appearance",
+      "kind": "java-library",
+      "environment": "server",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "configuration",
+        "content-core",
+        "image-core",
+        "platform-api",
+        "protocol-core",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "annotations",
+          "json",
+          "logging-api"
+        ],
+        "test_runtime_only": [
+          "json",
+          "logging-api"
+        ]
+      }
+    },
+    {
+      "id": "minecraft-adapter",
+      "path": "modules/minecraft-adapter",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [
+        "appearance-data",
+        "image-core",
+        "platform-api"
+      ],
+      "implementation": [],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "client-foundation",
+      "path": "modules/client-foundation",
+      "kind": "java-library",
+      "environment": "client",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "annotations",
+          "fabric-environment"
+        ],
+        "test_runtime_only": [
+          "logging-api"
+        ]
+      }
+    },
+    {
+      "id": "cape-import",
+      "path": "modules/cape-import",
+      "kind": "java-library",
+      "environment": "client",
+      "api": [
+        "appearance-data",
+        "image-core"
+      ],
+      "implementation": [
+        "client-foundation",
+        "content-core",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "fabric-environment"
+        ],
+        "test_runtime_only": [
+          "json"
+        ]
+      }
+    },
+    {
+      "id": "common",
+      "path": "common",
+      "kind": "minecraft",
+      "environment": "mixed",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "configuration",
+        "content-core",
+        "image-core",
+        "platform-api",
+        "protocol-core",
+        "server-appearance",
+        "transfer-core",
+        "minecraft-adapter",
+        "client-foundation",
+        "cape-import"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    }
+  ]
+}

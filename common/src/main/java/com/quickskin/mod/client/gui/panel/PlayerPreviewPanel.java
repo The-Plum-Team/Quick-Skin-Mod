@@ -339,7 +339,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
                 return detected;
             }
         } catch (Exception e) {
-            com.quickskin.mod.QuickSkin.LOGGER.debug(
+            com.quickskin.mod.platform.QuickSkinInfo.LOGGER.debug(
                     "Unable to detect the preview skin model", e);
         }
 

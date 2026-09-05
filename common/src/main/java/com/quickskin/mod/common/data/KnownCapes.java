@@ -1,6 +1,6 @@
 package com.quickskin.mod.common.data;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
@@ -123,12 +123,12 @@ public enum KnownCapes {
         this.textureLocation = id.equals("__NONE__") ? null :
                 //? if <1.21.11 {
                     //? if <1.21 {
-                new ResourceLocation(QuickSkin.MOD_ID, "textures/capes/" + id + ".png");
+                new ResourceLocation(QuickSkinInfo.MOD_ID, "textures/capes/" + id + ".png");
                     //?} else {
-                ResourceLocation.fromNamespaceAndPath(QuickSkin.MOD_ID, "textures/capes/" + id + ".png");
+                ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/capes/" + id + ".png");
                     //?}
                 //?} else {
-                Identifier.fromNamespaceAndPath(QuickSkin.MOD_ID, "textures/capes/" + id + ".png");
+                Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/capes/" + id + ".png");
                 //?}
     }
 
