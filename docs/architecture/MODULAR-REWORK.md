@@ -580,3 +580,13 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   The notifier checks the protected checkout and live `master` SHA; its consumer reauthenticates
   the source run and rejects stale or foreign shared dispatches before curation. All ten
   shared-source retirement, scheduling, notification and Pages policy tests pass.
+- Implemented full-baseline validation and Git dependency fingerprints in `feature_coverage.py`.
+  The validator derives every target/loader/checkpoint obligation from the existing matrix and
+  scenario contract, checks the exact successful source jobs and protected review owner, and
+  requires clean complete semantic reports. It rejects native-only/selected evidence, missing
+  captures, duplicate identities, altered expectations/regions and substituted source metadata.
+  Module fingerprints include compile/runtime dependencies, API providers and composition source
+  while preserving independence between unrelated features. Ten baseline/fingerprint tests pass;
+  the aggregate CI suite passes 333 tests. These primitives do not yet publish a trusted baseline
+  or reduce any required GitHub execution. Baseline publication, workflow admission and selective
+  evidence reuse remain part of stage 5.

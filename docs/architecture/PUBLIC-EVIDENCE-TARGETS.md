@@ -69,6 +69,18 @@ handoff jobs settle. Both notifier and protected consumer bind the real `master`
 advanced head or a foreign dispatch cannot start curation. This supplies the token-created
 workflow path without relying only on a recursive completion event.
 
+`scripts/ci/feature_coverage.py` validates a potential complete baseline against the authored
+PR-profile captures of every target and loader. It requires successful packaged jobs, exact
+protected review ownership and complete clean semantic verdicts. Native-only, selected,
+incomplete, duplicate, defective or substituted evidence cannot create that payload. Its Git
+fingerprints cover entire module trees, transitive compile/runtime dependencies, API providers
+and composition source. An editor change leaves an independent HUD fingerprint unchanged;
+a provider change reaches its API consumers. Original tested provenance remains explicit.
+
+These are validation primitives. A local payload grants no workflow exemption. Protected
+baseline publication and admission still need to be connected before GitHub can consume a
+reduced selection or Pages can carry unaffected frames forward.
+
 These producer, consumer, rotation, review and scheduling paths pass local API/shell fixtures.
 Optional-mod wave admission and selective healthy-baseline reuse still require migration. No
 successful GitHub deployment, model review or new Minecraft visual acceptance is claimed by
