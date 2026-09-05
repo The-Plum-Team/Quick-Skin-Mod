@@ -21,7 +21,7 @@ class SourceInventoryTest(unittest.TestCase):
                                 environment="common", api=[], implementation=[], runtime_only=[], libraries={}))
         (self.root / "architecture").mkdir()
         (self.root / "architecture/modules.json").write_text(
-            json.dumps(dict(schema_version=1, libraries={}, modules=modules)))
+            json.dumps(dict(schema_version=1, libraries={}, modules=modules, bindings=[])))
 
     def source(self, module: str, source_set: str = "main") -> Path:
         path = self.root / "modules" / module / "src" / source_set / "java/com/quickskin/mod/Example.java"

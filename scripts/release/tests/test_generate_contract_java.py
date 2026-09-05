@@ -71,17 +71,17 @@ class GenerateContractJavaTest(unittest.TestCase):
         )
         self.assertIn(
             "public record StepSpec(String id, boolean assertionRequired, "
-            "boolean captureRequired) {}",
+            "boolean captureRequired, List<String> requires, List<String> requiresCaptures) {",
             source,
         )
-        self.assertIn('new StepSpec("confirm_self", true, false)', source)
-        self.assertIn('new StepSpec("skin_menu_screen", true, true)', source)
+        self.assertIn('new StepSpec("confirm_self", true, false, List.of("baseline"), List.of())', source)
+        self.assertIn('new StepSpec("skin_menu_screen", true, true, List.of("local_skin_apply"), List.of())', source)
         self.assertIn(
-            'new StepSpec("remove_cape_with_elytra", true, false)',
+            'new StepSpec("remove_cape_with_elytra", true, false, List.of("adjusted_bmo_elytra"), List.of())',
             source,
         )
         self.assertIn(
-            'new StepSpec("vanilla_elytra_after_cape_removal", true, true)',
+            'new StepSpec("vanilla_elytra_after_cape_removal", true, true, List.of("remove_cape_with_elytra"), List.of())',
             source,
         )
         self.assertIn(

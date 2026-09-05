@@ -14,7 +14,7 @@ from typing import Any, NoReturn
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("scenario-contract.json")
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 REQUIRED_SCREENSHOT_SIZE = (1920, 1080)
 MAX_CONTRACT_BYTES = 1024 * 1024
 IDENTIFIER = re.compile(r"^[a-z][a-z0-9_-]*$")
@@ -140,6 +140,7 @@ class Scenario:
     execution_profiles: tuple[str, ...]
     orchestration: Orchestration
     roles: tuple[RoleContract, ...]
+    execution_scope: str
 
 
 @dataclass(frozen=True)
@@ -163,6 +164,10 @@ class StepContract:
     id: str
     assertion_required: bool
     capture: Capture | None = None
+    requires: tuple[str, ...] = ()
+    requires_captures: tuple[str, ...] = ()
+    modules: tuple[str, ...] = ()
+    bindings: tuple[str, ...] = ()
 
 
 class ScenarioContract:
@@ -666,6 +671,16 @@ def _probe(
     )
 
 
+def _identifiers(value: Any, label: str, *, nonempty: bool = False) -> tuple[str, ...]:
+    values = _array(value, label, nonempty=nonempty)
+    if len(values) > 256:
+        raise ScenarioContractError(f"{label} exceeds the identifier limit")
+    result = tuple(_identifier(item, label) for item in values)
+    if len(result) != len(set(result)):
+        raise ScenarioContractError(f"{label} contains duplicates")
+    return result
+
+
 def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
     root = _object(
         data,
@@ -681,7 +696,7 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
         ),
     )
     schema = _integer(
-        root["schema_version"], "scenario contract.schema_version", minimum=2, maximum=2
+        root["schema_version"], "scenario contract.schema_version", minimum=3, maximum=3
     )
     if schema != SCHEMA_VERSION:  # pragma: no cover - range check documents the invariant
         raise ScenarioContractError(f"unsupported scenario contract schema {schema}")
@@ -725,6 +740,7 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
                     "execution_profiles",
                     "orchestration",
                     "roles",
+                    "execution_scope",
                 }
             ),
         )
@@ -788,12 +804,26 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
                 step_raw = _object(
                     step_value,
                     step_label,
-                    frozenset({"id", "assertion_required"}),
+                    frozenset({"id", "assertion_required", "requires", "requires_captures", "covers"}),
                     frozenset({"capture"}),
                 )
                 step_name = _identifier(step_raw["id"], f"{step_label}.id")
                 if step_name in step_names:
                     raise ScenarioContractError(f"{role_label}.steps contains duplicates")
+                requires = _identifiers(step_raw["requires"], f"{step_label}.requires")
+                if set(requires) - step_names:
+                    raise ScenarioContractError(f"{step_label}.requires must reference earlier steps in this role")
+                requires_captures = _identifiers(
+                    step_raw["requires_captures"], f"{step_label}.requires_captures"
+                )
+                earlier_captures = {step.id for step in steps if step.capture is not None}
+                if set(requires_captures) - earlier_captures:
+                    raise ScenarioContractError(
+                        f"{step_label}.requires_captures must reference earlier captures in this role"
+                    )
+                covers = _object(step_raw["covers"], f"{step_label}.covers", frozenset({"modules", "bindings"}))
+                modules = _identifiers(covers["modules"], f"{step_label}.covers.modules", nonempty=True)
+                bindings = _identifiers(covers["bindings"], f"{step_label}.covers.bindings")
                 step_names.add(step_name)
                 assertion_required = _boolean(
                     step_raw["assertion_required"],
@@ -870,7 +900,8 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
                             else None
                         ),
                     )
-                steps.append(StepContract(step_name, assertion_required, capture))
+                steps.append(StepContract(step_name, assertion_required, capture,
+                                          requires, requires_captures, modules, bindings))
 
             if len(step_names) != len(steps):
                 raise ScenarioContractError(f"{role_label}.steps contains duplicates")
@@ -913,12 +944,18 @@ def _parse_contract(data: Any, *, raw_sha256: str) -> ScenarioContract:
             f"{scenario_label}.orchestration",
             tuple(role_names),
         )
+        execution_scope = scenario_raw["execution_scope"]
+        if execution_scope not in ("steps", "scenario"):
+            raise ScenarioContractError(f"{scenario_label}.execution_scope must be steps or scenario")
+        if orchestration.two_clients and execution_scope != "scenario":
+            raise ScenarioContractError(f"{scenario_label}: coordinated clients require scenario execution scope")
         scenarios.append(
             Scenario(
                 scenario_name,
                 execution_profiles,
                 orchestration,
                 tuple(roles),
+                execution_scope,
             )
         )
 

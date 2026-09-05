@@ -28,6 +28,7 @@ LIBRARY_SCOPES = ("api", "implementation", "compile_only_api", "compile_only",
                   "runtime_only", "test_implementation", "test_runtime_only")
 COORDINATE = re.compile(r"^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$")
 MODULE_KEYS = {"id", "path", "kind", "environment", "libraries", *DEPENDENCY_KINDS}
+BINDING_KEYS = {"id", "api", "providers", "consumers", "composition", "impact"}
 
 
 class ModuleGraphError(ValueError):
@@ -89,10 +90,26 @@ class Module:
         }
 
 
+@dataclass(frozen=True)
+class Binding:
+    id: str
+    api: str
+    providers: tuple[str, ...]
+    consumers: tuple[str, ...]
+    composition: str
+    impact: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(id=self.id, api=self.api, providers=list(self.providers),
+                    consumers=list(self.consumers), composition=self.composition, impact=self.impact)
+
+
 class ModuleGraph:
-    def __init__(self, modules: tuple[Module, ...], libraries: dict[str, str], sha256: str):
+    def __init__(self, modules: tuple[Module, ...], libraries: dict[str, str], sha256: str,
+                 bindings: tuple[Binding, ...] = ()):
         self.modules = modules
         self.libraries = libraries
+        self.bindings = bindings
         self.sha256 = sha256
         self.by_id = {module.id: module for module in modules}
         self.order = self._dependency_order()
@@ -135,10 +152,35 @@ class ModuleGraph:
         if not owners or None in owners:
             return None
         affected = {owner for owner in owners if owner is not None}
-        for module_id in self.order:
-            if affected.intersection(self.by_id[module_id].dependencies):
-                affected.add(module_id)
+        # Runtime providers can form feedback loops without introducing a compile cycle.
+        # A composition module becoming affected is not itself a change to its wiring.
+        while True:
+            before = set(affected)
+            for module_id in self.order:
+                if affected.intersection(self.by_id[module_id].dependencies):
+                    affected.add(module_id)
+            for binding in self.bindings:
+                if binding.impact == "propagate" and (
+                    affected.intersection(binding.providers)
+                    or binding.composition in owners
+                ):
+                    affected.update(binding.consumers)
+            if affected == before:
+                break
         return tuple(sorted(affected))
+
+    def affected_bindings(self, affected_modules: Iterable[str]) -> tuple[str, ...]:
+        """Interactions requiring authored checkpoints, including UI navigation callbacks.
+
+        Coverage-only interactions must have explicit scenario coverage before selective E2E
+        is authorized. They do not claim that unrelated consumer exports changed as well.
+        """
+        affected = set(affected_modules)
+        if affected - self.by_id.keys():
+            raise ModuleGraphError("unknown module in binding impact")
+        return tuple(binding.id for binding in self.bindings
+                     if affected.intersection(
+                         {binding.api, *binding.providers, *binding.consumers} - {binding.composition}))
 
     def dependencies_of(self, module_id: str) -> tuple[str, ...]:
         if module_id not in self.by_id:
@@ -154,11 +196,29 @@ class ModuleGraph:
         visit(module_id)
         return tuple(item for item in self.order if item in result)
 
+    def compile_classpath_of(self, module_id: str) -> tuple[str, ...]:
+        """Own api/implementation dependencies and only their exported API dependencies."""
+        if module_id not in self.by_id:
+            raise ModuleGraphError(f"unknown module: {module_id}")
+        result: set[str] = set()
+
+        def exported(current: str) -> None:
+            if current in result:
+                return
+            result.add(current)
+            for dependency in self.by_id[current].api:
+                exported(dependency)
+
+        for dependency in self.by_id[module_id].compile_dependencies:
+            exported(dependency)
+        return tuple(sorted(result))
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": 1,
             "sha256": self.sha256,
             "libraries": self.libraries,
+            "bindings": [binding.to_dict() for binding in self.bindings],
             "modules": [self.by_id[item].to_dict() for item in self.order],
         }
 
@@ -170,8 +230,8 @@ def parse_graph(raw: bytes) -> ModuleGraph:
         data = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object)
     except (UnicodeError, json.JSONDecodeError, RecursionError) as error:
         raise ModuleGraphError("module graph must be bounded UTF-8 JSON") from error
-    if not isinstance(data, dict) or set(data) != {"schema_version", "libraries", "modules"}:
-        raise ModuleGraphError("module graph must define schema_version, libraries and modules only")
+    if not isinstance(data, dict) or set(data) != {"schema_version", "libraries", "modules", "bindings"}:
+        raise ModuleGraphError("module graph must define schema_version, libraries, modules and bindings only")
     if type(data["schema_version"]) is not int or data["schema_version"] != 1:
         raise ModuleGraphError("unsupported module graph schema_version")
     rows = data["modules"]
@@ -202,7 +262,7 @@ def parse_graph(raw: bytes) -> ModuleGraph:
         if module_id in modules:
             raise ModuleGraphError(f"duplicate module id: {module_id}")
         path = repository_path(row["path"])
-        if row["kind"] not in ("java-library", "minecraft"):
+        if row["kind"] not in ("java-library", "minecraft", "minecraft-assembly"):
             raise ModuleGraphError(f"unknown module kind: {module_id}")
         if row["environment"] not in ("common", "client", "server", "mixed"):
             raise ModuleGraphError(f"unknown module environment: {module_id}")
@@ -246,6 +306,8 @@ def parse_graph(raw: bytes) -> ModuleGraph:
             dependency = modules.get(dependency_id)
             if dependency is None:
                 raise ModuleGraphError(f"unknown dependency: {module.id} -> {dependency_id}")
+            if dependency.kind == "minecraft-assembly":
+                raise ModuleGraphError(f"feature cannot depend on its assembled mod: {module.id} -> {dependency_id}")
             if module.environment != "mixed" and dependency.environment not in (
                 "common", module.environment,
             ):
@@ -257,8 +319,39 @@ def parse_graph(raw: bytes) -> ModuleGraph:
                 module.path == other.path or module.path.startswith(other.path + "/")
             ):
                 raise ModuleGraphError(f"overlapping module paths: {module.id}, {other.id}")
-    return ModuleGraph(tuple(modules[key] for key in sorted(modules)), dict(sorted(libraries.items())),
-                       hashlib.sha256(raw).hexdigest())
+    binding_rows = data["bindings"]
+    if not isinstance(binding_rows, list) or len(binding_rows) > MAX_MODULES:
+        raise ModuleGraphError("binding inventory must be a bounded list")
+    bindings: dict[str, Binding] = {}
+    for row in binding_rows:
+        if not isinstance(row, dict) or set(row) != BINDING_KEYS:
+            raise ModuleGraphError("binding fields must exactly match the schema")
+        binding_id = row["id"]
+        if not isinstance(binding_id, str) or not IDENTIFIER.fullmatch(binding_id) or binding_id in bindings:
+            raise ModuleGraphError("invalid or duplicate binding id")
+        if row["impact"] not in ("propagate", "coverage"):
+            raise ModuleGraphError(f"invalid binding impact: {binding_id}")
+        for key in ("api", "composition"):
+            if not isinstance(row[key], str) or row[key] not in modules:
+                raise ModuleGraphError(f"unknown binding {key}: {binding_id}")
+        for key in ("providers", "consumers"):
+            values = row[key]
+            if (not isinstance(values, list) or not 1 <= len(values) <= MAX_MODULES
+                    or any(not isinstance(value, str) or value not in modules for value in values)
+                    or len(set(values)) != len(values)):
+                raise ModuleGraphError(f"invalid binding {key}: {binding_id}")
+        bindings[binding_id] = Binding(binding_id, row["api"], tuple(sorted(row["providers"])),
+                                      tuple(sorted(row["consumers"])), row["composition"], row["impact"])
+    graph = ModuleGraph(tuple(modules[key] for key in sorted(modules)), dict(sorted(libraries.items())),
+                        hashlib.sha256(raw).hexdigest(), tuple(bindings[key] for key in sorted(bindings)))
+    for binding in graph.bindings:
+        for consumer in binding.consumers:
+            if binding.api != consumer and binding.api not in graph.compile_classpath_of(consumer):
+                raise ModuleGraphError(f"binding consumer cannot access its API: {binding.id}/{consumer}")
+        wired = {binding.composition, *graph.compile_classpath_of(binding.composition)}
+        if not {binding.api, *binding.providers, *binding.consumers} <= wired:
+            raise ModuleGraphError(f"binding composition cannot access its participants: {binding.id}")
+    return graph
 
 
 def load_graph(repository: Path = REPOSITORY) -> ModuleGraph:

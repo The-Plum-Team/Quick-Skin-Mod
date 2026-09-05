@@ -20,11 +20,11 @@ This `master` integration baseline exercises the following exact packaged lanes:
 
 | Artifact | Minecraft | Loader | Java | Contract scenarios |
 |---|---:|---|---:|---:|
-| `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `10` |
-| `forge-1.20.1` | `1.20.1` | Forge | `17` | `10` |
+| `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `11` |
+| `forge-1.20.1` | `1.20.1` | Forge | `17` | `11` |
 
-Scenario contract SHA-256: `dfbe373a3489262db39a167ed5ad42b275a814df2b8e7cf86a51f6aa02fb4ef3`
-Contract totals: `123` ordered steps, `92` captures.
+Scenario contract SHA-256: `34af3e6772e956a9ac8f2797e7de017e2412e46fa67c7ca47fd151d10002d7dd`
+Contract totals: `126` ordered steps, `95` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
@@ -38,11 +38,38 @@ Contract totals: `123` ordered steps, `92` captures.
 | `mod-compatibility-remote` | `compatibility-remote` | `concurrent-two-client` | `client_a`, `client_b` | `8` | `2` |
 | `mod-compatibility-late-join` | `compatibility-remote` | `sequential-two-client` | `client_a`, `client_b` | `5` | `1` |
 | `mod-compatibility-cpm-first-person` | `compatibility-cpm` | `single-client` | `client_a` | `4` | `2` |
+| `feature-navigation` | `pr`, `release` | `single-client` | `client_a` | `3` | `3` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->
 
 ## Local setup
+
+For a local preview of a feature change, generate a selection from its source path and run it
+against staged production and harness JARs:
+
+```bash
+python e2e/selection.py \
+  --changed-path modules/cape-editor/src/main/java/com/quickskin/mod/client/gui/screen/CapeAdjustScreen.java \
+  --output build/e2e-selection.json
+python e2e/orchestrator.py --packaged \
+  --artifacts-manifest build/release/artifacts.json \
+  --artifact-node fabric-1.20.1 --runtime-version 1.20.1 \
+  --selection build/e2e-selection.json --output-root build/feature-e2e
+```
+
+The selector follows compilation dependencies and declared API bindings, then resolves the
+contract's action prerequisites, required earlier images and comparison partners. Prerequisite
+assertions still execute, while their normal captures are suppressed unless explicitly needed.
+The legacy `full` scenario retains a conservative action-prefix dependency chain during migration;
+the new navigation checks have independent setup. Unknown paths, policy/build/resource changes,
+assembly edits or missing module/binding coverage select the complete profile.
+
+This command previews supplied paths; it does not authenticate a Git diff. The runner recomputes
+the entire manifest against the current module graph and scenario contract and records its hash
+in every selected report. These reports are local evidence and are rejected by current full-profile
+CI/AI consumers. Selective protected CI, compatibility reference provenance and reuse of unaffected
+evidence remain in progress in [the rework plan](../docs/architecture/MODULAR-REWORK.md).
 
 Build and stage the production jars plus separate remapped automation mods:
 

@@ -114,6 +114,42 @@ dependent behavior.
 
 ## Verification and progress log
 
+Current selective-execution milestone: the graph now describes API provider/consumer bindings
+and the final Minecraft assembly. Contract schema 3 declares module/binding checkpoints, action
+prerequisites, image prerequisites and atomic multiplayer orchestration. The Python selector
+recomputes the entire plan, and the Java harness validates the complete executable contract before
+filtering actions/captures. Selected assertions and required setup assertions remain mandatory;
+comparison partners and assertions that read previous images retain those images.
+
+The path-preview example for `CapeAdjustScreen.java` selects `cape-editor`, `cape-menu` and
+`skin-menu`, plus their actual navigation callbacks. With contract
+`34af3e6772e956a9ac8f2797e7de017e2412e46fa67c7ca47fd151d10002d7dd`, this means 35
+target assertions, 71 executed assertions including conservative legacy prerequisites, and 45
+review captures versus 88 for the complete PR profile. Private assertion probe images are
+additional runtime diagnostics, not additional review checkpoints. The new navigation scenario
+exercises the registered key and reconstructs both parent menus after changing button style;
+its setup is independent for each step. The older `full` helper still needs a more granular
+state/setup review before safely pruning its action-prefix prerequisites.
+
+Local packaged selection passed on Fabric (157.9s + 29.6s) and Forge (168.7s + 38.8s),
+with 68 assertions/42 captures in the selected `full` role and three navigation assertions/captures.
+Both production JARs retain their client-features milestone hashes. The final Fabric harness
+includes cursor positioning to avoid incidental hover tooltips; the Forge selection above used
+the preceding harness, with final navigation verification recorded separately in the checkpoint.
+Final Forge navigation passed in 43.3s. With CPM installed, activation and navigation passed in
+33.9s and 29.4s; the protected model fixture remains outside tracked source and exported evidence.
+`testStableLane` passed with 264 JUnit tests and 35 architecture/selection tests, including compiled
+Java rejection canaries. The 462 release-policy and 289 CI tests pass with the new complete
+scenario inventory and updated gallery fixtures. Existing full-profile visual consumers explicitly
+reject selection-labelled results, even if their listed steps happen to be complete.
+
+This is a local execution milestone, not completion of stage 4 or authorization to reduce CI/AI
+coverage. Next: authenticated base/head diff admission and policy fingerprints; selective protected
+job/evidence/curation/AI contracts; compatibility clean-reference obligations; reuse of unaffected
+evidence with original provenance. Missing coverage and unknown source/resource/assembly changes
+still fall back to full. Shell/resource extraction and the remaining version/loader imports remain
+part of the active goal.
+
 Run Gradle serially; Architectury's transform state is JVM-global. Start with targeted
 checks and reuse successful evidence until another change invalidates it. Preserve wire
 identity, bounded queues/I/O, session lifetime, optional-mod degradation, and client/server

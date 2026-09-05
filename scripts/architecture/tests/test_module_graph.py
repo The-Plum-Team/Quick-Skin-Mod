@@ -38,6 +38,7 @@ class ModuleGraphTest(unittest.TestCase):
         self.data = {
             "schema_version": 1,
             "libraries": {},
+            "bindings": [],
             "modules": [
                 module("editor", implementation=["textures"]),
                 module("textures", api=["identity"]),
@@ -62,6 +63,65 @@ class ModuleGraphTest(unittest.TestCase):
         self.assertEqual(("settings",), graph.affected_modules([
             "modules/settings/src/main/java/Settings.java",
         ]))
+
+    def test_feature_cannot_import_the_final_assembly(self):
+        self.data["modules"][1]["kind"] = "minecraft-assembly"
+        self.data["modules"][0]["kind"] = "minecraft"
+        with self.assertRaisesRegex(ModuleGraphError, "assembled mod"):
+            self.graph()
+
+    def provider_graph(self, impact="propagate"):
+        data = copy.deepcopy(self.data)
+        data["modules"] += [module("provider", api=["identity"]),
+                            module("bootstrap", implementation=["editor", "provider", "identity"])]
+        data["bindings"] = [dict(id="editor-adapter", api="identity", providers=["provider"],
+                                 consumers=["editor"], composition="bootstrap", impact=impact)]
+        return data
+
+    def test_provider_change_reaches_bound_consumer_without_affecting_every_api_user(self):
+        graph = self.graph(self.provider_graph())
+        affected = graph.affected_modules(["modules/provider/src/main/java/Adapter.java"])
+        self.assertEqual(("bootstrap", "editor", "integration", "provider"), affected)
+        self.assertNotIn("textures", affected)
+        self.assertEqual(("editor-adapter",), graph.affected_bindings(affected))
+
+    def test_runtime_feedback_reaches_a_fixed_point_without_a_compile_cycle(self):
+        data = self.provider_graph()
+        data["bindings"].append(dict(id="feedback", api="identity", providers=["editor"],
+                                     consumers=["provider"], composition="bootstrap", impact="propagate"))
+        graph = self.graph(data)
+        self.assertEqual(("bootstrap", "editor", "integration", "provider"), graph.affected_modules([
+            "modules/editor/src/main/java/Editor.java"]))
+
+    def test_coverage_binding_requires_an_interaction_without_rewriting_consumer_exports(self):
+        graph = self.graph(self.provider_graph("coverage"))
+        affected = graph.affected_modules(["modules/provider/src/main/java/Adapter.java"])
+        self.assertEqual(("bootstrap", "provider"), affected)
+        self.assertEqual(("editor-adapter",), graph.affected_bindings(affected))
+
+    def test_unchanged_composition_does_not_couple_every_feature(self):
+        graph = self.graph(self.provider_graph())
+        affected = graph.affected_modules(["modules/editor/src/main/java/Editor.java"])
+        self.assertNotIn("provider", affected)
+        # Direct wiring edits do require the bound consumer.
+        self.assertIn("editor", graph.affected_modules(["modules/bootstrap/Bindings.java"]))
+
+    def test_invalid_or_inaccessible_binding_is_rejected(self):
+        for mutation in ("unknown-provider", "duplicate", "hidden-api", "missing-wiring", "unknown-impact"):
+            data = self.provider_graph()
+            if mutation == "unknown-provider":
+                data["bindings"][0]["providers"] = ["absent"]
+            elif mutation == "duplicate":
+                data["bindings"].append(copy.deepcopy(data["bindings"][0]))
+            elif mutation == "hidden-api":
+                next(m for m in data["modules"] if m["id"] == "textures")["api"] = []
+                next(m for m in data["modules"] if m["id"] == "textures")["implementation"] = ["identity"]
+            elif mutation == "missing-wiring":
+                data["bindings"][0]["composition"] = "integration"
+            else:
+                data["bindings"][0]["impact"] = "ignore"
+            with self.subTest(mutation=mutation), self.assertRaises(ModuleGraphError):
+                self.graph(data)
 
     def test_unknown_empty_and_sibling_prefix_require_full_coverage(self):
         graph = self.graph()

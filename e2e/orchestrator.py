@@ -35,6 +35,7 @@ from packaged_runtime import (  # noqa: E402
 from release_identity import ReleaseIdentityError, derive as derive_release_identity  # noqa: E402
 from runtime_store import RunWorkspace, RuntimeStoreError, WorkspacePromotion  # noqa: E402
 from scenario_contract import default_contract  # noqa: E402
+from selection import load_selection  # noqa: E402
 
 
 SCENARIO_CONTRACT = default_contract()
@@ -58,6 +59,8 @@ def parse_args() -> argparse.Namespace:
         help="comma-separated scenario selection emitted from the scenario contract",
     )
     parser.add_argument("--compatibility-mod", help="run with one lock-selected optional mod")
+    parser.add_argument("--selection", type=Path,
+                        help="local preview manifest from e2e/selection.py; not release evidence")
     parser.add_argument(
         "--compatibility-contract",
         type=Path,
@@ -106,6 +109,11 @@ def select_rows(data: dict[str, Any], args: argparse.Namespace) -> list[dict[str
 
 
 def scenarios_for(data: dict[str, Any], row: dict[str, Any], args: argparse.Namespace) -> list[str]:
+    selection = getattr(args, "selection_plan", None)
+    if selection is not None:
+        if args.scenarios:
+            raise ValueError("--scenarios cannot override a selection's exact obligations")
+        return [run.scenario for run in selection.runs]
     scenarios = (
         [value.strip() for value in args.scenarios.split(",") if value.strip()]
         if args.scenarios
@@ -227,6 +235,9 @@ def execute_packaged_rows(
                         if compatibility_lane is not None
                         else {}
                     )
+                    selection = getattr(args, "selection_plan", None)
+                    if selection is not None:
+                        compatibility_arguments["selection"] = selection
                     result = run_packaged_row(
                         REPO,
                         data,
@@ -291,6 +302,8 @@ def execute_packaged_rows(
             json.dumps(runtime_store_metrics, indent=2) + "\n",
             encoding="utf-8",
         )
+        if getattr(args, "selection_plan", None) is not None:
+            (evidence.path / "selection.json").write_bytes(args.selection_plan.to_bytes())
         promotion = evidence.promote_to(output_root / "current")
 
     return results, promotion
@@ -302,6 +315,12 @@ def main() -> int:
     manifest_path = absolute(args.artifacts_manifest)
     output_root = absolute(args.output_root)
     try:
+        args.selection_plan = load_selection(absolute(args.selection)) if args.selection else None
+        if args.selection_plan is not None:
+            if args.scenarios or args.row_json:
+                raise ValueError("local selection cannot override workflow rows or explicit scenario lists")
+            if args.compatibility_mod or args.selection_plan.reference_captures:
+                raise ValueError("selective compatibility needs authenticated clean reference evidence; use the full compatibility runner")
         data = load_matrix(matrix_path)
         identity = derive_release_identity(matrix_path, data)
         commit = current_git_commit(REPO)

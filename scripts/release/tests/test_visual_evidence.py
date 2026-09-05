@@ -92,6 +92,9 @@ class VisualEvidenceTest(unittest.TestCase):
                     {
                         "id": step,
                         "assertion_required": True,
+                        "requires": [],
+                        "requires_captures": [],
+                        "covers": {"modules": ["common"], "bindings": []},
                         "capture": {
                             "title": f"{scenario} {step}",
                             "review_tier": "key",
@@ -120,13 +123,14 @@ class VisualEvidenceTest(unittest.TestCase):
                         else ["pr", "release"]
                     ),
                     "orchestration": orchestration,
+                    "execution_scope": "scenario" if len(role_order) == 2 else "steps",
                     "roles": roles,
                 }
             )
         self.catalog_path.write_text(
             json.dumps(
                 {
-                    "schema_version": 2,
+                    "schema_version": 3,
                     "screenshot_size": [PNG_WIDTH, PNG_HEIGHT],
                     "gui_text_reference_size": [1600, 900],
                     "review_regions": {
@@ -970,6 +974,11 @@ class VisualEvidenceTest(unittest.TestCase):
         report_hash = json.loads(json.dumps(valid))
         report_hash["reports"]["client_a"]["contract_sha256"] = "0" * 64
         mutations.append(("report hash", report_hash))
+        for owner in ("result", "report"):
+            partial = json.loads(json.dumps(valid))
+            target = partial if owner == "result" else partial["reports"]["client_a"]
+            target["selection_sha256"] = "a" * 64
+            mutations.append((f"local selection cannot certify full {owner} coverage", partial))
         extra_comparison = json.loads(json.dumps(valid))
         extra_comparison["reports"]["client_a"]["pixel_validation"][
             "comparisons"
@@ -992,7 +1001,8 @@ class VisualEvidenceTest(unittest.TestCase):
             self.catalog_path.read_text(encoding="utf-8")
         )
         contract_payload["scenarios"][0]["roles"][0]["steps"].append(
-            {"id": "wait_only", "assertion_required": True}
+            {"id": "wait_only", "assertion_required": True, "requires": [],
+             "requires_captures": [], "covers": {"modules": ["common"], "bindings": []}}
         )
         self.catalog_path.write_text(
             json.dumps(contract_payload) + "\n",

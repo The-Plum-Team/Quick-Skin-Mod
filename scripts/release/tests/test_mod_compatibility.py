@@ -205,6 +205,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
                     "full",
                     "server-policy",
                     "session",
+                    "feature-navigation",
                 ],
                 scenarios[len(expected_prefix):],
             )

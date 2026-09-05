@@ -68,9 +68,11 @@ def render_java(contract: ScenarioContract) -> str:
             "    }",
             "",
             "    public record StepSpec(String id, boolean assertionRequired, "
-            "boolean captureRequired) {}",
-            "    public record RoleSpec(List<StepSpec> steps) {",
-            "        public RoleSpec { steps = List.copyOf(steps); }",
+            "boolean captureRequired, List<String> requires, List<String> requiresCaptures) {",
+            "        public StepSpec { requires = List.copyOf(requires); requiresCaptures = List.copyOf(requiresCaptures); }",
+            "    }",
+            "    public record RoleSpec(List<StepSpec> steps, boolean atomic, List<List<String>> comparisons) {",
+            "        public RoleSpec { steps = List.copyOf(steps); comparisons = comparisons.stream().map(List::copyOf).toList(); }",
             "    }",
             "",
             "    private static final Map<ScenarioId, Map<String, RoleSpec>> ROLES;",
@@ -92,13 +94,21 @@ def render_java(contract: ScenarioContract) -> str:
                 delimiter = "" if step_index == len(role.steps) - 1 else ","
                 assertion_required = str(step.assertion_required).lower()
                 capture_required = str(step.capture is not None).lower()
+                requires = ", ".join(_java_string(value) for value in step.requires)
+                requires_captures = ", ".join(_java_string(value) for value in step.requires_captures)
                 lines.append(
                     "                new StepSpec("
-                    f"{_java_string(step.id)}, {assertion_required}, {capture_required})"
+                    f"{_java_string(step.id)}, {assertion_required}, {capture_required}, "
+                    f"List.of({requires}), List.of({requires_captures}))"
                     f"{delimiter}"
                 )
             role_delimiter = "" if role_index == len(scenario.roles) - 1 else ","
-            lines.append(f"            ))){role_delimiter}")
+            pairs = ", ".join(
+                f"List.of({_java_string(pair.first_step)}, {_java_string(pair.second_step)})"
+                for pair in role.comparisons
+            )
+            atomic = str(scenario.execution_scope == "scenario").lower()
+            lines.append(f"            ), {atomic}, List.of({pairs}))){role_delimiter}")
         lines.append("        ));")
     lines.extend(
         [

@@ -30,9 +30,22 @@ dependencies come from the release matrix through `gradle/minecraft-module-frame
 module builds must not add hidden project, Maven, or file dependencies. Stable Java libraries
 cannot depend on Minecraft modules. `api` exposes a dependency to consumers; `implementation`
 keeps it out of their compile API.
+`minecraft-assembly` identifies final composition projects; feature modules cannot import an
+assembly. API providers/consumers and their composition roots are declared as `bindings` in the
+same graph. A `propagate` binding carries provider changes to consumer modules; a `coverage`
+binding requires the specific authored interaction checkpoints without treating every consumer
+export as modified. A composition project merely being rebuilt does not modify its wiring.
 The common JAR bundles the internal module closure before the existing Architectury and loader
 transforms, preserving one production JAR per release artifact. It must reject duplicate entries
 and must never absorb the harness. The common test task also runs its extracted libraries' tests.
+
+The version-3 scenario contract declares each step's module/binding coverage, earlier action
+prerequisites, and earlier captures consumed by assertions. Coordinated multiplayer scenarios
+retain all clients and actions through `execution_scope: scenario`. `e2e/selection.py` computes
+the separate execution/capture closures and comparison partners. Its current CLI emits local
+path previews only: protected Git-diff admission, selective AI curation and retained unaffected
+evidence are still being migrated. CI continues to require complete profiles. A selected runtime
+report carries its exact selection SHA and must be rejected by a consumer expecting full evidence.
 
 `PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
 after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in

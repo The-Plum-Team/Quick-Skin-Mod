@@ -17,6 +17,7 @@ import scenario_contract  # noqa: E402
 
 
 EXPECTED_STEPS = {
+    ("feature-navigation", "client_a"): ("open_skin_menu_using_key", "skin_menu_settings_return", "cape_menu_settings_return"),
     ("phase0-smoke", "client_a"): ("baseline", "apply_local_skin"),
     ("propagation", "client_a"): ("baseline", "apply_local_look"),
     ("propagation", "client_b"): (
@@ -179,6 +180,7 @@ FULL_NON_CAPTURE_STEPS = frozenset(
 )
 
 EXPECTED_CAPTURES = {
+    ("feature-navigation", "client_a"): ("open_skin_menu_using_key", "skin_menu_settings_return", "cape_menu_settings_return"),
     ("phase0-smoke", "client_a"): ("baseline", "apply_local_skin"),
     ("propagation", "client_a"): ("baseline", "apply_local_look"),
     ("propagation", "client_b"): ("baseline", "observe_a"),
@@ -228,7 +230,7 @@ EXPECTED_CAPTURES = {
     ),
 }
 
-EXPECTED_CAPTURE_COUNT = 92
+EXPECTED_CAPTURE_COUNT = 95
 
 # The scenario index the mutation cases below address. Mutations must target the intended
 # scenario even after the contract grows, so these are named rather than inlined.
@@ -295,6 +297,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "mod-compatibility-remote",
                 "mod-compatibility-late-join",
                 "mod-compatibility-cpm-first-person",
+                "feature-navigation",
             ),
             self.contract.scenario_ids,
         )
@@ -310,6 +313,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "full",
                 "server-policy",
                 "session",
+                "feature-navigation",
             ),
             self.contract.scenarios_for_profile("pr"),
         )
@@ -321,6 +325,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "full",
                 "server-policy",
                 "session",
+                "feature-navigation",
             ),
             scenario_contract.scenarios_for_profile(
                 "release", self.contract
@@ -349,6 +354,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "full": ("client_a",),
                 "server-policy": ("client_a",),
                 "session": ("client_a",),
+                "feature-navigation": ("client_a",),
                 "mod-compatibility": ("client_a",),
                 "mod-compatibility-remote": ("client_a", "client_b"),
                 "mod-compatibility-late-join": ("client_a", "client_b"),
@@ -553,7 +559,7 @@ class ScenarioContractTest(unittest.TestCase):
                         step=step["id"],
                     ):
                         self.assertEqual(
-                            {"id", "assertion_required"}
+                            {"id", "assertion_required", "requires", "requires_captures", "covers"}
                             | ({"capture"} if "capture" in step else set()),
                             set(step),
                         )
@@ -1264,7 +1270,7 @@ class ScenarioContractTest(unittest.TestCase):
                 "schema_version", True
             ),
             "unsupported schema": lambda value: value.__setitem__(
-                "schema_version", 3
+                "schema_version", 4
             ),
             "wrong screenshot size": lambda value: value.__setitem__(
                 "screenshot_size", [1280, 720]
@@ -1317,8 +1323,8 @@ class ScenarioContractTest(unittest.TestCase):
 
     def test_malformed_json_encoding_and_symlinks_are_rejected(self) -> None:
         duplicate = self.contract_path.read_text(encoding="utf-8").replace(
-            '"schema_version": 2,',
-            '"schema_version": 2,\n  "schema_version": 2,',
+            '"schema_version": 3,',
+            '"schema_version": 3,\n  "schema_version": 3,',
             1,
         )
         duplicate_path = self.root / "duplicate.json"
@@ -1330,7 +1336,7 @@ class ScenarioContractTest(unittest.TestCase):
             scenario_contract.load_contract(duplicate_path)
 
         nonfinite = self.contract_path.read_text(encoding="utf-8").replace(
-            '"schema_version": 2',
+            '"schema_version": 3',
             '"schema_version": NaN',
             1,
         )

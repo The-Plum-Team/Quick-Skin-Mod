@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import ExitStack, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, BinaryIO
 
@@ -38,6 +38,7 @@ from runtime_store import (
     StoreCorruptionError,
 )
 from scenario_contract import OpaqueStarsProbe, RequiredGuiTextProbe, default_contract
+from selection import Selection
 from mod_compatibility import CompatibilityLane
 
 
@@ -1175,6 +1176,7 @@ def client_command(
     port: int,
     java: str,
     compatibility_mod: str | None = None,
+    selection: Selection | None = None,
 ) -> list[str]:
     import minecraft_launcher_lib.command  # type: ignore[import-not-found]
     import minecraft_launcher_lib.utils  # type: ignore[import-not-found]
@@ -1210,6 +1212,13 @@ def client_command(
             ],
         }
     )
+    if selection is not None:
+        selected = selection.role(scenario, role)
+        options["jvmArguments"].extend([
+            f"-Dquickskin.e2e.selection={selection.sha256}",
+            "-Dquickskin.e2e.steps=" + ",".join(selected.steps),
+            "-Dquickskin.e2e.captures=" + ",".join(selected.captures),
+        ])
     if compatibility_mod is None:
         # Exercise Quick Skin's own injector expectations in the clean runtime. Enabling this
         # global Mixin debug switch in compatibility lanes also turns optional injectors owned
@@ -1868,7 +1877,8 @@ def compare_screenshots(
     return comparison
 
 
-def validate_report(game_dir: Path, row: dict[str, Any], scenario: str, role: str) -> dict[str, Any]:
+def validate_report(game_dir: Path, row: dict[str, Any], scenario: str, role: str,
+                    selection: Selection | None = None) -> dict[str, Any]:
     report_path = game_dir / "e2e-report" / "report.json"
     if not report_path.is_file():
         raise RuntimeFailure(f"missing {role} report: {report_path}")
@@ -1880,6 +1890,19 @@ def validate_report(game_dir: Path, row: dict[str, Any], scenario: str, role: st
         role_contract = SCENARIO_CONTRACT.role(scenario, role)
     except ValueError as exc:
         raise RuntimeFailure(f"no locked report contract for {scenario}/{role}") from exc
+    if selection is None:
+        if "selection_sha256" in report:
+            raise RuntimeFailure("partial E2E evidence requires its independently expected selection")
+    else:
+        if (report.get("selection_sha256") != selection.sha256
+                or selection.contract_sha256 != SCENARIO_CONTRACT.sha256):
+            raise RuntimeFailure("report selection identity mismatch")
+        selected = selection.role(scenario, role)
+        role_contract = replace(role_contract,
+            steps=tuple(replace(step, capture=step.capture if step.id in selected.captures else None)
+                        for step in role_contract.steps if step.id in selected.steps),
+            comparisons=tuple(pair for pair in role_contract.comparisons
+                              if pair.first_step in selected.captures or pair.second_step in selected.captures))
     expected_steps = list(role_contract.step_ids)
     if report.get("contract_sha256") != SCENARIO_CONTRACT.sha256:
         raise RuntimeFailure(
@@ -2250,6 +2273,7 @@ def run_packaged_row(
     *,
     compatibility_lane: CompatibilityLane | None = None,
     compatibility_files: tuple[Path, ...] = (),
+    selection: Selection | None = None,
 ) -> dict[str, Any]:
     port = allocate_port()
     compatibility_suffix = (
@@ -2277,6 +2301,8 @@ def run_packaged_row(
         "status": "fail",
         "profile": evidence_profile.relative_to(output_root).as_posix(),
     }
+    if selection is not None:
+        result["selection_sha256"] = selection.sha256
     if compatibility_lane is not None:
         result["compatibility"] = compatibility_lane.public_identity()
         result["installed_compatibility"] = []
@@ -2438,6 +2464,7 @@ def run_packaged_row(
                 port,
                 java,
                 compatibility_lane.mod.id if compatibility_lane is not None else None,
+                **({"selection": selection} if selection is not None else {}),
             )
             process, handle = start_process(command, game_dir, client_log, env)
             client_processes[role] = process
@@ -2621,6 +2648,7 @@ def run_packaged_row(
                 row,
                 scenario,
                 role,
+                **({"selection": selection} if selection is not None else {}),
             )
             for role in roles
         }

@@ -709,7 +709,7 @@
     {
       "id": "common",
       "path": "common",
-      "kind": "minecraft",
+      "kind": "minecraft-assembly",
       "environment": "mixed",
       "api": [],
       "implementation": [
@@ -751,6 +751,119 @@
       ],
       "runtime_only": [],
       "libraries": {}
+    }
+  ],
+  "bindings": [
+    {
+      "id": "cpm-assets",
+      "api": "client-api",
+      "providers": [
+        "asset-catalog",
+        "client-textures"
+      ],
+      "consumers": [
+        "cpm-integration"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
+    {
+      "id": "client-network-actions",
+      "api": "client-api",
+      "providers": [
+        "networking"
+      ],
+      "consumers": [
+        "appearance-services",
+        "settings-ui"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
+    {
+      "id": "remote-appearance",
+      "api": "client-api",
+      "providers": [
+        "appearance-services"
+      ],
+      "consumers": [
+        "networking"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
+    {
+      "id": "skin-application-listener",
+      "api": "client-api",
+      "providers": [
+        "customnpcs-integration"
+      ],
+      "consumers": [
+        "appearance-services"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
+    {
+      "id": "gif-decoder",
+      "api": "image-core",
+      "providers": [
+        "minecraft-adapter"
+      ],
+      "consumers": [
+        "cape-import"
+      ],
+      "composition": "cape-menu",
+      "impact": "propagate"
+    },
+    {
+      "id": "settings-reload-deferral",
+      "api": "networking",
+      "providers": [
+        "settings-ui"
+      ],
+      "consumers": [
+        "networking"
+      ],
+      "composition": "common",
+      "impact": "coverage"
+    },
+    {
+      "id": "connection-identity",
+      "api": "client-transfer",
+      "providers": [
+        "common"
+      ],
+      "consumers": [
+        "client-transfer"
+      ],
+      "composition": "common",
+      "impact": "coverage"
+    },
+    {
+      "id": "open-skin-menu",
+      "api": "client-input",
+      "providers": [
+        "skin-menu"
+      ],
+      "consumers": [
+        "client-input"
+      ],
+      "composition": "common",
+      "impact": "coverage"
+    },
+    {
+      "id": "settings-parent-reconstruction",
+      "api": "ui-foundation",
+      "providers": [
+        "skin-menu",
+        "cape-menu"
+      ],
+      "consumers": [
+        "settings-ui"
+      ],
+      "composition": "common",
+      "impact": "coverage"
     }
   ]
 }
