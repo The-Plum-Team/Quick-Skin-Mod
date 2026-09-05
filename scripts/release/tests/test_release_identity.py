@@ -48,6 +48,43 @@ class UnifiedReleaseIdentityTest(unittest.TestCase):
         release_identity.validate_ci_event(selected, event_name="push", ref_type="tag", ref_name=selected.tag,
             event_commit="a" * 40, checkout_commit="a" * 40, release_branch_head="a" * 40)
 
+    def test_every_tag_selects_only_its_matrix_target(self):
+        for target in {row["artifact_version"] for row in self.data["artifacts"]}:
+            identity = release_identity.derive(self.path, self.data, target=target)
+            with self.subTest(target=target):
+                selected = release_identity.resolve_event_target(self.path, data=self.data,
+                    event_name="push", ref_type="tag", ref_name=identity.tag)
+                self.assertEqual(target, selected)
+                view = release_matrix.select_release_target(self.data, selected)
+                self.assertEqual({target}, {row["artifact_version"] for row in view["artifacts"]})
+
+    def test_manual_validation_requires_an_explicit_supported_target_on_master(self):
+        arguments = dict(event_name="workflow_dispatch", ref_type="branch", ref_name="master")
+        self.assertEqual(self.target, release_identity.resolve_event_target(
+            self.path, data=self.data, requested_target=self.target, **arguments))
+        for target in (None, "", "unsupported", self.target + "\n"):
+            with self.subTest(target=target), self.assertRaises((release_identity.ReleaseIdentityError, release_matrix.MatrixError)):
+                release_identity.resolve_event_target(self.path, data=self.data, requested_target=target, **arguments)
+        with self.assertRaises(release_identity.ReleaseIdentityError):
+            release_identity.resolve_event_target(self.path, data=self.data, requested_target=self.target,
+                event_name="workflow_dispatch", ref_type="branch", ref_name="feature/untrusted")
+
+    def test_tags_cannot_override_or_guess_a_target_or_old_mod_version(self):
+        canonical = release_identity.derive(self.path, self.data, target=self.target).tag
+        for tag, override in ((canonical, self.target), (canonical + "-extra", None),
+                              (canonical.replace("v3.0.0", "v2.0.0"), None),
+                              ("build-v3.0.0", None), ("mcunsupported-v3.0.0", None)):
+            with self.subTest(tag=tag, override=override), self.assertRaises(release_identity.ReleaseIdentityError):
+                release_identity.resolve_event_target(self.path, data=self.data, requested_target=override,
+                    event_name="push", ref_type="tag", ref_name=tag)
+
+    def test_event_target_validation_includes_unselected_inventory(self):
+        unselected = next(row for row in self.data["artifacts"] if row["artifact_version"] != self.target)
+        unselected["java"] = 0
+        with self.assertRaises(release_matrix.MatrixError):
+            release_identity.resolve_event_target(self.path, data=self.data, requested_target=self.target,
+                event_name="workflow_dispatch", ref_type="branch", ref_name="master")
+
     def test_target_view_is_exact_and_does_not_mutate_the_authoritative_matrix(self):
         before = copy.deepcopy(self.data)
         selected = release_matrix.select_release_target(self.data, self.target)

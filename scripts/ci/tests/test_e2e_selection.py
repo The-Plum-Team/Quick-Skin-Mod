@@ -233,7 +233,7 @@ class E2ESelectionAdmissionTest(unittest.TestCase):
         report_path.write_text(json.dumps(report))
         with patch.object(packaged_runtime, "inspect_screenshot_for_step", return_value={}) as inspect:
             packaged_runtime.validate_report(self.repository, row, "feature-navigation", "client_a", selected)
-            self.assertEqual(3, inspect.call_count)
+            self.assertEqual(4, inspect.call_count)
         report["selection_sha256"] = selected.require_selection().sha256
         report_path.write_text(json.dumps(report))
         with self.assertRaisesRegex(packaged_runtime.RuntimeFailure, "selection identity mismatch"):

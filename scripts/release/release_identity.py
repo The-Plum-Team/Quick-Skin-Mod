@@ -13,7 +13,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from matrix import MatrixError, load_matrix, read_mod_version, release_id as matrix_release_id, select_release_target
+from matrix import (
+    MatrixError,
+    load_matrix,
+    read_mod_version,
+    release_id as matrix_release_id,
+    select_release_target,
+    validate_matrix,
+)
 
 
 class ReleaseIdentityError(RuntimeError):
@@ -115,6 +122,48 @@ def git_commit(repository: Path) -> str:
         raise ReleaseIdentityError("cannot resolve the checked-out commit") from exc
 
 
+def resolve_event_target(
+    matrix_path: Path,
+    *,
+    event_name: str,
+    ref_type: str,
+    ref_name: str,
+    requested_target: str | None = None,
+    data: dict[str, Any] | None = None,
+) -> str | None:
+    """Resolve a tag or explicit manual target against the complete support inventory.
+
+    Tag publication cannot accept a caller-selected override. Manual dispatch is a validation
+    run and must name its target; neither path guesses a version from the shared source branch.
+    Exact commit/branch-head and changelog checks remain in validate_ci_event/main.
+    """
+    loaded = load_matrix(matrix_path) if data is None else data
+    # Validate unselected rows too; target resolution cannot hide a corrupt inventory.
+    validate_matrix(loaded)
+    if event_name == "push" and ref_type == "tag":
+        if requested_target:
+            raise ReleaseIdentityError("tag publication derives its target only from the canonical tag")
+        if loaded.get("schema_version") == 3:
+            for target in sorted({row["artifact_version"] for row in loaded["artifacts"]}):
+                if derive(matrix_path, loaded, target=target).tag == ref_name:
+                    return target
+        elif derive(matrix_path, loaded).tag == ref_name:
+            return None
+        raise ReleaseIdentityError("release tag is not a current canonical matrix target")
+    if event_name == "workflow_dispatch" and ref_type == "branch":
+        if ref_name != loaded["project"]["release_branch"]:
+            raise ReleaseIdentityError("manual release validation must use the matrix source branch")
+        if loaded.get("schema_version") == 3:
+            if not requested_target:
+                raise ReleaseIdentityError("manual release validation requires one Minecraft target")
+            select_release_target(loaded, requested_target)
+            return requested_target
+        if requested_target:
+            raise ReleaseIdentityError("historical single-target matrices do not accept target overrides")
+        return None
+    raise ReleaseIdentityError("release target requires a canonical tag push or manual branch validation")
+
+
 def validate_ci_event(
     identity: ReleaseIdentity,
     *,
@@ -149,7 +198,7 @@ def validate_ci_event(
         raise ReleaseIdentityError(f"unsupported release event {event_name!r}")
 
 
-def write_github_output(path: Path, identity: ReleaseIdentity) -> None:
+def write_github_output(path: Path, identity: ReleaseIdentity, *, target: str | None = None) -> None:
     with path.open("a", encoding="utf-8") as output:
         for key, value in (
             ("release_id", identity.release_id),
@@ -157,6 +206,7 @@ def write_github_output(path: Path, identity: ReleaseIdentity) -> None:
             ("branch", identity.branch),
             ("version", identity.mod_version),
             ("minecraft_versions", ",".join(identity.minecraft_versions)),
+            ("target", target or ""),
         ):
             output.write(f"{key}={value}\n")
 
@@ -168,12 +218,23 @@ def main() -> int:
     parser.add_argument("--release-branch-head")
     parser.add_argument("--github-output", type=Path)
     parser.add_argument("--target", help="one Minecraft version published from the unified matrix")
+    parser.add_argument("--event-target", action="store_true",
+                        help="resolve the canonical tag target or require an explicit manual --target")
     args = parser.parse_args()
 
     repository = Path(__file__).resolve().parents[2]
     matrix_path = args.matrix if args.matrix.is_absolute() else repository / args.matrix
     try:
-        identity = derive(matrix_path, target=args.target)
+        target = args.target
+        if args.event_target:
+            target = resolve_event_target(
+                matrix_path,
+                event_name=os.environ.get("GITHUB_EVENT_NAME", ""),
+                ref_type=os.environ.get("GITHUB_REF_TYPE", ""),
+                ref_name=os.environ.get("GITHUB_REF_NAME", ""),
+                requested_target=target,
+            )
+        identity = derive(matrix_path, target=target)
         changelog = repository / "CHANGELOG.md"
         validate_changelog(changelog, identity.mod_version)
         if args.validate_ci:
@@ -191,7 +252,7 @@ def main() -> int:
                     changelog, identity.mod_version, publication=True
                 )
         if args.github_output:
-            write_github_output(args.github_output, identity)
+            write_github_output(args.github_output, identity, target=target)
         print(json.dumps(identity.manifest(), separators=(",", ":"), sort_keys=True))
     except (MatrixError, OSError, ReleaseIdentityError) as exc:
         print(f"release identity error: {exc}", file=sys.stderr)

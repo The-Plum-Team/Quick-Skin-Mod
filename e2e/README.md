@@ -53,22 +53,22 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.2` | `26.2` | Fabric | `25` | `11` |
 | `neoforge-26.2` | `26.2` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `34af3e6772e956a9ac8f2797e7de017e2412e46fa67c7ca47fd151d10002d7dd`
-Contract totals: `126` ordered steps, `95` captures.
+Scenario contract SHA-256: `800ef4a3c35873d2ccf24d9304eed7b5ecf6916cdbee6630541c1463863479c0`
+Contract totals: `128` ordered steps, `97` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `17` | `9` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `69` | `62` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `70` | `63` |
 | `server-policy` | `pr`, `release` | `single-client` | `client_a` | `4` | `4` |
 | `session` | `pr`, `release` | `single-client` | `client_a` | `5` | `4` |
 | `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
 | `mod-compatibility-remote` | `compatibility-remote` | `concurrent-two-client` | `client_a`, `client_b` | `8` | `2` |
 | `mod-compatibility-late-join` | `compatibility-remote` | `sequential-two-client` | `client_a`, `client_b` | `5` | `1` |
 | `mod-compatibility-cpm-first-person` | `compatibility-cpm` | `single-client` | `client_a` | `4` | `2` |
-| `feature-navigation` | `pr`, `release` | `single-client` | `client_a` | `3` | `3` |
+| `feature-navigation` | `pr`, `release` | `single-client` | `client_a` | `4` | `4` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->

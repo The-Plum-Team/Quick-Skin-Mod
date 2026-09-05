@@ -215,7 +215,7 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         self.assertIn("captured completed rendered frame", source)
 
     def test_hud_preview_targets_the_authored_lower_right_region(self) -> None:
-        source = FULL_SCENARIO.read_text(encoding="utf-8")
+        source = FULL_SCENARIO.with_name("HudPreviewSteps.java").read_text(encoding="utf-8")
 
         self.assertIn("positionHudOverlayForEvidence(mc, ClientConfig.getInstance())", source)
         self.assertIn("Math.round(screenWidth * 0.89f)", source)

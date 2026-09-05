@@ -650,8 +650,12 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         client_events = (ROOT / "common/src/main/java/com/quickskin/mod/event/ClientEvents.java").read_text(
             encoding="utf-8"
         )
+        menu_integration = java_source(
+            "client/gui/integration/MenuIntegration.java", repository=ROOT
+        ).read_text(encoding="utf-8")
+        self.assertIn("MenuIntegration.init(parent ->", client_events)
         self.assertGreaterEqual(
-            client_events.count("CPMCompatIntegration.onRenderedFrameBoundary();"), 2
+            (client_events + menu_integration).count("CPMCompatIntegration.onRenderedFrameBoundary();"), 2
         )
         force_refresh = integration[
             integration.index("public static void forceReRegisterSkins") :

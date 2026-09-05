@@ -480,3 +480,32 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   No new Minecraft/image E2E was launched. Full reproducibility, remaining feature/API ownership,
   selective CI/evidence, publication/governance/Pages and the prepared GitHub visual gate remain
   outstanding.
+- Extracted `menu-integration` and `hud-preview`, bringing the compiled production graph to
+  37 modules plus the common assembly. Title/pause controls receive a skin-menu callback instead
+  of importing the menu. HUD input/render callbacks and overlay code have their own owner;
+  lifecycle composition preserves callback order and session resets. All 32 production JARs
+  contain each moved class once, add only the two feature entry classes, lose no production
+  classes and contain no harness code.
+- Isolated title and HUD harness setup. The title probe keeps its two-frame splash control and
+  now requires only the reference-skin import. HUD evidence has its own disabled/enabled pair
+  on the same reference scene, avoiding the old baseline's unrelated comparison closure. The
+  new vanilla-menu button step invokes the registered callback and checks parent identity,
+  including Essential's icon alternative. Contract
+  `800ef4a3c35873d2ccf24d9304eed7b5ecf6916cdbee6630541c1463863479c0` declares 128
+  steps and 97 captures across all profiles; the complete PR profile has 90 captures. Local
+  path previews select two HUD captures, five menu-integration captures, and 45 editor captures.
+  These revised flows are compiled for every target; their image execution is deferred to GitHub.
+- The complete matrix builds in 307 seconds and all 64 production/harness outputs stage and
+  verify independently. `testStableLane` passes 264 JUnit tests and 39 architecture tests. A real
+  `--rerun-tasks` rebuild of 1.21.8 passes in 57 seconds and reproduces its four staged JARs
+  byte-for-byte; all 64 matrix output hashes still match afterward. This does not claim a second
+  rebuild of the other fifteen targets.
+- The release workflow now resolves one target from a canonical tag or an explicit manual
+  dispatch and carries it through build/rebuild, staging, runtime rows and each publication
+  verification. It preserves the full matrix identity and the aggregate bundle's publication
+  rejection. The actual identity-step shell passes local fixtures for all sixteen manual
+  targets and rejects five missing/unknown/stale/override cases; a staged 1.21.8 runtime plan
+  contains only its selected lanes, and verification under 1.21.7 is rejected. No publication
+  or GitHub workflow was executed. Final policy suites pass 497 release and 301 CI tests.
+  Protected selective review/baseline evidence, remaining API/feature boundaries, release
+  governance/status/Pages and complete final reproducibility/visual acceptance remain pending.

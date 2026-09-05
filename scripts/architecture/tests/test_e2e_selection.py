@@ -53,7 +53,7 @@ class E2ESelectionTest(unittest.TestCase):
         self.assertEqual("affected", result.mode)
         self.assertEqual(("cape-editor",), result.direct_modules)
         self.assertEqual({"cape-editor", "cape-menu", "skin-menu", "common"}, set(result.affected_modules))
-        self.assertEqual({"open-skin-menu", "settings-parent-reconstruction"}, set(result.affected_bindings))
+        self.assertEqual({"open-skin-menu", "settings-parent-reconstruction", "vanilla-menu-navigation"}, set(result.affected_bindings))
         self.assertEqual(["full", "feature-navigation"], [run.scenario for run in result.runs])
         role = result.role("full", "client_a")
         self.assertIn("cape_adjust_screen", role.captures)
@@ -62,20 +62,52 @@ class E2ESelectionTest(unittest.TestCase):
         self.assertNotIn("settings_screen", role.captures)
         self.assertNotIn("base_layer_transparency_first_person", role.captures)
         self.assertLess(len(role.captures), len(self.contract.expected_capture_steps("full", "client_a")))
-        self.assertEqual(3, len(result.role("feature-navigation", "client_a").captures))
+        self.assertEqual(4, len(result.role("feature-navigation", "client_a").captures))
 
     def test_projected_contract_keeps_assertions_and_hash_but_only_selected_images(self):
         plan = select(self.contract, self.graph, [self.editor_path])
         projected = project_contract(self.contract, plan)
         self.assertEqual(self.contract.sha256, projected.sha256)
         self.assertEqual(45, len(projected.captures))
-        self.assertEqual(68, len(projected.expected_steps("full", "client_a")))
+        self.assertEqual(67, len(projected.expected_steps("full", "client_a")))
         self.assertEqual(plan.role("full", "client_a").captures,
                          projected.expected_capture_steps("full", "client_a"))
         self.assertEqual(set(projected.capture_ids), set(projected.review_regions))
         for run in plan.runs:
             for role in run.roles:
                 self.assertTrue(all(step.assertion_required for step in projected.role(run.scenario, role.role).steps))
+
+    def test_menu_integration_keeps_its_preview_controls_without_running_cape_editor(self):
+        plan = select(self.contract, self.graph, [
+            "modules/menu-integration/src/main/java/com/quickskin/mod/client/gui/integration/MenuIntegration.java"
+        ])
+        self.assertEqual("affected", plan.mode)
+        self.assertEqual({"menu-integration", "common"}, set(plan.affected_modules))
+        title = plan.role("full", "client_a")
+        self.assertEqual(("baseline", "local_skin_apply", "title_screen_splash_order"), title.steps)
+        self.assertEqual(("title_screen_splash_order",), title.captures)
+        session = plan.role("session", "client_a")
+        self.assertEqual(self.contract.expected_steps("session", "client_a"), session.steps)
+        self.assertEqual(("pause_menu_preview", "inventory_paper_doll", "quit_to_title"), session.captures)
+        navigation = plan.role("feature-navigation", "client_a")
+        self.assertEqual(("open_skin_menu_using_vanilla_button",), navigation.steps)
+        self.assertEqual(navigation.steps, navigation.captures)
+        self.assertEqual(5, len(project_contract(self.contract, plan).captures))
+
+    def test_hud_preview_uses_its_own_control_without_selecting_menus_or_capes(self):
+        plan = select(self.contract, self.graph, [
+            "modules/hud-preview/src/main/java/com/quickskin/mod/client/gui/overlay/SkinPreviewOverlay.java"
+        ])
+        self.assertEqual("affected", plan.mode)
+        self.assertEqual({"hud-preview", "common"}, set(plan.affected_modules))
+        self.assertEqual(["full"], [run.scenario for run in plan.runs])
+        role = plan.role("full", "client_a")
+        self.assertEqual(("baseline", "local_skin_apply", "hud_preview_disabled", "hud_preview_overlay"), role.steps)
+        self.assertEqual(("hud_preview_disabled", "hud_preview_overlay"), role.captures)
+        comparisons = project_contract(self.contract, plan).role("full", "client_a").comparisons
+        self.assertEqual(1, len(comparisons))
+        self.assertEqual("hud_preview_disabled", comparisons[0].first_step)
+        self.assertEqual("hud_preview_overlay", comparisons[0].second_step)
 
     def test_projection_rejects_missing_prerequisites_and_malformed_roles(self):
         plan = select(self.contract, self.graph, [self.editor_path])

@@ -882,6 +882,22 @@
         1.0,
         1.0
       ]
+    ],
+    "feature-navigation.client_a.open_skin_menu_using_vanilla_button": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
+    "full.client_a.hud_preview_disabled": [
+      [
+        0.82,
+        0.72,
+        0.96,
+        0.99
+      ]
     ]
   },
   "scenarios": [
@@ -3227,6 +3243,27 @@
               }
             },
             {
+              "id": "hud_preview_disabled",
+              "assertion_required": true,
+              "capture": {
+                "title": "HUD preview disabled control",
+                "review_tier": "all",
+                "expectation": "The reference skin is worn in the same stable world view as the enabled HUD checkpoint, with no player-preview thumbnail in the lower-right corner.",
+                "probes": []
+              },
+              "requires": [
+                "local_skin_apply"
+              ],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "hud-preview",
+                  "preview-rendering"
+                ],
+                "bindings": []
+              }
+            },
+            {
               "id": "hud_preview_overlay",
               "assertion_required": true,
               "capture": {
@@ -3236,12 +3273,12 @@
                 "probes": []
               },
               "requires": [
-                "stale_skin_fallback"
+                "hud_preview_disabled"
               ],
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "player-preview",
+                  "hud-preview",
                   "preview-rendering"
                 ],
                 "bindings": []
@@ -3257,11 +3294,12 @@
                 "probes": []
               },
               "requires": [
-                "hud_preview_overlay"
+                "local_skin_apply"
               ],
               "requires_captures": [],
               "covers": {
                 "modules": [
+                  "menu-integration",
                   "ui-foundation"
                 ],
                 "bindings": []
@@ -3328,7 +3366,7 @@
               "minimum_changed_fraction": 1e-05
             },
             {
-              "first_step": "baseline",
+              "first_step": "hud_preview_disabled",
               "second_step": "hud_preview_overlay",
               "minimum_changed_fraction": 0.05,
               "region": [
@@ -3695,6 +3733,7 @@
                   "appearance-services",
                   "client-preferences",
                   "common",
+                  "menu-integration",
                   "player-preview",
                   "preview-rendering"
                 ],
@@ -3762,7 +3801,8 @@
                 "modules": [
                   "appearance-services",
                   "client-preferences",
-                  "common"
+                  "common",
+                  "menu-integration"
                 ],
                 "bindings": []
               }
@@ -3803,7 +3843,8 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "common",
+                  "menu-integration"
                 ],
                 "bindings": []
               }
@@ -3824,7 +3865,8 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "common",
+                  "menu-integration"
                 ],
                 "bindings": []
               }
@@ -3845,7 +3887,8 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "common",
+                  "menu-integration"
                 ],
                 "bindings": []
               }
@@ -4246,6 +4289,27 @@
                 "title": "Skin menu opened through its key binding",
                 "review_tier": "key",
                 "expectation": "The registered key opens the settled skin menu, with its catalog, controls and player preview visible.",
+                "probes": []
+              }
+            },
+            {
+              "id": "open_skin_menu_using_vanilla_button",
+              "assertion_required": true,
+              "requires": [],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "menu-integration",
+                  "skin-menu"
+                ],
+                "bindings": [
+                  "vanilla-menu-navigation"
+                ]
+              },
+              "capture": {
+                "title": "Skin menu opened through the vanilla-menu button",
+                "review_tier": "key",
+                "expectation": "The injected Quick Skin button opens the settled skin menu with its catalog, controls and player preview, retaining the vanilla menu as its parent.",
                 "probes": []
               }
             },

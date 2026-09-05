@@ -16,6 +16,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.network.chat.Component;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,9 +53,58 @@ public final class FeatureNavigationScenario implements Scenario {
                             ? Step.Result.pass("registered key callback opened the skin menu; key restored")
                             : Step.Result.fail("registered key did not open the skin menu");
                 });
-        return List.of(open,
+        return List.of(open, vanillaMenuButton(mc, version, role),
                 settingsReturn(mc, true, version, role),
                 settingsReturn(mc, false, version, role));
+    }
+
+    private Step vanillaMenuButton(Minecraft mc, String version, String role) {
+        AtomicReference<Screen> parent = new AtomicReference<>();
+        AtomicReference<String> failure = new AtomicReference<>();
+        AtomicInteger phase = new AtomicInteger();
+        return Step.of("open_skin_menu_using_vanilla_button")
+                .action(() -> {
+                    Screen title = new TitleScreen();
+                    parent.set(title);
+                    VanillaShim.setScreen(mc, title);
+                })
+                .ready(() -> {
+                    Screen current = VanillaShim.currentScreen(mc);
+                    if (phase.get() == 0) {
+                        if (current != parent.get() || current.children().isEmpty()) return false;
+                        String label = Component.translatable("quickskin.button.change_skin").getString();
+                        boolean essential = com.quickskin.mod.client.compat.EssentialCompatIntegration.isAvailable();
+                        List<Button> buttons = current.children().stream()
+                                .filter(Button.class::isInstance).map(Button.class::cast)
+                                .filter(button -> button.visible && button.active
+                                        && (label.equals(button.getMessage().getString())
+                                        || essential && button instanceof
+                                                com.quickskin.mod.client.gui.widget.IconActionButton)).toList();
+                        if (buttons.isEmpty()) return false;
+                        if (buttons.size() != 1) {
+                            failure.set("vanilla menu has duplicate Quick Skin buttons");
+                            return true;
+                        }
+                        phase.set(1);
+                        if (!VanillaShim.press(buttons.get(0))) {
+                            failure.set("could not press the injected vanilla-menu button");
+                            return true;
+                        }
+                        return false;
+                    }
+                    return failure.get() != null || current instanceof PlayerSkinMenuScreen
+                            && !current.children().isEmpty() && VanillaShim.moveMouseTo(mc, 5, 5) == null;
+                })
+                .minTicks(30).settleTicks(20).timeoutTicks(400)
+                .screenshot(version + "_navigation_vanilla_button_" + role + ".png")
+                .assertion(() -> {
+                    if (failure.get() != null) return Step.Result.fail(failure.get());
+                    Screen current = VanillaShim.currentScreen(mc);
+                    if (!(current instanceof PlayerSkinMenuScreen)
+                            || FullScenario.screenField(current, "parent") != parent.get())
+                        return Step.Result.fail("vanilla-menu callback did not retain its parent");
+                    return Step.Result.pass("injected vanilla-menu button opened its declared skin menu");
+                });
     }
 
     private Step settingsReturn(Minecraft mc, boolean skin, String version, String role) {

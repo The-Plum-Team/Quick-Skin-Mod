@@ -14,6 +14,10 @@ inputs:
   scenarios:
     description: Comma-separated contract scenario ids
     required: true
+  release-target:
+    description: Exact Minecraft target for a separately staged release; empty consumes the complete build bundle
+    required: false
+    default: ""
   evidence-name:
     description: Unique Actions artifact name for this runtime lane
     required: true
@@ -87,23 +91,33 @@ runs:
       shell: bash
       env:
         EXPECTED_SOURCE_SHA: ${{ inputs.source-sha }}
+        RELEASE_TARGET: ${{ inputs.release-target }}
       run: |
         set -euo pipefail
         [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
         [[ "$(git rev-parse HEAD)" == "$EXPECTED_SOURCE_SHA" ]]
+        target_arguments=()
+        if [[ -n "$RELEASE_TARGET" ]]; then
+          target_arguments=(--target "$RELEASE_TARGET")
+        fi
         GITHUB_SHA="$EXPECTED_SOURCE_SHA" \
-          python scripts/release/verify_release.py --verify-staged
+          python scripts/release/verify_release.py "${target_arguments[@]}" --verify-staged
 
     - name: Run contract-declared packaged scenarios
       shell: bash
       env:
         E2E_ROW_JSON: ${{ inputs.row-json }}
         E2E_SCENARIOS: ${{ inputs.scenarios }}
+        RELEASE_TARGET: ${{ inputs.release-target }}
         E2E_COMPATIBILITY_MOD: ${{ inputs.compatibility-mod }}
         QUICKSKIN_E2E_CPM_MODEL_PATH: ${{ inputs.cpm-model-path }}
         QUICKSKIN_E2E_RUNTIME_STORE: ${{ runner.temp }}/quick-skin-runtime-store
       run: |
         set -euo pipefail
+        target_arguments=()
+        if [[ -n "$RELEASE_TARGET" ]]; then
+          target_arguments=(--target "$RELEASE_TARGET")
+        fi
         compatibility_arguments=()
         if [[ -n "$E2E_COMPATIBILITY_MOD" ]]; then
           compatibility_arguments=(
@@ -123,6 +137,7 @@ runs:
           --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render" \
           python e2e/orchestrator.py \
             --matrix release/release-matrix.json \
+            "${target_arguments[@]}" \
             --row-json "$E2E_ROW_JSON" \
             --artifacts-manifest build/release/artifacts.json \
             --packaged \

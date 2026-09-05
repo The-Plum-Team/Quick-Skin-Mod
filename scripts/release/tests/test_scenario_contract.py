@@ -17,7 +17,7 @@ import scenario_contract  # noqa: E402
 
 
 EXPECTED_STEPS = {
-    ("feature-navigation", "client_a"): ("open_skin_menu_using_key", "skin_menu_settings_return", "cape_menu_settings_return"),
+    ("feature-navigation", "client_a"): ("open_skin_menu_using_key", "open_skin_menu_using_vanilla_button", "skin_menu_settings_return", "cape_menu_settings_return"),
     ("phase0-smoke", "client_a"): ("baseline", "apply_local_skin"),
     ("propagation", "client_a"): ("baseline", "apply_local_look"),
     ("propagation", "client_b"): (
@@ -115,6 +115,7 @@ EXPECTED_STEPS = {
         "rename_dialog",
         "delete_dialog",
         "stale_skin_fallback",
+        "hud_preview_disabled",
         "hud_preview_overlay",
         "title_screen_splash_order",
     ),
@@ -180,7 +181,7 @@ FULL_NON_CAPTURE_STEPS = frozenset(
 )
 
 EXPECTED_CAPTURES = {
-    ("feature-navigation", "client_a"): ("open_skin_menu_using_key", "skin_menu_settings_return", "cape_menu_settings_return"),
+    ("feature-navigation", "client_a"): ("open_skin_menu_using_key", "open_skin_menu_using_vanilla_button", "skin_menu_settings_return", "cape_menu_settings_return"),
     ("phase0-smoke", "client_a"): ("baseline", "apply_local_skin"),
     ("propagation", "client_a"): ("baseline", "apply_local_look"),
     ("propagation", "client_b"): ("baseline", "observe_a"),
@@ -230,7 +231,7 @@ EXPECTED_CAPTURES = {
     ),
 }
 
-EXPECTED_CAPTURE_COUNT = 95
+EXPECTED_CAPTURE_COUNT = 97
 
 # The scenario index the mutation cases below address. Mutations must target the intended
 # scenario even after the contract grows, so these are named rather than inlined.
@@ -798,7 +799,7 @@ class ScenarioContractTest(unittest.TestCase):
                     None,
                 ),
                 (
-                    "baseline",
+                    "hud_preview_disabled",
                     "hud_preview_overlay",
                     0.05,
                     (0.82, 0.72, 0.96, 0.99),

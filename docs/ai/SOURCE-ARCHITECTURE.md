@@ -82,8 +82,22 @@ its clock and connection source are injectable for bounded retry regression test
 `PreviewAnimationState` belongs to client infrastructure instead of global event registration.
 Settings reconstruct their parent through `RestylableScreen`; key handling receives an open-menu
 callback from bootstrap. Neither mechanism introduces a settings-to-skin-menu compile dependency.
+`menu-integration` owns injected title/pause controls, preview rotation/animation state and deferred
+menu rendering. Its skin-menu action is another bootstrap callback, covered by
+`vanilla-menu-navigation`; it does not compile against the skin menu. `hud-preview` owns its overlay,
+mouse/tick/render callbacks and drag state independently of menu widgets. Bootstrap keeps CPM's
+frame-boundary callback after HUD extraction, including when the HUD is hidden.
+The harness's `TitleMenuSteps` and `HudPreviewSteps` prepare their own reference appearance from
+`local_skin_apply`. HUD evidence compares a dedicated disabled control with the enabled overlay;
+it must not reuse the full-suite baseline and inherit unrelated image-comparison dependencies.
 Source-inspection policies resolve Java classes through `scripts/architecture/source_inventory.py`
 and the module registry, including explicitly selected legacy replacements.
+
+Shared-source release tags select exactly one matrix target. `release_identity.py --event-target`
+resolves canonical tag pushes or requires an explicit manual target on the source branch. The
+release workflow carries that target through both builds, staged verification, runtime rows and
+publication. Complete build bundles remain non-publishable; target views retain the authoritative
+full matrix hash. See `docs/architecture/RELEASING-FROM-SHARED-SOURCE.md`.
 
 Module ownership is transitional while the rework proceeds: the remaining `common` tree is one
 mixed runtime module, and loader/build/policy paths outside this graph have unknown ownership.

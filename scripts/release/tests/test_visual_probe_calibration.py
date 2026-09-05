@@ -215,7 +215,7 @@ class VisualProbeCalibrationTest(unittest.TestCase):
 
         source = (
             ROOT
-            / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/FullScenario.java"
+            / "common/src/e2e/java/com/quickskin/mod/e2e/scenario/TitleMenuSteps.java"
         ).read_text(encoding="utf-8")
         self.assertIn("int scanBottom = Math.max(1, height / 2);", source)
         self.assertIn("int scanLeft = width / 2;", source)

@@ -707,6 +707,42 @@
       "libraries": {}
     },
     {
+      "id": "menu-integration",
+      "path": "modules/menu-integration",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "configuration",
+        "minecraft-adapter",
+        "client-foundation",
+        "asset-catalog",
+        "appearance-services",
+        "ui-foundation",
+        "player-preview",
+        "essential-integration",
+        "cpm-integration"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "hud-preview",
+      "path": "modules/hud-preview",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "asset-catalog",
+        "configuration",
+        "preview-rendering"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
       "id": "common",
       "path": "common",
       "kind": "minecraft-assembly",
@@ -747,7 +783,9 @@
         "skin-import",
         "settings-ui",
         "cape-menu",
-        "skin-menu"
+        "skin-menu",
+        "menu-integration",
+        "hud-preview"
       ],
       "runtime_only": [],
       "libraries": {}
@@ -861,6 +899,18 @@
       ],
       "consumers": [
         "settings-ui"
+      ],
+      "composition": "common",
+      "impact": "coverage"
+    },
+    {
+      "id": "vanilla-menu-navigation",
+      "api": "menu-integration",
+      "providers": [
+        "skin-menu"
+      ],
+      "consumers": [
+        "menu-integration"
       ],
       "composition": "common",
       "impact": "coverage"
