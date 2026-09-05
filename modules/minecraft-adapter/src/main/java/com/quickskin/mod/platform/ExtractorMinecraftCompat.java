@@ -1,4 +1,4 @@
-//? if >=26.1.2 {
+//? if >=26.1 {
 package com.quickskin.mod.platform;
 
 import com.mojang.blaze3d.platform.NativeImage;
@@ -13,9 +13,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * Minecraft 26.2 implementation of rendering and image compatibility operations.
+ * GUI extractor implementation of rendering and image compatibility operations.
  */
-public final class MinecraftCompat26_2 implements MinecraftCompat {
+public final class ExtractorMinecraftCompat implements MinecraftCompat {
     private static Field cloakField;
     private static boolean cloakFieldChecked;
 

@@ -55,7 +55,12 @@ selected report, including a selected report that happens to contain all authore
 
 `PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
 after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in
-`minecraft-adapter`. `QuickSkinInfo` owns diagnostics/identity without initializing either runtime.
+`minecraft-adapter`. That facade selects four implementations by Minecraft API family: immediate
+GUI/model operations, RenderType GUI, RenderPipeline GUI and GUI extraction. Equivalent patch
+versions share an implementation. Native identifier/model package changes remain inside this
+adapter seam; each selected target compiles exactly one implementation. Consolidating this facade
+does not yet consolidate all preview, networking, mixin or feature call sites across the matrix.
+`QuickSkinInfo` owns diagnostics/identity without initializing either runtime.
 `QuickSkin` retains public aliases for compatibility, but internal services use the API directly.
 `PlayerAppearance` retains opaque `TextureReference` values; `MinecraftTextures` performs the
 native conversion and preserves the allocation-free cached lookup. Server stores accept a world

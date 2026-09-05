@@ -319,3 +319,24 @@ tasks should not eagerly configure or resolve every unrelated Minecraft module/v
   301 tests: its new integration fixture initially used an unlocked player name; after correction,
   all twelve admission tests pass, including the added full-profile fallback check. The other 300
   CI tests passed in the aggregate run. No production or harness bytecode changed in this milestone.
+
+- The image/GUI compatibility facade now selects four API-family implementations. The immediate
+  implementation is shared by 1.20.1 and 1.21.1; RenderType, RenderPipeline and GUI extraction own
+  their respective API changes. The 1.21.2 model generic transition and 26.1 GUI-extraction boundary
+  were reconciled from the pinned release trees and actual Minecraft APIs. This removes the missing
+  per-version implementation references in the facade without importing whole version trees.
+  An isolated Gradle/Stonecutter probe compiled the facade and exactly one implementation against
+  all sixteen mapped Minecraft API JARs, using the matrix-declared Java 17, 21 or 25. Its inputs,
+  Minecraft JAR hashes, generated-source hashes and class inventory are recorded under
+  `build/rework/adapter-family-api-probe`; this proves the facade's API compilation, not compilation
+  or runtime compatibility of the entire mod on those versions. The active two-loader production
+  and harness build passes, with all 264 JUnit and 37 architecture/selection tests. A final rebuild
+  after the boundary correction retains all four staged JAR hashes. Thirty affected source-policy
+  tests also pass. Packaged runtime results are recorded with the adapter-family checkpoint.
+- The shared immediate adapter passes all 69 `full` assertions and 62 contract captures on
+  Forge (179.7s) and Fabric (175.8s). Fabric's first attempt stopped on a dependency-download
+  network error; its retry used the existing Gradle artifact after verification against the
+  repository's dependency hash. The exact runtime inputs have production SHA-256 values
+  `52408ebfd7567ea60902343d0703a649c0b385ca6b61c47526b67369a8a13105` (Fabric) and
+  `3c4f0d784d149466f5e89101d438225d9238393477435b6dd8c33d945d6b17a4` (Forge).
+  The Forge editor frame was inspected visually. These remain macOS development runs.

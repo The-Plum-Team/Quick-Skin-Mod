@@ -1,4 +1,4 @@
-//? if <1.21 {
+//? if <1.21.2 {
 package com.quickskin.mod.platform;
 
 import com.mojang.blaze3d.platform.NativeImage;
@@ -8,8 +8,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.resources.ResourceLocation;
 
-/** Minecraft 1.20.1 implementation of the version-sensitive Minecraft APIs. */
-public final class MinecraftCompat1_20_1 implements MinecraftCompat {
+/** Immediate GUI/model APIs shared by the 1.20.1 and 1.21.1 targets. */
+public final class ImmediateMinecraftCompat implements MinecraftCompat {
     @Override
     public void setPixel(NativeImage image, int x, int y, int color) {
         image.setPixelRGBA(x, y, color);
