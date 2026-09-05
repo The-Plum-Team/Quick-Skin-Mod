@@ -4,6 +4,7 @@ import json
 import re
 import unittest
 from pathlib import Path
+from scripts.architecture.source_inventory import java_sources
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -59,7 +60,10 @@ def active_gui_sources() -> tuple[Path, ...]:
     modules = {"common", *overlays}
     modules.update(artifact["loader"] for artifact in MATRIX["artifacts"])
 
-    sources: set[Path] = set()
+    source_sets = {"main", *overlays.get("common", {}).values()}
+    sources = {path for source_set in source_sets
+               for path in java_sources(source_set=source_set, repository=ROOT)
+               if "/client/gui/" in path.as_posix()}
     for module in modules:
         java_roots = [ROOT / module / "src" / "main" / "java"]
         java_roots.extend(

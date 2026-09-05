@@ -4,6 +4,8 @@ import json
 import unittest
 from pathlib import Path
 
+from scripts.architecture.source_inventory import java_source
+
 
 ROOT = Path(__file__).resolve().parents[3]
 MATRIX = json.loads(
@@ -27,17 +29,7 @@ def uses_vanilla_translucent_hand_collector() -> bool:
 
 
 CPM_INTEGRATION = (
-    ROOT
-    / "common"
-    / "src"
-    / "main"
-    / "java"
-    / "com"
-    / "quickskin"
-    / "mod"
-    / "client"
-    / "compat"
-    / "CPMCompatIntegration.java"
+    java_source('client/compat/CPMCompatIntegration.java', source_set='main', repository=ROOT)
 )
 CLIENT_EVENTS = (
     ROOT

@@ -5,19 +5,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.architecture.source_inventory import java_source
+
 
 ROOT = Path(__file__).resolve().parents[3]
 BACKGROUND = (
-    ROOT
-    / "common/src/main/java/com/quickskin/mod/client/gui/util/BackgroundRenderer.java"
+    java_source('client/gui/util/BackgroundRenderer.java', source_set='main', repository=ROOT)
 )
 PANORAMA = (
-    ROOT
-    / "common/src/main/java/com/quickskin/mod/client/gui/util/PanoramaTimeSync.java"
+    java_source('client/gui/util/PanoramaTimeSync.java', source_set='main', repository=ROOT)
 )
 PLAYER = (
-    ROOT
-    / "common/src/main/java/com/quickskin/mod/client/rendering/PlayerModelRenderer.java"
+    java_source('client/rendering/PlayerModelRenderer.java', source_set='main', repository=ROOT)
 )
 OPTIONS = ROOT / "e2e/options.txt.template"
 SERVER_PROPERTIES = ROOT / "e2e/server-template/server.properties"

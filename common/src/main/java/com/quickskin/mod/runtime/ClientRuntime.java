@@ -120,7 +120,11 @@ public final class ClientRuntime implements AutoCloseable {
         UUID playerIdToSave = localPlayerId != null ? localPlayerId : activePlayerId;
         if (playerIdToSave != null) {
             runCleanup("save local appearance preferences",
-                    () -> appearanceStorage.savePlayerPreferences(playerIdToSave));
+                    () -> {
+                        String skinId = ClientConfig.getInstance().activeSkinHash;
+                        appearanceStorage.savePlayerPreferences(playerIdToSave, skinId,
+                                skinId.isEmpty() ? "auto" : assetManager.getSkinModelPreference(skinId));
+                    });
         }
         resetSessionState();
         activePlayerId = null;

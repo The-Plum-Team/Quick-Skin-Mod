@@ -58,23 +58,12 @@ public class ClientEvents {
     private static float titleScreenBodyYaw = 20.0f;
     private static float titleScreenTargetRotation = 20.0f;
 
-    // Shared animation state (preserved across all screens)
-    private static String sharedAnimation = "idle";
-
-    /**
-     * Get the current shared animation state
-     */
     public static String getSharedAnimation() {
-        return sharedAnimation;
+        return com.quickskin.mod.client.services.PreviewAnimationState.get();
     }
 
-    /**
-     * Set the shared animation state
-     */
     public static void setSharedAnimation(String animation) {
-        if (animation != null && !animation.isEmpty()) {
-            sharedAnimation = animation;
-        }
+        com.quickskin.mod.client.services.PreviewAnimationState.set(animation);
     }
 
     // Animation buttons (for dropdown menu)
@@ -811,7 +800,7 @@ public class ClientEvents {
     private static void resetSessionUiState() {
         tickCounter = 0;
         playerWidget = null;
-        sharedAnimation = "idle";
+        setSharedAnimation("idle");
         animationToggleButton = null;
         animationButtons.clear();
         isAnimationDropdownOpen = false;

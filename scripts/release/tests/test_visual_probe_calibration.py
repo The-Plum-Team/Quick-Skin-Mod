@@ -7,6 +7,8 @@ import unittest
 from itertools import pairwise
 from pathlib import Path
 
+from scripts.architecture.source_inventory import java_source
+
 from PIL import Image, ImageDraw
 
 
@@ -371,8 +373,7 @@ class VisualProbeCalibrationTest(unittest.TestCase):
         self.assertIn('"sourceDimensions"', source[padded_start:aligned_start])
         self.assertIn('"outputDimensions"', source[padded_start:aligned_start])
         screen = (
-            ROOT
-            / "common/src/main/java/com/quickskin/mod/client/gui/screen/CapeAdjustScreen.java"
+            java_source('client/gui/screen/CapeAdjustScreen.java', source_set='main', repository=ROOT)
         ).read_text(encoding="utf-8")
         self.assertIn("renderSourceTransparencyBackdrop(graphics);", screen)
         self.assertIn("renderSourceBoundary(graphics);", screen)
@@ -426,8 +427,7 @@ class VisualProbeCalibrationTest(unittest.TestCase):
         self.assertEqual(2, animated_section.count(".settleTicks(12)"))
 
         manager_source = (
-            ROOT
-            / "common/src/main/java/com/quickskin/mod/client/services/AnimatedTextureManager.java"
+            java_source('client/services/AnimatedTextureManager.java', source_set='main', repository=ROOT)
         ).read_text(encoding="utf-8")
         self.assertIn("speedMultiplier == 0.0f", manager_source)
         self.assertIn("boolean setAnimationFrame(String animationId, int frame)", manager_source)

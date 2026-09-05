@@ -9,15 +9,17 @@ These are the primary implementation trees:
 - `modules/<module>/src/main`: independently compiled modules declared by
   `architecture/modules.json`. Java libraries own content/protocol values, stable loader and
   texture-reference APIs, appearance data, bounded image processing, configuration, transfer
-  validation, server appearance storage, client infrastructure, and cape imports. Minecraft modules own version-sensitive adapters
-  and compile separately for each matrix target. Regression tests live in each module's `src/test`.
-- `common/src/main`: the remaining client features, Minecraft networking/mixin bridges, and
-  client/server lifecycle composition. Feature extraction from this transitional module continues.
+  validation, server appearance storage, client infrastructure/preferences, texture state, and cape
+  imports. Minecraft modules own adapters, networking, assets, services, previews, optional-mod
+  integrations, and individual menus; they compile separately for each matrix target. Regression
+  tests live in the owning module's `src/test`.
+- `common/src/main`: Minecraft mixin/event bridges and client/server lifecycle composition.
+  Feature implementations compile outside this assembly.
 - `fabric/src/main`: canonical Fabric entry points and loader integration.
 - `forge/src/main`: the active Forge 1.20.1 integration.
 - `common/src/e2e` plus each loader's `src/e2e`: the separate packaged-runtime test mod.
-- `common/src/test`: loader-independent JUnit regression tests compiled against the common 1.20.1
-  node.
+- `modules/<module>/src/test`: the existing JUnit regression tests redistributed by ownership,
+  including pure Java tests and tests against each Minecraft module's version node.
 
 `architecture/modules.json` is the module dependency authority. Its typed reader,
 `scripts/architecture/module_graph.py`, rejects unknown/duplicate dependencies, cycles,
@@ -43,6 +45,18 @@ native conversion and preserves the allocation-free cached lookup. Server stores
 ARGB atlas and animation metadata; `MinecraftGifDecoder` in the adapter owns native decoding,
 channel conversion, and native-frame disposal. Keep native image objects out of import processing.
 
+`ClientFeatureBindings` installs the process-owned links before catalog scans or network callbacks:
+CPM consumes `CpmAssetAccess`, accepted packets target `RemoteAppearanceTarget`, and feature code
+uses `ClientNetworkActions` without depending on the mixed client/server networking implementation.
+The runtime supplies CustomNPCs' skin listener and the current connection identity supplier.
+`TextureRequestCoordinator` compares connection identity with `==`, preserving session isolation;
+its clock and connection source are injectable for bounded retry regression tests.
+`PreviewAnimationState` belongs to client infrastructure instead of global event registration.
+Settings reconstruct their parent through `RestylableScreen`; key handling receives an open-menu
+callback from bootstrap. Neither mechanism introduces a settings-to-skin-menu compile dependency.
+Source-inspection policies resolve Java classes through `scripts/architecture/source_inventory.py`
+and the module registry, including explicitly selected legacy replacements.
+
 Module ownership is transitional while the rework proceeds: the remaining `common` tree is one
 mixed runtime module, and loader/build/policy paths outside this graph have unknown ownership.
 The graph alone does not authorize selective E2E. Until scenario prerequisites, module coverage,
@@ -54,6 +68,10 @@ detached generated sources. Stable Java-library sources compile directly without
 generated or staged output under `common/versions`, `fabric/versions`, `forge/versions`, any
 `build/` directory, `.gradle/`, `.architectury-transformer/`, `e2e-out/`, or `build/release/`. Fix
 the tracked canonical source or active overlay instead.
+`gradle/minecraft-module-sources.gradle.kts` applies the matrix's common API-family routing to
+Minecraft modules that own a `src/legacy*` tree. Same-path Java files replace their canonical source;
+newer-only files carry whole-file Stonecutter guards. Mixin/resource overlays remain owned by the
+common assembly until their resource ownership and loader contracts are migrated.
 
 `gradle/e2e-harness-conventions.gradle.kts` owns the exact E2E source roots, classpaths, generated
 contract source, and harness archive tasks for every active loader node. Loader build scripts may
@@ -87,6 +105,9 @@ overlays are:
 | Module | Minecraft | Active overlay |
 |---|---|---|
 | common | 1.20.1 | `common/src/legacy1_20_1` |
+| networking | 1.20.1 | `modules/networking/src/legacy1_20_1` |
+| preview-rendering | 1.20.1 | `modules/preview-rendering/src/legacy1_20_1` |
+| replay-integration | 1.20.1 | `modules/replay-integration/src/legacy1_20_1` |
 | fabric | 1.20.1 | none; canonical output |
 | forge | 1.20.1 | none; `forge/src/main` |
 

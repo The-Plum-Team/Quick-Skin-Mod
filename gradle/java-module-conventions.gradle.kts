@@ -11,6 +11,9 @@ val definition = definitions.single {
     it["id"] == if (project.path.startsWith(":modules:")) project.name else project.path.split(':')[1]
 }
 val isMinecraftModule = definition["kind"] == "minecraft"
+if (isMinecraftModule) {
+    apply(from = rootProject.file("gradle/minecraft-module-sources.gradle.kts"))
+}
 val moduleVersion = if (isMinecraftModule) project.name else null
 @Suppress("UNCHECKED_CAST")
 val graph = gradle.extensions.extraProperties["quickSkinModuleGraph"] as Map<String, Any>

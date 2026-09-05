@@ -4,23 +4,15 @@ import json
 import unittest
 from pathlib import Path
 
+from scripts.architecture.source_inventory import java_source
+
 
 ROOT = Path(__file__).resolve().parents[3]
 MATRIX = json.loads(
     (ROOT / "release" / "release-matrix.json").read_text(encoding="utf-8")
 )
 PLAYER_APPEARANCE_SERVICE = (
-    ROOT
-    / "common"
-    / "src"
-    / "main"
-    / "java"
-    / "com"
-    / "quickskin"
-    / "mod"
-    / "client"
-    / "services"
-    / "PlayerAppearanceService.java"
+    java_source('client/services/PlayerAppearanceService.java', source_set='main', repository=ROOT)
 )
 LEGACY_PLAYER_INFO_MIXIN = (
     ROOT

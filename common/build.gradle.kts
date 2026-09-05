@@ -105,23 +105,9 @@ check(actualLegacyDirectories == declaredLegacyDirectories) {
 
 val canonicalOnlyAfterLegacyByVersion = mapOf(
     "1.20.1" to setOf(
-            "com/quickskin/mod/client/rendering/DeferredCollectorPreviewRenderBackend.java",
             "com/quickskin/mod/mixin/GuiSkinRendererMixin.java",
             "com/quickskin/mod/mixin/PlayerRendererMixin.java",
             "com/quickskin/mod/mixin/SkinManagerMixin.java",
-            "com/quickskin/mod/networking/payloads/CooldownUpdatePayload.java",
-            "com/quickskin/mod/networking/payloads/PayloadCodecs.java",
-            "com/quickskin/mod/networking/payloads/RequestTexturePayload.java",
-            "com/quickskin/mod/networking/payloads/SendAnimationMetadataPayload.java",
-            "com/quickskin/mod/networking/payloads/SendTextureChunkPayload.java",
-            "com/quickskin/mod/networking/payloads/SendTexturePayload.java",
-            "com/quickskin/mod/networking/payloads/SyncAppearancePayload.java",
-            "com/quickskin/mod/networking/payloads/SyncServerConfigPayload.java",
-            "com/quickskin/mod/networking/payloads/TextureChunkPayload.java",
-            "com/quickskin/mod/networking/payloads/UpdateAppearancePayload.java",
-            "com/quickskin/mod/networking/payloads/UpdateServerConfigPayload.java",
-            "com/quickskin/mod/networking/payloads/UploadAnimationMetadataPayload.java",
-            "com/quickskin/mod/networking/payloads/UploadTexturePayload.java",
     ),
 )
 check(canonicalOnlyAfterLegacyByVersion.keys == declaredLegacyVersions) {

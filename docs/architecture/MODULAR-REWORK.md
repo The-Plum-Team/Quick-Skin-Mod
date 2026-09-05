@@ -210,20 +210,56 @@ until implementation and required validation are complete.
   remain pending. The recoverable patch, module graph, JARs, logs, and runtime reports are
   preserved outside Gradle build directories in the sibling `Quick-Skin-Mod-modular-rework-evidence`.
 
+- The client feature extraction now has 35 separately compiled modules plus the common assembly.
+  It includes asset catalog, client texture/animation state, client transfer policy, preferences,
+  appearance services, native networking, rendering, player previews, shared UI, input, skin
+  import/upload, cape import/editor/menu, skin menu, settings, and separate optional integrations.
+  Common retains 23 canonical Java files for mixins, event registration, and lifecycle composition.
+  The named JAR has 182 effective classes and 728 internal edges. There are no inter-module cycles;
+  the two largest seven-class cycles are internal to the skin-menu and networking implementations.
+- Client bootstrap now supplies the CPM catalog/cache access, accepted-appearance effects,
+  CustomNPCs listener, connection identity source, and feature-facing network actions. The latter
+  prevents client features from depending on the mixed client/server transport implementation.
+  Shared preview animation state no longer points at global event registration. Settings ask
+  their parent to recreate itself; key handling receives an open-menu callback. Preferences
+  persist a supplied selection instead of querying the catalog from storage.
+- Four new JUnit regressions cover equal-but-distinct server connections, texture-type-specific
+  retry/fulfilment, failed submission retry, and persisted preference migration after the boundary
+  change. All 264 JUnit tests pass. `buildAllLanes buildAllE2EHarnesses :common:1.20.1:sourcesJar`
+  passes; the combined source JAR has 350 entries and no duplicate paths.
+- Packaged `full` passes on Fabric (169.4 seconds) and Forge (176.1 seconds), with 69 steps and
+  68 full-size captures on each. CPM compatibility and first-person scenarios pass on current
+  Fabric artifacts (31.9 and 39.3 seconds). The first CPM attempt lacked its required protected
+  fixture; the exact documented model was found in Downloads and verified against its reviewed
+  SHA-256 before retrying. The fixture was not copied into the repository or preserved artifacts.
+  Current runtime evidence is under `build/rework/client-features*-runtime`.
+- The 462 release-policy, 289 CI-policy, 15 graph/source-inventory, and nine guidance tests pass.
+  Source-policy checks resolve moved classes through the module registry, reject missing or
+  ambiguous ownership, and inspect all authored GUI trees. Historical version-port tests preserve
+  their exact previously audited policy in a fixture: the old merge exception intentionally
+  rejects the new module-aware policy, whose source resolver is absent from old target branches.
+  A regression confirms that rejection; the protected production merge policy was not widened.
+- Current packaged propagation-live and session scenarios pass on Fabric (50.6 and 33.4 seconds)
+  and Forge (59.8 and 42.7 seconds). They exercise remote appearance application through the
+  injected API and connection teardown, beyond the single-player full scenario: Alice/Bob pass
+  nine/eight live-propagation steps and the session scenario passes five steps on each loader.
+
 ## Next implementation checkpoint
 
 Continue stage 3 from this worktree, preserving the module extraction, stable API boundaries,
-world-storage test, test-isolation fix, and exact framebuffer setup. Separate cape editing and the
-remaining client feature cycles. Native pixel/image
-operations belong to the selected adapter; feature processing consumes owned decoded-image/metadata
-values. Keep the single module registry and explicit provider bindings before enabling selection,
-and remeasure the compiled graph after each boundary. The current graph has 173 effective 1.20.1
-classes and 700 internal edges, with no inter-module cycles; common retains cycles of 32 and seven
-classes. The 16 pinned release branches still require source/matrix/CI consolidation and validation.
+world-storage test, test-isolation fix, and exact framebuffer setup. Preserve the current multiplayer
+and session results alongside the full/CPM reports. Finish ownership of
+event-driven shell behavior, resources, and loader/mixin bridges; narrow remaining native API drift
+inside Minecraft modules. Introduce explicit provider bindings in the impact graph before enabling
+selection: compile dependencies alone miss the injected reverse relationships. Keep integration
+coverage for both ends without introducing compile cycles or coupling every consumer through the
+composition root.
 
-The remaining large cycle spans menus, previews, services, networking, optional
-integrations, and runtime composition. Move interface ownership downward and instantiate concrete
-adapters at the composition roots. Do not declare these cyclic groups to be independent features
-merely to reduce screenshots. After those boundaries exist, annotate scenario coverage and
-prerequisites in the canonical contract and implement selection throughout the harness/evidence
-pipeline together.
+Next annotate scenario coverage and state prerequisites in the canonical contract and implement
+capture selection throughout the harness and authenticated evidence pipeline together. Existing
+source scanners, AI repair paths, release validation, and version-port consumers still need the
+complete modular contract migration; passing their current tests does not certify that stage.
+All 16 pinned release branches still require source/matrix/CI consolidation and validation. The
+active 1.20.1 matrix and local development runs are not evidence for the other 30 artifact lanes.
+Measure Gradle configuration cost when all target versions are registered; target-specific CI
+tasks should not eagerly configure or resolve every unrelated Minecraft module/version node.

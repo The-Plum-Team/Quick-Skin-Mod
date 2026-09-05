@@ -8,6 +8,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from scripts.architecture.source_inventory import java_source, java_sources
 from unittest import mock
 
 
@@ -130,18 +132,12 @@ class ModCompatibilityContractTest(unittest.TestCase):
                     self.assertRegex(locked_file.sha512, r"^[0-9a-f]{128}$")
 
     def test_player_armor_stands_integration_is_fully_retired(self) -> None:
-        retired = (
-            ROOT
-            / "common/src/legacy1_20_1/java/com/quickskin/mod/client/compat/PasCompatService.java",
-            ROOT
-            / "common/src/legacy1_20_1/java/com/quickskin/mod/mixin/compat/PasConfiguratorAccessor.java",
-            ROOT
-            / "common/src/legacy1_20_1/java/com/quickskin/mod/mixin/compat/PasConfiguratorMixin.java",
-        )
-        self.assertTrue(all(not path.exists() for path in retired))
+        retired = {"PasCompatService.java", "PasConfiguratorAccessor.java", "PasConfiguratorMixin.java"}
+        for source_set in ("main", "legacy1_20_1"):
+            self.assertFalse(retired.intersection(
+                path.name for path in java_sources(source_set=source_set, repository=ROOT)))
         screen = (
-            ROOT
-            / "common/src/main/java/com/quickskin/mod/client/gui/screen/PlayerSkinMenuScreen.java"
+            java_source('client/gui/screen/PlayerSkinMenuScreen.java', source_set='main', repository=ROOT)
         ).read_text(encoding="utf-8")
         self.assertNotIn("setSelectionCallback", screen)
         self.assertNotIn("isSelectionMode", screen)

@@ -6,6 +6,7 @@ import com.quickskin.mod.event.ClientEvents;
 import com.quickskin.mod.networking.NetworkTransport;
 import com.quickskin.mod.platform.PlatformHelper;
 import com.quickskin.mod.runtime.ClientRuntime;
+import com.quickskin.mod.runtime.ClientFeatureBindings;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
@@ -27,6 +28,8 @@ public class QuickSkinClient {
             return;
         }
 
+        ClientFeatureBindings.install();
+
         // Stores and configuration must be ready before event registration starts async work.
         RUNTIME.initializeStores(PlatformHelper.getConfigDirectory());
 
@@ -43,7 +46,9 @@ public class QuickSkinClient {
 
         // Register client events and keybinds after all their dependencies are available.
         ClientEvents.init(RUNTIME);
-        KeybindRegistry.init();
+        KeybindRegistry.init(() -> com.quickskin.mod.client.gui.GuiCompat.openScreen(
+                new com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen(
+                        com.quickskin.mod.client.gui.GuiCompat.currentScreen())));
 
         // Auto-select player's own skin if no skin is currently selected.
         ClientEvents.autoSelectPlayerOwnSkin();
