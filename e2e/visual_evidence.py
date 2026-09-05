@@ -597,9 +597,17 @@ def collect_evidence(
     *,
     compatibility_id: str | None = None,
     compatibility_contract_path: Path = DEFAULT_COMPATIBILITY_CONTRACT,
+    artifact_nodes: frozenset[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Return lanes, frames and directed pixel comparisons from successful result files."""
 
+    if artifact_nodes is not None and (
+        not isinstance(artifact_nodes, frozenset)
+        or not artifact_nodes
+        or any(not isinstance(node, str) or not SAFE_ID.fullmatch(node) for node in artifact_nodes)
+        or compatibility_id is not None
+    ):
+        raise VisualEvidenceError("artifact filtering requires a non-empty ordinary-evidence node set")
     root = output_root.resolve()
     profiles = root / "profiles"
     if not profiles.is_dir():
@@ -687,6 +695,11 @@ def collect_evidence(
             raise VisualEvidenceError(
                 f"result profile identity mismatch: {result.get('profile')!r} != {expected_profile!r}"
             )
+        # A shared-source run contains every target. Authenticate bounded result metadata
+        # before filtering, then decode only this target's images. The Pages producer still
+        # requires the exact selected matrix/scenario product after collection.
+        if artifact_nodes is not None and artifact_node not in artifact_nodes:
+            continue
         compatibility_lane: CompatibilityLane | None = None
         if compatibility_id is not None:
             if compatibility_contract is None:  # pragma: no cover - guarded above

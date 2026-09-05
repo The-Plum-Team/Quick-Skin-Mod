@@ -29,7 +29,13 @@ from packaged_runtime import (  # noqa: E402
     compare_screenshots,
     inspect_screenshot,
 )
-from matrix import MatrixError, load_matrix  # noqa: E402
+from evidence_target import (  # noqa: E402
+    DEFAULT_MATRIX,
+    EvidenceTargetError,
+    bundle_version,
+    load_target,
+    target_for_key,
+)
 from scenario_contract import ScenarioContract  # noqa: E402
 from version_branches import parse_version_branch  # noqa: E402
 from visual_evidence import (  # noqa: E402
@@ -50,13 +56,17 @@ from visual_evidence import (  # noqa: E402
 
 RAW_SCHEMA_VERSION = 1
 COMPACT_SCHEMA_VERSION = 2
-SCHEMA_VERSIONS = frozenset({RAW_SCHEMA_VERSION, COMPACT_SCHEMA_VERSION})
+SHARED_RAW_SCHEMA_VERSION = 3
+SHARED_COMPACT_SCHEMA_VERSION = 4
+RAW_SCHEMA_VERSIONS = frozenset({RAW_SCHEMA_VERSION, SHARED_RAW_SCHEMA_VERSION})
+COMPACT_SCHEMA_VERSIONS = frozenset({COMPACT_SCHEMA_VERSION, SHARED_COMPACT_SCHEMA_VERSION})
+SHARED_SCHEMA_VERSIONS = frozenset({SHARED_RAW_SCHEMA_VERSION, SHARED_COMPACT_SCHEMA_VERSION})
+SCHEMA_VERSIONS = RAW_SCHEMA_VERSIONS | COMPACT_SCHEMA_VERSIONS
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 BRANCH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
 MAX_FRAMES = 1000
 MAX_MANIFEST_BYTES = 10 * 1024 * 1024
-MAX_MATRIX_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_BYTES = MAX_EVIDENCE_SCREENSHOT_BYTES
 MAX_TOTAL_IMAGE_BYTES = 1024 * 1024 * 1024
 MAX_IMAGE_PIXELS = 20_000_000
@@ -270,23 +280,14 @@ def load_matrix_inventory(
     path: Path,
     target_branch: str,
     contract: ScenarioContract,
+    *,
+    minecraft_target: str | None = None,
 ) -> dict[str, Any]:
-    strict_matrix = _read_json(
-        path,
-        "release matrix",
-        maximum_bytes=MAX_MATRIX_BYTES,
-    )
     try:
-        matrix = load_matrix(path)
-    except MatrixError as exc:
-        raise PublicEvidenceError(f"invalid canonical release matrix: {exc}") from exc
-    if matrix != strict_matrix:
-        raise PublicEvidenceError("release matrix changed while it was being validated")
-    project = matrix.get("project")
-    if not isinstance(project, dict) or project.get("release_branch") != target_branch:
-        raise PublicEvidenceError(
-            "release matrix project.release_branch must equal the public target branch"
-        )
+        target = load_target(path, target_branch, minecraft_target=minecraft_target)
+    except EvidenceTargetError as exc:
+        raise PublicEvidenceError(str(exc)) from exc
+    matrix = target.matrix
     artifacts = matrix.get("artifacts")
     runtimes = matrix.get("runtimes")
     if not isinstance(artifacts, list) or not artifacts:
@@ -339,13 +340,11 @@ def load_matrix_inventory(
                 f"artifact/runtime identity mismatch for {runtime['artifact_node']}"
             )
     versions = {row["version"] for row in runtime_rows}
-    parsed = parse_version_branch(target_branch)
     runtime_loaders = [row["loader"] for row in runtime_rows]
     loaders = set(runtime_loaders)
     if (
-        parsed is None
-        or versions != {parsed.version}
-        or loaders != set(parsed.loaders)
+        versions != {target.version}
+        or loaders != set(target.loaders)
         or len(runtime_loaders) != len(loaders)
     ):
         raise PublicEvidenceError(
@@ -353,7 +352,9 @@ def load_matrix_inventory(
             f"{target_branch}, versions={sorted(versions)}, loaders={sorted(loaders)}"
         )
     return {
-        "version": parsed.version,
+        "version": target.version,
+        "bundle_key": target.key,
+        "matrix_sha256": target.matrix_sha256,
         "artifacts": sorted(artifact_rows, key=lambda row: (row["loader"], row["artifact_node"])),
         "runtimes": sorted(runtime_rows, key=lambda row: (row["loader"], row["artifact_node"])),
         "scenarios": list(scenarios),
@@ -375,13 +376,14 @@ def prepare(
     target_branch: str,
     target_sha: str,
     target_created_at: str,
+    minecraft_target: str | None = None,
 ) -> Path:
     if not REPOSITORY.fullmatch(repository):
         raise PublicEvidenceError(f"invalid owner/repository identity {repository!r}")
     source_run_id = _run_id(source_run_id, "source_run_id")
     target_run_id = _run_id(target_run_id, "target_run_id")
     source_branch = _branch(source_branch, "source_branch")
-    target_branch = _branch(target_branch, "target_branch", release=True)
+    target_branch = _branch(target_branch, "target_branch")
     source_sha = _sha(source_sha, "source_sha")
     target_sha = _sha(target_sha, "target_sha")
     source_created_at = _timestamp(source_created_at, "source_created_at")
@@ -391,9 +393,20 @@ def prepare(
         matrix_path,
         target_branch,
         catalog.contract,
+        minecraft_target=minecraft_target,
     )
+    if inventory["matrix_sha256"] is not None and (
+        source_branch != target_branch or source_sha != target_sha
+    ):
+        raise PublicEvidenceError("shared-source evidence must name one tested source commit")
     try:
-        lanes, frames, comparisons = collect_evidence(e2e_root, catalog)
+        lanes, frames, comparisons = collect_evidence(
+            e2e_root, catalog,
+            artifact_nodes=(
+                frozenset(row["artifact_node"] for row in inventory["artifacts"])
+                if minecraft_target is not None else None
+            ),
+        )
     except VisualEvidenceError as exc:
         raise PublicEvidenceError(str(exc)) from exc
 
@@ -416,7 +429,8 @@ def prepare(
         if not any(frame["frame_id"].startswith(lane["lane_id"] + "/") for frame in frames):
             raise PublicEvidenceError(f"packaged lane has no catalogued frames: {lane['lane_id']}")
 
-    bundle = output_root.resolve() / target_branch
+    bundle_key = inventory["bundle_key"]
+    bundle = output_root.resolve() / bundle_key
     if bundle.exists():
         raise PublicEvidenceError(f"refusing to replace existing public evidence bundle {bundle}")
     images = bundle / "images"
@@ -439,7 +453,9 @@ def prepare(
         public_frames.append(public)
 
     manifest = {
-        "schema_version": RAW_SCHEMA_VERSION,
+        "schema_version": (
+            SHARED_RAW_SCHEMA_VERSION if minecraft_target is not None else RAW_SCHEMA_VERSION
+        ),
         "contract_sha256": catalog.contract_sha256,
         "repository": repository,
         "release": {
@@ -468,18 +484,21 @@ def prepare(
         "frames": public_frames,
         "comparisons": comparisons,
     }
+    if inventory["matrix_sha256"] is not None:
+        manifest["release"]["matrix_sha256"] = inventory["matrix_sha256"]
     (bundle / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
     validate_bundle(
         output_root.resolve(),
-        target_branch,
+        bundle_key,
         expected_repository=repository,
         expected_source_run_id=source_run_id,
         expected_target_run_id=target_run_id,
         expected_target_sha=target_sha,
         catalog_path=catalog_path,
+        matrix_path=matrix_path,
     )
     return bundle
 
@@ -496,6 +515,14 @@ def bundle_coverage_sha(manifest: dict[str, Any]) -> str:
     return covered if isinstance(covered, str) else provenance["target"]["sha"]
 
 
+def _bundle_key(value: str) -> str:
+    try:
+        bundle_version(value)
+    except EvidenceTargetError as exc:
+        raise PublicEvidenceError(str(exc)) from exc
+    return value
+
+
 def validate_bundle(
     evidence_root: Path,
     branch: str,
@@ -508,8 +535,11 @@ def validate_bundle(
     expected_target_sha: str | None = None,
     expected_coverage_sha: str | None = None,
     catalog_path: Path = DEFAULT_CATALOG,
+    matrix_path: Path = DEFAULT_MATRIX,
 ) -> dict[str, Any]:
-    branch = _branch(branch, "branch", release=True)
+    # This positional argument is the bundle key. Historical keys are branch names;
+    # shared-source keys name a Minecraft target and never stand in for a Git ref.
+    branch = _bundle_key(branch)
     root = evidence_root.resolve()
     if not root.is_dir():
         raise PublicEvidenceError(f"evidence root does not exist: {root}")
@@ -555,7 +585,7 @@ def validate_bundle(
         raise PublicEvidenceError(
             f"public evidence schema_version must be one of {sorted(SCHEMA_VERSIONS)}"
         )
-    bundle_kind = "raw" if schema_version == RAW_SCHEMA_VERSION else "compact"
+    bundle_kind = "raw" if schema_version in RAW_SCHEMA_VERSIONS else "compact"
     if expected_kind is not None and expected_kind not in {"raw", "compact"}:
         raise PublicEvidenceError(f"unsupported expected evidence kind {expected_kind!r}")
     if expected_kind is not None and bundle_kind != expected_kind:
@@ -570,14 +600,36 @@ def validate_bundle(
             f"evidence repository mismatch: {repository!r} != {expected_repository!r}"
         )
     release = manifest.get("release")
+    shared = schema_version in SHARED_SCHEMA_VERSIONS
     if (
         not isinstance(release, dict)
-        or set(release) != RELEASE_FIELDS
-        or release.get("branch") != branch
+        or set(release) != RELEASE_FIELDS | ({"matrix_sha256"} if shared else set())
     ):
+        raise PublicEvidenceError("evidence release fields are invalid")
+    expected_artifacts = None
+    if shared:
+        try:
+            target_identity = target_for_key(branch, matrix_path)
+        except EvidenceTargetError as exc:
+            raise PublicEvidenceError(str(exc)) from exc
+        source_branch = target_identity.branch
+        target_version = target_identity.version
+        target_loaders = target_identity.loaders
+        if release["matrix_sha256"] != target_identity.matrix_sha256:
+            raise PublicEvidenceError("evidence full release matrix hash mismatch")
+        expected_artifacts = sorted(
+            ({"artifact_node": row["artifact_node"], "version": row["artifact_version"],
+              "loader": row["loader"]} for row in target_identity.matrix["artifacts"]),
+            key=lambda row: (row["loader"], row["artifact_node"]),
+        )
+    else:
+        parsed = parse_version_branch(branch)
+        if parsed is None:
+            raise PublicEvidenceError("historical evidence requires a release branch key")
+        source_branch, target_version, target_loaders = branch, parsed.version, parsed.loaders
+    if release.get("branch") != source_branch:
         raise PublicEvidenceError("evidence release branch mismatch")
-    parsed = parse_version_branch(branch)
-    if parsed is None or release.get("version") != parsed.version:
+    if release.get("version") != target_version:
         raise PublicEvidenceError("evidence release version does not match its branch")
     scenarios = release.get("scenarios")
     artifacts = release.get("artifacts")
@@ -590,6 +642,8 @@ def validate_bundle(
         raise PublicEvidenceError("evidence release scenarios are invalid")
     if not isinstance(artifacts, list) or not artifacts:
         raise PublicEvidenceError("evidence release artifacts are invalid")
+    if expected_artifacts is not None and artifacts != expected_artifacts:
+        raise PublicEvidenceError("evidence artifacts disagree with the exact matrix target")
     artifact_ids: set[str] = set()
     artifact_by_node: dict[str, dict[str, str]] = {}
     for artifact in artifacts:
@@ -605,7 +659,7 @@ def validate_bundle(
         if (
             node in artifact_ids
             or not SAFE_ID.fullmatch(node)
-            or version != parsed.version
+            or version != target_version
             or loader not in {"fabric", "forge", "neoforge"}
         ):
             raise PublicEvidenceError("evidence release artifacts contain duplicates or wrong versions")
@@ -617,7 +671,7 @@ def validate_bundle(
         }
     artifact_loaders = [artifact["loader"] for artifact in artifact_by_node.values()]
     if (
-        set(parsed.loaders) != set(artifact_loaders)
+        set(target_loaders) != set(artifact_loaders)
         or len(artifact_loaders) != len(set(artifact_loaders))
     ):
         raise PublicEvidenceError("evidence loaders do not match the release branch name")
@@ -659,7 +713,7 @@ def validate_bundle(
         expected_url = f"https://github.com/{repository}/actions/runs/{run_id}"
         if record["run_url"] != expected_url:
             raise PublicEvidenceError(f"evidence provenance.{name}.run_url is invalid")
-        _branch(record["branch"], f"provenance.{name}.branch", release=name == "target")
+        _branch(record["branch"], f"provenance.{name}.branch", release=name == "target" and not shared)
         _sha(record["sha"], f"provenance.{name}.sha")
         _timestamp(record["created_at"], f"provenance.{name}.created_at")
         expected_run_id = (
@@ -670,8 +724,13 @@ def validate_bundle(
         ):
             raise PublicEvidenceError(f"evidence provenance.{name}.run_id mismatch")
     target = provenance["target"]
-    if target["branch"] != branch:
+    if target["branch"] != source_branch:
         raise PublicEvidenceError("evidence target branch mismatch")
+    if shared and (
+        provenance["source"]["branch"] != source_branch
+        or provenance["source"]["sha"] != target["sha"]
+    ):
+        raise PublicEvidenceError("shared-source evidence must name one tested source commit")
     if expected_target_sha is not None and target["sha"] != expected_target_sha:
         raise PublicEvidenceError(
             f"evidence target SHA mismatch: {target['sha']} != {expected_target_sha}"
@@ -774,7 +833,7 @@ def validate_bundle(
     frames_per_lane = {lane_id: 0 for lane_id in lane_ids}
     for frame in frames:
         expected_frame_fields = (
-            RAW_FRAME_FIELDS if schema_version == RAW_SCHEMA_VERSION else COMPACT_FRAME_FIELDS
+            RAW_FRAME_FIELDS if schema_version in RAW_SCHEMA_VERSIONS else COMPACT_FRAME_FIELDS
         )
         if (
             not isinstance(frame, dict)
@@ -844,7 +903,7 @@ def validate_bundle(
                 f"public frame source dimensions are implausible: {frame_id}"
             )
 
-        if schema_version == RAW_SCHEMA_VERSION:
+        if schema_version in RAW_SCHEMA_VERSIONS:
             asset = frame.get("asset")
             expected_metrics = source_pixel_validation
             expected_format = "PNG"
@@ -998,7 +1057,7 @@ def validate_bundle(
     for comparison in comparisons:
         expected_comparison_fields = (
             COMPARISON_FIELDS
-            if schema_version == RAW_SCHEMA_VERSION
+            if schema_version in RAW_SCHEMA_VERSIONS
             else COMPACT_COMPARISON_FIELDS
         )
         if (
@@ -1053,7 +1112,7 @@ def validate_bundle(
         if metrics.get("region") != expected["region"]:
             raise PublicEvidenceError(f"public comparison region drifted: {comparison_id}")
         recorded_asset_metrics = metrics
-        if schema_version == COMPACT_SCHEMA_VERSION:
+        if schema_version in COMPACT_SCHEMA_VERSIONS:
             try:
                 recorded_asset_metrics = validate_comparison_metrics(
                     comparison.get("derivative_pixel_validation"),
@@ -1200,10 +1259,11 @@ def compact_bundle(
     expected_target_sha: str | None = None,
     expected_coverage_sha: str | None = None,
     catalog_path: Path = DEFAULT_CATALOG,
+    matrix_path: Path = DEFAULT_MATRIX,
 ) -> Path:
     """Atomically copy or convert one validated bundle into the compact cache schema."""
 
-    branch = _branch(branch, "branch", release=True)
+    branch = _bundle_key(branch)
     input_root = evidence_root.resolve()
     manifest = validate_bundle(
         input_root,
@@ -1216,6 +1276,7 @@ def compact_bundle(
         expected_target_sha=expected_target_sha,
         expected_coverage_sha=expected_coverage_sha,
         catalog_path=catalog_path,
+        matrix_path=matrix_path,
     )
     destination_root = output_root.resolve()
     if destination_root.exists() and not destination_root.is_dir():
@@ -1234,7 +1295,7 @@ def compact_bundle(
     )
     staged_bundle = temporary_root / branch
     try:
-        if manifest["schema_version"] == COMPACT_SCHEMA_VERSION:
+        if manifest["schema_version"] in COMPACT_SCHEMA_VERSIONS:
             shutil.copytree(input_root / branch, staged_bundle)
         else:
             images = staged_bundle / "images"
@@ -1317,7 +1378,11 @@ def compact_bundle(
 
             compact_manifest = {
                 **manifest,
-                "schema_version": COMPACT_SCHEMA_VERSION,
+                "schema_version": (
+                    SHARED_COMPACT_SCHEMA_VERSION
+                    if manifest["schema_version"] in SHARED_SCHEMA_VERSIONS
+                    else COMPACT_SCHEMA_VERSION
+                ),
                 "frames": compact_frames,
                 "comparisons": compact_comparisons,
             }
@@ -1340,6 +1405,7 @@ def compact_bundle(
             expected_target_sha=expected_target_sha,
             expected_coverage_sha=expected_coverage_sha,
             catalog_path=catalog_path,
+            matrix_path=matrix_path,
         )
         os.replace(staged_bundle, destination)
     finally:
@@ -1355,6 +1421,7 @@ def carry_forward(
     coverage_sha: str,
     expected_repository: str | None = None,
     catalog_path: Path = DEFAULT_CATALOG,
+    matrix_path: Path = DEFAULT_MATRIX,
 ) -> Path:
     """Rebind one validated bundle to a protected non-visual descendant head.
 
@@ -1363,7 +1430,7 @@ def carry_forward(
     screenshots came from and never claims a run tested a head it did not.
     """
 
-    branch = _branch(branch, "branch", release=True)
+    branch = _bundle_key(branch)
     coverage_sha = _sha(coverage_sha, "coverage_sha")
     manifest = validate_bundle(
         evidence_root,
@@ -1371,6 +1438,7 @@ def carry_forward(
         only_branch=True,
         expected_repository=expected_repository,
         catalog_path=catalog_path,
+        matrix_path=matrix_path,
     )
     if output_root.is_symlink():
         raise PublicEvidenceError("evidence output root cannot be a symlink")
@@ -1396,6 +1464,7 @@ def carry_forward(
             expected_repository=expected_repository,
             expected_coverage_sha=coverage_sha,
             catalog_path=catalog_path,
+            matrix_path=matrix_path,
         )
         os.replace(staged, destination)
         return destination
@@ -1426,11 +1495,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare_parser.add_argument("--target-branch", required=True)
     prepare_parser.add_argument("--target-sha", required=True)
     prepare_parser.add_argument("--target-created-at", required=True)
+    prepare_parser.add_argument("--minecraft-target")
 
     compact_parser = subparsers.add_parser("compact")
     compact_parser.add_argument("--evidence-root", type=Path, required=True)
     compact_parser.add_argument("--output", type=Path, required=True)
-    compact_parser.add_argument("--branch", required=True)
+    compact_parser.add_argument("--bundle-key", "--branch", dest="branch", required=True)
+    compact_parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     compact_parser.add_argument("--allow-sibling-branches", action="store_true")
     compact_parser.add_argument("--input-kind", choices=("raw", "compact"))
     compact_parser.add_argument("--repository")
@@ -1448,7 +1519,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("--evidence-root", type=Path, required=True)
-    validate_parser.add_argument("--branch", required=True)
+    validate_parser.add_argument("--bundle-key", "--branch", dest="branch", required=True)
+    validate_parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     validate_parser.add_argument("--only-branch", action="store_true")
     validate_parser.add_argument("--repository")
     validate_parser.add_argument("--source-run-id")
@@ -1467,7 +1539,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     carry_parser = subparsers.add_parser("carry-forward")
     carry_parser.add_argument("--evidence-root", type=Path, required=True)
     carry_parser.add_argument("--output", type=Path, required=True)
-    carry_parser.add_argument("--branch", required=True)
+    carry_parser.add_argument("--bundle-key", "--branch", dest="branch", required=True)
+    carry_parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     carry_parser.add_argument("--coverage-sha", required=True)
     carry_parser.add_argument("--repository")
     carry_parser.add_argument(
@@ -1498,6 +1571,7 @@ def main(argv: list[str] | None = None) -> int:
                 target_branch=args.target_branch,
                 target_sha=args.target_sha,
                 target_created_at=args.target_created_at,
+                minecraft_target=args.minecraft_target,
             )
             print(bundle)
         elif args.command == "compact":
@@ -1513,6 +1587,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_target_sha=args.target_sha,
                 expected_coverage_sha=args.coverage_sha,
                 catalog_path=args.catalog,
+                matrix_path=args.matrix,
             )
             print(bundle)
         elif args.command == "carry-forward":
@@ -1523,6 +1598,7 @@ def main(argv: list[str] | None = None) -> int:
                 coverage_sha=args.coverage_sha,
                 expected_repository=args.repository,
                 catalog_path=args.catalog,
+                matrix_path=args.matrix,
             )
             print(bundle)
         else:
@@ -1537,6 +1613,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_target_sha=args.target_sha,
                 expected_coverage_sha=args.coverage_sha,
                 catalog_path=args.catalog,
+                matrix_path=args.matrix,
             )
             print(f"validated public E2E evidence for {args.branch}")
         return 0

@@ -247,9 +247,9 @@ class WorkflowSecurityTest(unittest.TestCase):
             ): "90",
             (
                 "on-demand-e2e.yml",
-                "Upload stable public evidence for this release branch",
-                "pages-e2e-${{ github.ref_name }}",
-            ): "${{ steps.identity.outputs.reference_retention_days }}",
+                "Upload stable public evidence for this Minecraft target",
+                "pages-e2e-${{ matrix.bundle_key }}",
+            ): "${{ matrix.raw_retention_days }}",
             (
                 "visual-review.yml",
                 "Upload only the curated review input",
@@ -1631,7 +1631,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('cron: "43 4 1 * *"', workflow)
         self.assertIn("- deploy", refresh)
         self.assertIn("scripts/pages/select_artifact.py", collect)
-        self.assertIn('cache_name = f"pages-cache-{branch}--{current_sha}"', selector)
+        self.assertIn('cache_name = f"pages-cache-{key}--{current_sha}"', selector)
+        self.assertIn('key = bundle_key if bundle_key is not None else branch', selector)
         self.assertIn('legacy_name = f"pages-cache-{branch}"', selector)
         self.assertIn("max(exact, key=lambda item: item.order)", selector)
         self.assertIn("if exact:", selector)
@@ -2043,12 +2044,12 @@ class WorkflowSecurityTest(unittest.TestCase):
 
         self.assertIn("actions: read", handoff)
         self.assertNotIn("actions: write", handoff)
-        self.assertIn("pages-e2e-${{ github.ref_name }}", handoff)
+        self.assertIn("pages-e2e-${{ matrix.bundle_key }}", handoff)
         self.assertIn(
-            "retention-days: ${{ steps.identity.outputs.reference_retention_days }}",
+            "retention-days: ${{ matrix.raw_retention_days }}",
             handoff,
         )
-        self.assertIn("--reference-retention-days", handoff)
+        self.assertIn("fromJSON(needs.pages-inventory.outputs.targets)", handoff)
         self.assertIn("--preserve-raw-branch", rotate)
         self.assertIn('expected_names = {"github-pages"}', rotator)
         self.assertIn(
@@ -2191,7 +2192,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('[[ "$BUILD_RESULT" == skipped ]]', required)
         self.assertIn('[[ "$E2E_RESULT" == skipped ]]', required)
         self.assertIn("not applicable", required)
-        self.assertIn("inputs.runtime_policy == 'full'", pages)
+        inventory = job_block("on-demand-e2e.yml", "pages-inventory")
+        self.assertIn("inputs.runtime_policy == 'full'", inventory)
+        self.assertIn("needs: pages-inventory", pages)
         self.assertIn("--arg runtime_policy", notify)
         self.assertIn("runtime_policy:$runtime_policy", notify)
         self.assertIn("needs.runtime-policy.outputs.effective == 'full'", notify)

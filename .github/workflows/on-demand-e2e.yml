@@ -453,25 +453,59 @@ jobs:
       tested_sha: ${{ inputs.attest_sha }}
       target_sha: ${{ inputs.attest_target_sha }}
 
-  prepare-pages-evidence:
-    name: Prepare public visual evidence (advisory)
+  pages-inventory:
+    name: Resolve public evidence targets (advisory)
     needs:
       - runtime-policy
       - required-gate
       - attest
-    # Non-attest runs boot this advisory job only on a release-branch-named ref; pull
-    # requests, schedule, and automation/sync/* runs always resolve publish=false, so they
-    # skip the runner entirely and the skip stays visible in the job graph.
+    # Only complete public-profile runs may emit handoffs. Scheduled release-profile
+    # and pull-request evidence have different coverage/provenance and stay private.
     if: >-
       always() &&
       ((inputs.attest_run_id == '' &&
-      (startsWith(github.ref_name, 'fabric-and-neoforge-') ||
+      ((github.ref_name == 'master' && github.event_name == 'workflow_dispatch') ||
+      startsWith(github.ref_name, 'fabric-and-neoforge-') ||
       startsWith(github.ref_name, 'forge-and-fabric-')) &&
       needs.runtime-policy.outputs.effective == 'full' &&
       needs.required-gate.result == 'success') ||
       (inputs.attest_run_id != '' &&
       inputs.runtime_policy == 'full' &&
       needs.attest.result == 'success'))
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      targets: ${{ steps.inventory.outputs.targets }}
+    steps:
+      - name: Check out the exact source inventory
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Derive every public target from the validated release matrix
+        id: inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_branch="$(python3 scripts/pages/evidence_target.py --kind source-branch)"
+          if [[ "$source_branch" != "$GITHUB_REF_NAME" ]]; then
+            printf 'Public evidence requires the canonical source branch.\n' >&2
+            exit 1
+          fi
+          targets="$(python3 scripts/pages/evidence_target.py --kind matrix)"
+          printf 'targets=%s\n' "$targets" >> "$GITHUB_OUTPUT"
+
+  prepare-pages-evidence:
+    name: Prepare public evidence for ${{ matrix.bundle_key }} (advisory)
+    needs: pages-inventory
+    if: needs.pages-inventory.outputs.targets != ''
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.pages-inventory.outputs.targets) }}
     continue-on-error: true
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -510,13 +544,14 @@ jobs:
           ATTEST_RUN_ID: ${{ inputs.attest_run_id }}
           ATTEST_SHA: ${{ inputs.attest_sha }}
           ATTEST_TARGET_SHA: ${{ inputs.attest_target_sha }}
+          SOURCE_BRANCH: ${{ matrix.source_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if ! python3 scripts/release/version_branches.py \
-              --target "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            printf 'publish=false\n' >> "$GITHUB_OUTPUT"
-            exit 0
+          canonical_branch="$(python3 scripts/pages/evidence_target.py --kind source-branch)"
+          if [[ "$SOURCE_BRANCH" != "$GITHUB_REF_NAME" || "$canonical_branch" != "$SOURCE_BRANCH" ]]; then
+            printf 'Public evidence source identity changed.\n' >&2
+            exit 1
           fi
 
           source_run_id="${ATTEST_RUN_ID:-$GITHUB_RUN_ID}"
@@ -542,18 +577,12 @@ jobs:
           printf 'source_created_at=%s\n' "$source_created_at" >> "$GITHUB_OUTPUT"
           printf 'target_sha=%s\n' "$target_sha" >> "$GITHUB_OUTPUT"
           printf 'target_created_at=%s\n' "$target_created_at" >> "$GITHUB_OUTPUT"
-          reference_retention_days="$(python3 e2e/visual_review.py \
-            --matrix release/release-matrix.json \
-            --reference-retention-days)"
-          [[ "$reference_retention_days" == 1 || "$reference_retention_days" == 90 ]]
-          printf 'reference_retention_days=%s\n' "$reference_retention_days" \
-            >> "$GITHUB_OUTPUT"
 
       - name: Fetch exact packaged behavior evidence
         if: steps.identity.outputs.publish == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: packaged-e2e-*
+          pattern: ${{ matrix.artifact_pattern }}
           merge-multiple: true
           path: e2e-out
           github-token: ${{ github.token }}
@@ -562,33 +591,48 @@ jobs:
 
       - name: Prepare the curated SHA-bound evidence bundle
         if: steps.identity.outputs.publish == 'true'
-        run: >-
-          python3 scripts/pages/evidence.py prepare
-          --e2e-root e2e-out
-          --matrix release/release-matrix.json
-          --contract e2e/scenario-contract.json
-          --output public-evidence
-          --repository "$GITHUB_REPOSITORY"
-          --source-run-id "${{ steps.identity.outputs.source_run_id }}"
-          --source-branch "${{ steps.identity.outputs.source_branch }}"
-          --source-sha "${{ steps.identity.outputs.source_sha }}"
-          --source-created-at "${{ steps.identity.outputs.source_created_at }}"
-          --target-run-id "$GITHUB_RUN_ID"
-          --target-branch "$GITHUB_REF_NAME"
-          --target-sha "${{ steps.identity.outputs.target_sha }}"
-          --target-created-at "${{ steps.identity.outputs.target_created_at }}"
+        shell: bash
+        env:
+          MINECRAFT_TARGET: ${{ matrix.minecraft_target }}
+          SOURCE_RUN_ID: ${{ steps.identity.outputs.source_run_id }}
+          SOURCE_BRANCH: ${{ steps.identity.outputs.source_branch }}
+          SOURCE_SHA: ${{ steps.identity.outputs.source_sha }}
+          SOURCE_CREATED_AT: ${{ steps.identity.outputs.source_created_at }}
+          TARGET_SHA: ${{ steps.identity.outputs.target_sha }}
+          TARGET_CREATED_AT: ${{ steps.identity.outputs.target_created_at }}
+        run: |
+          set -euo pipefail
+          target_argument=()
+          if [[ -n "$MINECRAFT_TARGET" ]]; then
+            target_argument=(--minecraft-target "$MINECRAFT_TARGET")
+          fi
+          python3 scripts/pages/evidence.py prepare \
+            --e2e-root e2e-out \
+            --matrix release/release-matrix.json \
+            --contract e2e/scenario-contract.json \
+            --output public-evidence \
+            --repository "$GITHUB_REPOSITORY" \
+            --source-run-id "$SOURCE_RUN_ID" \
+            --source-branch "$SOURCE_BRANCH" \
+            --source-sha "$SOURCE_SHA" \
+            --source-created-at "$SOURCE_CREATED_AT" \
+            --target-run-id "$GITHUB_RUN_ID" \
+            --target-branch "$GITHUB_REF_NAME" \
+            --target-sha "$TARGET_SHA" \
+            --target-created-at "$TARGET_CREATED_AT" \
+            "${target_argument[@]}"
 
-      - name: Upload stable public evidence for this release branch
+      - name: Upload stable public evidence for this Minecraft target
         if: steps.identity.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: pages-e2e-${{ github.ref_name }}
+          name: pages-e2e-${{ matrix.bundle_key }}
           path: public-evidence/
           if-no-files-found: error
           compression-level: 6
           # Ordinary raw handoffs are deleted after Pages promotion. The matrix-derived 1.20.1
           # visual anchor remains lossless for bounded AI comparison and is rotated on replacement.
-          retention-days: ${{ steps.identity.outputs.reference_retention_days }}
+          retention-days: ${{ matrix.raw_retention_days }}
 
       - name: Confirm the exact handoff was published
         id: published

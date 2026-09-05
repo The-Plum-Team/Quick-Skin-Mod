@@ -34,7 +34,7 @@ REPO = Path(__file__).resolve().parent.parent
 RELEASE_SCRIPTS = REPO / "scripts" / "release"
 sys.path.insert(0, str(RELEASE_SCRIPTS))
 
-from matrix import gha_matrix, load_matrix, read_mod_version  # noqa: E402
+from matrix import gha_matrix, load_matrix, read_mod_version, select_release_target  # noqa: E402
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("mod-compatibility-contract.json")
@@ -739,12 +739,18 @@ def build_plan(
     *,
     base_matrix_kind: str = "runtime",
     scenario_contract_path: Path = DEFAULT_SCENARIO_CONTRACT,
+    minecraft_target: str | None = None,
 ) -> dict[str, Any]:
     if base_matrix_kind not in BASE_MATRIX_KINDS:
         raise CompatibilityContractError(
             f"unsupported base matrix kind {base_matrix_kind!r}"
         )
+    matrix_payload = matrix_path.read_bytes()
     matrix = load_matrix(matrix_path)
+    if matrix_path.read_bytes() != matrix_payload:
+        raise CompatibilityContractError("release matrix changed during compatibility planning")
+    if minecraft_target is not None:
+        matrix = select_release_target(matrix, minecraft_target)
     contract = load_contract(contract_path)
     try:
         scenario_contract = load_scenario_contract(scenario_contract_path)
@@ -850,7 +856,10 @@ def build_plan(
                 }
             )
     return {
-        "schema_version": 1,
+        "schema_version": 2 if minecraft_target is not None else 1,
+        **({"minecraft_target": minecraft_target,
+            "matrix_sha256": hashlib.sha256(matrix_payload).hexdigest()}
+           if minecraft_target is not None else {}),
         "release_branch": matrix["project"]["release_branch"],
         "base_matrix_kind": base_matrix_kind,
         "compatibility_contract_sha256": contract.sha256,
@@ -951,6 +960,7 @@ def _parser() -> argparse.ArgumentParser:
         "--scenario-contract", type=Path, default=DEFAULT_SCENARIO_CONTRACT
     )
     parser.add_argument("--matrix", type=Path, default=REPO / "release/release-matrix.json")
+    parser.add_argument("--minecraft-target")
     parser.add_argument(
         "--base-matrix-kind",
         choices=sorted(BASE_MATRIX_KINDS),
@@ -977,6 +987,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             args.contract,
             base_matrix_kind=args.base_matrix_kind,
             scenario_contract_path=args.scenario_contract,
+            minecraft_target=args.minecraft_target,
         )
         output: Any = {"include": plan["runnable"]} if args.github_matrix else plan
         json.dump(

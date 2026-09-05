@@ -1704,12 +1704,12 @@ class PagesSiteTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        handoff = packaged.index("name: pages-e2e-${{ github.ref_name }}")
+        handoff = packaged.index("name: pages-e2e-${{ matrix.bundle_key }}")
         self.assertIn(
-            "retention-days: ${{ steps.identity.outputs.reference_retention_days }}",
+            "retention-days: ${{ matrix.raw_retention_days }}",
             packaged[handoff : handoff + 900],
         )
-        self.assertIn("--reference-retention-days", packaged)
+        self.assertIn("python3 scripts/pages/evidence_target.py --kind matrix", packaged)
         compact = pages.index("python3 scripts/pages/evidence.py compact")
         fan_in = pages.index("name: collected-pages-${{ matrix.branch }}", compact)
         self.assertLess(compact, fan_in)

@@ -519,3 +519,18 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   All 507 release-policy and 303 CI-policy tests pass. This control-plane checkpoint reuses the
   preceding 64 verified JARs: no Java, resource, matrix or build input changed. Pages and protected
   selective review still require their shared-source migration.
+- Public evidence now separates the Minecraft bundle key from its real source branch. Raw
+  schema 3, compact schema 4 and optional-mod schema 6 bind the complete matrix digest and one
+  tested source commit; historical schemas remain readable. Target planning covers every matrix
+  version, including locked optional-mod applicability. The ordinary selector requires an exact
+  current-head handoff or SHA-namespaced compact cache and rejects an unproved continuation.
+  Two-target synthetic fixtures exercise 360 ordinary captures through WebP conversion and site
+  rendering, alongside optional-mod publication and identity-tampering rejection. These are
+  tooling tests, not new Minecraft captures. The on-demand producer now derives per-target jobs
+  and downloads only their packaged artifacts. Its real inventory shell admits the source branch
+  and rejects target keys, feature refs and retired release branches. Pages consumer/controller
+  and selective healthy-baseline migration remain unfinished; see
+  [the target-evidence contract](PUBLIC-EVIDENCE-TARGETS.md).
+  The complete checkpoint passes 517 release-policy and 305 CI-policy tests; all fourteen
+  workflow/action YAML files parse. No Minecraft runtime or image E2E was launched, and no
+  publication, governance or repository mutation was sent to GitHub.
