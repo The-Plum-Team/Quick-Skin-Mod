@@ -199,9 +199,13 @@ public final class SkinLayers3DIntegration {
      * Replaces the six flat outer parts with the meshes supplied by 3D Skin Layers for one
      * preview draw. This is the same public injection seam used by the mod's compatibility
      * renderer, so every mesh inherits the exact pose of its corresponding outer part.
+     *
+     * <p>The model parameter stays raw because {@code PlayerModel} carries an entity type argument
+     * only before 1.21.2; the six overlay parts this bridge touches are plain {@code ModelPart}
+     * members on every supported version.</p>
      */
     public static boolean prepareInjectedPreview(
-            PlayerModel<?> model, ResourceLocation skinLocation, boolean thinArms) {
+            PlayerModel model, ResourceLocation skinLocation, boolean thinArms) {
 //?} else {
     /**
      * Replaces the six flat outer parts with the meshes supplied by 3D Skin Layers for one
@@ -297,13 +301,8 @@ public final class SkinLayers3DIntegration {
 //?}
     }
 
-//? if <1.21.11 {
-    /** Clears the temporary injection after the synchronous preview draw completes. */
-    public static void clearInjectedPreview(PlayerModel<?> model) {
-//?} else {
     /** Clears the temporary injection after the synchronous preview draw completes. */
     public static void clearInjectedPreview(PlayerModel model) {
-//?}
 //? if <26.2 {
         if (model == null || injectedPreviewCapability != CapabilityState.AVAILABLE) {
             return;
@@ -335,7 +334,7 @@ public final class SkinLayers3DIntegration {
     /** Renders the six manual-preview overlay layers into an immediate buffer. */
     public static void render3DLayers(PoseStack poseStack, MultiBufferSource bufferSource,
                                       int light, int overlay,
-                                      PlayerModel<?> model, ResourceLocation skinLocation,
+                                      PlayerModel model, ResourceLocation skinLocation,
                                       boolean thinArms) {
         if (poseStack == null || bufferSource == null || model == null || skinLocation == null
                 || shouldSuppressManualLayers() || !ensureMeshCapability()) {
@@ -1209,7 +1208,7 @@ public final class SkinLayers3DIntegration {
 //? if <1.21.11 {
     private static void renderHeadLayer(PoseStack poseStack, VertexConsumer vertices,
                                         int light, int overlay,
-                                        PlayerModel<?> model,
+                                        PlayerModel model,
                                         Object mesh) {
         poseStack.pushPose();
         try {
@@ -1230,7 +1229,7 @@ public final class SkinLayers3DIntegration {
 
     private static void renderBodyLayer(PoseStack poseStack, VertexConsumer vertices,
                                         int light, int overlay,
-                                        PlayerModel<?> model,
+                                        PlayerModel model,
                                         Object mesh) {
         poseStack.pushPose();
         try {

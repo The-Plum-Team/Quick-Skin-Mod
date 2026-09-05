@@ -2,6 +2,7 @@ package com.quickskin.mod.client.gui;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.quickskin.mod.platform.QuickSkinInfo;
+import com.quickskin.mod.platform.MinecraftCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 //? if <1.21.11 {
@@ -75,15 +76,22 @@ public class StarPatternCache {
             cachedTextureHeight = cachedImage.getHeight();
 
             // Upload to GPU
-            //? if <1.21.11 {
+            //? if <1.21.5 {
             cachedTexture = new DynamicTexture(cachedImage);
-            cachedTextureLocation = mc.getTextureManager().register("quickskin_star_cache", cachedTexture);
             //?} else {
             cachedTexture = new DynamicTexture(() -> "quickskin_star_cache", cachedImage);
+            //?}
+            //? if <1.21.4 {
+            cachedTextureLocation = mc.getTextureManager().register("quickskin_star_cache", cachedTexture);
+            //?} else if <1.21.11 {
+            cachedTextureLocation = ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "star_cache");
+            mc.getTextureManager().register(cachedTextureLocation, cachedTexture);
+            //?} else {
             cachedTextureLocation = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "star_cache");
             mc.getTextureManager().register(cachedTextureLocation, cachedTexture);
-
-            // 1.21.11: setFilter() removed from DynamicTexture, filtering handled at GpuSampler level
+            //?}
+            //? if <1.21.11 {
+            cachedTexture.setFilter(true, false);
             //?}
 
         } catch (IOException e) {
@@ -149,38 +157,49 @@ public class StarPatternCache {
             // Fill with transparent pixels
             for (int y = 0; y < size; y++) {
                 for (int x = 0; x < size; x++) {
-                    //? if <1.21.11 {
-                    fallbackImage.setPixelRGBA(x, y, 0x00000000); // Fully transparent
-                    //?} else {
-                    fallbackImage.setPixel(x, y, 0x00000000); // Fully transparent
-                    //?}
+                    MinecraftCompat.INSTANCE.setPixel(fallbackImage, x, y, 0x00000000);
                 }
             }
 
             cachedTextureWidth = size;
             cachedTextureHeight = size;
-            //? if <1.21.11 {
+            //? if <1.21.5 {
             cachedTexture = new DynamicTexture(fallbackImage);
-            cachedTextureLocation = mc.getTextureManager().register("quickskin_star_cache_fallback", cachedTexture);
             //?} else {
             cachedTexture = new DynamicTexture(() -> "quickskin_star_cache_fallback", fallbackImage);
-            cachedTextureLocation = Identifier.withDefaultNamespace("quickskin_star_cache_fallback");
+            //?}
+            //? if <1.21.4 {
+            cachedTextureLocation = mc.getTextureManager().register("quickskin_star_cache_fallback", cachedTexture);
+            //?} else if <1.21.11 {
+            cachedTextureLocation = ResourceLocation.fromNamespaceAndPath(
+                    QuickSkinInfo.MOD_ID, "star_cache_fallback");
             mc.getTextureManager().register(cachedTextureLocation, cachedTexture);
+            //?} else {
+            cachedTextureLocation = Identifier.fromNamespaceAndPath(
+                    QuickSkinInfo.MOD_ID, "star_cache_fallback");
+            mc.getTextureManager().register(cachedTextureLocation, cachedTexture);
+            //?}
+            //? if <1.21.11 {
+            cachedTexture.setFilter(true, false);
             //?}
 
         } catch (Exception e) {
         }
     }
 
-    //? if >=1.21.11 {
     /**
      * Re-apply linear filtering before rendering.
      * RenderType may reset texture parameters, so this ensures smooth sub-pixel scrolling.
      */
     public static void ensureLinearFiltering() {
+        //? if <1.21.11 {
+        if (cachedTexture != null) {
+            cachedTexture.setFilter(true, false);
+        }
+        //?} else {
         // 1.21.11: setFilter() removed, filtering handled at GpuSampler level
+        //?}
     }
-    //?}
 
     //?}
     /**

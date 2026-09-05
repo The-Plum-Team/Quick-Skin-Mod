@@ -48,9 +48,11 @@ public class IconActionButton extends Button {
         //?} else {
         super.renderWidget(graphics, mouseX, mouseY, partialTicks);
         //?}
+        //? if <1.21.5 {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
+        //?}
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, this.alpha);
     //?} else {
         //? if <26.1.2 {

@@ -16,6 +16,10 @@ Features and compatibility adapters compile as separate Gradle modules. The sele
 |---|---|---:|
 | `1.20.1` | Fabric + Forge | `17` |
 | `1.21.1` | Fabric + NeoForge | `21` |
+| `1.21.2` | Fabric + NeoForge | `21` |
+| `1.21.3` | Fabric + NeoForge | `21` |
+| `1.21.4` | Fabric + NeoForge | `21` |
+| `1.21.5` | Fabric + NeoForge | `21` |
 
 All targets build from the same source revision. Publication identity remains per Minecraft version (`mc<version>-v<mod_version>`); the complete build bundle is not a publishable release. Dependency ranges remain in the matrix and generated JAR metadata.
 
@@ -188,6 +192,16 @@ On Windows:
 Launch Gradle with JDK 21 or newer because the Stonecutter build plugin requires it. Each produced
 JAR targets the Java version declared for its artifact through Gradle's Java toolchain.
 
+To work on one Minecraft target, register only that target's modules and loaders:
+
+```bash
+./gradlew --no-parallel -PquickskinTarget=1.21.1 buildTargetLanes buildTargetE2EHarnesses
+python3 scripts/release/verify_release.py --target 1.21.1 --stage build/target --manifest build/target/artifacts.json
+```
+
+The complete matrix is validated before filtering. Full-build tasks reject a target-scoped
+invocation; a partial stage retains the complete matrix hash and its own publication identity.
+
 Production jars are written under the selected module and version node, for example:
 
 ```text
@@ -195,11 +209,11 @@ fabric/versions/1.20.1/build/libs/
 forge/versions/1.20.1/build/libs/
 ```
 
-Development launches should use configuration-on-demand so unrelated version nodes are not configured:
+Development launches can use the same target scope:
 
 ```bash
-./gradlew :fabric:1.20.1:runClient --configure-on-demand
-./gradlew :forge:1.20.1:runServer --configure-on-demand
+./gradlew -PquickskinTarget=1.20.1 :fabric:1.20.1:runClient
+./gradlew -PquickskinTarget=1.20.1 :forge:1.20.1:runServer
 ```
 
 The aggregate build intentionally runs with `org.gradle.parallel=false`; Architectury's transformers use JVM-global properties and concurrent transforms are not safe.

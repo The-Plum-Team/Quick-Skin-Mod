@@ -24,6 +24,14 @@ This `master` shared source exercises the following exact packaged lanes:
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `11` |
 | `fabric-1.21.1` | `1.21.1` | Fabric | `21` | `11` |
 | `neoforge-1.21.1` | `1.21.1` | NeoForge | `21` | `11` |
+| `fabric-1.21.2` | `1.21.2` | Fabric | `21` | `11` |
+| `neoforge-1.21.2` | `1.21.2` | NeoForge | `21` | `11` |
+| `fabric-1.21.3` | `1.21.3` | Fabric | `21` | `11` |
+| `neoforge-1.21.3` | `1.21.3` | NeoForge | `21` | `11` |
+| `fabric-1.21.4` | `1.21.4` | Fabric | `21` | `11` |
+| `neoforge-1.21.4` | `1.21.4` | NeoForge | `21` | `11` |
+| `fabric-1.21.5` | `1.21.5` | Fabric | `21` | `11` |
+| `neoforge-1.21.5` | `1.21.5` | NeoForge | `21` | `11` |
 
 Scenario contract SHA-256: `34af3e6772e956a9ac8f2797e7de017e2412e46fa67c7ca47fd151d10002d7dd`
 Contract totals: `126` ordered steps, `95` captures.

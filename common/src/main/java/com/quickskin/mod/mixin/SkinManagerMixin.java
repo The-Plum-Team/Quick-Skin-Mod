@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-//? if <1.21.11 {
+//? if <1.21.4 {
 //?} else {
 import java.util.Optional;
 //?}
@@ -87,7 +87,7 @@ public class SkinManagerMixin {
             boolean anyOverride = false;
 
             if (hasCustomSkin) {
-//? if <1.21.11 {
+//? if <1.21.4 {
                 ResourceLocation customSkin;
                 if (CPMCompatIntegration.isAvailable()) {
                     // When CPM is installed, register skin as HttpTexture so CPM can
@@ -112,6 +112,11 @@ public class SkinManagerMixin {
                 } else {
                     customSkin = service.getSkinLocation(uuid);
                 }
+//?} else if <1.21.11 {
+                // Minecraft 1.21.4 removed HttpTexture. Keep normal QuickSkin texture
+                // replacement and activate the one-time explicit degraded CPM capability log.
+                CPMCompatIntegration.isAvailable();
+                ResourceLocation customSkin = service.getSkinLocation(uuid);
 //?} else {
                 Identifier customSkin = service.getSkinLocation(uuid);
 //?}
@@ -277,7 +282,7 @@ public class SkinManagerMixin {
             at = @At("RETURN"),
             cancellable = true,
             require = 1,
-            // Minecraft 1.21.1 has two RETURN opcodes in getInsecureSkin; both must be wrapped.
+            // Minecraft 1.21.1-1.21.5 has two RETURN opcodes here; both must be wrapped.
             expect = 2,
             allow = 2
     )
@@ -332,7 +337,7 @@ public class SkinManagerMixin {
      * (cache hit), so getInsecureSkin (which calls getOrLoad().getNow(null)) will also
      * see the modified skin through this mixin.
      */
-//? if <1.21.11 {
+//? if <1.21.4 {
     @Inject(
             method = "getOrLoad",
             at = @At("RETURN"),
@@ -342,6 +347,18 @@ public class SkinManagerMixin {
             allow = 1
     )
     private void quickskin$modifyGetOrLoad(GameProfile profile, CallbackInfoReturnable<CompletableFuture<PlayerSkin>> cir) {
+        UUID uuid = profile.getId();
+//?} else if <1.21.11 {
+    /** In Minecraft 1.21.4-1.21.10, getOrLoad returns an optional skin. */
+    @Inject(
+            method = "getOrLoad",
+            at = @At("RETURN"),
+            cancellable = true,
+            require = 1,
+            expect = 1,
+            allow = 1
+    )
+    private void quickskin$modifyGetOrLoad(GameProfile profile, CallbackInfoReturnable<CompletableFuture<Optional<PlayerSkin>>> cir) {
         UUID uuid = profile.getId();
 //?} else if <26.1.2 {
     /**
@@ -407,7 +424,7 @@ public class SkinManagerMixin {
         // Only wrap the future if we actually have overrides to apply
         if (!hasServiceOverrides && !hasTitleScreenFallback) return;
 
-//? if <1.21.11 {
+//? if <1.21.4 {
         CompletableFuture<PlayerSkin> original = cir.getReturnValue();
         CompletableFuture<PlayerSkin> modified = original.thenApply(skin -> {
             return quickskin$applyOverrides(skin, uuid);

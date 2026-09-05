@@ -91,6 +91,8 @@ val releaseMatrixFile = matrixState["quickSkinReleaseMatrixFile"] as java.io.Fil
 val releaseMatrix = matrixState["quickSkinReleaseMatrix"] as Map<*, *>
 @Suppress("UNCHECKED_CAST")
 val releaseArtifacts = matrixState["quickSkinReleaseArtifacts"] as List<Map<*, *>>
+@Suppress("UNCHECKED_CAST")
+val buildArtifacts = matrixState["quickSkinBuildArtifacts"] as List<Map<*, *>>
 val expectedLaneCount = (releaseMatrix["lane_count"] as? Number)?.toInt()
     ?: error("Missing lane_count in $releaseMatrixFile")
 check(releaseArtifacts.size == expectedLaneCount) {
@@ -109,11 +111,12 @@ val releaseLanes = releaseArtifacts.map { artifact ->
     loader to version
 }
 check(releaseLanes.distinct().size == releaseLanes.size) { "Duplicate lane in $releaseMatrixFile" }
-val releaseLoaders = releaseLanes.map { it.first }.toSet()
+val buildLanes = buildArtifacts.map { it["loader"].toString() to it["artifact_version"].toString() }
+val releaseLoaders = buildLanes.map { it.first }.toSet()
 check(releaseLoaders.isNotEmpty()) {
     "Release lanes must declare at least one active loader"
 }
-val releaseVersions = releaseLanes.map { it.second }.distinct().toTypedArray()
+val releaseVersions = buildLanes.map { it.second }.distinct().toTypedArray()
 
 stonecutter {
     kotlinController = true
@@ -136,7 +139,7 @@ stonecutter {
         releaseLoaders.sorted().forEach { loader ->
             branch(loader) {
                 versions(
-                    *releaseLanes
+                    *buildLanes
                         .filter { it.first == loader }
                         .map { it.second }
                         .toTypedArray()

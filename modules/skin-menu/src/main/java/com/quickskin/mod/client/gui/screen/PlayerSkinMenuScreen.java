@@ -824,7 +824,13 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //? if <1.21 {
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 //?} else if <1.21.11 {
+    //? if <1.21.2 {
     public void renderBlurredBackground(float partialTick) {
+    //?} else if <1.21.6 {
+    protected void renderBlurredBackground() {
+    //?} else {
+    protected void renderBlurredBackground(net.minecraft.client.gui.GuiGraphics guiGraphics) {
+    //?}
         // Disable the default blur effect - we have our own custom background
     }
 

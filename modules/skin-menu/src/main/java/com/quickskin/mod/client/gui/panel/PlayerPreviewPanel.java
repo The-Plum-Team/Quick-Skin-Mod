@@ -426,12 +426,12 @@ public class PlayerPreviewPanel extends AbstractWidget {
             int iconSize = Math.min(getWidth(), getHeight()) - 16;
             int iconX = getX() + (getWidth() - iconSize) / 2;
             int iconY = getY() + (getHeight() - iconSize) / 2;
-            //? if <1.21.11 {
+            //? if <1.21.5 {
             com.mojang.blaze3d.systems.RenderSystem.enableBlend();
             //?}
             GuiCompat.blit(graphics, cpmIconLocation, iconX, iconY, iconSize, iconSize,
                     0, 0, 64, 64, 64, 64);
-            //? if <1.21.11 {
+            //? if <1.21.5 {
             com.mojang.blaze3d.systems.RenderSystem.disableBlend();
             //?}
         }

@@ -9,8 +9,9 @@ import java.util.Map;
  *
  * <p>The explicit {@code .cpmmodel} workflow is available everywhere. Reading
  * embedded CPM payloads from a QuickSkin-selected PNG is intentionally marked
- * degraded from 1.21.11 onward because current CPM reads the authenticated
- * profile payload instead of Minecraft's registered player texture.</p>
+ * degraded from 1.21.4 onward because Minecraft removed {@code HttpTexture},
+ * so QuickSkin cannot expose a file-backed registered texture to CPM's
+ * embedded-PNG reader.</p>
  */
 public final class CpmCapabilities {
     public enum Availability {
@@ -21,6 +22,7 @@ public final class CpmCapabilities {
     public enum Band {
         MC_1_20_1("1.20.1", RenderPipeline.IMMEDIATE),
         MC_1_21_1("1.21.1", RenderPipeline.IMMEDIATE),
+        MC_1_21_5("1.21.5", RenderPipeline.IMMEDIATE),
         MC_1_21_11("1.21.11", RenderPipeline.RENDER_STATE),
         MC_26_1_2("26.1.2", RenderPipeline.EXTRACTOR),
         MC_26_2("26.2", RenderPipeline.DEFERRED_COLLECTOR);
@@ -70,6 +72,7 @@ public final class CpmCapabilities {
         EnumMap<Band, Capabilities> matrix = new EnumMap<>(Band.class);
         matrix.put(Band.MC_1_20_1, availableWithEmbeddedBridge(Band.MC_1_20_1));
         matrix.put(Band.MC_1_21_1, availableWithEmbeddedBridge(Band.MC_1_21_1));
+        matrix.put(Band.MC_1_21_5, availableWithDegradedEmbeddedBridge(Band.MC_1_21_5));
         matrix.put(Band.MC_1_21_11, availableWithDegradedEmbeddedBridge(Band.MC_1_21_11));
         matrix.put(Band.MC_26_1_2, availableWithDegradedEmbeddedBridge(Band.MC_26_1_2));
         matrix.put(Band.MC_26_2, availableWithDegradedEmbeddedBridge(Band.MC_26_2));
@@ -90,8 +93,10 @@ public final class CpmCapabilities {
     public static Band currentBand() {
         //? if <1.21 {
         return Band.MC_1_20_1;
-        //?} else if <1.21.11 {
+        //?} else if <1.21.4 {
         return Band.MC_1_21_1;
+        //?} else if <1.21.11 {
+        return Band.MC_1_21_5;
         //?} else if <26.1.2 {
         return Band.MC_1_21_11;
         //?} else if <26.2 {

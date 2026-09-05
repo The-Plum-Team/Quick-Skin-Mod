@@ -71,8 +71,10 @@ check(actualLegacyDirectories == declaredLegacyDirectories) {
 val overlayDirectory = neoForgeOverlayRoutes[minecraftVersion]?.toString()
 if (overlayDirectory != null) {
     val legacyJavaRoot = rootProject.file("neoforge/src/$overlayDirectory/java")
-    check(legacyJavaRoot.isDirectory) { "Missing NeoForge overlay Java root: $legacyJavaRoot" }
     val legacyResourcesRoot = legacyJavaRoot.parentFile.resolve("resources")
+    check(legacyJavaRoot.isDirectory || legacyResourcesRoot.isDirectory) {
+        "Missing NeoForge overlay source/resources: ${legacyJavaRoot.parentFile}"
+    }
     val legacyOverrides = fileTree(legacyJavaRoot) {
         include("**/*.java")
     }.files.mapTo(linkedSetOf()) {

@@ -82,7 +82,7 @@ public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
     }
 
     @Override
-    //? if <1.21.11 {
+    //? if <1.21.4 {
     protected int getScrollbarPosition() {
         //? if <1.21 {
         return this.x1 - 6;

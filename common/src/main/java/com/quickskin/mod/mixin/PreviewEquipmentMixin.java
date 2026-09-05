@@ -32,8 +32,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * guard. Every caller outside that one draw - gameplay, the HUD, the E2E assertions - reads the real
  * equipment.
  *
- * <p>Registered only on the eras that need it: the 1.20.1 and 1.21.1 mixin configurations. From
- * 1.21.11 the renderer blanks the extracted render state instead and this class is never applied.
+ * <p>Registered only on the immediate-render eras that need it. From 1.21.2 through 1.21.10 the
+ * concrete method is owned by {@link Player}; its declaration on LivingEntity is abstract and has
+ * no bytecode injection point. From 1.21.11 the renderer blanks the extracted render state instead
+ * and this class is never applied.
  * The injection allocates a callback per call on a warm method; the cost is a short-lived object
  * that dies in the nursery, and it buys a single choke point instead of one hook per equipment layer.
  */

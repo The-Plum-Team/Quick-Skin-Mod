@@ -199,12 +199,19 @@ public class CapeAdjustScreen extends Screen {
                 ? sourceImage.getSubimage(0, 0, sourceImage.getWidth(), srcFrameHeight)
                 : sourceImage;
         NativeImage nativeImage = convertToNativeImage(displayFrame);
-        //? if <1.21.11 {
+        //? if <1.21.5 {
         sourceDynTexture = new DynamicTexture(nativeImage);
-        sourceTextureLocation = Minecraft.getInstance().getTextureManager()
-                .register("quickskin/cape_adjust_source", sourceDynTexture);
         //?} else {
         sourceDynTexture = new DynamicTexture(() -> "quickskin_cape_adjust_source", nativeImage);
+        //?}
+        //? if <1.21.4 {
+        sourceTextureLocation = Minecraft.getInstance().getTextureManager()
+                .register("quickskin/cape_adjust_source", sourceDynTexture);
+        //?} else if <1.21.11 {
+        sourceTextureLocation = ResourceLocation.fromNamespaceAndPath(
+                QuickSkinInfo.MOD_ID, "cape_adjust_source");
+        Minecraft.getInstance().getTextureManager().register(sourceTextureLocation, sourceDynTexture);
+        //?} else {
         sourceTextureLocation = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "cape_adjust_source");
         Minecraft.getInstance().getTextureManager().register(sourceTextureLocation, sourceDynTexture);
         //?}
@@ -1581,12 +1588,19 @@ public class CapeAdjustScreen extends Screen {
         }
 
         NativeImage ni = convertToNativeImage(cape);
-        //? if <1.21.11 {
+        //? if <1.21.5 {
         previewDynTexture = new DynamicTexture(ni);
-        previewTextureLocation = Minecraft.getInstance().getTextureManager()
-                .register("quickskin/cape_adjust_preview", previewDynTexture);
         //?} else {
         previewDynTexture = new DynamicTexture(() -> "quickskin_cape_adjust_preview", ni);
+        //?}
+        //? if <1.21.4 {
+        previewTextureLocation = Minecraft.getInstance().getTextureManager()
+                .register("quickskin/cape_adjust_preview", previewDynTexture);
+        //?} else if <1.21.11 {
+        previewTextureLocation = ResourceLocation.fromNamespaceAndPath(
+                QuickSkinInfo.MOD_ID, "cape_adjust_preview");
+        Minecraft.getInstance().getTextureManager().register(previewTextureLocation, previewDynTexture);
+        //?} else {
         previewTextureLocation = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "cape_adjust_preview");
         Minecraft.getInstance().getTextureManager().register(previewTextureLocation, previewDynTexture);
         //?}
@@ -1813,8 +1827,18 @@ public class CapeAdjustScreen extends Screen {
         //?}
     //?}
 
-    //? if >=1.21.11 {
-        //? if <26.1.2 {
+    //? if >=1.21.2 {
+        //? if <1.21.6 {
+    @Override
+    protected void renderBlurredBackground() {
+        // Disable the default blur effect - we have our own custom background
+    }
+
+    @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Disable the default dark background overlay - we render our own custom background
+    }
+        //?} else if <26.1.2 {
     @Override
     protected void renderBlurredBackground(GuiGraphics guiGraphics) {
         // Disable the default blur effect - we have our own custom background
@@ -1837,7 +1861,7 @@ public class CapeAdjustScreen extends Screen {
         //?}
     //?}
 
-    //? if >=1.21.11 {
+    //? if >=1.21.6 {
     /**
      * Draws an outline immediately using fill calls.
      */

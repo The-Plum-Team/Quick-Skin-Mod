@@ -781,6 +781,21 @@ public class SettingsScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false; // Don't pause game
+    //? if >=1.21.2 {
+        //? if <1.21.6 {
+    }
+
+    @Override
+    protected void renderBlurredBackground() {
+        // Disable the default Minecraft blur effect - we handle blur manually
+        //?} else if <26.1.2 {
+    }
+
+    @Override
+    protected void renderBlurredBackground(net.minecraft.client.gui.GuiGraphics guiGraphics) {
+        // Disable the default Minecraft blur effect - we handle blur manually
+        //?}
+    //?}
     //? if >=26.1.2 {
     }
 

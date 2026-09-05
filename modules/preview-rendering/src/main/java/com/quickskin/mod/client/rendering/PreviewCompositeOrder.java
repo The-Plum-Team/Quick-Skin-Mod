@@ -50,9 +50,7 @@ public final class PreviewCompositeOrder {
          * From 1.21.6 - deferred {@code GuiRenderState} recording composited as a painter's
          * algorithm with no depth test at all. Later intersecting submissions win.
          *
-         * <p>Live on the 1.21.11, 26.1.2 and 26.2 lanes. The mod ships no lane in 1.21.6..1.21.10,
-         * which is why the Stonecutter predicate that picks this arm can be {@code >=1.21.11} even
-         * though vanilla changed at 1.21.6.
+         * <p>Used by every supported lane from 1.21.6 onward.
          */
         PAINTERS_ORDERED
     }

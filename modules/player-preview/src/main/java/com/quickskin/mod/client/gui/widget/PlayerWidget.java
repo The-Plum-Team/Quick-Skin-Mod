@@ -91,10 +91,10 @@ public class PlayerWidget extends AbstractWidget {
      * How the running Minecraft version decides which GUI draw ends up on top.
      *
      * <p>Vanilla swapped the depth-buffered immediate GUI for the deferred, depth-less
-     * {@code GuiRenderState} in 1.21.6; the mod ships no lane between 1.21.6 and 1.21.10, so the
-     * boundary that matters here is its first lane on the new pipeline.
+     * {@code GuiRenderState} in 1.21.6, so that is the compatibility boundary regardless of which
+     * release lanes currently exist.
      */
-//? if <1.21.11 {
+//? if <1.21.6 {
     private static final PreviewCompositeOrder.Pipeline GUI_PIPELINE =
             PreviewCompositeOrder.Pipeline.DEPTH_ORDERED;
 //?} else {

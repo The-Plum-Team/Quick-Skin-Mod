@@ -731,7 +731,7 @@ public class ClientEvents {
          * a hidden preview stays hidden and a preview drawn through a modal's inline parent render
          * still gets composited. The stratum is opened only when there is something to put in it.
          */
-        //? if <1.21.11 {
+        //? if <1.21.6 {
         //?} else {
         ClientGuiEvent.RENDER_POST.register((screen, graphics, mouseX, mouseY, delta) -> {
             PlayerWidget widget = playerWidget;

@@ -12,7 +12,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.ResourceManager;
-//? if <1.21.11 {
+//? if <1.21.2 {
 import net.minecraft.util.profiling.ProfilerFiller;
 //?}
 
@@ -37,8 +37,10 @@ public class CapeTransparencyEvents implements PreparableReloadListener {
     }
 
     @Override
-    //? if <1.21.11 {
+    //? if <1.21.2 {
     public final CompletableFuture<Void> reload(PreparationBarrier preparationBarrier, ResourceManager resourceManager, ProfilerFiller preparationsProfiler, ProfilerFiller reloadProfiler, Executor backgroundExecutor, Executor gameExecutor) {
+    //?} else if <1.21.11 {
+    public final CompletableFuture<Void> reload(PreparationBarrier preparationBarrier, ResourceManager resourceManager, Executor backgroundExecutor, Executor gameExecutor) {
     //?} else {
     public final CompletableFuture<Void> reload(PreparableReloadListener.SharedState sharedState, Executor backgroundExecutor, PreparableReloadListener.PreparationBarrier preparationBarrier, Executor gameExecutor) {
     //?}

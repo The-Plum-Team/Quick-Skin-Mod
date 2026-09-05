@@ -170,6 +170,12 @@ No stage is complete merely because its design is documented. Update this checkl
 record exact commands/results below as implementation proceeds. Keep the active goal open
 until implementation and required validation are complete.
 
+The maintainer has approved deferring routine per-version visual E2E execution to GitHub after
+the version imports are complete. Keep compilation, unit/policy tests and artifact verification
+local during migration; launch Minecraft locally only to investigate a concrete runtime concern.
+Prepare the complete matrix-driven visual gate and clearly distinguish prepared CI from an
+executed, passing GitHub run. Preserve the already completed four-lane pilot evidence.
+
 - 2026-09-05: Created the active goal and isolated named worktree; read the worktree's
   instruction set and active release matrix. No production or CI behavior changed yet.
 - Baseline: `./gradlew --no-daemon --no-parallel :common:1.20.1:test buildAllLanes
@@ -300,8 +306,8 @@ inside Minecraft modules. Existing source scanners, AI repair paths, release wor
 evidence consumers and version-port automation still need the complete modular contract migration;
 passing their current tests does not certify those stages.
 
-The active matrix now imports the 1.20.1 and 1.21.1 targets from the pinned migration inputs.
-The remaining fourteen pinned targets and twenty-eight artifact lanes still require full-mod
+The active matrix now imports six targets through 1.21.5 from the pinned migration inputs.
+The remaining ten pinned targets and twenty artifact lanes still require full-mod
 source/matrix consolidation and validation. The isolated sixteen-version native-API compilation
 probe is not full-mod or runtime evidence for those targets. Keep target publication independent
 while migrating branch-discovery consumers to the central matrix.
@@ -373,3 +379,28 @@ tasks should not eagerly configure or resolve every unrelated Minecraft module/v
   all eight production/harness JAR SHA-256 values exactly. Target-scoped comparison also passes.
   The final guidance check exposed an old single-version assumption in the workflow renderer;
   schema 3 now takes its test task from `unit_test_version`, independently of artifact ordering.
+- `-PquickskinTarget=<minecraft>` now validates the complete matrix before registering only that
+  target's Minecraft projects. Explicit `buildTargetLanes`, `buildTargetE2EHarnesses` and
+  `testTargetLane` tasks preserve the meaning of full-build tasks: a scoped invocation of
+  `buildAllLanes` fails. Five actual Gradle probes cover complete/scoped project registration,
+  unknown targets, missing targets and partial-as-complete rejection. In the four-lane pilot,
+  registration decreased from 91 to 65 projects, with only 1.21.1 version nodes in the scoped
+  result. The scope validation JSON and logs live under `build/rework/build-scope-*`.
+- Imported the four 1.21.2 through 1.21.5 targets and all eight loader lanes from their pinned
+  input matrices, including dependency locks and 357 additional verified dependency components.
+  Shared immediate previews and payload transport replace identical per-version copies. The
+  render-state cape/hand bridge is shared across this family; the chest-equipment field changes
+  at 1.21.4. NeoForge's older player-info bridges and mixin resources are shared, with resources-only
+  roots supported. Native GUI, texture-registration, player-model and HttpTexture boundaries were
+  merged through the existing module ownership, preserving the new API seams.
+- All twelve production JARs and twelve harnesses build and pass staged artifact/SBOM verification.
+  The new version builds passed in 43s, 58s, 35s and 36s respectively; regressions of 1.20.1 and
+  1.21.1 each passed in 17s. The 482-test release-policy run found only five subtest errors in one
+  static inspector that did not understand bounded API-family conditions. Its five tests now pass,
+  including boundary selection and rejection of unsupported syntax. Ten protected bootstrap tests
+  pass. New visual E2E runs are deferred to GitHub under the maintainer's instruction.
+- Follow up the pinned 1.21.5 Replay improvement before declaring migration acceptance: its
+  `PlayerAppearanceService.applyLookFromNetwork` notifies Replay of the authoritative subject,
+  and its rewritten watcher re-applies a look after that entity spawns. Port that behavior through
+  the client event/API boundary; do not reintroduce an `appearance-services -> replay-integration`
+  compilation cycle. Preserve the current bounded per-tick watcher and cached optional reflection.

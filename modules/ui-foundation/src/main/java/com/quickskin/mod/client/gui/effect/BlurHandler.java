@@ -1,11 +1,11 @@
 package com.quickskin.mod.client.gui.effect;
 
-//? if <1.21.11 {
+//? if <1.21.2 {
 import com.mojang.blaze3d.systems.RenderSystem;
 //?}
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-//? if <1.21.11 {
+//? if <1.21.2 {
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.resources.ResourceLocation;
@@ -14,13 +14,13 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * Handles blur rendering - simplified to be called directly from the screen.
  *
- * In MC 1.21.11+, the PostChain API was reworked (constructor changed, resize/close/process
- * methods removed or changed signatures), so custom PostChain-based blur is not supported.
- * This handler gracefully no-ops to allow compilation and runtime without blur effects.
+ * In MC 1.21.2+, the PostChain API no longer supports this legacy custom blur implementation.
+ * The handler intentionally no-ops on those versions; screens still render their explicit modal
+ * overlays and suppress vanilla's duplicate background blur.
  */
 @Environment(EnvType.CLIENT)
 public class BlurHandler {
-    //? if <1.21.11 {
+    //? if <1.21.2 {
     private static PostChain blurShader = null;
         //? if <1.21 {
     private static final ResourceLocation BLUR_SHADER = new ResourceLocation("minecraft", "shaders/post/blur.json");
@@ -34,10 +34,10 @@ public class BlurHandler {
 
     /**
      * Call this after rendering the background but before rendering UI.
-     * No-op on 1.21.11+ due to PostChain API changes.
+     * No-op on 1.21.2+ due to PostChain API changes.
      */
     public static void renderBlur() {
-        //? if <1.21.11 {
+        //? if <1.21.2 {
         Minecraft mc = Minecraft.getInstance();
         if (blurShader == null) {
             try {
@@ -52,7 +52,7 @@ public class BlurHandler {
             warned = true;
         //?}
         }
-        //? if <1.21.11 {
+        //? if <1.21.2 {
         RenderSystem.disableBlend();
         RenderSystem.disableDepthTest();
         blurShader.process(0.0f);
@@ -68,10 +68,10 @@ public class BlurHandler {
 
     /**
      * Cleans up blur shader resources.
-     * No-op on 1.21.11+ since no shader is loaded.
+     * No-op on 1.21.2+ since no shader is loaded.
      */
     public static void cleanup() {
-        //? if <1.21.11 {
+        //? if <1.21.2 {
         if (blurShader != null) {
             blurShader.close();
             blurShader = null;

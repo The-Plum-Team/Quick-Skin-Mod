@@ -249,12 +249,18 @@ public class DeletionConfirmScreen extends Screen {
         this.callback.accept(false);
     }
     //? if >=1.21 {
-        //? if <1.21.11 {
+        //? if <1.21.2 {
     @Override
     public void renderBlurredBackground(float partialTick) {
+        //?} else if <1.21.6 {
+    @Override
+    protected void renderBlurredBackground() {
+        //?} else if <1.21.11 {
+    @Override
+    protected void renderBlurredBackground(net.minecraft.client.gui.GuiGraphics guiGraphics) {
+        //?}
         // Disable the default Minecraft blur effect - we handle blur with BlurHandler
     }
-        //?}
         //? if <1.21.2 {
     @Override
     public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
