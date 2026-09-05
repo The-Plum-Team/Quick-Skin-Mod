@@ -16,7 +16,7 @@ These are the primary implementation trees:
 - `common/src/main`: Minecraft mixin/event bridges and client/server lifecycle composition.
   Feature implementations compile outside this assembly.
 - `fabric/src/main`: canonical Fabric entry points and loader integration.
-- `forge/src/main`: the active Forge 1.20.1 integration.
+- `forge/src/main` and `neoforge/src/main`: the respective loader integrations.
 - `common/src/e2e` plus each loader's `src/e2e`: the separate packaged-runtime test mod.
 - `modules/<module>/src/test`: the existing JUnit regression tests redistributed by ownership,
   including pure Java tests and tests against each Minecraft module's version node.
@@ -99,10 +99,11 @@ common assembly until their resource ownership and loader contracts are migrated
 
 `gradle/e2e-harness-conventions.gradle.kts` owns the exact E2E source roots, classpaths, generated
 contract source, and harness archive tasks for every active loader node. Loader build scripts may
-only bind that protected convention and are authenticated byte-for-byte for their release branch by
+only bind that protected convention and are authenticated byte-for-byte by
 `e2e/loader-bootstrap-contract.json`, together with the exact loader entrypoint and manifest tree.
-The contract is an integrity allowlist selected by the branch's matrix, not a support-discovery
-inventory. Any deliberate edit below `<loader>/src/e2e` or to an active loader build script must
+Its schema 3 pins one build implementation per loader; the release matrix selects the active
+loaders and versions. Historical schema-2 snapshots retain their branch-specific seals.
+Any deliberate edit below `<loader>/src/e2e` or to an active loader build script must
 update its protected digest contract and mutation tests on `master` in the same change.
 
 ## Active `legacy*` overlays
@@ -123,22 +124,16 @@ canonical src/main/resources
   -> process generated/consolidated/main/resources
 ```
 
-An overlay file therefore replaces the canonical file at the same relative path. The active
-overlays are:
+An overlay file therefore replaces the canonical file at the same relative path. Read active
+routes from the release matrix; every Minecraft feature module may own a subset of its common
+routes. Pure Java modules cannot own version overlays. A common assembly overlay may contain only
+resources after its Java implementations have moved into their feature modules.
 
-| Module | Minecraft | Active overlay |
-|---|---|---|
-| common | 1.20.1 | `common/src/legacy1_20_1` |
-| networking | 1.20.1 | `modules/networking/src/legacy1_20_1` |
-| preview-rendering | 1.20.1 | `modules/preview-rendering/src/legacy1_20_1` |
-| replay-integration | 1.20.1 | `modules/replay-integration/src/legacy1_20_1` |
-| fabric | 1.20.1 | none; canonical output |
-| forge | 1.20.1 | none; `forge/src/main` |
-
-The remaining whole-file canonical replacements are genuine 1.20.1 rewrites:
-`ModNetworking`, `ServerNetworkHandler`, `PlayerInfoMixin`, and
-`MixinAbstractClientPlayer`. Other overlay Java files are additive compatibility classes or thin
-1.20.1 backends.
+`validate_source_roots` reads the same typed module registry used by Gradle. It rejects undeclared
+overlays, retired `src/v*` trees, linked sources and classes with multiple owners in one assembled
+JAR. Loader source trees are mutually exclusive artifacts. Schema 3 permits several API-family
+replacements within one owner, since each target selects only its declared family. Newer-only
+canonical classes use whole-file Stonecutter guards, without per-version exclusion maps in Gradle.
 
 Keep overlays narrow. Prefer a small adapter or a Stonecutter version branch over copying an entire
 service, screen, or handler. When a class exists in an active overlay:

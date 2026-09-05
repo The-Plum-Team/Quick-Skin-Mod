@@ -1,9 +1,15 @@
 # Releasing Quick Skin
 
-Quick Skin publishes one immutable release identity for every branch-owned Minecraft era. The
-identity is derived from the exact Minecraft versions in `release/release-matrix.json` and the
-logical `mod_version`; it is not typed independently into a workflow. For this branch the identity
-is `mc1.20.1-v3.0.0`, and the matrix binds it to `forge-and-fabric-1.20.1`.
+The shared-source rework uses release-matrix schema 3. The complete artifact bundle has the
+non-publishable identity `build-v<mod_version>`. Passing `--target <minecraft>` to
+`scripts/release/release_identity.py` derives an independent `mc<minecraft>-v<mod_version>`
+publication identity from the same `master` source revision. The target set comes from the matrix's
+artifact rows. Selecting a target never rewrites that authoritative matrix.
+
+Target-specific workflow, governance and evidence migration is still in progress; see the
+[migration plan](docs/architecture/MODULAR-REWORK.md). The identity validator rejects attempts to
+publish the aggregate bundle. The procedure below describes existing schema-2 release branches
+until their publication consumers have been migrated and validated together.
 
 ## Preconditions
 

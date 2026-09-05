@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "release"))
 
 from workflow_guidance import WorkflowGuidanceError, render_guidance  # noqa: E402
+import matrix as release_matrix  # noqa: E402
 
 
 class WorkflowGuidanceTest(unittest.TestCase):
@@ -42,6 +43,16 @@ class WorkflowGuidanceTest(unittest.TestCase):
             source,
             render_guidance(source, self.matrix("1.20.1"), profile_branch="master"),
         )
+
+    def test_shared_matrix_uses_its_unit_lane_independently_of_artifact_order(self) -> None:
+        data = release_matrix.load_matrix(ROOT / "release/release-matrix.json")
+        data["artifacts"].reverse()
+        source = ":common:1.21.11:test\n:common:1.21.11:test\n"
+        rendered = render_guidance(source, data, profile_branch="master")
+        self.assertEqual(2, rendered.count(f":common:{data['unit_test_version']}:test"))
+        data["unit_test_version"] = "0.0.0"
+        with self.assertRaises(release_matrix.MatrixError):
+            render_guidance(source, data, profile_branch="master")
 
     def test_rejects_wrong_branch_and_mixed_artifact_versions(self) -> None:
         source = ":common:1.20.1:test\n:common:1.20.1:test\n"

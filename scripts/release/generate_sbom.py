@@ -20,7 +20,7 @@ from artifact_manifest import (
     load_artifact_manifest,
     validate_artifact_manifest,
 )
-from matrix import MatrixError, load_matrix
+from matrix import MatrixError, load_matrix, select_release_target
 from release_identity import ReleaseIdentityError, derive as derive_release_identity
 
 
@@ -448,6 +448,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, default=Path("release/release-matrix.json"))
     parser.add_argument("--manifest", type=Path, default=Path("build/release/artifacts.json"))
+    parser.add_argument("--target", help="verify one Minecraft publication target")
     parser.add_argument("--output", type=Path, default=Path("build/release") / SBOM_RELATIVE_PATH)
     args = parser.parse_args()
 
@@ -457,7 +458,9 @@ def main() -> int:
     output = args.output if args.output.is_absolute() else repository / args.output
     try:
         matrix = load_matrix(matrix_path)
-        identity = derive_release_identity(matrix_path, matrix)
+        if args.target is not None:
+            matrix = select_release_target(matrix, args.target)
+        identity = derive_release_identity(matrix_path, matrix, target=args.target)
         commit = current_git_commit(repository)
         stage = manifest_path.parent.resolve()
         manifest = load_artifact_manifest(

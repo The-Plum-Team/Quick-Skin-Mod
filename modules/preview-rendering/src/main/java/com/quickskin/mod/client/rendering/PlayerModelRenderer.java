@@ -8,12 +8,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
-//? if <1.21 {
 import com.quickskin.mod.platform.MinecraftCompat;
-//?} else if <1.21.11 {
-//?} else {
-import com.quickskin.mod.platform.MinecraftCompat;
-//?}
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;

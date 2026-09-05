@@ -293,21 +293,18 @@ until implementation and required validation are complete.
 
 ## Next implementation checkpoint
 
-Continue stage 3 from this worktree, preserving the module extraction, stable API boundaries,
-world-storage test, test-isolation fix, and exact framebuffer setup. Preserve the current multiplayer
-and session results alongside the full/CPM reports. Finish ownership of
+Continue from the shared-matrix pilot in this worktree. Preserve the compiled modules, provider
+bindings, selectable scenario graph, and local/Git admission separation. Finish ownership of
 event-driven shell behavior, resources, and loader/mixin bridges; narrow remaining native API drift
-inside Minecraft modules. Introduce explicit provider bindings in the impact graph before enabling
-selection: compile dependencies alone miss the injected reverse relationships. Keep integration
-coverage for both ends without introducing compile cycles or coupling every consumer through the
-composition root.
+inside Minecraft modules. Existing source scanners, AI repair paths, release workflows, protected
+evidence consumers and version-port automation still need the complete modular contract migration;
+passing their current tests does not certify those stages.
 
-Next annotate scenario coverage and state prerequisites in the canonical contract and implement
-capture selection throughout the harness and authenticated evidence pipeline together. Existing
-source scanners, AI repair paths, release validation, and version-port consumers still need the
-complete modular contract migration; passing their current tests does not certify that stage.
-All 16 pinned release branches still require source/matrix/CI consolidation and validation. The
-active 1.20.1 matrix and local development runs are not evidence for the other 30 artifact lanes.
+The active matrix now imports the 1.20.1 and 1.21.1 targets from the pinned migration inputs.
+The remaining fourteen pinned targets and twenty-eight artifact lanes still require full-mod
+source/matrix consolidation and validation. The isolated sixteen-version native-API compilation
+probe is not full-mod or runtime evidence for those targets. Keep target publication independent
+while migrating branch-discovery consumers to the central matrix.
 Measure Gradle configuration cost when all target versions are registered; target-specific CI
 tasks should not eagerly configure or resolve every unrelated Minecraft module/version node.
 
@@ -340,3 +337,39 @@ tasks should not eagerly configure or resolve every unrelated Minecraft module/v
   `52408ebfd7567ea60902343d0703a649c0b385ca6b61c47526b67369a8a13105` (Fabric) and
   `3c4f0d784d149466f5e89101d438225d9238393477435b6dd8c33d945d6b17a4` (Forge).
   The Forge editor frame was inspected visually. These remain macOS development runs.
+
+- The first shared-source pilot uses release-matrix schema 3 with four artifact lanes: the
+  previous Fabric/Forge 1.20.1 and imported Fabric/NeoForge 1.21.1. The latter inputs come from
+  pinned commit `32e91aeb118a81b62922610804eb1a67b92f85ad`, including exact dependency locks and
+  reviewed dependency hashes. Loader bootstraps now seal one build implementation per loader,
+  independent of the number of matrix targets. Schema-2 snapshots keep their historical reader.
+  Source ownership validation permits a shared API-family root and resources-only overlays while
+  rejecting duplicate assembled classes, undeclared roots, symlinks and inactive version trees.
+- The immediate preview renderer is shared by both pilot versions. Typed payload networking and
+  Replay integration move into their existing owning modules. The imported Replay watcher now
+  advances once per client tick, expires startup after 600 ticks, and unsubscribes on teardown;
+  it no longer recursively queues main-thread tasks. Optional Replay runtime validation remains
+  outstanding. Loader implementations expose only the stable platform API. Whole-file version
+  guards replace the pilot's duplicate build-script exclusion tables.
+- The packaged world fixture now materializes the version's actual function-directory and
+  game-rule identifiers from the runtime row. The canonical template stays shared. A regression
+  checks both sides of the 1.21 directory and 1.21.11 game-rule transitions, including idempotence.
+- All four production JARs and four separate harnesses build and pass staged metadata/class/SBOM
+  verification. The aggregate identity is `build-v3.0.0`, which publication explicitly rejects.
+  `--target 1.21.1` stages and validates only that target's two production JARs, harnesses and
+  CycloneDX SBOM under `mc1.21.1-v3.0.0`; its provenance retains the complete canonical matrix hash.
+  E2E planning and reproducibility comparison consume that explicit scope. Tests reject partial
+  bundles presented as complete, mismatched targets, duplicate rebuild nodes, and invalid rows
+  outside the requested target. This is local packaging support, not completed release automation.
+- The final pilot runs pass `full` (69 assertions, 62 contract captures) and `feature-navigation`
+  (three assertions/captures) on all four loaders/targets. Forge 1.20.1 took 175.7s/39.7s,
+  Fabric 1.21.1 took 167.3s/29.4s, and NeoForge 1.21.1 took 175.1s/39.6s. Fabric 1.20.1
+  passed on retry in 166.2s/29.4s; preserve its first connection-timeout failure and separate
+  installer network-timeout failure as diagnostics. Every successful lane produced 71 full-size
+  PNGs including six private assertion probes. The NeoForge cape editor frame was visually
+  inspected. These macOS runs exercise two scenarios, not the complete release profile or Linux
+  certification. All 481 release-policy and 301 CI-policy tests pass for this pilot.
+- An independent `--rerun-tasks` rebuild executed all 387 tasks in 33 seconds and reproduced
+  all eight production/harness JAR SHA-256 values exactly. Target-scoped comparison also passes.
+  The final guidance check exposed an old single-version assumption in the workflow renderer;
+  schema 3 now takes its test task from `unit_test_version`, independently of artifact ordering.

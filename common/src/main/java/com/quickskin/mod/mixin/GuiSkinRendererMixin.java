@@ -1,3 +1,4 @@
+//? if >=1.21.6 {
 package com.quickskin.mod.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -173,3 +174,4 @@ public class GuiSkinRendererMixin {
     }
     //?}
 }
+//?}

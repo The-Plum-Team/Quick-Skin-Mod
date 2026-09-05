@@ -19,7 +19,7 @@ from artifact_manifest import (  # noqa: E402
     current_git_commit,
     load_artifact_manifest,
 )
-from matrix import MatrixError, load_matrix  # noqa: E402
+from matrix import MatrixError, load_matrix, select_release_target  # noqa: E402
 from mod_compatibility import (  # noqa: E402
     DEFAULT_CONTRACT as DEFAULT_COMPATIBILITY_CONTRACT,
     CompatibilityContractError,
@@ -46,6 +46,7 @@ SCENARIO_CONTRACT = default_contract()
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, default=Path("release/release-matrix.json"))
+    parser.add_argument("--target", help="consume one independently staged Minecraft release target")
     parser.add_argument(
         "--artifacts-manifest", type=Path, default=Path("build/release/artifacts.json")
     )
@@ -349,7 +350,9 @@ def main() -> int:
         commit = current_git_commit(REPO)
         args.selection_plan = resolve_selection(args, commit)
         data = load_matrix(matrix_path)
-        identity = derive_release_identity(matrix_path, data)
+        if args.target is not None:
+            data = select_release_target(data, args.target)
+        identity = derive_release_identity(matrix_path, data, target=args.target)
         rows = select_rows(data, args)
         manifest = (
             read_manifest(

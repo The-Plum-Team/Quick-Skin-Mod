@@ -1,0 +1,20 @@
+{
+  "required": true,
+  "package": "com.quickskin.mod.neoforge.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "priority": 2000,
+  "client": [
+    "PlayerInfoMixin",
+    "MixinAbstractClientPlayer",
+    "CapeLayerMixin",
+    "PlayerRendererMixin",
+    "SkinManagerMixin",
+    "GuiSkinRendererMixin"
+  ],
+  "mixins": [
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

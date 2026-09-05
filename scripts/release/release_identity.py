@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from matrix import MatrixError, load_matrix, read_mod_version, release_id as matrix_release_id
+from matrix import MatrixError, load_matrix, read_mod_version, release_id as matrix_release_id, select_release_target
 
 
 class ReleaseIdentityError(RuntimeError):
@@ -80,8 +80,10 @@ def validate_changelog(
     return marker
 
 
-def derive(matrix_path: Path, data: dict[str, Any] | None = None) -> ReleaseIdentity:
+def derive(matrix_path: Path, data: dict[str, Any] | None = None, *, target: str | None = None) -> ReleaseIdentity:
     loaded = load_matrix(matrix_path) if data is None else data
+    if target is not None:
+        loaded = select_release_target(loaded, target)
     mod_version = read_mod_version(matrix_path, loaded)
     if not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z._-]*", mod_version):
         raise ReleaseIdentityError(f"unsafe mod_version {mod_version!r}")
@@ -91,7 +93,7 @@ def derive(matrix_path: Path, data: dict[str, Any] | None = None) -> ReleaseIden
     ))
     if not versions:
         raise ReleaseIdentityError("release matrix has no Minecraft versions")
-    release_id = matrix_release_id(loaded, mod_version)
+    release_id = matrix_release_id(loaded, mod_version, target=target)
     return ReleaseIdentity(
         release_id=release_id,
         tag=release_id,
@@ -123,6 +125,8 @@ def validate_ci_event(
     checkout_commit: str,
     release_branch_head: str,
 ) -> None:
+    if identity.release_id.startswith("build-"):
+        raise ReleaseIdentityError("a unified build bundle cannot be published; select one Minecraft target")
     if not re.fullmatch(r"[0-9a-f]{40}", event_commit):
         raise ReleaseIdentityError("GITHUB_SHA must be a full lowercase commit ID")
     if checkout_commit != event_commit:
@@ -163,12 +167,13 @@ def main() -> int:
     parser.add_argument("--validate-ci", action="store_true")
     parser.add_argument("--release-branch-head")
     parser.add_argument("--github-output", type=Path)
+    parser.add_argument("--target", help="one Minecraft version published from the unified matrix")
     args = parser.parse_args()
 
     repository = Path(__file__).resolve().parents[2]
     matrix_path = args.matrix if args.matrix.is_absolute() else repository / args.matrix
     try:
-        identity = derive(matrix_path)
+        identity = derive(matrix_path, target=args.target)
         changelog = repository / "CHANGELOG.md"
         validate_changelog(changelog, identity.mod_version)
         if args.validate_ci:

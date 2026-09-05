@@ -106,6 +106,9 @@ public class ClientEvents {
             AnimatedTextureManager.getInstance().tick();
             com.quickskin.mod.networking.ClientNetworkHandler.tick();
             com.quickskin.mod.networking.NetworkSyncService.getInstance().tick();
+            //? if >=1.21 {
+            com.quickskin.mod.client.compat.ReplayModHelper.tick();
+            //?}
 
             // Handle HUD overlay dragging only when a GUI is open (cursor is visible)
             if (!client.mouseHandler.isMouseGrabbed()) {

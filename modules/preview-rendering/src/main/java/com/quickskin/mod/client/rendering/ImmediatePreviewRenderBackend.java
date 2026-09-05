@@ -1,3 +1,4 @@
+//? if <1.21.6 {
 package com.quickskin.mod.client.rendering;
 
 import net.fabricmc.api.EnvType;
@@ -23,3 +24,4 @@ public final class ImmediatePreviewRenderBackend implements PreviewRenderBackend
                 graphics, x, y, scale, yRotation, playerData, mouseX, mouseY, followMouse);
     }
 }
+//?}

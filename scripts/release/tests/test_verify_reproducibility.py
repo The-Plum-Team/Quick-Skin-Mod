@@ -78,6 +78,12 @@ class ReproducibilityTest(unittest.TestCase):
                 self.repository, self.matrix_path, self.manifest, self.data
             )
 
+    def test_rejects_duplicate_nodes_even_when_the_unique_inventory_matches(self) -> None:
+        self.manifest["artifacts"].append(dict(self.manifest["artifacts"][0]))
+        with self.assertRaisesRegex(verify_reproducibility.ReproducibilityError, "node inventory"):
+            verify_reproducibility.compare_rebuild(
+                self.repository, self.matrix_path, self.manifest, self.data)
+
 
 if __name__ == "__main__":
     unittest.main()

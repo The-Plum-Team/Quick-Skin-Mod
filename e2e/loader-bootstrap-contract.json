@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "loaders": {
     "fabric": {
       "files": {
@@ -20,70 +20,9 @@
       }
     }
   },
-  "release_build_scripts": {
-    "fabric-and-neoforge-1.21.1": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "866df4ee1a1d3f5d005cfa7d98a4bf12a88cceeb8beae746c7acb06abe20a6fe"
-    },
-    "fabric-and-neoforge-1.21.10": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "226e406b4cb32c883a8aa1904c27856ee5438e95ce57d07e875cf3dd06b56f2e"
-    },
-    "fabric-and-neoforge-1.21.11": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "226e406b4cb32c883a8aa1904c27856ee5438e95ce57d07e875cf3dd06b56f2e"
-    },
-    "fabric-and-neoforge-1.21.2": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "a1c559f4f4c3db4182743bfd54bc34c8ac0e825e6ec02fe2bff277d2eedccebd"
-    },
-    "fabric-and-neoforge-1.21.3": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "b64903695cc95c526f0852508b55086f9b550ca3a01ffd11ef33133714614856"
-    },
-    "fabric-and-neoforge-1.21.4": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "c819afa841ffa807a283996b24665c1037641be1f02efe36ba64b3290e6fd2a7"
-    },
-    "fabric-and-neoforge-1.21.5": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "bcfc5e3b53d7df6909bfa3ceacd296f1274ace75380f25f3a99a30fae40890cd"
-    },
-    "fabric-and-neoforge-1.21.6": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "226e406b4cb32c883a8aa1904c27856ee5438e95ce57d07e875cf3dd06b56f2e"
-    },
-    "fabric-and-neoforge-1.21.7": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "226e406b4cb32c883a8aa1904c27856ee5438e95ce57d07e875cf3dd06b56f2e"
-    },
-    "fabric-and-neoforge-1.21.8": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "226e406b4cb32c883a8aa1904c27856ee5438e95ce57d07e875cf3dd06b56f2e"
-    },
-    "fabric-and-neoforge-1.21.9": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "226e406b4cb32c883a8aa1904c27856ee5438e95ce57d07e875cf3dd06b56f2e"
-    },
-    "fabric-and-neoforge-26.1": {
-      "fabric": "e2bd99792715d67734d03731df249c82d930d391ff96c811c81a86be16413a6a",
-      "neoforge": "f6f0ba2e70fb83bd6dea8280b3543fe67771204ff8aa9c822e57e604fa0d41b2"
-    },
-    "fabric-and-neoforge-26.1.1": {
-      "fabric": "8c6324b036c490c6b4b00e59a5068bb967a52ed2ef01018933f7e44deee70fd3",
-      "neoforge": "f6f0ba2e70fb83bd6dea8280b3543fe67771204ff8aa9c822e57e604fa0d41b2"
-    },
-    "fabric-and-neoforge-26.1.2": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "226e406b4cb32c883a8aa1904c27856ee5438e95ce57d07e875cf3dd06b56f2e"
-    },
-    "fabric-and-neoforge-26.2": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "neoforge": "226e406b4cb32c883a8aa1904c27856ee5438e95ce57d07e875cf3dd06b56f2e"
-    },
-    "forge-and-fabric-1.20.1": {
-      "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-      "forge": "3606bdad2788d13351e452c9aa17561007bd4ce0206e44d6588693b00ffbd386"
-    }
+  "build_scripts": {
+    "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
+    "forge": "3606bdad2788d13351e452c9aa17561007bd4ce0206e44d6588693b00ffbd386",
+    "neoforge": "f8fc25a8c072d633a047f306fc6ef988efbc293163b0f6761810149119330f55"
   }
 }

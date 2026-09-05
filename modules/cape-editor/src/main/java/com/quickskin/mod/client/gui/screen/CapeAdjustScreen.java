@@ -1804,6 +1804,15 @@ public class CapeAdjustScreen extends Screen {
         return false;
     }
 
+    //? if >=1.21 {
+        //? if <1.21.2 {
+    @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Minecraft 1.21.1 invokes this from super.render() after our custom UI has been drawn.
+    }
+        //?}
+    //?}
+
     //? if >=1.21.11 {
         //? if <26.1.2 {
     @Override

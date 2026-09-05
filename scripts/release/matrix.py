@@ -259,30 +259,67 @@ def load_matrix_snapshot(matrix_path: Path, properties_path: Path) -> dict[str, 
 
 
 def validate_source_roots(matrix_path: Path, data: dict[str, Any]) -> None:
-    """Fail on unreferenced live overlays or a reintroduced version-snapshot tree."""
+    """Validate authored source ownership and matrix-routed API-family overlays.
+
+    Shared modules may own a subset of the common overlays. Loader implementations
+    are mutually exclusive artifacts; shared modules coexist in every assembly.
+    Historical schema-2 snapshots without a module registry retain their old contract.
+    """
     repository = matrix_path.resolve().parents[1]
     overlays = data["source_overlays"]
-    for module, routes in overlays.items():
+    source_specs = {
+        module: (set(routes.values()), True) for module, routes in overlays.items()
+    }
+    graph_path = repository / "architecture" / "modules.json"
+    if graph_path.exists() or graph_path.is_symlink() or data["schema_version"] == 3:
+        # Import the executing validator, never Python from the inspected checkout.
+        # Older protected snapshots can still validate schema 2 without this package.
+        sys.path.insert(0, str(REPO / "scripts" / "architecture"))
+        try:
+            from module_graph import ModuleGraphError, load_graph
+        except ImportError as exc:
+            raise MatrixError("module source validation requires the module graph reader") from exc
+        try:
+            graph = load_graph(repository)
+        except ModuleGraphError as exc:
+            raise MatrixError(f"invalid source module graph: {exc}") from exc
+        for definition in graph.modules:
+            if definition.path not in source_specs:
+                expected = (set(overlays["common"].values())
+                            if definition.kind == "minecraft" else set())
+                source_specs[definition.path] = (expected, False)
+
+    def source_files(path: Path) -> tuple[Path, ...]:
+        if path.is_symlink() or path.resolve() != path:
+            raise MatrixError(f"source roots must not resolve through symbolic links: {path}")
+        if not path.exists():
+            return ()
+        if not path.is_dir():
+            raise MatrixError(f"source root must be a directory: {path}")
+        children = tuple(sorted(path.rglob("*")))
+        if any(child.is_symlink() or child.resolve() != child for child in children):
+            raise MatrixError(f"source files must not resolve through symbolic links: {path}")
+        return tuple(child for child in children if child.is_file())
+
+    owners_by_class: dict[str, dict[str, list[str]]] = {}
+    for module, (expected, required) in source_specs.items():
         source_root = repository / module / "src"
+        if source_root.is_symlink() or source_root.resolve() != source_root:
+            raise MatrixError(f"source roots must not resolve through symbolic links: {source_root}")
         actual = {
             path.name
             for path in source_root.glob("legacy*")
-            if path.is_dir() and any(child.is_file() for child in path.rglob("*"))
+            if source_files(path)
         }
-        expected = set(routes.values())
-        if actual != expected:
+        if (required and actual != expected) or actual - expected:
             raise MatrixError(
                 f"{module} overlay roots disagree with matrix: "
                 f"expected {sorted(expected)}, found {sorted(actual)}"
             )
-        for overlay in expected:
-            path = source_root / overlay
-            if not path.is_dir() or not any(child.is_file() for child in path.rglob("*")):
-                raise MatrixError(f"matrix references missing {module} overlay root {overlay}")
 
         retired_snapshots = [
             path for path in source_root.glob("v*")
-            if path.is_dir() and any(child.is_file() for child in path.rglob("*"))
+            if source_files(path)
         ]
         if retired_snapshots:
             raise MatrixError(
@@ -291,21 +328,23 @@ def validate_source_roots(matrix_path: Path, data: dict[str, Any]) -> None:
             )
 
         live_java_roots = [source_root / "main" / "java"] + [
-            source_root / overlay / "java" for overlay in expected
+            source_root / overlay / "java" for overlay in sorted(actual)
         ]
         locations_by_class: dict[str, list[str]] = {}
         for java_root in live_java_roots:
-            if not java_root.is_dir():
-                continue
-            for source in java_root.rglob("*.java"):
+            for source in source_files(java_root):
+                if source.suffix != ".java":
+                    continue
                 relative = source.relative_to(java_root).as_posix()
                 locations_by_class.setdefault(relative, []).append(
                     source.relative_to(repository).as_posix()
                 )
+        for relative, locations in locations_by_class.items():
+            owners_by_class.setdefault(relative, {})[module] = locations
         duplicated = {
             relative: locations
             for relative, locations in locations_by_class.items()
-            if len(locations) > 2
+            if data["schema_version"] == 2 and len(locations) > 2
         }
         if duplicated:
             details = "; ".join(
@@ -314,6 +353,13 @@ def validate_source_roots(matrix_path: Path, data: dict[str, Any]) -> None:
             )
             raise MatrixError(
                 f"{module} live Java classes exceed the two-copy overlay limit: {details}"
+            )
+
+    for relative, owners in sorted(owners_by_class.items()):
+        shared = set(owners) - KNOWN_LOADERS
+        if len(shared) > 1 or shared and len(owners) > 1:
+            raise MatrixError(
+                f"Java class has multiple owners in an assembled JAR: {relative}: {owners}"
             )
 
 
@@ -325,8 +371,9 @@ def validate_matrix(
         scenario_contract = contract or default_contract()
     except ScenarioContractError as exc:
         raise MatrixError(f"invalid packaged E2E scenario contract: {exc}") from exc
-    if data.get("schema_version") != 2:
-        raise MatrixError("release matrix schema_version must be 2")
+    schema = data.get("schema_version")
+    if type(schema) is not int or schema not in (2, 3):
+        raise MatrixError("release matrix schema_version must be 2 or 3")
     legacy_fields = set(data) & LEGACY_E2E_POLICY_FIELDS
     if legacy_fields:
         raise MatrixError(
@@ -466,17 +513,21 @@ def validate_matrix(
         raise MatrixError("unit_test_version must select a supported release version")
 
     release_branch = project["release_branch"]
-    branch_match = re.fullmatch(
-        r"((?:fabric|forge|neoforge)(?:-and-(?:fabric|forge|neoforge))+)-([0-9]+(?:\.[0-9]+)+)",
-        release_branch,
-    )
-    if branch_match is None:
-        raise MatrixError("project.release_branch must use the release-branch naming contract")
-    branch_loaders = set(branch_match.group(1).split("-and-"))
-    if branch_loaders != active_loaders:
-        raise MatrixError("project.release_branch loaders disagree with active artifacts")
-    if branch_match.group(2) not in artifact_versions:
-        raise MatrixError("project.release_branch version is absent from active artifacts")
+    if schema == 3:
+        if release_branch != "master":
+            raise MatrixError("unified matrices must use master as their shared release source")
+    else:
+        branch_match = re.fullmatch(
+            r"((?:fabric|forge|neoforge)(?:-and-(?:fabric|forge|neoforge))+)-([0-9]+(?:\.[0-9]+)+)",
+            release_branch,
+        )
+        if branch_match is None:
+            raise MatrixError("project.release_branch must use the release-branch naming contract")
+        branch_loaders = set(branch_match.group(1).split("-and-"))
+        if branch_loaders != active_loaders:
+            raise MatrixError("project.release_branch loaders disagree with active artifacts")
+        if branch_match.group(2) not in artifact_versions:
+            raise MatrixError("project.release_branch version is absent from active artifacts")
 
     source_overlays = data.get("source_overlays")
     expected_source_modules = {"common", *active_loaders}
@@ -507,7 +558,7 @@ def validate_matrix(
             for value in values
         ):
             raise MatrixError(f"source_overlays.{module} values must name legacy* roots")
-        if len(values) != len(set(values)):
+        if schema == 2 and len(values) != len(set(values)):
             raise MatrixError(f"source_overlays.{module} reuses an overlay root")
 
     version_policies: dict[str, tuple[int, bool]] = {}
@@ -731,12 +782,48 @@ def read_mod_version(matrix_path: Path, data: dict[str, Any]) -> str:
     return read_mod_version_from_properties(properties_path, data)
 
 
-def release_id(data: dict[str, Any], mod_version: str) -> str:
-    """Stable public identity: Minecraft era plus logical in-JAR mod version."""
+def select_release_target(data: dict[str, Any], target: str) -> dict[str, Any]:
+    """Derive one publication/runtime view without creating another support inventory.
+
+    The caller authenticates the complete matrix and source tree. This inert view retains
+    their shared branch; it must not be written over the authoritative matrix file.
+    """
+    validate_matrix(data)
+    if data["schema_version"] != 3:
+        raise MatrixError("per-version target selection requires a unified schema-3 matrix")
+    artifacts = [row for row in data["artifacts"] if row["artifact_version"] == target]
+    if not artifacts:
+        raise MatrixError(f"unknown release target {target!r}")
+    result = copy.deepcopy(data)
+    nodes = {row["artifact_node"] for row in artifacts}
+    loaders = {row["loader"] for row in artifacts}
+    result["artifacts"] = [row for row in result["artifacts"] if row["artifact_node"] in nodes]
+    result["runtimes"] = [row for row in result["runtimes"] if row["artifact_node"] in nodes]
+    result["lane_count"] = len(artifacts)
+    result["unit_test_version"] = target
+    installers = {row["installer"] for row in result["runtimes"]}
+    result["installers"] = {key: value for key, value in result["installers"].items() if key in installers}
+    result["source_overlays"] = {module: {version: root for version, root in routes.items() if version == target}
+                                for module, routes in result["source_overlays"].items()
+                                if module == "common" or module in loaders}
+    validate_matrix(result)
+    return result
+
+
+def release_id(data: dict[str, Any], mod_version: str, *, target: str | None = None) -> str:
+    """Keep unified build bundles distinct from independently published Minecraft targets."""
     versions = sorted(
         {str(row["artifact_version"]) for row in data["artifacts"]},
         key=lambda value: tuple(int(part) for part in value.split(".")),
     )
+    if data.get("schema_version") == 3:
+        if target is None:
+            return f"build-v{mod_version}"
+        if target not in versions:
+            raise MatrixError(f"unknown release target {target!r}")
+        return f"mc{target}-v{mod_version}"
+    if target is not None:
+        raise MatrixError("per-version release identity requires a unified schema-3 matrix")
     return f"mc{'+'.join(versions)}-v{mod_version}"
 
 
@@ -749,8 +836,9 @@ def gha_matrix(
     scenario_contract = contract or default_contract()
     if kind in {"artifacts", "publications"}:
         include = []
-        identity = release_id(data, mod_version)
         for artifact in data["artifacts"]:
+            identity = release_id(data, mod_version,
+                target=artifact["artifact_version"] if data.get("schema_version") == 3 else None)
             dependencies = ["architectury-api(required)"]
             if artifact["loader"] == "fabric":
                 dependencies.append("fabric-api(required)")
@@ -850,6 +938,7 @@ def main() -> int:
         help="atomically write the normalized matrix back to --matrix",
     )
     parser.add_argument("--pretty", action="store_true", help="pretty-print output")
+    parser.add_argument("--target", help="derive rows for one unified-matrix Minecraft target")
     args = parser.parse_args()
 
     try:
@@ -860,6 +949,8 @@ def main() -> int:
             raise MatrixError("--write requires a normalization option")
         if args.matrix_properties is not None and args.kind is None:
             raise MatrixError("--matrix-properties requires --kind")
+        if args.target is not None and (args.kind is None or normalizing):
+            raise MatrixError("--target requires --kind and cannot normalize the authoritative matrix")
         if normalizing:
             if args.matrix_properties is not None:
                 raise MatrixError(
@@ -887,6 +978,8 @@ def main() -> int:
                 mod_version = read_mod_version_from_properties(
                     args.matrix_properties, data
                 )
+            if args.target is not None:
+                data = select_release_target(data, args.target)
             output = (
                 gha_matrix(
                     data,

@@ -29,22 +29,26 @@ runtime dependencies, loader ranges, and FML pack formats. The versioned
 orchestration, steps, assertions, captures, probes, and comparisons. Do not duplicate either
 inventory in Gradle, Python, workflows, or documentation.
 
-The active production matrix on this branch contains exactly two artifacts:
-
-| Minecraft | Loaders | Java |
-|---|---|---:|
-| 1.20.1 | Fabric, Forge | 17 |
+This checkout is migrating to release-matrix schema 3: one shared source branch, with separately
+compiled feature/API modules and a per-Minecraft/loader JAR. The generated README profile displays
+the active matrix; do not maintain a second version table in agent guidance. The recoverable
+[migration plan](../architecture/MODULAR-REWORK.md) records imported targets and remaining work.
 
 Every artifact targets exactly the Minecraft version in its filename and metadata. A support or
 loader change starts in the release matrix and must pass its validation and mutation tests.
 
-The matrix also names its one canonical release branch. `scripts/release/release_identity.py`
-derives the only valid tag and publication prefix from the sorted Minecraft versions plus the
-logical mod version. A publishing run must be the exact head of that branch. Manual release runs
-are validation-only; only the canonical tag can publish. See `RELEASING.md` for the recoverable,
-immutable workflow and governance activation contract.
+The matrix names `master` as the shared source branch. `scripts/release/release_identity.py`
+derives a non-publishable `build-v<mod_version>` identity for the complete schema-3 bundle;
+`--target <minecraft>` derives that target's independent `mc<minecraft>-v<mod_version>` identity.
+A publishing run must still bind the exact source head. Release workflow, governance and public
+evidence migration must finish before this new target identity is used for publication. Historical
+schema-2 snapshots retain their original branch/tag validation contract.
 
 ## Version branch model
+
+The following describes delivery to existing schema-2 remote release branches. It is historical
+context for the shared-source rework, not a requirement to propagate unfinished schema-3 changes
+into those branches. Their source matrices and existing evidence remain intact during migration.
 
 - `master` is the shared integration branch. Release branches use the naming form
   `<loader>-and-<loader>-<minecraft>`, for example `forge-and-fabric-1.20.1`.

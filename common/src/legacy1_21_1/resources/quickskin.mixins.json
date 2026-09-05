@@ -1,0 +1,25 @@
+{
+  "required": true,
+  "package": "com.quickskin.mod.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "priority": 2000,
+  "client": [
+    "PlayerInfoMixin",
+    "MixinAbstractClientPlayer",
+    "PlayerRendererMixin",
+    "SkinManagerMixin",
+    "CapeLayerMixin",
+    "ItemInHandRendererMixin",
+    "PanoramaRendererMixin",
+    "PreviewEquipmentMixin"
+  ],
+  "mixins": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrite": {
+    "conformVisibility": true
+  }
+}

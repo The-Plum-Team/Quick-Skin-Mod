@@ -1020,7 +1020,7 @@ def prepare_server(
     return ["bash", str(script), "nogui"]
 
 
-def write_server_files(server: Path, port: int, template_root: Path) -> None:
+def write_server_files(server: Path, port: int, template_root: Path, *, runtime_version: str) -> None:
     properties = (template_root / "server.properties").read_text(encoding="utf-8")
     properties = re.sub(r"(?m)^server-port=.*$", f"server-port={port}", properties)
     (server / "server.properties").write_text(properties, encoding="utf-8")
@@ -1028,6 +1028,39 @@ def write_server_files(server: Path, port: int, template_root: Path) -> None:
     datapack = server / "world" / "datapacks" / "qs_e2e_time"
     datapack.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(template_root / "datapack", datapack, dirs_exist_ok=True)
+    adapt_server_datapack(datapack, runtime_version)
+
+
+def adapt_server_datapack(datapack: Path, runtime_version: str) -> None:
+    """Materialize the shared fixture using the target's resource and game-rule APIs."""
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", runtime_version):
+        raise RuntimeFailure("datapack requires a numeric Minecraft runtime version")
+    version = tuple(int(part) for part in runtime_version.split("."))
+    function_root = "function" if version >= (1, 21) else "functions"
+    obsolete_root = "functions" if function_root == "function" else "function"
+    for parent in (datapack / "data/qs_e2e", datapack / "data/minecraft/tags"):
+        expected, obsolete = parent / function_root, parent / obsolete_root
+        if obsolete.exists():
+            if expected.exists():
+                raise RuntimeFailure(f"datapack has ambiguous function directories: {parent}")
+            obsolete.rename(expected)
+        if not expected.is_dir():
+            raise RuntimeFailure(f"datapack function directory is missing: {expected}")
+    load = datapack / "data/qs_e2e" / function_root / "load.mcfunction"
+    content = load.read_text(encoding="utf-8")
+    rules = (
+        ("doWeatherCycle", "minecraft:advance_weather", "false"),
+        ("doDaylightCycle", "minecraft:advance_time", "false"),
+        ("doMobSpawning", "minecraft:spawn_mobs", "false"),
+        ("spawnRadius", "minecraft:respawn_radius", "0"),
+    )
+    for legacy, namespaced, value in rules:
+        pattern = rf"(?m)^gamerule (?:{legacy}|{namespaced}) {value}$"
+        if len(re.findall(pattern, content)) != 1:
+            raise RuntimeFailure(f"datapack must declare exactly one {legacy} rule")
+        selected = namespaced if version >= (1, 21, 11) else legacy
+        content = re.sub(pattern, f"gamerule {selected} {value}", content)
+    load.write_text(content, encoding="utf-8")
 
 
 def write_server_config(server: Path, scenario: str) -> Path | None:
@@ -2344,7 +2377,8 @@ def run_packaged_row(
                 java,
                 server_install_log,
             )
-            write_server_files(server, port, repo / "e2e" / "server-template")
+            write_server_files(server, port, repo / "e2e" / "server-template",
+                               runtime_version=row["runtime_version"])
             write_server_config(server, scenario)
             install_dir, version_id = prepare_client_install(
                 matrix, row, runtime_session, java

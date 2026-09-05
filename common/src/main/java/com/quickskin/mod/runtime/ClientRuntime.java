@@ -133,6 +133,8 @@ public final class ClientRuntime implements AutoCloseable {
     }
 
     private void resetSessionState() {
+        runCleanup("clear replay appearance tracking",
+                com.quickskin.mod.client.compat.ReplayModHelper::resetReplayEvidenceState);
         runCleanup("clear animated textures", animatedTextures::clearAnimations);
         runCleanup("clear player appearances", appearanceRepository::clear);
         runCleanup("clear model overrides", modelService::clearAll);

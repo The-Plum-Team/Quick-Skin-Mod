@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -196,13 +197,26 @@ class E2EJobGraphTest(unittest.TestCase):
             jobs_path.write_text(
                 json.dumps(self.payload(expected_scenarios)), encoding="utf-8"
             )
-            head_sha = subprocess.run(
-                ("git", "rev-parse", "HEAD"),
-                cwd=ROOT,
-                check=True,
-                stdout=subprocess.PIPE,
-                text=True,
-            ).stdout.strip()
+            # Authenticate the authored bootstrap bytes in a disposable bare repository.
+            # The implementation checkout can be dirty and its HEAD predates new loaders.
+            repository = root / "bootstrap.git"
+            subprocess.run(("git", "init", "--bare", "--quiet", str(repository)), check=True)
+            environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            environment.update(GIT_AUTHOR_NAME="Bootstrap Test", GIT_AUTHOR_EMAIL="bootstrap@example.invalid",
+                               GIT_COMMITTER_NAME="Bootstrap Test", GIT_COMMITTER_EMAIL="bootstrap@example.invalid")
+            def fixture_git(*arguments: str, content: bytes | None = None) -> str:
+                return subprocess.run(("git", "-C", str(repository), *arguments), input=content,
+                                      env=environment, check=True, stdout=subprocess.PIPE).stdout.decode().strip()
+            fixture_git("read-tree", "--empty")
+            contract = graph.load_bootstrap_contract(graph.DEFAULT_BOOTSTRAP_CONTRACT)
+            for loader in expected_loaders:
+                for path in (*contract.loaders[loader], f"{loader}/build.gradle.kts"):
+                    blob = fixture_git("hash-object", "-w", "--stdin", content=(ROOT / path).read_bytes())
+                    fixture_git("update-index", "--add", "--cacheinfo", f"100644,{blob},{path}")
+            tree = fixture_git("write-tree")
+            head_sha = fixture_git("commit-tree", tree, content=b"bootstrap fixture\n")
+            fixture_git("update-ref", "refs/heads/master", head_sha)
+            fixture_git("symbolic-ref", "HEAD", "refs/heads/master")
             output = io.StringIO()
 
             with redirect_stdout(output):
@@ -215,7 +229,7 @@ class E2EJobGraphTest(unittest.TestCase):
                         "--jobs",
                         str(jobs_path),
                         "--repository",
-                        str(ROOT),
+                        str(repository),
                         "--repository-head-sha",
                         head_sha,
                         "--protected-sha",

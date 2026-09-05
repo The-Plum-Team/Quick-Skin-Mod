@@ -18,12 +18,7 @@ import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.networking.NetworkSecurity;
 import com.quickskin.mod.platform.PlatformHelper;
-//? if <1.21 {
 import com.quickskin.mod.platform.MinecraftCompat;
-//?} else if <1.21.11 {
-//?} else {
-import com.quickskin.mod.platform.MinecraftCompat;
-//?}
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import com.mojang.blaze3d.platform.NativeImage;

@@ -102,6 +102,10 @@ INJECTION_COUNT_OVERRIDES = {
         "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
         "quickskin$overrideSkinInfo",
     ): {2},
+    (
+        "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
+        "quickskin$modifyInsecureSkinLegacy",
+    ): {2},
 }
 
 ALLOW_COUNT_OVERRIDES = {

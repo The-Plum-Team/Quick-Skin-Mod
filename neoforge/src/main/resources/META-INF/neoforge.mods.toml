@@ -1,0 +1,44 @@
+# NeoForge mod metadata for QuickSkin
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "All Rights Reserved"
+issueTrackerURL = "https://github.com/The-Plum-Team/Quick-Skin-Mod/issues"
+
+[[mods]]
+modId = "quickskin"
+version = "${version}"
+displayName = "Quick Skin"
+displayTest = "IGNORE_ALL_VERSION"
+authors = "The Plum Team"
+description = '''
+Change, preview, and synchronize local skins, capes, and CPM models in-game across Fabric and NeoForge.
+'''
+displayURL = "https://modrinth.com/mod/quick-skin"
+logoFile = "icon.png"
+
+[[mixins]]
+config = "quickskin-neoforge.mixins.json"
+
+[[mixins]]
+config = "quickskin-ears.mixins.json"
+
+[[dependencies.quickskin]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.quickskin]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,1.21.2)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.quickskin]]
+modId = "architectury"
+type = "required"
+versionRange = "[13.0.6,)"
+ordering = "AFTER"
+side = "BOTH"

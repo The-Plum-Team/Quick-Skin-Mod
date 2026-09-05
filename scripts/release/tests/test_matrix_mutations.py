@@ -23,8 +23,11 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.base = json.loads(
-            (ROOT / "release" / "release-matrix.json").read_text(encoding="utf-8")
+            (Path(__file__).parent / "fixtures/legacy-schema2-matrix.json").read_text(encoding="utf-8")
         )
+
+    def test_authoritative_checkout_validates_all_active_modules_and_targets(self) -> None:
+        release_matrix.load_matrix(ROOT / "release/release-matrix.json")
 
     def mutated(self) -> dict:
         return copy.deepcopy(self.base)
@@ -50,6 +53,20 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
                 marker.parent.mkdir(parents=True)
                 marker.write_text("live\n", encoding="utf-8")
         return matrix_path
+
+    def add_module_fixture(self, root: Path) -> None:
+        graph = ROOT / "architecture" / "modules.json"
+        destination = root / "architecture" / "modules.json"
+        destination.parent.mkdir(parents=True)
+        destination.write_bytes(graph.read_bytes())
+        for module in json.loads(graph.read_bytes())["modules"]:
+            (root / module["path"]).mkdir(parents=True, exist_ok=True)
+
+    def write_java_fixture(self, root: Path, module: str, source_set: str = "main") -> Path:
+        path = root / module / "src" / source_set / "java/com/quickskin/mod/Fixture.java"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("package com.quickskin.mod; final class Fixture {}\n", encoding="utf-8")
+        return path
 
     def neoforge_compatibility_matrix(self) -> dict:
         data = self.mutated()
@@ -394,6 +411,86 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
             with self.assertRaisesRegex(release_matrix.MatrixError, "two-copy overlay limit"):
                 release_matrix.validate_source_roots(matrix_path, data)
 
+    def test_module_source_roots_use_common_routes_but_allow_absent_overlays(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            matrix_path = self.make_source_fixture(root)
+            self.add_module_fixture(root)
+            overlay = next(iter(self.base["source_overlays"]["common"].values()))
+            self.write_java_fixture(root, "modules/preview-rendering", overlay)
+            release_matrix.validate_source_roots(matrix_path, self.base)
+
+    def test_module_source_roots_reject_orphans_snapshots_and_versioned_pure_java(self) -> None:
+        overlay = next(iter(self.base["source_overlays"]["common"].values()))
+        for module, source_set, message in (
+            ("modules/preview-rendering", "legacy_orphan", "overlay roots disagree"),
+            ("modules/preview-rendering", "v99", "version snapshots remain"),
+            ("modules/content-core", overlay, "overlay roots disagree"),
+        ):
+            with self.subTest(module=module, source_set=source_set), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                matrix_path = self.make_source_fixture(root)
+                self.add_module_fixture(root)
+                self.write_java_fixture(root, module, source_set)
+                with self.assertRaisesRegex(release_matrix.MatrixError, message):
+                    release_matrix.validate_source_roots(matrix_path, self.base)
+
+    def test_assembly_rejects_duplicate_module_owners_including_overlay_only_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            matrix_path = self.make_source_fixture(root)
+            self.add_module_fixture(root)
+            overlay = next(iter(self.base["source_overlays"]["common"].values()))
+            self.write_java_fixture(root, "modules/preview-rendering", overlay)
+            self.write_java_fixture(root, "common")
+            with self.assertRaisesRegex(release_matrix.MatrixError, "multiple owners.*assembled JAR"):
+                release_matrix.validate_source_roots(matrix_path, self.base)
+
+    def test_loader_sources_are_mutually_exclusive_but_cannot_duplicate_shared_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            matrix_path = self.make_source_fixture(root)
+            self.add_module_fixture(root)
+            for loader in {artifact["loader"] for artifact in self.base["artifacts"]}:
+                self.write_java_fixture(root, loader)
+            release_matrix.validate_source_roots(matrix_path, self.base)
+            self.write_java_fixture(root, "modules/minecraft-adapter")
+            with self.assertRaisesRegex(release_matrix.MatrixError, "multiple owners.*assembled JAR"):
+                release_matrix.validate_source_roots(matrix_path, self.base)
+
+    def test_unified_matrix_requires_graph_and_allows_multiple_families_in_one_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            matrix_path = self.make_source_fixture(root)
+            data = self.mutated()
+            data["schema_version"] = 3
+            with self.assertRaisesRegex(release_matrix.MatrixError, "invalid source module graph"):
+                release_matrix.validate_source_roots(matrix_path, data)
+            self.add_module_fixture(root)
+            data["source_overlays"]["common"]["fixture"] = "legacy_fixture"
+            marker = root / "common/src/legacy_fixture/resources/fixture.marker"
+            marker.parent.mkdir(parents=True)
+            marker.write_text("live\n", encoding="utf-8")
+            for source_set in {"main", *data["source_overlays"]["common"].values()}:
+                self.write_java_fixture(root, "modules/preview-rendering", source_set)
+            release_matrix.validate_source_roots(matrix_path, data)
+
+    def test_module_sources_cannot_escape_through_directory_or_file_links(self) -> None:
+        for linked_directory in (True, False):
+            with self.subTest(directory=linked_directory), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                matrix_path = self.make_source_fixture(root)
+                self.add_module_fixture(root)
+                source = self.write_java_fixture(root, "modules/preview-rendering")
+                if linked_directory:
+                    target = source.parent / "alias"
+                    target.symlink_to(root / "common", target_is_directory=True)
+                else:
+                    source.unlink()
+                    source.symlink_to(root / "architecture/modules.json")
+                with self.assertRaisesRegex(release_matrix.MatrixError, "symbolic links"):
+                    release_matrix.validate_source_roots(matrix_path, self.base)
+
     def test_no_remap_is_required_and_boolean(self) -> None:
         missing = self.mutated()
         del missing["artifacts"][0]["no_remap"]
@@ -454,7 +551,7 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
             matrix_path = root / "source-release-matrix.json"
             properties_path = root / "source-gradle.properties"
             matrix_path.write_text(json.dumps(self.base), encoding="utf-8")
-            properties_path.write_bytes((ROOT / "gradle.properties").read_bytes())
+            properties_path.write_bytes((Path(__file__).parent / "fixtures/legacy-schema2.properties").read_bytes())
 
             loaded = release_matrix.load_matrix_snapshot(
                 matrix_path, properties_path
@@ -485,7 +582,7 @@ class ReleaseMatrixMutationTest(unittest.TestCase):
             matrix_path = root / "source-release-matrix.json"
             properties_path = root / "source-gradle.properties"
             matrix_path.write_text(json.dumps(self.base), encoding="utf-8")
-            properties_path.write_bytes((ROOT / "gradle.properties").read_bytes())
+            properties_path.write_bytes((Path(__file__).parent / "fixtures/legacy-schema2.properties").read_bytes())
             output = io.StringIO()
 
             with (

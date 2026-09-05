@@ -55,6 +55,9 @@ def branch_version(
         )
         for artifact in artifacts
     }
+    if data.get("schema_version") == 3:
+        release_matrix.validate_matrix(dict(data))
+        return _text(data.get("unit_test_version"), name="unit_test_version")
     if len(versions) != 1:
         raise WorkflowGuidanceError(
             f"workflow guidance requires one Minecraft version, found {sorted(versions)!r}"

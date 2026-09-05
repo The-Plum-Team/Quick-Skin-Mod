@@ -69,7 +69,7 @@ class E2EReadmeTest(unittest.TestCase):
     def test_release_profile_rejects_a_branch_matrix_disagreement(self) -> None:
         # Derived from this branch's own matrix so the disagreement is real everywhere,
         # instead of only on a branch whose matrix names a different release branch.
-        release_branch = branch_readme.extract_branch_facts(self.matrix).release_branch
+        release_branch = self.matrix["project"]["release_branch"]
         with self.assertRaises(e2e_readme.E2EReadmeError):
             e2e_readme.render_profile(
                 self.matrix,

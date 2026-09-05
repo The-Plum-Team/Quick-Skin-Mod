@@ -40,6 +40,8 @@ def sha256(path: Path) -> str:
 
 
 def load_contract(manifest_path: Path, stage: Path, expected_tag: str, commit: str) -> ReleaseContract:
+    if expected_tag.startswith("build-"):
+        raise GitHubReleaseError("a shared build bundle cannot be published; select a Minecraft target")
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:

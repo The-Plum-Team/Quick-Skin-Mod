@@ -70,6 +70,15 @@ class GitHubReleaseContractTest(unittest.TestCase):
             with self.assertRaises(github_release.GitHubReleaseError):
                 github_release.load_contract(manifest, stage, "wrong-tag", commit)
 
+    def test_contract_rejects_shared_build_even_with_matching_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            stage, manifest, _, commit = self.fixture(Path(temporary))
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            data["release"]["tag"] = "build-v3.0.0"
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(github_release.GitHubReleaseError, "cannot be published"):
+                github_release.load_contract(manifest, stage, "build-v3.0.0", commit)
+
     def test_contract_rejects_missing_or_changed_sbom(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             stage, manifest, tag, commit = self.fixture(Path(temporary))

@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from matrix import MatrixError, load_matrix, read_mod_version
+from matrix import MatrixError, load_matrix, read_mod_version, select_release_target
+from release_identity import ReleaseIdentityError, derive as derive_release_identity
 from verify_release import VerificationError, resolve_template, sha256
 
 
@@ -27,10 +28,18 @@ def compare_rebuild(
     matrix_path: Path,
     manifest: dict[str, Any],
     data: dict[str, Any] | None = None,
+    *,
+    target: str | None = None,
 ) -> list[dict[str, str]]:
     matrix = load_matrix(matrix_path) if data is None else data
+    if target is not None:
+        matrix = select_release_target(matrix, target)
     mod_version = read_mod_version(matrix_path, matrix)
     require(manifest.get("schema_version") == 2, "unsupported artifact manifest schema")
+    if matrix.get("schema_version") == 3:
+        identity = derive_release_identity(matrix_path, matrix, target=target)
+        require(manifest.get("release") == identity.manifest(), "artifact manifest release scope disagrees")
+        require(manifest.get("matrix_sha256") == sha256(matrix_path), "artifact manifest matrix bytes disagree")
     records = manifest.get("artifacts")
     require(isinstance(records, list), "artifact manifest has no artifact records")
     by_node = {
@@ -39,7 +48,7 @@ def compare_rebuild(
         if isinstance(record, dict)
     }
     require(
-        len(by_node) == matrix["lane_count"],
+        len(by_node) == len(records) == matrix["lane_count"],
         "artifact manifest node inventory is incomplete",
     )
 
@@ -87,6 +96,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, default=Path("release/release-matrix.json"))
     parser.add_argument("--manifest", type=Path, default=Path("build/release/artifacts.json"))
+    parser.add_argument("--target", help="compare one independently staged Minecraft release target")
     args = parser.parse_args()
     repository = Path(__file__).resolve().parents[2]
     matrix_path = args.matrix if args.matrix.is_absolute() else repository / args.matrix
@@ -94,10 +104,11 @@ def main() -> int:
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         require(isinstance(manifest, dict), "artifact manifest root must be an object")
-        comparisons = compare_rebuild(repository, matrix_path, manifest)
+        comparisons = compare_rebuild(repository, matrix_path, manifest, target=args.target)
     except (
         json.JSONDecodeError,
         MatrixError,
+        ReleaseIdentityError,
         OSError,
         ReproducibilityError,
         VerificationError,
