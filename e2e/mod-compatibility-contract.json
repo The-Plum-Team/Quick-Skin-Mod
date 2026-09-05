@@ -1645,8 +1645,8 @@
         "P7dR8mSH"
       ],
       "evidence": {
-        "baseline_with_mod": "A stable world view shows a real server-owned CustomNPCs entity with its visible mod-owned nameplate standing near the complete local player. Both entities render cleanly, and the local player still has its untouched UUID-selected vanilla default skin.",
-        "apply_local_skin_with_mod": "The paired world view retains the same real CustomNPCs entity and visible mod-owned nameplate beside the complete local player, while the player now visibly wears Quick Skin's dark charcoal-and-gray plaid skin with brown hands. Neither entity may disappear, inherit the other's texture, or show corrupted geometry."
+        "baseline_with_mod": "A stable world view shows a real server-owned CustomNPCs entity with its visible mod-owned nameplate and standard Steve display skin standing near the complete local player. Both entities render cleanly, and the local player still has its untouched UUID-selected vanilla default skin.",
+        "apply_local_skin_with_mod": "The paired world view retains the same real CustomNPCs entity and visible mod-owned nameplate beside the complete local player. The NPC has visibly changed to CustomNPCs' fire-themed Steve skin through its public display API, while the player now wears Quick Skin's dark charcoal-and-gray plaid skin with brown hands. Neither entity may disappear, inherit the other's texture, or show corrupted geometry."
       },
       "review_regions": {
         "baseline_with_mod": [[0.4, 0.28, 0.65, 0.92]],
