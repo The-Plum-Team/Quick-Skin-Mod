@@ -44,6 +44,20 @@ artifact rotation use target keys while run ownership and live-head checks use t
 branch; lossless reference retention still follows the matrix's unit-test target. An incomplete
 handoff, advanced source commit or unproved ordinary continuation cannot replace the site.
 
-These producer, consumer and rotation paths pass local API/shell fixtures. Optional-mod wave
-admission, protected visual review and selective baseline reuse still require migration. No
-successful GitHub deployment or new Minecraft visual acceptance is claimed by these fixtures.
+Visual review now partitions the authenticated complete run into separate target capsules. Each
+curator independently checks the complete lane graph, recomputes its matrix-owned partition and
+downloads only that target's artifacts. The existing per-capsule image, archive and frame limits
+remain unchanged. Shared curation proof schema 6 binds the target, complete matrix digest and
+current protected source commit; the drainer independently verifies that scope against its queue
+entry before model admission. The reference comes from the matrix's lossless 1.20.1 bundle;
+shared WebP caches cannot supply an AI baseline.
+
+Queue identities include the target. A clean report or retry cooldown settles only that target,
+while a confirmed defect can still stop its source generation. Exact wakes query the target's
+marker names and retain numeric-ID cleanup. Each successful curator sibling can publish its own
+wake after the matrix settles, including when another target failed to produce a capsule.
+
+These producer, consumer, rotation and review paths pass local API/shell fixtures. Automatic
+shared-source post-merge scheduling, optional-mod wave admission and selective healthy-baseline
+reuse still require migration. No successful GitHub deployment, model review or new Minecraft
+visual acceptance is claimed by these fixtures.

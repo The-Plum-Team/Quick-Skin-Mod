@@ -40,6 +40,9 @@ from select_artifact import resolve_evidence, select_source  # noqa: E402
 import select_artifact  # noqa: E402
 import compatibility_evidence  # noqa: E402
 import mod_compatibility  # noqa: E402
+from visual_review import (  # noqa: E402
+    VisualEvidenceError, load_reference_frames, reference_identity,
+)
 
 
 MATRIX = json.loads(DEFAULT_MATRIX.read_bytes())
@@ -159,6 +162,36 @@ class SharedPagesTargetsTest(unittest.TestCase):
         other_result.write_text(json.dumps(value))
         with self.assertRaisesRegex(PublicEvidenceError, "profile identity mismatch"):
             self.prepare_target("1.20.1", output="invalid")
+
+    def test_visual_reference_uses_the_target_key_and_real_source_branch(self) -> None:
+        self.write_two_targets()
+        bundle = self.prepare_target("1.20.1")
+        identity = reference_identity(DEFAULT_MATRIX)
+        self.assertEqual("master", identity["release_branch"])
+        self.assertEqual("mc1.20.1", identity["bundle_key"])
+        arguments = dict(branch=identity["release_branch"], artifact_node=identity["artifact_node"],
+                         bundle_key=identity["bundle_key"])
+        references = load_reference_frames(self.root / "shared", ROOT / "e2e/scenario-contract.json", **arguments)
+        self.assertEqual(90, len(references))
+        self.assertTrue(all(row["label"].startswith("fabric-1.20.1/") for row in references.values()))
+        compact_bundle(self.root / "shared", self.root / "reference-compact", bundle.name)
+        with self.assertRaisesRegex(VisualEvidenceError, "lossless raw PNG"):
+            load_reference_frames(self.root / "reference-compact", ROOT / "e2e/scenario-contract.json",
+                                  **arguments)
+        path = bundle / "manifest.json"
+        original = json.loads(path.read_bytes())
+        for field, value in (("matrix_sha256", "0" * 64), ("version", "1.21.1"),
+                             ("artifacts", original["release"]["artifacts"][:1]), ("branch", "mc1.20.1")):
+            with self.subTest(field=field):
+                changed = json.loads(json.dumps(original))
+                changed["release"][field] = value
+                path.write_text(json.dumps(changed))
+                with self.assertRaises(VisualEvidenceError):
+                    load_reference_frames(self.root / "shared", ROOT / "e2e/scenario-contract.json", **arguments)
+        path.write_text(json.dumps(original))
+        with self.assertRaisesRegex(VisualEvidenceError, "release identity"):
+            load_reference_frames(self.root / "shared", ROOT / "e2e/scenario-contract.json",
+                                  branch="mc1.20.1", artifact_node=identity["artifact_node"])
 
     def test_shared_bundle_rejects_wrong_matrix_target_and_branch_identities(self) -> None:
         self.write_two_targets()

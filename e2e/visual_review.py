@@ -24,8 +24,10 @@ from pathlib import Path
 RELEASE_SCRIPTS = Path(__file__).resolve().parents[1] / "scripts" / "release"
 sys.path.insert(0, str(RELEASE_SCRIPTS))
 sys.path.insert(0, str(RELEASE_SCRIPTS.parent / "ci"))
+sys.path.insert(0, str(RELEASE_SCRIPTS.parent / "pages"))
 
 from matrix import MatrixError, load_matrix  # noqa: E402
+from evidence_target import DEFAULT_MATRIX, EvidenceTargetError, target_for_key  # noqa: E402
 
 from visual_evidence import (
     DEFAULT_CATALOG,
@@ -318,6 +320,7 @@ def _reference_identity_from_matrix(matrix: dict[str, object]) -> dict[str, str]
         raise VisualEvidenceError("protected visual reference artifact is invalid")
     return {
         "release_branch": branch,
+        **({"bundle_key": f"mc{version}"} if matrix.get("schema_version") == 3 else {}),
         "artifact_node": artifact_node,
         "version": version,
         "loader": VISUAL_REFERENCE_LOADER,
@@ -379,12 +382,14 @@ def load_reference_frames(
     *,
     branch: str,
     artifact_node: str,
+    bundle_key: str | None = None,
+    matrix_path: Path = DEFAULT_MATRIX,
 ) -> dict[str, dict[str, object]]:
     """Load one already validated raw or compact Pages lane as the visual anchor."""
 
     try:
         root = evidence_root.resolve(strict=True)
-        unresolved_bundle = root / branch
+        unresolved_bundle = root / (bundle_key if bundle_key is not None else branch)
         if unresolved_bundle.is_symlink():
             raise OSError("reference bundle is a symbolic link")
         bundle = unresolved_bundle.resolve(strict=True)
@@ -395,13 +400,35 @@ def load_reference_frames(
     manifest = _read_reference_manifest(bundle / "manifest.json")
     catalog = load_catalog(catalog_path)
     schema_version = manifest.get("schema_version")
-    if schema_version not in {1, 2}:
+    if schema_version == 4:
+        raise VisualEvidenceError("shared visual reference requires lossless raw PNG evidence")
+    if type(schema_version) is not int or schema_version not in {1, 2, 3}:
         raise VisualEvidenceError("visual reference must be raw or compact Pages evidence")
     if manifest.get("contract_sha256") != catalog.contract_sha256:
         raise VisualEvidenceError("visual reference uses a different scenario contract")
     release = manifest.get("release")
     if not isinstance(release, dict) or release.get("branch") != branch:
         raise VisualEvidenceError("visual reference release identity is invalid")
+    if schema_version == 3:
+        if bundle_key is None:
+            raise VisualEvidenceError("shared visual reference requires an explicit bundle key")
+        try:
+            target = target_for_key(bundle_key, matrix_path)
+        except EvidenceTargetError as exc:
+            raise VisualEvidenceError(str(exc)) from exc
+        if (
+            target.branch != branch or target.version != VISUAL_REFERENCE_VERSION
+            or release.get("version") != target.version
+            or release.get("matrix_sha256") != target.matrix_sha256
+            or release.get("artifacts") != sorted(
+                ({"artifact_node": row["artifact_node"], "version": row["artifact_version"],
+                  "loader": row["loader"]} for row in target.matrix["artifacts"]),
+                key=lambda row: (row["loader"], row["artifact_node"]),
+            )
+        ):
+            raise VisualEvidenceError("visual reference disagrees with the protected matrix target")
+    elif bundle_key not in {None, branch}:
+        raise VisualEvidenceError("historical visual reference cannot use a shared target key")
     artifacts = release.get("artifacts")
     matches = (
         [
@@ -459,7 +486,7 @@ def load_reference_frames(
             raise VisualEvidenceError(
                 f"visual reference frame {index} has invalid or duplicate identity"
             )
-        if schema_version == 1:
+        if schema_version in {1, 3}:
             asset = frame.get("asset")
             file_sha256 = frame.get("file_sha256")
             metrics = frame.get("pixel_validation")
@@ -880,6 +907,7 @@ def main(argv: list[str] | None = None) -> int:
         help="already validated raw or compact Pages evidence containing the 1.20.1 anchor",
     )
     parser.add_argument("--reference-branch")
+    parser.add_argument("--reference-bundle-key")
     parser.add_argument("--reference-artifact-node")
     parser.add_argument(
         "--curate-output",
@@ -908,7 +936,8 @@ def main(argv: list[str] | None = None) -> int:
             args.reference_branch,
             args.reference_artifact_node,
         )
-        has_reference = any(value is not None for value in reference_arguments)
+        has_reference = args.reference_bundle_key is not None or any(
+            value is not None for value in reference_arguments)
         if has_reference and not all(value is not None for value in reference_arguments):
             raise VisualEvidenceError(
                 "paired review requires --reference-evidence-root, --reference-branch, "
@@ -984,6 +1013,8 @@ def main(argv: list[str] | None = None) -> int:
             if (
                 args.reference_branch != anchor["release_branch"]
                 or args.reference_artifact_node != anchor["artifact_node"]
+                or (args.reference_bundle_key or args.reference_branch)
+                != anchor.get("bundle_key", anchor["release_branch"])
             ):
                 raise VisualEvidenceError(
                     "paired review reference disagrees with protected master identity"
@@ -993,6 +1024,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.catalog,
                 branch=args.reference_branch,
                 artifact_node=args.reference_artifact_node,
+                bundle_key=args.reference_bundle_key,
+                matrix_path=args.matrix,
             )
         manifest = build_manifest(
             args.e2e_root,

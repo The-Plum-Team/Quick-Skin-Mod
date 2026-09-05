@@ -258,7 +258,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             (
                 "visual-review-drain.yml",
                 "Upload the source-bound normalized report",
-                "visual-review-${{ needs.select.outputs.source_run_id }}",
+                "visual-review-${{ needs.select.outputs.review_key }}",
             ): "7",
             (
                 "visual-review-drain.yml",
@@ -763,7 +763,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("actions/runs/$sibling_id/cancel", review)
         self.assertIn("steps.wave-block-artifact.outputs.artifact-id", review)
         self.assertIn("visual-review-failure.json", review)
-        self.assertIn("visual-review-attempt-${{ needs.select.outputs.source_run_id }}", review)
+        self.assertIn("visual-review-attempt-${{ needs.select.outputs.review_key }}", review)
         self.assertIn("claude-capacity-pause", review)
         self.assertIn("cooling=true", review)
         self.assertNotIn("visual-review-report.raw.json", drain_workflow)

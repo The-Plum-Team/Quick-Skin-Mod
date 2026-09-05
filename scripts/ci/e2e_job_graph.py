@@ -100,6 +100,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "scripts/architecture/module_graph.py",
     "scripts/ci/e2e_job_graph.py",
     "scripts/ci/visual_anchor_certification.py",
+    "scripts/ci/visual_review_targets.py",
     "scripts/ci/version_port_conflicts.py",
     "scripts/ci/version_port_merge.py",
     "scripts/release/artifact_manifest.py",

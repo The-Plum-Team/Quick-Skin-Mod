@@ -546,3 +546,17 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
 - The maintainer authorized the remaining integration and publication work while unavailable,
   including necessary commits and GitHub operations. Existing user changes remain protected;
   routine Minecraft image execution stays delegated to GitHub after the migration is ready.
+- Protected visual review now partitions the complete authenticated run into independent target
+  capsules. Each curator recomputes its exact partition after validating the full lane graph;
+  shared proof schema 6 binds the complete matrix digest, target key and current source commit.
+  The drainer checks that proof against its queue target before model admission. Raw reference
+  selection uses `mc1.20.1` while authenticating the real source branch; shared compact WebP
+  evidence is rejected as an AI baseline. Existing per-capsule image and archive limits remain.
+  Queue reports, cooldowns and newest-capsule selection now distinguish targets from the same
+  source run, and completed siblings can wake independently after a partial curator failure.
+  Actual curator/drainer shell fixtures reject substituted targets, incomplete inventories,
+  stale matrix hashes and foreign proofs. All 520 release-policy and 318 CI-policy tests pass;
+  fourteen workflow/action YAML files parse. This tooling checkpoint reuses the preceding 64
+  compiled outputs. Shared post-merge scheduling, optional-mod wave admission and protected
+  selective healthy-baseline coverage remain unfinished; no new Minecraft or model execution
+  is claimed by the local fixtures.
