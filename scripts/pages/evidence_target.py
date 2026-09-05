@@ -22,6 +22,8 @@ from version_branches import parse_version_branch  # noqa: E402
 
 DEFAULT_MATRIX = REPO / "release/release-matrix.json"
 MAX_MATRIX_BYTES = 5 * 1024 * 1024
+MAX_TARGETS = 64
+MAX_HANDOFF_ARTIFACTS = 512
 TARGET_KEY = re.compile(r"^mc((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*))?)$")
 
 
@@ -146,8 +148,8 @@ def inventory(matrix_path: Path = DEFAULT_MATRIX) -> dict[str, list[dict[str, An
     matrix, payload = _load_matrix(matrix_path)
     versions = sorted({row["artifact_version"] for row in matrix["artifacts"]},
                       key=lambda version: tuple(map(int, version.split("."))))
-    if len(versions) > 64:
-        raise EvidenceTargetError("public evidence inventory exceeds 64 targets")
+    if len(versions) > MAX_TARGETS:
+        raise EvidenceTargetError(f"public evidence inventory exceeds {MAX_TARGETS} targets")
     rows = []
     for version in versions:
         shared = matrix["schema_version"] == 3
@@ -171,12 +173,76 @@ def target_for_key(key: str, matrix_path: Path = DEFAULT_MATRIX) -> EvidenceTarg
 
 
 
+def validate_handoffs(
+    pages: Any, *, matrix_path: Path, source_branch: str, source_sha: str, source_run_id: int,
+) -> None:
+    """Require one exact ordinary handoff for every target before waking a deployment."""
+    rows = inventory(matrix_path)["include"]
+    if (
+        not isinstance(source_branch, str)
+        or {row["source_branch"] for row in rows} != {source_branch}
+        or not isinstance(source_sha, str) or re.fullmatch(r"[0-9a-f]{40}", source_sha) is None
+        or type(source_run_id) is not int or source_run_id <= 0
+    ):
+        raise EvidenceTargetError("handoff source identity disagrees with the canonical inventory")
+    if not isinstance(pages, list) or not 1 <= len(pages) <= 6:
+        raise EvidenceTargetError("handoff inventory must contain bounded GitHub artifact pages")
+    expected = {f"pages-e2e-{row['bundle_key']}" for row in rows}
+    found: set[str] = set()
+    artifact_ids: set[int] = set()
+    count = 0
+    for page in pages:
+        if not isinstance(page, dict) or not isinstance(page.get("artifacts"), list):
+            raise EvidenceTargetError("invalid handoff artifact page")
+        count += len(page["artifacts"])
+        if count > MAX_HANDOFF_ARTIFACTS:
+            raise EvidenceTargetError("handoff artifact inventory exceeds its limit")
+        for artifact in page["artifacts"]:
+            if not isinstance(artifact, dict) or not isinstance(artifact.get("name"), str):
+                raise EvidenceTargetError("invalid handoff artifact record")
+            name = artifact["name"]
+            if not name.startswith("pages-e2e-"):
+                continue
+            run = artifact.get("workflow_run")
+            if (
+                name not in expected or name in found
+                or type(artifact.get("id")) is not int or artifact["id"] <= 0
+                or artifact["id"] in artifact_ids
+                or artifact.get("expired") is not False
+                or type(artifact.get("size_in_bytes")) is not int
+                or not 0 < artifact["size_in_bytes"] <= 1024 * 1024 * 1024
+                or not isinstance(run, dict)
+                or type(run.get("id")) is not int or run["id"] != source_run_id
+                or run.get("head_branch") != source_branch or run.get("head_sha") != source_sha
+            ):
+                raise EvidenceTargetError("handoff artifact has an unexpected target or owner")
+            found.add(name)
+            artifact_ids.add(artifact["id"])
+    if found != expected:
+        raise EvidenceTargetError(f"incomplete public target handoffs: {sorted(expected - found)}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     parser.add_argument("--kind", choices=("matrix", "keys", "source-branch"), default="matrix")
+    parser.add_argument("--validate-handoffs", type=Path)
+    parser.add_argument("--source-branch")
+    parser.add_argument("--source-sha")
+    parser.add_argument("--source-run-id", type=int)
     args = parser.parse_args(argv)
     try:
+        if args.validate_handoffs is not None:
+            with args.validate_handoffs.open("rb") as handle:
+                payload = handle.read(MAX_MATRIX_BYTES + 1)
+            if not payload or len(payload) > MAX_MATRIX_BYTES:
+                raise EvidenceTargetError("handoff metadata exceeds its byte limit")
+            pages = json.loads(payload, object_pairs_hook=_unique_object,
+                               parse_constant=_nonfinite, parse_float=_finite_float)
+            validate_handoffs(pages, matrix_path=args.matrix, source_branch=args.source_branch,
+                              source_sha=args.source_sha, source_run_id=args.source_run_id)
+            print("validated every target handoff")
+            return 0
         rows = inventory(args.matrix)
         if args.kind == "source-branch":
             branches = {row["source_branch"] for row in rows["include"]}
@@ -187,7 +253,7 @@ def main(argv: list[str] | None = None) -> int:
             result = [row["bundle_key"] for row in rows["include"]] if args.kind == "keys" else rows
             print(json.dumps(result, separators=(",", ":"), allow_nan=False))
         return 0
-    except EvidenceTargetError as exc:
+    except (EvidenceTargetError, OSError, ValueError) as exc:
         parser.exit(2, f"public evidence target error: {exc}\n")
 
 

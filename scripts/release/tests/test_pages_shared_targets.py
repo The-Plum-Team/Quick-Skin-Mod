@@ -29,8 +29,13 @@ from evidence_target import (  # noqa: E402
     bundle_version,
     load_target,
     target_for_key,
+    inventory,
+    validate_handoffs,
 )
-from rotate_artifacts import E2E_WORKFLOW, PAGES_WORKFLOW, RotationError  # noqa: E402
+from rotate_artifacts import (  # noqa: E402
+    E2E_WORKFLOW, PAGES_WORKFLOW, RotationError, BranchGeneration,
+    load_generations, rotate_branch, rotate_generations,
+)
 from select_artifact import resolve_evidence, select_source  # noqa: E402
 import select_artifact  # noqa: E402
 import compatibility_evidence  # noqa: E402
@@ -119,6 +124,14 @@ class SharedPagesTargetsTest(unittest.TestCase):
             self.assertEqual(4, compact["schema_version"])
             self.assertEqual(manifest["release"], compact["release"])
             self.assertFalse(list((self.root / "compact" / bundle.name).rglob("*.png")))
+        caches = [artifact_fixtures.artifact(
+            index + 100, f"pages-cache-{key}--{SOURCE_SHA}", "2026-09-05T13:00:00Z",
+            run_id=900, head_branch="master", head_sha="b" * 40,
+        ) for index, key in enumerate(sorted(keys))]
+        generations = load_generations(evidence_root=self.root / "compact", repository=REPOSITORY,
+                                       pages_run_id=900, pages_run_sha="b" * 40, trigger_artifacts=caches)
+        self.assertEqual(keys, {generation.key for generation in generations})
+        self.assertEqual({"master"}, {generation.branch for generation in generations})
         output = self.root / "site"
         build(evidence_root=self.root / "compact", output=output, repository=REPOSITORY,
               require_compact=True, expected_branches=keys)
@@ -277,7 +290,69 @@ class SharedPagesSelectionTest(unittest.TestCase):
             self.assertEqual(0, select_artifact.main([
                 "--repository", artifact_fixtures.REPOSITORY, "--branch", "master",
                 "--bundle-key", "mc1.20.1", "--probe", "--require-raw",
+                "--expected-source-sha", SOURCE_SHA,
             ]))
+
+    def test_rotation_waits_for_success_and_uses_source_refs_and_separate_target_keys(self) -> None:
+        keys = ("mc1.20.1", "mc1.21.1")
+        caches = [artifact_fixtures.artifact(
+            i + 100, f"pages-cache-{key}--{SOURCE_SHA}", "2026-09-05T13:00:00Z",
+            run_id=900, head_branch="master", head_sha="b" * 40,
+        ) for i, key in enumerate(keys)]
+        handoffs = [artifact_fixtures.artifact(
+            i + 10, f"pages-e2e-{key}", "2026-09-05T12:00:00Z",
+            run_id=42, head_branch="master", head_sha=SOURCE_SHA,
+        ) for i, key in enumerate(keys)]
+        api = artifact_fixtures.FakeApi(
+            keep=caches[0], inventories={item.name: [item] for item in [*caches, *handoffs]},
+            runs={
+                900: artifact_fixtures.run(900, workflow=PAGES_WORKFLOW, event="workflow_dispatch",
+                                          branch="master", sha="b" * 40),
+                42: artifact_fixtures.run(42, workflow=E2E_WORKFLOW, event="workflow_dispatch",
+                                         branch="master", sha=SOURCE_SHA),
+            }, branch_shas={"master": SOURCE_SHA},
+        )
+        generations = [BranchGeneration(branch="master", target_sha=SOURCE_SHA, coverage_sha=SOURCE_SHA,
+                                        target_run_id=42, keep=cache, bundle_key=key)
+                       for key, cache in zip(keys, caches)]
+        api.runs[900]["status"] = "in_progress"
+        with self.assertRaises(RotationError):
+            rotate_branch(api, generations[1], repository=artifact_fixtures.REPOSITORY,
+                          pages_run_id=900, pages_run_sha="b" * 40, delete_delay_seconds=0)
+        self.assertFalse(api.deleted)
+        api.runs[900]["status"] = "completed"
+        rotated, deferred = rotate_generations(
+            api, generations, repository=artifact_fixtures.REPOSITORY, pages_run_id=900,
+            pages_run_sha="b" * 40, delete_delay_seconds=0, preserve_handoff_branch=keys[0],
+        )
+        self.assertEqual({keys[0]: [], keys[1]: [handoffs[1].artifact_id]}, rotated)
+        self.assertFalse(deferred)
+        self.assertEqual([handoffs[1].artifact_id], api.deleted)
+
+    def test_wake_admission_requires_the_complete_exact_target_inventory(self) -> None:
+        artifacts = [{
+            "id": index + 1, "name": f"pages-e2e-{row['bundle_key']}",
+            "expired": False, "size_in_bytes": 100,
+            "workflow_run": {"id": 42, "head_branch": "master", "head_sha": SOURCE_SHA},
+        } for index, row in enumerate(inventory()["include"])]
+        def validate(rows):
+            validate_handoffs([{"artifacts": rows}], matrix_path=DEFAULT_MATRIX,
+                              source_branch="master", source_sha=SOURCE_SHA, source_run_id=42)
+        validate(artifacts)
+        with self.assertRaisesRegex(EvidenceTargetError, "incomplete public target"):
+            validate(artifacts[:-1])
+        with self.assertRaisesRegex(EvidenceTargetError, "unexpected target or owner"):
+            validate([*artifacts, artifacts[0]])
+        for label in ("same-id", "wrong-sha", "wrong-branch", "wrong-run", "expired", "unknown-target"):
+            changed = json.loads(json.dumps(artifacts))
+            if label == "same-id": changed[-1]["id"] = changed[0]["id"]
+            elif label == "wrong-sha": changed[-1]["workflow_run"]["head_sha"] = "b" * 40
+            elif label == "wrong-branch": changed[-1]["workflow_run"]["head_branch"] = "mc1.20.1"
+            elif label == "wrong-run": changed[-1]["workflow_run"]["id"] = 43
+            elif label == "expired": changed[-1]["expired"] = True
+            else: changed[-1]["name"] = "pages-e2e-mc99.1"
+            with self.subTest(label=label), self.assertRaises(EvidenceTargetError):
+                validate(changed)
 
 
 if __name__ == "__main__":

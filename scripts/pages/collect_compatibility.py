@@ -797,6 +797,7 @@ def main(argv: list[str] | None = None) -> int:
             with args.github_output.open("a", encoding="utf-8") as output:
                 for key in (
                     "branch",
+                    "bundle_key",
                     "target_sha",
                     "coverage_sha",
                     "compatibility_run_id",

@@ -294,6 +294,7 @@ class PagesArtifactRotationTest(unittest.TestCase):
 
     def test_generation_binds_cache_name_to_coverage_and_run_to_target(self) -> None:
         manifest = {
+            "release": {"branch": BRANCH},
             "provenance": {
                 "target": {"sha": OLD_PAGES_SHA, "run_id": 800},
                 "coverage_sha": TARGET_SHA,
@@ -350,6 +351,7 @@ class PagesArtifactRotationTest(unittest.TestCase):
 
     def test_compatibility_generation_is_bound_to_manifest_coverage_sha(self) -> None:
         manifest = {
+            "release": {"branch": BRANCH},
             "provenance": {
                 "coverage_sha": TARGET_SHA,
                 "compatibility_run_id": 810,

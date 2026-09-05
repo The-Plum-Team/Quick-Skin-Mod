@@ -14,6 +14,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
+from itertools import islice
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -30,7 +31,7 @@ from compatibility_evidence import (  # noqa: E402
     CompatibilityEvidenceError,
     validate_bundle as validate_compatibility_bundle,
 )
-from version_branches import parse_version_branch  # noqa: E402
+from evidence_target import EvidenceTargetError, MAX_TARGETS, bundle_version  # noqa: E402
 
 
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -118,6 +119,11 @@ class BranchGeneration:
     coverage_sha: str
     target_run_id: int
     keep: Artifact
+    bundle_key: str | None = None
+
+    @property
+    def key(self) -> str:
+        return self.bundle_key if self.bundle_key is not None else self.branch
 
 
 @dataclass(frozen=True)
@@ -127,6 +133,11 @@ class CompatibilityGeneration:
     compatibility_run_id: int
     publication_run_id: int
     keep: Artifact
+    bundle_key: str | None = None
+
+    @property
+    def key(self) -> str:
+        return self.bundle_key if self.bundle_key is not None else self.branch
 
 
 class ArtifactApi(Protocol):
@@ -213,8 +224,9 @@ def select_consumed_handoffs(
     target_run_id: int,
     target_sha: str,
     keep: Artifact,
+    bundle_key: str | None = None,
 ) -> list[Artifact]:
-    expected_name = f"pages-e2e-{branch}"
+    expected_name = f"pages-e2e-{bundle_key if bundle_key is not None else branch}"
     return sorted(
         (
             artifact
@@ -231,11 +243,11 @@ def select_consumed_handoffs(
 
 
 def select_old_handoffs(
-    artifacts: list[Artifact], *, branch: str, keep: Artifact
+    artifacts: list[Artifact], *, branch: str, keep: Artifact, bundle_key: str | None = None
 ) -> list[Artifact]:
     """Select only older raw generations after a validated raw replacement exists."""
 
-    expected_name = f"pages-e2e-{branch}"
+    expected_name = f"pages-e2e-{bundle_key if bundle_key is not None else branch}"
     return sorted(
         (
             artifact
@@ -297,10 +309,10 @@ def select_pages_run_transients(
 
     expected_names = {"github-pages"}
     expected_names.update(
-        f"collected-pages-{generation.branch}" for generation in generations
+        f"collected-pages-{generation.key}" for generation in generations
     )
     expected_names.update(
-        f"collected-compatibility-{generation.branch}"
+        f"collected-compatibility-{generation.key}"
         for generation in (compatibility_generations or [])
     )
     return sorted(
@@ -575,14 +587,14 @@ def rotate_branch(
         print(f"head changed; rotation skipped for {generation.branch}")
         return []
 
-    cache_name = f"pages-cache-{generation.branch}"
-    handoff_name = f"pages-e2e-{generation.branch}"
+    cache_name = f"pages-cache-{generation.key}"
+    handoff_name = f"pages-e2e-{generation.key}"
     # GitHub supports exact artifact-name filtering but not prefixes. A repository-wide prefix
     # scan grows with every unrelated artifact and can exhaust the installation quota before a
     # single branch is rotated. Retire legacy exact-name caches here; SHA-namespaced caches remain
     # bounded by their 90-day retention policy.
     old_caches = select_old_caches(
-        api.list_artifacts(cache_name), branch=generation.branch, keep=generation.keep
+        api.list_artifacts(cache_name), branch=generation.key, keep=generation.keep
     )
     handoff_inventory = api.list_artifacts(handoff_name)
     consumed_handoffs = select_consumed_handoffs(
@@ -591,8 +603,9 @@ def rotate_branch(
         target_run_id=generation.target_run_id,
         target_sha=generation.target_sha,
         keep=generation.keep,
+        bundle_key=generation.bundle_key,
     )
-    if generation.branch == preserve_handoff_branch:
+    if generation.key == preserve_handoff_branch:
         if len(consumed_handoffs) != 1:
             raise RotationError(
                 f"lossless visual reference requires exactly one current handoff for "
@@ -603,6 +616,7 @@ def rotate_branch(
             handoff_inventory,
             branch=generation.branch,
             keep=retained_handoff,
+            bundle_key=generation.bundle_key,
         )
         _validate_run(
             api.get_run(retained_handoff.run_id),
@@ -654,7 +668,7 @@ def rotate_branch(
             pages_run_id=pages_run_id,
             pages_run_sha=pages_run_sha,
         )
-        if generation.branch == preserve_handoff_branch:
+        if generation.key == preserve_handoff_branch:
             current_handoff = api.get_artifact(retained_handoff.artifact_id)
             if current_handoff != retained_handoff or current_handoff.expired:
                 raise RotationError(
@@ -683,13 +697,13 @@ def rotate_compatibility_branch(
         print(f"head changed; compatibility rotation skipped for {generation.branch}")
         return []
 
-    cache_name = f"pages-mod-compatibility-cache-{generation.branch}"
-    handoff_name = f"pages-mod-compatibility-{generation.branch}"
+    cache_name = f"pages-mod-compatibility-cache-{generation.key}"
+    handoff_name = f"pages-mod-compatibility-{generation.key}"
     old_caches = select_old_compatibility_caches(
-        api.list_artifacts(cache_name), branch=generation.branch, keep=generation.keep
+        api.list_artifacts(cache_name), branch=generation.key, keep=generation.keep
     )
     old_handoffs = select_old_compatibility_handoffs(
-        api.list_artifacts(handoff_name), branch=generation.branch, keep=generation.keep
+        api.list_artifacts(handoff_name), branch=generation.key, keep=generation.keep
     )
     candidates = [*old_caches, *old_handoffs]
     if deletion_budget is not None:
@@ -756,15 +770,15 @@ def rotate_generations(
     for generation in generations:
         if deletion_budget is not None and deletion_budget.remaining == 0:
             print(
-                f"Pages evidence rotation deferred for {generation.branch}: "
+                f"Pages evidence rotation deferred for {generation.key}: "
                 "global deletion budget exhausted; retention will retire these artifacts",
                 file=sys.stderr,
             )
-            summary[generation.branch] = []
-            deferred.append(generation.branch)
+            summary[generation.key] = []
+            deferred.append(generation.key)
             continue
         try:
-            summary[generation.branch] = rotate_branch(
+            summary[generation.key] = rotate_branch(
                 api,
                 generation,
                 repository=repository,
@@ -776,22 +790,22 @@ def rotate_generations(
             )
             if deletion_budget is not None and deletion_budget.last_deferred_count:
                 print(
-                    f"Pages evidence rotation deferred for {generation.branch}: "
+                    f"Pages evidence rotation deferred for {generation.key}: "
                     f"global deletion budget left "
                     f"{deletion_budget.last_deferred_count} artifact(s) to retention",
                     file=sys.stderr,
                 )
-                deferred.append(generation.branch)
+                deferred.append(generation.key)
         except RotationError as exc:
             # Every deletion is individually revalidated inside rotate_branch, so a
             # mid-rotation head or keep change only defers this branch's remaining
             # artifacts to the next successful deployment's rotation.
             print(
-                f"Pages evidence rotation deferred for {generation.branch}: {exc}",
+                f"Pages evidence rotation deferred for {generation.key}: {exc}",
                 file=sys.stderr,
             )
-            summary[generation.branch] = []
-            deferred.append(generation.branch)
+            summary[generation.key] = []
+            deferred.append(generation.key)
     return summary, deferred
 
 
@@ -810,15 +824,15 @@ def rotate_compatibility_generations(
     for generation in generations:
         if deletion_budget is not None and deletion_budget.remaining == 0:
             print(
-                f"Pages compatibility rotation deferred for {generation.branch}: "
+                f"Pages compatibility rotation deferred for {generation.key}: "
                 "global deletion budget exhausted; retention will retire these artifacts",
                 file=sys.stderr,
             )
-            summary[generation.branch] = []
-            deferred.append(generation.branch)
+            summary[generation.key] = []
+            deferred.append(generation.key)
             continue
         try:
-            summary[generation.branch] = rotate_compatibility_branch(
+            summary[generation.key] = rotate_compatibility_branch(
                 api,
                 generation,
                 repository=repository,
@@ -829,19 +843,19 @@ def rotate_compatibility_generations(
             )
             if deletion_budget is not None and deletion_budget.last_deferred_count:
                 print(
-                    f"Pages compatibility rotation deferred for {generation.branch}: "
+                    f"Pages compatibility rotation deferred for {generation.key}: "
                     f"global deletion budget left "
                     f"{deletion_budget.last_deferred_count} artifact(s) to retention",
                     file=sys.stderr,
                 )
-                deferred.append(generation.branch)
+                deferred.append(generation.key)
         except RotationError as exc:
             print(
-                f"Pages compatibility rotation deferred for {generation.branch}: {exc}",
+                f"Pages compatibility rotation deferred for {generation.key}: {exc}",
                 file=sys.stderr,
             )
-            summary[generation.branch] = []
-            deferred.append(generation.branch)
+            summary[generation.key] = []
+            deferred.append(generation.key)
     return summary, deferred
 
 
@@ -915,14 +929,14 @@ def load_generations(
     trigger_artifacts: list[Artifact],
 ) -> list[BranchGeneration]:
     try:
-        entries = list(evidence_root.iterdir())
-        exact_root = bool(entries) and all(
+        entries = list(islice(evidence_root.iterdir(), MAX_TARGETS + 1))
+        exact_root = bool(entries) and len(entries) <= MAX_TARGETS and all(
             not path.is_symlink()
             and path.is_dir()
-            and parse_version_branch(path.name) is not None
+            and bool(bundle_version(path.name))
             for path in entries
         )
-    except OSError as exc:
+    except (OSError, EvidenceTargetError) as exc:
         raise RotationError(f"cannot inspect cache generation: {exc}") from exc
     if not exact_root:
         raise RotationError("cache generation must contain only release-branch directories")
@@ -963,7 +977,8 @@ def load_generations(
             )
         generations.append(
             BranchGeneration(
-                branch=branch,
+                branch=manifest["release"]["branch"],
+                bundle_key=branch if "matrix_sha256" in manifest["release"] else None,
                 target_sha=target_sha,
                 coverage_sha=coverage_sha,
                 target_run_id=target_run_id,
@@ -995,14 +1010,14 @@ def load_compatibility_generations(
 ) -> list[CompatibilityGeneration]:
     try:
         evidence_root.mkdir(parents=True, exist_ok=True)
-        entries = list(evidence_root.iterdir())
-        exact_root = all(
+        entries = list(islice(evidence_root.iterdir(), MAX_TARGETS + 1))
+        exact_root = len(entries) <= MAX_TARGETS and all(
             not path.is_symlink()
             and path.is_dir()
-            and parse_version_branch(path.name) is not None
+            and bool(bundle_version(path.name))
             for path in entries
         )
-    except OSError as exc:
+    except (OSError, EvidenceTargetError) as exc:
         raise RotationError(
             f"cannot inspect compatibility cache generation: {exc}"
         ) from exc
@@ -1034,6 +1049,8 @@ def load_compatibility_generations(
             "compatibility provenance.publication_run_id",
         )
         expected_name = f"pages-mod-compatibility-cache-{branch}"
+        if "matrix_sha256" in manifest["release"]:
+            expected_name += f"--{coverage_sha}"
         matching = [
             artifact
             for artifact in trigger_artifacts
@@ -1050,7 +1067,8 @@ def load_compatibility_generations(
             )
         generations.append(
             CompatibilityGeneration(
-                branch=branch,
+                branch=manifest["release"]["branch"],
+                bundle_key=branch if "matrix_sha256" in manifest["release"] else None,
                 coverage_sha=coverage_sha,
                 compatibility_run_id=compatibility_run_id,
                 publication_run_id=publication_run_id,
@@ -1082,7 +1100,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--pages-run-sha", required=True)
     parser.add_argument("--delete-delay-seconds", type=float, default=1.0)
     parser.add_argument(
-        "--preserve-raw-branch",
+        "--preserve-raw-key", "--preserve-raw-branch", dest="preserve_raw_branch",
         help="retain the newest validated raw handoff for this visual-reference branch",
     )
     return parser.parse_args(argv)
@@ -1099,11 +1117,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.delete_delay_seconds < 0 or args.delete_delay_seconds > 10:
             raise RotationError("delete delay must be between 0 and 10 seconds")
         preserve_raw_branch = args.preserve_raw_branch
-        if (
-            preserve_raw_branch is not None
-            and parse_version_branch(preserve_raw_branch) is None
-        ):
-            raise RotationError("preserved raw branch must be a release branch")
+        if preserve_raw_branch is not None:
+            bundle_version(preserve_raw_branch)
         token = os.environ.get("GH_TOKEN", "")
         if not token:
             raise RotationError("GH_TOKEN is required")

@@ -534,3 +534,15 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   The complete checkpoint passes 517 release-policy and 305 CI-policy tests; all fourteen
   workflow/action YAML files parse. No Minecraft runtime or image E2E was launched, and no
   publication, governance or repository mutation was sent to GitHub.
+- Pages wake, discovery, collection, cache replacement and artifact rotation now share the
+  target inventory. Each deployment pins one source commit and rechecks it before rendering and
+  deployment; all ordinary target handoffs must exist with exact run ownership. Cache and bundle
+  keys never enter Git branch API calls. Rotation preserves the current lossless reference and
+  waits for the replacement owner's successful completion before deleting consumed artifacts.
+  Local tests cover complete and incomplete handoffs, advancing heads, independent target keys
+  and delayed cache replacement. The full suites pass 519 release-policy and 306 CI-policy tests;
+  all fourteen workflow/action YAML files parse. This checkpoint reuses the unchanged compiled
+  artifacts. Optional-mod wave admission and protected selective visual review remain pending.
+- The maintainer authorized the remaining integration and publication work while unavailable,
+  including necessary commits and GitHub operations. Existing user changes remain protected;
+  routine Minecraft image execution stays delegated to GitHub after the migration is ready.

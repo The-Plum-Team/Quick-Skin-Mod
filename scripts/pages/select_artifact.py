@@ -216,6 +216,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--branch", required=True)
     parser.add_argument("--bundle-key")
     parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
+    parser.add_argument("--expected-source-sha")
     parser.add_argument("--github-output", type=Path)
     parser.add_argument(
         "--probe",
@@ -260,6 +261,8 @@ def main(argv: list[str] | None = None) -> int:
             api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
         )
         current_sha = api.get_branch_sha(branch)
+        if args.expected_source_sha is not None and current_sha != args.expected_source_sha:
+            raise RotationError("source branch advanced after Pages discovery")
         if args.probe:
             # The probe authenticates exactly like a selection but downloads nothing and
             # reports a missing source as a distinct clean outcome for defer decisions.

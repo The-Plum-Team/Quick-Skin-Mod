@@ -1562,7 +1562,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("contents: read", wake)
         self.assertIn("protected_gh_api_retry", wake)
         self.assertIn("on-demand-e2e.yml", wake)
-        self.assertIn("pages-e2e-$EVIDENCE_BRANCH", wake)
+        self.assertIn("--validate-handoffs", wake)
+        self.assertIn("--validate-handoffs", discover)
+        self.assertIn("evidence_target.py --kind keys", discover)
+        self.assertNotIn("branches?per_page=100", discover)
         self.assertIn("ref: ${{ github.sha }}", wake)
         self.assertIn("persist-credentials: false", wake)
         self.assertIn("gh workflow run pages.yml --ref master", wake)
@@ -1585,8 +1588,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('.event == "workflow_dispatch"', discover)
         self.assertIn('.path == ".github/workflows/on-demand-e2e.yml"', discover)
         self.assertIn("DISPATCH_OPERATION", discover)
-        self.assertIn("pages-cache-$branch--$current_sha", discover)
-        self.assertIn("Every release head already belongs", discover)
+        self.assertIn("pages-cache-$bundle_key--$current_sha", discover)
+        self.assertIn("Every Minecraft target already belongs", discover)
         self.assertIn("Deferring publication while", discover)
         self.assertNotIn("--probe", discover)
         self.assertIn(
@@ -1616,18 +1619,20 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("target_run_id", collect)
         self.assertIn("digest-mismatch: error", collect)
         self.assertIn("needs:\n      - discover\n      - collect", build)
-        self.assertIn("needs.discover.outputs.branches", build)
-        self.assertIn("--expected-branches-json", build)
-        self.assertIn("Recheck every branch immediately before rendering", build)
+        self.assertIn("needs.discover.outputs.bundle_keys", build)
+        self.assertIn("--expected-bundles-json", build)
+        self.assertIn("Recheck shared source immediately before rendering", build)
         self.assertIn(".provenance.coverage_sha // .provenance.target.sha", build)
         self.assertIn('--target-sha "$target_sha"', build)
         self.assertIn('--coverage-sha "$coverage_sha"', build)
-        self.assertIn('[[ "$current_sha" != "$coverage_sha" ]]', build)
+        self.assertIn('"$current_sha" != "$coverage_sha"', build)
+        self.assertIn('"$target_sha" != "$SOURCE_SHA"', build)
         self.assertIn("name: github-pages", deploy)
         self.assertIn("pages: write", deploy)
         self.assertIn("id-token: write", deploy)
         self.assertNotIn("actions/checkout@", deploy)
-        self.assertNotRegex(deploy, r"(?m)^\s+run:")
+        self.assertIn("Recheck the shared source immediately before deployment", deploy)
+        self.assertIn('"$current_sha" != "$SOURCE_SHA"', deploy)
         self.assertIn('cron: "43 4 1 * *"', workflow)
         self.assertIn("- deploy", refresh)
         self.assertIn("scripts/pages/select_artifact.py", collect)
@@ -1657,10 +1662,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--require-hashes", build)
         self.assertIn("scripts/pages/requirements.txt", build)
 
-        # A non-visual port advances a release branch without re-running Minecraft. The
-        # selector may nominate the earlier head that still owns evidence, but only the
-        # collector may publish it, and only after recomputing the range from Git itself.
-        self.assertIn("--allow-continuation", collect)
+        # Historical selectors retain branch continuation for archive tooling. The shared
+        # workflow requires exact source coverage until a healthy-baseline proof is admitted.
+        self.assertNotIn("--allow-continuation", collect)
+        self.assertIn('--branch "$SOURCE_BRANCH"', collect)
+        self.assertIn('--bundle-key "$BUNDLE_KEY"', collect)
+        self.assertIn('--expected-source-sha', collect)
         self.assertIn("MAX_CONTINUATION_COMMITS = 20", selector)
         self.assertIn("api.list_branch_commits(branch, MAX_CONTINUATION_COMMITS)", selector)
         self.assertIn("if require_raw or not allow_continuation:", selector)
@@ -1671,28 +1678,21 @@ class WorkflowSecurityTest(unittest.TestCase):
         # Actions cache, which is exactly the cache-poisoning shape CodeQL rejects.
         self.assertNotIn("git fetch", collect)
         self.assertNotIn("fetch-depth", collect)
-        self.assertIn('/compare/$COVERAGE_SHA...$HEAD_SHA', collect)
+        self.assertNotIn('/compare/$COVERAGE_SHA...$HEAD_SHA', collect)
         self.assertNotIn('/compare/$EXPECTED_SHA...$HEAD_SHA', collect)
-        self.assertIn('.status == "ahead" and .behind_by == 0', collect)
-        self.assertIn(".merge_base_commit.sha == $base", collect)
-        self.assertIn(".total_commits <= 20", collect)
-        self.assertIn("(.files | length) <= 100", collect)
-        self.assertIn("scripts/ci/visual_review_impact.py", collect)
-        self.assertIn("--scope replicated-port", collect)
-        self.assertIn('[[ "$classification" == skip ]]', collect)
-        self.assertIn("scripts/pages/evidence.py carry-forward", collect)
-        self.assertIn('--coverage-sha "$HEAD_SHA"', collect)
+        self.assertNotIn("scripts/pages/evidence.py carry-forward", collect)
+        self.assertIn("Shared-source coverage requires an authenticated baseline proof", collect)
 
-    def test_pages_render_recheck_accepts_exact_carried_coverage(self) -> None:
+    def test_pages_render_recheck_requires_the_exact_shared_source_commit(self) -> None:
         script = step_script(
-            "pages.yml", "build", "Recheck every branch immediately before rendering"
+            "pages.yml", "build", "Recheck shared source immediately before rendering"
         )
-        target_sha = "a" * 40
+        target_sha = "b" * 40
         coverage_sha = "b" * 40
 
         with tempfile.TemporaryDirectory() as temporary:
             temp = Path(temporary)
-            branch = "fabric-and-neoforge-26.2"
+            branch = "mc26.2"
             manifest = temp / "public-evidence" / branch / "manifest.json"
             manifest.parent.mkdir(parents=True)
             manifest.write_text(
@@ -1725,6 +1725,8 @@ class WorkflowSecurityTest(unittest.TestCase):
             environment.update(
                 {
                     "CURRENT_SHA": coverage_sha,
+                    "SOURCE_SHA": coverage_sha,
+                    "SOURCE_BRANCH": "master",
                     "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
                     "PATH": f"{temp}{os.pathsep}{environment.get('PATH', '')}",
                     "VALIDATE_ARGUMENTS": str(arguments),
@@ -1746,7 +1748,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             self.assertEqual(validate_arguments[target_index + 1], target_sha)
             self.assertEqual(validate_arguments[coverage_index + 1], coverage_sha)
 
-            environment["CURRENT_SHA"] = target_sha
+            environment["CURRENT_SHA"] = "a" * 40
             stale = subprocess.run(
                 ["bash", "-c", script],
                 cwd=temp,
@@ -1758,16 +1760,16 @@ class WorkflowSecurityTest(unittest.TestCase):
             self.assertNotEqual(stale.returncode, 0)
             self.assertIn("moved from covered SHA", stale.stderr)
 
-    def test_pages_collector_extends_coverage_instead_of_rebinding_target(self) -> None:
+    def test_pages_collector_rejects_unproved_shared_coverage(self) -> None:
         script = step_script(
-            "pages.yml", "collect", "Validate the curated bundle and recheck its branch head"
+            "pages.yml", "collect", "Validate the target bundle and recheck its source commit"
         )
         # GitHub's runner uses Bash 5. macOS Bash 3.2 applies nounset to an empty array
         # expansion differently, so keep this test focused on the identity contract.
         script = script.replace("set -euo pipefail", "set -eo pipefail", 1)
-        branch = "fabric-and-neoforge-26.2"
-        source_branch = "forge-and-fabric-1.20.1"
-        source_sha = "d" * 40
+        branch = "mc26.2"
+        source_branch = "master"
+        source_sha = "a" * 40
         target_sha = "a" * 40
         coverage_sha = "b" * 40
         head_sha = "c" * 40
@@ -1777,6 +1779,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         target_run_id = 202
         source_run = json.dumps(
             {
+                "id": source_run_id,
                 "status": "completed",
                 "conclusion": "success",
                 "event": "workflow_dispatch",
@@ -1790,10 +1793,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         target_run = json.dumps(
             {
+                "id": target_run_id,
                 "status": "completed",
                 "conclusion": "success",
                 "event": "workflow_dispatch",
-                "head_branch": branch,
+                "head_branch": source_branch,
                 "head_sha": target_sha,
                 "created_at": target_created_at,
                 "path": ".github/workflows/on-demand-e2e.yml",
@@ -1801,18 +1805,6 @@ class WorkflowSecurityTest(unittest.TestCase):
             },
             separators=(",", ":"),
         )
-        comparison = json.dumps(
-            {
-                "status": "ahead",
-                "behind_by": 0,
-                "base_commit": {"sha": coverage_sha},
-                "merge_base_commit": {"sha": coverage_sha},
-                "total_commits": 1,
-                "files": [{"filename": ".github/workflows/pages.yml"}],
-            },
-            separators=(",", ":"),
-        )
-
         with tempfile.TemporaryDirectory() as temporary:
             temp = Path(temporary)
             manifest = temp / "selected-evidence" / branch / "manifest.json"
@@ -1829,7 +1821,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                             },
                             "target": {
                                 "run_id": target_run_id,
-                                "branch": branch,
+                                "branch": source_branch,
                                 "sha": target_sha,
                                 "created_at": target_created_at,
                             },
@@ -1850,8 +1842,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                       case "$1" in
                         */actions/runs/{source_run_id}) printf '%s\\n' '{source_run}' ;;
                         */actions/runs/{target_run_id}) printf '%s\\n' '{target_run}' ;;
-                        */branches/{branch}) printf '%s\\n' '{head_sha}' ;;
-                        */compare/{coverage_sha}...{head_sha}) printf '%s\\n' '{comparison}' ;;
+                        */branches/{source_branch}) printf '%s\\n' '{head_sha}' ;;
                         *) printf 'unexpected API call: %s\\n' "$1" >&2; return 90 ;;
                       esac
                     }}
@@ -1886,7 +1877,8 @@ class WorkflowSecurityTest(unittest.TestCase):
                 {
                     "API_CALLS": str(api_calls),
                     "ARTIFACT_NAME": f"pages-cache-{branch}--{coverage_sha}",
-                    "BRANCH": branch,
+                    "BUNDLE_KEY": branch,
+                    "SOURCE_BRANCH": source_branch,
                     "COVERAGE_SHA": coverage_sha,
                     "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
                     "HEAD_SHA": head_sha,
@@ -1905,17 +1897,16 @@ class WorkflowSecurityTest(unittest.TestCase):
                 text=True,
             )
 
-            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("authenticated baseline proof", completed.stderr)
             arguments = validate_arguments.read_text(encoding="utf-8").splitlines()
             self.assertEqual(arguments[arguments.index("--target-sha") + 1], target_sha)
             self.assertEqual(
                 arguments[arguments.index("--coverage-sha") + 1], coverage_sha
             )
             calls = api_calls.read_text(encoding="utf-8").splitlines()
-            self.assertIn(
-                f"repos/The-Plum-Team/Quick-Skin-Mod/compare/{coverage_sha}...{head_sha}",
-                calls,
-            )
+            self.assertIn("repos/The-Plum-Team/Quick-Skin-Mod/branches/master", calls)
+            self.assertFalse(any("/compare/" in call for call in calls))
 
     def test_mod_compatibility_pages_publication_reuses_only_complete_clean_reports(self) -> None:
         review_workflow = (
@@ -1955,7 +1946,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--publication-run-id", publish)
         self.assertNotIn("visual_review_runner.py", publish)
         self.assertNotIn("ANTHROPIC", publish)
-        self.assertIn("pages-mod-compatibility-$BRANCH", publish)
+        self.assertIn("pages-mod-compatibility-$BUNDLE_KEY", publish)
+        self.assertIn("bundle_key:$bundle_key", publish)
         self.assertIn("pages-compatibility-evidence-ready", publish)
         self.assertIn('^[0-9a-f]{64}$', publish)
         self.assertIn('"sha256:$ARTIFACT_DIGEST"', publish)
@@ -1979,10 +1971,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("git merge-base --is-ancestor", collect)
         self.assertIn("scripts/ci/mod_compatibility_impact.py", collect)
         self.assertIn("scripts/pages/compatibility_evidence.py carry-forward", collect)
-        self.assertIn("collected-compatibility-${{ matrix.branch }}", collect)
+        self.assertIn("collected-compatibility-${{ matrix.bundle_key }}", collect)
         self.assertIn("--compatibility-root public-compatibility", build)
         self.assertIn("pattern: collected-compatibility-*", build)
-        self.assertIn("pattern: collected-compatibility-${{ matrix.branch }}", refresh)
+        self.assertIn("pattern: collected-compatibility-${{ matrix.bundle_key }}", refresh)
         self.assertIn("pages-mod-compatibility-cache-%s", refresh)
         self.assertIn("retention-days: 90", refresh)
 
@@ -2050,10 +2042,10 @@ class WorkflowSecurityTest(unittest.TestCase):
             handoff,
         )
         self.assertIn("fromJSON(needs.pages-inventory.outputs.targets)", handoff)
-        self.assertIn("--preserve-raw-branch", rotate)
+        self.assertIn("--preserve-raw-key", rotate)
         self.assertIn('expected_names = {"github-pages"}', rotator)
         self.assertIn(
-            'f"collected-pages-{generation.branch}" for generation in generations',
+            'f"collected-pages-{generation.key}" for generation in generations',
             rotator,
         )
         self.assertIn("candidates = [*old_caches, *handoffs]", rotator)

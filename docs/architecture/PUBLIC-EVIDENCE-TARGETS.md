@@ -37,6 +37,13 @@ The local tests exercise matrix-wide identity and optional-mod planning, actual 
 admission, raw/compact conversion, two-target site rendering and identity-tampering rejection.
 Their PNGs are synthetic fixtures. They are not Minecraft image acceptance evidence.
 
-The shared-target producer is prepared in `on-demand-e2e.yml`. The Pages wake, discovery,
-collection, rotation and optional-mod workflow consumers still require the matching migration;
-this foundation does not claim a successful GitHub deployment or visual review.
+The shared-target producer is prepared in `on-demand-e2e.yml`. Pages authenticates the complete
+target handoff inventory, discovers keys from the matrix and pins one real source commit for all
+collectors. It rechecks that commit before rendering and deployment. Cache replacement and
+artifact rotation use target keys while run ownership and live-head checks use the real source
+branch; lossless reference retention still follows the matrix's unit-test target. An incomplete
+handoff, advanced source commit or unproved ordinary continuation cannot replace the site.
+
+These producer, consumer and rotation paths pass local API/shell fixtures. Optional-mod wave
+admission, protected visual review and selective baseline reuse still require migration. No
+successful GitHub deployment or new Minecraft visual acceptance is claimed by these fixtures.

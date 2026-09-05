@@ -1711,7 +1711,7 @@ class PagesSiteTest(unittest.TestCase):
         )
         self.assertIn("python3 scripts/pages/evidence_target.py --kind matrix", packaged)
         compact = pages.index("python3 scripts/pages/evidence.py compact")
-        fan_in = pages.index("name: collected-pages-${{ matrix.branch }}", compact)
+        fan_in = pages.index("name: collected-pages-${{ matrix.bundle_key }}", compact)
         self.assertLess(compact, fan_in)
         self.assertIn("kind_argument=(--kind raw)", pages[:compact])
         self.assertIn("input_kind_argument=(--input-kind raw)", pages[:fan_in])
