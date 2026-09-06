@@ -618,3 +618,12 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   cumulative editor/HUD changes and independent immutable-ID revalidation before curation.
   All 357 CI tests pass; the final source-run guard also passes its focused revalidation test.
   Required workflow selection, AI admission and public-frame reuse remain unconnected.
+- GitHub's first full matrix found the same startup failure on Fabric and NeoForge 1.21.5:
+  `PreviewEquipmentMixin` still targeted `Player.getItemBySlot`, whose concrete implementation
+  moved to `LivingEntity` in 1.21.5. The canonical bridge now selects the declaring class at that
+  API boundary and retains the existing thread/subject-scoped read policy. A new common JUnit
+  test reads the active packaged mixin configuration and its selected vanilla bytecode without
+  initializing Minecraft. It failed against the original 1.21.5 target and passes after the fix;
+  the 1.20.1, 1.21.4 and 1.21.6 boundary checks also pass, along with six mixin-policy tests.
+  The original failing GitHub logs/artifacts and local red/green reports are preserved in the
+  evidence directory. The remote matrix is still testing the preceding published source.

@@ -21,9 +21,9 @@ import java.util.Set;
  * are listed in the class comment of the caller rather than silently ignored.
  *
  * <p>The suppression is a scoped <em>read</em> override, never a write: no inventory, equipment or
- * world state is touched to draw a GUI. Two eras need two seams for the same rule - from 1.21.11 the
+ * world state is touched to draw a GUI. Two eras need two seams for the same rule - from 1.21.6 the
  * mod builds the entity render state itself and blanks its equipment fields, and before that the
- * layers read the entity directly, so the read is answered as empty for the duration of the draw.
+ * renderer reads the entity during its inline draw/extraction, so that read is answered as empty.
  * {@link Scope} is that duration.
  *
  * <p>Deliberately free of Minecraft types, so the rule and the scoping stay unit testable in the

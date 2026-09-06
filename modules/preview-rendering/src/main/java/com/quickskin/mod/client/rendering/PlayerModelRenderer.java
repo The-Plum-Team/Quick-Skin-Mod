@@ -404,8 +404,8 @@ public class PlayerModelRenderer {
     // The seam differs by era because the render timing does, exactly as the preview cape binding
     // above. From 1.21.6 the mod builds the entity render state itself, so the equipment is blanked
     // on that state before it is submitted - which is what vanilla does for its own smithing-table
-    // preview. Before that there is no render state: the layers read the entity while the render
-    // runs inline, so the scope below answers those reads as empty for the length of that call.
+    // preview. Earlier renderers read the entity within the inline render/extraction call, so the
+    // scope below answers those reads as empty for the length of that call.
     // Nothing is written to the player: this is a read override, not a mutation.
     private static final PreviewEquipmentPolicy.Scope<Object> PREVIEW_EQUIPMENT_SCOPE =
             new PreviewEquipmentPolicy.Scope<>();
