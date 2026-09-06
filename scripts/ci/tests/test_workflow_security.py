@@ -96,6 +96,47 @@ def upload_artifact_steps() -> list[tuple[str, str, str]]:
 
 
 class WorkflowSecurityTest(unittest.TestCase):
+    def test_confirmed_visual_defects_stop_shared_generations_without_blocking_prs(self):
+        script = step_script("visual-review-drain.yml", "review",
+                             "Create a sanitized generation block after a confirmed defect")
+        generation, other = "a" * 40, "b" * 40
+        shared = {"schema_version": 8, "source_branch": "master", "source_sha": generation,
+                  "master_source_sha": generation, "implementation_sha": generation, "source_run_id": 123}
+        cases = (
+            ("shared full", {}, "blocking-partial", [{"defect": True}], True, False),
+            ("shared selected", {"schema_version": 7}, "blocking-partial", [{"defect": True}], True, False),
+            ("legacy wave", {"schema_version": 5, "source_branch": "automation/sync/example/123"},
+             "blocking-partial", [{"defect": True}], True, False),
+            ("advisory PR", {"source_branch": "feature/example"}, "blocking-partial", [{"defect": True}], False, False),
+            ("complete review", {}, "complete", [{"defect": False}], False, False),
+            ("wrong shared schema", {"schema_version": 5}, "blocking-partial", [{"defect": True}], False, True),
+            ("wrong source", {"source_sha": other}, "blocking-partial", [{"defect": True}], False, True),
+            ("wrong implementation", {"implementation_sha": other}, "blocking-partial", [{"defect": True}], False, True),
+            ("wrong generation", {"master_source_sha": other}, "blocking-partial", [{"defect": True}], False, True),
+            ("wrong run", {"source_run_id": 124}, "blocking-partial", [{"defect": True}], False, True),
+            ("unconfirmed report", {}, "blocking-partial", [{"defect": False}], False, True),
+        )
+        for label, change, completion, report, blocked, rejected in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                (root / "curation-proof.json").write_text(json.dumps(shared | change), encoding="utf-8")
+                (root / "visual-review-completion.json").write_text(json.dumps({"state": completion}), encoding="utf-8")
+                (root / "visual-review-report.json").write_text(json.dumps(report), encoding="utf-8")
+                output = root / "outputs"
+                result = subprocess.run(["bash", "-c", script], cwd=root, capture_output=True, text=True,
+                                        env=os.environ | {"GITHUB_OUTPUT": str(output),
+                                                          "GENERATION_SHA": generation,
+                                                          "IMPLEMENTATION_SHA": generation,
+                                                          "SOURCE_RUN_ID": "123"}, timeout=15)
+                self.assertEqual(rejected, result.returncode != 0, result.stdout + result.stderr)
+                marker = root / "visual-review-wave-block.json"
+                self.assertEqual(blocked, marker.exists(), result.stdout + result.stderr)
+                self.assertEqual(blocked, "blocked=true" in output.read_text(encoding="utf-8"))
+                if blocked:
+                    document = json.loads(marker.read_text(encoding="utf-8"))
+                    self.assertEqual(generation, document["generation_sha"])
+                    self.assertEqual(123, document["source_run_id"])
+
     def test_secret_bearing_ai_steps_have_a_closed_tool_and_path_surface(self) -> None:
         secret_steps = 0
         for workflow in workflow_paths():

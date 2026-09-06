@@ -1450,8 +1450,9 @@ jobs:
             exit 0
           fi
           source_branch="$(jq -er .source_branch curation-proof.json)"
-          # Advisory PRs must never suppress reviews for the protected automatic version wave.
-          if [[ "$source_branch" != automation/sync/* ]]; then
+          # Only protected shared-source or historical automatic-wave evidence may stop a generation.
+          # Advisory PRs cannot suppress protected reviews.
+          if [[ "$source_branch" != master && "$source_branch" != automation/sync/* ]]; then
             exit 0
           fi
           [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -1466,9 +1467,15 @@ jobs:
             --arg implementation_sha "$IMPLEMENTATION_SHA" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             '.implementation_sha == $implementation_sha and
-             .source_run_id == $source_run_id and
-             (.source_branch | startswith("automation/sync/"))' \
+             .source_run_id == $source_run_id' \
             curation-proof.json > /dev/null
+          if [[ "$source_branch" == master ]]; then
+            jq -e --arg generation "$GENERATION_SHA" \
+              '(.schema_version == 7 or .schema_version == 8) and
+               .source_branch == "master" and .source_sha == $generation and
+               .master_source_sha == $generation and .implementation_sha == $generation' \
+              curation-proof.json > /dev/null
+          fi
           jq -e 'length > 0 and all(.[]; .defect == true)' \
             visual-review-report.json > /dev/null
           report_sha256="$(sha256sum visual-review-report.json | cut -d ' ' -f 1)"
