@@ -450,20 +450,24 @@ The curator applies the protected review checker before upload and reserves 32 M
 envelope for the bounded manifest, proof, archive metadata, and structure. A source/run/
 implementation proof and bounded manifest become a seven-day durable queue entry. A protected
 exact wake may authenticate only its requested artifact and locks the complete drain by that ID;
-distinct capsules therefore run concurrently while duplicate wakes coalesce. Scheduled/manual
-recovery sweeps share a separate lock and only redispatch one authenticated exact identity. The
-queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without losing
-reviews.
+duplicate wakes coalesce. The model/cache job runs one capsule at a time per protected implementation
+so the next target can reuse the preceding verdicts. Its `queue: max` retains up to 100 pending jobs
+instead of replacing all but one. Independent model chunks inside that job remain concurrent.
+Scheduled/manual recovery sweeps share a separate lock and redispatch an authenticated pending
+identity. Completed drains do not wake their consumed capsule again; curator wakes, capacity
+recovery and scheduled sweeps admit remaining work. The durable artifact remains the source of
+queue state if a pending job is lost.
 
 Before any exact drains fan out, they cross one repository-wide capacity section. A fresh
-authenticated success marker lets unrelated capsules continue concurrently for ten minutes. If no
+authenticated success marker admits capsules to the model/cache queue for ten minutes. If no
 marker exists, competing probe jobs coalesce behind one tool-free, low-effort Haiku call that
 checks whether the subscription can accept work. A fresh success redispatches every authenticated
-pending capsule by exact artifact ID, preserving parallel review even when earlier probe contenders
+pending capsule by exact artifact ID, preserving admission even when earlier probe contenders
 were coalesced. A rejected rate-limit event opens a sanitized thirty-minute circuit and leaves every
 capsule in the durable queue. A successful `allowed_warning` remains usable because that coarse
-headless signal can disagree with the subscription usage panel; when the event includes an explicit
-utilization value, 95% still pauses the fan-out. Scheduled recovery probes again after the pause.
+headless signal can disagree with the subscription usage panel. Optional utilization does not
+override a successful call; an explicit rejection or failed probe pauses admission. Scheduled
+recovery probes again after the pause.
 Claude does not reliably expose the Pro/Max percentage remaining in headless output, so this is
 primarily an availability circuit rather than an invented quota estimate. The marker retains only
 the normalized provider status, known limit type, and utilization band; neither provider text nor
@@ -477,7 +481,8 @@ loaders share one AI-reviewed representative. A protected verdict is reusable on
 semantic fingerprints, review scope, expectation, passed runtime evidence, capture identity,
 scenario contract, release matrix, prompts, reviewer/checker/cache/similarity code, models, mode,
 and chunk policy match exactly; artifact labels and loaders may differ because they are not visual
-identity. Unpaired anchor semantics are never cached. Haiku triages the remaining representative
+identity. Unpaired anchor cache hits additionally bind the exact loader label and full canonical PNG,
+so one loader cannot certify another. Haiku triages the remaining representative
 frames in chunks of at most eight. All independent chunks run concurrently. After the complete
 Haiku stage settles, every concern or confidence below high is packed source-wide and rechecked by
 Opus in concurrent chunks of at most four; a clean high-confidence Haiku verdict is final.
@@ -486,8 +491,9 @@ The authenticated evidence remains 1920x1080 for exact comparison and caching, w
 creates deterministic 1280x720 copies only for chunks that actually reach a model. Provider
 throttling is handled by bounded retries rather than serial launch pacing. Once any Opus chunk
 confirms a defect, outstanding calls are cancelled and the
-explicit blocking-partial result cannot certify or release anything. For an automatic version
-wave, the protected drain then publishes a sanitized marker bound to that exact master generation,
+explicit blocking-partial result cannot certify or release anything. For protected shared-source
+reviews, both complete and selected, and historical automatic version waves, the drain publishes a
+sanitized marker bound to that exact master generation,
 best-effort cancels sibling drains, and makes later authenticated queue selection skip its remaining
 capsules. Both models can read only the
 bounded manifest/images; stdout is captured without granting a write or shell tool. Protected code
