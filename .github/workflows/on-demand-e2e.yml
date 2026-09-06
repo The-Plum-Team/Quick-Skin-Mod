@@ -1,10 +1,8 @@
 name: Packaged E2E
 
-# The slow lane, and the only one that launches Minecraft: it builds the inputs once, fans the
-# contract-selected packaged scenarios out across both loaders. Pull requests run it automatically
-# against only the lanes declared by their target version branch. Version synchronization also
-# dispatches it explicitly because events created with GITHUB_TOKEN do not recursively trigger
-# ordinary pull-request workflows. Secret-bearing visual review runs separately from this gate.
+# Packaged Minecraft consumes the exact successful Build bundle, then runs contract-selected
+# scenarios on every matrix lane. A standalone run without an available bundle uses the same
+# isolated target compiler. Semantic visual review remains a separate protected workflow.
 on:
   pull_request:
   schedule:
@@ -323,17 +321,22 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  build:
-    name: Build immutable E2E input bundle
+  build-source:
+    name: Resolve the exact source Build bundle
     needs: runtime-policy
     if: >-
       needs.runtime-policy.result == 'success' &&
       needs.runtime-policy.outputs.effective == 'full'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 100
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
     outputs:
-      anchors: ${{ steps.matrix.outputs.matrix }}
-
+      reused: ${{ steps.bundle.outputs.reused }}
+      run_id: ${{ steps.bundle.outputs.run_id }}
+      artifact_id: ${{ steps.bundle.outputs.artifact_id }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -341,129 +344,66 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-
-      - name: Verify exact Gradle bootstrap checksums
-        shell: bash
-        run: |
-          set -euo pipefail
-          (cd gradle/wrapper && sha256sum --check --strict gradle-wrapper.jar.sha256)
-          distribution_hash="$(tr -d '\r\n' < gradle/wrapper/gradle-9.7.1-bin.zip.sha256)"
-          grep --fixed-strings --line-regexp "distributionSha256Sum=$distribution_hash" \
-            gradle/wrapper/gradle-wrapper.properties
-
-      - name: Install all required JDKs
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          distribution: temurin
-          java-version: |
-            17
-            21
-            25
+          python-version: "3.13"
+
+      - name: Authenticate the complete Build bundle and wait for PR compilation
+        id: bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ci/staged_build_bundle.py --wait-seconds 5400
+
+  compile:
+    needs: build-source
+    if: >-
+      needs.build-source.result == 'success' &&
+      needs.build-source.outputs.reused == 'false'
+    uses: ./.github/workflows/build-matrix.yml
+
+  build:
+    name: Build immutable E2E input bundle
+    needs: [runtime-policy, build-source, compile]
+    if: >-
+      always() && !cancelled() && needs.runtime-policy.result == 'success' &&
+      needs.runtime-policy.outputs.effective == 'full' &&
+      needs.build-source.result == 'success' &&
+      (needs.build-source.outputs.reused == 'true' || needs.compile.result == 'success')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      anchors: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Install Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
 
-      - name: Configure Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          # Build gate is the only writer. Packaged Minecraft jobs consume its stable cache
-          # instead of creating another immutable cache generation for every E2E run.
-          cache-read-only: true
-
-      - name: Validate central release matrix
-        run: python scripts/release/matrix.py --matrix release/release-matrix.json > /dev/null
-
-      # A version-port dispatch starts an exact-head Build gate run concurrently. When that
-      # run has already finished successfully, reuse its verified staged bundle instead of
-      # repeating the identical Gradle build. Every discovery, download, or verification
-      # failure falls back to building from source; only a fully reverified bundle skips it.
-      - name: Discover the exact-head Build gate staged bundle
-        id: gate-bundle
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.attest_run_id == ''
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          build_event=workflow_dispatch
-          if [[ "$GITHUB_REF_NAME" == master &&
-                "$(python3 scripts/release/release_sources.py --kind mode)" == shared ]]; then
-            build_event=push
-          fi
-          run_json="$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/build-gate.yml/runs?event=$build_event&status=success&head_sha=$GITHUB_SHA&per_page=1" \
-            --jq '.workflow_runs[0] // empty')"
-          [[ -n "$run_json" ]]
-          jq -e \
-            --arg branch "$GITHUB_REF_NAME" \
-            --arg head "$GITHUB_SHA" \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg event "$build_event" \
-            '.status == "completed" and .conclusion == "success" and .event == $event and .path == ".github/workflows/build-gate.yml" and .head_branch == $branch and .head_sha == $head and .head_repository.full_name == $repository' \
-            <<< "$run_json" > /dev/null
-          run_id="$(jq -er '.id | select(type == "number" and . > 0 and . == floor)' <<< "$run_json")"
-          [[ "$run_id" =~ ^[0-9]+$ ]]
-          printf 'run_id=%s\n' "$run_id" >> "$GITHUB_OUTPUT"
-
-      - name: Download the staged Build gate bundle
-        id: gate-bundle-download
-        if: steps.gate-bundle.outcome == 'success'
-        continue-on-error: true
+      - name: Download the authenticated Build gate bundle by immutable ID
+        if: needs.build-source.outputs.reused == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: staged-release-bundle
+          artifact-ids: ${{ needs.build-source.outputs.artifact_id }}
+          merge-multiple: true
           path: build/release
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: ${{ steps.gate-bundle.outputs.run_id }}
-
-      - name: Reverify the reused staged bytes against this exact commit
-        id: gate-bundle-verify
-        if: steps.gate-bundle-download.outcome == 'success'
-        continue-on-error: true
+          run-id: ${{ needs.build-source.outputs.run_id }}
+      - name: Download the independently compiled complete matrix
+        if: needs.build-source.outputs.reused == 'false'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: compiled-matrix-bundle
+          path: build/release
+      - name: Reverify the staged bytes against this exact tested commit
         run: python scripts/release/verify_release.py --verify-staged
-
-      - name: Resolve whether the Build gate bundle was reused
-        id: reuse
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.attest_run_id == ''
-        shell: bash
-        env:
-          GATE_RUN_ID: ${{ steps.gate-bundle.outputs.run_id }}
-          VERIFY_OUTCOME: ${{ steps.gate-bundle-verify.outcome }}
-        run: |
-          set -euo pipefail
-          if [[ "$VERIFY_OUTCOME" == success ]]; then
-            printf 'reused=true\n' >> "$GITHUB_OUTPUT"
-            printf 'Reused the reverified staged bundle from Build gate run %s.\n' \
-              "$GATE_RUN_ID" | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          rm -rf build/release
-          printf 'reused=false\n' >> "$GITHUB_OUTPUT"
-          printf 'No exact-head Build gate bundle was authenticated; building from source.\n' \
-            | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Build all production artifacts and E2E harnesses
-        if: steps.reuse.outputs.reused != 'true'
-        run: >-
-          python scripts/release/build_matrix.py --clean
-
-      - name: Stage and verify all production artifacts
-        if: steps.reuse.outputs.reused != 'true'
-        run: >-
-          python scripts/release/verify_release.py
-          --matrix release/release-matrix.json
-          --manifest build/release/artifacts.json
-          --stage build/release
 
       - name: Resolve authoritative E2E matrix
         id: matrix
@@ -502,9 +442,8 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      # The shared matrix replaces separate per-version workflows. Bound the wave while allowing
-      # four isolated hosted runners; each runner still executes its Gradle/runtime work serially.
-      max-parallel: 4
+      # Every Minecraft process stays isolated; independent versions need not wait eight waves.
+      max-parallel: 16
       matrix: ${{ fromJSON(needs.build.outputs.anchors) }}
 
     steps:

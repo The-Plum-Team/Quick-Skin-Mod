@@ -1,11 +1,8 @@
 name: Build gate
 
-# The fast lane: everything that can be checked without launching Minecraft. It runs on every
-# pull request plus direct pushes to protected/release branches so a broken compile, a bad matrix,
-# or a build that dirties tracked sources is caught immediately without building an in-repository
-# feature commit twice. Automation branches dispatch this workflow explicitly.
-#
-# Packaged E2E remains a separate workflow so version branches can run both gates independently.
+# Compile each matrix target on an isolated runner while repository-policy checks run alongside.
+# The stable required gate reverifies the complete bundle, which Packaged E2E consumes unchanged.
+# Historical automation branches may still dispatch both gates independently.
 on:
   pull_request:
   push:
@@ -44,42 +41,25 @@ env:
   PYTHONUNBUFFERED: "1"
 
 jobs:
-  build:
-    name: Build and verify
+  compile:
     if: >-
-      github.event_name != 'workflow_dispatch' ||
-      inputs.attest_run_id == ''
-    runs-on: ubuntu-24.04
-    # The shared matrix builds every target serially after the repository-policy suites.
-    timeout-minutes: 90
+      github.event_name != 'workflow_dispatch' || inputs.attest_run_id == ''
+    uses: ./.github/workflows/build-matrix.yml
+    with:
+      cache-writer: true
 
+  policy:
+    name: Validate repository policy
+    if: >-
+      github.event_name != 'workflow_dispatch' || inputs.attest_run_id == ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-
-      - name: Verify exact Gradle bootstrap checksums
-        shell: bash
-        run: |
-          set -euo pipefail
-          (cd gradle/wrapper && sha256sum --check --strict gradle-wrapper.jar.sha256)
-          distribution_hash="$(tr -d '\r\n' < gradle/wrapper/gradle-9.7.1-bin.zip.sha256)"
-          grep --fixed-strings --line-regexp "distributionSha256Sum=$distribution_hash" \
-            gradle/wrapper/gradle-wrapper.properties
-
-      - name: Install all required JDKs
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
-        with:
-          distribution: temurin
-          java-version: |
-            17
-            21
-            25
 
       - name: Install Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -92,29 +72,6 @@ jobs:
           --only-binary=:all:
           --require-hashes
           --requirement scripts/pages/requirements.txt
-
-      - name: Select the bounded Gradle cache mode
-        id: gradle-cache
-        shell: bash
-        env:
-          REF_PROTECTED: ${{ github.ref_protected }}
-          REF_TYPE: ${{ github.ref_type }}
-        run: |
-          set -euo pipefail
-          read_only="$(python3 scripts/ci/gradle_cache_policy.py \
-            --matrix release/release-matrix.json \
-            --event-name "$GITHUB_EVENT_NAME" \
-            --ref-name "$GITHUB_REF_NAME" \
-            --ref-type "$REF_TYPE" \
-            --ref-protected "$REF_PROTECTED")"
-          [[ "$read_only" == true || "$read_only" == false ]]
-          printf 'read_only=%s\n' "$read_only" >> "$GITHUB_OUTPUT"
-
-      - name: Configure Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          cache-read-only: ${{ steps.gradle-cache.outputs.read_only }}
-          cache-cleanup: on-success
 
       - name: Validate central matrix
         run: python scripts/release/matrix.py --matrix release/release-matrix.json > /dev/null
@@ -167,20 +124,56 @@ jobs:
           python -m unittest discover -s scripts/release/tests -p 'test_*.py' -v
           python -m unittest discover -s scripts/ci/tests -p 'test_*.py' -v
 
-      - name: Build all production artifacts and E2E harnesses
-        run: >-
-          python scripts/release/build_matrix.py --clean
+      - name: Upload build diagnostics
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-gate-diagnostics
+          path: |
+            **/build/reports/
+            **/build/test-results/
+            **/build/*.log
+            **/run/logs/
+          if-no-files-found: ignore
+          retention-days: 1
 
-      - name: Stage and verify all production artifacts
-        run: >-
-          python scripts/release/verify_release.py
-          --matrix release/release-matrix.json
-          --manifest build/release/artifacts.json
-          --stage build/release
+  build:
+    name: Build and verify
+    needs: [compile, policy]
+    if: >-
+      always() && !cancelled() &&
+      (github.event_name != 'workflow_dispatch' || inputs.attest_run_id == '')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Require the complete compilation and policy jobs
+        shell: bash
+        env:
+          COMPILE_RESULT: ${{ needs.compile.result }}
+          POLICY_RESULT: ${{ needs.policy.result }}
+        run: |
+          set -euo pipefail
+          [[ "$COMPILE_RESULT" == success && "$POLICY_RESULT" == success ]]
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
-      # A concurrently dispatched Packaged E2E run for this exact head may reuse these
-      # verified bytes instead of repeating the identical Gradle build. Consumers
-      # authenticate the owning run and reverify the staged manifest before trusting them.
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Download the complete bundle from this execution
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: compiled-matrix-bundle
+          path: build/release
+      - name: Reverify all staged production artifacts and harnesses
+        run: python scripts/release/verify_release.py --verify-staged
+
       - name: Upload the staged release bundle for exact-head reuse
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -196,20 +189,6 @@ jobs:
           set -euo pipefail
           git diff --exit-code
           test -z "$(git status --porcelain --untracked-files=no)"
-
-      - name: Upload build diagnostics
-        if: failure()
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: build-gate-diagnostics
-          path: |
-            **/build/reports/
-            **/build/test-results/
-            **/build/*.log
-            **/run/logs/
-          if-no-files-found: ignore
-          retention-days: 1
 
   request-shared-e2e:
     name: Request packaged E2E for shared source

@@ -209,8 +209,10 @@ python -m unittest discover -s scripts/release/tests -p "test_*.py" -v
 python -m unittest discover -s scripts/ci/tests -p "test_*.py" -v
 ```
 
-Do not run multiple Gradle commands at the same time. Architectury's transforms share JVM-global
-state and this repository deliberately builds serially.
+Do not run multiple Gradle commands at the same time on one machine. Architectury's transforms share
+JVM-global state, so local aggregate builds remain serial. GitHub compiles separate targets on
+isolated runners, then verifies the complete set before passing Build. Packaged E2E reuses that
+exact compilation; changes within one feature can then reduce its authenticated scenario scope.
 
 You normally do not need to launch packaged Minecraft E2E locally. Use the `capture_coverage=full`
 manual recovery option when complete coverage is needed; nightly and optional-mod profiles remain

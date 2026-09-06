@@ -166,26 +166,34 @@ else: raise SystemExit("Unexpected fixture API endpoint")
                                      result.stderr[:1500])
 
     def test_shared_runtime_reuses_only_the_exact_successful_master_push_build(self):
-        script = step_script("on-demand-e2e.yml", "build", "Discover the exact-head Build gate staged bundle")
         sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
-            python = folder / "python3"
-            python.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + ' "$@"\n')
-            python.chmod(0o755)
             fixture = folder / "api.py"
             fixture.write_text('''import json,os,sys
 from pathlib import Path
 args=sys.argv[1:]; sha=os.environ["FIXTURE_SHA"]
 endpoint=next((arg for arg in args if arg.startswith("repos/")), "")
-if not args or args[0] != "api" or "event=push" not in endpoint or "head_sha="+sha not in endpoint:
- raise SystemExit("Unexpected build-reuse API query")
-print(Path(os.environ["FIXTURE_RUN"]).read_text())
+if args[:3] != ["api","--method","GET"]:
+ raise SystemExit("Expected a read-only Build API query")
+if "/actions/workflows/build-gate.yml/runs?" in endpoint:
+ if "event=push" not in endpoint or "head_sha="+sha not in endpoint:
+  raise SystemExit("Unexpected build-reuse source")
+ print(json.dumps({"total_count":1,"workflow_runs":[json.loads(Path(os.environ["FIXTURE_RUN"]).read_text())]}))
+elif endpoint.endswith("/actions/runs/42/attempts/1/jobs?per_page=100&page=1"):
+ print(json.dumps({"total_count":1,"jobs":[{"id":43,"run_id":42,"run_attempt":1,"head_sha":sha,
+  "name":"Build and verify","status":"completed","conclusion":"success"}]}))
+elif endpoint.endswith("/actions/runs/42/artifacts?per_page=100"):
+ print(json.dumps({"total_count":1,"artifacts":[{"id":44,"name":"staged-release-bundle",
+  "expired":False,"size_in_bytes":100,"digest":"sha256:"+"c"*64}]}))
+else: raise SystemExit("Unexpected Build API query")
 ''')
             gh = folder / "gh"
             gh.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + " " + shlex.quote(str(fixture)) + ' "$@"\n')
             gh.chmod(0o755)
-            original = {"id": 42, "status": "completed", "conclusion": "success", "event": "push",
+            event = folder / "event.json"
+            event.write_text("{}\n")
+            original = {"id": 42, "run_attempt": 1, "status": "completed", "conclusion": "success", "event": "push",
                         "path": ".github/workflows/build-gate.yml", "head_branch": "master", "head_sha": sha,
                         "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"}}
             for field, value in ((None, None), ("event", "pull_request"), ("head_sha", "b" * 40),
@@ -195,14 +203,17 @@ print(Path(os.environ["FIXTURE_RUN"]).read_text())
                     if field is not None: run[field] = value
                     fixture_run, output = folder / "run.json", folder / "output"
                     fixture_run.write_text(json.dumps(run)); output.write_text("")
-                    env = {"PATH": str(folder) + os.pathsep + "/opt/homebrew/bin" + os.pathsep + os.defpath,
-                           "GITHUB_REF_NAME": "master", "GITHUB_SHA": sha,
-                           "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod", "GITHUB_OUTPUT": str(output),
-                           "FIXTURE_SHA": sha, "FIXTURE_RUN": str(fixture_run)}
-                    result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
-                                            cwd=ROOT, env=env, text=True, capture_output=True, timeout=20)
-                    self.assertEqual(field is None, result.returncode == 0, result.stderr[:1500])
-                    self.assertEqual("run_id=42\n" if field is None else "", output.read_text())
+                    env = {"PATH": str(folder) + os.pathsep + os.defpath,
+                           "GITHUB_REF_NAME": "master", "GITHUB_SHA": sha, "GITHUB_EVENT_NAME": "workflow_dispatch",
+                           "GITHUB_EVENT_PATH": str(event), "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
+                           "GITHUB_OUTPUT": str(output), "FIXTURE_SHA": sha, "FIXTURE_RUN": str(fixture_run)}
+                    result = subprocess.run([sys.executable, str(ROOT / "scripts/ci/staged_build_bundle.py"),
+                                             "--wait-seconds", "0"], cwd=ROOT, env=env,
+                                            text=True, capture_output=True, timeout=20)
+                    self.assertEqual(field in {None, "head_branch"}, result.returncode == 0, result.stderr[:1500])
+                    expected = ("reused=true\nrun_id=42\nartifact_id=44\n" if field is None
+                                else "reused=false\n" if field == "head_branch" else "")
+                    self.assertEqual(expected, output.read_text())
 
     def test_sync_exits_before_git_or_github_even_for_delayed_and_manual_targets(self):
         script = step_script("sync-version-branches.yml", "discover", "Resolve targets from GitHub")

@@ -378,8 +378,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertEqual(observed_overrides, set(retention_overrides))
 
     def test_gradle_cache_writes_are_limited_to_protected_master_builds(self) -> None:
-        build = job_block("build-gate.yml", "build")
-        e2e = job_block("on-demand-e2e.yml", "build")
+        build = job_block("build-matrix.yml", "target")
+        e2e = job_block("on-demand-e2e.yml", "compile")
         release = job_block("release.yml", "build")
         policy = (ROOT / "scripts" / "ci" / "gradle_cache_policy.py").read_text(
             encoding="utf-8"
@@ -389,7 +389,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             workflow.read_text(encoding="utf-8").count("gradle/actions/setup-gradle@")
             for workflow in WORKFLOWS.glob("*.yml")
         )
-        self.assertEqual(setup_count, 3)
+        self.assertEqual(setup_count, 2)
         self.assertIn("scripts/ci/gradle_cache_policy.py", build)
         self.assertIn("--matrix release/release-matrix.json", build)
         self.assertIn('--event-name "$GITHUB_EVENT_NAME"', build)
@@ -402,11 +402,15 @@ class WorkflowSecurityTest(unittest.TestCase):
             "cache-read-only: ${{ steps.gradle-cache.outputs.read_only }}", build
         )
         self.assertIn("cache-cleanup: on-success", build)
-        for workflow, block in (("on-demand-e2e.yml", e2e), ("release.yml", release)):
-            with self.subTest(workflow=workflow):
-                self.assertEqual(block.count("gradle/actions/setup-gradle@"), 1)
-                self.assertEqual(block.count("cache-read-only: true"), 1)
-                self.assertNotIn("gradle_cache_policy.py", block)
+        self.assertIn("uses: ./.github/workflows/build-matrix.yml", e2e)
+        self.assertNotIn("cache-writer: true", e2e)
+        compiler = (WORKFLOWS / "build-matrix.yml").read_text()
+        self.assertIn("default: false", compiler)
+        self.assertIn('if [[ "$CACHE_WRITER" == true ]]', build)
+        self.assertIn("cache-writer: true", job_block("build-gate.yml", "compile"))
+        self.assertEqual(release.count("gradle/actions/setup-gradle@"), 1)
+        self.assertEqual(release.count("cache-read-only: true"), 1)
+        self.assertNotIn("gradle_cache_policy.py", release)
 
         self.assertIn('WRITER_EVENTS = frozenset({"push", "workflow_dispatch"})', policy)
         self.assertIn("event_name not in WRITER_EVENTS", policy)
@@ -2339,7 +2343,7 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_release_test_jobs_install_locked_pages_dependency(self) -> None:
         for workflow, job in (
-            ("build-gate.yml", "build"),
+            ("build-gate.yml", "policy"),
             ("refresh-release-status.yml", "refresh"),
             ("sync-version-branches.yml", "validate"),
             ("handle-version-port-result.yml", "validate-repair"),
@@ -2359,7 +2363,7 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_python_compilation_covers_the_entire_tooling_tree(self) -> None:
         for workflow, job in (
-            ("build-gate.yml", "build"),
+            ("build-gate.yml", "policy"),
             ("refresh-release-status.yml", "refresh"),
             ("sync-version-branches.yml", "validate"),
             ("handle-version-port-result.yml", "validate-repair"),
@@ -2379,7 +2383,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                 self.assertNotIn("-m py_compile", text)
 
     def test_build_gate_checks_the_actual_branch_readme_profile(self) -> None:
-        build = job_block("build-gate.yml", "build")
+        build = job_block("build-gate.yml", "policy")
 
         self.assertIn("Validate branch-specific README profile", build)
         self.assertIn("BASE_REF: ${{ github.base_ref }}", build)
@@ -2861,11 +2865,33 @@ class WorkflowSecurityTest(unittest.TestCase):
 
         self.assertIn("name: staged-release-bundle", gate)
         self.assertIn("retention-days: 1", gate)
-        self.assertIn("head_sha=$GITHUB_SHA", build)
-        self.assertIn('.path == ".github/workflows/build-gate.yml"', build)
-        self.assertIn(".head_repository.full_name == $repository", build)
+        source = job_block("on-demand-e2e.yml", "build-source")
+        consumer = (ROOT / "scripts/ci/staged_build_bundle.py").read_text()
+        self.assertIn("scripts/ci/staged_build_bundle.py --wait-seconds 5400", source)
+        self.assertIn('WORKFLOW = ".github/workflows/build-gate.yml"', consumer)
+        self.assertIn('run.get("head_sha") == source.head', consumer)
+        self.assertIn('run.get("head_repository", {}).get("full_name") == source.head_repository', consumer)
+        self.assertIn("artifact-ids: ${{ needs.build-source.outputs.artifact_id }}", build)
+        self.assertIn("run-id: ${{ needs.build-source.outputs.run_id }}", build)
         self.assertIn("--verify-staged", build)
-        self.assertIn("steps.reuse.outputs.reused != 'true'", build)
+        self.assertNotIn("continue-on-error", source)
+        self.assertNotIn("build_matrix.py", build)
+        self.assertIn("needs.build-source.outputs.reused == 'false'",
+                      job_block("on-demand-e2e.yml", "compile"))
+
+    def test_isolated_compilation_keeps_the_complete_required_build_gate(self) -> None:
+        target = job_block("build-matrix.yml", "target")
+        assemble = job_block("build-matrix.yml", "assemble")
+        gate = job_block("build-gate.yml", "build")
+        self.assertIn("max-parallel: 8", target)
+        self.assertIn('python scripts/release/build_matrix.py --clean "${target_args[@]}"', target)
+        self.assertIn('python scripts/release/verify_release.py "${target_args[@]}"', target)
+        self.assertIn("needs: target", assemble)
+        self.assertIn("scripts/release/assemble_build.py", assemble)
+        self.assertIn("needs: [compile, policy]", gate)
+        self.assertIn('[[ "$COMPILE_RESULT" == success && "$POLICY_RESULT" == success ]]', gate)
+        self.assertIn("--verify-staged", gate)
+        self.assertIn("max-parallel: 16", job_block("on-demand-e2e.yml", "e2e"))
 
     def test_version_port_merge_bridges_verified_runs_to_required_statuses(self) -> None:
         merge = job_block("handle-version-port-result.yml", "merge")

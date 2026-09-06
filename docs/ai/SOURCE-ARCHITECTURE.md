@@ -43,6 +43,14 @@ The common JAR bundles the internal module closure before the existing Architect
 transforms, preserving one production JAR per release artifact. It must reject duplicate entries
 and must never absorb the harness. The common test task also runs its extracted libraries' tests.
 
+`build-matrix.yml` fans the validated build plan out to isolated GitHub runners without enabling
+parallel Gradle work inside a JVM. `assemble_build.py` authenticates the exact complete partition
+and its target manifests before staging one aggregate bundle. Build and Packaged E2E share those
+bytes through `staged_build_bundle.py`; PR head identity selects the producer, while the manifest's
+distinct tested merge commit must equal the consumer checkout. Missing PR builds, failed gates,
+advanced PR parents and malformed bundles cannot authorize runtime. Standalone runs without an
+available bundle use the same compiler.
+
 The version-3 scenario contract declares each step's module/binding coverage, earlier action
 prerequisites, and earlier captures consumed by assertions. Coordinated multiplayer scenarios
 retain all clients and actions through `execution_scope: scenario`. `e2e/selection.py` computes

@@ -20,8 +20,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   caches, or IDE output.
 - Keep production and E2E JARs physically separate. The E2E harness may compile against main output
   but must never package Quick Skin production classes.
-- Do not run multiple Gradle invocations concurrently. Architectury uses JVM-global transform state,
-  and this repository intentionally disables parallel Gradle execution for aggregate builds.
+- Do not run multiple Gradle invocations concurrently on one machine or checkout. Architectury uses
+  JVM-global transform state, and aggregate local builds remain serial. GitHub may compile separate
+  targets concurrently only on isolated hosted runners, each with its own checkout and serial JVM.
 - A workflow step that receives an AI credential must run the pinned CLI with safe mode, no session
   persistence or prompt history, `dontAsk`, an explicit shell-free `--tools` set, and scoped
   `Read`/`Edit`/`Write` permission rules. Install that CLI only from package and lock files
@@ -174,6 +175,15 @@ The full build coordinator runs one Gradle process per matrix target sequentiall
 that target's unit tests, production JARs, and packaged harnesses. Never nest Gradle processes or
 combine every Minecraft target's remapping tasks in one JVM. Use `--target <minecraft>` for an
 explicitly partial build. A successful build report does not replace artifact staging or E2E.
+
+GitHub's reusable `build-matrix.yml` derives all target jobs from that same validated plan and
+allows eight isolated runners. `assemble_build.py` independently reverifies every target manifest,
+commit, matrix, production/harness hash and SBOM before constructing the complete bundle.
+Repository-policy tests run alongside compilation; both must pass the stable `Build and verify`
+gate. A PR's Packaged E2E waits for that exact source Build and downloads its immutable artifact
+by ID, then reverifies it against the tested merge commit. It never starts a second PR compilation.
+Standalone runs without an available bundle use the same complete isolated compiler. Runtime
+coverage uses up to sixteen isolated runners and retains every required target/loader job.
 
 Release automation always rebuilds `scripts/release/build_matrix.py` with `--rerun-tasks` and
 requires every production and harness SHA-256 to equal the first build. When determinism is in

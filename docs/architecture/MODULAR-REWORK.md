@@ -709,8 +709,9 @@ The full matrix is the next acceptance step.
 Contributor and imported agent instructions now route all new fixes to `master`, including one
 Minecraft target. Matrix-derived unit commands explicitly scope Gradle with `quickskinTarget`;
 historical schema-2 command rendering remains supported. The external-mod lock updater reads
-schema-3 targets from the matrix without requiring remote version branches. Full E2E uses four
-isolated hosted runners for the shared matrix while local Gradle remains strictly serial.
+schema-3 targets from the matrix without requiring remote version branches. The first complete
+shared E2E used four isolated hosted runners while local Gradle remained strictly serial; the
+subsequent CI latency checkpoint below revises hosted scheduling.
 
 The final module graph still has 37 production modules plus the common assembly. Current local
 selection previews use 2 HUD captures, 5 menu-integration captures, 45 editor captures, and 28
@@ -759,3 +760,27 @@ GitHub's annotation explicitly identifies that timeout. The Build job now allows
 matching the runtime input builder while accommodating its additional policy suites and staging.
 The 49 workflow-security tests and all 15 YAML documents pass. Runtime acceptance remains pending;
 this scheduling correction changes no production or harness source.
+
+### Shared CI latency
+
+The first successful final-source GitHub Build (`34014354343`, PR head `d00fdbe6`) took about
+66 minutes. Its separately compiled E2E input bundle took 51 minutes, and 32 runtime rows were
+limited to four runners. The unified source had exposed serial work and duplicated PR compilation;
+fewer feature screenshots alone could not remove those costs.
+
+The compiler now derives every target from the existing validated local plan and builds on up to
+eight isolated hosted runners. Local Gradle remains serial. Complete assembly reverifies every
+target's commit, matrix, JARs, harnesses and SBOM before it creates an aggregate bundle; a missing,
+foreign, overlapping or altered target cannot pass. Repository-policy suites run alongside the
+compiler and remain required by the stable Build gate. PR E2E waits for that exact successful Build
+and consumes its immutable artifact, checking the manifest against the distinct tested merge SHA.
+Standalone runs without an available bundle use the same compiler. Sixteen isolated runtime
+runners retain the full required lane inventory while reducing scheduling waves. GitHub timing
+and complete runtime acceptance for this revised orchestration are still pending.
+
+Local validation passes all 408 CI tests and 532 release/Pages tests, the generated profile checks,
+all 16 workflow/action YAML documents, and actionlint on the three changed workflows. A real
+assembly round trip partitions and reverifies the previously accepted 64 JARs and their SBOMs,
+reconstructs the complete bundle, and preserves every JAR hash without starting Gradle or
+Minecraft. A read-only live probe authenticates the successful PR Build and its immutable bundle
+while preserving the distinction between PR head and tested merge SHA.
