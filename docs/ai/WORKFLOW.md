@@ -37,6 +37,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Never place raw visual artifacts in a credential-bearing job. Authenticate them, validate the
   protected lane graph, extract them with aggregate budgets, enforce exact matrix-row/scenario/JAR
   coverage, and canonicalize selected images in a prior secretless job. The fresh review capsule
+  budgets candidate/reference visits at the contract's fixed resolution, counting a reused
+  reference for each pair; retained image bytes have a separate aggregate limit. Revalidate the
+  exact source/generation/target tuple before queue API access, and scope completed reports and
+  retry markers to that same target so sibling reviews cannot suppress one another. The capsule
   may expose only bounded manifest chunks and its curated image directory through a read-only model
   tool surface; the shell captures one private raw JSON result envelope per bounded call from model
   stdout. The pinned CLI must validate supported structural types, required keys, and

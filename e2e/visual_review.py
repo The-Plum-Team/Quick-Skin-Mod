@@ -39,6 +39,7 @@ from visual_evidence import (
 )
 from visual_similarity import SimilarityError, analyze_png_payloads
 from selection import SelectionPlan
+from scenario_contract import REQUIRED_SCREENSHOT_SIZE
 from e2e_selection import verify as verify_selection_admission
 
 
@@ -46,7 +47,11 @@ MAX_REVIEW_FRAMES = 512
 # Leave explicit headroom inside the 512 MiB handoff envelope for the
 # manifest, proof, ZIP metadata, and directory entries.
 MAX_REVIEW_IMAGE_BYTES = 480 * 1024 * 1024
-MAX_REVIEW_IMAGE_PIXELS = 512 * 1024 * 1024
+# Bound candidate and reference visits at the contract's fixed resolution. The
+# complete two-loader profile must fit; reused references still count per frame.
+MAX_REVIEW_IMAGE_PIXELS = (
+    MAX_REVIEW_FRAMES * REQUIRED_SCREENSHOT_SIZE[0] * REQUIRED_SCREENSHOT_SIZE[1]
+)
 SAFE_DIRECTORY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")

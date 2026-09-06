@@ -504,9 +504,11 @@ jobs:
           ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
           ARTIFACT_RUN_ID: ${{ needs.select.outputs.artifact_run_id }}
           ARTIFACT_SIZE: ${{ needs.select.outputs.artifact_size }}
+          BUNDLE_KEY: ${{ needs.select.outputs.bundle_key }}
           GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
           GH_TOKEN: ${{ github.token }}
           IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
+          REVIEW_KEY: ${{ needs.select.outputs.review_key }}
           SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
         run: |
           set -euo pipefail
@@ -560,15 +562,23 @@ jobs:
           printf 'wave_blocked=false\n' >> "$GITHUB_OUTPUT"
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$ARTIFACT_NAME" == "visual-review-input-$SOURCE_RUN_ID" \
-            || "$ARTIFACT_NAME" == \
-              "visual-review-input-$SOURCE_RUN_ID-$GENERATION_SHA" ]]
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 1
+          if [[ -n "$BUNDLE_KEY" ]]; then
+            [[ "$BUNDLE_KEY" =~ ^mc[0-9]+([.][0-9]+)+$ ]] || exit 1
+            [[ "$ARTIFACT_NAME" == \
+              "visual-review-input-$SOURCE_RUN_ID-$GENERATION_SHA--$BUNDLE_KEY" ]] || exit 1
+            [[ "$REVIEW_KEY" == "$SOURCE_RUN_ID--$BUNDLE_KEY" ]] || exit 1
+          else
+            [[ "$ARTIFACT_NAME" == "visual-review-input-$SOURCE_RUN_ID" \
+              || "$ARTIFACT_NAME" == \
+                "visual-review-input-$SOURCE_RUN_ID-$GENERATION_SHA" ]] || exit 1
+            [[ "$REVIEW_KEY" == "$SOURCE_RUN_ID" ]] || exit 1
+          fi
           [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
           [[ "$ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
           (( ARTIFACT_SIZE <= 536870912 ))
           [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
 
           # An Opus-confirmed defect in one automatic port stops every sibling review from the same
           # exact propagated generation. The marker's protected implementation is reauthenticated
@@ -641,7 +651,7 @@ jobs:
              [.workflow_run.id, .expired, .size_in_bytes,
               .workflow_run.head_sha] | @tsv' <<< "$blocks")
 
-          report_name="visual-review-$SOURCE_RUN_ID"
+          report_name="visual-review-$REVIEW_KEY"
           reports="$(protected_gh_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$report_name&per_page=100")"
           jq -e \
@@ -673,9 +683,9 @@ jobs:
              [.workflow_run.id, .expired] | @tsv' <<< "$reports")
 
           # A wake may have selected this capsule while an older run still held the model group.
-          # Re-check the exact source's fixed-name marker after entering that group so a recent
+          # Re-check the selected target's fixed-name marker after entering that group so a recent
           # provider failure cannot be retried by an already-pending duplicate drain.
-          attempt_name="visual-review-attempt-$SOURCE_RUN_ID"
+          attempt_name="visual-review-attempt-$REVIEW_KEY"
           attempts="$(protected_gh_api_retry --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$attempt_name&per_page=100")"
           jq -e \

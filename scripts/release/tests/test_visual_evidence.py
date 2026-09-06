@@ -49,6 +49,7 @@ from visual_review import (  # noqa: E402
     validate_semantic_anchor_manifest,
 )
 from selection import RoleSelection, ScenarioSelection, Selection
+from scenario_contract import default_contract
 from e2e_selection import Admission
 
 
@@ -832,6 +833,72 @@ class VisualEvidenceTest(unittest.TestCase):
 
         self.assertNotIn(marker, served.read_bytes())
         self.assertEqual(PNG_PIXEL_SHA256, validate_png_snapshot(served)[2])
+
+    def paired_curator_fixture(self, frame_count: int):
+        capture_id = "phase0-smoke.client_a.baseline"
+        self.write_catalog([("phase0-smoke", "client_a", "baseline")])
+        self.write_result(
+            "phase0-smoke", artifact_node="fabric-1.21.1", runtime_version="1.21.1"
+        )
+        reference_root, _pixels = self.write_raw_reference(capture_id)
+        references = load_reference_frames(
+            reference_root, self.catalog_path,
+            branch="forge-and-fabric-1.20.1", artifact_node="fabric-1.20.1"
+        )
+        template = build_manifest(
+            self.e2e_root, self.catalog_path, include_all=True,
+            combos=None, reference_frames=references
+        )[0]
+        candidate = visual_review.canonicalize_png_snapshot(Path(template["path"]))
+        reference = visual_review.canonicalize_png_snapshot(Path(template["reference_path"]))
+        similarity = visual_review.analyze_png_payloads(
+            candidate[-1], reference[-1], template["_review_regions"], candidate[0]
+        )
+        frames = [
+            {
+                **template,
+                "label": f"fabric-1.21.1/phase0-smoke/client_a/capture_{index}",
+                "capture_id": f"phase0-smoke.client_a.capture_{index}",
+                "kind": f"phase0-smoke.client_a.capture_{index}",
+                "reference_label": f"fabric-1.20.1/phase0-smoke/client_a/capture_{index}",
+            }
+            for index in range(frame_count)
+        ]
+        return frames, candidate, similarity
+
+    def test_curator_accepts_complete_paired_pr_capture_product(self) -> None:
+        contract = default_contract()
+        captures_per_loader = sum(
+            step.capture is not None
+            for scenario in contract.scenarios_for_profile("pr")
+            for role in contract.scenario(scenario).roles
+            for step in role.steps
+        )
+        frames, candidate, similarity = self.paired_curator_fixture(2 * captures_per_loader)
+        output = self.root / "complete-paired-review"
+        # Reuse a real authenticated PNG snapshot and analysis to isolate aggregate accounting
+        # from the cost of decoding the same fixture for every authored frame.
+        with (
+            mock.patch("visual_review.canonicalize_png_snapshot", return_value=candidate),
+            mock.patch("visual_review.analyze_png_payloads", return_value=similarity),
+        ):
+            curated = curate_manifest(frames, output)
+        self.assertEqual(2 * captures_per_loader, len(curated))
+        self.assertEqual(
+            2 * captures_per_loader, validate_input(curated, output, require_paired=True)
+        )
+
+    def test_curator_rejects_more_than_512_full_resolution_image_visits(self) -> None:
+        frames, candidate, similarity = self.paired_curator_fixture(257)
+        output = self.root / "over-budget-review"
+        with (
+            mock.patch("visual_review.canonicalize_png_snapshot", return_value=candidate),
+            mock.patch("visual_review.analyze_png_payloads", return_value=similarity),
+            self.assertRaisesRegex(VisualEvidenceError, "total pixel"),
+        ):
+            curate_manifest(frames, output)
+        self.assertFalse(output.exists())
+        self.assertEqual([], list(self.root.glob(".over-budget-review.curating-*")))
 
     def test_curator_enforces_exact_dimensions_and_aggregate_pixels(self) -> None:
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
