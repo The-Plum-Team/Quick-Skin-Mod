@@ -3766,9 +3766,9 @@
               "id": "tab_list_head",
               "assertion_required": true,
               "capture": {
-                "title": "Tab list head",
+                "title": "Player list appearance",
                 "review_tier": "all",
-                "expectation": "The vanilla player list overlay is held open at the top of the in-world view and the single Alice row shows a small face icon taken from the custom plaid skin.",
+                "expectation": "The vanilla player list overlay is held open at the top of the in-world view with a single Alice row and connection indicator. The runtime assertion records vanilla's connection policy as headsVisible: when true, the row must show the custom skin's small face icon; when false, vanilla intentionally omits heads on this offline dedicated connection and the row must have no head icon. In both cases the runtime assertion must confirm PlayerInfo and the player renderer resolve the active custom skin.",
                 "probes": []
               },
               "requires": [

@@ -53,7 +53,7 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.2` | `26.2` | Fabric | `25` | `11` |
 | `neoforge-26.2` | `26.2` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `800ef4a3c35873d2ccf24d9304eed7b5ecf6916cdbee6630541c1463863479c0`
+Scenario contract SHA-256: `b65dc823449e5c24180997c8ed97379dba30a521afc29993671960031f1a69c8`
 Contract totals: `128` ordered steps, `97` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -336,7 +336,9 @@ editor preview.
 The `full` scenario continues with skin-fidelity checkpoints derived from the same plaid fixture:
 an auto-detected slim layout, a converted 64x32 legacy skin with mirrored blue limbs, a 128x128
 HD skin whose one-pixel torso checker must survive rendering, and a base-layer transparent skin
-captured before and after the real Disable Skin Transparency checkbox flattens it. Catalog
+captured before and after the real Disable Skin Transparency checkbox flattens it. Its sleeves
+are half-transparent on every base face with opaque hands; cleared arm overlays let both the
+first-person and rear-view captures inspect the base layer. Catalog
 checkpoints rename, sort, protect, and delete entries through the real skin-menu paths and show
 the own-skin deletion toast and the stale-id fallback. Cape checkpoints import a translucent cape
 through the real drop workflow (vanilla elytra composited into its transparent elytra area), open
@@ -351,8 +353,12 @@ starts with a non-default `quickskin-server.json`; the seed is declared in the c
 override reaches the client, that the server transparency policy wins over the client setting,
 that a second skin change stays on the real cooldown button and unacknowledged, and that a cape
 change during the cooldown is still accepted. `session` proves the pause menu, inventory paper
-doll, player-list head, and the post-disconnect title preview all consume the saved look and that
+doll, player-list skin binding, and the post-disconnect title preview all consume the saved look and that
 the client session state is cleared after leaving the server.
+The player-list assertion records vanilla's actual head-visibility policy: local server or encrypted
+connection through 26.1.x, then `onlineMode()` in 26.2. The offline dedicated fixture normally hides
+heads; the visual contract requires the Alice row and connection indicator, plus a custom face
+only when that policy enables it. An unreadable policy fails the assertion.
 The disconnect driver shows a neutral temporary screen until vanilla finishes teardown, then
 opens the title screen. Its assertion also rejects a cached preview entity from the closed world;
 opening the title during teardown can repopulate that cache after the player-quit callback.

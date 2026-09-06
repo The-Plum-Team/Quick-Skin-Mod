@@ -79,6 +79,8 @@ import java.util.function.Consumer;
  *       {@code SplashRenderer(Component)}, plus its remapped private field on {@code TitleScreen}.</li>
  *   <li><b>transient overlays</b>: toast/chat access through {@code Minecraft}/{@code Gui}
  *       (1.20.1..26.1.x) vs {@code Gui.toastManager()}/{@code Gui.hud.getChat()} (26.2).</li>
+ *   <li><b>tab-list heads</b>: local-server/encrypted-connection policy through 26.1.x,
+ *       then {@code ClientPacketListener.onlineMode()} in 26.2.</li>
  *   <li><b>disconnect to title</b>: {@code Level.disconnect()} vs
  *       {@code Level.disconnect(Component)}, followed by the loader-observable
  *       {@code Minecraft.disconnect} boundary (or its legacy no-arg form).</li>
@@ -1195,6 +1197,33 @@ public final class VanillaShim {
         } catch (Throwable t) {
             E2ELog.warn("setGuiScale: " + t);
             return false;
+        }
+    }
+
+    /** The actual vanilla head-visibility rule, kept separate from Quick Skin's texture binding. */
+    public record TabListHeadPolicy(boolean visible, String rule) {}
+
+    /** Returns {@code null} when the current connection policy cannot be read; never assumes a pass. */
+    public static TabListHeadPolicy tabListHeadPolicy(Minecraft mc) {
+        try {
+            var listener = mc.getConnection();
+            if (listener == null) return null;
+            // This accessor first appears in the official-namespace 26.2 API.
+            Method onlineMode = findNoArg(listener.getClass(), "onlineMode");
+            if (onlineMode != null) {
+                boolean online = (Boolean) onlineMode.invoke(listener);
+                return new TabListHeadPolicy(online, "onlineMode=" + online);
+            }
+            Object connection = listener.getConnection();
+            Method isEncrypted = findNoArg(connection.getClass(), "isEncrypted", "method_10771", "m_129535_");
+            if (isEncrypted == null) return null;
+            boolean local = mc.isLocalServer();
+            boolean encrypted = (Boolean) isEncrypted.invoke(connection);
+            return new TabListHeadPolicy(local || encrypted,
+                    "localServer=" + local + ", encrypted=" + encrypted);
+        } catch (Throwable failure) {
+            E2ELog.warn("tabListHeadPolicy: " + failure);
+            return null;
         }
     }
 

@@ -120,7 +120,7 @@ public final class TestAssets {
     public static final int TRANSPARENT_SKIN_WINDOW_Y = 23;
     public static final int TRANSPARENT_SKIN_WINDOW_W = 4;
     public static final int TRANSPARENT_SKIN_WINDOW_H = 6;
-    /** Alpha applied to both arm back base faces by {@link #makeTransparentSkin()}. */
+    /** Alpha applied to every shirt-covered arm base face by {@link #makeTransparentSkin()}. */
     public static final int TRANSLUCENT_SLEEVE_ALPHA = 128;
     /** One pixel inside the right arm back base face (x 52..55, y 20..31). */
     public static final int TRANSLUCENT_SLEEVE_PROBE_X = 53;
@@ -128,18 +128,12 @@ public final class TestAssets {
 
     /**
      * The plaid skin with base-layer transparency: a fully transparent window in the torso back and
-     * half-transparent arm backs. Hat/jacket/sleeve overlay layers are untouched, so the only alpha
-     * below 255 on a base face is the one this fixture introduced.
+     * half-transparent sleeves on every face, with opaque hands. Arm overlays are cleared so they
+     * cannot hide the base-layer transparency in either camera; other overlay layers are unchanged.
      */
     public static Path makeTransparentSkin() throws Exception {
         BufferedImage img = loadPlaidSkinImage();
-        for (int y = TRANSPARENT_SKIN_WINDOW_Y; y < TRANSPARENT_SKIN_WINDOW_Y + TRANSPARENT_SKIN_WINDOW_H; y++) {
-            for (int x = TRANSPARENT_SKIN_WINDOW_X; x < TRANSPARENT_SKIN_WINDOW_X + TRANSPARENT_SKIN_WINDOW_W; x++) {
-                img.setRGB(x, y, 0);
-            }
-        }
-        setAlpha(img, 52, 20, 4, 12, TRANSLUCENT_SLEEVE_ALPHA); // right arm back (base layer)
-        setAlpha(img, 44, 52, 4, 12, TRANSLUCENT_SLEEVE_ALPHA); // left arm back (base layer)
+        SkinTransparencyFixture.apply(img);
         Path tmp = deterministicFixture("qs_e2e_skin_transparent.png");
         writePng(img, tmp);
         return tmp;
@@ -312,14 +306,6 @@ public final class TestAssets {
             for (int x = 0; x < 3; x++) img.setRGB(ox + 4 + x, oy + y, block[y][4 + x]);
             for (int x = 0; x < 4; x++) img.setRGB(ox + 7 + x, oy + y, block[y][8 + x]);
             for (int x = 0; x < 3; x++) img.setRGB(ox + 11 + x, oy + y, block[y][12 + x]);
-        }
-    }
-
-    private static void setAlpha(BufferedImage img, int x0, int y0, int w, int h, int alpha) {
-        for (int y = y0; y < y0 + h; y++) {
-            for (int x = x0; x < x0 + w; x++) {
-                img.setRGB(x, y, (img.getRGB(x, y) & 0x00FFFFFF) | (alpha << 24));
-            }
         }
     }
 
