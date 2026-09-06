@@ -92,7 +92,6 @@ apply(from = rootProject.file("gradle/repository-policy.gradle.kts"))
 
 val sourceOverlays = releaseMatrix["source_overlays"] as Map<*, *>
 val commonOverlayRoutes = sourceOverlays["common"] as Map<*, *>
-val declaredLegacyVersions = commonOverlayRoutes.keys.mapTo(linkedSetOf()) { it.toString() }
 val declaredLegacyDirectories = commonOverlayRoutes.values.mapTo(linkedSetOf()) { it.toString() }
 val actualLegacyDirectories = rootProject.file("common/src").listFiles()
     .orEmpty()
@@ -103,46 +102,17 @@ check(actualLegacyDirectories == declaredLegacyDirectories) {
         "actual=$actualLegacyDirectories"
 }
 
-val canonicalOnlyAfterLegacyByVersion = mapOf(
-    "1.20.1" to setOf(
-            "com/quickskin/mod/client/rendering/DeferredCollectorPreviewRenderBackend.java",
-            "com/quickskin/mod/mixin/GuiSkinRendererMixin.java",
-            "com/quickskin/mod/mixin/PlayerRendererMixin.java",
-            "com/quickskin/mod/mixin/SkinManagerMixin.java",
-            "com/quickskin/mod/networking/payloads/CooldownUpdatePayload.java",
-            "com/quickskin/mod/networking/payloads/PayloadCodecs.java",
-            "com/quickskin/mod/networking/payloads/RequestTexturePayload.java",
-            "com/quickskin/mod/networking/payloads/SendAnimationMetadataPayload.java",
-            "com/quickskin/mod/networking/payloads/SendTextureChunkPayload.java",
-            "com/quickskin/mod/networking/payloads/SendTexturePayload.java",
-            "com/quickskin/mod/networking/payloads/SyncAppearancePayload.java",
-            "com/quickskin/mod/networking/payloads/SyncServerConfigPayload.java",
-            "com/quickskin/mod/networking/payloads/TextureChunkPayload.java",
-            "com/quickskin/mod/networking/payloads/UpdateAppearancePayload.java",
-            "com/quickskin/mod/networking/payloads/UpdateServerConfigPayload.java",
-            "com/quickskin/mod/networking/payloads/UploadAnimationMetadataPayload.java",
-            "com/quickskin/mod/networking/payloads/UploadTexturePayload.java",
-            "com/quickskin/mod/platform/MinecraftCompat26_2.java",
-    ),
-)
-check(canonicalOnlyAfterLegacyByVersion.keys == declaredLegacyVersions) {
-    "Common canonical exclusions must cover exactly the matrix-declared overlay versions"
-}
 val legacyOverlay = commonOverlayRoutes[minecraftVersion]?.toString()?.let { overlayDirectory ->
-    Triple(
+    Pair(
         rootProject.file("common/src/$overlayDirectory/java"),
         rootProject.file("common/src/$overlayDirectory/resources"),
-        canonicalOnlyAfterLegacyByVersion.getValue(minecraftVersion),
     )
 }
 
 if (legacyOverlay != null) {
-    val (legacyJavaRoot, legacyResourcesRoot, canonicalOnlyAfterLegacy) = legacyOverlay
-    check(legacyJavaRoot.isDirectory) { "Missing common overlay Java root: $legacyJavaRoot" }
-    canonicalOnlyAfterLegacy.forEach { relativePath ->
-        check(rootProject.file("common/src/main/java/$relativePath").isFile) {
-            "Common overlay exclusion matches no canonical source: $relativePath"
-        }
+    val (legacyJavaRoot, legacyResourcesRoot) = legacyOverlay
+    check(legacyJavaRoot.isDirectory || legacyResourcesRoot.isDirectory) {
+        "Missing common overlay sources: ${legacyJavaRoot.parentFile}"
     }
     val legacyOverrides = fileTree(legacyJavaRoot) {
         include("**/*.java")
@@ -159,7 +129,7 @@ if (legacyOverlay != null) {
     val prepareConsolidatedJava = tasks.register<Sync>("prepareConsolidatedJava") {
         dependsOn("stonecutterGenerate")
         from(generatedStonecutterJava) {
-            exclude(legacyOverrides + canonicalOnlyAfterLegacy)
+            exclude(legacyOverrides)
         }
         from(legacyJavaRoot)
         into(consolidatedLegacyJava)
@@ -241,6 +211,8 @@ tasks.test {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
+
+apply(from = rootProject.file("gradle/java-module-bundle-conventions.gradle.kts"))
 
 // Keep the production transform identity independent from checkout paths. Loader branches share
 // this transform seam; NeoForge does not consume classic refmap/SRG properties.

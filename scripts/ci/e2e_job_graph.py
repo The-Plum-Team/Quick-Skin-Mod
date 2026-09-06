@@ -50,6 +50,7 @@ PROTECTED_CONTROLLER_PATHS = (
     ".github/workflows/on-demand-e2e.yml",
     ".github/workflows/verify-gate-attestation.yml",
     "build.gradle.kts",
+    "architecture/modules.json",
     "common/src/e2e",
     "e2e/check_visual_review.py",
     "e2e/visual_review_cache.py",
@@ -57,6 +58,8 @@ PROTECTED_CONTROLLER_PATHS = (
     "e2e/ci_summary.py",
     "e2e/dependency_integrity.py",
     "e2e/generate_contract_java.py",
+    "e2e/fml.toml.forge",
+    "e2e/fml.toml.neoforge",
     "e2e/loader-bootstrap-contract.json",
     "e2e/mod-compatibility-contract.json",
     "e2e/mod_compatibility.py",
@@ -69,6 +72,8 @@ PROTECTED_CONTROLLER_PATHS = (
     "e2e/runtime_store.py",
     "e2e/scenario-contract.json",
     "e2e/scenario_contract.py",
+    "e2e/server-template",
+    "e2e/selection.py",
     "e2e/visual_evidence.py",
     "e2e/visual_review.py",
     "e2e/visual_review_prompt.md",
@@ -80,19 +85,38 @@ PROTECTED_CONTROLLER_PATHS = (
     "gradle/archive-conventions.gradle.kts",
     "gradle/e2e-harness-conventions.gradle.kts",
     "gradle/fml-metadata-conventions.gradle.kts",
+    "gradle/java-module-bundle-conventions.gradle.kts",
+    "gradle/java-module-conventions.gradle.kts",
+    "gradle/minecraft-module-framework.gradle.kts",
+    "gradle/minecraft-module-sources.gradle.kts",
+    "gradle/module-graph.settings.gradle.kts",
     "gradle/no-remap-shadow-conventions.gradle.kts",
     "gradle/release-matrix.settings.gradle.kts",
     "gradle/wrapper",
     "gradlew",
     "scripts/ci/e2e_impact.py",
+    "scripts/ci/e2e_selection.py",
+    "scripts/ci/feature_coverage.py",
+    "scripts/ci/feature_coverage_github.py",
+    "scripts/ci/feature_coverage_consumer.py",
+    "scripts/ci/feature_review.py",
+    "scripts/ci/shared_compatibility.py",
+    "scripts/ci/feature_pages.py",
+    ".github/workflows/feature-coverage.yml",
+    "scripts/pages/evidence_target.py",
+    "scripts/pages/feature_evidence.py",
+    "scripts/architecture/module_graph.py",
     "scripts/ci/e2e_job_graph.py",
     "scripts/ci/visual_anchor_certification.py",
+    "scripts/ci/visual_review_targets.py",
     "scripts/ci/version_port_conflicts.py",
     "scripts/ci/version_port_merge.py",
     "scripts/release/artifact_manifest.py",
+    "scripts/release/build_matrix.py",
     "scripts/release/generate_sbom.py",
     "scripts/release/matrix.py",
     "scripts/release/release_identity.py",
+    "scripts/release/release_sources.py",
     "scripts/release/verify_reproducibility.py",
     "scripts/release/version_branches.py",
     "scripts/release/workflow_guidance.py",
@@ -365,14 +389,14 @@ def load_bootstrap_contract(path: Path) -> BootstrapContract:
         )
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         raise JobGraphError(f"invalid loader bootstrap contract {path}: {exc}") from exc
-    if not isinstance(document, dict) or set(document) != {
-        "schema_version",
-        "loaders",
-        "release_build_scripts",
-    }:
+    if not isinstance(document, dict):
         raise JobGraphError("loader bootstrap contract has an invalid root schema")
-    if document.get("schema_version") != 2:
-        raise JobGraphError("loader bootstrap contract schema version must be 2")
+    schema = document.get("schema_version")
+    if type(schema) is not int or schema not in (2, 3):
+        raise JobGraphError("loader bootstrap contract schema version must be 2 or 3")
+    scripts_key = "build_scripts" if schema == 3 else "release_build_scripts"
+    if set(document) != {"schema_version", "loaders", scripts_key}:
+        raise JobGraphError("loader bootstrap contract has an invalid root schema")
     loaders = document.get("loaders")
     if not isinstance(loaders, dict) or set(loaders) != {"fabric", "forge", "neoforge"}:
         raise JobGraphError("loader bootstrap contract must cover every supported loader")
@@ -398,7 +422,10 @@ def load_bootstrap_contract(path: Path) -> BootstrapContract:
                 )
             expected[raw_path] = digest
         validated[loader] = expected
-    raw_build_scripts = document.get("release_build_scripts")
+    # Schema 3 seals one build implementation per loader, independent of how many
+    # Minecraft targets the release matrix assigns to that implementation.
+    raw_build_scripts = ({"master": document["build_scripts"]} if schema == 3
+                         else document["release_build_scripts"])
     if (
         not isinstance(raw_build_scripts, dict)
         or not raw_build_scripts
@@ -407,7 +434,9 @@ def load_bootstrap_contract(path: Path) -> BootstrapContract:
         raise JobGraphError("release build-script contract must contain 1..64 branches")
     release_build_scripts: dict[str, dict[str, str]] = {}
     for branch, records in raw_build_scripts.items():
-        if not isinstance(branch, str) or not RELEASE_BRANCH.fullmatch(branch):
+        if not isinstance(branch, str) or not (
+            schema == 3 and branch == "master" or schema == 2 and RELEASE_BRANCH.fullmatch(branch)
+        ):
             raise JobGraphError(f"invalid release branch in bootstrap contract: {branch!r}")
         if (
             not isinstance(records, dict)
@@ -487,10 +516,16 @@ def validate_loader_bootstraps(
     contract = load_bootstrap_contract(contract_path)
     project = matrix.get("project")
     release_branch = project.get("release_branch") if isinstance(project, dict) else None
-    if not isinstance(release_branch, str) or not RELEASE_BRANCH.fullmatch(release_branch):
+    unified = matrix.get("schema_version") == 3
+    if not isinstance(release_branch, str) or not (
+        unified and release_branch == "master" or not unified and RELEASE_BRANCH.fullmatch(release_branch)
+    ):
         raise JobGraphError("release matrix has no valid project.release_branch")
     expected_build_scripts = contract.release_build_scripts.get(release_branch)
-    if expected_build_scripts is None or set(expected_build_scripts) != set(active):
+    if expected_build_scripts is None or (
+        not set(active) <= set(expected_build_scripts) if unified
+        else set(expected_build_scripts) != set(active)
+    ):
         raise JobGraphError(
             f"bootstrap contract does not bind every active loader for {release_branch}"
         )

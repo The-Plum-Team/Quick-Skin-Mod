@@ -21,12 +21,13 @@ from typing import Any, Protocol
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+TARGET_KEY_PATTERN = r"mc(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*))?"
 INPUT_NAME = re.compile(
     r"^visual-review-input-(?P<source>[1-9][0-9]*)"
-    r"(?:-(?P<generation>[0-9a-f]{40}))?$"
+    rf"(?:-(?P<generation>[0-9a-f]{{40}})(?:--(?P<target>{TARGET_KEY_PATTERN}))?)?$"
 )
-REPORT_NAME = re.compile(r"^visual-review-(?P<source>[1-9][0-9]*)$")
-ATTEMPT_NAME = re.compile(r"^visual-review-attempt-(?P<source>[1-9][0-9]*)$")
+REPORT_NAME = re.compile(rf"^visual-review-(?P<source>[1-9][0-9]*)(?:--(?P<target>{TARGET_KEY_PATTERN}))?$")
+ATTEMPT_NAME = re.compile(rf"^visual-review-attempt-(?P<source>[1-9][0-9]*)(?:--(?P<target>{TARGET_KEY_PATTERN}))?$")
 WAVE_BLOCK_NAME = re.compile(
     r"^visual-review-wave-block-(?P<generation>[0-9a-f]{40})$"
 )
@@ -211,11 +212,12 @@ def _valid_sources(
     return selected
 
 
-def reviewed_sources(
+def reviewed_entries(
     api: QueueApi, artifacts: list[Artifact], *, repository: str
-) -> set[int]:
-    return set(
-        _valid_sources(
+) -> set[tuple[int, str | None]]:
+    return {
+        (source, REPORT_NAME.fullmatch(artifact.name).group("target"))
+        for source, values in _valid_sources(
             api,
             artifacts,
             repository=repository,
@@ -224,8 +226,16 @@ def reviewed_sources(
             events=DRAIN_EVENTS,
             conclusions=frozenset({"success", "failure"}),
             allow_in_progress=True,
-        )
-    )
+        ).items()
+        for artifact in values
+    }
+
+
+def reviewed_sources(
+    api: QueueApi, artifacts: list[Artifact], *, repository: str, bundle_key: str | None = None,
+) -> set[int]:
+    return {source for source, target in reviewed_entries(api, artifacts, repository=repository)
+            if target == bundle_key}
 
 
 def blocked_generations(
@@ -298,6 +308,21 @@ def input_generation(artifact: Artifact) -> str:
     return match.group("generation") or artifact.head_sha
 
 
+def input_target(artifact: Artifact) -> str | None:
+    match = INPUT_NAME.fullmatch(artifact.name)
+    if match is None:
+        raise QueueError("visual review input name is invalid")
+    return match.group("target")
+
+
+def input_review_key(artifact: Artifact) -> str:
+    match = INPUT_NAME.fullmatch(artifact.name)
+    if match is None:
+        raise QueueError("visual review input name is invalid")
+    target = match.group("target")
+    return match.group("source") + (f"--{target}" if target is not None else "")
+
+
 def source_is_eligible(
     api: QueueApi,
     *,
@@ -318,7 +343,7 @@ def source_is_eligible(
     if not SHA.fullmatch(current_master) or generation != current_master:
         return False
     release_anchor = bool(
-        isinstance(branch, str)
+        input_target(artifact) is None and isinstance(branch, str)
         and (
             ANCHOR_SOURCE_BRANCH.fullmatch(branch)
             or (event == "schedule" and branch == "master")
@@ -392,12 +417,12 @@ def list_pending_candidates(
     now: datetime | None = None,
     cooldown: timedelta = timedelta(minutes=DEFAULT_COOLDOWN_MINUTES),
 ) -> list[tuple[Artifact, int]]:
-    """Return every eligible source once, with a certifiable anchor first."""
+    """Return every eligible source/target once, with a certifiable legacy anchor first."""
 
     artifacts = api.list_artifacts()
     if len(artifacts) > MAX_ARTIFACTS:
         raise QueueError(f"visual review artifact inventory exceeds {MAX_ARTIFACTS}")
-    reviewed = reviewed_sources(api, artifacts, repository=repository)
+    reviewed = reviewed_entries(api, artifacts, repository=repository)
     blocked = blocked_generations(api, artifacts, repository=repository)
     certified = certified_generations(api, artifacts, repository=repository)
     attempts = _valid_sources(
@@ -412,9 +437,10 @@ def list_pending_candidates(
     )
     current_time = now or datetime.now(timezone.utc)
     cooling = {
-        source_run_id
+        (source_run_id, ATTEMPT_NAME.fullmatch(artifact.name).group("target"))
         for source_run_id, values in attempts.items()
-        if max(values, key=lambda item: item.order).created_at + cooldown > current_time
+        for artifact in values
+        if artifact.created_at + cooldown > current_time
     }
     pending = _valid_sources(
         api,
@@ -427,9 +453,10 @@ def list_pending_candidates(
     )
     raw_candidates: list[tuple[Artifact, int]] = []
     for source_run_id, values in pending.items():
-        if source_run_id in reviewed or source_run_id in cooling:
-            continue
         for artifact in values:
+            key = (source_run_id, input_target(artifact))
+            if key in reviewed or key in cooling:
+                continue
             if (
                 artifact.size_in_bytes <= MAX_INPUT_BYTES
                 and input_generation(artifact) not in blocked
@@ -460,15 +487,16 @@ def list_pending_candidates(
         return (0 if certifiable_anchor else 1, artifact.created_at, artifact.artifact_id)
 
     # A retried curator can leave multiple still-authenticated inputs for one source run. Dispatch
-    # only its newest immutable artifact; a duplicate source must never multiply model sessions.
-    newest_by_source: dict[int, Artifact] = {}
+    # only its newest immutable artifact per target; one report cannot settle a sibling target.
+    newest_by_source: dict[tuple[int, str | None], Artifact] = {}
     for artifact, source_run_id in raw_candidates:
-        current = newest_by_source.get(source_run_id)
+        key = (source_run_id, input_target(artifact))
+        current = newest_by_source.get(key)
         if current is None or artifact.order > current.order:
-            newest_by_source[source_run_id] = artifact
+            newest_by_source[key] = artifact
     candidates = [
         (artifact, source_run_id)
-        for source_run_id, artifact in newest_by_source.items()
+        for (source_run_id, _target), artifact in newest_by_source.items()
     ]
     return sorted(candidates, key=priority)
 
@@ -504,10 +532,12 @@ def select_requested(
         return None
     source_run_id = int(match.group("source"))
     generation = input_generation(requested)
+    target = input_target(requested)
+    review_key = input_review_key(requested)
     related: list[Artifact] = []
     for name in (
-        f"visual-review-{source_run_id}",
-        f"visual-review-attempt-{source_run_id}",
+        f"visual-review-{review_key}",
+        f"visual-review-attempt-{review_key}",
         f"visual-review-wave-block-{generation}",
         f"visual-anchor-certification-{generation}",
     ):
@@ -516,7 +546,7 @@ def select_requested(
             raise QueueError(f"visual review artifact name exceeds {MAX_NAMED_ARTIFACTS}")
         related.extend(named)
 
-    if source_run_id in reviewed_sources(api, related, repository=repository):
+    if source_run_id in reviewed_sources(api, related, repository=repository, bundle_key=target):
         return None
     if generation in blocked_generations(api, related, repository=repository):
         return None
@@ -533,7 +563,8 @@ def select_requested(
     )
     current_time = now or datetime.now(timezone.utc)
     if any(
-        artifact.created_at + cooldown > current_time
+        ATTEMPT_NAME.fullmatch(artifact.name).group("target") == target
+        and artifact.created_at + cooldown > current_time
         for artifact in attempts.get(source_run_id, [])
     ):
         return None
@@ -889,6 +920,8 @@ def main(argv: list[str] | None = None) -> int:
             output.write(f"implementation_sha={artifact.head_sha}\n")
             output.write(f"generation_sha={input_generation(artifact)}\n")
             output.write(f"source_run_id={source_run_id}\n")
+            output.write(f"bundle_key={input_target(artifact) or ''}\n")
+            output.write(f"review_key={input_review_key(artifact)}\n")
         return 0
     except GitHubRateLimitError as exc:
         print(f"Visual review queue deferred: {exc}", file=sys.stderr)

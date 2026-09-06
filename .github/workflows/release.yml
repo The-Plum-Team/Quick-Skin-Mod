@@ -7,6 +7,11 @@ on:
   # Manual runs are validation-only. Publication requires the canonical tag, which avoids a
   # second path that could create/move a tag while another release run is already active.
   workflow_dispatch:
+    inputs:
+      minecraft_target:
+        description: Exact Minecraft target from release/release-matrix.json (validation only)
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -38,6 +43,7 @@ jobs:
       release_id: ${{ steps.release.outputs.release_id }}
       tag: ${{ steps.release.outputs.tag }}
       branch: ${{ steps.release.outputs.branch }}
+      target: ${{ steps.release.outputs.target }}
       runtimes: ${{ steps.matrices.outputs.runtimes }}
       artifacts: ${{ steps.matrices.outputs.artifacts }}
       publications: ${{ steps.matrices.outputs.publications }}
@@ -89,13 +95,16 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          REQUESTED_TARGET: ${{ inputs.minecraft_target || '' }}
         run: |
           set -euo pipefail
-          identity="$(python scripts/release/release_identity.py)"
+          identity="$(python scripts/release/release_identity.py \
+            --event-target --target "$REQUESTED_TARGET")"
           release_branch="$(jq -r .branch <<< "$identity")"
           branch_head="$(gh api \
             "repos/$GITHUB_REPOSITORY/branches/$release_branch" --jq .commit.sha)"
           python scripts/release/release_identity.py \
+            --event-target --target "$REQUESTED_TARGET" \
             --validate-ci \
             --release-branch-head "$branch_head" \
             --github-output "$GITHUB_OUTPUT" > /dev/null
@@ -103,42 +112,55 @@ jobs:
       - name: Validate central release matrix
         run: python scripts/release/matrix.py --matrix release/release-matrix.json > /dev/null
 
-      - name: Build all production artifacts and E2E harnesses
+      - name: Build the selected target's production artifacts and E2E harnesses
+        env:
+          RELEASE_TARGET: ${{ steps.release.outputs.target }}
         run: >-
-          ./gradlew --no-daemon --no-parallel --stacktrace
-          clean buildAllLanes buildAllE2EHarnesses
+          python scripts/release/build_matrix.py --target "$RELEASE_TARGET" --clean
 
       - name: Stage and verify all production artifacts
+        env:
+          RELEASE_TARGET: ${{ steps.release.outputs.target }}
         run: >-
           python scripts/release/verify_release.py
           --matrix release/release-matrix.json
+          --target "$RELEASE_TARGET"
           --manifest build/release/artifacts.json
           --stage build/release
 
       - name: Rebuild every production and harness JAR for reproducibility
+        env:
+          RELEASE_TARGET: ${{ steps.release.outputs.target }}
         run: >-
-          ./gradlew --no-daemon --no-parallel --stacktrace --rerun-tasks
-          buildAllLanes buildAllE2EHarnesses
+          python scripts/release/build_matrix.py --target "$RELEASE_TARGET" --rerun-tasks
 
       - name: Prove first and second build bytes are identical
+        env:
+          RELEASE_TARGET: ${{ steps.release.outputs.target }}
         run: >-
           python scripts/release/verify_reproducibility.py
           --matrix release/release-matrix.json
+          --target "$RELEASE_TARGET"
           --manifest build/release/artifacts.json
 
       - name: Resolve release matrices
         id: matrices
         shell: bash
+        env:
+          RELEASE_TARGET: ${{ steps.release.outputs.target }}
         run: |
           set -euo pipefail
           runtimes="$(python scripts/release/matrix.py \
             --matrix release/release-matrix.json \
+            --target "$RELEASE_TARGET" \
             --kind runtime)"
           artifacts="$(python scripts/release/matrix.py \
             --matrix release/release-matrix.json \
+            --target "$RELEASE_TARGET" \
             --kind artifacts)"
           publications="$(python scripts/release/matrix.py \
             --matrix release/release-matrix.json \
+            --target "$RELEASE_TARGET" \
             --kind publications)"
           python -c 'import json,sys; value=json.loads(sys.argv[1]); assert value' "$runtimes"
           python -c 'import json,sys; value=json.loads(sys.argv[1]); assert value' "$artifacts"
@@ -212,6 +234,7 @@ jobs:
           row-json: ${{ toJSON(matrix) }}
           source-sha: ${{ github.sha }}
           scenarios: ${{ matrix.scenarios }}
+          release-target: ${{ needs.build.outputs.target }}
           evidence-name: release-behavior-${{ matrix.id }}
 
   stage-github-release:
@@ -247,7 +270,9 @@ jobs:
           path: build/release
 
       - name: Reverify staged bytes before creating a draft
-        run: python scripts/release/verify_release.py --verify-staged
+        env:
+          RELEASE_TARGET: ${{ needs.build.outputs.target }}
+        run: python scripts/release/verify_release.py --target "$RELEASE_TARGET" --verify-staged
 
       - name: Reconcile or create the draft and upload exact assets
         env:
@@ -295,7 +320,9 @@ jobs:
           path: build/release
 
       - name: Reverify staged bytes before publication
-        run: python scripts/release/verify_release.py --verify-staged
+        env:
+          RELEASE_TARGET: ${{ needs.build.outputs.target }}
+        run: python scripts/release/verify_release.py --target "$RELEASE_TARGET" --verify-staged
 
       - name: Reconcile existing marketplace publication by identity and hash
         id: reconcile
@@ -407,7 +434,9 @@ jobs:
           path: build/release
 
       - name: Reverify staged bytes before final publication
-        run: python scripts/release/verify_release.py --verify-staged
+        env:
+          RELEASE_TARGET: ${{ needs.build.outputs.target }}
+        run: python scripts/release/verify_release.py --target "$RELEASE_TARGET" --verify-staged
 
       - name: Publish the fully reconciled GitHub Release
         env:

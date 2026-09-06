@@ -20,6 +20,8 @@ from visual_review_queue import (  # noqa: E402
     PREPARE_WORKFLOW,
     Artifact,
     blocked_generations,
+    input_review_key,
+    input_target,
     list_pending_candidates,
     select_pending,
     select_requested,
@@ -128,6 +130,77 @@ class FakeApi:
 
 
 class VisualReviewQueueTest(unittest.TestCase):
+    def test_shared_targets_keep_independent_newest_capsules_for_one_source(self) -> None:
+        capsules = [
+            artifact(1, f"visual-review-input-55-{SHA}--mc1.20.1", run_id=10, minutes_ago=15),
+            artifact(2, f"visual-review-input-55-{SHA}--mc1.21.8", run_id=10, minutes_ago=10),
+            artifact(3, f"visual-review-input-55-{SHA}--mc1.20.1", run_id=11, minutes_ago=5),
+        ]
+        api = FakeApi(capsules, {10: owner(10, PREPARE_WORKFLOW), 11: owner(11, PREPARE_WORKFLOW)})
+        pending = list_pending_candidates(api, repository=REPOSITORY, now=NOW)
+        self.assertEqual({2, 3}, {item.artifact_id for item, _source in pending})
+        self.assertEqual({55}, {source for _item, source in pending})
+        self.assertEqual({"55--mc1.20.1", "55--mc1.21.8"}, {input_review_key(item) for item, _ in pending})
+        self.assertEqual({"mc1.20.1", "mc1.21.8"}, {input_target(item) for item, _ in pending})
+
+    def test_shared_target_report_does_not_complete_siblings_or_legacy_entry(self) -> None:
+        capsules = [
+            artifact(1, f"visual-review-input-55-{SHA}--mc1.20.1", run_id=10, minutes_ago=15),
+            artifact(2, f"visual-review-input-55-{SHA}--mc1.21.8", run_id=10, minutes_ago=15),
+            artifact(3, f"visual-review-input-55-{SHA}", run_id=10, minutes_ago=15),
+        ]
+        for name, expected in (("visual-review-55--mc1.20.1", {2, 3}),
+                               ("visual-review-55--mc1.21.8", {1, 3}),
+                               ("visual-review-55", {1, 2})):
+            with self.subTest(marker=name):
+                api = FakeApi(capsules + [artifact(4, name, run_id=20, minutes_ago=2)],
+                              {10: owner(10, PREPARE_WORKFLOW), 20: owner(20, DRAIN_WORKFLOW)})
+                pending = list_pending_candidates(api, repository=REPOSITORY, now=NOW)
+                self.assertEqual(expected, {item.artifact_id for item, _ in pending})
+                for item in capsules:
+                    selected = select_requested(api, repository=REPOSITORY,
+                                                requested_artifact_id=item.artifact_id, now=NOW)
+                    self.assertEqual(item.artifact_id in expected, selected is not None)
+
+    def test_shared_target_cooldown_and_direct_queries_are_scoped_to_that_target(self) -> None:
+        capsules = [
+            artifact(1, f"visual-review-input-55-{SHA}--mc1.20.1", run_id=10, minutes_ago=15),
+            artifact(2, f"visual-review-input-55-{SHA}--mc1.21.8", run_id=10, minutes_ago=15),
+            artifact(3, "visual-review-attempt-55--mc1.20.1", run_id=20, minutes_ago=2),
+        ]
+        api = FakeApi(capsules, {10: owner(10, PREPARE_WORKFLOW),
+                                20: owner(20, DRAIN_WORKFLOW, conclusion="failure")})
+        self.assertEqual({2}, {item.artifact_id for item, _ in
+                               list_pending_candidates(api, repository=REPOSITORY, now=NOW)})
+        with patch.object(api, "list_artifacts", side_effect=AssertionError("direct wake scanned the queue")), \
+             patch.object(api, "list_artifacts_named", wraps=api.list_artifacts_named) as named:
+            self.assertIsNotNone(select_requested(api, repository=REPOSITORY, requested_artifact_id=2, now=NOW))
+        self.assertEqual({"visual-review-55--mc1.21.8", "visual-review-attempt-55--mc1.21.8",
+                          f"visual-review-wave-block-{SHA}", f"visual-anchor-certification-{SHA}"},
+                         {call.args[0] for call in named.call_args_list})
+        self.assertEqual({1, 2}, {item.artifact_id for item, _ in list_pending_candidates(
+            api, repository=REPOSITORY, now=NOW + timedelta(minutes=31))})
+
+    def test_shared_target_names_require_a_canonical_key_and_exact_generation(self) -> None:
+        invalid = ("mc1.020.1", "mc1.21.8/other", "mc1.21.8--extra", "mc1", "master", "../mc1.20.1")
+        for key in invalid:
+            with self.subTest(key=key):
+                item = artifact(1, f"visual-review-input-55-{SHA}--{key}", run_id=10, minutes_ago=15)
+                api = FakeApi([item], {10: owner(10, PREPARE_WORKFLOW)})
+                self.assertEqual([], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+                self.assertIsNone(select_requested(api, repository=REPOSITORY, requested_artifact_id=1, now=NOW))
+        item = artifact(1, f"visual-review-input-55-{SHA}--mc1.20.1", run_id=10, minutes_ago=15)
+        api = FakeApi([item], {10: owner(10, PREPARE_WORKFLOW)}, branch_sha="b" * 40)
+        self.assertEqual([], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+
+    def test_shared_target_report_requires_the_protected_owner(self) -> None:
+        item = artifact(1, f"visual-review-input-55-{SHA}--mc1.20.1", run_id=10, minutes_ago=15)
+        report = artifact(2, "visual-review-55--mc1.20.1", run_id=20, minutes_ago=2)
+        untrusted = owner(20, DRAIN_WORKFLOW)
+        untrusted["head_repository"] = {"full_name": "someone/else"}
+        api = FakeApi([item, report], {10: owner(10, PREPARE_WORKFLOW), 20: untrusted})
+        self.assertEqual([(item, 55)], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+
     def test_recovery_sweep_accepts_a_full_bounded_repository_window(self) -> None:
         api = GitHubApi(
             repository=REPOSITORY,

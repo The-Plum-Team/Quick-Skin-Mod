@@ -11,12 +11,15 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import quote
+
+from matrix import MatrixError, validate_matrix
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -132,17 +135,30 @@ def load_config(path: Path) -> dict[str, Any]:
         "api_version",
         "repository",
         "managed_rulesets",
-        "release_branch_pattern",
         "release_tag_pattern",
         "required_checks",
         "release_environment",
         "readiness",
     }
+    if not isinstance(data, dict) or type(data.get("schema")) is not int or data["schema"] not in (1, 2):
+        raise GovernanceError("unsupported governance schema")
+    required.add("release_branch_pattern" if data["schema"] == 1 else "source_matrix")
     missing = sorted(required - data.keys())
     if missing:
         raise GovernanceError(f"governance config is missing: {', '.join(missing)}")
-    if data["schema"] != 1:
-        raise GovernanceError(f"unsupported governance schema {data['schema']!r}")
+    if data["schema"] == 2:
+        if data["source_matrix"] != "release/release-matrix.json":
+            raise GovernanceError("shared governance must read the authoritative source matrix")
+        if set(data["managed_rulesets"]) != {"default_branch", "release_tags"}:
+            raise GovernanceError("shared governance manages the default branch and target tags")
+        if "release_source" not in data["readiness"]:
+            raise GovernanceError("shared governance requires release-source readiness")
+        expected = data["release_environment"]["deployment_policies"]
+        if expected != [{"type": "tag", "name": data["release_tag_pattern"]}]:
+            raise GovernanceError("shared publication deploys only through canonical target tags")
+        retired = data["release_environment"].get("retired_deployment_policies", [])
+        if retired != [{"type": "branch", "name": "*-and-*-*"}]:
+            raise GovernanceError("only the historical release-branch deployment policy may be retired")
     if not data["required_checks"]:
         raise GovernanceError("at least one required check is mandatory")
     return data
@@ -196,15 +212,10 @@ def branch_ruleset(
 def desired_rulesets(config: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
     names = config["managed_rulesets"]
     checks = list(config["required_checks"])
-    return (
+    rulesets = [
         branch_ruleset(
             name=names["default_branch"],
             includes=["~DEFAULT_BRANCH"],
-            required_checks=checks,
-        ),
-        branch_ruleset(
-            name=names["release_branches"],
-            includes=[f"refs/heads/{config['release_branch_pattern']}"],
             required_checks=checks,
         ),
         {
@@ -223,7 +234,15 @@ def desired_rulesets(config: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
                 {"type": "non_fast_forward"},
             ],
         },
-    )
+    ]
+    if config["schema"] == 1:
+        rulesets.insert(1, branch_ruleset(
+            name=names["release_branches"],
+            includes=[f"refs/heads/{config['release_branch_pattern']}"],
+            required_checks=checks,
+        ))
+    # Historical branch rulesets are neither updated nor deleted by shared-source governance.
+    return tuple(rulesets)
 
 
 def desired_environment(config: Mapping[str, Any]) -> dict[str, Any]:
@@ -304,13 +323,30 @@ def readiness_errors(
     repository = str(config["repository"])
     metadata = client.json(f"repos/{repository}")
     default = str(metadata["default_branch"])
-    releases = [
-        name
-        for name in branch_names(client, repository)
-        if fnmatch.fnmatchcase(name, str(config["release_branch_pattern"]))
-    ]
-    if not releases:
-        return ["no release branches match the configured pattern"]
+    source_ref = default
+    if config["schema"] == 2:
+        head = client.json(f"repos/{repository}/branches/{quote(default, safe='')}")
+        source_ref = head.get("commit", {}).get("sha") if isinstance(head, Mapping) else None
+        if not isinstance(source_ref, str) or not re.fullmatch(r"[0-9a-f]{40}", source_ref):
+            return ["shared-source default branch has no exact commit identity"]
+        path = str(config["source_matrix"])
+        raw = client.text(f"repos/{repository}/contents/{quote(path, safe='/')}?ref={source_ref}",
+                          optional=True)
+        try:
+            data = json.loads(raw) if raw is not None else None
+            if not isinstance(data, dict):
+                raise GovernanceError("remote source matrix is absent or not an object")
+            validate_matrix(data)
+            if data["schema_version"] != 3 or data["project"]["release_branch"] != default:
+                raise GovernanceError("remote matrix does not declare the default branch as shared source")
+        except (MatrixError, GovernanceError, ValueError, TypeError) as exc:
+            return [f"shared-source release matrix is not ready: {exc}"]
+        releases = []
+    else:
+        releases = [name for name in branch_names(client, repository)
+                    if fnmatch.fnmatchcase(name, str(config["release_branch_pattern"]))]
+        if not releases:
+            return ["no release branches match the configured pattern"]
 
     sources: dict[tuple[str, str], str | None] = {}
     errors: list[str] = []
@@ -321,7 +357,7 @@ def readiness_errors(
             if key not in sources:
                 endpoint = (
                     f"repos/{repository}/contents/{quote(path, safe='/')}"
-                    f"?ref={quote(branch, safe='')}"
+                    f"?ref={quote(source_ref if config['schema'] == 2 else branch, safe='')}"
                 )
                 sources[key] = client.text(endpoint, optional=True)
             errors.extend(
@@ -331,6 +367,8 @@ def readiness_errors(
     common = config["readiness"]["all_protected_branches"]
     validate(default, common)
     validate(default, config["readiness"]["default_branch"])
+    if config["schema"] == 2:
+        validate(default, config["readiness"]["release_source"])
     for branch in releases:
         validate(branch, common)
         validate(branch, config["readiness"]["release_branches"])
@@ -380,6 +418,18 @@ def policy_identity(policy: Mapping[str, Any]) -> tuple[str, str | None]:
     )
 
 
+def retired_policies(config: Mapping[str, Any], policies: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    allowed = {policy_identity(policy) for policy in
+               config["release_environment"].get("retired_deployment_policies", [])}
+    matches = [policy for policy in policies if policy_identity(policy) in allowed]
+    identities = [policy_identity(policy) for policy in matches]
+    ids = [policy.get("id") for policy in matches]
+    if (len(set(identities)) != len(identities) or any(type(value) is not int or value <= 0 for value in ids)
+            or len(set(ids)) != len(ids)):
+        raise GovernanceError("retired deployment policy has an ambiguous or invalid identity")
+    return matches
+
+
 def plan(client: GitHubClient, config: Mapping[str, Any]) -> list[Operation]:
     repository = str(config["repository"])
     operations: list[Operation] = []
@@ -407,7 +457,8 @@ def plan(client: GitHubClient, config: Mapping[str, Any]) -> list[Operation]:
         for item in config["release_environment"]["deployment_policies"]
     }
     actual_policies = {policy_identity(item) for item in policies}
-    unknown = actual_policies - expected_policies
+    retired = retired_policies(config, policies)
+    unknown = actual_policies - expected_policies - {policy_identity(policy) for policy in retired}
     if unknown:
         formatted = ", ".join(f"{kind or '?'}:{name}" for name, kind in sorted(unknown))
         raise GovernanceError(
@@ -417,6 +468,9 @@ def plan(client: GitHubClient, config: Mapping[str, Any]) -> list[Operation]:
         operations.append(
             Operation(f"environment-policy:{kind}:{name}", "create")
         )
+    for policy in retired:
+        name, kind = policy_identity(policy)
+        operations.append(Operation(f"environment-policy:{kind}:{name}", "delete"))
     return operations
 
 
@@ -446,6 +500,11 @@ def apply(client: GitHubClient, config: Mapping[str, Any]) -> None:
         payload=desired_environment(config),
     )
     _, remote_policies = remote_environment(client, config)
+    for policy in retired_policies(config, remote_policies):
+        client.json(
+            f"repos/{repository}/environments/{environment_name}/deployment-branch-policies/{policy['id']}",
+            method="DELETE",
+        )
     existing_policies = {policy_identity(item) for item in remote_policies}
     for policy in environment["deployment_policies"]:
         if policy_identity(policy) not in existing_policies:

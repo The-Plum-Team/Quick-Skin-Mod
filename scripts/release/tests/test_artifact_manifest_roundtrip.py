@@ -14,7 +14,9 @@ sys.path.insert(0, str(ROOT / "scripts" / "release"))
 sys.path.insert(0, str(ROOT / "e2e"))
 
 import generate_sbom  # noqa: E402
+import matrix as release_matrix  # noqa: E402
 import verify_release  # noqa: E402
+import verify_reproducibility  # noqa: E402
 from artifact_manifest import (  # noqa: E402
     ArtifactManifestError,
     file_digest,
@@ -107,7 +109,7 @@ class ArtifactManifestRoundTripTest(unittest.TestCase):
             "sha256": file_digest(path, "sha256"),
         }
 
-    def build_manifest(self) -> dict[str, object]:
+    def build_manifest(self, *, target: str | None = None) -> dict[str, object]:
         with (
             mock.patch.object(verify_release, "git_commit", return_value=self.commit),
             mock.patch.object(verify_release, "verify_jar", side_effect=self.verified_production),
@@ -120,6 +122,7 @@ class ArtifactManifestRoundTripTest(unittest.TestCase):
                 self.manifest_path,
                 self.mod_version,
                 self.data,
+                target=target,
             )
         self.manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         return manifest
@@ -176,6 +179,52 @@ class ArtifactManifestRoundTripTest(unittest.TestCase):
                 self.mod_version,
                 self.data,
             )
+
+    def test_target_stage_keeps_full_matrix_provenance_and_cannot_impersonate_the_bundle(self) -> None:
+        self.data = release_matrix.load_matrix(ROOT / "release/release-matrix.json")
+        self.matrix_path.write_text(json.dumps(self.data) + "\n", encoding="utf-8")
+        (self.repository / "gradle.properties").write_bytes((ROOT / "gradle.properties").read_bytes())
+        for artifact in self.data["artifacts"]:
+            for key in ("jar", "harness_jar"):
+                path = self.repository / artifact[key].format(mod_version=self.mod_version)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((artifact["artifact_node"] + key).encode())
+            (self.repository / "gradle/dependency-locks" / f"{artifact['artifact_node']}.lockfile").write_text(
+                "org.sejda.imageio:webp-imageio:0.1.6=shadowBundle\nempty=\n", encoding="utf-8")
+        before = self.matrix_path.read_bytes()
+        target = self.data["unit_test_version"]
+        selected = release_matrix.select_release_target(self.data, target)
+        produced = self.build_manifest(target=target)
+        identity = derive_release_identity(self.matrix_path, self.data, target=target)
+        loaded = load_artifact_manifest(self.manifest_path, repository=self.repository,
+            matrix_path=self.matrix_path, matrix=selected, stage=self.stage,
+            expected_mod_version=self.mod_version, expected_commit=self.commit,
+            expected_release=identity.manifest())
+        self.assertEqual(produced, loaded)
+        self.assertEqual(before, self.matrix_path.read_bytes())
+        self.assertEqual(hashlib.sha256(before).hexdigest(), produced["matrix_sha256"])
+        self.assertEqual({target}, {row["artifact_version"] for row in produced["artifacts"]})
+        self.assertEqual({row["filename"] for row in produced["artifacts"]},
+                         {path.name for path in (self.stage / "files").iterdir()})
+        self.assertEqual(produced["sbom"]["sha256"], hashlib.sha256(
+            generate_sbom.build_cyclonedx_bytes(self.repository, self.matrix_path, selected,
+                produced, self.stage, expected_release=identity.manifest())).hexdigest())
+        comparisons = verify_reproducibility.compare_rebuild(
+            self.repository, self.matrix_path, produced, self.data, target=target)
+        self.assertEqual({row["artifact_node"] for row in selected["artifacts"]},
+                         {row["artifact_node"] for row in comparisons})
+        with self.assertRaisesRegex(verify_reproducibility.ReproducibilityError, "release scope"):
+            verify_reproducibility.compare_rebuild(self.repository, self.matrix_path, produced, self.data)
+        for wrong_scope in (self.data, release_matrix.select_release_target(self.data,
+                next(row["artifact_version"] for row in self.data["artifacts"]
+                     if row["artifact_version"] != target))):
+            with self.assertRaises(ArtifactManifestError):
+                load_artifact_manifest(self.manifest_path, repository=self.repository,
+                    matrix_path=self.matrix_path, matrix=wrong_scope, stage=self.stage)
+        self.data["artifacts"][-1]["java"] = 0
+        with self.assertRaises(release_matrix.MatrixError):
+            self.build_manifest(target=target)
+        self.assertEqual(produced, json.loads(self.manifest_path.read_bytes()))
 
 
 if __name__ == "__main__":

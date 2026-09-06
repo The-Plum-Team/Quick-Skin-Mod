@@ -22,6 +22,7 @@ from scenario_contract import (
     ScenarioContractError,
     load_contract,
 )
+from selection import SelectionError, SelectionPlan, project_contract
 from mod_compatibility import (
     DEFAULT_CONTRACT as DEFAULT_COMPATIBILITY_CONTRACT,
     CompatibilityContractError,
@@ -103,6 +104,7 @@ class Catalog:
     by_id: dict[str, dict[str, Any]]
     by_key: dict[tuple[str, str, str], dict[str, Any]]
     contract: ScenarioContract
+    selection_sha256: str | None = None
 
     @property
     def contract_sha256(self) -> str:
@@ -158,10 +160,12 @@ def _nonempty_string(value: Any, label: str) -> str:
     return value.strip()
 
 
-def load_catalog(path: Path = DEFAULT_CATALOG) -> Catalog:
+def load_catalog(path: Path = DEFAULT_CATALOG, *, selection: SelectionPlan | None = None) -> Catalog:
     try:
         contract = load_contract(path)
-    except ScenarioContractError as exc:
+        if selection is not None:
+            contract = project_contract(contract, selection)
+    except (ScenarioContractError, SelectionError) as exc:
         raise VisualEvidenceError(f"invalid scenario contract {path}: {exc}") from exc
     captures = tuple(
         {
@@ -181,7 +185,7 @@ def load_catalog(path: Path = DEFAULT_CATALOG) -> Catalog:
         (capture["scenario"], capture["role"], capture["step"]): capture
         for capture in captures
     }
-    return Catalog(captures, by_id, by_key, contract)
+    return Catalog(captures, by_id, by_key, contract, selection.sha256 if selection is not None else None)
 
 
 def sha256_file(path: Path) -> str:
@@ -593,9 +597,17 @@ def collect_evidence(
     *,
     compatibility_id: str | None = None,
     compatibility_contract_path: Path = DEFAULT_COMPATIBILITY_CONTRACT,
+    artifact_nodes: frozenset[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Return lanes, frames and directed pixel comparisons from successful result files."""
 
+    if artifact_nodes is not None and (
+        not isinstance(artifact_nodes, frozenset)
+        or not artifact_nodes
+        or any(not isinstance(node, str) or not SAFE_ID.fullmatch(node) for node in artifact_nodes)
+        or compatibility_id is not None
+    ):
+        raise VisualEvidenceError("artifact filtering requires a non-empty ordinary-evidence node set")
     root = output_root.resolve()
     profiles = root / "profiles"
     if not profiles.is_dir():
@@ -634,6 +646,8 @@ def collect_evidence(
             if compatibility_id is not None
             else RESULT_FIELDS
         )
+        if catalog.selection_sha256 is not None:
+            expected_result_fields |= {"selection_sha256"}
         if not isinstance(result, dict) or set(result) != expected_result_fields:
             raise VisualEvidenceError(
                 "packaged result must contain exactly "
@@ -659,6 +673,8 @@ def collect_evidence(
             raise VisualEvidenceError(
                 f"packaged result scenario contract hash mismatch in {result_path}"
             )
+        if result.get("selection_sha256") != catalog.selection_sha256:
+            raise VisualEvidenceError("packaged result belongs to a different E2E selection")
         try:
             scenario_contract = catalog.contract.scenario(scenario)
         except ScenarioContractError as exc:
@@ -679,6 +695,11 @@ def collect_evidence(
             raise VisualEvidenceError(
                 f"result profile identity mismatch: {result.get('profile')!r} != {expected_profile!r}"
             )
+        # A shared-source run contains every target. Authenticate bounded result metadata
+        # before filtering, then decode only this target's images. The Pages producer still
+        # requires the exact selected matrix/scenario product after collection.
+        if artifact_nodes is not None and artifact_node not in artifact_nodes:
+            continue
         compatibility_lane: CompatibilityLane | None = None
         if compatibility_id is not None:
             if compatibility_contract is None:  # pragma: no cover - guarded above
@@ -733,9 +754,10 @@ def collect_evidence(
             if role not in {"client_a", "client_b"}:
                 raise VisualEvidenceError(f"unsupported report role {role!r} in {result_path}")
             report = reports[role]
-            if not isinstance(report, dict) or set(report) != REPORT_FIELDS:
+            expected_report_fields = REPORT_FIELDS | ({"selection_sha256"} if catalog.selection_sha256 else set())
+            if not isinstance(report, dict) or set(report) != expected_report_fields:
                 raise VisualEvidenceError(
-                    f"report {role} must contain exactly {sorted(REPORT_FIELDS)} "
+                    f"report {role} must contain exactly {sorted(expected_report_fields)} "
                     f"in {result_path}"
                 )
             if (
@@ -749,6 +771,8 @@ def collect_evidence(
                 raise VisualEvidenceError(
                     f"report scenario contract hash mismatch for {lane_id}/{role}"
                 )
+            if report.get("selection_sha256") != catalog.selection_sha256:
+                raise VisualEvidenceError("packaged report belongs to a different E2E selection")
             try:
                 role_contract = catalog.contract.role(scenario, role)
             except ScenarioContractError as exc:  # pragma: no cover - roles checked above
@@ -1004,6 +1028,7 @@ def collect_evidence(
                 "status": "pass",
                 "roles": sorted(reports),
                 "elapsed_s": elapsed,
+                **({"selection_sha256": catalog.selection_sha256} if catalog.selection_sha256 else {}),
                 **(
                     {"compatibility_mod": compatibility_id}
                     if compatibility_id is not None
@@ -1012,6 +1037,14 @@ def collect_evidence(
             }
         )
 
+    if catalog.selection_sha256 is not None:
+        expected_scenarios = set(catalog.contract.scenario_ids)
+        by_runtime: dict[tuple[str, str, str], set[str]] = {}
+        for lane in lanes:
+            key = (lane["artifact_node"], lane["version"], lane["loader"])
+            by_runtime.setdefault(key, set()).add(lane["scenario"])
+        if not by_runtime or any(observed != expected_scenarios for observed in by_runtime.values()):
+            raise VisualEvidenceError("selected evidence must contain every admitted scenario for each runtime")
     lanes.sort(key=lambda item: (item["version"], item["loader"], item["scenario"]))
     frames.sort(
         key=lambda item: (

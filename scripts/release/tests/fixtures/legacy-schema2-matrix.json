@@ -1,0 +1,111 @@
+{
+  "schema_version": 2,
+  "lane_count": 2,
+  "unit_test_version": "1.20.1",
+  "project": {
+    "name": "Quick Skin",
+    "mod_id": "quickskin",
+    "description": "Change, preview, and synchronize local skins, capes, and CPM models in-game across Fabric and Forge.",
+    "mod_version_property": "mod_version",
+    "release_branch": "forge-and-fabric-1.20.1",
+    "modrinth_id": "zAIE84Ch",
+    "curseforge_id": 1323980,
+    "homepage": "https://modrinth.com/mod/quick-skin",
+    "sources": "https://github.com/The-Plum-Team/Quick-Skin-Mod",
+    "issues": "https://github.com/The-Plum-Team/Quick-Skin-Mod/issues",
+    "license": "All Rights Reserved"
+  },
+  "source_overlays": {
+    "common": {
+      "1.20.1": "legacy1_20_1"
+    },
+    "fabric": {},
+    "forge": {}
+  },
+  "installers": {
+    "fabric-1.1.0": {
+      "url": "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.1.0/fabric-installer-1.1.0.jar",
+      "sha256": "c20c407d5ca4b119aae97847eb2fbb1d34c92969b647fbbb1de2fd36ca00738e"
+    },
+    "forge-1.20.1-47.4.9": {
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.4.9/forge-1.20.1-47.4.9-installer.jar",
+      "sha256": "58fc5db6e3dc47745475375be6fa275e68320563c05d29b4203e0d2ca57a50c4"
+    }
+  },
+  "artifacts": [
+    {
+      "artifact_node": "fabric-1.20.1",
+      "artifact_version": "1.20.1",
+      "loader": "fabric",
+      "java": 17,
+      "no_remap": false,
+      "metadata_range": "=1.20.1",
+      "gradle_task": ":fabric:1.20.1:remapJar",
+      "harness_task": ":fabric:1.20.1:remapE2EHarnessJar",
+      "jar": "fabric/versions/1.20.1/build/libs/Quick Skin - Fabric - 1.20.1-{mod_version}.jar",
+      "harness_jar": "fabric/versions/1.20.1/build/libs/Quick Skin E2E - Fabric - 1.20.1-0.0.0.jar",
+      "game_versions": ["1.20.1"],
+      "metadata": {
+        "file": "fabric.mod.json",
+        "loader": ">=0.17.0",
+        "architectury": ">=9.2.14"
+      }
+    },
+    {
+      "artifact_node": "forge-1.20.1",
+      "artifact_version": "1.20.1",
+      "loader": "forge",
+      "java": 17,
+      "no_remap": false,
+      "metadata_range": "[1.20.1,1.20.2)",
+      "gradle_task": ":forge:1.20.1:remapJar",
+      "harness_task": ":forge:1.20.1:remapE2EHarnessJar",
+      "jar": "forge/versions/1.20.1/build/libs/Quick Skin - Forge - 1.20.1-{mod_version}.jar",
+      "harness_jar": "forge/versions/1.20.1/build/libs/Quick Skin E2E - Forge - 1.20.1-0.0.0.jar",
+      "game_versions": ["1.20.1"],
+      "metadata": {
+        "file": "META-INF/mods.toml",
+        "loader_api": "[47,)",
+        "loader": "[47,)",
+        "architectury": "[9.2.14,)",
+        "pack_format": 15,
+        "server_data_pack_format": 15
+      }
+    }
+  ],
+  "runtimes": [
+    {
+      "artifact_node": "fabric-1.20.1",
+      "runtime_version": "1.20.1",
+      "loader": "fabric",
+      "jar_sha256": "from:artifact-manifest",
+      "port": 0,
+      "java": 17,
+      "loader_version": "0.17.3",
+      "installer": "fabric-1.1.0",
+      "fabric_api": "0.92.6+1.20.1",
+      "architectury": {
+        "kind": "maven",
+        "version": "9.2.14"
+      },
+      "scheduled_anchor": true,
+      "pr_anchor": true
+    },
+    {
+      "artifact_node": "forge-1.20.1",
+      "runtime_version": "1.20.1",
+      "loader": "forge",
+      "jar_sha256": "from:artifact-manifest",
+      "port": 0,
+      "java": 17,
+      "loader_version": "1.20.1-47.4.9",
+      "installer": "forge-1.20.1-47.4.9",
+      "architectury": {
+        "kind": "maven",
+        "version": "9.2.14"
+      },
+      "scheduled_anchor": true,
+      "pr_anchor": true
+    }
+  ]
+}

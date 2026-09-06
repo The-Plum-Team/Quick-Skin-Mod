@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "e2e"))
 
 import packaged_runtime  # noqa: E402
+import visual_review  # noqa: E402
 from check_visual_review import (  # noqa: E402
     MAX_JSON_BYTES,
     ReviewError,
@@ -47,6 +48,8 @@ from visual_review import (  # noqa: E402
     validate_expected_row,
     validate_semantic_anchor_manifest,
 )
+from selection import RoleSelection, ScenarioSelection, Selection
+from e2e_selection import Admission
 
 
 PNG_WIDTH = 1920
@@ -92,6 +95,9 @@ class VisualEvidenceTest(unittest.TestCase):
                     {
                         "id": step,
                         "assertion_required": True,
+                        "requires": [],
+                        "requires_captures": [],
+                        "covers": {"modules": ["common"], "bindings": []},
                         "capture": {
                             "title": f"{scenario} {step}",
                             "review_tier": "key",
@@ -120,13 +126,14 @@ class VisualEvidenceTest(unittest.TestCase):
                         else ["pr", "release"]
                     ),
                     "orchestration": orchestration,
+                    "execution_scope": "scenario" if len(role_order) == 2 else "steps",
                     "roles": roles,
                 }
             )
         self.catalog_path.write_text(
             json.dumps(
                 {
-                    "schema_version": 2,
+                    "schema_version": 3,
                     "screenshot_size": [PNG_WIDTH, PNG_HEIGHT],
                     "gui_text_reference_size": [1600, 900],
                     "review_regions": {
@@ -970,6 +977,11 @@ class VisualEvidenceTest(unittest.TestCase):
         report_hash = json.loads(json.dumps(valid))
         report_hash["reports"]["client_a"]["contract_sha256"] = "0" * 64
         mutations.append(("report hash", report_hash))
+        for owner in ("result", "report"):
+            partial = json.loads(json.dumps(valid))
+            target = partial if owner == "result" else partial["reports"]["client_a"]
+            target["selection_sha256"] = "a" * 64
+            mutations.append((f"local selection cannot certify full {owner} coverage", partial))
         extra_comparison = json.loads(json.dumps(valid))
         extra_comparison["reports"]["client_a"]["pixel_validation"][
             "comparisons"
@@ -992,7 +1004,8 @@ class VisualEvidenceTest(unittest.TestCase):
             self.catalog_path.read_text(encoding="utf-8")
         )
         contract_payload["scenarios"][0]["roles"][0]["steps"].append(
-            {"id": "wait_only", "assertion_required": True}
+            {"id": "wait_only", "assertion_required": True, "requires": [],
+             "requires_captures": [], "covers": {"modules": ["common"], "bindings": []}}
         )
         self.catalog_path.write_text(
             json.dumps(contract_payload) + "\n",
@@ -1015,6 +1028,95 @@ class VisualEvidenceTest(unittest.TestCase):
                 self.e2e_root,
                 load_catalog(self.catalog_path),
             )
+
+    def test_selected_evidence_requires_an_independently_expected_scope(self) -> None:
+        self.write_catalog([("phase0-smoke", "client_a", "baseline"),
+                            ("phase0-smoke", "client_a", "unselected")])
+        plan = Selection(self.contract_hash, "b" * 64, "pr", "affected", "affected-module-coverage",
+                         ("modules/feature/src/main/java/Feature.java",), ("feature",), ("feature",), (),
+                         (ScenarioSelection("phase0-smoke", (RoleSelection("client_a", ("baseline",),
+                                              ("baseline",), ("baseline",)),)),), ())
+        result_path = self.write_result("phase0-smoke")
+        result = json.loads(result_path.read_bytes())
+        result["selection_sha256"] = plan.sha256
+        result["reports"]["client_a"]["selection_sha256"] = plan.sha256
+        result_path.write_text(json.dumps(result))
+        with self.assertRaises(VisualEvidenceError):
+            collect_evidence(self.e2e_root, load_catalog(self.catalog_path))
+        catalog = load_catalog(self.catalog_path, selection=plan)
+        lanes, frames, _ = collect_evidence(self.e2e_root, catalog)
+        self.assertEqual(1, len(frames))
+        self.assertEqual("baseline", frames[0]["step"])
+        self.assertEqual(plan.sha256, lanes[0]["selection_sha256"])
+        row = dict(id="fabric-1.20.1", artifact_node="fabric-1.20.1", runtime_version="1.20.1",
+                   loader="fabric", scenarios="phase0-smoke")
+        proof = validate_expected_row(self.e2e_root, self.catalog_path, row, selection=plan)
+        self.assertEqual(2, proof["schema_version"])
+        self.assertEqual(plan.sha256, proof["selection_sha256"])
+        manifest = build_manifest(self.e2e_root, self.catalog_path, include_all=True, combos=None, selection=plan)
+        self.assertEqual(["phase0-smoke.client_a.baseline"], [item["capture_id"] for item in manifest])
+        curated = curate_manifest(manifest, self.root / "selected-curation")
+        self.assertEqual(1, len(curated))
+        with self.assertRaises(VisualEvidenceError):
+            build_manifest(self.e2e_root, self.catalog_path, include_all=False, combos=None, selection=plan)
+        for target in (result, result["reports"]["client_a"]):
+            target["selection_sha256"] = "0" * 64
+            result_path.write_text(json.dumps(result))
+            with self.assertRaises(VisualEvidenceError):
+                collect_evidence(self.e2e_root, catalog)
+            target["selection_sha256"] = plan.sha256
+
+    def test_selected_curation_cannot_omit_an_entire_required_scenario(self) -> None:
+        self.write_catalog([("phase0-smoke", "client_a", "baseline"), ("second", "client_a", "baseline")])
+        plan = Selection(self.contract_hash, "b" * 64, "pr", "affected", "affected-module-coverage",
+                         ("modules/feature/src/main/java/Feature.java",), ("feature",), ("feature",), (),
+                         tuple(ScenarioSelection(name, (RoleSelection("client_a", ("baseline",),
+                               ("baseline",), ("baseline",)),)) for name in ("phase0-smoke", "second")), ())
+        path = self.write_result("phase0-smoke")
+        result = json.loads(path.read_bytes())
+        result["selection_sha256"] = plan.sha256
+        result["reports"]["client_a"]["selection_sha256"] = plan.sha256
+        path.write_text(json.dumps(result))
+        with self.assertRaisesRegex(VisualEvidenceError, "every admitted scenario"):
+            collect_evidence(self.e2e_root, load_catalog(self.catalog_path, selection=plan))
+
+    def test_curation_cli_binds_independent_commits_and_never_certifies_a_partial_anchor(self):
+        self.write_catalog([("phase0-smoke", "client_a", "baseline")])
+        plan = Selection(self.contract_hash, "b" * 64, "pr", "affected", "affected-module-coverage",
+                         ("modules/example/src/main/java/Feature.java",), ("example",), ("example",), (),
+                         (ScenarioSelection("phase0-smoke", (RoleSelection("client_a", ("baseline",),
+                             ("baseline",), ("baseline",)),)),), ())
+        admitted = Admission("a" * 40, "b" * 40, "c" * 40, "d" * 40, "e" * 40, "f" * 40,
+                             "1" * 64, "2" * 64, True, "pr", "affected-module-coverage", plan)
+        result_path = self.write_result("phase0-smoke")
+        result = json.loads(result_path.read_text())
+        result["selection_sha256"] = admitted.sha256
+        result["reports"]["client_a"]["selection_sha256"] = admitted.sha256
+        result_path.write_text(json.dumps(result))
+        admission_path = self.root / "admission.json"
+        admission_path.write_bytes(admitted.to_bytes())
+        arguments = ["--e2e-root", str(self.e2e_root), "--catalog", str(self.catalog_path),
+                     "--selection-admission", str(admission_path), "--selection-base", "a" * 40,
+                     "--selection-head", "b" * 40, "--selection-policy", "c" * 40,
+                     "--selection-repository", str(self.root)]
+        row = {"id": "fabric-1.20.1", "artifact_node": "fabric-1.20.1",
+               "runtime_version": "1.20.1", "loader": "fabric", "scenarios": "phase0-smoke"}
+        with mock.patch.object(visual_review, "verify_selection_admission", return_value=admitted) as verify:
+            output = io.StringIO()
+            with mock.patch("sys.stdout", output):
+                self.assertEqual(0, visual_review.main(arguments + ["--validate-row-json", json.dumps(row)]))
+            verify.assert_called_once_with(admission_path, self.root,
+                base="a" * 40, head="b" * 40, policy="c" * 40, profile="pr")
+            self.assertEqual(admitted.sha256, json.loads(output.getvalue())["selection_sha256"])
+            with mock.patch("sys.stdout", io.StringIO()) as curated, mock.patch("sys.stderr", io.StringIO()):
+                self.assertEqual(0, visual_review.main(arguments + ["--all", "--curate-output", str(self.root / "curated-cli")]))
+            self.assertEqual(1, len(json.loads(curated.getvalue())))
+            with mock.patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit):
+                visual_review.main(arguments + ["--all", "--semantic-anchor"])
+        with mock.patch.object(visual_review, "verify_selection_admission") as verify, \
+                mock.patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit):
+            visual_review.main(["--selection-admission", str(admission_path)])
+        verify.assert_not_called()
 
     def test_rejects_unknown_fields_at_every_packaged_schema_level(self) -> None:
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])

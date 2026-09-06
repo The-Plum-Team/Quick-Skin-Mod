@@ -1,3 +1,4 @@
+//? if >=1.21.6 {
 package com.quickskin.mod.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -13,7 +14,7 @@ import net.minecraft.client.Minecraft;
 //?} else {
 //?}
 import net.minecraft.client.gui.render.pip.GuiSkinRenderer;
-//? if <26.1.2 {
+//? if <26.1 {
 import net.minecraft.client.gui.render.state.pip.GuiSkinRenderState;
 import net.minecraft.client.renderer.MultiBufferSource;
 //?} else if <26.2 {
@@ -23,12 +24,15 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.state.gui.pip.GuiSkinRenderState;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 //?}
+//? if <1.21.11 {
+import net.minecraft.client.renderer.RenderType;
+//?} else {
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
+//?}
 import net.minecraft.client.renderer.texture.OverlayTexture;
-//? if <26.2 {
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier;
-//?} else {
 //?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -53,7 +57,7 @@ public class GuiSkinRendererMixin {
             require = 0,
             expect = 1,
             allow = 1,
-        //? if <26.1.2 {
+        //? if <26.1 {
             method = "renderToTexture(Lnet/minecraft/client/gui/render/state/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
         //?} else {
             method = "renderToTexture(Lnet/minecraft/client/renderer/state/gui/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
@@ -74,7 +78,7 @@ public class GuiSkinRendererMixin {
             require = 0,
             expect = 1,
             allow = 1,
-//? if <26.1.2 {
+//? if <26.1 {
             method = "renderToTexture(Lnet/minecraft/client/gui/render/state/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
             at = @At(
                     value = "INVOKE",
@@ -134,7 +138,11 @@ public class GuiSkinRendererMixin {
             return;
         }
 
+//? if <1.21.11 {
+        RenderType capeRenderType = RenderType.entityTranslucent(cape.texture());
+//?} else {
         RenderType capeRenderType = RenderTypes.entityTranslucent(cape.texture());
+//?}
 //? if <26.2 {
         VertexConsumer capeConsumer = bufferSource.getBuffer(capeRenderType);
 //?} else {
@@ -160,7 +168,7 @@ public class GuiSkinRendererMixin {
             require = 0,
             expect = 1,
             allow = 1,
-        //? if <26.1.2 {
+        //? if <26.1 {
             method = "renderToTexture(Lnet/minecraft/client/gui/render/state/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
         //?} else {
             method = "renderToTexture(Lnet/minecraft/client/renderer/state/gui/pip/GuiSkinRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
@@ -173,3 +181,4 @@ public class GuiSkinRendererMixin {
     }
     //?}
 }
+//?}

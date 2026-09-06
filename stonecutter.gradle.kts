@@ -25,6 +25,10 @@ val releaseMatrixFile = matrixState["quickSkinReleaseMatrixFile"] as java.io.Fil
 val releaseMatrix = matrixState["quickSkinReleaseMatrix"] as Map<*, *>
 @Suppress("UNCHECKED_CAST")
 val releaseArtifacts = matrixState["quickSkinReleaseArtifacts"] as List<Map<*, *>>
+@Suppress("UNCHECKED_CAST")
+val buildArtifacts = matrixState["quickSkinBuildArtifacts"] as List<Map<*, *>>
+val buildTarget = providers.gradleProperty("quickskinTarget").orNull
+val singleVersionInventory = releaseArtifacts.map { it["artifact_version"] }.distinct().size == 1
 val releaseLaneCount = (releaseMatrix["lane_count"] as? Number)?.toInt()
     ?: error("Missing lane_count in $releaseMatrixFile")
 val unitTestVersion = releaseMatrix["unit_test_version"]?.toString()
@@ -92,16 +96,33 @@ val validateReleaseLaneInventory = tasks.register("validateReleaseLaneInventory"
     description = "Checks that every central release-matrix lane resolves to real Gradle tasks."
     inputs.file(releaseMatrixFile)
     doLast {
+        check(buildTarget == null) { "Full inventory validation requires omitting -PquickskinTarget" }
         (releaseArtifactTasks + releaseHarnessTasks).forEach { taskPath ->
             tasks.getByPath(taskPath)
         }
     }
 }
 
+val testModuleGraph = tasks.register<Exec>("testModuleGraph") {
+    group = "verification"
+    description = "Verifies module-boundary and transitive-impact policy."
+    workingDir(rootProject.projectDir)
+    val defaultPython = if (System.getProperty("os.name").startsWith("Windows", true))
+        "python" else "python3"
+    commandLine(
+        providers.environmentVariable("QUICKSKIN_PYTHON").orElse(defaultPython).get(),
+        "-m", "unittest", "discover", "-s", "scripts/architecture/tests", "-p", "test_*.py",
+    )
+}
+
 val testStableLane = tasks.register("testStableLane") {
     group = "verification"
     description = "Runs loader-independent JUnit tests on common $unitTestVersion."
-    dependsOn(":common:$unitTestVersion:test")
+    if (buildTarget == null || buildTarget == unitTestVersion) {
+        dependsOn(testModuleGraph, ":common:$unitTestVersion:test")
+    } else {
+        doFirst { error("testStableLane requires the matrix unit target; use testTargetLane for $buildTarget") }
+    }
 }
 
 tasks.register("check") {
@@ -113,11 +134,55 @@ tasks.register("check") {
 tasks.register("buildAllLanes") {
     group = "build"
     description = "Builds all $releaseLaneCount production artifacts from the release matrix."
-    dependsOn(validateReleaseLaneInventory, testStableLane, releaseArtifactTasks)
+    if (singleVersionInventory) {
+        dependsOn(validateReleaseLaneInventory)
+        if (buildTarget == null) dependsOn(testStableLane, releaseArtifactTasks)
+    } else {
+        doFirst { error("Build the complete matrix with python scripts/release/build_matrix.py; each target needs a separate Gradle process.") }
+    }
 }
 
 tasks.register("buildAllE2EHarnesses") {
     group = "verification"
     description = "Builds all $releaseLaneCount packaged-runtime E2E harnesses from the release matrix."
-    dependsOn(validateReleaseLaneInventory, releaseHarnessTasks)
+    if (singleVersionInventory) {
+        dependsOn(validateReleaseLaneInventory)
+        if (buildTarget == null) dependsOn(releaseHarnessTasks)
+    } else {
+        doFirst { error("Build the complete matrix with python scripts/release/build_matrix.py; each target needs a separate Gradle process.") }
+    }
+}
+
+val validateTargetLaneInventory = tasks.register("validateTargetLaneInventory") {
+    group = "verification"
+    description = "Checks the Gradle tasks selected by -PquickskinTarget against the complete matrix."
+    inputs.file(releaseMatrixFile)
+    doLast {
+        check(buildTarget != null) { "Target tasks require -PquickskinTarget=<minecraft>" }
+        buildArtifacts.forEach { artifact ->
+            tasks.getByPath(artifact["gradle_task"].toString())
+            tasks.getByPath(artifact["harness_task"].toString())
+        }
+    }
+}
+
+val testTargetLane = tasks.register("testTargetLane") {
+    group = "verification"
+    description = "Runs module policy and unit tests against -PquickskinTarget."
+    dependsOn(validateTargetLaneInventory)
+    if (buildTarget != null) dependsOn(testModuleGraph, ":common:$buildTarget:test")
+}
+
+tasks.register("buildTargetLanes") {
+    group = "build"
+    description = "Builds every loader artifact for -PquickskinTarget without configuring other versions."
+    dependsOn(testTargetLane)
+    if (buildTarget != null) dependsOn(buildArtifacts.map { it["gradle_task"].toString() })
+}
+
+tasks.register("buildTargetE2EHarnesses") {
+    group = "verification"
+    description = "Builds every packaged E2E harness for -PquickskinTarget."
+    dependsOn(validateTargetLaneInventory)
+    if (buildTarget != null) dependsOn(buildArtifacts.map { it["harness_task"].toString() })
 }

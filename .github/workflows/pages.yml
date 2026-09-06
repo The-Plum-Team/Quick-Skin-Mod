@@ -1,8 +1,8 @@
 name: Project site
 
 # The privileged workflow always executes the protected implementation from master. A completed
-# packaged run is only a wake-up signal: release-branch artifacts are selected independently by
-# exact current branch SHA and then revalidated as hostile data before any HTML is generated.
+# packaged run is only a wake-up signal: target artifacts are selected independently by
+# exact current source SHA and then revalidated as hostile data before any HTML is generated.
 on:
   schedule:
     - cron: "43 4 1 * *"
@@ -141,20 +141,6 @@ jobs:
             exit 0
           fi
 
-          handoff_name="pages-e2e-$EVIDENCE_BRANCH"
-          artifacts="$(protected_gh_api_retry --paginate --slurp \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$EVIDENCE_RUN_ID/artifacts?per_page=100")"
-          [[ "$(jq \
-            --arg branch "$EVIDENCE_BRANCH" \
-            --arg name "$handoff_name" \
-            --arg sha "$EVIDENCE_SHA" \
-            --argjson run_id "$EVIDENCE_RUN_ID" \
-            '[.[].artifacts[] | select(
-              .name == $name and (.expired | not) and .size_in_bytes > 0 and
-              .workflow_run.id == $run_id and
-              .workflow_run.head_branch == $branch and
-              .workflow_run.head_sha == $sha)] | length' <<< "$artifacts")" == 1 ]]
-
           printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
 
       - name: Check out the exact protected dispatcher
@@ -164,7 +150,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Dispatch one protected all-branch deployment
+      - name: Dispatch one protected all-target deployment
         if: steps.request.outputs.eligible == 'true'
         shell: bash
         env:
@@ -176,8 +162,14 @@ jobs:
           set -euo pipefail
           [[ "$GITHUB_REF" == refs/heads/master ]]
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
-          python3 scripts/release/version_branches.py \
-            --target "$EVIDENCE_BRANCH" > /dev/null
+          source scripts/ci/github_api_retry.sh
+          handoffs="$RUNNER_TEMP/pages-wake-handoffs.json"
+          github_api_retry --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$EVIDENCE_RUN_ID/artifacts?per_page=100" > "$handoffs"
+          python3 scripts/pages/evidence_target.py \
+            --validate-handoffs "$handoffs" \
+            --source-branch "$EVIDENCE_BRANCH" --source-sha "$EVIDENCE_SHA" \
+            --source-run-id "$EVIDENCE_RUN_ID"
           gh workflow run pages.yml --ref master \
             -f operation=deploy \
             -f evidence_run_id="$EVIDENCE_RUN_ID" \
@@ -204,6 +196,7 @@ jobs:
           ARTIFACT_ID: ${{ github.event.client_payload.artifact_id }}
           ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
           BRANCH: ${{ github.event.client_payload.branch }}
+          BUNDLE_KEY: ${{ github.event.client_payload.bundle_key }}
           COVERAGE_SHA: ${{ github.event.client_payload.coverage_sha }}
           GH_TOKEN: ${{ github.token }}
           PUBLICATION_REPOSITORY: ${{ github.event.client_payload.repository }}
@@ -240,9 +233,10 @@ jobs:
           [[ "$PUBLICATION_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          [[ "$BRANCH" =~ ^[a-z0-9]+(-and-[a-z0-9]+)*-[0-9]+([.][0-9]+)+$ ]]
+          [[ "$BRANCH" == master ]]
+          [[ "$BUNDLE_KEY" =~ ^mc[0-9]+([.][0-9]+)+$ ]]
           [[ "$COVERAGE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$ARTIFACT_NAME" == "pages-mod-compatibility-$BRANCH" ]]
+          [[ "$ARTIFACT_NAME" == "pages-mod-compatibility-$BUNDLE_KEY" ]]
 
           publication=''
           for attempt in {1..30}; do
@@ -291,21 +285,28 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Dispatch one protected all-branch deployment
+      - name: Dispatch one protected all-target deployment
         if: steps.request.outputs.eligible == 'true'
         shell: bash
         env:
           BRANCH: ${{ github.event.client_payload.branch }}
+          BUNDLE_KEY: ${{ github.event.client_payload.bundle_key }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == refs/heads/master ]]
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
-          python3 scripts/release/version_branches.py --target "$BRANCH" > /dev/null
+          source_branch="$(python3 scripts/pages/evidence_target.py --kind source-branch)"
+          if [[ "$BRANCH" != "$source_branch" ]]; then
+            printf 'Compatibility handoff names a different source branch.\n' >&2
+            exit 1
+          fi
+          python3 scripts/pages/evidence_target.py --kind keys \
+            | jq -e --arg key "$BUNDLE_KEY" 'index($key) != null' > /dev/null
           gh workflow run pages.yml --ref master -f operation=compatibility
 
   discover:
-    name: Discover exact release heads
+    name: Discover Minecraft evidence targets
     if: >-
       (github.event_name == 'schedule' ||
       (github.event_name == 'workflow_dispatch' &&
@@ -316,7 +317,9 @@ jobs:
       actions: read
       contents: read
     outputs:
-      branches: ${{ steps.inventory.outputs.branches }}
+      bundle_keys: ${{ steps.inventory.outputs.bundle_keys }}
+      source_branch: ${{ steps.inventory.outputs.source_branch }}
+      source_sha: ${{ steps.inventory.outputs.source_sha }}
       eligible: ${{ steps.inventory.outputs.eligible }}
 
     steps:
@@ -326,7 +329,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Discover release branches and validate the wake-up event
+      - name: Discover matrix targets and validate the wake-up event
         id: inventory
         shell: bash
         env:
@@ -338,13 +341,21 @@ jobs:
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
-          printf 'branches=[]\n' >> "$GITHUB_OUTPUT"
+          printf 'bundle_keys=[]\n' >> "$GITHUB_OUTPUT"
           printf 'eligible=false\n' >> "$GITHUB_OUTPUT"
 
           [[ "$GITHUB_REF" == refs/heads/master ]]
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
 
+          source_branch="$(python3 scripts/pages/evidence_target.py --kind source-branch)"
+          source_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$source_branch" --jq .commit.sha)"
+          if [[ "$source_sha" != "$GITHUB_SHA" ]]; then
+            printf 'Shared source advanced before Pages discovery; retaining the deployed site.\n'
+            exit 0
+          fi
+          printf 'source_branch=%s\n' "$source_branch" >> "$GITHUB_OUTPUT"
+          printf 'source_sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
           workflow_id="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/workflows/on-demand-e2e.yml" --jq .id)"
           authenticate_handoff() {
@@ -354,8 +365,10 @@ jobs:
             [[ "$source_run_id" =~ ^[1-9][0-9]*$ ]]
             [[ "$source_branch" =~ ^[A-Za-z0-9._-]+$ ]]
             [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
-            python3 scripts/release/version_branches.py \
-              --target "$source_branch" > /dev/null
+            if [[ "$source_branch" != "$(python3 scripts/pages/evidence_target.py --kind source-branch)" ]]; then
+              printf 'Handoff names a different source branch.\n' >&2
+              return 1
+            fi
 
             local source_run
             source_run="$(github_api_retry \
@@ -375,20 +388,14 @@ jobs:
             [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$source_branch" \
               --jq .commit.sha)" == "$source_sha" ]]
 
-            local artifacts handoff_name
-            handoff_name="pages-e2e-$source_branch"
-            artifacts="$(github_api_retry --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id/artifacts?per_page=100")"
-            [[ "$(jq \
-              --arg branch "$source_branch" \
-              --arg name "$handoff_name" \
-              --arg sha "$source_sha" \
-              --argjson run_id "$source_run_id" \
-              '[.[].artifacts[] | select(
-                .name == $name and (.expired | not) and .size_in_bytes > 0 and
-                .workflow_run.id == $run_id and
-                .workflow_run.head_branch == $branch and
-                .workflow_run.head_sha == $sha)] | length' <<< "$artifacts")" == 1 ]]
+            local handoffs
+            handoffs="$RUNNER_TEMP/pages-discovery-handoffs.json"
+            github_api_retry --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id/artifacts?per_page=100" > "$handoffs"
+            python3 scripts/pages/evidence_target.py \
+              --validate-handoffs "$handoffs" \
+              --source-branch "$source_branch" --source-sha "$source_sha" \
+              --source-run-id "$source_run_id"
           }
 
           if [[ "$DISPATCH_OPERATION" == deploy ]]; then
@@ -396,11 +403,9 @@ jobs:
               "$DISPATCH_RUN_ID" "$DISPATCH_BRANCH" "$DISPATCH_SHA"
           fi
 
-          branches="$(github_api_retry --paginate \
-            "repos/$GITHUB_REPOSITORY/branches?per_page=100" --jq '.[].name' \
-            | python3 scripts/release/version_branches.py)"
-          [[ "$(jq 'length' <<< "$branches")" -gt 0 ]]
-          printf 'branches=%s\n' "$branches" >> "$GITHUB_OUTPUT"
+          bundle_keys="$(python3 scripts/pages/evidence_target.py --kind keys)"
+          [[ "$(jq 'length' <<< "$bundle_keys")" -gt 0 ]]
+          printf 'bundle_keys=%s\n' "$bundle_keys" >> "$GITHUB_OUTPUT"
 
           # Duplicate dispatches and burst replacements are harmless. An automatic run exits
           # before fan-out only when every exact current head already has a cache owned by a
@@ -409,11 +414,11 @@ jobs:
             pages_workflow_id="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/workflows/pages.yml" --jq .id)"
             all_current=true
-            while IFS= read -r branch; do
+            while IFS= read -r bundle_key; do
               current_sha="$(github_api_retry \
-                "repos/$GITHUB_REPOSITORY/branches/$branch" \
+                "repos/$GITHUB_REPOSITORY/branches/$source_branch" \
                 --jq .commit.sha)"
-              cache_name="pages-cache-$branch--$current_sha"
+              cache_name="pages-cache-$bundle_key--$current_sha"
               cache_artifacts="$(github_api_retry --paginate --slurp \
                 "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$cache_name&per_page=100")"
               cached=false
@@ -446,9 +451,9 @@ jobs:
                 all_current=false
                 break
               fi
-            done < <(jq -r '.[]' <<< "$branches")
+            done < <(jq -r '.[]' <<< "$bundle_keys")
             if [[ "$all_current" == true ]]; then
-              printf 'Every release head already belongs to a successful deployed cache.\n'
+              printf 'Every Minecraft target already belongs to a successful deployed cache.\n'
               exit 0
             fi
 
@@ -471,10 +476,10 @@ jobs:
                 '$previous + $current')"
             done
             active_release_runs="$(jq \
-              --argjson branches "$branches" \
+              --arg source_branch "$source_branch" --arg source_sha "$source_sha" \
               '[.[] | select(
                 .event == "workflow_dispatch" and .status != "completed" and
-                (.head_branch as $branch | $branches | index($branch)))] | length' \
+                .head_branch == $source_branch and .head_sha == $source_sha)] | length' \
               <<< "$active_runs")"
             if [[ "$active_release_runs" -gt 0 ]]; then
               printf 'Deferring publication while %s release attestations are active.\n' \
@@ -486,14 +491,14 @@ jobs:
           printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
 
   collect:
-    name: Collect ${{ matrix.branch }}
+    name: Collect ${{ matrix.bundle_key }}
     needs: discover
     if: needs.discover.outputs.eligible == 'true'
     strategy:
       fail-fast: false
       max-parallel: 3
       matrix:
-        branch: ${{ fromJSON(needs.discover.outputs.branches) }}
+        bundle_key: ${{ fromJSON(needs.discover.outputs.bundle_keys) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -505,6 +510,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Python
@@ -519,17 +525,19 @@ jobs:
           --require-hashes
           --requirement scripts/pages/requirements.txt
 
-      - name: Select the newest artifact for the exact current branch SHA
+      - name: Select the target artifact for the exact source commit
         id: artifact
         shell: bash
         env:
-          BRANCH: ${{ matrix.branch }}
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          SOURCE_BRANCH: ${{ needs.discover.outputs.source_branch }}
           GH_TOKEN: ${{ github.token }}
         run: >-
           python3 scripts/pages/select_artifact.py
           --repository "$GITHUB_REPOSITORY"
-          --branch "$BRANCH"
-          --allow-continuation
+          --branch "$SOURCE_BRANCH"
+          --bundle-key "$BUNDLE_KEY"
+          --expected-source-sha "${{ needs.discover.outputs.source_sha }}"
           --github-output "$GITHUB_OUTPUT"
 
       - name: Download the digest-checked branch artifact
@@ -542,11 +550,37 @@ jobs:
           run-id: ${{ steps.artifact.outputs.run_id }}
           digest-mismatch: error
 
-      - name: Validate the curated bundle and recheck its branch head
+      - name: Compose authenticated feature evidence with its complete baseline
+        shell: bash
+        env:
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          ARTIFACT_NAME: ${{ steps.artifact.outputs.name }}
+          OWNER_RUN_ID: ${{ steps.artifact.outputs.run_id }}
+          SOURCE_SHA: ${{ needs.discover.outputs.source_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          manifest="selected-evidence/$BUNDLE_KEY/manifest.json"
+          schema="$(jq -er .schema_version "$manifest")"
+          if [[ "$schema" == 5 || "$schema" == 7 ]]; then
+            owner_argument=()
+            if [[ "$ARTIFACT_NAME" == "pages-e2e-$BUNDLE_KEY" ]]; then
+              owner_argument=(--artifact-run-id "$OWNER_RUN_ID")
+            fi
+            python3 scripts/ci/feature_pages.py --github-repository "$GITHUB_REPOSITORY" \
+              --repository . --evidence-root selected-evidence --output composed-evidence \
+              --bundle-key "$BUNDLE_KEY" --source-sha "$SOURCE_SHA" \
+              ${owner_argument[@]+"${owner_argument[@]}"}
+            mv selected-evidence source-feature-evidence
+            mv composed-evidence selected-evidence
+          fi
+
+      - name: Validate the target bundle and recheck its source commit
         shell: bash
         env:
           ARTIFACT_NAME: ${{ steps.artifact.outputs.name }}
-          BRANCH: ${{ matrix.branch }}
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          SOURCE_BRANCH: ${{ needs.discover.outputs.source_branch }}
           COVERAGE_SHA: ${{ steps.artifact.outputs.coverage_sha }}
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
@@ -554,17 +588,19 @@ jobs:
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
-          manifest="selected-evidence/$BRANCH/manifest.json"
+          manifest="selected-evidence/$BUNDLE_KEY/manifest.json"
           target_sha="$(jq -er .provenance.target.sha "$manifest")"
           target_run_argument=()
           kind_argument=()
-          if [[ "$ARTIFACT_NAME" == "pages-e2e-$BRANCH" ]]; then
+          if [[ "$ARTIFACT_NAME" == "pages-e2e-$BUNDLE_KEY" ]]; then
             target_run_argument=(--target-run-id "$OWNER_RUN_ID")
-            kind_argument=(--kind raw)
+            if [[ "$(jq -r .schema_version "$manifest")" != 7 ]]; then
+              kind_argument=(--kind raw)
+            fi
           fi
           python3 scripts/pages/evidence.py validate \
             --evidence-root selected-evidence \
-            --branch "$BRANCH" \
+            --bundle-key "$BUNDLE_KEY" \
             --only-branch \
             --repository "$GITHUB_REPOSITORY" \
             --target-sha "$target_sha" \
@@ -586,71 +622,57 @@ jobs:
             --arg branch "$source_branch" \
             --arg sha "$source_sha" \
             --arg created "$source_created_at" \
-            '.status == "completed" and .conclusion == "success" and
+            --argjson run_id "$source_run_id" \
+            '.id == $run_id and .status == "completed" and .conclusion == "success" and
              .event == "workflow_dispatch" and .head_branch == $branch and
              .head_sha == $sha and .created_at == $created and
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == env.GITHUB_REPOSITORY' \
             <<< "$source_run" > /dev/null
           jq -e \
-            --arg branch "$BRANCH" \
+            --arg branch "$SOURCE_BRANCH" \
             --arg sha "$target_sha" \
             --arg created "$target_created_at" \
-            '.status == "completed" and .conclusion == "success" and
+            --argjson run_id "$target_run_id" \
+            '.id == $run_id and .status == "completed" and .conclusion == "success" and
              .event == "workflow_dispatch" and .head_branch == $branch and
              .head_sha == $sha and .created_at == $created and
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == env.GITHUB_REPOSITORY' \
             <<< "$target_run" > /dev/null
-          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
+          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" \
             --jq .commit.sha)"
           [[ "$current_sha" == "$HEAD_SHA" ]]
-          if [[ "$COVERAGE_SHA" != "$HEAD_SHA" ]]; then
-            # This job is privileged on the default branch, so the continuation is proved
-            # from the comparison API instead of fetching release-branch objects: untrusted
-            # history never reaches a workspace that can write the Actions cache.
-            # "ahead" with a base merge base is the only relation that proves the evidence
-            # head is a strict ancestor of the current head without divergence, and the
-            # bounded file count keeps a truncated inventory from reading as a complete one.
-            comparison="$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/compare/$COVERAGE_SHA...$HEAD_SHA")"
-            jq -e --arg base "$COVERAGE_SHA" \
-              '.status == "ahead" and .behind_by == 0 and
-               .base_commit.sha == $base and .merge_base_commit.sha == $base and
-               (.total_commits | type) == "number" and .total_commits <= 20 and
-               (.files | type) == "array" and (.files | length) <= 100' \
-              <<< "$comparison" > /dev/null
-            jq -er '.files' <<< "$comparison" > compare-files.json
-            classification="$(python3 scripts/ci/visual_review_impact.py \
-              --files compare-files.json \
-              --changed-files "$(jq -er 'length' compare-files.json)" \
-              --scope replicated-port)"
-            [[ "$classification" == skip ]]
-            rm -f compare-files.json
+          if [[ "$COVERAGE_SHA" != "$HEAD_SHA" || "$target_sha" != "$HEAD_SHA" ]]; then
+            printf 'Shared-source coverage requires an authenticated baseline proof.\n' >&2
+            exit 1
           fi
 
       - name: Convert the validated handoff into an atomic compact bundle
         shell: bash
         env:
           ARTIFACT_NAME: ${{ steps.artifact.outputs.name }}
-          BRANCH: ${{ matrix.branch }}
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          SOURCE_BRANCH: ${{ needs.discover.outputs.source_branch }}
           COVERAGE_SHA: ${{ steps.artifact.outputs.coverage_sha }}
           HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
           OWNER_RUN_ID: ${{ steps.artifact.outputs.run_id }}
         run: |
           set -euo pipefail
-          manifest="selected-evidence/$BRANCH/manifest.json"
+          manifest="selected-evidence/$BUNDLE_KEY/manifest.json"
           target_sha="$(jq -er .provenance.target.sha "$manifest")"
           target_run_argument=()
           input_kind_argument=()
-          if [[ "$ARTIFACT_NAME" == "pages-e2e-$BRANCH" ]]; then
+          if [[ "$ARTIFACT_NAME" == "pages-e2e-$BUNDLE_KEY" ]]; then
             target_run_argument=(--target-run-id "$OWNER_RUN_ID")
-            input_kind_argument=(--input-kind raw)
+            if [[ "$(jq -r .schema_version "$manifest")" != 7 ]]; then
+              input_kind_argument=(--input-kind raw)
+            fi
           fi
           python3 scripts/pages/evidence.py compact \
             --evidence-root selected-evidence \
             --output public-evidence \
-            --branch "$BRANCH" \
+            --bundle-key "$BUNDLE_KEY" \
             --repository "$GITHUB_REPOSITORY" \
             --target-sha "$target_sha" \
             --coverage-sha "$COVERAGE_SHA" \
@@ -658,42 +680,32 @@ jobs:
             "${input_kind_argument[@]}"
           python3 scripts/pages/evidence.py validate \
             --evidence-root public-evidence \
-            --branch "$BRANCH" \
+            --bundle-key "$BUNDLE_KEY" \
             --only-branch \
             --kind compact \
             --repository "$GITHUB_REPOSITORY" \
             --target-sha "$target_sha" \
             --coverage-sha "$COVERAGE_SHA" \
             "${target_run_argument[@]}"
-          if [[ "$COVERAGE_SHA" != "$HEAD_SHA" ]]; then
-            python3 scripts/pages/evidence.py carry-forward \
-              --evidence-root public-evidence \
-              --output carried-evidence \
-              --branch "$BRANCH" \
-              --coverage-sha "$HEAD_SHA" \
-              --repository "$GITHUB_REPOSITORY"
-            rm -rf public-evidence
-            mv carried-evidence public-evidence
-          fi
 
-      - name: Upload this validated branch to the atomic fan-in
+      - name: Upload this validated target to the atomic fan-in
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: collected-pages-${{ matrix.branch }}
+          name: collected-pages-${{ matrix.bundle_key }}
           path: public-evidence/
           if-no-files-found: error
           compression-level: 6
           retention-days: 1
 
   collect-compatibility:
-    name: Collect compatibility ${{ matrix.branch }}
+    name: Collect compatibility ${{ matrix.bundle_key }}
     needs: discover
     if: needs.discover.outputs.eligible == 'true'
     strategy:
       fail-fast: false
       max-parallel: 3
       matrix:
-        branch: ${{ fromJSON(needs.discover.outputs.branches) }}
+        bundle_key: ${{ fromJSON(needs.discover.outputs.bundle_keys) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -724,12 +736,15 @@ jobs:
         id: artifact
         shell: bash
         env:
-          BRANCH: ${{ matrix.branch }}
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          SOURCE_BRANCH: ${{ needs.discover.outputs.source_branch }}
           GH_TOKEN: ${{ github.token }}
         run: >-
           python3 scripts/pages/select_compatibility_artifact.py
           --repository "$GITHUB_REPOSITORY"
-          --branch "$BRANCH"
+          --branch "$SOURCE_BRANCH"
+          --bundle-key "$BUNDLE_KEY"
+          --expected-source-sha "${{ needs.discover.outputs.source_sha }}"
           --github-output "$GITHUB_OUTPUT"
 
       - name: Download the digest-checked compatibility generation
@@ -748,7 +763,8 @@ jobs:
         if: steps.artifact.outputs.available == 'true'
         shell: bash
         env:
-          BRANCH: ${{ matrix.branch }}
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          SOURCE_BRANCH: ${{ needs.discover.outputs.source_branch }}
           EXPECTED_SHA: ${{ steps.artifact.outputs.sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -758,18 +774,18 @@ jobs:
           validation_status=0
           python3 scripts/pages/compatibility_evidence.py validate \
             --evidence-root selected-compatibility \
-            --branch "$BRANCH" \
+            --bundle-key "$BUNDLE_KEY" \
             --only-branch \
             --repository "$GITHUB_REPOSITORY" || validation_status=$?
           if [[ "$validation_status" -eq 3 ]]; then
             printf 'Compatibility evidence for %s uses a superseded contract; omitting it.\n' \
-              "$BRANCH"
+              "$BUNDLE_KEY"
             exit 0
           fi
           if [[ "$validation_status" -ne 0 ]]; then
             exit "$validation_status"
           fi
-          manifest="selected-compatibility/$BRANCH/manifest.json"
+          manifest="selected-compatibility/$BUNDLE_KEY/manifest.json"
           coverage_sha="$(jq -er .provenance.coverage_sha "$manifest")"
           target_sha="$(jq -er .provenance.target_sha "$manifest")"
           [[ "$coverage_sha" =~ ^[0-9a-f]{40}$ ]]
@@ -778,27 +794,27 @@ jobs:
           if ! git merge-base --is-ancestor "$target_sha" "$coverage_sha" || \
              ! git merge-base --is-ancestor "$coverage_sha" "$EXPECTED_SHA"; then
             printf 'Compatibility evidence for %s no longer belongs to the current branch lineage.\n' \
-              "$BRANCH"
+              "$BUNDLE_KEY"
             exit 0
           fi
           if [[ "$coverage_sha" != "$EXPECTED_SHA" ]]; then
             classification="$(python3 scripts/ci/mod_compatibility_impact.py \
               --repository . --base "$coverage_sha" --head "$EXPECTED_SHA")"
             if [[ "$classification" != skip ]]; then
-              printf 'Compatibility-impacting changes supersede evidence for %s.\n' "$BRANCH"
+              printf 'Compatibility-impacting changes supersede evidence for %s.\n' "$BUNDLE_KEY"
               exit 0
             fi
           fi
-          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
+          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" \
             --jq .commit.sha)"
           if [[ "$current_sha" != "$EXPECTED_SHA" ]]; then
-            printf 'Release branch %s advanced during optional evidence collection.\n' "$BRANCH"
+            printf 'Release branch %s advanced during optional evidence collection.\n' "$BUNDLE_KEY"
             exit 0
           fi
           python3 scripts/pages/compatibility_evidence.py carry-forward \
             --evidence-root selected-compatibility \
             --output public-compatibility \
-            --branch "$BRANCH" \
+            --bundle-key "$BUNDLE_KEY" \
             --coverage-sha "$EXPECTED_SHA" \
             --repository "$GITHUB_REPOSITORY"
           printf 'publishable=true\n' >> "$GITHUB_OUTPUT"
@@ -807,7 +823,7 @@ jobs:
         if: steps.evidence.outputs.publishable == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: collected-compatibility-${{ matrix.branch }}
+          name: collected-compatibility-${{ matrix.bundle_key }}
           path: public-compatibility/
           if-no-files-found: error
           compression-level: 6
@@ -863,10 +879,12 @@ jobs:
           path: public-compatibility
           digest-mismatch: error
 
-      - name: Recheck every branch immediately before rendering
+      - name: Recheck shared source immediately before rendering
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          SOURCE_BRANCH: ${{ needs.discover.outputs.source_branch }}
+          SOURCE_SHA: ${{ needs.discover.outputs.source_sha }}
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
@@ -874,20 +892,20 @@ jobs:
           for manifest in public-evidence/*/manifest.json; do
             test -f "$manifest"
             found=$((found + 1))
-            branch="$(basename "$(dirname "$manifest")")"
+            bundle_key="$(basename "$(dirname "$manifest")")"
             target_sha="$(jq -er .provenance.target.sha "$manifest")"
             coverage_sha="$(jq -er \
               '.provenance.coverage_sha // .provenance.target.sha' "$manifest")"
             current_sha="$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/branches/$branch" --jq .commit.sha)"
-            if [[ "$current_sha" != "$coverage_sha" ]]; then
+              "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" --jq .commit.sha)"
+            if [[ "$current_sha" != "$coverage_sha" || "$coverage_sha" != "$SOURCE_SHA" || "$target_sha" != "$SOURCE_SHA" ]]; then
               printf 'Branch %s moved from covered SHA %s to %s before rendering.\n' \
-                "$branch" "$coverage_sha" "$current_sha" >&2
+                "$bundle_key" "$coverage_sha" "$current_sha" >&2
               exit 1
             fi
             python3 scripts/pages/evidence.py validate \
               --evidence-root public-evidence \
-              --branch "$branch" \
+              --bundle-key "$bundle_key" \
               --kind compact \
               --repository "$GITHUB_REPOSITORY" \
               --target-sha "$target_sha" \
@@ -897,7 +915,7 @@ jobs:
 
       - name: Render the landing page and comparison gallery
         env:
-          EXPECTED_BRANCHES: ${{ needs.discover.outputs.branches }}
+          EXPECTED_BUNDLE_KEYS: ${{ needs.discover.outputs.bundle_keys }}
         run: >-
           python3 scripts/pages/build_site.py
           --evidence-root public-evidence
@@ -905,7 +923,7 @@ jobs:
           --output _site
           --repository "$GITHUB_REPOSITORY"
           --require-compact-evidence
-          --expected-branches-json "$EXPECTED_BRANCHES"
+          --expected-bundles-json "$EXPECTED_BUNDLE_KEYS"
 
       - name: Upload the complete Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
@@ -915,23 +933,39 @@ jobs:
 
   deploy:
     name: Deploy GitHub Pages
-    needs: build
+    needs:
+      - discover
+      - build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       pages: write
       id-token: write
+      contents: read
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Recheck the shared source immediately before deployment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_BRANCH: ${{ needs.discover.outputs.source_branch }}
+          SOURCE_SHA: ${{ needs.discover.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" --jq .commit.sha)"
+          if [[ "$current_sha" != "$SOURCE_SHA" ]]; then
+            printf 'Shared source advanced before deployment; retaining the deployed site.\n' >&2
+            exit 1
+          fi
       - name: Deploy the immutable site artifact
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
 
   refresh-cache:
-    name: Refresh evidence cache for ${{ matrix.branch }}
+    name: Refresh evidence cache for ${{ matrix.bundle_key }}
     needs:
       - discover
       - deploy
@@ -942,7 +976,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        branch: ${{ fromJSON(needs.discover.outputs.branches) }}
+        bundle_key: ${{ fromJSON(needs.discover.outputs.bundle_keys) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -974,7 +1008,7 @@ jobs:
       - name: Download the branch bundle validated in this Pages run
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: collected-pages-${{ matrix.branch }}
+          name: collected-pages-${{ matrix.bundle_key }}
           path: public-evidence
           digest-mismatch: error
 
@@ -982,12 +1016,13 @@ jobs:
         id: cache
         shell: bash
         env:
-          BRANCH: ${{ matrix.branch }}
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          SOURCE_BRANCH: ${{ needs.discover.outputs.source_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
-          manifest="public-evidence/$BRANCH/manifest.json"
+          manifest="public-evidence/$BUNDLE_KEY/manifest.json"
           manifest_branch="$(jq -er .release.branch "$manifest")"
           target_sha="$(jq -er .provenance.target.sha "$manifest")"
           # The cache is keyed by the head this bundle covers, which a protected
@@ -996,20 +1031,25 @@ jobs:
           # name no later run can ask for.
           coverage_sha="$(jq -er '.provenance.coverage_sha // .provenance.target.sha' \
             "$manifest")"
-          [[ "$manifest_branch" == "$BRANCH" ]]
+          [[ "$manifest_branch" == "$SOURCE_BRANCH" ]]
           [[ "$target_sha" =~ ^[0-9a-f]{40}$ ]]
           [[ "$coverage_sha" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
+          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" \
             --jq .commit.sha)" == "$coverage_sha" ]]
           python3 scripts/pages/evidence.py validate \
             --evidence-root public-evidence \
-            --branch "$BRANCH" \
+            --bundle-key "$BUNDLE_KEY" \
             --only-branch \
             --kind compact \
             --repository "$GITHUB_REPOSITORY" \
             --target-sha "$target_sha" \
             --coverage-sha "$coverage_sha"
-          printf 'name=pages-cache-%s--%s\n' "$BRANCH" "$coverage_sha" >> "$GITHUB_OUTPUT"
+          printf 'name=pages-cache-%s--%s\n' "$BUNDLE_KEY" "$coverage_sha" >> "$GITHUB_OUTPUT"
+          if [[ "$(jq -r .schema_version "$manifest")" == 4 ]]; then
+            source_run_id="$(jq -er .provenance.source.run_id "$manifest")"
+            printf 'complete_name=pages-full-baseline-%s--%s--%s\n' \
+              "$BUNDLE_KEY" "$target_sha" "$source_run_id" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Roll the protected evidence cache forward
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1020,8 +1060,18 @@ jobs:
           compression-level: 6
           retention-days: 90
 
+      - name: Retain the complete compact generation for feature evidence reuse
+        if: steps.cache.outputs.complete_name != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.cache.outputs.complete_name }}
+          path: public-evidence/
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 90
+
   refresh-compatibility-cache:
-    name: Refresh compatibility cache for ${{ matrix.branch }}
+    name: Refresh compatibility cache for ${{ matrix.bundle_key }}
     needs:
       - discover
       - collect-compatibility
@@ -1033,7 +1083,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        branch: ${{ fromJSON(needs.discover.outputs.branches) }}
+        bundle_key: ${{ fromJSON(needs.discover.outputs.bundle_keys) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -1062,7 +1112,7 @@ jobs:
       - name: Download compatibility evidence validated in this Pages run
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: collected-compatibility-${{ matrix.branch }}
+          pattern: collected-compatibility-${{ matrix.bundle_key }}
           merge-multiple: true
           path: public-compatibility
           digest-mismatch: error
@@ -1071,29 +1121,30 @@ jobs:
         id: cache
         shell: bash
         env:
-          BRANCH: ${{ matrix.branch }}
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          SOURCE_BRANCH: ${{ needs.discover.outputs.source_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           printf 'available=false\n' >> "$GITHUB_OUTPUT"
-          manifest="public-compatibility/$BRANCH/manifest.json"
+          manifest="public-compatibility/$BUNDLE_KEY/manifest.json"
           if [[ ! -f "$manifest" ]]; then
-            printf 'No public compatibility evidence exists for %s yet.\n' "$BRANCH"
+            printf 'No public compatibility evidence exists for %s yet.\n' "$BUNDLE_KEY"
             exit 0
           fi
           source scripts/ci/github_api_retry.sh
           coverage_sha="$(jq -er .provenance.coverage_sha "$manifest")"
           [[ "$coverage_sha" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$BRANCH" \
+          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" \
             --jq .commit.sha)" == "$coverage_sha" ]]
           python3 scripts/pages/compatibility_evidence.py validate \
             --evidence-root public-compatibility \
-            --branch "$BRANCH" \
+            --bundle-key "$BUNDLE_KEY" \
             --only-branch \
             --repository "$GITHUB_REPOSITORY" \
             --coverage-sha "$coverage_sha"
           printf 'available=true\n' >> "$GITHUB_OUTPUT"
-          printf 'name=pages-mod-compatibility-cache-%s\n' "$BRANCH" >> "$GITHUB_OUTPUT"
+          printf 'name=pages-mod-compatibility-cache-%s--%s\n' "$BUNDLE_KEY" "$coverage_sha" >> "$GITHUB_OUTPUT"
 
       - name: Roll the protected compatibility cache forward
         if: steps.cache.outputs.available == 'true'
@@ -1104,6 +1155,44 @@ jobs:
           if-no-files-found: error
           compression-level: 6
           retention-days: 90
+
+  request-feature-coverage:
+    name: Request feature coverage after public baseline retention
+    continue-on-error: true
+    needs:
+      - discover
+      - refresh-cache
+      - refresh-compatibility-cache
+      - request-rotation
+    if: >-
+      always() && needs.discover.outputs.eligible == 'true' &&
+      needs.discover.outputs.source_branch == 'master' &&
+      needs.refresh-cache.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Wake the collector after complete public evidence becomes available
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/master || ! "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            printf 'Feature coverage wake requires a protected Pages owner.\n' >&2
+            exit 1
+          fi
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            printf 'A newer source generation owns feature coverage.\n'
+            exit 0
+          fi
+          payload="$RUNNER_TEMP/pages-feature-coverage-request.json"
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" \
+            '{event_type:"feature-coverage-requested",client_payload:{source_repository:$repository,
+              pages_run_id:$run_id}}' > "$payload"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" > /dev/null
 
   request-rotation:
     name: Request post-success evidence rotation
@@ -1292,14 +1381,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          reference_identity="$(python3 e2e/visual_review.py \
-            --matrix release/release-matrix.json \
-            --reference-identity)"
-          reference_branch="$(jq -er .release_branch <<< "$reference_identity")"
+          reference_key="$(python3 scripts/pages/evidence_target.py --kind matrix \
+            | jq -er '[.include[] | select(.raw_retention_days == 90) | .bundle_key] |
+              if length == 1 then .[0] else error("reference target is ambiguous") end')"
           python scripts/pages/rotate_artifacts.py \
             --evidence-root "$RUNNER_TEMP/pages-cache" \
             --compatibility-evidence-root "$RUNNER_TEMP/pages-compatibility-cache" \
             --repository "$GITHUB_REPOSITORY" \
             --pages-run-id "${{ steps.owner.outputs.pages_run_id }}" \
             --pages-run-sha "${{ steps.owner.outputs.pages_run_sha }}" \
-            --preserve-raw-branch "$reference_branch"
+            --preserve-raw-key "$reference_key"

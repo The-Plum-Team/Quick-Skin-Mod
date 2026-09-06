@@ -20,6 +20,9 @@ repositories.withType<MavenArtifactRepository>().configureEach {
         }
         repositoryHost == "libraries.minecraft.net" -> content {
             includeGroupByRegex("com\\.mojang(\\..*)?")
+            // Mojang's 1.21.x library metadata declares a patched macOS classifier that is not
+            // published by LWJGL on Maven Central. Keep the exception module-scoped.
+            includeModule("org.lwjgl", "lwjgl-freetype")
         }
         repositoryHost == "maven.minecraftforge.net" -> content {
             includeGroupByRegex("net\\.minecraftforge(\\..*)?")
@@ -29,6 +32,8 @@ repositories.withType<MavenArtifactRepository>().configureEach {
         }
         repositoryHost == "maven.neoforged.net" -> content {
             includeGroupByRegex("net\\.neoforged(\\..*)?")
+            includeGroupByRegex("cpw\\.mods(\\..*)?")
+            excludeGroupByRegex("net\\.neoforged\\.fancymodloader\\.[0-9a-f]{64}")
         }
         repositoryHost == "repo.maven.apache.org" -> content {
             excludeGroupByRegex("dev\\.architectury(\\..*)?")

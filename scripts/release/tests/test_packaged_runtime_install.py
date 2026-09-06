@@ -21,6 +21,32 @@ import runtime_store  # noqa: E402
 
 
 class PackagedRuntimeClientInstallTest(unittest.TestCase):
+    def test_shared_datapack_materializes_target_resource_names_and_game_rules(self) -> None:
+        for version, directory, clock_rule in (
+            ("1.20.1", "functions", "doDaylightCycle"),
+            ("1.21.1", "function", "doDaylightCycle"),
+            ("1.21.11", "function", "minecraft:advance_time"),
+            ("26.1", "function", "minecraft:advance_time"),
+        ):
+            with self.subTest(version=version):
+                server = self.root / version
+                server.mkdir()
+                packaged_runtime.write_server_files(server, 25578, ROOT / "e2e/server-template",
+                                                    runtime_version=version)
+                pack = server / "world/datapacks/qs_e2e_time"
+                load = pack / "data/qs_e2e" / directory / "load.mcfunction"
+                self.assertIn(f"gamerule {clock_rule} false\n", load.read_text())
+                self.assertIn("team add qs_e2e\n", load.read_text())
+                self.assertEqual({"load.json", "tick.json"},
+                                 {path.name for path in (pack / "data/minecraft/tags" / directory).iterdir()})
+                opposite = "function" if directory == "functions" else "functions"
+                self.assertFalse((pack / "data/qs_e2e" / opposite).exists())
+                self.assertFalse((pack / "data/minecraft/tags" / opposite).exists())
+                # Re-materialization never duplicates game rules or changes the chosen layout.
+                before = load.read_bytes()
+                packaged_runtime.adapt_server_datapack(pack, version)
+                self.assertEqual(before, load.read_bytes())
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)

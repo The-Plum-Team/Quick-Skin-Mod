@@ -8,6 +8,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from scripts.architecture.source_inventory import java_source, java_sources
 from unittest import mock
 
 
@@ -40,6 +42,16 @@ class _Response:
 
 
 class ModCompatibilityContractTest(unittest.TestCase):
+    def test_shared_lock_refresh_discovers_only_matrix_targets_without_remote_branches(self) -> None:
+        matrix = mod_compatibility.load_matrix(ROOT / "release/release-matrix.json")
+        with mock.patch.object(update_mod_compatibility_lock.subprocess, "run",
+                               side_effect=AssertionError("shared discovery must not inspect Git branches")):
+            versions = update_mod_compatibility_lock.discover_versions(ROOT)
+        self.assertEqual(sorted({row["artifact_version"] for row in matrix["artifacts"]},
+                                key=update_mod_compatibility_lock._version_tuple), versions)
+        with tempfile.TemporaryDirectory() as temporary, self.assertRaises((ValueError, OSError)):
+            update_mod_compatibility_lock.discover_versions(Path(temporary))
+
     def setUp(self) -> None:
         self.contract_path = ROOT / "e2e" / "mod-compatibility-contract.json"
         self.payload = json.loads(self.contract_path.read_text(encoding="utf-8"))
@@ -130,18 +142,12 @@ class ModCompatibilityContractTest(unittest.TestCase):
                     self.assertRegex(locked_file.sha512, r"^[0-9a-f]{128}$")
 
     def test_player_armor_stands_integration_is_fully_retired(self) -> None:
-        retired = (
-            ROOT
-            / "common/src/legacy1_20_1/java/com/quickskin/mod/client/compat/PasCompatService.java",
-            ROOT
-            / "common/src/legacy1_20_1/java/com/quickskin/mod/mixin/compat/PasConfiguratorAccessor.java",
-            ROOT
-            / "common/src/legacy1_20_1/java/com/quickskin/mod/mixin/compat/PasConfiguratorMixin.java",
-        )
-        self.assertTrue(all(not path.exists() for path in retired))
+        retired = {"PasCompatService.java", "PasConfiguratorAccessor.java", "PasConfiguratorMixin.java"}
+        for source_set in ("main", "legacy1_20_1"):
+            self.assertFalse(retired.intersection(
+                path.name for path in java_sources(source_set=source_set, repository=ROOT)))
         screen = (
-            ROOT
-            / "common/src/main/java/com/quickskin/mod/client/gui/screen/PlayerSkinMenuScreen.java"
+            java_source('client/gui/screen/PlayerSkinMenuScreen.java', source_set='main', repository=ROOT)
         ).read_text(encoding="utf-8")
         self.assertNotIn("setSelectionCallback", screen)
         self.assertNotIn("isSelectionMode", screen)
@@ -209,6 +215,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
                     "full",
                     "server-policy",
                     "session",
+                    "feature-navigation",
                 ],
                 scenarios[len(expected_prefix):],
             )

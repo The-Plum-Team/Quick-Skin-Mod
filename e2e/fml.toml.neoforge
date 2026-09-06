@@ -1,0 +1,6 @@
+# Dev-only NeoForge loader config, pre-seeded into each client runDir's config/fml.toml.
+# Disables NeoForge's early-display GLFW window: on macOS a second client window intermittently
+# fails glfwGetPrimaryMonitor in the early display (the real game window still opens afterwards).
+# This is the NeoForge analog of Forge's -Dfml.earlyprogresswindow=false (NeoForge has no such
+# system property; the early window is gated by this FMLConfig value instead).
+earlyWindowControl = false

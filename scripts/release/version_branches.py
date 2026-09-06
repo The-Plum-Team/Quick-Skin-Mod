@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Discover release branches without maintaining a second version inventory.
+"""Recognize historical release-branch names without maintaining a version inventory.
 
 The release matrix inside each branch remains authoritative for its Minecraft
-lanes.  This module only recognizes the repository's branch naming contract so
-the synchronization workflow can discover targets from GitHub itself.
+lanes. This parser remains for historical evidence and branch-layout recovery. Shared-source
+consumers use release_sources.py and the complete matrix; old refs do not declare active targets.
 """
 
 from __future__ import annotations

@@ -19,6 +19,7 @@ EXPECTED_LOCAL_TRUST = {
         r"^(minecraft-merged-[0-9a-f]{10}|(?:forge|neoforge)-[0-9A-Za-z.+_-]+-minecraft-merged(?:-deobf)?)$",
     ),
     (r"^net[.]minecraftforge[.][0-9a-f]{64}$", r"^fmlloader$"),
+    (r"^net[.]neoforged[.]fancymodloader[.][0-9a-f]{64}$", r"^loader$"),
 }
 
 
@@ -126,6 +127,7 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ("net.minecraft", "neoforge-21.11.38-beta-minecraft-merged"),
             ("net.minecraft", "neoforge-26.2.0.6-beta-minecraft-merged-deobf"),
             ("net.minecraftforge." + "a" * 64, "fmlloader"),
+            ("net.neoforged.fancymodloader." + "a" * 64, "loader"),
         )
         rejected = (
             ("remapped", "architectury"),
@@ -139,6 +141,9 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ("net.minecraftforge." + "a" * 63, "fmlloader"),
             ("net.minecraftforge." + "g" * 64, "fmlloader"),
             ("net.minecraftforge." + "a" * 64, "forge"),
+            ("net.neoforged.fancymodloader." + "a" * 63, "loader"),
+            ("net.neoforged.fancymodloader." + "g" * 64, "loader"),
+            ("net.neoforged.fancymodloader." + "a" * 64, "loader-extra"),
         )
         for coordinate in allowed:
             with self.subTest(allowed=coordinate):

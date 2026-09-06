@@ -19,7 +19,7 @@ sys.path.insert(0, str(REPO / "scripts" / "pages"))
 sys.path.insert(0, str(REPO / "scripts" / "release"))
 
 from evidence import (  # noqa: E402
-    COMPACT_SCHEMA_VERSION,
+    COMPACT_SCHEMA_VERSIONS,
     PublicEvidenceError,
     bundle_coverage_sha,
     sha256_file,
@@ -34,7 +34,7 @@ from packaged_runtime import (  # noqa: E402
     compare_screenshots,
     inspect_screenshot,
 )
-from version_branches import parse_version_branch  # noqa: E402
+from evidence_target import EvidenceTargetError, bundle_version, manifest_key  # noqa: E402
 
 
 SITE_SOURCE = REPO / "site"
@@ -190,19 +190,18 @@ def build(
         )
     manifests: list[dict[str, Any]] = []
     for candidate in root_entries:
-        parsed = parse_version_branch(candidate.name)
-        if parsed is None:
-            raise SiteBuildError(f"unexpected directory in evidence root: {candidate.name}")
         try:
+            bundle_version(candidate.name)
             manifests.append(
                 validate_bundle(
                     root,
                     candidate.name,
                     expected_kind="compact" if require_compact else None,
                     expected_repository=repository,
+                    matrix_path=matrix_path,
                 )
             )
-        except PublicEvidenceError as exc:
+        except (PublicEvidenceError, EvidenceTargetError) as exc:
             raise SiteBuildError(str(exc)) from exc
     if not manifests:
         raise SiteBuildError("cannot build a public site without release evidence")
@@ -216,9 +215,15 @@ def build(
     # Compatibility evidence is bound to the head the ordinary bundle covers, which a
     # non-visual port may have carried past the head its packaged run actually tested.
     ordinary_head_by_branch = {
-        manifest["release"]["branch"]: bundle_coverage_sha(manifest)
+        manifest_key(manifest): bundle_coverage_sha(manifest)
         for manifest in manifests
     }
+    shared_heads = {
+        bundle_coverage_sha(manifest) for manifest in manifests
+        if "matrix_sha256" in manifest["release"]
+    }
+    if len(shared_heads) > 1:
+        raise SiteBuildError("shared-source evidence targets cover different source commits")
 
     compatibility_manifests: list[dict[str, Any]] = []
     compatibility_source_root: Path | None = None
@@ -247,6 +252,7 @@ def build(
                     compatibility_source_root,
                     candidate.name,
                     expected_repository=repository,
+                    matrix_path=matrix_path,
                 )
             except CompatibilityEvidenceError as exc:
                 raise SiteBuildError(str(exc)) from exc
@@ -279,9 +285,10 @@ def build(
     ] = {}
     inspected_sources: dict[Path, dict[str, Any]] = {}
     for manifest in manifests:
-        compact = manifest["schema_version"] == COMPACT_SCHEMA_VERSION
+        compact = manifest["schema_version"] in COMPACT_SCHEMA_VERSIONS
         release = manifest["release"]
         branch = release["branch"]
+        bundle_key = manifest_key(manifest)
         provenance = manifest["provenance"]
         loaders = sorted(
             {artifact["loader"] for artifact in release["artifacts"]},
@@ -312,6 +319,8 @@ def build(
                 "short_sha": provenance["target"]["sha"][:12],
                 "target_run_url": provenance["target"]["run_url"],
                 "branch_url": f"https://github.com/{repository}/tree/{branch}",
+                **({"matrix_sha256": release["matrix_sha256"]}
+                   if "matrix_sha256" in release else {}),
             }
         )
         for lane in manifest["lanes"]:
@@ -335,11 +344,12 @@ def build(
         release_source_paths: dict[str, Path] = {}
         for frame in release_frames:
             frame_id = frame["frame_id"]
+            frame_provenance = frame.get("tested_provenance", provenance)
             if frame_id in frame_ids:
                 raise SiteBuildError(f"duplicate frame identity across release bundles: {frame_id}")
             frame_ids.add(frame_id)
             derivative = frame.get("derivative") if compact else None
-            source = root / branch / (
+            source = root / bundle_key / (
                 derivative["asset"] if derivative is not None else frame["asset"]
             )
             release_source_paths[frame_id] = source
@@ -448,7 +458,7 @@ def build(
             }
             public_frame.update(
                 {
-                    "lane_id": f"{frame['artifact_node']}/{frame['scenario']}",
+                    "lane_id": frame.get("lane_id", f"{frame['artifact_node']}/{frame['scenario']}"),
                     "loader_name": loader_name(frame["loader"]),
                     "image": image_relative.relative_to("e2e").as_posix(),
                     "width": rendered_width,
@@ -465,14 +475,16 @@ def build(
                         f"{loader_name(frame['loader'])}, {frame['role'].replace('_', ' ')}. "
                         f"Expected view: {frame['expectation']}"
                     ),
-                    "source_run_url": provenance["source"]["run_url"],
-                    "source_branch": provenance["source"]["branch"],
-                    "source_sha": provenance["source"]["sha"],
-                    "source_created_at": provenance["source"]["created_at"],
-                    "target_run_url": provenance["target"]["run_url"],
-                    "target_branch": provenance["target"]["branch"],
-                    "target_sha": provenance["target"]["sha"],
-                    "target_created_at": provenance["target"]["created_at"],
+                    "source_run_url": frame_provenance["source"]["run_url"],
+                    "source_branch": frame_provenance["source"]["branch"],
+                    "source_sha": frame_provenance["source"]["sha"],
+                    "source_created_at": frame_provenance["source"]["created_at"],
+                    "target_run_url": frame_provenance["target"]["run_url"],
+                    "target_branch": frame_provenance["target"]["branch"],
+                    "target_sha": frame_provenance["target"]["sha"],
+                    "target_created_at": frame_provenance["target"]["created_at"],
+                    **{field: frame[field] for field in ("coverage_sha", "jar_sha256", "evidence_epoch")
+                       if field in frame},
                 }
             )
             gallery_frames.append(public_frame)
@@ -524,6 +536,7 @@ def build(
         for manifest in compatibility_manifests:
             release = manifest["release"]
             branch = release["branch"]
+            bundle_key = manifest_key(manifest)
             provenance = manifest["provenance"]
             compatibility_releases.append(
                 {
@@ -577,7 +590,7 @@ def build(
                         record = frame[side]
                         derivative = record["derivative"]
                         source = (
-                            compatibility_source_root / branch / derivative["asset"]
+                            compatibility_source_root / bundle_key / derivative["asset"]
                         )
                         digest = derivative["file_sha256"]
                         cached = compatibility_assets.get(digest)
@@ -757,8 +770,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repository", required=True)
     parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     parser.add_argument(
-        "--expected-branches-json",
-        help="exact JSON array of release branches discovered by the protected workflow",
+        "--expected-bundles-json", "--expected-branches-json", dest="expected_branches_json",
+        help="exact JSON array of bundle keys discovered by the protected workflow",
     )
     parser.add_argument(
         "--copy-images",
@@ -780,13 +793,15 @@ def main(argv: list[str] | None = None) -> int:
         if (
             not isinstance(raw_branches, list)
             or not raw_branches
-            or any(
-                not isinstance(branch, str) or parse_version_branch(branch) is None
-                for branch in raw_branches
-            )
+            or any(not isinstance(branch, str) for branch in raw_branches)
             or len(set(raw_branches)) != len(raw_branches)
         ):
-            parser.error("--expected-branches-json must be unique release branch names")
+            parser.error("--expected-bundles-json must contain unique bundle keys")
+        try:
+            for key in raw_branches:
+                bundle_version(key)
+        except EvidenceTargetError as exc:
+            parser.error(str(exc))
         expected_branches = set(raw_branches)
     try:
         summary = build(

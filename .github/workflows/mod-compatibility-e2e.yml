@@ -14,7 +14,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: mod-compatibility-${{ github.event.client_payload.target_sha || github.run_id }}
+  group: mod-compatibility-${{ github.event.client_payload.target_sha || github.run_id }}-${{ github.event.client_payload.review_artifact_name }}
   cancel-in-progress: false
 
 env:
@@ -34,6 +34,8 @@ jobs:
       contents: read
     outputs:
       base_matrix_kind: ${{ steps.admit.outputs.base_matrix_kind }}
+      minecraft_target: ${{ steps.admit.outputs.minecraft_target }}
+      bundle_key: ${{ steps.admit.outputs.bundle_key }}
       source_branch: ${{ steps.admit.outputs.source_branch }}
       source_run_attempt: ${{ steps.admit.outputs.source_run_attempt }}
       source_run_id: ${{ steps.admit.outputs.source_run_id }}
@@ -75,6 +77,13 @@ jobs:
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
+          if [[ "$SOURCE_BRANCH" == master || "$TARGET_BRANCH" == master ]]; then
+            python3 scripts/ci/shared_compatibility.py \
+              --github-repository "$GITHUB_REPOSITORY" --repository . \
+              --policy-sha "$GITHUB_SHA" --event "$GITHUB_EVENT_PATH" \
+              --github-output "$GITHUB_OUTPUT" || exit 1
+            exit 0
+          fi
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$ ]]
@@ -273,6 +282,7 @@ jobs:
         shell: bash
         env:
           BASE_MATRIX_KIND: ${{ needs.admit.outputs.base_matrix_kind }}
+          MINECRAFT_TARGET: ${{ needs.admit.outputs.minecraft_target }}
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
@@ -350,7 +360,12 @@ jobs:
           rm -f -- "$bundle_archive"
           GITHUB_SHA="$SOURCE_SHA" \
             python3 scripts/release/verify_release.py --verify-staged
+          target_arguments=()
+          if [[ -n "$MINECRAFT_TARGET" ]]; then
+            target_arguments+=(--minecraft-target "$MINECRAFT_TARGET")
+          fi
           python3 e2e/mod_compatibility.py --plan \
+            ${target_arguments[@]+"${target_arguments[@]}"} \
             --base-matrix-kind "$BASE_MATRIX_KIND" \
             > "$RUNNER_TEMP/compatibility-plan.raw.json"
           jq \
@@ -370,7 +385,7 @@ jobs:
             --arg target_branch "$TARGET_BRANCH" \
             --arg target_sha "$TARGET_SHA" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
-            '.schema_version == 1 and .release_branch == $target_branch and
+            '(.schema_version == 1 or .schema_version == 2) and .release_branch == $target_branch and
              .base_matrix_kind == $base_matrix_kind and
              .source_run_id == $source_run_id and .source_branch == $source_branch and
              .source_sha == $source_sha and .target_branch == $target_branch and
@@ -399,6 +414,10 @@ jobs:
                    else endswith("--scheduled-behavior") end)) and
                 .compatibility_contract_sha256 == $lock))' \
              "$RUNNER_TEMP/mod-compatibility-plan.json" > /dev/null
+          if [[ -n "$MINECRAFT_TARGET" ]]; then
+            python3 scripts/ci/shared_compatibility.py --policy-sha "$SOURCE_SHA" \
+              --validate-plan "$RUNNER_TEMP/mod-compatibility-plan.json" || exit 1
+          fi
           # Failed-only reruns retain immutable artifacts from earlier attempts. Bound each
           # same-name set by the authenticated source attempt and select its newest identity,
           # matching the visual reviewer that certified these exact baseline bytes.

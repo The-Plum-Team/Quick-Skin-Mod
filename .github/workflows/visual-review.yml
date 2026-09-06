@@ -41,6 +41,7 @@ jobs:
       pull-requests: read
     outputs:
       artifact_inventory: ${{ steps.source.outputs.artifact_inventory }}
+      target_matrix: ${{ steps.source.outputs.target_matrix }}
       compatibility_impact: ${{ steps.source.outputs.compatibility_impact }}
       eligible: ${{ steps.source.outputs.eligible }}
       source_sha: ${{ steps.source.outputs.source_sha }}
@@ -133,13 +134,25 @@ jobs:
           ' <<< "$source_run")"
 
           if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
-            [[ "$(jq -r .event <<< "$source_run")" == workflow_dispatch ]]
-            [[ "$source_branch" == automation/sync/* ]]
+            if [[ "$(jq -r .event <<< "$source_run")" != workflow_dispatch ]]; then
+              printf 'Review dispatch must authenticate a dispatched runtime source.\n' >&2
+              exit 1
+            fi
+            if [[ "$source_branch" == master ]]; then
+              if [[ "$(jq -r .schema_version release/release-matrix.json)" != 3 ||
+                    "$source_sha" != "$GITHUB_SHA" ]]; then
+                printf 'Shared review dispatch must name the current protected source.\n' >&2
+                exit 1
+              fi
+            elif [[ "$source_branch" != automation/sync/* ]]; then
+              printf 'Review dispatch has no supported protected source identity.\n' >&2
+              exit 1
+            fi
           fi
 
           # A PR targeting master is a deterministic preview only. If it merges, the protected
-          # synchronizer necessarily exercises the cumulative generation through the 1.20.1
-          # anchor, so reviewing the same source head here would duplicate Claude work. Direct
+          # post-merge scheduler exercises the cumulative generation, so reviewing the same
+          # source head here would duplicate Claude work. Direct
           # release-branch PRs have no guaranteed post-merge anchor and retain the narrower
           # fail-closed source-PR classifier below.
           if [[ "$(jq -r .event <<< "$source_run")" == pull_request ]]; then
@@ -192,7 +205,7 @@ jobs:
                .head.repo.full_name == $repository and
                .base.repo.full_name == $repository and
                (.base.ref | type == "string" and length > 0) and
-               (.changed_files | type == "number" and . > 0 and . <= 100)' \
+               (.changed_files | type == "number" and . > 0 and . == floor)' \
               <<< "$source_pr" > /dev/null
             source_pr_base="$(jq -er .base.ref <<< "$source_pr")"
             if [[ "$source_pr_base" == master ]]; then
@@ -200,7 +213,9 @@ jobs:
                 "$source_pr_number"
               exit 0
             fi
-            jq -e '.state == "open" and .merged == false' \
+            # Only direct release PRs enumerate changed files for model applicability.
+            # Large shared-source PRs can defer without reading that file inventory.
+            jq -e '.state == "open" and .merged == false and .changed_files <= 100' \
               <<< "$source_pr" > /dev/null
             changed_files="$(jq -r .changed_files <<< "$source_pr")"
             source_pr_files="$(github_api_retry \
@@ -216,6 +231,13 @@ jobs:
             if [[ "$impact" == skip ]]; then
               printf 'Ignoring source PR %s: its complete diff is outside ordinary visual review\n' \
                 "$source_pr_number"
+              exit 0
+            fi
+          fi
+
+          if [[ "$(jq -r .schema_version release/release-matrix.json)" == 3 ]]; then
+            if [[ "$source_branch" != master || "$source_sha" != "$GITHUB_SHA" ]]; then
+              printf 'Shared visual review waits for the current protected source generation.\n'
               exit 0
             fi
           fi
@@ -390,7 +412,7 @@ jobs:
             jq -e --arg name "$artifact_query_name" \
               '(type == "array") and
                ([.[] | (.artifacts | type == "array")] | all) and
-               ([.[].artifacts[]] | length <= 100) and
+               ([.[].artifacts[]] | length <= 1000) and
                ([.[].artifacts[] | .name == $name] | all)' \
               <<< "$artifacts" > /dev/null
             while IFS=$'\t' read -r artifact_name artifact_run_id artifact_expired; do
@@ -435,7 +457,7 @@ jobs:
           jq -e \
             '(type == "array") and
              ([.[] | (.jobs | type == "array")] | all) and
-             ([.[].jobs[]] | length <= 100)' \
+             ([.[].jobs[]] | length <= 1000)' \
             <<< "$jobs" > /dev/null
           jobs="$(jq -c '[.[].jobs[]]' <<< "$jobs")"
           gate_count="$(jq '[.[] | select(
@@ -471,7 +493,7 @@ jobs:
           jq -e \
             '(type == "array") and
              ([.[] | (.artifacts | type == "array")] | all) and
-             ([.[].artifacts[]] | length <= 100)' \
+             ([.[].artifacts[]] | length <= 1000)' \
             <<< "$source_artifacts" > /dev/null
           raw_artifact_inventory="$(jq -c --argjson run_id "$source_run_id" '[
             .[].artifacts[] | select(.name | startswith("packaged-e2e-")) |
@@ -485,7 +507,7 @@ jobs:
             exit 0
           fi
           [[ "$scenario_job_count" -gt 0 ]]
-          [[ "$scenario_job_count" -le 8 ]]
+          [[ "$scenario_job_count" -le 512 ]]
           [[ "$raw_packaged_count" -le \
             "$((scenario_job_count * source_run_attempt))" ]]
           jq -e --argjson run_id "$source_run_id" '
@@ -518,10 +540,21 @@ jobs:
           jq -e '
             ([.[].id] | length) == ([.[].id] | unique | length) and
             ([.[].name] | length) == ([.[].name] | unique | length) and
-            ([.[].size_in_bytes] | add // 0) <= 268435456
+            ([.[].size_in_bytes] | add // 0) <= 17179869184
           ' <<< "$artifact_inventory" > /dev/null
 
           [[ "$GITHUB_REF" == refs/heads/master ]]
+          inventory_path="$RUNNER_TEMP/visual-review-artifact-inventory.json"
+          printf '%s\n' "$artifact_inventory" > "$inventory_path"
+          matrix_kind=pr-anchors
+          if [[ "$(jq -r .event <<< "$source_run")" == schedule ]]; then
+            matrix_kind=native-anchors
+          fi
+          target_matrix="$(python3 scripts/ci/visual_review_targets.py \
+            --artifacts "$inventory_path" --source-run-id "$source_run_id" \
+            --source-branch "$source_branch" --source-sha "$source_sha" \
+            --matrix-kind "$matrix_kind")"
+          printf 'target_matrix=%s\n' "$target_matrix" >> "$GITHUB_OUTPUT"
           printf 'artifact_inventory=%s\n' "$artifact_inventory" >> "$GITHUB_OUTPUT"
           printf 'compatibility_impact=%s\n' "$compatibility_impact" >> "$GITHUB_OUTPUT"
           printf 'eligible=true\n' >> "$GITHUB_OUTPUT"
@@ -529,9 +562,13 @@ jobs:
           printf 'source_run_id=%s\n' "$source_run_id" >> "$GITHUB_OUTPUT"
 
   curate:
-    name: Authenticate and curate review input
+    name: Authenticate and curate ${{ matrix.bundle_key }} review input
     needs: authenticate
     if: needs.authenticate.outputs.eligible == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.authenticate.outputs.target_matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -547,6 +584,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Python for protected evidence validation
@@ -568,7 +606,11 @@ jobs:
         id: evidence
         shell: bash
         env:
-          ARTIFACT_INVENTORY: ${{ needs.authenticate.outputs.artifact_inventory }}
+          ARTIFACT_INVENTORY: ${{ toJSON(matrix.artifact_inventory) }}
+          COMPLETE_ARTIFACT_INVENTORY: ${{ needs.authenticate.outputs.artifact_inventory }}
+          TARGET_BUNDLE_KEY: ${{ matrix.bundle_key }}
+          TARGET_MINECRAFT_VERSION: ${{ matrix.minecraft_target }}
+          TARGET_MATRIX_SHA256: ${{ matrix.matrix_sha256 }}
           COMPATIBILITY_IMPACT: ${{ needs.authenticate.outputs.compatibility_impact }}
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
@@ -627,6 +669,13 @@ jobs:
           git show "$SOURCE_SHA:release/release-matrix.json" > "$source_matrix"
           git show "$SOURCE_SHA:gradle.properties" > "$source_properties"
           git show "$SOURCE_SHA:e2e/scenario-contract.json" > "$source_contract"
+          if [[ -n "$TARGET_MINECRAFT_VERSION" ]]; then
+            if [[ "$SOURCE_SHA" != "$IMPLEMENTATION_SHA" ]]; then
+              printf 'Shared target review requires the exact current source commit.\n' >&2
+              exit 1
+            fi
+            cmp --silent "$source_matrix" release/release-matrix.json
+          fi
 
           # Protected master code validates review evidence produced from the authenticated source
           # commit. Contract skew would make step parity ambiguous, so it skips advisory review.
@@ -654,7 +703,7 @@ jobs:
           jq -e \
             '(type == "array") and
              ([.[] | (.jobs | type == "array")] | all) and
-             ([.[].jobs[]] | length > 0 and length <= 100)' \
+             ([.[].jobs[]] | length > 0 and length <= 1000)' \
             "$jobs" > /dev/null
 
           job_graph_status=0
@@ -687,8 +736,48 @@ jobs:
           expected_artifacts="$(jq -c \
             '[.include[].id | "packaged-e2e-" + .] | sort' \
             "$RUNNER_TEMP/expected-e2e-matrix.json")"
-          [[ "$expected_artifacts" == \
-            "$(jq -c '[.[].name] | sort' <<< "$ARTIFACT_INVENTORY")" ]]
+          if [[ "$expected_artifacts" != \
+              "$(jq -c '[.[].name] | sort' <<< "$COMPLETE_ARTIFACT_INVENTORY")" ]]; then
+            printf 'Visual review requires every authenticated matrix artifact.\n' >&2
+            exit 1
+          fi
+          # Recompute the target partition after full-run controller and lane validation. The
+          # per-target download/capsule limits remain unchanged as the support matrix grows.
+          complete_inventory_path="$RUNNER_TEMP/complete-review-inventory.json"
+          printf '%s\n' "$COMPLETE_ARTIFACT_INVENTORY" > "$complete_inventory_path"
+          python3 scripts/ci/visual_review_targets.py \
+            --artifacts "$complete_inventory_path" --source-run-id "$SOURCE_RUN_ID" \
+            --source-branch "$(jq -er .head_branch <<< "$source_run")" --source-sha "$SOURCE_SHA" \
+            --matrix-kind "$matrix_kind" > "$RUNNER_TEMP/target-review-inventory.json"
+          target_plan="$(jq -ce --arg key "$TARGET_BUNDLE_KEY" \
+            '[.include[] | select(.bundle_key == $key)] |
+              if length == 1 then .[0] else error("review target is ambiguous") end' \
+            "$RUNNER_TEMP/target-review-inventory.json")"
+          jq -e --arg version "$TARGET_MINECRAFT_VERSION" --arg digest "$TARGET_MATRIX_SHA256" \
+            --argjson artifacts "$ARTIFACT_INVENTORY" \
+            '.minecraft_target == $version and .matrix_sha256 == $digest and .artifact_inventory == $artifacts' \
+            <<< "$target_plan" > /dev/null
+          jq --argjson names "$(jq -c '[.[].name]' <<< "$ARTIFACT_INVENTORY")" \
+            '{include:[.include[] | select(("packaged-e2e-" + .id) as $name | $names | index($name))]}' \
+            "$RUNNER_TEMP/expected-e2e-matrix.json" > "$RUNNER_TEMP/target-e2e-matrix.json"
+          mv "$RUNNER_TEMP/target-e2e-matrix.json" "$RUNNER_TEMP/expected-e2e-matrix.json"
+
+          if [[ -n "$TARGET_MINECRAFT_VERSION" ]]; then
+            printf '%s\n' "$COMPATIBILITY_IMPACT" > "$RUNNER_TEMP/selected-compatibility-impact.json"
+            python3 scripts/ci/feature_review.py \
+              --github-repository "$GITHUB_REPOSITORY" --repository . \
+              --source-run-id "$SOURCE_RUN_ID" --source-sha "$IMPLEMENTATION_SHA" \
+              --bundle-key "$TARGET_BUNDLE_KEY" --matrix-kind "$matrix_kind" --output "$RUNNER_TEMP" \
+              --compatibility-impact "$RUNNER_TEMP/selected-compatibility-impact.json" \
+              --github-output "$RUNNER_TEMP/selected-review.outputs" \
+              > "$RUNNER_TEMP/selected-review.json" || exit 1
+            if jq -e '.curated == true' "$RUNNER_TEMP/selected-review.json" > /dev/null; then
+              cat "$RUNNER_TEMP/selected-review.outputs" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            printf 'Shared review did not produce its authenticated capsule.\n' >&2
+            exit 1
+          fi
 
           # Resolve the reference only after the candidate run, source commit, controller parity,
           # job graph, and artifact inventory have all been authenticated by protected code.
@@ -699,6 +788,11 @@ jobs:
             --matrix release/release-matrix.json \
             --reference-identity)"
           REFERENCE_BRANCH="$(jq -er .release_branch <<< "$reference_identity")"
+          REFERENCE_BUNDLE_KEY="$(jq -er '.bundle_key // .release_branch' <<< "$reference_identity")"
+          reference_target_arguments=()
+          if [[ "$REFERENCE_BUNDLE_KEY" != "$REFERENCE_BRANCH" ]]; then
+            reference_target_arguments=(--bundle-key "$REFERENCE_BUNDLE_KEY")
+          fi
           REFERENCE_ARTIFACT_NODE="$(jq -er .artifact_node <<< "$reference_identity")"
           REFERENCE_VERSION="$(jq -er .version <<< "$reference_identity")"
           REFERENCE_LOADER="$(jq -er .loader <<< "$reference_identity")"
@@ -706,6 +800,9 @@ jobs:
           source_release_branch="$(jq -er .project.release_branch "$source_matrix")"
           review_mode=reference-comparison
           master_source_sha=''
+          if [[ -n "$TARGET_MINECRAFT_VERSION" ]]; then
+            master_source_sha="$SOURCE_SHA"
+          fi
           # Every controller-owned version port is a two-parent merge whose second parent is the
           # exact master generation being propagated. Preserve that identity for the whole wave,
           # not only for its 1.20.1 anchor, so a confirmed later-version defect can stop sibling
@@ -757,6 +854,7 @@ jobs:
             if python3 scripts/pages/select_artifact.py \
                 --repository "$GITHUB_REPOSITORY" \
                 --branch "$REFERENCE_BRANCH" \
+                "${reference_target_arguments[@]}" \
                 --require-raw \
                 --github-output "$reference_output" 2> "$reference_error"; then
               [[ "$(wc -l < "$reference_output" | tr -d ' ')" == 5 ]]
@@ -810,7 +908,10 @@ jobs:
           [[ "$REFERENCE_LOADER" == fabric ]]
           [[ "$REFERENCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$REFERENCE_VERSION" == 1.20.1 ]]
-          [[ "$REFERENCE_ARTIFACT_NAME" == "pages-e2e-$REFERENCE_BRANCH" ]]
+          if [[ "$REFERENCE_ARTIFACT_NAME" != "pages-e2e-$REFERENCE_BUNDLE_KEY" ]]; then
+            printf 'Visual reference artifact disagrees with the protected target key.\n' >&2
+            exit 1
+          fi
 
           # Reauthenticate and normalize the exact current-head 1.20.1 Pages artifact. The
           # selector already validated its owner workflow; the numeric-ID fetch below binds the
@@ -850,13 +951,13 @@ jobs:
 
           python3 scripts/pages/evidence.py validate \
             --evidence-root "$reference_selected" \
-            --branch "$REFERENCE_BRANCH" \
+            --bundle-key "$REFERENCE_BUNDLE_KEY" \
             --only-branch \
             --kind raw \
             --repository "$GITHUB_REPOSITORY" \
             --target-sha "$REFERENCE_SHA" \
             --target-run-id "$REFERENCE_ARTIFACT_RUN_ID"
-          reference_manifest="$reference_selected/$REFERENCE_BRANCH/manifest.json"
+          reference_manifest="$reference_selected/$REFERENCE_BUNDLE_KEY/manifest.json"
           reference_manifest_sha256="$(sha256sum "$reference_manifest" | cut -d ' ' -f 1)"
           reference_source_run_id="$(jq -er .provenance.source.run_id "$reference_manifest")"
           reference_source_branch="$(jq -er .provenance.source.branch "$reference_manifest")"
@@ -875,7 +976,8 @@ jobs:
             --arg created "$reference_source_created_at" \
             --arg repository "$GITHUB_REPOSITORY" \
             --arg sha "$reference_source_sha" \
-            '.status == "completed" and .conclusion == "success" and
+            --argjson run_id "$reference_source_run_id" \
+            '.id == $run_id and .status == "completed" and .conclusion == "success" and
              .event == "workflow_dispatch" and .head_branch == $branch and
              .head_sha == $sha and .created_at == $created and
              .path == ".github/workflows/on-demand-e2e.yml" and
@@ -886,7 +988,8 @@ jobs:
             --arg created "$reference_target_created_at" \
             --arg repository "$GITHUB_REPOSITORY" \
             --arg sha "$REFERENCE_SHA" \
-            '.status == "completed" and .conclusion == "success" and
+            --argjson run_id "$reference_target_run_id" \
+            '.id == $run_id and .status == "completed" and .conclusion == "success" and
              .event == "workflow_dispatch" and .head_branch == $branch and
              .head_sha == $sha and .created_at == $created and
              .path == ".github/workflows/on-demand-e2e.yml" and
@@ -1002,6 +1105,7 @@ jobs:
             review_arguments+=(
               --reference-evidence-root "$reference_selected"
               --reference-branch "$REFERENCE_BRANCH"
+              --reference-bundle-key "$REFERENCE_BUNDLE_KEY"
               --reference-artifact-node "$REFERENCE_ARTIFACT_NODE"
             )
           fi
@@ -1061,6 +1165,9 @@ jobs:
               "$(sha256sum e2e/scenario-contract.json | cut -d ' ' -f 1)" \
             --arg source_branch "$source_branch" \
             --arg source_sha "$SOURCE_SHA" \
+            --arg bundle_key "$TARGET_BUNDLE_KEY" \
+            --arg minecraft_target "$TARGET_MINECRAFT_VERSION" \
+            --arg matrix_sha256 "$TARGET_MATRIX_SHA256" \
             --argjson artifact_inventory "$ARTIFACT_INVENTORY" \
             --argjson frame_count "$frame_count" \
             --argjson image_bytes "$image_bytes" \
@@ -1078,8 +1185,14 @@ jobs:
               artifact_inventory:$artifact_inventory, job_graph:$job_graph,
               visual_reference:$visual_reference,
               manifest_sha256:$manifest_sha256, frame_count:$frame_count,
-              image_count:$image_count, image_bytes:$image_bytes}' \
+              image_count:$image_count, image_bytes:$image_bytes} +
+              (if $minecraft_target != "" then {schema_version:6,
+                bundle_key:$bundle_key,matrix_sha256:$matrix_sha256} else {} end)' \
             > "$RUNNER_TEMP/curation-proof.json"
+          if [[ -n "$TARGET_MINECRAFT_VERSION" ]]; then
+            python3 scripts/ci/visual_review_targets.py \
+              --validate-proof "$RUNNER_TEMP/curation-proof.json"
+          fi
 
       - name: Name the source-bound curated handoff
         id: identity
@@ -1088,12 +1201,18 @@ jobs:
         env:
           GENERATION_SHA: ${{ steps.evidence.outputs.generation_sha }}
           SOURCE_RUN_ID: ${{ needs.authenticate.outputs.source_run_id }}
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          MINECRAFT_TARGET: ${{ matrix.minecraft_target }}
         run: |
           set -euo pipefail
           [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          printf 'artifact_name=visual-review-input-%s-%s\n' \
-            "$SOURCE_RUN_ID" "$GENERATION_SHA" \
+          target_suffix=''
+          if [[ -n "$MINECRAFT_TARGET" ]]; then
+            target_suffix="--$BUNDLE_KEY"
+          fi
+          printf 'artifact_name=visual-review-input-%s-%s%s\n' \
+            "$SOURCE_RUN_ID" "$GENERATION_SHA" "$target_suffix" \
             >> "$GITHUB_OUTPUT"
 
       - name: Upload only the curated review input
@@ -1112,32 +1231,62 @@ jobs:
           retention-days: 7
 
   request-drain:
-    name: Wake the durable visual-review queue
+    name: Wake ${{ matrix.bundle_key }} visual review
     needs:
       - authenticate
       - curate
     if: >-
+      always() &&
       needs.authenticate.outputs.eligible == 'true' &&
-      needs.curate.result == 'success' &&
-      needs.curate.outputs.artifact_id != ''
+      (needs.curate.result == 'success' || needs.curate.result == 'failure')
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.authenticate.outputs.target_matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
+      actions: read
       contents: write
 
     steps:
       - name: Request one protected queue drain
         shell: bash
         env:
-          ARTIFACT_ID: ${{ needs.curate.outputs.artifact_id }}
-          ARTIFACT_NAME: ${{ needs.curate.outputs.artifact_name }}
-          GENERATION_SHA: ${{ needs.curate.outputs.generation_sha }}
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          MINECRAFT_TARGET: ${{ matrix.minecraft_target }}
+          SOURCE_RUN_ID: ${{ needs.authenticate.outputs.source_run_id }}
+          GENERATION_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # Matrix job outputs are not a per-target inventory. Resolve this exact capsule from
+          # the current curator run, allowing completed siblings to wake when another target fails.
+          target_suffix=''
+          if [[ -n "$MINECRAFT_TARGET" ]]; then
+            target_suffix="--$BUNDLE_KEY"
+          fi
+          ARTIFACT_NAME="visual-review-input-$SOURCE_RUN_ID-$GENERATION_SHA$target_suffix"
+          artifacts="$(gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100")"
+          selected="$(jq -ce --arg name "$ARTIFACT_NAME" \
+            'select(type == "array" and length <= 10) |
+              [.[].artifacts[]] | select(length <= 1000) |
+              [.[] | select(.name == $name)]' <<< "$artifacts")"
+          if [[ "$(jq length <<< "$selected")" == 0 ]]; then
+            printf 'No capsule was produced for %s; its siblings remain independent.\n' "$BUNDLE_KEY"
+            exit 0
+          fi
+          ARTIFACT_ID="$(jq -er --arg sha "$GENERATION_SHA" --argjson run_id "$GITHUB_RUN_ID" \
+            'select(length == 1) | .[0] |
+              select(.expired == false and .workflow_run.id == $run_id and
+                .workflow_run.head_sha == $sha and .workflow_run.head_branch == "master" and
+                (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
+                (.size_in_bytes | type == "number" and . > 0 and . <= 536870912)) |
+              .id | select(type == "number" and . == floor and . > 0)' <<< "$selected")"
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA$ ]]
+          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA(--mc[0-9]+([.][0-9]+)+)?$ ]]
           payload="$RUNNER_TEMP/visual-review-drain-request.json"
           jq -n \
             --arg artifact_id "$ARTIFACT_ID" \

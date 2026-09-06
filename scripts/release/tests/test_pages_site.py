@@ -561,10 +561,10 @@ class PagesSiteTest(unittest.TestCase):
             expected_target_sha="2" * 40,
         )
 
-        # 85 pr-profile captures (88 contract captures minus the 3 compatibility-only
-        # frames) for each of the two 1.20.1 loaders; 6 pr scenarios per loader.
-        self.assertEqual(170, len(manifest["frames"]))
-        self.assertEqual(12, len(manifest["lanes"]))
+        # 88 pr-profile captures for each of the two 1.20.1 loaders;
+        # the navigation callback scenario brings this to seven pr scenarios per loader.
+        self.assertEqual(180, len(manifest["frames"]))
+        self.assertEqual(14, len(manifest["lanes"]))
         self.assertEqual(
             self.catalog.contract_sha256,
             manifest["contract_sha256"],
@@ -1092,7 +1092,7 @@ class PagesSiteTest(unittest.TestCase):
         )
 
         self.assertEqual(2, summary["versions"])
-        self.assertEqual(340, summary["frames"])
+        self.assertEqual(360, summary["frames"])
         self.assertTrue((output / ".nojekyll").is_file())
         self.assertTrue((output / "index.html").is_file())
         self.assertTrue((output / "e2e" / "index.html").is_file())
@@ -1102,8 +1102,8 @@ class PagesSiteTest(unittest.TestCase):
             (output / "e2e" / "gallery-data.json").read_text(encoding="utf-8")
         )
         self.assertEqual(["1.21.1", "1.20.1"], [row["version"] for row in site_data["releases"]])
-        self.assertEqual(340, len(gallery["frames"]))
-        self.assertEqual(340, len({frame["frame_id"] for frame in gallery["frames"]}))
+        self.assertEqual(360, len(gallery["frames"]))
+        self.assertEqual(360, len({frame["frame_id"] for frame in gallery["frames"]}))
         sample = gallery["frames"][0]
         published = output / "e2e" / sample["image"]
         self.assertEqual(sample["published_file_sha256"], published.stem)
@@ -1704,14 +1704,14 @@ class PagesSiteTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        handoff = packaged.index("name: pages-e2e-${{ github.ref_name }}")
+        handoff = packaged.index("name: pages-e2e-${{ matrix.bundle_key }}")
         self.assertIn(
-            "retention-days: ${{ steps.identity.outputs.reference_retention_days }}",
+            "retention-days: ${{ matrix.raw_retention_days }}",
             packaged[handoff : handoff + 900],
         )
-        self.assertIn("--reference-retention-days", packaged)
+        self.assertIn("python3 scripts/pages/evidence_target.py --kind matrix", packaged)
         compact = pages.index("python3 scripts/pages/evidence.py compact")
-        fan_in = pages.index("name: collected-pages-${{ matrix.branch }}", compact)
+        fan_in = pages.index("name: collected-pages-${{ matrix.bundle_key }}", compact)
         self.assertLess(compact, fan_in)
         self.assertIn("kind_argument=(--kind raw)", pages[:compact])
         self.assertIn("input_kind_argument=(--input-kind raw)", pages[:fan_in])

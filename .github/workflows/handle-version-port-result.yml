@@ -16,9 +16,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  source-layout:
+    name: Check whether version ports are still active
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.layout.outputs.mode }}
+    steps:
+      - name: Check out protected source-layout policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Resolve the authoritative source layout
+        id: layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          mode="$(python3 scripts/release/release_sources.py --kind mode)"
+          printf 'mode=%s\n' "$mode" >> "$GITHUB_OUTPUT"
+          if [[ "$mode" == shared ]]; then
+            printf 'Ignoring a historical version-port result: shared source has no port work.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   inspect:
     name: Verify version port result
+    needs: source-layout
     if: >-
+      needs.source-layout.outputs.mode == 'version-branches' &&
       github.event.client_payload.source_event == 'workflow_dispatch' &&
       github.event.client_payload.source_repository == github.repository &&
       (github.event.client_payload.gate == 'build-gate.yml' ||

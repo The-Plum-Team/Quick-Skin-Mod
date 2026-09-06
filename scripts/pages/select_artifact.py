@@ -26,6 +26,7 @@ from rotate_artifacts import (  # noqa: E402
     _validate_run,
 )
 from version_branches import parse_version_branch  # noqa: E402
+from evidence_target import DEFAULT_MATRIX, EvidenceTargetError, target_for_key  # noqa: E402
 
 
 # Probe callers distinguish "no current-head evidence" (defer and wait for the next
@@ -74,9 +75,11 @@ def select_source(
     branch: str,
     current_sha: str,
     require_raw: bool = False,
+    bundle_key: str | None = None,
 ) -> Artifact:
-    handoff_name = f"pages-e2e-{branch}"
-    cache_name = f"pages-cache-{branch}--{current_sha}"
+    key = bundle_key if bundle_key is not None else branch
+    handoff_name = f"pages-e2e-{key}"
+    cache_name = f"pages-cache-{key}--{current_sha}"
     legacy_name = f"pages-cache-{branch}"
 
     handoff = _newest_valid(
@@ -121,6 +124,8 @@ def select_source(
     exact = [candidate for candidate in (handoff, cache) if candidate is not None]
     if exact:
         return max(exact, key=lambda item: item.order)
+    if bundle_key is not None:
+        raise RotationError(f"no authenticated current evidence exists for {key} on {branch}")
 
     legacy = _newest_valid(
         api,
@@ -159,6 +164,7 @@ def resolve_evidence(
     current_sha: str,
     require_raw: bool = False,
     allow_continuation: bool = False,
+    bundle_key: str | None = None,
 ) -> Evidence:
     """Select current-head evidence, or the newest earlier head still on this lineage.
 
@@ -168,6 +174,8 @@ def resolve_evidence(
     The AI oracle path requires an exact lossless handoff and never continues.
     """
 
+    if bundle_key is not None and allow_continuation:
+        raise RotationError("shared-source evidence continuation requires a protected coverage proof")
     try:
         return Evidence(
             select_source(
@@ -176,6 +184,7 @@ def resolve_evidence(
                 branch=branch,
                 current_sha=current_sha,
                 require_raw=require_raw,
+                bundle_key=bundle_key,
             ),
             current_sha,
         )
@@ -205,6 +214,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--branch", required=True)
+    parser.add_argument("--bundle-key")
+    parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
+    parser.add_argument("--expected-source-sha")
     parser.add_argument("--github-output", type=Path)
     parser.add_argument(
         "--probe",
@@ -234,7 +246,11 @@ def main(argv: list[str] | None = None) -> int:
         if not REPOSITORY.fullmatch(repository):
             raise RotationError("repository must use the owner/name form")
         branch = args.branch.strip()
-        if parse_version_branch(branch) is None:
+        if args.bundle_key is not None:
+            target = target_for_key(args.bundle_key, args.matrix)
+            if target.branch != branch:
+                raise RotationError("bundle key disagrees with the canonical source branch")
+        elif parse_version_branch(branch) is None:
             raise RotationError(f"not a release branch: {branch!r}")
         token = os.environ.get("GH_TOKEN", "")
         if not token:
@@ -245,6 +261,8 @@ def main(argv: list[str] | None = None) -> int:
             api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
         )
         current_sha = api.get_branch_sha(branch)
+        if args.expected_source_sha is not None and current_sha != args.expected_source_sha:
+            raise RotationError("source branch advanced after Pages discovery")
         if args.probe:
             # The probe authenticates exactly like a selection but downloads nothing and
             # reports a missing source as a distinct clean outcome for defer decisions.
@@ -256,6 +274,7 @@ def main(argv: list[str] | None = None) -> int:
                     current_sha=current_sha,
                     require_raw=args.require_raw,
                     allow_continuation=args.allow_continuation,
+                    bundle_key=args.bundle_key,
                 )
             except ApiError:
                 # Infrastructure failure is not evidence absence. Keep it visible so the
@@ -276,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
             current_sha=current_sha,
             require_raw=args.require_raw,
             allow_continuation=args.allow_continuation,
+            bundle_key=args.bundle_key,
         )
         selected = evidence.artifact
         with args.github_output.open("a", encoding="utf-8") as output:
@@ -286,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
             output.write(f"head_sha={current_sha}\n")
             output.write(f"size_in_bytes={selected.size_in_bytes}\n")
         return 0
-    except (OSError, RotationError) as exc:
+    except (OSError, RotationError, EvidenceTargetError) as exc:
         print(f"Pages evidence selection error: {exc}", file=sys.stderr)
         return 2
 

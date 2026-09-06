@@ -64,6 +64,8 @@ public final class E2EReport {
         sb.append("  \"role\": ").append(q(role)).append(",\n");
         sb.append("  \"scenario\": ").append(q(scenario)).append(",\n");
         sb.append("  \"contract_sha256\": ").append(q(ScenarioContract.SHA256)).append(",\n");
+        String selection = System.getProperty("quickskin.e2e.selection");
+        if (selection != null) sb.append("  \"selection_sha256\": ").append(q(selection)).append(",\n");
         sb.append("  \"status\": ").append(q(allPassed() ? "pass" : "fail")).append(",\n");
         sb.append("  \"steps\": [\n");
         for (int i = 0; i < steps.size(); i++) {

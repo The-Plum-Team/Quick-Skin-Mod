@@ -26,12 +26,10 @@ DIRECT_ORIGINAL_ELYTRA_ARGUMENT = re.compile(
     r"(?m)^\s*(?:original|originalSkin)\.elytra(?:Texture)?\(\),\s*$"
 )
 STONECUTTER_IF = re.compile(
-    r"^\s*//\?\s*if\s+(?P<operator><=|>=|<|>|==|=)\s*"
-    r"(?P<version>\d+(?:\.\d+)*)\s*\{\s*$"
+    r"^\s*//\?\s*if\s+(?P<condition>.+?)\s*\{\s*$"
 )
 STONECUTTER_ELSE_IF = re.compile(
-    r"^\s*//\?\}\s*else if\s+(?P<operator><=|>=|<|>|==|=)\s*"
-    r"(?P<version>\d+(?:\.\d+)*)\s*\{\s*$"
+    r"^\s*//\?\}\s*else if\s+(?P<condition>.+?)\s*\{\s*$"
 )
 STONECUTTER_ELSE = re.compile(r"^\s*//\?\}\s*else\s*\{\s*$")
 STONECUTTER_END = re.compile(r"^\s*//\?\}\s*$")
@@ -62,11 +60,7 @@ def active_stonecutter_source(source: str, version: str) -> str:
     for line in source.splitlines():
         if match := STONECUTTER_IF.match(line):
             parent_active = frames[-1]["active"] if frames else True
-            matched = _matches_version(
-                version,
-                match.group("operator"),
-                match.group("version"),
-            )
+            matched = _matches_condition(version, match.group("condition"))
             frames.append({
                 "parent_active": parent_active,
                 "matched": matched,
@@ -77,11 +71,7 @@ def active_stonecutter_source(source: str, version: str) -> str:
             if not frames:
                 raise ValueError("Stonecutter else-if without matching if")
             frame = frames[-1]
-            matched = _matches_version(
-                version,
-                match.group("operator"),
-                match.group("version"),
-            )
+            matched = _matches_condition(version, match.group("condition"))
             frame["active"] = (
                 frame["parent_active"] and not frame["matched"] and matched
             )
@@ -104,6 +94,14 @@ def active_stonecutter_source(source: str, version: str) -> str:
     if frames:
         raise ValueError("unterminated Stonecutter conditional")
     return "\n".join(active_lines)
+
+
+def _matches_condition(version: str, condition: str) -> bool:
+    clauses = [re.fullmatch(r"\s*(<=|>=|<|>|==|=)\s*(\d+(?:\.\d+)*)\s*", clause)
+               for clause in condition.split("&&")]
+    if any(clause is None for clause in clauses):
+        raise ValueError(f"unsupported Stonecutter version condition: {condition!r}")
+    return all(_matches_version(version, clause[1], clause[2]) for clause in clauses)
 
 
 def cape_elytra_binding_failures(
@@ -166,6 +164,14 @@ def active_player_skin_mixins(root: Path, matrix: dict) -> list[tuple[str, Path]
 
 
 class CapeElytraBindingTest(unittest.TestCase):
+    def test_api_family_condition_selects_both_boundaries_and_rejects_unknown_syntax(self) -> None:
+        source = "//? if >=1.21.2 && <1.21.6 {\nfamily\n//?} else {\nother\n//?}\n"
+        for version, expected in (("1.21.1", "other"), ("1.21.2", "family"),
+                                  ("1.21.5", "family"), ("1.21.6", "other")):
+            self.assertEqual(expected, active_stonecutter_source(source, version))
+        with self.assertRaisesRegex(ValueError, "unsupported Stonecutter"):
+            active_stonecutter_source(source.replace("<1.21.6", "unknown"), "1.20.1")
+
     def test_binding_policy_rejects_original_elytra_constructor_argument(self) -> None:
         source = """
             boolean hasCustomCape = true;

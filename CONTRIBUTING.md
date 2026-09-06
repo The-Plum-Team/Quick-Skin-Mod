@@ -13,7 +13,7 @@ contributing; submitting a pull request accepts its contribution terms.
 - [README.md](README.md) explains what the mod does and how to build it.
 - [AGENTS.md](AGENTS.md) is an import-only manifest. Every `@path.md` listed there is part of the
   authoritative instruction set for coding assistants.
-- [VERSION-BRANCHES.md](VERSION-BRANCHES.md) explains how shared changes reach release branches.
+- [VERSION-BRANCHES.md](VERSION-BRANCHES.md) explains shared-source development and historical branch recovery.
 - [RELEASING.md](RELEASING.md) explains immutable publication and repository governance.
 - [DEPENDENCY-SECURITY.md](DEPENDENCY-SECURITY.md) explains repository routing, checksums, and locks.
 - [e2e/README.md](e2e/README.md) describes the packaged Minecraft tests used by CI.
@@ -24,57 +24,30 @@ copies. Do not put rules directly in either manifest.
 
 ## 1. Choose the correct base branch
 
-The first decision is whether the change is shared or version-specific.
+All new changes target `master`, including a fix for one Minecraft version or loader. The
+schema-3 release matrix builds every supported target from that source; publication remains
+independent for each Minecraft target.
 
-| Your change | Pull-request base |
+| Your change | Owning definition |
 |---|---|
-| Shared behavior, security, tests, CI, build tooling, or general documentation | `master` |
-| Only one Minecraft version or loader pair | That exact release branch |
-| A new Minecraft version, loader, or release lane | Discuss it in an issue first; the release matrix must change first |
+| Feature behavior | Its compiled module in `architecture/modules.json` |
+| Minecraft API difference | The selected API-family implementation in `minecraft-adapter`, or the owning loader/mixin bridge |
+| Feature interaction or dependency | The module graph's dependency/binding and scenario coverage declarations |
+| New Minecraft version or loader | `release/release-matrix.json` and the required adapter/bootstrap inputs |
 
-Release branches are named from their loader pair and Minecraft version, such as
-`forge-and-fabric-1.20.1`. Check the current remote branch list instead of copying a version from
-this guide:
+Add a version by extending the matrix and selecting or adapting its API family. Keep differences
+inside the smallest owning boundary. Existing version branches and `automation/sync/*` are
+historical schema-2 inputs; the shared-source controller creates no new port branches.
 
-```bash
-git branch --remotes
-```
+The README support/status and profile blocks, the E2E README profile, and the imported workflow
+commands are generated from the matrix and scenario contract. Update those definitions, then run
+`scripts/release/branch_readme.py`, `e2e_readme.py`, and `workflow_guidance.py` with
+`--profile-branch master --write` as appropriate. Never edit a generated block by hand.
 
-Never work on `automation/sync/*`. GitHub Actions owns those temporary branches and deletes them
-after their tested port PR is merged.
-
-Do not edit either generated block in `README.md` by hand. Automation discovers release branches
-and regenerates the release-status badges, while `scripts/release/branch_readme.py` derives the
-current branch's identity, compatibility pins, and source-routing differences from its matrix. If
-matrix-owned profile facts change, run that helper with `--profile-branch master` or the matrix's
-exact `project.release_branch` and `--write`.
-
-The marked profile in `e2e/README.md` is generated too. `scripts/release/e2e_readme.py` combines
-lane facts from the active release matrix with suite facts from `e2e/scenario-contract.json`; the
-version synchronizer regenerates it for each target branch. Edit the matrix or contract, not the
-marked block.
-
-The two active-common test commands in `docs/ai/WORKFLOW.md` are matrix-owned as well.
-`scripts/release/workflow_guidance.py` renders their exact Minecraft version for each branch; the
-synchronizer applies that protected renderer after any shared guidance merge.
-
-Merge conflicts in protected version-owned files are not delegated to AI. The synchronizer uses a
-reviewed merge controller and classifier to preserve the target matrix, keep inactive loader
-modules absent, and merge shared runtime/guidance documents with source preference only at
-conflicting hunks. It then regenerates all matrix-owned profiles. The complete proposal is opened
-only in an alternate Git index; validator and writer independently reconstruct the original merge,
-copy only recomputed AI-conflict entries, and require an exact final-tree match. Unknown protected
-conflicts stop the port; Claude can see only the remaining unprotected conflict paths.
-
-The current synchronizer attempts to port every new `master` change to every release branch. A
-change described as “all versions except one” therefore needs an explicit design decision before
-coding. Open an issue or draft PR stating the exclusion; do not let an AI hide the policy in many
-scattered version conditions.
-
-A shared change is delivered repository-wide only after one synchronization PR per discovered
-release branch passes its exact-head Build and Packaged E2E gates, merges into that branch, and
-receives successful final exact-tree attestations. Record every intentional exclusion and
-outstanding port in the source pull request so an omitted branch is never mistaken for success.
+A change is validated across its affected module consumers and runtime bindings. Unknown impact,
+a changed selection policy, or unavailable complete baseline evidence requires the full profile.
+CI still builds every target and keeps the complete required lane gate; a valid feature selection
+reduces executed assertions, generated captures, and AI inputs within those lanes.
 
 ## 2. Prepare a checkout
 
@@ -96,24 +69,23 @@ git remote add upstream https://github.com/The-Plum-Team/Quick-Skin-Mod.git
 git fetch upstream
 ```
 
-Create a topic branch from the correct base. For a shared fix:
+Create a topic branch from `master`:
 
 ```bash
 git switch --create fix/short-description upstream/master
 ```
 
-For a version-only fix, keep the existing checkout where it is and create a separate ephemeral
-worktree from the fetched release branch. The commands below use a POSIX-compatible shell on macOS,
+If another task owns the current checkout, create a separate ephemeral worktree from fetched
+`master`, including for a version-only fix. The commands below use a POSIX-compatible shell on macOS,
 Linux, or Git Bash; replace the placeholders first:
 
 ```bash
-release_branch="<release-branch>"
 topic_branch="fix/short-description"
 git fetch upstream
 qsm_worktree_root="$(mktemp -d "${TMPDIR:-/tmp}/quick-skin-worktree.XXXXXX")"
 qsm_worktree_path="$qsm_worktree_root/checkout"
 git worktree add -b "$topic_branch" "$qsm_worktree_path" \
-  "upstream/$release_branch"
+  "upstream/master"
 cd "$qsm_worktree_path"
 ```
 
@@ -149,7 +121,7 @@ Help the agent by including:
 - what you expected and what happened instead;
 - the Minecraft version and loader;
 - reproduction steps and the smallest relevant log excerpt;
-- whether the change should apply to every version or one release branch;
+- whether the change should apply to every matrix target or one Minecraft API family;
 - screenshots when the problem is visual.
 
 AI output is not automatically correct. Before accepting it:
@@ -167,11 +139,14 @@ architecture document imported by `AGENTS.md`.
 
 | Area | Tracked source |
 |---|---|
-| Shared runtime and protocol behavior | `common/src/main` |
+| Pure domain, protocol, and feature behavior | Its `modules/<owner>/src/main` tree |
+| Minecraft API-family operations | `modules/minecraft-adapter/src/main` |
+| Runtime assembly, event wiring, and mixin bridges | `common/src/main` |
+| Dependencies, API providers, and feature ownership | `architecture/modules.json` |
 | Fabric integration | `fabric/src/main` |
 | Forge or NeoForge integration | The active loader module's `src/main` |
 | Version API replacements | Matrix-declared `src/legacy*` overlays |
-| Loader-independent regression tests | `common/src/test` |
+| Regression tests | The owning module's `src/test`, with integrated Minecraft checks in `common/src/test` |
 | Packaged Minecraft test mod | `common/src/e2e` and loader `src/e2e` |
 | E2E loader/bootstrap integrity | `e2e/loader-bootstrap-contract.json` |
 | Supported artifacts and E2E lanes | `release/release-matrix.json` |
@@ -187,7 +162,7 @@ file does not change the overlaid release. Search before editing:
 rg "ClassName|methodName" --glob "*.java" .
 ```
 
-Missing loader directories are normal on branches whose matrix does not support that loader.
+Only loaders and overlays selected by a matrix target belong in that target's compiled output.
 Changing an active loader's `src/e2e` entrypoint, manifest, or complete `build.gradle.kts` also
 requires an intentional digest update in `e2e/loader-bootstrap-contract.json` on `master`; do not
 weaken the validator or treat the final convention-apply line alone as sufficient.
@@ -197,7 +172,7 @@ weaken the validator or treat the final convention-apply line alone as sufficien
 Run the smallest useful test while developing. On Unix-like systems:
 
 ```bash
-./gradlew --no-daemon --no-parallel testStableLane
+./gradlew --no-daemon --no-parallel -PquickskinTarget=1.20.1 testStableLane
 ```
 
 On Windows, replace `./gradlew` with `.\gradlew.bat`.
@@ -206,8 +181,7 @@ Changes to build routing, loaders, resources, overlays, networking boundaries, o
 need the aggregate gate:
 
 ```bash
-./gradlew --no-daemon --no-parallel clean \
-  buildAllLanes buildAllE2EHarnesses
+python3 scripts/release/build_matrix.py --clean
 ```
 
 The unit suites can be entirely green while a packaged scenario is broken, because they stand in
@@ -224,21 +198,25 @@ python scripts/release/e2e_readme.py \
   --matrix release/release-matrix.json \
   --contract e2e/scenario-contract.json \
   --readme e2e/README.md \
-  --profile-branch "<master-or-exact-release-branch>" \
+  --profile-branch master \
   --check
 python scripts/release/workflow_guidance.py \
   --matrix release/release-matrix.json \
   --guidance docs/ai/WORKFLOW.md \
-  --profile-branch "<master-or-exact-release-branch>" \
+  --profile-branch master \
   --check
 python -m unittest discover -s scripts/release/tests -p "test_*.py" -v
 python -m unittest discover -s scripts/ci/tests -p "test_*.py" -v
 ```
 
-Do not run multiple Gradle commands at the same time. Architectury's transforms share JVM-global
-state and this repository deliberately builds serially.
+Do not run multiple Gradle commands at the same time on one machine. Architectury's transforms share
+JVM-global state, so local aggregate builds remain serial. GitHub compiles separate targets on
+isolated runners, then verifies the complete set before passing Build. Packaged E2E reuses that
+exact compilation; changes within one feature can then reduce its authenticated scenario scope.
 
-You normally do not need to launch packaged Minecraft E2E locally. The pull-request workflow
+You normally do not need to launch packaged Minecraft E2E locally. Use the `capture_coverage=full`
+manual recovery option when complete coverage is needed; nightly and optional-mod profiles remain
+complete integration checks. The pull-request workflow
 builds immutable jars and runs the declared scenarios on GitHub. Fork pull requests do not receive
 repository secrets, so secret-dependent AI review may be skipped while programmatic checks still
 run.
@@ -290,8 +268,8 @@ git fetch upstream
 git rebase upstream/master
 ```
 
-Use the exact release branch instead of `master` for a version-only change. If the rebase becomes
-confusing, return to the pre-rebase state safely:
+Version-only fixes also use `master`. If the rebase becomes confusing, return to the pre-rebase
+state safely:
 
 ```bash
 git rebase --abort

@@ -1,0 +1,920 @@
+{
+  "schema_version": 1,
+  "libraries": {
+    "architectury-injectables": "dev.architectury:architectury-injectables:1.0.10",
+    "json": "com.google.code.gson:gson:2.10",
+    "logging-api": "org.slf4j:slf4j-api:2.0.1",
+    "webp-imageio": "org.sejda.imageio:webp-imageio:0.1.6",
+    "annotations": "org.jetbrains:annotations:26.0.2",
+    "fabric-environment": "net.fabricmc:fabric-loader:0.17.3"
+  },
+  "modules": [
+    {
+      "id": "content-core",
+      "path": "modules/content-core",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "protocol-core",
+      "path": "modules/protocol-core",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "platform-api",
+      "path": "modules/platform-api",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only_api": [
+          "logging-api"
+        ],
+        "compile_only": [
+          "architectury-injectables"
+        ],
+        "test_runtime_only": [
+          "logging-api"
+        ]
+      }
+    },
+    {
+      "id": "appearance-data",
+      "path": "modules/appearance-data",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [
+        "platform-api"
+      ],
+      "implementation": [
+        "content-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "json",
+          "annotations"
+        ],
+        "test_runtime_only": [
+          "json"
+        ]
+      }
+    },
+    {
+      "id": "image-core",
+      "path": "modules/image-core",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "content-core",
+        "protocol-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "test_runtime_only": [
+          "webp-imageio"
+        ]
+      }
+    },
+    {
+      "id": "configuration",
+      "path": "modules/configuration",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [
+        "content-core",
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "json"
+        ],
+        "test_runtime_only": [
+          "json",
+          "logging-api"
+        ]
+      }
+    },
+    {
+      "id": "transfer-core",
+      "path": "modules/transfer-core",
+      "kind": "java-library",
+      "environment": "common",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "content-core",
+        "protocol-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "test_runtime_only": [
+          "json"
+        ]
+      }
+    },
+    {
+      "id": "server-appearance",
+      "path": "modules/server-appearance",
+      "kind": "java-library",
+      "environment": "server",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "configuration",
+        "content-core",
+        "image-core",
+        "platform-api",
+        "protocol-core",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "annotations",
+          "json",
+          "logging-api"
+        ],
+        "test_runtime_only": [
+          "json",
+          "logging-api"
+        ]
+      }
+    },
+    {
+      "id": "minecraft-adapter",
+      "path": "modules/minecraft-adapter",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [
+        "appearance-data",
+        "image-core",
+        "platform-api"
+      ],
+      "implementation": [
+        "client-foundation"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "client-foundation",
+      "path": "modules/client-foundation",
+      "kind": "java-library",
+      "environment": "client",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "annotations",
+          "fabric-environment"
+        ],
+        "test_runtime_only": [
+          "logging-api"
+        ]
+      }
+    },
+    {
+      "id": "cape-import",
+      "path": "modules/cape-import",
+      "kind": "java-library",
+      "environment": "client",
+      "api": [
+        "appearance-data",
+        "image-core"
+      ],
+      "implementation": [
+        "client-foundation",
+        "content-core",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "fabric-environment"
+        ],
+        "test_runtime_only": [
+          "json"
+        ]
+      }
+    },
+    {
+      "id": "client-api",
+      "path": "modules/client-api",
+      "kind": "java-library",
+      "environment": "client",
+      "api": [
+        "appearance-data",
+        "platform-api"
+      ],
+      "implementation": [],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "annotations",
+          "fabric-environment"
+        ]
+      }
+    },
+    {
+      "id": "client-preferences",
+      "path": "modules/client-preferences",
+      "kind": "java-library",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "configuration",
+        "content-core",
+        "platform-api",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "json",
+          "fabric-environment"
+        ],
+        "test_runtime_only": [
+          "logging-api"
+        ],
+        "test_implementation": [
+          "json"
+        ]
+      }
+    },
+    {
+      "id": "cpm-integration",
+      "path": "modules/cpm-integration",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [
+        "client-api"
+      ],
+      "implementation": [
+        "configuration",
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "client-transfer",
+      "path": "modules/client-transfer",
+      "kind": "java-library",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "protocol-core",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "fabric-environment"
+        ],
+        "test_runtime_only": [
+          "json"
+        ]
+      }
+    },
+    {
+      "id": "texture-state",
+      "path": "modules/texture-state",
+      "kind": "java-library",
+      "environment": "client",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "content-core",
+        "protocol-core",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "compile_only": [
+          "fabric-environment",
+          "annotations"
+        ],
+        "test_runtime_only": [
+          "json"
+        ]
+      }
+    },
+    {
+      "id": "ears-integration",
+      "path": "modules/ears-integration",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "image-core"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "asset-catalog",
+      "path": "modules/asset-catalog",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "client-foundation",
+        "client-preferences",
+        "configuration",
+        "content-core",
+        "cpm-integration",
+        "ears-integration",
+        "image-core",
+        "minecraft-adapter",
+        "platform-api",
+        "protocol-core",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {
+        "test_runtime_only": [
+          "webp-imageio"
+        ]
+      }
+    },
+    {
+      "id": "client-textures",
+      "path": "modules/client-textures",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [
+        "appearance-data",
+        "texture-state"
+      ],
+      "implementation": [
+        "asset-catalog",
+        "client-foundation",
+        "client-transfer",
+        "configuration",
+        "content-core",
+        "cpm-integration",
+        "ears-integration",
+        "image-core",
+        "minecraft-adapter",
+        "platform-api",
+        "protocol-core",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "networking",
+      "path": "modules/networking",
+      "kind": "minecraft",
+      "environment": "mixed",
+      "api": [
+        "client-api",
+        "protocol-core"
+      ],
+      "implementation": [
+        "appearance-data",
+        "asset-catalog",
+        "client-foundation",
+        "client-textures",
+        "client-transfer",
+        "configuration",
+        "content-core",
+        "image-core",
+        "platform-api",
+        "server-appearance",
+        "texture-state",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "skinlayers-integration",
+      "path": "modules/skinlayers-integration",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "asset-catalog",
+        "configuration",
+        "cpm-integration",
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "appearance-services",
+      "path": "modules/appearance-services",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [
+        "appearance-data",
+        "client-api"
+      ],
+      "implementation": [
+        "asset-catalog",
+        "client-foundation",
+        "client-textures",
+        "client-transfer",
+        "configuration",
+        "content-core",
+        "cpm-integration",
+        "ears-integration",
+        "image-core",
+        "minecraft-adapter",
+        "platform-api",
+        "skinlayers-integration",
+        "texture-state",
+        "transfer-core"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "preview-rendering",
+      "path": "modules/preview-rendering",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "appearance-services",
+        "client-foundation",
+        "client-textures",
+        "configuration",
+        "cpm-integration",
+        "minecraft-adapter",
+        "platform-api",
+        "skinlayers-integration",
+        "texture-state"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "ui-foundation",
+      "path": "modules/ui-foundation",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "client-foundation",
+        "configuration",
+        "minecraft-adapter",
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "client-input",
+      "path": "modules/client-input",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "player-preview",
+      "path": "modules/player-preview",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "appearance-services",
+        "client-foundation",
+        "client-textures",
+        "configuration",
+        "minecraft-adapter",
+        "platform-api",
+        "preview-rendering",
+        "texture-state",
+        "ui-foundation",
+        "asset-catalog"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "cape-editor",
+      "path": "modules/cape-editor",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "asset-catalog",
+        "configuration",
+        "image-core",
+        "minecraft-adapter",
+        "platform-api",
+        "player-preview",
+        "ui-foundation"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "customnpcs-integration",
+      "path": "modules/customnpcs-integration",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "appearance-services",
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "essential-integration",
+      "path": "modules/essential-integration",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "appearance-services",
+        "asset-catalog",
+        "configuration",
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "replay-integration",
+      "path": "modules/replay-integration",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "appearance-services",
+        "configuration",
+        "platform-api",
+        "asset-catalog"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "skin-upload",
+      "path": "modules/skin-upload",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "client-foundation",
+        "content-core",
+        "image-core",
+        "minecraft-adapter",
+        "ui-foundation"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "skin-import",
+      "path": "modules/skin-import",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [
+        "appearance-data"
+      ],
+      "implementation": [
+        "appearance-services",
+        "asset-catalog",
+        "configuration",
+        "content-core",
+        "cpm-integration",
+        "image-core",
+        "platform-api"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "settings-ui",
+      "path": "modules/settings-ui",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-services",
+        "client-api",
+        "client-input",
+        "configuration",
+        "minecraft-adapter",
+        "ui-foundation"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "cape-menu",
+      "path": "modules/cape-menu",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "appearance-services",
+        "asset-catalog",
+        "cape-editor",
+        "cape-import",
+        "client-foundation",
+        "client-textures",
+        "configuration",
+        "content-core",
+        "image-core",
+        "minecraft-adapter",
+        "platform-api",
+        "player-preview",
+        "preview-rendering",
+        "replay-integration",
+        "texture-state",
+        "ui-foundation"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "skin-menu",
+      "path": "modules/skin-menu",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "appearance-services",
+        "asset-catalog",
+        "cape-menu",
+        "client-foundation",
+        "client-textures",
+        "configuration",
+        "content-core",
+        "cpm-integration",
+        "image-core",
+        "minecraft-adapter",
+        "platform-api",
+        "player-preview",
+        "preview-rendering",
+        "replay-integration",
+        "settings-ui",
+        "skin-import",
+        "skin-upload",
+        "ui-foundation"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "menu-integration",
+      "path": "modules/menu-integration",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "configuration",
+        "minecraft-adapter",
+        "client-foundation",
+        "asset-catalog",
+        "appearance-services",
+        "ui-foundation",
+        "player-preview",
+        "essential-integration",
+        "cpm-integration"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "hud-preview",
+      "path": "modules/hud-preview",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "asset-catalog",
+        "configuration",
+        "preview-rendering"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
+      "id": "common",
+      "path": "common",
+      "kind": "minecraft-assembly",
+      "environment": "mixed",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "configuration",
+        "content-core",
+        "image-core",
+        "platform-api",
+        "protocol-core",
+        "server-appearance",
+        "transfer-core",
+        "minecraft-adapter",
+        "client-foundation",
+        "cape-import",
+        "client-api",
+        "client-preferences",
+        "cpm-integration",
+        "client-transfer",
+        "texture-state",
+        "ears-integration",
+        "asset-catalog",
+        "client-textures",
+        "networking",
+        "skinlayers-integration",
+        "appearance-services",
+        "preview-rendering",
+        "ui-foundation",
+        "client-input",
+        "player-preview",
+        "cape-editor",
+        "customnpcs-integration",
+        "essential-integration",
+        "replay-integration",
+        "skin-upload",
+        "skin-import",
+        "settings-ui",
+        "cape-menu",
+        "skin-menu",
+        "menu-integration",
+        "hud-preview"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    }
+  ],
+  "bindings": [
+    {
+      "id": "cpm-assets",
+      "api": "client-api",
+      "providers": [
+        "asset-catalog",
+        "client-textures"
+      ],
+      "consumers": [
+        "cpm-integration"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
+    {
+      "id": "client-network-actions",
+      "api": "client-api",
+      "providers": [
+        "networking"
+      ],
+      "consumers": [
+        "appearance-services",
+        "settings-ui"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
+    {
+      "id": "remote-appearance",
+      "api": "client-api",
+      "providers": [
+        "appearance-services"
+      ],
+      "consumers": [
+        "networking"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
+    {
+      "id": "skin-application-listener",
+      "api": "client-api",
+      "providers": [
+        "customnpcs-integration"
+      ],
+      "consumers": [
+        "appearance-services"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
+    {
+      "id": "gif-decoder",
+      "api": "image-core",
+      "providers": [
+        "minecraft-adapter"
+      ],
+      "consumers": [
+        "cape-import"
+      ],
+      "composition": "cape-menu",
+      "impact": "propagate"
+    },
+    {
+      "id": "settings-reload-deferral",
+      "api": "networking",
+      "providers": [
+        "settings-ui"
+      ],
+      "consumers": [
+        "networking"
+      ],
+      "composition": "common",
+      "impact": "coverage"
+    },
+    {
+      "id": "connection-identity",
+      "api": "client-transfer",
+      "providers": [
+        "common"
+      ],
+      "consumers": [
+        "client-transfer"
+      ],
+      "composition": "common",
+      "impact": "coverage"
+    },
+    {
+      "id": "open-skin-menu",
+      "api": "client-input",
+      "providers": [
+        "skin-menu"
+      ],
+      "consumers": [
+        "client-input"
+      ],
+      "composition": "common",
+      "impact": "coverage"
+    },
+    {
+      "id": "settings-parent-reconstruction",
+      "api": "ui-foundation",
+      "providers": [
+        "skin-menu",
+        "cape-menu"
+      ],
+      "consumers": [
+        "settings-ui"
+      ],
+      "composition": "common",
+      "impact": "coverage"
+    },
+    {
+      "id": "vanilla-menu-navigation",
+      "api": "menu-integration",
+      "providers": [
+        "skin-menu"
+      ],
+      "consumers": [
+        "menu-integration"
+      ],
+      "composition": "common",
+      "impact": "coverage"
+    }
+  ]
+}

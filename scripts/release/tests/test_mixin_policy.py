@@ -102,6 +102,20 @@ INJECTION_COUNT_OVERRIDES = {
         "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
         "quickskin$overrideSkinInfo",
     ): {2},
+    (
+        "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
+        "quickskin$modifyInsecureSkinLegacy",
+    ): {2},
+    # Audited mapped Minecraft JARs: createLookup has three returns from 1.21.9 onward.
+    # Its async get method has two returns from 1.21.9 onward.
+    (
+        "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
+        "quickskin$modifyCreateLookup",
+    ): {3},
+    (
+        "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
+        "quickskin$modifyGet",
+    ): {2},
 }
 
 ALLOW_COUNT_OVERRIDES = {

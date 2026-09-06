@@ -17,6 +17,7 @@ import com.quickskin.mod.e2e.E2ELog;
 import com.quickskin.mod.e2e.Step;
 import com.quickskin.mod.e2e.VanillaShim;
 import com.quickskin.mod.event.ClientEvents;
+import com.quickskin.mod.client.importing.PlayerOwnSkinBootstrap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -919,14 +920,12 @@ final class CatalogSteps {
     /** Non-null failure text when the startup Mojang own-skin importer future is live. */
     private static String importerTaskState() {
         try {
-            Field field = ClientEvents.class.getDeclaredField("playerOwnSkinTask");
+            Field field = PlayerOwnSkinBootstrap.class.getDeclaredField("playerOwnSkinTask");
             field.setAccessible(true);
             Object task = field.get(null);
-            return task == null ? null : "ClientEvents.playerOwnSkinTask is live: " + task;
-        } catch (NoSuchFieldException absent) {
-            return null; // not a member on this branch; the other importer evidence still applies
+            return task == null ? null : "PlayerOwnSkinBootstrap.playerOwnSkinTask is live: " + task;
         } catch (Throwable t) {
-            return "could not read ClientEvents.playerOwnSkinTask: " + t;
+            return "could not read PlayerOwnSkinBootstrap.playerOwnSkinTask: " + t;
         }
     }
 

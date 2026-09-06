@@ -23,7 +23,7 @@ from artifact_manifest import (
     validate_manifest_location,
 )
 from generate_sbom import SbomError, stage_sbom, verify_staged_sbom
-from matrix import MatrixError, load_matrix
+from matrix import MatrixError, load_matrix, select_release_target
 from release_identity import ReleaseIdentityError, derive as derive_release_identity
 
 
@@ -395,7 +395,11 @@ def build_manifest(
     manifest_path: Path,
     mod_version: str,
     data: dict[str, Any],
+    *,
+    target: str | None = None,
 ) -> dict[str, Any]:
+    if target is not None:
+        data = select_release_target(data, target)
     validate_manifest_location(manifest_path, stage)
     files_dir = stage / "files"
     harness_dir = stage / "harness"
@@ -432,7 +436,7 @@ def build_manifest(
         len({record["sha256"] for record in records}) == lane_count,
         "production jar hashes are not unique",
     )
-    release = derive_release_identity(matrix_path, data).manifest()
+    release = derive_release_identity(matrix_path, data, target=target).manifest()
     commit = git_commit(repo)
     manifest = {
         "schema_version": 2,
@@ -478,9 +482,13 @@ def verify_staged_manifest(
     matrix_path: Path,
     mod_version: str,
     expected_commit: str | None,
+    *,
+    target: str | None = None,
 ) -> None:
+    if target is not None:
+        data = select_release_target(data, target)
     validate_manifest_location(manifest_path, stage)
-    release = derive_release_identity(matrix_path, data).manifest()
+    release = derive_release_identity(matrix_path, data, target=target).manifest()
     record_by_node = validate_artifact_manifest(
         manifest,
         repository=repo,
@@ -508,6 +516,7 @@ def main() -> int:
     parser.add_argument("--matrix", type=Path, default=Path("release/release-matrix.json"))
     parser.add_argument("--manifest", type=Path, default=Path("build/release/artifacts.json"))
     parser.add_argument("--stage", type=Path, default=Path("build/release"))
+    parser.add_argument("--target", help="stage or verify one Minecraft publication target")
     parser.add_argument(
         "--verify-staged",
         action="store_true",
@@ -522,6 +531,8 @@ def main() -> int:
 
     try:
         data = load_matrix(matrix_path)
+        if args.target is not None:
+            data = select_release_target(data, args.target)
         properties = read_gradle_properties(repo / "gradle.properties")
         mod_version = properties.get(data["project"]["mod_version_property"])
         require(bool(mod_version), "mod_version is missing from gradle.properties")
@@ -533,7 +544,7 @@ def main() -> int:
                 f"checkout commit {current_commit!r} does not equal GITHUB_SHA {github_commit!r}",
             )
         if args.verify_staged:
-            release = derive_release_identity(matrix_path, data).manifest()
+            release = derive_release_identity(matrix_path, data, target=args.target).manifest()
             manifest = load_artifact_manifest(
                 manifest_path,
                 repository=repo,
@@ -553,6 +564,7 @@ def main() -> int:
                 matrix_path,
                 mod_version,
                 current_commit,
+                target=args.target,
             )
             print(
                 f"Verified {data['lane_count']} staged production jars and "
@@ -560,7 +572,8 @@ def main() -> int:
             )
             return 0
 
-        manifest = build_manifest(repo, matrix_path, stage, manifest_path, mod_version, data)
+        manifest = build_manifest(repo, matrix_path, stage, manifest_path, mod_version, data,
+                                  target=args.target)
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         verify_staged_manifest(
@@ -572,6 +585,7 @@ def main() -> int:
             matrix_path,
             mod_version,
             current_commit,
+            target=args.target,
         )
     except (
         ArtifactManifestError,

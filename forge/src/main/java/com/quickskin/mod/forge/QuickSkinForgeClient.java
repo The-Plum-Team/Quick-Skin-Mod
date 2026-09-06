@@ -1,6 +1,6 @@
 package com.quickskin.mod.forge;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.QuickSkinClient;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.GameShuttingDownEvent;
@@ -12,7 +12,7 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
  * Forge client entry point for QuickSkin
  * This class is only loaded on Forge clients (not dedicated servers)
  */
-@Mod.EventBusSubscriber(modid = QuickSkin.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = QuickSkinInfo.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class QuickSkinForgeClient {
 
     @SubscribeEvent
@@ -24,7 +24,7 @@ public class QuickSkinForgeClient {
     }
 
     /** Game-bus lifecycle hook; the outer subscriber listens on the mod bus. */
-    @Mod.EventBusSubscriber(modid = QuickSkin.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE,
+    @Mod.EventBusSubscriber(modid = QuickSkinInfo.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE,
             value = Dist.CLIENT)
     public static final class Shutdown {
         private Shutdown() {}

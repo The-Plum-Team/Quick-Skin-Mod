@@ -1,6 +1,6 @@
 package com.quickskin.mod.mixin.compat;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.compat.ReplayModHelper;
 import com.quickskin.mod.networking.ClientNetworkHandler;
 import com.quickskin.mod.networking.ModNetworking;
@@ -45,7 +45,7 @@ public class ReplayModCompatMixin {
         ResourceLocation id = packet.getIdentifier();
 
         // Check if the packet belongs to QuickSkin
-        if (!id.getNamespace().equals(QuickSkin.MOD_ID)) {
+        if (!id.getNamespace().equals(QuickSkinInfo.MOD_ID)) {
             return;
         }
 
@@ -135,7 +135,7 @@ public class ReplayModCompatMixin {
                 handled = true;
             }
         } catch (Exception exception) {
-            QuickSkin.LOGGER.warn(
+            QuickSkinInfo.LOGGER.warn(
                     "Could not route recorded Quick Skin payload " + id, exception);
         } finally {
             buf.release();
@@ -144,7 +144,7 @@ public class ReplayModCompatMixin {
         // Cancel original handler to prevent double-processing
         if (handled) {
             if (Boolean.getBoolean("quickskin.e2e.enabled")) {
-                QuickSkin.LOGGER.info("[QS-E2E] ReplayMod bridge handled recorded payload {}", id);
+                QuickSkinInfo.LOGGER.info("[QS-E2E] ReplayMod bridge handled recorded payload {}", id);
             }
             ReplayModHelper.markQuickSkinPacketIntercepted();
             ci.cancel();

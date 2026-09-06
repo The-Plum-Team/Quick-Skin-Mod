@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import json
 import sys
 import tempfile
 import unittest
@@ -13,11 +15,111 @@ import matrix as release_matrix  # noqa: E402
 import release_identity  # noqa: E402
 
 
+class UnifiedReleaseIdentityTest(unittest.TestCase):
+    def setUp(self):
+        self.path = ROOT / "release/release-matrix.json"
+        self.data = release_matrix.load_matrix(self.path)
+        self.target = next(row["artifact_version"] for row in self.data["artifacts"]
+                           if row["artifact_version"] != self.data["unit_test_version"])
+
+    def test_one_source_branch_has_independent_target_publication_identities(self):
+        bundle = release_identity.derive(self.path, self.data)
+        self.assertEqual("build-v3.0.0", bundle.tag)
+        self.assertEqual({row["artifact_version"] for row in self.data["artifacts"]},
+                         set(bundle.minecraft_versions))
+        selected = release_identity.derive(self.path, self.data, target=self.target)
+        self.assertEqual(f"mc{self.target}-v3.0.0", selected.tag)
+        self.assertEqual("master", selected.branch)
+        self.assertEqual((self.target,), selected.minecraft_versions)
+        rows = release_matrix.gha_matrix(self.data, "publications", "3.0.0")["include"]
+        self.assertEqual(self.data["lane_count"] * 2, len(rows))
+        for row in rows:
+            self.assertEqual(f"mc{row['artifact_version']}-v3.0.0", row["release_id"])
+            self.assertTrue(row["publication_id"].startswith(row["release_id"] + "-"))
+
+    def test_a_build_bundle_cannot_be_published_as_a_target(self):
+        for event, ref_type in (("push", "tag"), ("workflow_dispatch", "branch")):
+            bundle = release_identity.derive(self.path, self.data)
+            with self.subTest(event=event), self.assertRaisesRegex(release_identity.ReleaseIdentityError, "cannot be published"):
+                release_identity.validate_ci_event(bundle, event_name=event, ref_type=ref_type,
+                    ref_name=bundle.tag if ref_type == "tag" else "master", event_commit="a" * 40,
+                    checkout_commit="a" * 40, release_branch_head="a" * 40)
+        selected = release_identity.derive(self.path, self.data, target=self.target)
+        release_identity.validate_ci_event(selected, event_name="push", ref_type="tag", ref_name=selected.tag,
+            event_commit="a" * 40, checkout_commit="a" * 40, release_branch_head="a" * 40)
+
+    def test_every_tag_selects_only_its_matrix_target(self):
+        for target in {row["artifact_version"] for row in self.data["artifacts"]}:
+            identity = release_identity.derive(self.path, self.data, target=target)
+            with self.subTest(target=target):
+                selected = release_identity.resolve_event_target(self.path, data=self.data,
+                    event_name="push", ref_type="tag", ref_name=identity.tag)
+                self.assertEqual(target, selected)
+                view = release_matrix.select_release_target(self.data, selected)
+                self.assertEqual({target}, {row["artifact_version"] for row in view["artifacts"]})
+
+    def test_manual_validation_requires_an_explicit_supported_target_on_master(self):
+        arguments = dict(event_name="workflow_dispatch", ref_type="branch", ref_name="master")
+        self.assertEqual(self.target, release_identity.resolve_event_target(
+            self.path, data=self.data, requested_target=self.target, **arguments))
+        for target in (None, "", "unsupported", self.target + "\n"):
+            with self.subTest(target=target), self.assertRaises((release_identity.ReleaseIdentityError, release_matrix.MatrixError)):
+                release_identity.resolve_event_target(self.path, data=self.data, requested_target=target, **arguments)
+        with self.assertRaises(release_identity.ReleaseIdentityError):
+            release_identity.resolve_event_target(self.path, data=self.data, requested_target=self.target,
+                event_name="workflow_dispatch", ref_type="branch", ref_name="feature/untrusted")
+
+    def test_tags_cannot_override_or_guess_a_target_or_old_mod_version(self):
+        canonical = release_identity.derive(self.path, self.data, target=self.target).tag
+        for tag, override in ((canonical, self.target), (canonical + "-extra", None),
+                              (canonical.replace("v3.0.0", "v2.0.0"), None),
+                              ("build-v3.0.0", None), ("mcunsupported-v3.0.0", None)):
+            with self.subTest(tag=tag, override=override), self.assertRaises(release_identity.ReleaseIdentityError):
+                release_identity.resolve_event_target(self.path, data=self.data, requested_target=override,
+                    event_name="push", ref_type="tag", ref_name=tag)
+
+    def test_event_target_validation_includes_unselected_inventory(self):
+        unselected = next(row for row in self.data["artifacts"] if row["artifact_version"] != self.target)
+        unselected["java"] = 0
+        with self.assertRaises(release_matrix.MatrixError):
+            release_identity.resolve_event_target(self.path, data=self.data, requested_target=self.target,
+                event_name="workflow_dispatch", ref_type="branch", ref_name="master")
+
+    def test_target_view_is_exact_and_does_not_mutate_the_authoritative_matrix(self):
+        before = copy.deepcopy(self.data)
+        selected = release_matrix.select_release_target(self.data, self.target)
+        expected = [row for row in self.data["artifacts"] if row["artifact_version"] == self.target]
+        self.assertEqual(len(expected), selected["lane_count"])
+        self.assertEqual({"common", *(row["loader"] for row in expected)}, set(selected["source_overlays"]))
+        self.assertEqual({self.target: self.data["source_overlays"]["common"][self.target]},
+                         selected["source_overlays"]["common"])
+        self.assertEqual({row["installer"] for row in selected["runtimes"]}, set(selected["installers"]))
+        self.assertEqual(self.target, selected["unit_test_version"])
+        selected["project"]["description"] = "independent view"
+        self.assertEqual(before, self.data)
+        with self.assertRaisesRegex(release_matrix.MatrixError, "unknown release target"):
+            release_matrix.select_release_target(self.data, "unsupported")
+        self.data["artifacts"][0]["java"] = 0
+        with self.assertRaises(release_matrix.MatrixError):
+            release_matrix.select_release_target(self.data, self.target)
+
+    def test_schema3_requires_shared_source_and_allows_one_api_family_for_multiple_targets(self):
+        self.data["source_overlays"]["common"][self.target] = next(iter(self.data["source_overlays"]["common"].values()))
+        release_matrix.validate_matrix(self.data)
+        for schema, branch in ((3, "fabric-and-forge-1.20.1"), (3.0, "master"), (True, "master")):
+            with self.subTest(schema=schema, branch=branch), self.assertRaises(release_matrix.MatrixError):
+                self.data["schema_version"] = schema
+                self.data["project"]["release_branch"] = branch
+                release_matrix.validate_matrix(self.data)
+
+
 class ReleaseIdentityTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.matrix_path = ROOT / "release" / "release-matrix.json"
-        cls.identity = release_identity.derive(cls.matrix_path)
+        # Historical consumer compatibility is separate from the active support inventory.
+        cls.legacy = json.loads((Path(__file__).parent / "fixtures/legacy-schema2-matrix.json").read_bytes())
+        cls.identity = release_identity.derive(cls.matrix_path, cls.legacy)
 
     def test_identity_names_minecraft_era_and_logical_mod_version(self) -> None:
         self.assertEqual(self.identity.release_id, "mc1.20.1-v3.0.0")
@@ -25,7 +127,7 @@ class ReleaseIdentityTest(unittest.TestCase):
         self.assertEqual(self.identity.branch, "forge-and-fabric-1.20.1")
 
     def test_publication_matrix_is_artifact_times_marketplace(self) -> None:
-        data = release_matrix.load_matrix(self.matrix_path)
+        data = copy.deepcopy(self.legacy)
         matrix = release_matrix.gha_matrix(data, "publications", "3.0.0")
         rows = matrix["include"]
         self.assertEqual(len(rows), data["lane_count"] * 2)
@@ -95,7 +197,7 @@ class ReleaseIdentityTest(unittest.TestCase):
             )
 
     def test_matrix_rejects_a_release_branch_for_other_loaders(self) -> None:
-        data = release_matrix.load_matrix(self.matrix_path)
+        data = copy.deepcopy(self.legacy)
         data["project"] = dict(data["project"])
         data["project"]["release_branch"] = "fabric-and-neoforge-1.20.1"
         with self.assertRaisesRegex(

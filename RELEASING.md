@@ -1,9 +1,17 @@
 # Releasing Quick Skin
 
-Quick Skin publishes one immutable release identity for every branch-owned Minecraft era. The
-identity is derived from the exact Minecraft versions in `release/release-matrix.json` and the
-logical `mod_version`; it is not typed independently into a workflow. For this branch the identity
-is `mc1.20.1-v3.0.0`, and the matrix binds it to `forge-and-fabric-1.20.1`.
+The shared-source rework uses release-matrix schema 3. The complete artifact bundle has the
+non-publishable identity `build-v<mod_version>`. Passing `--target <minecraft>` to
+`scripts/release/release_identity.py` derives an independent `mc<minecraft>-v<mod_version>`
+publication identity from the same `master` source revision. The target set comes from the matrix's
+artifact rows. Selecting a target never rewrites that authoritative matrix.
+
+The target-specific release workflow and declared governance now use shared source. See
+[the shared-source command guide](docs/architecture/RELEASING-FROM-SHARED-SOURCE.md) for local
+build/stage/rebuild examples. Protected selective review and Pages use the shared contracts;
+live rollout and final GitHub image acceptance are tracked in the
+[migration plan](docs/architecture/MODULAR-REWORK.md). The identity
+validator rejects attempts to publish the aggregate bundle.
 
 ## Preconditions
 
@@ -12,14 +20,14 @@ Before creating a release tag:
 1. land the version, matrix, source, and workflow changes through reviewed PRs, and replace the
    current changelog heading's `unreleased` marker with its ISO release date;
 2. let both required checks, `Build and verify` and `Packaged E2E gate`, pass on the exact release
-   branch head;
+   source branch (`master`) head;
 3. confirm the working tree is clean and the branch head has not moved;
-4. run the release workflow manually from that exact branch if a validation-only rehearsal is
-   useful; `workflow_dispatch` never publishes;
+4. run the release workflow manually from `master` with an explicit `minecraft_target` if a
+   validation-only rehearsal is useful; `workflow_dispatch` never publishes;
 5. derive and inspect the only accepted identity:
 
    ```bash
-   python scripts/release/release_identity.py
+   python scripts/release/release_identity.py --target 1.20.1
    ```
 
 The release workflow rejects a stale checkout, a tag with another name, a commit that is not the
@@ -27,32 +35,32 @@ exact configured release-branch head, and a manual run from another branch.
 
 ## Publish
 
-Create the derived tag at the already-tested release-branch head and push only that new tag. Do not
+Create the derived target tag at the already-tested `master` head and push only that new tag. Do not
 move, reuse, or delete a release tag.
 
 ```bash
 git fetch origin --tags
-git switch forge-and-fabric-1.20.1
-git pull --ff-only origin forge-and-fabric-1.20.1
-python scripts/release/release_identity.py
+git switch master
+git pull --ff-only origin master
+python scripts/release/release_identity.py --target 1.20.1
 git tag --sign mc1.20.1-v3.0.0
 git push origin refs/tags/mc1.20.1-v3.0.0
 ```
 
-Replace the example identity and branch with the exact values printed from that branch. The
+Replace the example Minecraft target and identity with the exact values derived from the matrix. The
 protected `release` environment requires a human approval before publication jobs receive their
 credentials.
 
 The workflow then performs this fixed sequence:
 
-1. build production and packaged-E2E JARs twice from the tagged commit and require identical
+1. build the selected target's production and packaged-E2E JARs twice from the tagged commit and require identical
    SHA-256 bytes for every production and harness JAR;
 2. record source identity plus SHA-1, SHA-256, and SHA-512 for every production artifact, then
    generate a deterministic CycloneDX SBOM from those records, the matrix, each lane's strict
    `shadowBundle` lock, and the matching SHA-256 entries in Gradle verification metadata;
 3. attest the production JARs twice with the same pinned GitHub action: once for build provenance
    and once with the exact staged CycloneDX document as the SBOM predicate;
-4. run all matrix-declared packaged Minecraft scenarios against those staged bytes;
+4. run all release-profile scenarios for that target's matrix-declared runtimes against the staged bytes;
 5. create or reconcile an exact draft GitHub Release without overwriting assets;
 6. publish every artifact independently to Modrinth and CurseForge, reconciling the remote
    publication ID, filename, size, and bytes before and after each upload. Modrinth is reconciled
@@ -65,7 +73,7 @@ The workflow then performs this fixed sequence:
 
 The GitHub Release contains the production JARs, `artifacts.json`, `quick-skin.cdx.json`, and
 deterministic `SHA256SUMS`. The artifact manifest binds the SBOM's path, size, and SHA-256;
-`--verify-staged` regenerates it and requires byte-for-byte equality before any publication step.
+`--target <minecraft> --verify-staged` regenerates it and requires byte-for-byte equality before any publication step.
 Published releases are immutable at the repository level.
 
 ## Recovery and verification
@@ -139,10 +147,10 @@ python scripts/release/github_governance.py audit
 python scripts/release/github_governance.py readiness
 ```
 
-`readiness` checks the live default branch and every matching release branch. It must pass before
-activation so a required status check cannot strand an older branch whose base workflow does not
-yet define that check. Once all workflow changes have propagated, an administrator can converge
-the declared state explicitly:
+`readiness` pins the current default-branch commit, validates its complete schema-3 release matrix,
+and checks the shared build, runtime, release and retirement workflows at that same commit. It
+requires no historical version branches. Once those changes are present on protected source, an
+administrator can converge the declared state explicitly:
 
 ```bash
 python scripts/release/github_governance.py apply \
@@ -151,34 +159,22 @@ python scripts/release/github_governance.py apply \
 
 The helper enables immutable releases, creates no-bypass branch and tag rulesets, requires PRs and
 strict stable checks, blocks deletion and force-pushes, and configures the human-reviewed `release`
-environment. It never deletes unknown rulesets or deployment policies.
+environment. Shared publication accepts canonical release tags only. The schema-2 governance
+configuration explicitly retires the old `*-and-*-*` environment deployment policy; the helper
+shows that deletion in its plan and addresses only its independently read numeric policy ID.
+Unknown or ambiguous policies stop the apply operation. Historical release-branch rulesets are
+left untouched, and no branch or tag is removed. This migration has only been exercised with local
+API fixtures; no remote governance changes have been applied.
 
 ## GitHub Pages activation
 
-The project site is a separate advisory publication and is not part of release governance or the
-required branch checks. After `.github/workflows/pages.yml`, `site/`, and the evidence tooling have
-reached `master` and every release branch, an administrator performs the one-time repository setup:
+Pages is a separate advisory publication. Its shared-source fan-in, retained feature evidence and
+selective-review consumers remain under migration. Existing deployed evidence stays available;
+the new pipeline must authenticate the shared source commit, complete matrix and exact selected
+coverage before replacing it. The older branch-based fan-in is documented in
+[the historical delivery guide](VERSION-BRANCHES.md).
 
-1. Open **Settings → Environments**, create `github-pages`, choose **Selected branches and tags**
-   for deployment branches, and allow only the `master` branch. This environment rule is the
-   non-bypassable boundary that prevents a manually dispatched workflow from another ref from
-   receiving `pages: write`.
-2. Open **Settings → Pages** and set **Build and deployment → Source** to **GitHub Actions**.
-3. Run `Project site` manually from `master` after every release branch has produced an exact-head
-   `pages-e2e-<branch>` artifact.
-
-The expected project URL is <https://the-plum-team.github.io/Quick-Skin-Mod/>. Later successful
-release-branch Packaged E2E runs wake the site workflow automatically. The workflow executes the
-generator from protected `master`, validates all current release heads, and deploys through the
-`github-pages` environment. If Pages is not enabled or any branch lacks current evidence, the
-workflow fails without replacing the previously deployed site.
-Successful deployments refresh one protected cache for each exact-head evidence bundle. After the
-owning Pages run reaches `completed/success`, a separate protected rotation workflow validates the
-new compact WebP cache, deletes only older caches for that branch, and retires by exact artifact ID
-the consumed `pages-e2e-<branch>` handoff plus the successful Pages run's fan-in and deploy
-artifacts. Raw E2E proof expires after one day rather than being deleted during promotion because a
-concurrent branch
-attestation may still be consuming it. Rotation never removes the previous fallback before a
-replacement is usable, nor does it delete a concurrent newer handoff. The monthly Pages schedule
-revalidates and rolls the single caches forward without rerunning packaged Minecraft; an updated
-branch still requires a new exact-head E2E/attestation artifact before it can appear.
+The repository-level deployment boundary remains the `github-pages` environment, limited to
+`master`, with GitHub Pages configured to use GitHub Actions. Preparing that environment does not
+certify new evidence. Final activation and a verified deployment are separate from the local
+modular rework; follow its acceptance record before using the new pipeline.

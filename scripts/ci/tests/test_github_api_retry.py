@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -26,14 +28,18 @@ class GitHubApiRetryTest(unittest.TestCase):
             gh.write_text("#!/usr/bin/env bash\n" + textwrap.dedent(fake_gh), encoding="utf-8")
             gh.chmod(0o755)
             environment = {
-                **os.environ,
-                "PATH": f"{temp}{os.pathsep}{os.environ.get('PATH', '')}",
+                # A developer shell can inject a real gh function through BASH_ENV,
+                # overriding the fixture executable even with a prepended PATH.
+                # Tests need only system utilities and their owned fake CLI.
+                "PATH": f"{temp}{os.pathsep}{os.defpath}",
+                "GH_CONFIG_DIR": str(temp / "gh-config"),
                 "RETRY_TEST_STATE": str(temp / "attempts"),
                 **(environment_overrides or {}),
             }
             script = f"""
+                set -euo pipefail
                 sleep() {{ :; }}
-                source {subprocess.list2cmdline([str(HELPER)])}
+                source {shlex.quote(str(HELPER))}
                 {invocation}
             """
             return subprocess.run(
@@ -45,6 +51,23 @@ class GitHubApiRetryTest(unittest.TestCase):
                 stderr=subprocess.PIPE,
                 check=False,
             )
+
+    def test_inherited_shell_hooks_and_credentials_cannot_replace_fake_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            hook = Path(temporary) / "inherited-shell-hook"
+            hook.write_text("gh() { printf 'unexpected real CLI hook\\n'; return 97; }\n")
+            with mock.patch.dict(os.environ, {
+                "BASH_ENV": str(hook),
+                "ENV": str(hook),
+                "GH_TOKEN": "must-not-reach-fixture",
+                "GITHUB_TOKEN": "must-not-reach-fixture",
+            }):
+                completed = self._run("""
+                    [[ -z "${GH_TOKEN:-}${GITHUB_TOKEN:-}${BASH_ENV:-}${ENV:-}" ]] || exit 98
+                    printf 'isolated-fixture\\n'
+                """)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout, "isolated-fixture\n")
 
     def test_retries_rate_limit_without_polluting_response_stdout(self) -> None:
         completed = self._run(

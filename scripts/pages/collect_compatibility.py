@@ -720,12 +720,12 @@ def collect(
         final_root = temporary_root / "final"
         if current_target_sha == identity["target_sha"]:
             final_root.mkdir()
-            shutil.copytree(bundle, final_root / identity["branch"])
+            shutil.copytree(bundle, final_root / identity["bundle_key"])
         else:
             carry_forward(
                 evidence_root=built_root,
                 output_root=final_root,
-                branch=identity["branch"],
+                branch=identity["bundle_key"],
                 coverage_sha=current_target_sha,
                 expected_repository=repository,
                 scenario_contract_path=REPO / "e2e/scenario-contract.json",
@@ -737,16 +737,17 @@ def collect(
         if destination_root.exists() and not destination_root.is_dir():
             raise CollectionError("compatibility output root is not a directory")
         destination_root.mkdir(parents=True, exist_ok=True)
-        destination = destination_root / identity["branch"]
+        destination = destination_root / identity["bundle_key"]
         if destination.exists() or destination.is_symlink():
             raise CollectionError(f"refusing to replace {destination}")
-        os.replace(final_root / identity["branch"], destination)
+        os.replace(final_root / identity["bundle_key"], destination)
         summary = {
             "branch": identity["branch"],
+            "bundle_key": identity["bundle_key"],
             "target_sha": identity["target_sha"],
             "coverage_sha": current_target_sha,
             "compatibility_run_id": source_run_id,
-            "artifact_name": f"pages-mod-compatibility-{identity['branch']}",
+            "artifact_name": f"pages-mod-compatibility-{identity['bundle_key']}",
             "lane_count": len(plan_rows),
             "publication_run_id": publication_run_id,
         }
@@ -796,6 +797,7 @@ def main(argv: list[str] | None = None) -> int:
             with args.github_output.open("a", encoding="utf-8") as output:
                 for key in (
                     "branch",
+                    "bundle_key",
                     "target_sha",
                     "coverage_sha",
                     "compatibility_run_id",

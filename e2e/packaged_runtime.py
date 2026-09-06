@@ -38,6 +38,7 @@ from runtime_store import (
     StoreCorruptionError,
 )
 from scenario_contract import OpaqueStarsProbe, RequiredGuiTextProbe, default_contract
+from selection import SelectionPlan, project_contract
 from mod_compatibility import CompatibilityLane
 
 
@@ -1019,7 +1020,7 @@ def prepare_server(
     return ["bash", str(script), "nogui"]
 
 
-def write_server_files(server: Path, port: int, template_root: Path) -> None:
+def write_server_files(server: Path, port: int, template_root: Path, *, runtime_version: str) -> None:
     properties = (template_root / "server.properties").read_text(encoding="utf-8")
     properties = re.sub(r"(?m)^server-port=.*$", f"server-port={port}", properties)
     (server / "server.properties").write_text(properties, encoding="utf-8")
@@ -1027,6 +1028,39 @@ def write_server_files(server: Path, port: int, template_root: Path) -> None:
     datapack = server / "world" / "datapacks" / "qs_e2e_time"
     datapack.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(template_root / "datapack", datapack, dirs_exist_ok=True)
+    adapt_server_datapack(datapack, runtime_version)
+
+
+def adapt_server_datapack(datapack: Path, runtime_version: str) -> None:
+    """Materialize the shared fixture using the target's resource and game-rule APIs."""
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", runtime_version):
+        raise RuntimeFailure("datapack requires a numeric Minecraft runtime version")
+    version = tuple(int(part) for part in runtime_version.split("."))
+    function_root = "function" if version >= (1, 21) else "functions"
+    obsolete_root = "functions" if function_root == "function" else "function"
+    for parent in (datapack / "data/qs_e2e", datapack / "data/minecraft/tags"):
+        expected, obsolete = parent / function_root, parent / obsolete_root
+        if obsolete.exists():
+            if expected.exists():
+                raise RuntimeFailure(f"datapack has ambiguous function directories: {parent}")
+            obsolete.rename(expected)
+        if not expected.is_dir():
+            raise RuntimeFailure(f"datapack function directory is missing: {expected}")
+    load = datapack / "data/qs_e2e" / function_root / "load.mcfunction"
+    content = load.read_text(encoding="utf-8")
+    rules = (
+        ("doWeatherCycle", "minecraft:advance_weather", "false"),
+        ("doDaylightCycle", "minecraft:advance_time", "false"),
+        ("doMobSpawning", "minecraft:spawn_mobs", "false"),
+        ("spawnRadius", "minecraft:respawn_radius", "0"),
+    )
+    for legacy, namespaced, value in rules:
+        pattern = rf"(?m)^gamerule (?:{legacy}|{namespaced}) {value}$"
+        if len(re.findall(pattern, content)) != 1:
+            raise RuntimeFailure(f"datapack must declare exactly one {legacy} rule")
+        selected = namespaced if version >= (1, 21, 11) else legacy
+        content = re.sub(pattern, f"gamerule {selected} {value}", content)
+    load.write_text(content, encoding="utf-8")
 
 
 def write_server_config(server: Path, scenario: str) -> Path | None:
@@ -1175,6 +1209,7 @@ def client_command(
     port: int,
     java: str,
     compatibility_mod: str | None = None,
+    selection: SelectionPlan | None = None,
 ) -> list[str]:
     import minecraft_launcher_lib.command  # type: ignore[import-not-found]
     import minecraft_launcher_lib.utils  # type: ignore[import-not-found]
@@ -1210,6 +1245,13 @@ def client_command(
             ],
         }
     )
+    if selection is not None:
+        selected = selection.role(scenario, role)
+        options["jvmArguments"].extend([
+            f"-Dquickskin.e2e.selection={selection.sha256}",
+            "-Dquickskin.e2e.steps=" + ",".join(selected.steps),
+            "-Dquickskin.e2e.captures=" + ",".join(selected.captures),
+        ])
     if compatibility_mod is None:
         # Exercise Quick Skin's own injector expectations in the clean runtime. Enabling this
         # global Mixin debug switch in compatibility lanes also turns optional injectors owned
@@ -1868,7 +1910,8 @@ def compare_screenshots(
     return comparison
 
 
-def validate_report(game_dir: Path, row: dict[str, Any], scenario: str, role: str) -> dict[str, Any]:
+def validate_report(game_dir: Path, row: dict[str, Any], scenario: str, role: str,
+                    selection: SelectionPlan | None = None) -> dict[str, Any]:
     report_path = game_dir / "e2e-report" / "report.json"
     if not report_path.is_file():
         raise RuntimeFailure(f"missing {role} report: {report_path}")
@@ -1880,6 +1923,14 @@ def validate_report(game_dir: Path, row: dict[str, Any], scenario: str, role: st
         role_contract = SCENARIO_CONTRACT.role(scenario, role)
     except ValueError as exc:
         raise RuntimeFailure(f"no locked report contract for {scenario}/{role}") from exc
+    if selection is None:
+        if "selection_sha256" in report:
+            raise RuntimeFailure("partial E2E evidence requires its independently expected selection")
+    else:
+        if (report.get("selection_sha256") != selection.sha256
+                or selection.contract_sha256 != SCENARIO_CONTRACT.sha256):
+            raise RuntimeFailure("report selection identity mismatch")
+        role_contract = project_contract(SCENARIO_CONTRACT, selection).role(scenario, role)
     expected_steps = list(role_contract.step_ids)
     if report.get("contract_sha256") != SCENARIO_CONTRACT.sha256:
         raise RuntimeFailure(
@@ -2250,6 +2301,7 @@ def run_packaged_row(
     *,
     compatibility_lane: CompatibilityLane | None = None,
     compatibility_files: tuple[Path, ...] = (),
+    selection: SelectionPlan | None = None,
 ) -> dict[str, Any]:
     port = allocate_port()
     compatibility_suffix = (
@@ -2277,6 +2329,8 @@ def run_packaged_row(
         "status": "fail",
         "profile": evidence_profile.relative_to(output_root).as_posix(),
     }
+    if selection is not None:
+        result["selection_sha256"] = selection.sha256
     if compatibility_lane is not None:
         result["compatibility"] = compatibility_lane.public_identity()
         result["installed_compatibility"] = []
@@ -2323,7 +2377,8 @@ def run_packaged_row(
                 java,
                 server_install_log,
             )
-            write_server_files(server, port, repo / "e2e" / "server-template")
+            write_server_files(server, port, repo / "e2e" / "server-template",
+                               runtime_version=row["runtime_version"])
             write_server_config(server, scenario)
             install_dir, version_id = prepare_client_install(
                 matrix, row, runtime_session, java
@@ -2438,6 +2493,7 @@ def run_packaged_row(
                 port,
                 java,
                 compatibility_lane.mod.id if compatibility_lane is not None else None,
+                **({"selection": selection} if selection is not None else {}),
             )
             process, handle = start_process(command, game_dir, client_log, env)
             client_processes[role] = process
@@ -2621,6 +2677,7 @@ def run_packaged_row(
                 row,
                 scenario,
                 role,
+                **({"selection": selection} if selection is not None else {}),
             )
             for role in roles
         }

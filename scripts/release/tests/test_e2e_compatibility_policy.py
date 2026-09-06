@@ -4,22 +4,14 @@ import re
 import unittest
 from pathlib import Path
 
+from scripts.architecture.source_inventory import java_source
+
 
 ROOT = Path(__file__).resolve().parents[3]
 E2E_JAVA = ROOT / "common" / "src" / "e2e" / "java" / "com" / "quickskin" / "mod" / "e2e"
 SHIM = E2E_JAVA / "VanillaShim.java"
 CPM_INTEGRATION = (
-    ROOT
-    / "common"
-    / "src"
-    / "main"
-    / "java"
-    / "com"
-    / "quickskin"
-    / "mod"
-    / "client"
-    / "compat"
-    / "CPMCompatIntegration.java"
+    java_source('client/compat/CPMCompatIntegration.java', source_set='main', repository=ROOT)
 )
 CPM_RESOURCES = ROOT / "common" / "src" / "e2e" / "resources"
 CPM_SECRET_TOOL = ROOT / "scripts" / "ci" / "cpm_fixture_secret.py"
@@ -296,16 +288,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
         ).read_text(encoding="utf-8")
         network_sync = (
-            ROOT
-            / "common"
-            / "src"
-            / "main"
-            / "java"
-            / "com"
-            / "quickskin"
-            / "mod"
-            / "networking"
-            / "NetworkSyncService.java"
+            java_source('networking/NetworkSyncService.java', source_set='main', repository=ROOT)
         ).read_text(encoding="utf-8")
         assets = (E2E_JAVA / "TestAssets.java").read_text(encoding="utf-8")
         runtime = (ROOT / "e2e/packaged_runtime.py").read_text(encoding="utf-8")
@@ -471,12 +454,10 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
         ).read_text(encoding="utf-8")
         renderer = (
-            ROOT
-            / "common/src/main/java/com/quickskin/mod/client/rendering/PlayerModelRenderer.java"
+            java_source('client/rendering/PlayerModelRenderer.java', source_set='main', repository=ROOT)
         ).read_text(encoding="utf-8")
         integration = (
-            ROOT
-            / "common/src/main/java/com/quickskin/mod/client/rendering/SkinLayers3DIntegration.java"
+            java_source('client/rendering/SkinLayers3DIntegration.java', source_set='main', repository=ROOT)
         ).read_text(encoding="utf-8")
         gui_renderer_mixin = (
             ROOT
@@ -641,7 +622,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         )
         self.assertIn("schedulePlayerCacheInvalidation();", integration)
         capabilities = (
-            ROOT / "common/src/main/java/com/quickskin/mod/client/compat/CpmCapabilities.java"
+            java_source('client/compat/CpmCapabilities.java', source_set='main', repository=ROOT)
         ).read_text(encoding="utf-8")
         self.assertIn(
             "return renderPipeline != RenderPipeline.IMMEDIATE;", capabilities
@@ -669,8 +650,12 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         client_events = (ROOT / "common/src/main/java/com/quickskin/mod/event/ClientEvents.java").read_text(
             encoding="utf-8"
         )
+        menu_integration = java_source(
+            "client/gui/integration/MenuIntegration.java", repository=ROOT
+        ).read_text(encoding="utf-8")
+        self.assertIn("MenuIntegration.init(parent ->", client_events)
         self.assertGreaterEqual(
-            client_events.count("CPMCompatIntegration.onRenderedFrameBoundary();"), 2
+            (client_events + menu_integration).count("CPMCompatIntegration.onRenderedFrameBoundary();"), 2
         )
         force_refresh = integration[
             integration.index("public static void forceReRegisterSkins") :
@@ -691,8 +676,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         """The model-column controls must not win Essential's global bottom-widget search."""
 
         integration = (
-            ROOT
-            / "common/src/main/java/com/quickskin/mod/client/compat/EssentialCompatIntegration.java"
+            java_source('client/compat/EssentialCompatIntegration.java', source_set='main', repository=ROOT)
         ).read_text(encoding="utf-8")
         feature = (
             E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"

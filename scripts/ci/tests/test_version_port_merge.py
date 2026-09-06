@@ -333,6 +333,15 @@ class VersionPortMergeTest(unittest.TestCase):
         canonical_mixin_policy = (
             ROOT / version_port_merge.MIXIN_POLICY_SOURCE_FIXTURE_PATH
         ).read_text(encoding="utf-8")
+        # Reproduce the historical branch-port contract using its exact audited bytes. The
+        # modular policy uses a registry unavailable in those legacy target repositories.
+        canonical_transition_policy = (
+            ROOT / "scripts/ci/version_port_migrations/cpm-transition-policy-before-modules.py.fixture"
+        ).read_bytes()
+        self.assertEqual(
+            hashlib.sha256(canonical_transition_policy).hexdigest(),
+            version_port_merge.CPM_TRANSITION_POLICY_SHA256,
+        )
         legacy_mixin_policy = self.legacy_mixin_hand_policy()
         source_payload = canonical_payload
         if drift_source:
@@ -355,9 +364,7 @@ class VersionPortMergeTest(unittest.TestCase):
         self.git("switch", "--create", "hand-source", hand_base)
         self.write(
             version_port_merge.CPM_TRANSITION_POLICY_PATH,
-            (
-                ROOT / version_port_merge.CPM_TRANSITION_POLICY_PATH
-            ).read_text(encoding="utf-8"),
+            canonical_transition_policy.decode("utf-8"),
         )
         self.write(version_port_merge.COMMON_HAND_RENDERER_PATH, source_payload)
         self.write(version_port_merge.MIXIN_POLICY_PATH, canonical_mixin_policy)
@@ -674,6 +681,26 @@ class VersionPortMergeTest(unittest.TestCase):
             "invalid fixed Stonecutter entry",
         ):
             version_port_merge._migrate_dependency_security_stonecutter(canonical)
+
+    def test_module_aware_policy_cannot_be_ported_as_a_legacy_hand_policy(self) -> None:
+        source, target, _ = self.prepare_common_hand_renderer_branches()
+        self.git("switch", "--detach", source)
+        self.write(
+            version_port_merge.CPM_TRANSITION_POLICY_PATH,
+            (ROOT / version_port_merge.CPM_TRANSITION_POLICY_PATH).read_text(encoding="utf-8"),
+        )
+        self.git("add", "--all")
+        self.commit("policy now depends on module source inventory")
+        modular_source = self.sha("HEAD")
+        self.git("switch", "--detach", target)
+        with self.assertRaisesRegex(
+            version_port_merge.VersionPortMergeError,
+            "not the audited multiplicity policy",
+        ):
+            version_port_merge.reproduce_merge(
+                self.repository, target, modular_source, mode="probe"
+            )
+        self.assert_clean_at(target)
 
     def test_common_hand_renderer_uses_the_audited_source_across_versions(
         self,

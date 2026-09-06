@@ -6,24 +6,145 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 These are the primary implementation trees:
 
-- `common/src/main`: shared client, server, networking, storage, and compatibility code.
+- `modules/<module>/src/main`: independently compiled modules declared by
+  `architecture/modules.json`. Java libraries own content/protocol values, stable loader and
+  texture-reference APIs, appearance data, bounded image processing, configuration, transfer
+  validation, server appearance storage, client infrastructure/preferences, texture state, and cape
+  imports. Minecraft modules own adapters, networking, assets, services, previews, optional-mod
+  integrations, and individual menus; they compile separately for each matrix target. Regression
+  tests live in the owning module's `src/test`.
+- `common/src/main`: Minecraft mixin/event bridges and client/server lifecycle composition.
+  Feature implementations compile outside this assembly.
 - `fabric/src/main`: canonical Fabric entry points and loader integration.
-- `forge/src/main`: the active Forge 1.20.1 integration.
+- `forge/src/main` and `neoforge/src/main`: the respective loader integrations.
 - `common/src/e2e` plus each loader's `src/e2e`: the separate packaged-runtime test mod.
-- `common/src/test`: loader-independent JUnit regression tests compiled against the common 1.20.1
-  node.
+- `modules/<module>/src/test`: the existing JUnit regression tests redistributed by ownership,
+  including pure Java tests and tests against each Minecraft module's version node.
 
-Stonecutter preprocesses each canonical `src/main` tree into detached generated sources. Never edit
+`architecture/modules.json` is the module dependency authority. Its typed reader,
+`scripts/architecture/module_graph.py`, rejects unknown/duplicate dependencies, cycles,
+overlapping ownership, and client/server environment leaks. Gradle creates Java-library
+projects from this graph and verifies their declared dependencies before compilation. External
+libraries use the graph's pinned coordinate catalog and explicit scopes. Minecraft framework
+dependencies come from the release matrix through `gradle/minecraft-module-framework.gradle.kts`;
+module builds must not add hidden project, Maven, or file dependencies. Stable Java libraries
+cannot depend on Minecraft modules. `api` exposes a dependency to consumers; `implementation`
+keeps it out of their compile API.
+Remapped Minecraft modules expose Loom's `namedElements`; official-namespace targets use the
+ordinary Java API/runtime variants. The release matrix's `no_remap` policy selects the variant,
+including the common assembly's internal bundle. Never remap an official-namespace module or
+resolve another Minecraft target to satisfy its dependency.
+`minecraft-assembly` identifies final composition projects; feature modules cannot import an
+assembly. API providers/consumers and their composition roots are declared as `bindings` in the
+same graph. A `propagate` binding carries provider changes to consumer modules; a `coverage`
+binding requires the specific authored interaction checkpoints without treating every consumer
+export as modified. A composition project merely being rebuilt does not modify its wiring.
+The common JAR bundles the internal module closure before the existing Architectury and loader
+transforms, preserving one production JAR per release artifact. It must reject duplicate entries
+and must never absorb the harness. The common test task also runs its extracted libraries' tests.
+
+`build-matrix.yml` fans the validated build plan out to isolated GitHub runners without enabling
+parallel Gradle work inside a JVM. `assemble_build.py` authenticates the exact complete partition
+and its target manifests before staging one aggregate bundle. Build and Packaged E2E share those
+bytes through `staged_build_bundle.py`; PR head identity selects the producer, while the manifest's
+distinct tested merge commit must equal the consumer checkout. Missing PR builds, failed gates,
+advanced PR parents and malformed bundles cannot authorize runtime. Standalone runs without an
+available bundle use the same compiler.
+
+The version-3 scenario contract declares each step's module/binding coverage, earlier action
+prerequisites, and earlier captures consumed by assertions. Coordinated multiplayer scenarios
+retain all clients and actions through `execution_scope: scenario`. `e2e/selection.py` computes
+the separate execution/capture closures and comparison partners. Its CLI emits local path previews.
+`scripts/ci/e2e_selection.py` independently derives an admission from immutable Git objects and
+the executing protected policy. Runtime and visual consumers recompute that admission from caller
+supplied commits and require its outer hash on every selected report. `project_contract` supplies
+their shared exact view of the authored assertions/captures; its contract hash remains unchanged,
+so selection identity must be checked separately. Unknown impact forces every scenario in the
+profile. Selected curation emits a distinct scope proof and cannot certify a full semantic anchor.
+Protected CI resolves a cumulative selection against an authenticated complete healthy baseline.
+It rechecks unchanged module fingerprints, exact Git ancestry, all runtime jobs, normalized clean
+reviews, and available complete public evidence. Missing or expired coverage selects full profiles.
+`feature_review.py` emits schema 7 for partial scope and schema 8 for complete scope; both use the
+same runtime generation's Fabric reference. Only complete coverage can seed a healthy baseline.
+The feature Pages consumer separately authenticates baseline and selected components, preserving
+original tested SHA/run/JAR provenance for every reused frame. A consumer expecting full evidence
+must reject a selected report, even when that selection happens to contain all authored steps.
+
+`PlayerOwnSkinBootstrap` belongs to `skin-import`, including its bounded async startup task,
+closed-state guard, and persisted own-skin selection. `SavedAppearanceRestorer` belongs to
+`appearance-services`. `ClientEvents` admits the session/Replay subject and delegates to those
+features; it owns event registration and teardown wiring. The existing catalog E2E checks inspect
+the actual import owner and exercise the same composed saved-appearance path.
+
+`PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
+after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in
+`minecraft-adapter`. That facade selects four implementations by Minecraft API family: immediate
+GUI/model operations, RenderType GUI, RenderPipeline GUI and GUI extraction. Equivalent patch
+versions share an implementation. Native identifier/model package changes remain inside this
+adapter seam; each selected target compiles exactly one implementation. Consolidating this facade
+does not yet consolidate all preview, networking, mixin or feature call sites across the matrix.
+`QuickSkinInfo` owns diagnostics/identity without initializing either runtime.
+`QuickSkin` retains public aliases for compatibility, but internal services use the API directly.
+`PlayerAppearance` retains opaque `TextureReference` values; `MinecraftTextures` performs the
+native conversion and preserves the allocation-free cached lookup. Server stores accept a world
+`Path` supplied by `ServerRuntime`, without importing `MinecraftServer`.
+`cape-import` receives a `GifDecoder` through its workflow constructor. Its API returns a bounded
+ARGB atlas and animation metadata; `MinecraftGifDecoder` in the adapter owns native decoding,
+channel conversion, and native-frame disposal. Keep native image objects out of import processing.
+
+`ClientFeatureBindings` installs the process-owned links before catalog scans or network callbacks:
+CPM consumes `CpmAssetAccess`, accepted packets target `RemoteAppearanceTarget`, and feature code
+uses `ClientNetworkActions` without depending on the mixed client/server networking implementation.
+The runtime supplies CustomNPCs' skin listener and the current connection identity supplier.
+`TextureRequestCoordinator` compares connection identity with `==`, preserving session isolation;
+its clock and connection source are injectable for bounded retry regression tests.
+`PreviewAnimationState` belongs to client infrastructure instead of global event registration.
+Settings reconstruct their parent through `RestylableScreen`; key handling receives an open-menu
+callback from bootstrap. Neither mechanism introduces a settings-to-skin-menu compile dependency.
+`menu-integration` owns injected title/pause controls, preview rotation/animation state and deferred
+menu rendering. Its skin-menu action is another bootstrap callback, covered by
+`vanilla-menu-navigation`; it does not compile against the skin menu. `hud-preview` owns its overlay,
+mouse/tick/render callbacks and drag state independently of menu widgets. Bootstrap keeps CPM's
+frame-boundary callback after HUD extraction, including when the HUD is hidden.
+The harness's `TitleMenuSteps` and `HudPreviewSteps` prepare their own reference appearance from
+`local_skin_apply`. HUD evidence compares a dedicated disabled control with the enabled overlay;
+it must not reuse the full-suite baseline and inherit unrelated image-comparison dependencies.
+Source-inspection policies resolve Java classes through `scripts/architecture/source_inventory.py`
+and the module registry, including explicitly selected legacy replacements.
+
+Shared-source release tags select exactly one matrix target. `release_identity.py --event-target`
+resolves canonical tag pushes or requires an explicit manual target on the source branch. The
+release workflow carries that target through both builds, staged verification, runtime rows and
+publication. Complete build bundles remain non-publishable; target views retain the authoritative
+full matrix hash. See `docs/architecture/RELEASING-FROM-SHARED-SOURCE.md`.
+
+Module ownership is transitional while the rework proceeds: the remaining `common` tree is one
+mixed runtime module, and loader/build/policy paths outside this graph have unknown ownership.
+The graph alone does not authorize selective E2E. Until scenario prerequisites, module coverage,
+and authenticated selection/evidence are implemented together, existing full-suite policies remain
+in effect. Follow `docs/architecture/MODULAR-REWORK.md` for the recoverable migration state.
+
+Stonecutter preprocesses common, loader, and Minecraft-module canonical `src/main` trees into
+detached generated sources. Stable Java-library sources compile directly without preprocessing. Never edit
 generated or staged output under `common/versions`, `fabric/versions`, `forge/versions`, any
 `build/` directory, `.gradle/`, `.architectury-transformer/`, `e2e-out/`, or `build/release/`. Fix
 the tracked canonical source or active overlay instead.
+`gradle/minecraft-module-sources.gradle.kts` applies the matrix's common API-family routing to
+Minecraft modules that own a `src/legacy*` tree. Same-path Java files replace their canonical source;
+newer-only files carry whole-file Stonecutter guards. Mixin/resource overlays remain owned by the
+common assembly until their resource ownership and loader contracts are migrated.
+The shared NeoForge `legacy26_1` overlay contains the Architectury BreakEvent bridge and Screen
+access transformer for exactly the matrix-routed 26.1 and 26.1.1 targets. Its `test/java` directory
+runs only on that overlay and verifies the pinned upstream class shape and Screen hook calls.
+The 26.1.2 and 26.2 artifacts must contain neither the bridge configuration nor its classes.
 
 `gradle/e2e-harness-conventions.gradle.kts` owns the exact E2E source roots, classpaths, generated
 contract source, and harness archive tasks for every active loader node. Loader build scripts may
-only bind that protected convention and are authenticated byte-for-byte for their release branch by
+only bind that protected convention and are authenticated byte-for-byte by
 `e2e/loader-bootstrap-contract.json`, together with the exact loader entrypoint and manifest tree.
-The contract is an integrity allowlist selected by the branch's matrix, not a support-discovery
-inventory. Any deliberate edit below `<loader>/src/e2e` or to an active loader build script must
+Its schema 3 pins one build implementation per loader; the release matrix selects the active
+loaders and versions. Historical schema-2 snapshots retain their branch-specific seals.
+Any deliberate edit below `<loader>/src/e2e` or to an active loader build script must
 update its protected digest contract and mutation tests on `master` in the same change.
 
 ## Active `legacy*` overlays
@@ -44,19 +165,16 @@ canonical src/main/resources
   -> process generated/consolidated/main/resources
 ```
 
-An overlay file therefore replaces the canonical file at the same relative path. The active
-overlays are:
+An overlay file therefore replaces the canonical file at the same relative path. Read active
+routes from the release matrix; every Minecraft feature module may own a subset of its common
+routes. Pure Java modules cannot own version overlays. A common assembly overlay may contain only
+resources after its Java implementations have moved into their feature modules.
 
-| Module | Minecraft | Active overlay |
-|---|---|---|
-| common | 1.20.1 | `common/src/legacy1_20_1` |
-| fabric | 1.20.1 | none; canonical output |
-| forge | 1.20.1 | none; `forge/src/main` |
-
-The remaining whole-file canonical replacements are genuine 1.20.1 rewrites:
-`ModNetworking`, `ServerNetworkHandler`, `PlayerInfoMixin`, and
-`MixinAbstractClientPlayer`. Other overlay Java files are additive compatibility classes or thin
-1.20.1 backends.
+`validate_source_roots` reads the same typed module registry used by Gradle. It rejects undeclared
+overlays, retired `src/v*` trees, linked sources and classes with multiple owners in one assembled
+JAR. Loader source trees are mutually exclusive artifacts. Schema 3 permits several API-family
+replacements within one owner, since each target selects only its declared family. Newer-only
+canonical classes use whole-file Stonecutter guards, without per-version exclusion maps in Gradle.
 
 Keep overlays narrow. Prefer a small adapter or a Stonecutter version branch over copying an entire
 service, screen, or handler. When a class exists in an active overlay:
@@ -77,6 +195,13 @@ validation rejects reintroduced `src/v*` content and live Java classes with more
 See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
 
 ## Version-port control plane
+
+The shared-source schema-3 matrix retires automatic version ports. `release_sources.py` validates
+the complete matrix before resolving `master` as the only source branch and an empty port list.
+The sync workflow exits before Git/GitHub work; delayed port results must pass a protected layout
+job before candidate inspection or repair. Existing historical refs remain untouched and do not
+declare active support. README status uses `status_table.py --matrix` directly. The following
+controllers remain for historical schema-2 evidence and explicit recovery, not shared-source work.
 
 - `scripts/ci/version_port_merge.py` is the sole protected owner of version-port Git merge
   semantics. Given exact clean target/source commits, it runs a hook-free no-commit merge,
@@ -175,10 +300,21 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   evidence; `scripts/pages/rotate_artifacts.py` retains one
   current compatibility cache per covered branch and retires older caches, consumed handoffs, and
   fan-in artifacts only after a successful atomic deployment.
+- `scripts/ci/feature_review.py` curates complete and selected shared targets from the exact
+  successful current-master runtime. Both secretless curation and model admission authenticate
+  the complete job graph and immutable artifact partition. Paired targets use the same run's
+  Fabric anchor; shared review does not require a preceding Pages deployment. Scheduled runs
+  remain complete integration checks and cannot issue the manual generation's public baseline.
+- `scripts/ci/shared_compatibility.py` authenticates a clean complete schema-8 target review before
+  optional-mod E2E. Each wave has its own target key, while source and target SHA both name current
+  `master`. Its schema-2 plan is independently recomputed from the full matrix, scenario contract,
+  and pinned external-mod lock before both runtime and AI admission. Selected generations retain
+  their scoped review; optional integrations run full profiles on complete/manual/nightly waves.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every later-version candidate with the same semantic
-  capture from authenticated lossless raw Pages handoff evidence. For a 1.20.1 source it instead
+  capture from authenticated lossless raw Pages handoff evidence for historical schema-2 sources.
+  Shared-source curation supplies the same-run reference through the same renderer. For a 1.20.1 source it instead
   requires complete, identical Fabric/Forge capture-id sets and exposes each frame without any
   reference. It requires both sides to remain exactly 1920x1080 and atomically re-encodes candidates
   and references as metadata-free RGB PNGs without resizing. `e2e/visual_similarity.py` computes
@@ -279,7 +415,8 @@ See `ORACLE-RETIREMENT.md` for the retirement gate and resource-routing details.
   the separately authenticated continuation after Build and full Packaged E2E; it never becomes a
   semantic certificate.
 - `scripts/ci/mod_compatibility_impact.py` independently classifies the complete server-side
-  synchronization PR inventory. It binds a normalized manifest into the visual curation proof and
+  diff inventory supplied by the protected curator (historical synchronization PRs or the shared
+  generation). It binds a normalized manifest into the visual curation proof and
   permits the optional-mod wave only for product, build, runtime-harness, compatibility-policy, or
   unknown impact. Review-only workflows/prompts, publication, documentation, and policy tests skip
   that expensive wave. Renames classify both old and new paths and malformed or incomplete

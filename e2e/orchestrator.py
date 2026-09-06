@@ -12,13 +12,14 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts" / "release"))
+sys.path.insert(0, str(REPO / "scripts" / "ci"))
 
 from artifact_manifest import (  # noqa: E402
     ArtifactManifestError,
     current_git_commit,
     load_artifact_manifest,
 )
-from matrix import MatrixError, load_matrix  # noqa: E402
+from matrix import MatrixError, load_matrix, select_release_target  # noqa: E402
 from mod_compatibility import (  # noqa: E402
     DEFAULT_CONTRACT as DEFAULT_COMPATIBILITY_CONTRACT,
     CompatibilityContractError,
@@ -35,6 +36,8 @@ from packaged_runtime import (  # noqa: E402
 from release_identity import ReleaseIdentityError, derive as derive_release_identity  # noqa: E402
 from runtime_store import RunWorkspace, RuntimeStoreError, WorkspacePromotion  # noqa: E402
 from scenario_contract import default_contract  # noqa: E402
+from selection import SelectionPlan, load_selection  # noqa: E402
+from e2e_selection import verify as verify_selection_admission  # noqa: E402
 
 
 SCENARIO_CONTRACT = default_contract()
@@ -43,6 +46,7 @@ SCENARIO_CONTRACT = default_contract()
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, default=Path("release/release-matrix.json"))
+    parser.add_argument("--target", help="consume one independently staged Minecraft release target")
     parser.add_argument(
         "--artifacts-manifest", type=Path, default=Path("build/release/artifacts.json")
     )
@@ -58,6 +62,12 @@ def parse_args() -> argparse.Namespace:
         help="comma-separated scenario selection emitted from the scenario contract",
     )
     parser.add_argument("--compatibility-mod", help="run with one lock-selected optional mod")
+    parser.add_argument("--selection", type=Path,
+                        help="local preview manifest from e2e/selection.py; not release evidence")
+    parser.add_argument("--selection-admission", type=Path,
+                        help="Git admission to reverify against independently supplied commits")
+    parser.add_argument("--selection-base")
+    parser.add_argument("--selection-policy")
     parser.add_argument(
         "--compatibility-contract",
         type=Path,
@@ -106,6 +116,13 @@ def select_rows(data: dict[str, Any], args: argparse.Namespace) -> list[dict[str
 
 
 def scenarios_for(data: dict[str, Any], row: dict[str, Any], args: argparse.Namespace) -> list[str]:
+    selection = getattr(args, "selection_plan", None)
+    if selection is not None:
+        selected_scenarios = [run.scenario for run in selection.runs]
+        if args.scenarios and (not getattr(args, "selection_admission", None)
+                               or args.scenarios.split(",") != selected_scenarios):
+            raise ValueError("--scenarios cannot override a selection's exact obligations")
+        return selected_scenarios
     scenarios = (
         [value.strip() for value in args.scenarios.split(",") if value.strip()]
         if args.scenarios
@@ -227,6 +244,9 @@ def execute_packaged_rows(
                         if compatibility_lane is not None
                         else {}
                     )
+                    selection = getattr(args, "selection_plan", None)
+                    if selection is not None:
+                        compatibility_arguments["selection"] = selection
                     result = run_packaged_row(
                         REPO,
                         data,
@@ -291,9 +311,34 @@ def execute_packaged_rows(
             json.dumps(runtime_store_metrics, indent=2) + "\n",
             encoding="utf-8",
         )
+        if getattr(args, "selection_plan", None) is not None:
+            (evidence.path / "selection.json").write_bytes(args.selection_plan.to_bytes())
         promotion = evidence.promote_to(output_root / "current")
 
     return results, promotion
+
+
+def resolve_selection(args: argparse.Namespace, commit: str) -> SelectionPlan | None:
+    admission_arguments = (args.selection_admission, args.selection_base, args.selection_policy)
+    if args.selection and any(value is not None for value in admission_arguments):
+        raise ValueError("local preview and Git admission are mutually exclusive")
+    selected = load_selection(absolute(args.selection)) if args.selection else None
+    if any(value is not None for value in admission_arguments):
+        if args.selection_admission is None or args.selection_policy is None:
+            raise ValueError("Git selection requires an admission and independent policy commit")
+        admission = verify_selection_admission(absolute(args.selection_admission), REPO,
+            base=args.selection_base, head=commit, policy=args.selection_policy, profile="pr")
+        selected = admission if admission.enabled else None
+        if not admission.enabled:
+            complete_scenarios = ",".join(SCENARIO_CONTRACT.scenarios_for_profile(admission.profile))
+            if args.scenarios and args.scenarios != complete_scenarios:
+                raise ValueError("a full admission requires every scenario in its execution profile")
+            args.scenarios = complete_scenarios
+    if args.selection is not None and (args.scenarios or args.row_json):
+        raise ValueError("local selection cannot override workflow rows or explicit scenario lists")
+    if selected is not None and (args.compatibility_mod or selected.reference_captures):
+        raise ValueError("selective compatibility needs authenticated clean reference evidence; use the full compatibility runner")
+    return selected
 
 
 def main() -> int:
@@ -302,9 +347,12 @@ def main() -> int:
     manifest_path = absolute(args.artifacts_manifest)
     output_root = absolute(args.output_root)
     try:
-        data = load_matrix(matrix_path)
-        identity = derive_release_identity(matrix_path, data)
         commit = current_git_commit(REPO)
+        args.selection_plan = resolve_selection(args, commit)
+        data = load_matrix(matrix_path)
+        if args.target is not None:
+            data = select_release_target(data, args.target)
+        identity = derive_release_identity(matrix_path, data, target=args.target)
         rows = select_rows(data, args)
         manifest = (
             read_manifest(

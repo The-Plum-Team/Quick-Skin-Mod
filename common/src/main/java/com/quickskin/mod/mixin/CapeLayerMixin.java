@@ -1,6 +1,152 @@
+//? if >=1.21.2 && <1.21.6 {
 package com.quickskin.mod.mixin;
 
-import com.quickskin.mod.QuickSkin;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.quickskin.mod.platform.QuickSkinInfo;
+import com.quickskin.mod.client.compat.CPMCompatIntegration;
+import com.quickskin.mod.client.rendering.PlayerModelRenderer;
+import com.quickskin.mod.client.rendering.PreviewCapeBindings;
+import com.quickskin.mod.client.services.CapeAnimationHelper;
+import com.quickskin.mod.client.services.CapeService;
+import com.quickskin.mod.client.services.PlayerAppearanceService;
+import com.quickskin.mod.common.util.TextureAlphaDetector;
+import com.quickskin.mod.config.ClientConfig;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.layers.CapeLayer;
+import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.Items;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import java.util.UUID;
+
+/** Minecraft API-family cape adapter: render-state input with an immediate buffer. */
+@Mixin(value = CapeLayer.class, priority = 1100)
+public class CapeLayerMixin {
+
+    /** CapeLayer owns a separate PlayerCapeModel from Minecraft 1.21.2 onward. */
+    @Shadow @Final private HumanoidModel<?> model;
+
+    @Inject(
+            method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/PlayerRenderState;FF)V",
+            at = @At("HEAD"),
+            cancellable = true,
+            require = 1,
+            expect = 1,
+            allow = 1)
+    private void quickskin$renderCustomCape(PoseStack poseStack, MultiBufferSource buffer,
+                                            int packedLight, PlayerRenderState renderState,
+                                            float yRot, float xRot, CallbackInfo ci) {
+        if (CPMCompatIntegration.shouldDeferToCPM()) {
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        AbstractClientPlayer player = null;
+        UUID playerId = null;
+        if (minecraft.level != null) {
+            Entity entity = minecraft.level.getEntity(renderState.id);
+            if (entity instanceof AbstractClientPlayer resolvedPlayer) {
+                player = resolvedPlayer;
+                playerId = resolvedPlayer.getUUID();
+            }
+        }
+
+        // The 1.21.2 entity render is immediate but CapeLayer receives PlayerRenderState.
+        // consumePreviewCape falls back to the inline render's thread-scoped entity binding.
+        PreviewCapeBindings.Resolution<ResourceLocation> preview =
+                PlayerModelRenderer.consumePreviewCape(player);
+        if (preview.decision() == PreviewCapeBindings.Decision.HIDDEN) {
+            ci.cancel();
+            return;
+        }
+        boolean previewing = preview.decision() == PreviewCapeBindings.Decision.PREVIEW;
+
+        if (playerId == null && minecraft.level == null) {
+            playerId = minecraft.getUser().getProfileId();
+        }
+        if (playerId == null && !previewing) {
+            return;
+        }
+
+//? if <1.21.4 {
+        if (!previewing && renderState.chestItem.is(Items.ELYTRA)) {
+//?} else {
+        if (!previewing && renderState.chestEquipment.is(Items.ELYTRA)) {
+//?}
+            ci.cancel();
+            return;
+        }
+
+        PlayerAppearanceService service = PlayerAppearanceService.getInstance();
+        boolean hasServiceCape = !previewing && service.hasActiveCape(playerId);
+        boolean isLocalPlayer = playerId != null
+                && playerId.equals(minecraft.getUser().getProfileId());
+        ClientConfig config = ClientConfig.getInstance();
+        boolean hasConfigCape = !previewing && !hasServiceCape && isLocalPlayer
+                && !config.activeCapeHash.isEmpty();
+        if (!previewing && !hasServiceCape && !hasConfigCape) {
+            return;
+        }
+
+        String capeId = previewing ? null : service.getCapeId(playerId);
+        if (capeId != null) {
+            CapeAnimationHelper.markCapeVisible(capeId);
+        }
+
+        ResourceLocation capeTexture = previewing ? preview.texture() : null;
+        if (!previewing && hasServiceCape) {
+            capeTexture = service.getCapeLocation(playerId);
+        }
+        if (capeTexture == null && !previewing && hasConfigCape) {
+            capeTexture = CapeService.getInstance().getCapeLocation(null, config.activeCapeHash);
+        }
+        if (capeTexture == null) {
+            ci.cancel();
+            return;
+        }
+
+        ResourceLocation finalTexture =
+                CapeAnimationHelper.resolveCurrentFrame(capeTexture, capeId);
+        if (finalTexture == null) {
+            // Network animations deliberately render nothing until their bounded first frame exists.
+            ci.cancel();
+            return;
+        }
+
+        RenderType renderType = QuickSkinInfo.MOD_ID.equals(finalTexture.getNamespace())
+                || TextureAlphaDetector.hasTransparency(finalTexture)
+                ? RenderType.entityTranslucent(finalTexture)
+                : RenderType.entitySolid(finalTexture);
+        VertexConsumer vertices = buffer.getBuffer(renderType);
+
+        // Copy the parent pose into CapeLayer's separate PlayerCapeModel, then animate it from
+        // the same PlayerRenderState vanilla supplied for this frame.
+        @SuppressWarnings("unchecked")
+        HumanoidModel<PlayerRenderState> capeModel =
+                (HumanoidModel<PlayerRenderState>) (HumanoidModel<?>) model;
+        ((CapeLayer) (Object) this).getParentModel().copyPropertiesTo(capeModel);
+        capeModel.setupAnim(renderState);
+        capeModel.renderToBuffer(poseStack, vertices, packedLight, OverlayTexture.NO_OVERLAY);
+        ci.cancel();
+    }
+}
+//?} else {
+package com.quickskin.mod.mixin;
+
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
@@ -13,51 +159,59 @@ import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
 //?}
 import com.mojang.blaze3d.vertex.PoseStack;
-//? if <1.21.11 {
+//? if <1.21.6 {
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+//?} else if <1.21.9 {
+import com.mojang.blaze3d.vertex.VertexConsumer;
 //?} else {
 //?}
 import net.minecraft.client.player.AbstractClientPlayer;
-//? if <1.21.11 {
+//? if <1.21.9 {
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+//?} else if <1.21.11 {
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 //?} else {
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 //?}
 import net.minecraft.client.renderer.entity.layers.CapeLayer;
-//? if <1.21.11 {
-//?} else {
+//? if >=1.21.6 {
+    //? if <1.21.9 {
+import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+    //?} else {
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+    //?}
 //?}
 import net.minecraft.client.renderer.texture.OverlayTexture;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
 //?} else {
 import net.minecraft.resources.Identifier;
+//?}
+//? if <1.21.6 {
+import net.minecraft.util.Mth;
+//?} else {
 import net.minecraft.world.entity.Entity;
 //?}
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.Items;
-//? if <1.21.11 {
-//?} else {
+//? if >=1.21.6 {
 import net.minecraft.client.model.HumanoidModel;
 import org.spongepowered.asm.mixin.Final;
 //?}
 import org.spongepowered.asm.mixin.Mixin;
-//? if <1.21.11 {
-//?} else {
+//? if >=1.21.6 {
 import org.spongepowered.asm.mixin.Shadow;
 //?}
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-//? if <1.21.11 {
-//?} else {
+//? if >=1.21.6 {
 import java.util.UUID;
 
 //?}
@@ -66,12 +220,16 @@ public class CapeLayerMixin {
 
 //? if <1.21 {
     @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/player/AbstractClientPlayer;FFFFFF)V",
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
     // Throttle logging to avoid spam
 
     @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/player/AbstractClientPlayer;FFFFFF)V",
+//?} else if <1.21.9 {
+    @Shadow @Final private HumanoidModel<?> model;
+
+    @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/PlayerRenderState;FF)V",
 //?} else {
-    // In MC 1.21.11+, CapeLayer has its own cape model (PlayerCapeModel) separate from PlayerModel
+    // In MC 1.21.9+, CapeLayer submits a dedicated HumanoidModel render state.
     @Shadow @Final private HumanoidModel<?> model;
 
     @Inject(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/AvatarRenderState;FF)V",
@@ -81,10 +239,13 @@ public class CapeLayerMixin {
             require = 1,
             expect = 1,
             allow = 1)
-//? if <1.21.11 {
+//? if <1.21.6 {
     private void quickskin$renderCustomCape(PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                                             AbstractClientPlayer player, float limbSwing, float limbSwingAmount,
                                             float partialTicks, float ageInTicks, float netHeadYaw, float headPitch,
+//?} else if <1.21.9 {
+    private void quickskin$renderCustomCape(PoseStack poseStack, MultiBufferSource buffer, int packedLight,
+                                            PlayerRenderState renderState, float yRot, float xRot,
 //?} else {
     private void quickskin$renderCustomCape(PoseStack poseStack, SubmitNodeCollector buffer, int packedLight,
                                             AvatarRenderState renderState, float yRot, float xRot,
@@ -95,9 +256,12 @@ public class CapeLayerMixin {
         // The GUI preview renders the real player entity, so without this the cape below would be
         // the one the player is wearing rather than the one the editor has selected. The preview
         // binds its cape to this draw only; an unbound draw keeps resolving the applied cape.
-//? if <1.21.11 {
+//? if <1.21.6 {
         PreviewCapeBindings.Resolution<ResourceLocation> quickskin$preview =
                 PlayerModelRenderer.consumePreviewCape(player);
+//?} else if <1.21.11 {
+        PreviewCapeBindings.Resolution<ResourceLocation> quickskin$preview =
+                PlayerModelRenderer.consumePreviewCape(renderState);
 //?} else {
         PreviewCapeBindings.Resolution<Identifier> quickskin$preview =
                 PlayerModelRenderer.consumePreviewCape(renderState);
@@ -109,8 +273,7 @@ public class CapeLayerMixin {
         boolean quickskin$previewing =
                 quickskin$preview.decision() == PreviewCapeBindings.Decision.PREVIEW;
 
-//? if <1.21.11 {
-//?} else {
+//? if >=1.21.6 {
         // Don't render cape when elytra is equipped. Read that off the render state rather than the
         // live entity: in the world the state carries exactly what the player has on, so the rule is
         // unchanged, while in a preview the renderer has already blanked the state's equipment, so
@@ -138,7 +301,7 @@ public class CapeLayerMixin {
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
 //? if <1.21 {
         if (!quickskin$previewing && !service.hasActiveCape(player.getUUID())) {
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
 
         // Throttled debug logging
 
@@ -150,7 +313,7 @@ public class CapeLayerMixin {
             return; // No custom cape, let vanilla logic run
         }
 
-//? if <1.21.11 {
+//? if <1.21.6 {
         String capeId = quickskin$previewing ? null : service.getCapeId(player.getUUID());
 //?} else {
         String capeId = quickskin$previewing ? null : service.getCapeId(playerUUID);
@@ -164,7 +327,7 @@ public class CapeLayerMixin {
         ResourceLocation capeTexture = quickskin$previewing
                 ? quickskin$preview.texture()
                 : player.getCloakTextureLocation();
-//?} else if <1.21.11 {
+//?} else if <1.21.6 {
         // Get cape texture from our service instead of player.getSkin().capeTexture(),
         // because some mods (e.g. Essential) override getSkin() in a subclass,
         // bypassing our MixinAbstractClientPlayer that sets the correct cape texture.
@@ -180,6 +343,17 @@ public class CapeLayerMixin {
                     capeTexture = com.quickskin.mod.client.services.CapeService.getInstance()
                             .getCapeLocation(null, config.activeCapeHash);
                 }
+            }
+        }
+//?} else if <1.21.11 {
+        ResourceLocation capeTexture = quickskin$previewing
+                ? quickskin$preview.texture()
+                : service.getCapeLocation(playerUUID);
+        if (capeTexture == null && !quickskin$previewing && mc.level == null) {
+            ClientConfig config = ClientConfig.getInstance();
+            if (!config.activeCapeHash.isEmpty()) {
+                capeTexture = com.quickskin.mod.client.services.CapeService.getInstance()
+                        .getCapeLocation(null, config.activeCapeHash);
             }
         }
 //?} else {
@@ -207,7 +381,7 @@ public class CapeLayerMixin {
             return;
         }
 
-//? if <1.21.11 {
+//? if <1.21.6 {
         if (!quickskin$previewing && player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)) {
             ci.cancel();
             return;
@@ -233,9 +407,11 @@ public class CapeLayerMixin {
 
         // If the texture is from our mod (local, network, animated, or known),
         // always use the translucent render type to correctly handle transparency.
-        if (finalTexture.getNamespace().equals(QuickSkin.MOD_ID)) {
-//? if <1.21.11 {
+        if (finalTexture.getNamespace().equals(QuickSkinInfo.MOD_ID)) {
+//? if <1.21.6 {
             renderType = RenderType.entityTranslucentCull(finalTexture);
+//?} else if <1.21.11 {
+            renderType = RenderType.entityTranslucent(finalTexture);
 //?} else {
             renderType = RenderTypes.entityTranslucent(finalTexture);
 //?}
@@ -243,13 +419,17 @@ public class CapeLayerMixin {
             // For vanilla capes or capes from other mods, use the alpha detector.
             boolean hasTransparency = TextureAlphaDetector.hasTransparency(finalTexture);
             if (hasTransparency) {
-//? if <1.21.11 {
+//? if <1.21.6 {
                 renderType = RenderType.entityTranslucentCull(finalTexture);
+//?} else if <1.21.11 {
+                renderType = RenderType.entityTranslucent(finalTexture);
 //?} else {
                 renderType = RenderTypes.entityTranslucent(finalTexture);
 //?}
             } else {
-//? if <1.21.11 {
+//? if <1.21.6 {
+                renderType = RenderType.entitySolid(finalTexture);
+//?} else if <1.21.11 {
                 renderType = RenderType.entitySolid(finalTexture);
 //?} else {
                 renderType = RenderTypes.entitySolid(finalTexture);
@@ -257,13 +437,13 @@ public class CapeLayerMixin {
             }
         }
 
-//? if <1.21.11 {
+//? if <1.21.9 {
         VertexConsumer vertexconsumer = buffer.getBuffer(renderType);
 
 //?} else {
 //?}
         // Replicate the vanilla cape rendering logic with our custom render type
-//? if <1.21.11 {
+//? if <1.21.6 {
         poseStack.pushPose();
         poseStack.translate(0.0D, 0.0D, 0.125D);
         double d0 = Mth.lerp(partialTicks, player.xCloakO, player.xCloak) - Mth.lerp(partialTicks, player.xo, player.getX());
@@ -281,14 +461,20 @@ public class CapeLayerMixin {
         if (f2 < 0.0F) {
             f2 = 0.0F;
         }
+//?} else if <1.21.9 {
+        @SuppressWarnings("unchecked")
+        HumanoidModel<PlayerRenderState> capeModel =
+                (HumanoidModel<PlayerRenderState>) (HumanoidModel<?>) this.model;
+        ((CapeLayer)(Object)this).getParentModel().copyPropertiesTo(capeModel);
+        capeModel.setupAnim(renderState);
 //?} else {
-        // In MC 1.21.11, CapeLayer uses SubmitNodeCollector.submitModel() instead of renderToBuffer()
+        // In MC 1.21.9+, CapeLayer uses SubmitNodeCollector.submitModel() instead of renderToBuffer().
         @SuppressWarnings("unchecked")
         HumanoidModel<AvatarRenderState> capeModel = (HumanoidModel<AvatarRenderState>) (HumanoidModel<?>) this.model;
         capeModel.setupAnim(renderState);
 //?}
 
-//? if <1.21.11 {
+//? if <1.21.6 {
         float f4 = Mth.lerp(partialTicks, player.oBob, player.bob);
         f1 += Mth.sin(Mth.lerp(partialTicks, player.walkDistO, player.walkDist) * 6.0F) * 32.0F * f4;
         if (player.isCrouching()) {
@@ -303,6 +489,8 @@ public class CapeLayerMixin {
         ((CapeLayer)(Object)this).getParentModel().renderCloak(poseStack, vertexconsumer, packedLight, OverlayTexture.NO_OVERLAY);
 
         poseStack.popPose();
+//?} else if <1.21.9 {
+        capeModel.renderToBuffer(poseStack, vertexconsumer, packedLight, OverlayTexture.NO_OVERLAY);
 //?} else {
         // Submit the cape model with our custom render type
         buffer.submitModel(capeModel, renderState, poseStack, renderType, packedLight,
@@ -313,3 +501,4 @@ public class CapeLayerMixin {
         ci.cancel();
     }
 }
+//?}

@@ -4,6 +4,8 @@ import json
 import unittest
 from pathlib import Path
 
+from scripts.architecture.source_inventory import java_source
+
 
 ROOT = Path(__file__).resolve().parents[3]
 MATRIX = json.loads(
@@ -14,30 +16,15 @@ MIXIN_ROOT = (
 )
 
 
-def uses_vanilla_translucent_hand_collector() -> bool:
-    runtime_versions = {
-        runtime["runtime_version"] for runtime in MATRIX["runtimes"]
-    }
-    if len(runtime_versions) != 1:
-        raise AssertionError("release runtimes must share one Minecraft version")
-    components = tuple(int(value) for value in runtime_versions.pop().split("."))
+def uses_vanilla_translucent_hand_collector(version: str) -> bool:
+    components = tuple(int(value) for value in version.split("."))
     return components[0] >= 26 or (
         len(components) == 3 and components[:2] == (1, 21) and components[2] >= 9
     )
 
 
 CPM_INTEGRATION = (
-    ROOT
-    / "common"
-    / "src"
-    / "main"
-    / "java"
-    / "com"
-    / "quickskin"
-    / "mod"
-    / "client"
-    / "compat"
-    / "CPMCompatIntegration.java"
+    java_source('client/compat/CPMCompatIntegration.java', source_set='main', repository=ROOT)
 )
 CLIENT_EVENTS = (
     ROOT
@@ -230,9 +217,10 @@ class CpmTransitionPolicyTest(unittest.TestCase):
             with self.subTest(source=path.relative_to(ROOT).as_posix()):
                 source = path.read_text(encoding="utf-8")
                 self.assertIn("quickskin$redirectRenderHandBuffer", source)
-                if not uses_vanilla_translucent_hand_collector() and MATRIX[
-                    "runtimes"
-                ][0]["runtime_version"] != "1.20.1":
+                owning_runtimes = [row for row in MATRIX["runtimes"]
+                                   if path != neoforge_renderer or row["loader"] == "neoforge"]
+                if not any(uses_vanilla_translucent_hand_collector(row["runtime_version"])
+                           or row["runtime_version"] == "1.20.1" for row in owning_runtimes):
                     continue
                 legacy_guard = source.index("//? if <", source.index("public class"))
                 redirect = source.index("@Redirect(", legacy_guard)

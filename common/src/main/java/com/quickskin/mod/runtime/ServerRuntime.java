@@ -1,6 +1,6 @@
 package com.quickskin.mod.runtime;
 
-import com.quickskin.mod.QuickSkin;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.ServerNetworkHandler;
 import com.quickskin.mod.server.concurrent.ServerTextureIngressExecutor;
@@ -65,15 +65,17 @@ public final class ServerRuntime implements AutoCloseable {
             return;
         }
         if (activeServer != null && activeServer != server) {
-            QuickSkin.LOGGER.warn("Starting a new QuickSkin server runtime before the previous one stopped; resetting stale state");
+            QuickSkinInfo.LOGGER.warn("Starting a new QuickSkin server runtime before the previous one stopped; resetting stale state");
         }
 
         resetTransientState();
         ServerConfig.reload();
         ServerCacheIoExecutor.getInstance().start();
-        textureCache.init(server);
-        animationCache.init(server);
-        appearanceStorage.init(server);
+        java.nio.file.Path worldPath = server.getWorldPath(
+                net.minecraft.world.level.storage.LevelResource.ROOT);
+        textureCache.init(worldPath);
+        animationCache.init(worldPath);
+        appearanceStorage.init(worldPath);
         ServerTextureIngressExecutor.getInstance().start();
         activeServer = server;
     }
@@ -82,7 +84,7 @@ public final class ServerRuntime implements AutoCloseable {
     public synchronized void prepareStop(MinecraftServer server) {
         Objects.requireNonNull(server, "server");
         if (activeServer == null || activeServer != server) {
-            QuickSkin.LOGGER.warn("Ignoring a stale QuickSkin server-stopping callback");
+            QuickSkinInfo.LOGGER.warn("Ignoring a stale QuickSkin server-stopping callback");
             return;
         }
 
@@ -98,13 +100,13 @@ public final class ServerRuntime implements AutoCloseable {
             MinecraftServer server, UUID playerId, Object connection) {
         if (server == null || server != activeServer || playerId == null || connection == null) {
             if (server != null && activeServer != null && server != activeServer) {
-                QuickSkin.LOGGER.warn("Ignoring a stale QuickSkin player-disconnect callback");
+                QuickSkinInfo.LOGGER.warn("Ignoring a stale QuickSkin player-disconnect callback");
             }
             return false;
         }
         ServerPlayer activePlayer = server.getPlayerList().getPlayer(playerId);
         if (activePlayer != null && activePlayer.connection != connection) {
-            QuickSkin.LOGGER.debug(
+            QuickSkinInfo.LOGGER.debug(
                     "Ignoring an old QuickSkin session cleanup after {} reconnected", playerId);
             // Exact-session network state is safe to release even though UUID-scoped gameplay
             // state now belongs to the replacement connection.
@@ -121,7 +123,7 @@ public final class ServerRuntime implements AutoCloseable {
     /** Completes shutdown and guarantees no state can leak into the next integrated server. */
     public synchronized void stop(MinecraftServer server) {
         if (activeServer != null && activeServer != server) {
-            QuickSkin.LOGGER.warn("Ignoring a stale QuickSkin server-stopped callback");
+            QuickSkinInfo.LOGGER.warn("Ignoring a stale QuickSkin server-stopped callback");
             return;
         }
         resetTransientState();
@@ -143,7 +145,7 @@ public final class ServerRuntime implements AutoCloseable {
         try {
             action.run();
         } catch (RuntimeException | LinkageError error) {
-            QuickSkin.LOGGER.warn("Failed to {} while resetting the QuickSkin server runtime", operation, error);
+            QuickSkinInfo.LOGGER.warn("Failed to {} while resetting the QuickSkin server runtime", operation, error);
         }
     }
 
@@ -153,7 +155,7 @@ public final class ServerRuntime implements AutoCloseable {
             try {
                 prepareStop(activeServer);
             } catch (RuntimeException | LinkageError error) {
-                QuickSkin.LOGGER.error("Failed to persist QuickSkin state during explicit server shutdown", error);
+                QuickSkinInfo.LOGGER.error("Failed to persist QuickSkin state during explicit server shutdown", error);
             }
         }
         resetTransientState();

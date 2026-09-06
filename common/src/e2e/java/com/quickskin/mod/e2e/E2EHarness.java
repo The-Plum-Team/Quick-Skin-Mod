@@ -2,6 +2,7 @@ package com.quickskin.mod.e2e;
 
 import com.quickskin.mod.e2e.scenario.CpmFirstPersonScenario;
 import com.quickskin.mod.e2e.scenario.FullScenario;
+import com.quickskin.mod.e2e.scenario.FeatureNavigationScenario;
 import com.quickskin.mod.e2e.scenario.ModCompatibilityLateJoinScenario;
 import com.quickskin.mod.e2e.scenario.ModCompatibilityScenario;
 import com.quickskin.mod.e2e.scenario.ModCompatibilityRemoteScenario;
@@ -57,6 +58,10 @@ public final class E2EHarness {
     private boolean captureDispatched = false;
     private boolean captureSucceeded = false;
     private static final int CAPTURE_SETTLE_FRAMES = 2;
+    private static final int MAX_VIEWPORT_ADJUSTMENTS = 5;
+    private int viewportAdjustments = 0;
+    private int viewportAdjustmentTick = -20;
+    private long viewportReadyFrame = -1;
 
     // Track the last dispatched screenshot so FLUSH can confirm it landed at full size and re-grab a
     // transient undersized capture (a macOS window-resize race, observed as a tiny e.g. 90x110 PNG on
@@ -147,6 +152,7 @@ public final class E2EHarness {
             case PROPAGATION -> new PropagationScenario();
             case PROPAGATION_LIVE -> new PropagationLiveScenario();
             case FULL -> new FullScenario();
+            case FEATURE_NAVIGATION -> new FeatureNavigationScenario();
             case MOD_COMPATIBILITY_CPM_FIRST_PERSON -> new CpmFirstPersonScenario();
             case MOD_COMPATIBILITY -> new ModCompatibilityScenario();
             case MOD_COMPATIBILITY_LATE_JOIN -> new ModCompatibilityLateJoinScenario();
@@ -239,9 +245,11 @@ public final class E2EHarness {
             }
         }
         if (mc.player != null && mc.level != null) {
+            if (!prepareViewport(mc)) return;
             Scenario scenario = resolveScenario();
             steps = scenario.build(mc);
             E2EContractValidator.validate(scenario, role, steps);
+            steps = E2ESelection.apply(scenario, role, steps);
             E2ELog.info("joined world; running " + steps.size() + " steps");
             state = State.RUN_STEPS;
             return;
@@ -254,6 +262,35 @@ public final class E2EHarness {
                     "player/level null after 90s; lastScreen=" + lastScreen,
                     captured ? shot : null);
             finish(mc);
+        }
+    }
+
+    /** Establish the contracted pixel geometry before actions build screens or move the cursor. */
+    private boolean prepareViewport(Minecraft mc) {
+        try {
+            int[] size = VanillaShim.framebufferSize(mc);
+            if (expectedDimensions(size)) {
+                if (viewportReadyFrame < 0) viewportReadyFrame = renderedFrame + CAPTURE_SETTLE_FRAMES;
+                return renderedFrame >= viewportReadyFrame;
+            }
+            viewportReadyFrame = -1;
+            if (tick - viewportAdjustmentTick < 20) return false;
+            if (viewportAdjustments >= MAX_VIEWPORT_ADJUSTMENTS) {
+                report.record("capture_viewport", "fail", "could not establish "
+                        + ScenarioContract.SCREENSHOT_WIDTH + "x" + ScenarioContract.SCREENSHOT_HEIGHT
+                        + " rendered pixels; got " + size[0] + "x" + size[1], null);
+                finish(mc);
+                return false;
+            }
+            viewportAdjustments++;
+            viewportAdjustmentTick = tick;
+            E2ELog.info("adjusting capture viewport from " + size[0] + "x" + size[1]
+                    + " to " + ScenarioContract.SCREENSHOT_WIDTH + "x" + ScenarioContract.SCREENSHOT_HEIGHT);
+            VanillaShim.requestFramebufferSize(mc, ScenarioContract.SCREENSHOT_WIDTH,
+                    ScenarioContract.SCREENSHOT_HEIGHT);
+            return false;
+        } catch (Exception error) {
+            throw new IllegalStateException("could not establish capture viewport", error);
         }
     }
 

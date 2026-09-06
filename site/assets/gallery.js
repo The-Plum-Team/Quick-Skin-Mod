@@ -792,9 +792,15 @@ class Gallery {
         ["Published at", frame.target_created_at]
       );
     }
+    if (frame.coverage_sha && frame.coverage_sha !== frame.source_sha) {
+      rows.push(
+        ["Coverage commit", node("span", "mono", frame.coverage_sha)],
+        ["Evidence reuse", "This feature and its dependencies are unchanged since the tested commit."]
+      );
+    }
     return recordSection(
       "Provenance",
-      "Evidence is only published when its recorded runs and commits still match the current release-branch head.",
+      "Each image retains its original tested run and commit. Reused images include the newer commit whose coverage was verified.",
       factList(rows)
     );
   }

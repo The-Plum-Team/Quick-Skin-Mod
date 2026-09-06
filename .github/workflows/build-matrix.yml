@@ -1,0 +1,169 @@
+name: Compile isolated matrix targets
+
+on:
+  workflow_call:
+    inputs:
+      cache-writer:
+        description: Allow the protected master Build gate to write its Gradle cache
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  inventory:
+    name: Plan every supported build target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      targets: ${{ steps.plan.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Derive target jobs from the validated complete build plan
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          plan="$(python scripts/release/build_matrix.py --plan)"
+          targets="$(jq -ce '{include: map({target: .target})} | select(.include | length > 0)' <<< "$plan")"
+          printf 'targets=%s\n' "$targets" >> "$GITHUB_OUTPUT"
+
+  target:
+    name: Compile Minecraft ${{ matrix.target }}
+    needs: inventory
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      # Each hosted VM owns one checkout and one serial Gradle invocation.
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.inventory.outputs.targets) }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: Verify exact Gradle bootstrap checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd gradle/wrapper && sha256sum --check --strict gradle-wrapper.jar.sha256)
+          distribution_hash="$(tr -d '\r\n' < gradle/wrapper/gradle-9.7.1-bin.zip.sha256)"
+          grep --fixed-strings --line-regexp "distributionSha256Sum=$distribution_hash" \
+            gradle/wrapper/gradle-wrapper.properties
+      - name: Install all required JDKs
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+            25
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Select the bounded Gradle cache mode
+        id: gradle-cache
+        shell: bash
+        env:
+          REF_PROTECTED: ${{ github.ref_protected }}
+          REF_TYPE: ${{ github.ref_type }}
+          CACHE_WRITER: ${{ inputs.cache-writer }}
+        run: |
+          set -euo pipefail
+          read_only=true
+          if [[ "$CACHE_WRITER" == true ]]; then
+            read_only="$(python3 scripts/ci/gradle_cache_policy.py \
+              --matrix release/release-matrix.json \
+              --event-name "$GITHUB_EVENT_NAME" \
+              --ref-name "$GITHUB_REF_NAME" \
+              --ref-type "$REF_TYPE" \
+              --ref-protected "$REF_PROTECTED")"
+          fi
+          [[ "$read_only" == true || "$read_only" == false ]]
+          printf 'read_only=%s\n' "$read_only" >> "$GITHUB_OUTPUT"
+      - name: Configure Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: ${{ steps.gradle-cache.outputs.read_only }}
+          cache-cleanup: on-success
+      - name: Build and stage this target's production JARs and harnesses
+        shell: bash
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          target_args=()
+          if [[ "$(python scripts/release/release_sources.py --kind mode)" == shared ]]; then
+            target_args=(--target "$BUILD_TARGET")
+          fi
+          python scripts/release/build_matrix.py --clean "${target_args[@]}"
+          python scripts/release/verify_release.py "${target_args[@]}"
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
+      - name: Upload the verified target partition
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: compiled-target-${{ matrix.target }}
+          path: build/release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+      - name: Upload failed target diagnostics
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-diagnostics-${{ matrix.target }}
+          path: |
+            build/matrix-build/
+            **/build/reports/
+            **/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 1
+
+  assemble:
+    name: Reverify the complete compiled matrix
+    needs: target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Download every target partition from this execution
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: compiled-target-*
+          path: build/compiled-targets
+      - name: Authenticate every target and assemble the complete bundle
+        run: python scripts/release/assemble_build.py
+      - name: Assert assembly did not mutate tracked sources
+        run: git diff --exit-code
+      - name: Upload the complete compiled bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: compiled-matrix-bundle
+          path: build/release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1

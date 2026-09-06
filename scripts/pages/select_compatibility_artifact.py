@@ -24,6 +24,7 @@ from rotate_artifacts import (  # noqa: E402
     _validate_run,
 )
 from version_branches import parse_version_branch  # noqa: E402
+from evidence_target import DEFAULT_MATRIX, EvidenceTargetError, target_for_key  # noqa: E402
 
 
 COMPATIBILITY_REVIEW_WORKFLOW = ".github/workflows/mod-compatibility-review.yml"
@@ -62,9 +63,16 @@ def select_source(
     *,
     repository: str,
     branch: str,
+    bundle_key: str | None = None,
+    current_sha: str | None = None,
 ) -> Artifact | None:
-    handoff_name = f"pages-mod-compatibility-{branch}"
-    cache_name = f"pages-mod-compatibility-cache-{branch}"
+    if bundle_key is not None and current_sha is None:
+        raise RotationError("shared compatibility evidence requires the exact source head")
+    key = bundle_key if bundle_key is not None else branch
+    handoff_name = f"pages-mod-compatibility-{key}"
+    cache_name = f"pages-mod-compatibility-cache-{key}"
+    if bundle_key is not None:
+        cache_name += f"--{current_sha}"
     handoff = _newest_valid(
         api,
         [
@@ -73,6 +81,7 @@ def select_source(
             if artifact.name == handoff_name
             and not artifact.expired
             and artifact.head_branch == "master"
+            and (bundle_key is None or artifact.head_sha == current_sha)
         ],
         repository=repository,
         workflow=COMPATIBILITY_REVIEW_WORKFLOW,
@@ -99,6 +108,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--branch", required=True)
+    parser.add_argument("--bundle-key")
+    parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
+    parser.add_argument("--expected-source-sha")
     parser.add_argument("--github-output", type=Path, required=True)
     return parser.parse_args(argv)
 
@@ -110,7 +122,11 @@ def main(argv: list[str] | None = None) -> int:
         if REPOSITORY.fullmatch(repository) is None:
             raise RotationError("repository must use the owner/name form")
         branch = args.branch.strip()
-        if parse_version_branch(branch) is None:
+        if args.bundle_key is not None:
+            target = target_for_key(args.bundle_key, args.matrix)
+            if target.branch != branch:
+                raise RotationError("bundle key disagrees with the canonical source branch")
+        elif parse_version_branch(branch) is None:
             raise RotationError(f"not a release branch: {branch!r}")
         token = os.environ.get("GH_TOKEN", "")
         if not token:
@@ -121,7 +137,10 @@ def main(argv: list[str] | None = None) -> int:
             api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
         )
         current_sha = api.get_branch_sha(branch)
-        selected = select_source(api, repository=repository, branch=branch)
+        if args.expected_source_sha is not None and current_sha != args.expected_source_sha:
+            raise RotationError("source branch advanced after Pages discovery")
+        selected = select_source(api, repository=repository, branch=branch,
+                                 bundle_key=args.bundle_key, current_sha=current_sha)
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write(f"available={'true' if selected is not None else 'false'}\n")
             output.write(f"sha={current_sha}\n")
@@ -131,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
                 output.write(f"run_id={selected.run_id}\n")
                 output.write(f"size_in_bytes={selected.size_in_bytes}\n")
         return 0
-    except (OSError, RotationError) as exc:
+    except (OSError, RotationError, EvidenceTargetError) as exc:
         print(f"compatibility evidence selection error: {exc}", file=sys.stderr)
         return 2
 

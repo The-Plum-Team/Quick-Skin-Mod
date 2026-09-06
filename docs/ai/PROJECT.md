@@ -29,22 +29,53 @@ runtime dependencies, loader ranges, and FML pack formats. The versioned
 orchestration, steps, assertions, captures, probes, and comparisons. Do not duplicate either
 inventory in Gradle, Python, workflows, or documentation.
 
-The active production matrix on this branch contains exactly two artifacts:
-
-| Minecraft | Loaders | Java |
-|---|---|---:|
-| 1.20.1 | Fabric, Forge | 17 |
+This checkout uses release-matrix schema 3: one shared source branch, with separately
+compiled feature/API modules and a per-Minecraft/loader JAR. The generated README profile displays
+the active matrix; do not maintain a second version table in agent guidance. The recoverable
+[migration plan](../architecture/MODULAR-REWORK.md) records imported targets and remaining work.
 
 Every artifact targets exactly the Minecraft version in its filename and metadata. A support or
 loader change starts in the release matrix and must pass its validation and mutation tests.
 
-The matrix also names its one canonical release branch. `scripts/release/release_identity.py`
-derives the only valid tag and publication prefix from the sorted Minecraft versions plus the
-logical mod version. A publishing run must be the exact head of that branch. Manual release runs
-are validation-only; only the canonical tag can publish. See `RELEASING.md` for the recoverable,
-immutable workflow and governance activation contract.
+The matrix names `master` as the shared source branch. `scripts/release/release_identity.py`
+derives a non-publishable `build-v<mod_version>` identity for the complete schema-3 bundle;
+`--target <minecraft>` derives that target's independent `mc<minecraft>-v<mod_version>` identity.
+A publishing run must still bind the exact source head. Release workflow, governance and public
+evidence migration must finish before this new target identity is used for publication. Historical
+schema-2 snapshots retain their original branch/tag validation contract.
 
-## Version branch model
+## Shared validation and feature evidence
+
+- New work targets `master`, including a fix for one Minecraft version or loader. The matrix
+  chooses supported artifacts; historical branch names never extend that inventory.
+- `architecture/modules.json` owns separately compiled modules, dependencies, API bindings, and
+  their composition roots. Runtime integration edges supplement compile dependencies. Features
+  cannot import the common assembly. Selected module classes/resources enter each production JAR
+  exactly once, before its normal Architectury/loader remapping; the harness stays separate.
+- Build and Packaged E2E retain the complete required target/loader gate. A protected baseline
+  consumer may select fewer authored actions and captures only after proving the cumulative Git
+  diff, exact policy/contract/matrix, complete healthy source evidence, available full public
+  archives, and unchanged transitive module fingerprints. Unknown or unavailable proof selects
+  full profiles. PRs targeting `master` defer semantic AI review to the protected post-merge run.
+- Both full and partial shared visual reviews use their own runtime generation's Fabric anchor.
+  Secretless curation and model admission authenticate complete source jobs and immutable
+  artifacts independently. Full proof schema 8 and selected proof schema 7 remain distinct;
+  partial coverage cannot seed a complete healthy baseline or authorize optional-mod testing.
+- Full optional-mod waves are per Minecraft target and current source SHA. Their producer and
+  AI consumer independently recompute runnable/N/A lanes from the shared matrix and mod lock.
+  Nightly integration profiles stay complete; they do not replace the manual public baseline.
+- Pages publishes one atomic matrix-derived site. Selected evidence can cover unchanged features
+  only through independently authenticated full and selected components. Every reused image
+  retains the original tested commit/run/JAR and its separate coverage provenance.
+- Schema 3 disables automatic version ports and retains independent immutable target release
+  identities. Historical schema-2 controllers and evidence remain available for auditing old
+  releases. See `RELEASING.md` and the migration plan for activation and acceptance evidence.
+
+## Historical schema-2 version branch model
+
+The following describes delivery to existing schema-2 remote release branches. It is historical
+context for the shared-source rework, not a requirement to propagate unfinished schema-3 changes
+into those branches. Their source matrices and existing evidence remain intact during migration.
 
 - `master` is the shared integration branch. Release branches use the naming form
   `<loader>-and-<loader>-<minecraft>`, for example `forge-and-fabric-1.20.1`.
@@ -259,10 +290,14 @@ immutable workflow and governance activation contract.
   named seven-day exceptions are automatic-sync packaged evidence/input bundles needed by delayed
   compatibility review, compatibility plans/evidence/capsules/reports/block markers, queued visual
   review capsules, compatibility Pages handoffs, and rolling exact-policy visual verdict caches.
-  Five 90-day current-state artifact classes remain: the semantic certificate, the
+  Named 90-day artifact classes include the semantic certificate, the
   SHA-bound Pages cache, the matrix-derived lossless
   Fabric 1.20.1 anchor handoff, the per-covered-branch mod-compatibility Pages cache, and the
-  immutable `release-<release-id>` bundle. The release bundle
+  immutable `release-<release-id>` bundle. Shared-source feature coverage additionally retains its
+  complete healthy certificate and exact target/source/run compact Pages baselines for at most
+  90 days. Only a successfully deployed complete generation may create those public baselines;
+  partial generations reuse them without extending their lifetime. Missing or expired baseline
+  artifacts restore complete runtime coverage. The release bundle
   spans protected environment
   approvals and provides bounded recovery for an interrupted publication. After a successful Pages
   replacement, protected rotation deletes by exact artifact ID the superseded cache, ordinary
@@ -302,9 +337,9 @@ Choose the target before editing:
 
 | Change scope | Start from | Expected destination |
 |---|---|---|
-| Shared behavior, security, tests, automation, or general documentation | `master` | Workflow-owned port PRs to release branches |
-| One exact Minecraft version or loader pair | That release branch | Only that release branch |
-| Version/loader support inventory | `master`, matrix first | New or updated release branch after matrix validation |
+| Shared behavior, security, tests, automation, or general documentation | `master` | One shared source with affected matrix target/feature validation |
+| One exact Minecraft version or loader pair | `master` | Its owning API family, overlay, or loader module |
+| Version/loader support inventory | `master`, matrix first | A validated target built from the same shared source |
 | Generated output or staged artifacts | Nowhere | Fix the tracked input instead |
 
 At the start of every task:
@@ -319,7 +354,6 @@ At the start of every task:
 Never develop directly on `automation/sync/*`; those branches are disposable workflow-owned PR
 heads. Human contributors start with `CONTRIBUTING.md` and use a separate topic branch.
 
-The current synchronizer attempts every release branch for a new `master` change. If intended
-scope excludes a version, make that exception explicit before editing. Do not silently spread broad
-Stonecutter conditionals or create a second branch inventory; choose a narrow adapter/overlay,
-version-branch change, or explicit synchronization-policy change and document the decision.
+If intended behavior excludes a target, make the exception explicit in its owning module or
+API-family adapter and document the decision. Do not spread broad version conditions across
+unrelated features or create a second version inventory.

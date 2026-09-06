@@ -43,6 +43,9 @@ from scenario_contract import (  # noqa: E402
     load_contract as load_scenario_contract,
 )
 from version_branches import parse_version_branch  # noqa: E402
+from evidence_target import (  # noqa: E402
+    DEFAULT_MATRIX, EvidenceTargetError, TARGET_KEY, bundle_version, target_for_key,
+)
 from visual_evidence import (  # noqa: E402
     VisualEvidenceError,
     parse_finite_json_float,
@@ -51,6 +54,8 @@ from visual_evidence import (  # noqa: E402
 
 
 SCHEMA_VERSION = 5
+SHARED_SCHEMA_VERSION = 6
+CURRENT_SCHEMA_VERSIONS = frozenset({SCHEMA_VERSION, SHARED_SCHEMA_VERSION})
 LEGACY_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4})
 KIND = "quick-skin-public-mod-compatibility"
 MANIFEST_NAME = "manifest.json"
@@ -234,7 +239,7 @@ def _public_capture_ids(
         raise CompatibilityEvidenceError(
             "public compatibility checkpoint contract drifted"
         )
-    if schema_version == SCHEMA_VERSION:
+    if schema_version in CURRENT_SCHEMA_VERSIONS:
         try:
             selected_scenarios = frozenset(
                 compatibility_scenarios_for_mod(
@@ -398,12 +403,23 @@ def _branch(value: Any, label: str) -> tuple[str, str, tuple[str, ...]]:
 def _expected_plan(
     branch: str,
     contract: CompatibilityContract,
+    *,
+    matrix_path: Path = DEFAULT_MATRIX,
 ) -> tuple[dict[str, Any], dict[tuple[str, str], dict[str, str]]]:
-    _, version, loaders = _branch(branch, "release branch")
+    if TARGET_KEY.fullmatch(branch) is not None:
+        try:
+            target = target_for_key(branch, matrix_path)
+        except EvidenceTargetError as exc:
+            raise CompatibilityEvidenceError(str(exc)) from exc
+        version, loaders = target.version, target.loaders
+        artifact_nodes = {row["loader"]: row["artifact_node"] for row in target.matrix["artifacts"]}
+    else:
+        _, version, loaders = _branch(branch, "release branch")
+        artifact_nodes = {loader: f"{loader}-{version}" for loader in loaders}
     runnable: dict[str, Any] = {}
     not_applicable: dict[tuple[str, str], dict[str, str]] = {}
     for loader in loaders:
-        artifact_node = f"{loader}-{version}"
+        artifact_node = artifact_nodes[loader]
         for mod in contract.mods:
             reason: str | None = None
             if loader not in mod.loaders:
@@ -472,6 +488,7 @@ def validate_plan(
     compatibility_run_id: int,
     contract: CompatibilityContract,
     scenario_contract: ScenarioContract,
+    matrix_path: Path = DEFAULT_MATRIX,
 ) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, str]]]:
     if not isinstance(plan, dict):
         raise CompatibilityEvidenceError("compatibility plan must be an object")
@@ -489,13 +506,28 @@ def validate_plan(
         "target_branch",
         "target_sha",
     }
+    schema = plan.get("schema_version")
+    if type(schema) is not int or schema not in {1, 2}:
+        raise CompatibilityEvidenceError("compatibility plan schema is unsupported")
+    if schema == 2:
+        required |= {"minecraft_target", "matrix_sha256"}
     if set(plan) != required:
         raise CompatibilityEvidenceError("compatibility plan fields are invalid")
-    if plan["schema_version"] != 1:
-        raise CompatibilityEvidenceError("compatibility plan schema is unsupported")
-    target_branch, version, _loaders = _branch(
-        plan.get("target_branch"), "plan.target_branch"
-    )
+    if schema == 2:
+        version = _text(plan.get("minecraft_target"), "plan.minecraft_target", maximum=64)
+        bundle_key = f"mc{version}"
+        try:
+            target = target_for_key(bundle_key, matrix_path)
+        except EvidenceTargetError as exc:
+            raise CompatibilityEvidenceError(str(exc)) from exc
+        target_branch, version, loaders = target.branch, target.version, target.loaders
+        if plan["matrix_sha256"] != target.matrix_sha256:
+            raise CompatibilityEvidenceError("compatibility plan full matrix hash mismatch")
+        if plan.get("target_branch") != target_branch:
+            raise CompatibilityEvidenceError("compatibility plan target source branch mismatch")
+    else:
+        target_branch, version, loaders = _branch(plan.get("target_branch"), "plan.target_branch")
+        bundle_key = target_branch
     if plan.get("release_branch") != target_branch:
         raise CompatibilityEvidenceError("compatibility plan release branch mismatch")
     source_branch = _text(plan.get("source_branch"), "plan.source_branch", maximum=256)
@@ -504,12 +536,14 @@ def validate_plan(
     _positive_int(plan.get("source_run_id"), "plan.source_run_id")
     _commit(plan.get("source_sha"), "plan.source_sha")
     _commit(plan.get("target_sha"), "plan.target_sha")
+    if schema == 2 and (source_branch != target_branch or plan["source_sha"] != plan["target_sha"]):
+        raise CompatibilityEvidenceError("shared compatibility plan must name one tested source commit")
     if plan.get("compatibility_contract_sha256") != contract.sha256:
         raise CompatibilityEvidenceError("compatibility plan contract hash drifted")
     if plan.get("lock_revision") != contract.lock_revision:
         raise CompatibilityEvidenceError("compatibility plan lock revision drifted")
 
-    expected_runnable, expected_na = _expected_plan(target_branch, contract)
+    expected_runnable, expected_na = _expected_plan(bundle_key, contract, matrix_path=matrix_path)
     runnable = plan.get("runnable")
     not_applicable = plan.get("not_applicable")
     if (
@@ -608,6 +642,9 @@ def validate_plan(
         "source_sha": plan["source_sha"],
         "target_sha": plan["target_sha"],
         "compatibility_run_id": compatibility_run_id,
+        "bundle_key": bundle_key,
+        "loaders": list(loaders),
+        **({"matrix_sha256": target.matrix_sha256} if schema == 2 else {}),
     }
     return identity, selected, sorted(normalized_na.values(), key=lambda item: (
         item["version"], item["loader"], item["mod"]
@@ -868,6 +905,7 @@ def build_bundle(
     publication_run_id: int,
     scenario_contract_path: Path,
     compatibility_contract_path: Path,
+    matrix_path: Path = DEFAULT_MATRIX,
 ) -> Path:
     """Validate every clean lane and publish only compatibility-specific image pairs."""
 
@@ -891,6 +929,7 @@ def build_bundle(
         compatibility_run_id=compatibility_run_id,
         contract=compatibility_contract,
         scenario_contract=scenario_contract,
+        matrix_path=matrix_path,
     )
     if lanes_root.is_symlink():
         raise CompatibilityEvidenceError("lane evidence root cannot be a symlink")
@@ -915,15 +954,15 @@ def build_bundle(
         raise CompatibilityEvidenceError("compatibility output root cannot be a symlink")
     destination_root = output_root.resolve()
     destination_root.mkdir(parents=True, exist_ok=True)
-    destination = destination_root / identity["branch"]
+    destination = destination_root / identity["bundle_key"]
     if destination.exists() or destination.is_symlink():
         raise CompatibilityEvidenceError(
             f"refusing to replace compatibility bundle {destination}"
         )
     temporary_root = Path(
-        tempfile.mkdtemp(prefix=f".{identity['branch']}.compatibility-", dir=destination_root)
+        tempfile.mkdtemp(prefix=f".{identity['bundle_key']}.compatibility-", dir=destination_root)
     )
-    staged_bundle = temporary_root / identity["branch"]
+    staged_bundle = temporary_root / identity["bundle_key"]
     (staged_bundle / "images").mkdir(parents=True)
     derivatives: dict[str, dict[str, Any]] = {}
     public_lanes: list[dict[str, Any]] = []
@@ -1100,7 +1139,7 @@ def build_bundle(
             )
 
         manifest = {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": SHARED_SCHEMA_VERSION if "matrix_sha256" in identity else SCHEMA_VERSION,
             "kind": KIND,
             "repository": repository,
             "contracts": {
@@ -1110,7 +1149,9 @@ def build_bundle(
             "release": {
                 "branch": identity["branch"],
                 "version": identity["version"],
-                "loaders": list(parse_version_branch(identity["branch"]).loaders),
+                "loaders": identity["loaders"],
+                **({"matrix_sha256": identity["matrix_sha256"]}
+                   if "matrix_sha256" in identity else {}),
             },
             "provenance": {
                 "implementation_sha": implementation_sha,
@@ -1130,12 +1171,13 @@ def build_bundle(
         )
         validate_bundle(
             temporary_root,
-            identity["branch"],
+            identity["bundle_key"],
             expected_repository=repository,
             expected_compatibility_run_id=compatibility_run_id,
             expected_coverage_sha=identity["target_sha"],
             scenario_contract_path=scenario_contract_path,
             compatibility_contract_path=compatibility_contract_path,
+            matrix_path=matrix_path,
         )
         os.replace(staged_bundle, destination)
         return destination
@@ -1228,8 +1270,12 @@ def validate_bundle(
     only_branch: bool = False,
     scenario_contract_path: Path = REPO / "e2e" / "scenario-contract.json",
     compatibility_contract_path: Path = REPO / "e2e" / "mod-compatibility-contract.json",
+    matrix_path: Path = DEFAULT_MATRIX,
 ) -> dict[str, Any]:
-    branch, version, loaders = _branch(branch, "branch")
+    try:
+        bundle_version(branch)
+    except EvidenceTargetError as exc:
+        raise CompatibilityEvidenceError(str(exc)) from exc
     if evidence_root.is_symlink():
         raise CompatibilityEvidenceError("compatibility evidence root cannot be a symlink")
     root = evidence_root.resolve()
@@ -1247,7 +1293,7 @@ def validate_bundle(
     schema_version = manifest.get("schema_version")
     if (
         type(schema_version) is not int
-        or schema_version not in LEGACY_SCHEMA_VERSIONS | {SCHEMA_VERSION}
+        or schema_version not in LEGACY_SCHEMA_VERSIONS | CURRENT_SCHEMA_VERSIONS
         or manifest.get("kind") != KIND
     ):
         raise CompatibilityEvidenceError("compatibility manifest identity is invalid")
@@ -1278,9 +1324,22 @@ def validate_bundle(
         raise CompatibilityContractDriftError(
             "compatibility contract identity drifted"
         )
-    release = _exact_object(manifest.get("release"), RELEASE_FIELDS, "manifest.release")
+    shared = schema_version == SHARED_SCHEMA_VERSION
+    release = _exact_object(manifest.get("release"),
+                            RELEASE_FIELDS | ({"matrix_sha256"} if shared else set()),
+                            "manifest.release")
+    if shared:
+        try:
+            target = target_for_key(branch, matrix_path)
+        except EvidenceTargetError as exc:
+            raise CompatibilityEvidenceError(str(exc)) from exc
+        source_branch, version, loaders = target.branch, target.version, target.loaders
+        if release["matrix_sha256"] != target.matrix_sha256:
+            raise CompatibilityEvidenceError("compatibility release full matrix hash mismatch")
+    else:
+        source_branch, version, loaders = _branch(branch, "branch")
     if (
-        release.get("branch") != branch
+        release.get("branch") != source_branch
         or release.get("version") != version
         or release.get("loaders") != list(loaders)
     ):
@@ -1290,6 +1349,8 @@ def validate_bundle(
     )
     for field in ("implementation_sha", "source_sha", "target_sha", "coverage_sha"):
         _commit(provenance.get(field), f"provenance.{field}")
+    if shared and provenance["source_sha"] != provenance["target_sha"]:
+        raise CompatibilityEvidenceError("shared compatibility evidence must name one tested source commit")
     for field in ("base_run_id", "compatibility_run_id", "publication_run_id"):
         _positive_int(provenance.get(field), f"provenance.{field}")
     if expected_compatibility_run_id is not None and provenance.get(
@@ -1301,7 +1362,7 @@ def validate_bundle(
     ) != expected_coverage_sha:
         raise CompatibilityEvidenceError("compatibility coverage SHA mismatch")
 
-    expected_runnable, expected_na = _expected_plan(branch, compatibility_contract)
+    expected_runnable, expected_na = _expected_plan(branch, compatibility_contract, matrix_path=matrix_path)
     lanes = manifest.get("lanes")
     not_applicable = manifest.get("not_applicable")
     if (
@@ -1486,6 +1547,7 @@ def carry_forward(
     expected_repository: str,
     scenario_contract_path: Path,
     compatibility_contract_path: Path,
+    matrix_path: Path = DEFAULT_MATRIX,
 ) -> Path:
     """Rebind validated evidence to a protected non-impacting descendant head."""
 
@@ -1496,6 +1558,7 @@ def carry_forward(
         expected_repository=expected_repository,
         scenario_contract_path=scenario_contract_path,
         compatibility_contract_path=compatibility_contract_path,
+        matrix_path=matrix_path,
     )
     if output_root.is_symlink():
         raise CompatibilityEvidenceError("compatibility output root cannot be a symlink")
@@ -1522,6 +1585,7 @@ def carry_forward(
             expected_coverage_sha=coverage_sha,
             scenario_contract_path=scenario_contract_path,
             compatibility_contract_path=compatibility_contract_path,
+            matrix_path=matrix_path,
         )
         os.replace(staged, destination)
         return destination
@@ -1535,6 +1599,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     build_parser = subparsers.add_parser("build")
     build_parser.add_argument("--plan", type=Path, required=True)
+    build_parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     build_parser.add_argument("--lanes-root", type=Path, required=True)
     build_parser.add_argument("--output", type=Path, required=True)
     build_parser.add_argument("--repository", required=True)
@@ -1552,7 +1617,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("--evidence-root", type=Path, required=True)
-    validate_parser.add_argument("--branch", required=True)
+    validate_parser.add_argument("--bundle-key", "--branch", dest="branch", required=True)
+    validate_parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     validate_parser.add_argument("--repository")
     validate_parser.add_argument("--compatibility-run-id", type=int)
     validate_parser.add_argument("--coverage-sha")
@@ -1569,7 +1635,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     carry_parser = subparsers.add_parser("carry-forward")
     carry_parser.add_argument("--evidence-root", type=Path, required=True)
     carry_parser.add_argument("--output", type=Path, required=True)
-    carry_parser.add_argument("--branch", required=True)
+    carry_parser.add_argument("--bundle-key", "--branch", dest="branch", required=True)
+    carry_parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     carry_parser.add_argument("--coverage-sha", required=True)
     carry_parser.add_argument("--repository", required=True)
     carry_parser.add_argument(
@@ -1597,6 +1664,7 @@ def main(argv: list[str] | None = None) -> int:
                 publication_run_id=args.publication_run_id,
                 scenario_contract_path=args.scenario_contract,
                 compatibility_contract_path=args.compatibility_contract,
+                matrix_path=args.matrix,
             )
         elif args.command == "carry-forward":
             result = carry_forward(
@@ -1607,6 +1675,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_repository=args.repository,
                 scenario_contract_path=args.scenario_contract,
                 compatibility_contract_path=args.compatibility_contract,
+                matrix_path=args.matrix,
             )
         else:
             validate_bundle(
@@ -1618,6 +1687,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_coverage_sha=args.coverage_sha,
                 scenario_contract_path=args.scenario_contract,
                 compatibility_contract_path=args.compatibility_contract,
+                matrix_path=args.matrix,
             )
             result = f"validated compatibility evidence for {args.branch}"
         print(result)

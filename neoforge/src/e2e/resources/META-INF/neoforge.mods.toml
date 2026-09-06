@@ -1,0 +1,28 @@
+# Dev-only NeoForge manifest for the Quick Skin E2E harness. Never shipped in the release jar.
+# loaderVersion "[1,)" (javafml language-loader version) is satisfied by every enabled NeoForge target
+# (1.21.x and 26.x), so this single manifest serves all of them.
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "All Rights Reserved"
+
+[[mods]]
+modId = "quick_skin_e2e"
+version = "0.0.0"
+displayName = "Quick Skin E2E (dev-only)"
+description = "Dev-only end-to-end test harness for Quick Skin."
+# Client-only dev mod connecting to a server that lacks it; ignore the network mod-version handshake.
+displayTest = "IGNORE_ALL_VERSION"
+
+[[dependencies.quick_skin_e2e]]
+modId = "quickskin"
+type = "required"
+ordering = "AFTER"
+side = "BOTH"
+versionRange = "[0,)"
+
+[[dependencies.quick_skin_e2e]]
+modId = "neoforge"
+type = "required"
+ordering = "NONE"
+side = "BOTH"
+versionRange = "[0,)"

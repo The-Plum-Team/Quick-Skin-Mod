@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "api_version": "2026-03-10",
+  "repository": "The-Plum-Team/Quick-Skin-Mod",
+  "managed_rulesets": {
+    "default_branch": "Quick Skin default branch",
+    "release_branches": "Quick Skin release branches",
+    "release_tags": "Quick Skin immutable release tags"
+  },
+  "release_branch_pattern": "*-and-*-*",
+  "release_tag_pattern": "mc*-v*",
+  "required_checks": [
+    "Build and verify",
+    "Packaged E2E gate"
+  ],
+  "release_environment": {
+    "name": "release",
+    "reviewer": {
+      "type": "User",
+      "login": "AkaNebur",
+      "id": 105746531
+    },
+    "wait_timer": 0,
+    "prevent_self_review": false,
+    "deployment_policies": [
+      {
+        "type": "branch",
+        "name": "*-and-*-*"
+      },
+      {
+        "type": "tag",
+        "name": "mc*-v*"
+      }
+    ]
+  },
+  "readiness": {
+    "all_protected_branches": {
+      ".github/workflows/build-gate.yml": [
+        "pull_request:",
+        "name: Build and verify"
+      ],
+      ".github/workflows/on-demand-e2e.yml": [
+        "pull_request:",
+        "name: Packaged E2E gate"
+      ]
+    },
+    "default_branch": {
+      ".github/workflows/refresh-release-status.yml": [
+        "automation/refresh-release-status",
+        "gh pr create"
+      ]
+    },
+    "release_branches": {
+      ".github/workflows/release.yml": [
+        "environment: release",
+        "github_release.py stage",
+        "github_release.py publish"
+      ]
+    }
+  }
+}
