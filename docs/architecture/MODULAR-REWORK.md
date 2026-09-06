@@ -784,3 +784,15 @@ assembly round trip partitions and reverifies the previously accepted 64 JARs an
 reconstructs the complete bundle, and preserves every JAR hash without starting Gradle or
 Minecraft. A read-only live probe authenticates the successful PR Build and its immutable bundle
 while preserving the distinction between PR head and tested merge SHA.
+
+### NeoForge equipment hook coverage
+
+The first isolated-build runtime wave exposed an omitted loader-specific adaptation: NeoForge
+1.21.5 still targeted `Player.getItemBySlot`, although the common hook already targeted its new
+concrete owner, `LivingEntity`. The NeoForge hook now follows that boundary and queries the preview
+scope by object identity, so unrelated living entities require no `Player` cast. A NeoForge-owned
+bytecode test reads the active mixin configuration and compiled Minecraft classes, requires one
+concrete injection target, and rejects that unsafe cast. It reproduces the original failure on
+1.21.5 and passes after the correction; adjacent 1.21.4 and 1.21.6 checks also pass. The corrected
+1.21.5 production and harness JARs build successfully. Full GitHub runtime confirmation remains
+pending, and the ongoing preceding wave is retained long enough to collect other failures.
