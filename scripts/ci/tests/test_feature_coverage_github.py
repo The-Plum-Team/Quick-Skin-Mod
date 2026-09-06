@@ -206,6 +206,33 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
         self.api.runs[1000]["path"] = ".github/workflows/build-gate.yml"
         with self.assertRaises(ValueError): publisher.source_from_trigger(self.api, 1000, self.fixture.source)
 
+    def test_pages_finishing_after_ai_can_wake_the_same_complete_generation_without_images(self):
+        self.assertEqual(self.fixture.run_id, publisher.source_from_trigger(self.api, 8000, self.fixture.source))
+        self.assertEqual([], self.api.downloaded)
+        source = self.api.runs[8000]
+        with patch.object(self.api, "run", side_effect=[{**source, "status": "in_progress"}, source]), \
+             patch.object(publisher.time, "sleep") as sleep:
+            self.assertEqual(self.fixture.run_id, publisher.source_from_trigger(self.api, 8000, self.fixture.source))
+            sleep.assert_called_once_with(2)
+
+    def test_partial_mixed_or_failed_pages_generations_cannot_select_a_complete_baseline(self):
+        target = self.fixture.targets[-1]["bundle_key"]
+        name = publisher.public_baseline_name(target, self.fixture.source, self.fixture.run_id)
+        record = self.api.records.pop(name)
+        self.assertIsNone(publisher.source_from_trigger(self.api, 8000, self.fixture.source))
+        self.api.records[name] = record
+        record[0]["name"] = publisher.public_baseline_name(target, self.fixture.source, 56)
+        self.assertIsNone(publisher.source_from_trigger(self.api, 8000, self.fixture.source))
+        record[0]["name"] = name
+        self.api.job_lists[8000][0]["jobs"][1]["conclusion"] = "failure"
+        with self.assertRaises(ValueError): publisher.source_from_trigger(self.api, 8000, self.fixture.source)
+        self.assertEqual([], self.api.downloaded)
+
+    def test_pages_wake_is_not_a_publication_or_a_baseline_source(self):
+        self.api.runs[8000]["event"] = "repository_dispatch"
+        with patch.object(self.api, "artifacts", side_effect=AssertionError("wake has no public archive inventory")):
+            self.assertIsNone(publisher.source_from_trigger(self.api, 8000, self.fixture.source))
+
 
 class FeatureCoverageApiTest(unittest.TestCase):
     def setUp(self):

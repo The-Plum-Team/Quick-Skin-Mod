@@ -729,3 +729,14 @@ and stage 32 production plus 32 harness JARs. A second forced serial build repro
 of those 64 JARs byte-for-byte. The durable local evidence records the exact source commit,
 matrix/module/scenario hashes, staged manifest hash, and command reports. Routine Minecraft
 image acceptance remains delegated to GitHub, as requested by the maintainer.
+
+### Baseline completion order
+
+The complete-baseline issuer now accepts authenticated completion from either the AI reviewer or
+the successful Pages publisher. Pages explicitly wakes it after cache retention and rotation
+scheduling have settled, so a fast AI review cannot strand a baseline that was still waiting for
+public artifacts. The collector derives one complete source generation from all matrix target
+archives; partial, mixed, failed, stale, and intermediate Pages wakes cannot certify coverage.
+Targeted validation passes 20 publisher tests, 12 executable workflow-routing tests, and 49
+workflow-security tests. This changes orchestration only; the verified production/harness bytes
+remain the same.

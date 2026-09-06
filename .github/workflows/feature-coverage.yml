@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows:
       - AI visual review drain
+      - Project site
     types:
       - completed
   repository_dispatch:
@@ -46,7 +47,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id || github.event.client_payload.review_run_id }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id || github.event.client_payload.review_run_id || github.event.client_payload.pages_run_id }}
           REQUEST_REPOSITORY: ${{ github.event.client_payload.source_repository }}
           REQUESTED_SOURCE_RUN: ${{ inputs.source_run_id }}
         run: |

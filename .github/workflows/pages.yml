@@ -1156,6 +1156,44 @@ jobs:
           compression-level: 6
           retention-days: 90
 
+  request-feature-coverage:
+    name: Request feature coverage after public baseline retention
+    continue-on-error: true
+    needs:
+      - discover
+      - refresh-cache
+      - refresh-compatibility-cache
+      - request-rotation
+    if: >-
+      always() && needs.discover.outputs.eligible == 'true' &&
+      needs.discover.outputs.source_branch == 'master' &&
+      needs.refresh-cache.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Wake the collector after complete public evidence becomes available
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/master || ! "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            printf 'Feature coverage wake requires a protected Pages owner.\n' >&2
+            exit 1
+          fi
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            printf 'A newer source generation owns feature coverage.\n'
+            exit 0
+          fi
+          payload="$RUNNER_TEMP/pages-feature-coverage-request.json"
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" \
+            '{event_type:"feature-coverage-requested",client_payload:{source_repository:$repository,
+              pages_run_id:$run_id}}' > "$payload"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" > /dev/null
+
   request-rotation:
     name: Request post-success evidence rotation
     needs:

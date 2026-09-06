@@ -22,6 +22,8 @@ from bounded_zip import ExtractionLimits, extract_bounded_zip
 from visual_review_queue import REPORT_NAME, REPOSITORY
 
 WORKFLOW = ".github/workflows/feature-coverage.yml"
+PAGES_WORKFLOW = ".github/workflows/pages.yml"
+PAGES_EVENTS = frozenset({"schedule", "workflow_dispatch", "workflow_run"})
 PUBLIC_BASELINE_NAME = re.compile(r"^pages-full-baseline-mc[0-9]+(?:\.[0-9]+){1,2}--[0-9a-f]{40}--[1-9][0-9]*$")
 MAX_PUBLIC_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_API_BYTES = 8 * 1024 * 1024
@@ -178,11 +180,15 @@ def source_from_trigger(api: Api, trigger_run_id: int, source_sha: str) -> int |
     owner = api.run(trigger_run_id)
     if owner.get("head_sha") != source_sha:
         return None
-    if (owner.get("path") != coverage.DRAIN_WORKFLOW or owner.get("head_branch") != "master"
-            or owner.get("event") not in coverage.DRAIN_EVENTS
+    pages = owner.get("path") == PAGES_WORKFLOW
+    if (owner.get("path") not in {coverage.DRAIN_WORKFLOW, PAGES_WORKFLOW}
+            or owner.get("head_branch") != "master"
+            or owner.get("event") not in (PAGES_EVENTS | {"repository_dispatch"} if pages else coverage.DRAIN_EVENTS)
             or not isinstance(owner.get("head_repository"), dict)
             or owner["head_repository"].get("full_name") != api.repository):
-        raise coverage.CoverageError("feature baseline wake has a foreign protected reviewer")
+        raise coverage.CoverageError("feature baseline wake has a foreign protected producer")
+    if pages and owner.get("event") == "repository_dispatch":
+        return None  # A Pages wake only dispatches its separate publication run; it owns no images.
     # The explicit wake is sent at the reviewer's tail; its final cleanup may still be settling.
     for _attempt in range(30):
         if owner.get("status") == "completed":
@@ -191,6 +197,8 @@ def source_from_trigger(api: Api, trigger_run_id: int, source_sha: str) -> int |
         owner = api.run(trigger_run_id)
     if owner.get("status") != "completed":
         return None
+    if pages:
+        return _source_from_pages(api, owner, source_sha)
     reports = [item for item in api.artifacts(run_id=trigger_run_id) if REPORT_NAME.fullmatch(item["name"])]
     if not reports:
         return None
@@ -205,6 +213,31 @@ def source_from_trigger(api: Api, trigger_run_id: int, source_sha: str) -> int |
     source_run_id = int(match.group("source"))
     coverage.validate_review_owner(report, owner, api.jobs(owner), github_repository=api.repository,
                                    source_sha=source_sha, source_run_id=source_run_id, bundle_key=key)
+    return source_run_id
+
+
+def _source_from_pages(api: Api, owner: dict[str, Any], source_sha: str) -> int | None:
+    """Resolve a complete public generation when publication finishes after its AI reviews."""
+    expected = {target["bundle_key"] for target in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]}
+    sources, records = set(), {}
+    for artifact in api.artifacts(run_id=owner["id"]):
+        name = artifact["name"]
+        if PUBLIC_BASELINE_NAME.fullmatch(name) is None:
+            continue
+        key, sha, source = name[len("pages-full-baseline-"):].split("--")
+        if sha != source_sha:
+            continue  # Carried historical frames cannot seed the current source baseline.
+        if key not in expected or key in records:
+            raise coverage.CoverageError("Pages baseline wake has a foreign or duplicate target")
+        records[key] = artifact
+        sources.add(int(source))
+    if set(records) != expected or len(sources) != 1:
+        return None  # Partial/composed publications cannot supply a complete runtime generation.
+    source_run_id = sources.pop()
+    jobs = api.jobs(owner)
+    for key, artifact in records.items():
+        validate_public_owner(artifact, owner, jobs, github_repository=api.repository,
+            source_sha=source_sha, source_run_id=source_run_id, bundle_key=key)
     return source_run_id
 
 
@@ -233,8 +266,8 @@ def validate_public_owner(artifact: Any, owner: Any, jobs: Any, *, github_reposi
             or type(artifact["workflow_run"].get("id")) is not int
             or any(item.get("head_branch") != "master" or item.get("head_sha") != source_sha
                    for item in (owner, artifact["workflow_run"]))
-            or owner.get("path") != ".github/workflows/pages.yml"
-            or owner.get("event") not in {"schedule", "workflow_dispatch", "workflow_run"}
+            or owner.get("path") != PAGES_WORKFLOW
+            or owner.get("event") not in PAGES_EVENTS
             or owner.get("status") != "completed" or owner.get("conclusion") != "success"
             or not isinstance(owner.get("head_repository"), dict)
             or owner["head_repository"].get("full_name") != github_repository):
