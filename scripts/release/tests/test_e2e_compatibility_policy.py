@@ -146,11 +146,16 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn(
             '"disconnect", "method_18096", "method_76795"', body
         )
-        self.assertIn("disconnectClient.invoke(mc, title, false);", body)
+        self.assertIn("disconnectClient.invoke(mc, teardown, false);", body)
         self.assertIn(
-            "disconnectClientWithEngineReset.invoke(mc, title, false, true);", body
+            "disconnectClientWithEngineReset.invoke(mc, teardown, false, true);", body
         )
         self.assertNotIn("clearClientLevel.invoke", body)
+        self.assertLess(
+            body.index("if (mc.level != null || mc.player != null)"),
+            body.index("new TitleScreen()"),
+        )
+        self.assertLess(body.index("new TitleScreen()"), body.index("setScreen(mc, title)"))
 
     def test_modern_drag_uses_public_event_before_accumulated_fallback(self) -> None:
         """An unfocused Xvfb window must not suppress the 1.21.9+ drag."""
