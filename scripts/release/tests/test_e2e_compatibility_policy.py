@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import unittest
 from pathlib import Path
@@ -129,6 +130,28 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         for alias in ("m_91300_", "m_94919_", "m_93076_", "m_93795_"):
             with self.subTest(alias=alias):
                 self.assertIn(f'"{alias}"', shim)
+
+    def test_tab_list_evidence_obeys_the_vanilla_connection_policy(self) -> None:
+        shim = SHIM.read_text(encoding="utf-8")
+        body = shim[shim.index("public static TabListHeadPolicy tabListHeadPolicy"):]
+        body = body[:body.index("private static Method findNoArg")]
+        for query in ('"onlineMode"', '"isEncrypted", "method_10771", "m_129535_"',
+                      "mc.isLocalServer()", "local || encrypted"):
+            self.assertIn(query, body)
+        self.assertNotIn("return new TabListHeadPolicy(false", body)
+        session = (E2E_JAVA / "scenario/SessionScenario.java").read_text(encoding="utf-8")
+        self.assertIn("headsVisible=", session)
+        self.assertIn("heads.rule()", session)
+        self.assertIn('return "could not read vanilla\'s tab-list head policy"', session)
+        self.assertIn("return paperDollProblem(mc, svc, uuid, cpm)", session)
+        contract = json.loads((ROOT / "e2e/scenario-contract.json").read_text(encoding="utf-8"))
+        # The authored oracle must require both branches, not waive a missing online head.
+        session_contract = next(item for item in contract["scenarios"] if item["scenario"] == "session")
+        role = next(item for item in session_contract["roles"] if item["role"] == "client_a")
+        step = next(item for item in role["steps"] if item["id"] == "tab_list_head")
+        expectation = step["capture"]["expectation"]
+        for required in ("headsVisible", "when true", "when false", "PlayerInfo", "player renderer"):
+            self.assertIn(required, expectation)
 
     def test_transient_overlay_adapter_supports_the_26_2_gui_split(self) -> None:
         """26.2 moved toast and chat ownership without exposing stable cross-version types."""

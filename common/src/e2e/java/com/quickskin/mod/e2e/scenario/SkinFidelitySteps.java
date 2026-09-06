@@ -512,10 +512,25 @@ final class SkinFidelitySteps {
                     if (ClientConfig.getInstance().shouldDisableSkinTransparency()) {
                         return Step.Result.fail("transparency became disabled before the first-person capture");
                     }
+                    // The first-person camera sees the front/side, not the rear probe alone.
+                    int[][] armProbes = {
+                            {45, 25, 128}, {41, 25, 128}, {49, 25, 128}, {53, 25, 128},
+                            {37, 57, 128}, {33, 57, 128}, {41, 57, 128}, {45, 57, 128},
+                            {45, 31, 255}, {49, 17, 255}, {37, 63, 255}, {41, 49, 255},
+                            {45, 37, 0}, {53, 53, 0}
+                    };
+                    for (int[] probe : armProbes) {
+                        int pixel = decoded.getRGB(probe[0], probe[1]);
+                        if (alpha(pixel) != probe[2]) {
+                            return Step.Result.fail("first-person arm " + pixelFact(probe[0], probe[1], pixel)
+                                    + " expected alpha " + probe[2]);
+                        }
+                    }
                     String route = rendererRouteMismatch(mc, svc, uuid);
                     if (route != null) return Step.Result.fail(route);
                     return Step.Result.pass("first-person camera with " + expectedId + ": registered right-arm "
                             + "sleeve " + pixelFact(sx, sy, sleeve) + " alpha " + alpha(sleeve)
+                            + ", both arms' four sleeve faces half-transparent, hands opaque, arm overlays clear"
                             + ", alpha detector cache[" + location + "]=true so the arm mixin renders "
                             + "translucently, FOV restored to " + VanillaShim.fieldOfView(mc) + "; "
                             + rendererRouteNote(mc, svc, uuid));

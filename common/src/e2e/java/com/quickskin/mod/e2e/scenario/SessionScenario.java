@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *   <li>inventory_paper_doll &mdash; the vanilla inventory opened through the keybind flow. Its
  *       paper doll samples {@code PlayerInfo.getSkinLocation()}, which the mod overrides.</li>
  *   <li>tab_list_head &mdash; the player-list overlay held open over the world; its head icon
- *       samples the same {@code PlayerInfo} location.</li>
+ *       samples the same {@code PlayerInfo} location when vanilla's connection policy shows heads.</li>
  *   <li>quit_to_title &mdash; vanilla's pause-menu disconnect sequence, then the title screen with
  *       the preview restored purely from configuration and every session cache empty.</li>
  * </ol>
@@ -217,11 +217,14 @@ public final class SessionScenario implements Scenario {
                 .assertion(() -> {
                     String problem = tabListProblem(mc, svc, uuid, cpm);
                     Boolean visible = tabListVisible(mc);
+                    VanillaShim.TabListHeadPolicy heads = VanillaShim.tabListHeadPolicy(mc);
                     mc.options.keyPlayerList.setDown(false);
                     if (problem != null) return Step.Result.fail(problem);
+                    if (heads == null) return Step.Result.fail("tab-list head policy became unavailable");
                     return Step.Result.pass("player list held open (keyPlayerList down, overlay visible="
                             + (visible == null ? "unreadable; key state only" : visible)
-                            + ") in a pinned rear view; " + describePaperDoll(mc, svc, uuid, cpm));
+                            + ") in a pinned rear view; headsVisible=" + heads.visible()
+                            + " (vanilla " + heads.rule() + "); " + describePaperDoll(mc, svc, uuid, cpm));
                 }));
 
         // 5. disconnect to the title screen ---------------------------------------------------------
@@ -594,6 +597,7 @@ public final class SessionScenario implements Scenario {
         if (mc.options == null || !mc.options.keyPlayerList.isDown()) return "keyPlayerList is not held";
         Boolean visible = tabListVisible(mc);
         if (Boolean.FALSE.equals(visible)) return "player list overlay is not visible";
+        if (VanillaShim.tabListHeadPolicy(mc) == null) return "could not read vanilla's tab-list head policy";
         return paperDollProblem(mc, svc, uuid, cpm);
     }
 

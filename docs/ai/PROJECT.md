@@ -184,8 +184,10 @@ into those branches. Their source matrices and existing evidence remain intact d
   Only canonical content-addressed 1920x1080 RGB PNGs, authored checkpoint regions, a bounded
   manifest, and provenance enter the durable queue; curation never downsizes or normalizes a
   different resolution, and raw E2E ZIPs never share a runner with the credential. Protected drains are locked by
-  exact queue artifact, so different capsules run concurrently while duplicate wakes coalesce;
-  generic recovery sweeps only redispatch an authenticated exact wake. Before those independent
+  exact queue artifact, so duplicate wakes coalesce. Their model/cache job serializes capsules for
+  one protected implementation to reuse the latest verdicts, with `queue: max` retaining pending
+  work and concurrent model chunks inside each job. Generic recovery sweeps only redispatch an
+  authenticated pending identity; settled drains never wake their consumed capsule again. Before those independent
   drains fan out, one global serialized capacity section reuses only a fresh marker from the exact
   protected workflow. Its single tool-free Haiku probe either opens a short shared ready window or
   records a sanitized hard-rejection/provider-failure pause. A successful `allowed` or
@@ -193,8 +195,8 @@ into those branches. Their source matrices and existing evidence remain intact d
   that field may disagree with the subscription usage panel; a later rejected review still fails
   closed and keeps its capsule durable. Paused capsules remain durable and the scheduled sweep
   probes again later. A fresh ready probe enumerates and redispatches every authenticated
-  pending artifact independently, so coalescing probe contenders never serializes the actual
-  reviews. It consumes the bounded headless rate-limit status and optional utilization when
+  pending artifact independently, so coalescing probe contenders cannot lose model/cache admission.
+  It consumes the bounded headless rate-limit status and optional utilization when
   present, without pretending Claude provides a reliable Pro/Max percentage to headless CI. A
   certifiable anchor is prioritized before the cross-version wave. An unpaired anchor frame reaches
   Haiku unless an authenticated ancestor cache carries the exact same canonical PNG, lane label,

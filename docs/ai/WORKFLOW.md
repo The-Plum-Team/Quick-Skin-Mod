@@ -50,8 +50,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   must not depend on a pending workflow run: a sanitized marker may cool a failed entry, raw
   provider text must never be uploaded, and a final `actions: write` job may delete only a
   completed handoff reauthenticated by exact id. A repository-wide capacity circuit may serialize
-  only its tool-free preflight and marker publication; it must preserve parallel capsule review
-  after a fresh ready marker, fail closed on unknown/permanent probe failures, and retain every
+  its tool-free preflight and marker publication independently from the model/cache job. The latter
+  serializes capsules per protected implementation so subsequent targets reuse the latest verdicts;
+  its `queue: max` preserves pending jobs and its independent model chunks remain concurrent.
+  Capacity admission must fail closed on unknown/permanent probe failures and retain every
   capsule while an authenticated quota-pause marker is live. A successful tool-free call carrying
   `allowed` or `allowed_warning` is capacity-ready even when its optional coarse utilization field
   reports at least 95%; pause only for an explicit rejection or a failed probe classified as a

@@ -53,7 +53,7 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.2` | `26.2` | Fabric | `25` | `11` |
 | `neoforge-26.2` | `26.2` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `800ef4a3c35873d2ccf24d9304eed7b5ecf6916cdbee6630541c1463863479c0`
+Scenario contract SHA-256: `b65dc823449e5c24180997c8ed97379dba30a521afc29993671960031f1a69c8`
 Contract totals: `128` ordered steps, `97` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -336,7 +336,9 @@ editor preview.
 The `full` scenario continues with skin-fidelity checkpoints derived from the same plaid fixture:
 an auto-detected slim layout, a converted 64x32 legacy skin with mirrored blue limbs, a 128x128
 HD skin whose one-pixel torso checker must survive rendering, and a base-layer transparent skin
-captured before and after the real Disable Skin Transparency checkbox flattens it. Catalog
+captured before and after the real Disable Skin Transparency checkbox flattens it. Its sleeves
+are half-transparent on every base face with opaque hands; cleared arm overlays let both the
+first-person and rear-view captures inspect the base layer. Catalog
 checkpoints rename, sort, protect, and delete entries through the real skin-menu paths and show
 the own-skin deletion toast and the stale-id fallback. Cape checkpoints import a translucent cape
 through the real drop workflow (vanilla elytra composited into its transparent elytra area), open
@@ -351,8 +353,12 @@ starts with a non-default `quickskin-server.json`; the seed is declared in the c
 override reaches the client, that the server transparency policy wins over the client setting,
 that a second skin change stays on the real cooldown button and unacknowledged, and that a cape
 change during the cooldown is still accepted. `session` proves the pause menu, inventory paper
-doll, player-list head, and the post-disconnect title preview all consume the saved look and that
+doll, player-list skin binding, and the post-disconnect title preview all consume the saved look and that
 the client session state is cleared after leaving the server.
+The player-list assertion records vanilla's actual head-visibility policy: local server or encrypted
+connection through 26.1.x, then `onlineMode()` in 26.2. The offline dedicated fixture normally hides
+heads; the visual contract requires the Alice row and connection indicator, plus a custom face
+only when that policy enables it. An unreadable policy fails the assertion.
 The disconnect driver shows a neutral temporary screen until vanilla finishes teardown, then
 opens the title screen. Its assertion also rejects a cached preview entity from the closed world;
 opening the title during teardown can repopulate that cache after the player-quit callback.
@@ -444,20 +450,24 @@ The curator applies the protected review checker before upload and reserves 32 M
 envelope for the bounded manifest, proof, archive metadata, and structure. A source/run/
 implementation proof and bounded manifest become a seven-day durable queue entry. A protected
 exact wake may authenticate only its requested artifact and locks the complete drain by that ID;
-distinct capsules therefore run concurrently while duplicate wakes coalesce. Scheduled/manual
-recovery sweeps share a separate lock and only redispatch one authenticated exact identity. The
-queue—not a pending workflow run—owns the work, so GitHub may coalesce wake-ups without losing
-reviews.
+duplicate wakes coalesce. The model/cache job runs one capsule at a time per protected implementation
+so the next target can reuse the preceding verdicts. Its `queue: max` retains up to 100 pending jobs
+instead of replacing all but one. Independent model chunks inside that job remain concurrent.
+Scheduled/manual recovery sweeps share a separate lock and redispatch an authenticated pending
+identity. Completed drains do not wake their consumed capsule again; curator wakes, capacity
+recovery and scheduled sweeps admit remaining work. The durable artifact remains the source of
+queue state if a pending job is lost.
 
 Before any exact drains fan out, they cross one repository-wide capacity section. A fresh
-authenticated success marker lets unrelated capsules continue concurrently for ten minutes. If no
+authenticated success marker admits capsules to the model/cache queue for ten minutes. If no
 marker exists, competing probe jobs coalesce behind one tool-free, low-effort Haiku call that
 checks whether the subscription can accept work. A fresh success redispatches every authenticated
-pending capsule by exact artifact ID, preserving parallel review even when earlier probe contenders
+pending capsule by exact artifact ID, preserving admission even when earlier probe contenders
 were coalesced. A rejected rate-limit event opens a sanitized thirty-minute circuit and leaves every
 capsule in the durable queue. A successful `allowed_warning` remains usable because that coarse
-headless signal can disagree with the subscription usage panel; when the event includes an explicit
-utilization value, 95% still pauses the fan-out. Scheduled recovery probes again after the pause.
+headless signal can disagree with the subscription usage panel. Optional utilization does not
+override a successful call; an explicit rejection or failed probe pauses admission. Scheduled
+recovery probes again after the pause.
 Claude does not reliably expose the Pro/Max percentage remaining in headless output, so this is
 primarily an availability circuit rather than an invented quota estimate. The marker retains only
 the normalized provider status, known limit type, and utilization band; neither provider text nor
@@ -471,7 +481,8 @@ loaders share one AI-reviewed representative. A protected verdict is reusable on
 semantic fingerprints, review scope, expectation, passed runtime evidence, capture identity,
 scenario contract, release matrix, prompts, reviewer/checker/cache/similarity code, models, mode,
 and chunk policy match exactly; artifact labels and loaders may differ because they are not visual
-identity. Unpaired anchor semantics are never cached. Haiku triages the remaining representative
+identity. Unpaired anchor cache hits additionally bind the exact loader label and full canonical PNG,
+so one loader cannot certify another. Haiku triages the remaining representative
 frames in chunks of at most eight. All independent chunks run concurrently. After the complete
 Haiku stage settles, every concern or confidence below high is packed source-wide and rechecked by
 Opus in concurrent chunks of at most four; a clean high-confidence Haiku verdict is final.
@@ -480,8 +491,9 @@ The authenticated evidence remains 1920x1080 for exact comparison and caching, w
 creates deterministic 1280x720 copies only for chunks that actually reach a model. Provider
 throttling is handled by bounded retries rather than serial launch pacing. Once any Opus chunk
 confirms a defect, outstanding calls are cancelled and the
-explicit blocking-partial result cannot certify or release anything. For an automatic version
-wave, the protected drain then publishes a sanitized marker bound to that exact master generation,
+explicit blocking-partial result cannot certify or release anything. For protected shared-source
+reviews, both complete and selected, and historical automatic version waves, the drain publishes a
+sanitized marker bound to that exact master generation,
 best-effort cancels sibling drains, and makes later authenticated queue selection skip its remaining
 capsules. Both models can read only the
 bounded manifest/images; stdout is captured without granting a write or shell tool. Protected code

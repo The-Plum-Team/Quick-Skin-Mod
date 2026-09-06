@@ -419,21 +419,26 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   marker, never uploads raw provider text, and
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
   entry for cooldown and retry. Each exact artifact ID locks its complete protected drain, from
-  exact selection through cleanup, so duplicate wakes cannot overlap while unrelated capsules run
-  concurrently. Exact wakes must authenticate through ID-scoped capsule lookup and exact-name
+  exact selection through cleanup, so duplicate wakes cannot overlap. The model/cache job admits
+  one capsule per protected implementation at a time, retaining up to 100 pending jobs through
+  `queue: max` so the next target can reuse the latest verdicts. Its independent model chunks remain
+  concurrent. Exact wakes must authenticate through ID-scoped capsule lookup and exact-name
   report, cooldown, and generation-block lookup rather than multiplying a full artifact-inventory
   scan across a parallel release wave; retryable GitHub API failures use bounded backoff and never
   become an image verdict. If the exact capsule returns authenticated metadata and then a download
   404, only that post-guard disappearance is a coalesced settled wake: no model starts, while every
   other download or validation failure remains visible. Once a normalized report or durable block
   makes a source ineligible, an explicit
-  GitHub installation-rate-limit response may defer input cleanup or the redundant continuation
-  wake without turning the completed review red. The normalized report or block must outlive its
+  GitHub installation-rate-limit response may defer input cleanup without turning the completed
+  review red. The normalized report or block must outlive its
   durable input so deferred cleanup can never make reviewed work eligible again; artifact retention
   and the scheduled sweep own eventual housekeeping/recovery, while every other API error remains visible. A separately locked
   scheduled/manual sweep never reviews directly: it converts
   one authenticated oldest-entry selection into an exact wake. Pending-run coalescing remains safe
-  because queue state is durable and a settled drain dispatches its own continuation. The curator
+  because queue state is durable and curator/capacity wakes plus scheduled sweeps admit pending work.
+  A settled drain must never redispatch its consumed capsule. Generation blocks cover authenticated
+  complete and selected shared-source reviews as well as historical automatic waves; advisory PRs
+  cannot block protected work. The curator
   may suppress a replicated
   automation sync only after authenticating one bot-owned associated PR and its complete
   server-side file list,
