@@ -87,8 +87,14 @@ only a discovery key; source identity comes from the authenticated owner and pay
 
 The collector supports completion events, an explicit protected reviewer wake and manual recovery
 of existing complete reports. It makes no model call. A local payload grants no workflow exemption.
-The baseline consumer and selective workflow admission still need to be connected before GitHub
-can consume a reduced selection or Pages can carry unaffected frames forward.
+`feature_coverage_consumer.py` authenticates that publisher artifact and recomputes its complete
+matrix, capture, controller and dependency identities from Git objects. Its cumulative diff starts
+at the last complete healthy baseline; partial runs never advance that baseline. It separately
+binds master executions and GitHub PR merge commits, including both authenticated parents, and
+rechecks the current source before returning a selection. Missing/expired/foreign evidence and
+changed policy require the complete profile. A second consumer entry point reauthenticates the
+exact immutable baseline and both manifests before selected evidence can enter curation.
+Workflow/AI admission and public-frame reuse still need to be connected to these consumers.
 
 These producer, consumer, rotation, review and scheduling paths pass local API/shell fixtures.
 Optional-mod wave admission and selective healthy-baseline reuse still require migration. No

@@ -82,10 +82,10 @@ class FixtureApi(publisher.Api):
             return self.records.get(name, [])
         return [item for records in self.records.values() for item in records if item["workflow_run"]["id"] == run_id]
 
-    def download(self, metadata, destination):
+    def download(self, metadata, destination, **kwargs):
         self.downloaded.append(metadata["id"])
         with patch.object(publisher, "_get", return_value=self.archives[metadata["id"]]):
-            super().download(metadata, destination)
+            super().download(metadata, destination, **kwargs)
 
 
 class FeatureCoverageGitHubTest(unittest.TestCase):

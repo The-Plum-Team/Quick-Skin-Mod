@@ -98,6 +98,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "scripts/ci/e2e_selection.py",
     "scripts/ci/feature_coverage.py",
     "scripts/ci/feature_coverage_github.py",
+    "scripts/ci/feature_coverage_consumer.py",
     ".github/workflows/feature-coverage.yml",
     "scripts/pages/evidence_target.py",
     "scripts/architecture/module_graph.py",

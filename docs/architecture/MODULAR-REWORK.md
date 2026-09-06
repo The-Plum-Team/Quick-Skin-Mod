@@ -607,3 +607,14 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   Packaged E2E run `33996911180` has built/staged all targets and is executing the complete
   runtime matrix; the first five lanes have passed at this checkpoint. These remote results
   belong to the previously published source, not the subsequent CI-only commits.
+- Implemented the protected baseline consumer and independent evidence revalidation. It binds
+  the immutable publisher artifact and successful issuer job, exact complete target/capture
+  inventory, original source jobs, executing controller policy and Git dependency fingerprints.
+  It derives cumulative impact from the last complete healthy baseline, checks every unaffected
+  fingerprint, and preserves that original tested provenance alongside the selection hash.
+  Master execution identity and PR merge identity are authenticated separately; the latter binds
+  the live PR base/head and both Git parents. Missing, expired, tampered, foreign, partial or
+  stale evidence falls back to full execution. The consumer's fixtures exercise 45 editor captures,
+  cumulative editor/HUD changes and independent immutable-ID revalidation before curation.
+  All 357 CI tests pass; the final source-run guard also passes its focused revalidation test.
+  Required workflow selection, AI admission and public-frame reuse remain unconnected.

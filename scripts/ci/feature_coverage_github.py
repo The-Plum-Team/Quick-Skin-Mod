@@ -82,6 +82,13 @@ class Api:
             raise coverage.CoverageError("GitHub run response has another identity")
         return record
 
+    def artifact(self, identifier: int) -> dict[str, Any]:
+        coverage._positive_integer(identifier, "artifact")
+        record = self.json(f"actions/artifacts/{identifier}")
+        if not isinstance(record, dict) or type(record.get("id")) is not int or record["id"] != identifier:
+            raise coverage.CoverageError("GitHub artifact response has another immutable identity")
+        return record
+
     def jobs(self, run: dict[str, Any]) -> list[dict[str, Any]]:
         identifier = coverage._positive_integer(run.get("id"), "workflow run")
         attempt = coverage._positive_integer(run.get("run_attempt"), "run attempt")
@@ -118,8 +125,9 @@ class Api:
             coverage._positive_integer(run_id, "artifact owner run")
             endpoint = f"actions/runs/{run_id}/artifacts?per_page={MAX_INVENTORY}"
         else:
-            if not isinstance(name, str) or REPORT_NAME.fullmatch(name) is None:
-                raise coverage.CoverageError("artifact query requires an exact normalized report name")
+            if (not isinstance(name, str)
+                    or name != coverage.BASELINE_ARTIFACT_NAME and REPORT_NAME.fullmatch(name) is None):
+                raise coverage.CoverageError("artifact query requires an exact report or baseline name")
             endpoint = "actions/artifacts?" + urllib.parse.urlencode({"name": name, "per_page": MAX_INVENTORY})
         record = self.json(endpoint)
         if (not isinstance(record, dict) or type(record.get("total_count")) is not int
@@ -133,9 +141,12 @@ class Api:
                 raise coverage.CoverageError("artifact query contains a foreign name")
         return record["artifacts"]
 
-    def download(self, metadata: dict[str, Any], destination: Path) -> None:
+    def download(self, metadata: dict[str, Any], destination: Path, *,
+                 maximum: int = coverage.MAX_REPORT_ARCHIVE_BYTES) -> None:
+        if type(maximum) is not int or not 0 < maximum <= coverage.MAX_REPORT_ARCHIVE_BYTES:
+            raise coverage.CoverageError("artifact download has an invalid byte limit")
         raw = _get(self.prefix + f"actions/artifacts/{metadata['id']}/zip",
-                   maximum=coverage.MAX_REPORT_ARCHIVE_BYTES)
+                   maximum=maximum)
         if len(raw) != metadata["size_in_bytes"] or "sha256:" + coverage.digest(raw) != metadata["digest"]:
             raise coverage.CoverageError("downloaded report archive differs from its authenticated metadata")
         with destination.open("xb") as stream:
