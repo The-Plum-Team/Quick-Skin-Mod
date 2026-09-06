@@ -20,6 +20,9 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "e2e"))
 sys.path.insert(0, str(REPO / "scripts" / "release"))
+sys.path.insert(0, str(REPO / "scripts" / "ci"))
+
+import ci_reuse  # noqa: E402
 
 from check_visual_review import (  # noqa: E402
     ReviewError,
@@ -511,6 +514,8 @@ def validate_plan(
         raise CompatibilityEvidenceError("compatibility plan schema is unsupported")
     if schema == 2:
         required |= {"minecraft_target", "matrix_sha256"}
+        if "runtime_source" in plan:
+            required.add("runtime_source")
     if set(plan) != required:
         raise CompatibilityEvidenceError("compatibility plan fields are invalid")
     if schema == 2:
@@ -538,6 +543,10 @@ def validate_plan(
     _commit(plan.get("target_sha"), "plan.target_sha")
     if schema == 2 and (source_branch != target_branch or plan["source_sha"] != plan["target_sha"]):
         raise CompatibilityEvidenceError("shared compatibility plan must name one tested source commit")
+    if "runtime_source" in plan:
+        _validate_runtime_source(plan["runtime_source"], source_sha=plan["source_sha"])
+        if plan["base_matrix_kind"] != "pr-anchors":
+            raise CompatibilityEvidenceError("runtime reuse requires the complete PR compatibility base")
     if plan.get("compatibility_contract_sha256") != contract.sha256:
         raise CompatibilityEvidenceError("compatibility plan contract hash drifted")
     if plan.get("lock_revision") != contract.lock_revision:
@@ -645,10 +654,22 @@ def validate_plan(
         "bundle_key": bundle_key,
         "loaders": list(loaders),
         **({"matrix_sha256": target.matrix_sha256} if schema == 2 else {}),
+        **({"runtime_source": plan["runtime_source"]} if "runtime_source" in plan else {}),
     }
     return identity, selected, sorted(normalized_na.values(), key=lambda item: (
         item["version"], item["loader"], item["mod"]
     ))
+
+
+def _validate_runtime_source(value: Any, *, source_sha: str,
+                             repository: str | None = None) -> dict[str, Any]:
+    try:
+        source = ci_reuse.validate_reference(value, "e2e")
+    except ci_reuse.ReuseError as exc:
+        raise CompatibilityEvidenceError(f"invalid original runtime reference: {exc}") from exc
+    if value["coverage_sha"] != source_sha or repository is not None and value["repository"] != repository:
+        raise CompatibilityEvidenceError("original runtime reference has another coverage source or repository")
+    return source
 
 
 def validate_curation_proof(
@@ -661,7 +682,10 @@ def validate_curation_proof(
     compatibility_contract: CompatibilityContract,
     manifest_path: Path,
 ) -> dict[str, Any]:
-    proof = _exact_object(proof, PROOF_FIELDS, "curation proof")
+    origin_fields = {"runtime_source"} if "runtime_source" in identity else set()
+    proof = _exact_object(proof, PROOF_FIELDS | origin_fields, "curation proof")
+    if origin_fields and proof["runtime_source"] != identity["runtime_source"]:
+        raise CompatibilityEvidenceError("curation proof substituted its original runtime reference")
     if proof.get("schema_version") != 1 or proof.get("kind") != (
         "quick-skin-mod-compatibility-review-input"
     ):
@@ -707,6 +731,13 @@ def validate_curation_proof(
         if re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None:
             raise CompatibilityEvidenceError(f"proof artifact {kind} digest is invalid")
         _text(record.get("name"), f"proof artifact {kind}.name", maximum=512)
+    base_run_id = identity["base_run_id"]
+    if origin_fields:
+        source = _validate_runtime_source(proof["runtime_source"], source_sha=identity["source_sha"])
+        base_run_id = source["run_id"]
+    if (inventory["base"]["run_id"] != base_run_id
+            or inventory["candidate"]["run_id"] != identity["compatibility_run_id"]):
+        raise CompatibilityEvidenceError("curation proof artifact inventory has another runtime owner")
     return proof
 
 
@@ -931,6 +962,9 @@ def build_bundle(
         scenario_contract=scenario_contract,
         matrix_path=matrix_path,
     )
+    if "runtime_source" in identity:
+        _validate_runtime_source(identity["runtime_source"], source_sha=identity["source_sha"],
+                                 repository=repository)
     if lanes_root.is_symlink():
         raise CompatibilityEvidenceError("lane evidence root cannot be a symlink")
     root = lanes_root.resolve()
@@ -1161,6 +1195,7 @@ def build_bundle(
                 "compatibility_run_id": compatibility_run_id,
                 "publication_run_id": publication_run_id,
                 "coverage_sha": identity["target_sha"],
+                **({"runtime_source": identity["runtime_source"]} if "runtime_source" in identity else {}),
             },
             "lanes": public_lanes,
             "not_applicable": not_applicable,
@@ -1344,13 +1379,16 @@ def validate_bundle(
         or release.get("loaders") != list(loaders)
     ):
         raise CompatibilityEvidenceError("compatibility release identity mismatch")
-    provenance = _exact_object(
-        manifest.get("provenance"), PROVENANCE_FIELDS, "manifest.provenance"
-    )
+    provenance = manifest.get("provenance")
+    origin_fields = {"runtime_source"} if shared and isinstance(provenance, dict) and "runtime_source" in provenance else set()
+    provenance = _exact_object(provenance, PROVENANCE_FIELDS | origin_fields, "manifest.provenance")
     for field in ("implementation_sha", "source_sha", "target_sha", "coverage_sha"):
         _commit(provenance.get(field), f"provenance.{field}")
     if shared and provenance["source_sha"] != provenance["target_sha"]:
         raise CompatibilityEvidenceError("shared compatibility evidence must name one tested source commit")
+    if origin_fields:
+        _validate_runtime_source(provenance["runtime_source"], source_sha=provenance["source_sha"],
+                                 repository=repository)
     for field in ("base_run_id", "compatibility_run_id", "publication_run_id"):
         _positive_int(provenance.get(field), f"provenance.{field}")
     if expected_compatibility_run_id is not None and provenance.get(
