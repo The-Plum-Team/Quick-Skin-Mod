@@ -103,6 +103,13 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
             return publisher.prepare(self.api, repository=ROOT, source_sha=self.fixture.source,
                                      source_run_id=self.fixture.run_id, issuer_run_id=9000, directory=directory)
 
+    def test_selected_generation_keeps_its_complete_baseline_without_downloading_reports(self):
+        self.api.records[publisher.coverage.SELECTION_ARTIFACT_NAME] = [{
+            "name": publisher.coverage.SELECTION_ARTIFACT_NAME,
+            "workflow_run": {"id": self.fixture.run_id}}]
+        self.assertIsNone(self.prepare())
+        self.assertEqual([], self.api.downloaded)
+
     def test_complete_source_and_clean_reviews_produce_a_bound_baseline_without_images(self):
         result = self.prepare()
         self.assertEqual("full", result["coverage"])

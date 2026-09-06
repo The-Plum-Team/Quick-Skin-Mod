@@ -212,6 +212,8 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
     source = api.run(source_run_id)
     graph = coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
                                          source_sha=source_sha, source_run_id=source_run_id)
+    if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in api.artifacts(run_id=source_run_id)):
+        return None  # Partial generations retain their earlier complete baseline.
     metadata = {}
     for target in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]:
         key = target["bundle_key"]

@@ -641,3 +641,13 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   all 363 CI tests and fifteen parsed workflow/action files pass. Selected AI capsules and public
   evidence reuse must be connected before this migration is integrated; no protected healthy
   baseline or reduced GitHub runtime has yet been produced.
+- Connected selected image curation and protected model admission. The curator authenticates
+  the complete healthy baseline, actual successful source jobs, cumulative Git selection and
+  every selected target artifact before decoding images. Paired review uses the selected Fabric
+  reference from that same runtime generation; the anchor target receives semantic review.
+  Coverage is separate from judgment mode: schema-7 proofs preserve their partial admission and
+  cannot issue a complete semantic or healthy-baseline certificate. The drainer independently
+  repeats admission before model access. Full generations keep their existing path, and selected
+  generations retain the preceding complete baseline. All 372 CI tests and fifteen workflow/action
+  YAML files pass, including real-shell routing and bounded selected-capsule mutation fixtures.
+  Public evidence composition remains the next stage; no reduced GitHub run has occurred yet.

@@ -886,8 +886,9 @@ jobs:
               "master_source_sha", "matrix_kind", "review_mode",
               "scenario_contract_sha256", "schema_version", "source_branch",
               "source_run_id", "source_sha", "visual_reference"] +
-              (if $bundle_key != "" then ["bundle_key", "matrix_sha256"] else [] end) | sort) and
-             (if $bundle_key != "" then .schema_version == 6 and .bundle_key == $bundle_key
+              (if $bundle_key != "" then ["bundle_key", "matrix_sha256"] else [] end) +
+              (if $bundle_key != "" and $proof.schema_version == 7 then ["feature_selection"] else [] end) | sort) and
+             (if $bundle_key != "" then (.schema_version == 6 or .schema_version == 7) and .bundle_key == $bundle_key
               else .schema_version == 5 end) and .source_run_id == $source_run_id and
              .source_branch == $source_branch and .source_sha == $source_sha and
              (.master_source_sha == null or
@@ -931,7 +932,12 @@ jobs:
               end)' \
             "$proof" > /dev/null
 
-          if [[ -n "$BUNDLE_KEY" ]]; then
+          if [[ "$(jq -r .schema_version "$proof")" == 7 ]]; then
+            python3 scripts/ci/feature_review.py \
+              --github-repository "$GITHUB_REPOSITORY" --repository . \
+              --source-run-id "$SOURCE_RUN_ID" --source-sha "$IMPLEMENTATION_SHA" \
+              --bundle-key "$BUNDLE_KEY" --verify-proof "$proof" --manifest "$manifest"
+          elif [[ -n "$BUNDLE_KEY" ]]; then
             python3 scripts/ci/visual_review_targets.py --validate-proof "$proof"
           fi
           validation_arguments=(
@@ -939,7 +945,7 @@ jobs:
             --input-root "$capsule/review-input"
             --validate-input-only
           )
-          if [[ "$review_mode" == reference-comparison ]]; then
+          if [[ "$review_mode" == reference-comparison && "$(jq -r .schema_version "$proof")" != 7 ]]; then
             reference_identity="$(python3 e2e/visual_review.py \
               --matrix release/release-matrix.json --reference-identity)"
             reference_branch="$(jq -er .release_branch <<< "$reference_identity")"
@@ -1014,6 +1020,8 @@ jobs:
                (.visual_reference.manifest_sha256 | type == "string" and
                  test("^[0-9a-f]{64}$"))' \
               "$proof" > /dev/null
+          fi
+          if [[ "$review_mode" == reference-comparison ]]; then
             validation_arguments+=(--require-paired)
           fi
           python3 e2e/check_visual_review.py "${validation_arguments[@]}"

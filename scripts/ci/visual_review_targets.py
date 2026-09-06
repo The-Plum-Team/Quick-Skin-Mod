@@ -151,12 +151,25 @@ def plan_targets(artifacts: Any, *, source_run_id: int, source_branch: str, sour
     return {"include": sorted(include, key=lambda row: tuple(map(int, bundle_version(row["bundle_key"]).split("."))))}
 
 
-def validate_target_proof(proof: Any, *, matrix_path: Path = DEFAULT_MATRIX) -> None:
+def validate_target_proof(proof: Any, *, matrix_path: Path = DEFAULT_MATRIX, selection: Any = None) -> None:
     """Recompute a shared capsule's target scope independently before model admission.
 
     Generic capsule hashes, counts, owner-run authentication and normalized review validation
     remain the drainer's responsibility. This binds its new scope fields to the complete matrix.
     """
+    if isinstance(proof, dict) and type(proof.get("schema_version")) is int and proof["schema_version"] == 7:
+        feature = proof.get("feature_selection")
+        if (selection is None or not isinstance(feature, dict) or set(feature) != {"admission", "coverage"}
+                or not isinstance(feature["coverage"], dict)
+                or feature["coverage"].get("selection_sha256") != selection.sha256
+                or feature["coverage"].get("selective") is not True
+                or (json.dumps(feature["admission"], sort_keys=True, separators=(",", ":"), allow_nan=False)
+                    + "\n").encode() != selection.to_bytes()):
+            raise ReviewTargetError("selected proof requires independently authenticated feature coverage")
+        complete_scope = {**proof, "schema_version": 6}
+        del complete_scope["feature_selection"]
+        validate_target_proof(complete_scope, matrix_path=matrix_path)
+        return
     if not isinstance(proof, dict) or type(proof.get("schema_version")) is not int or proof["schema_version"] != 6:
         raise ReviewTargetError("a shared target curation proof is required")
     data, digest, rows = _inventory(matrix_path, proof.get("matrix_kind"))

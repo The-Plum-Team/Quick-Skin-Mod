@@ -34,6 +34,7 @@ POLICY_PATHS = tuple(sorted(set(PROTECTED_CONTROLLER_PATHS) | set(admission.POLI
 }))
 BASELINE_KIND = "quick-skin-complete-feature-baseline"
 BASELINE_ARTIFACT_NAME = "healthy-e2e-baseline"
+SELECTION_ARTIFACT_NAME = "e2e-feature-selection"
 MAX_REPORT_ARCHIVE_BYTES = 4 * 1024 * 1024
 
 
@@ -121,16 +122,8 @@ def validate_review_owner(artifact: Any, owner: Any, jobs: Any, *, github_reposi
             "digest": parsed.digest, "size_in_bytes": parsed.size_in_bytes}
 
 
-def validate_clean_target(files: ReviewFiles, *, source_sha: str, source_run_id: int,
-                          bundle_key: str, matrix_path: Path = DEFAULT_MATRIX) -> dict[str, Any]:
-    """Require every authored PR capture and its clean, exact normalized verdict."""
-    proof, proof_digest = _read(files.proof)
-    manifest, manifest_digest = _read(files.manifest)
-    report, report_digest = _read(files.report)
-    if not isinstance(proof, dict) or set(proof) != PROOF_KEYS | {"bundle_key", "matrix_sha256"}:
-        raise CoverageError("only a complete shared-target curation proof can supply a baseline")
-    validate_target_proof(proof, matrix_path=matrix_path)
-    impact = proof["compatibility_impact"]
+def validate_compatibility_impact(impact: Any) -> None:
+    """Accept the protected diff classification or its conservative unknown-impact result."""
     if not isinstance(impact, dict) or type(impact.get("schema_version")) is not int:
         raise CoverageError("compatibility impact must use an integer schema version")
     # A first shared generation has no prior diff. Its protected curator conservatively
@@ -140,6 +133,18 @@ def validate_clean_target(files: ReviewFiles, *, source_sha: str, source_run_id:
             or type(impact.get("schema_version")) is not int
             or type(impact.get("compatibility_required")) is not bool):
         _validate_compatibility_impact(impact)
+
+
+def validate_clean_target(files: ReviewFiles, *, source_sha: str, source_run_id: int,
+                          bundle_key: str, matrix_path: Path = DEFAULT_MATRIX) -> dict[str, Any]:
+    """Require every authored PR capture and its clean, exact normalized verdict."""
+    proof, proof_digest = _read(files.proof)
+    manifest, manifest_digest = _read(files.manifest)
+    report, report_digest = _read(files.report)
+    if not isinstance(proof, dict) or set(proof) != PROOF_KEYS | {"bundle_key", "matrix_sha256"}:
+        raise CoverageError("only a complete shared-target curation proof can supply a baseline")
+    validate_target_proof(proof, matrix_path=matrix_path)
+    validate_compatibility_impact(proof["compatibility_impact"])
     contract = default_contract()
     if (not isinstance(source_sha, str) or admission.SHA.fullmatch(source_sha) is None
             or proof["source_sha"] != source_sha

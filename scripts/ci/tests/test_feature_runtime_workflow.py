@@ -157,6 +157,43 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.assertIn("e2e-out/current/selection.json", action)
         self.assertIn("e2e-out/current/coverage.json", action)
 
+    def test_selected_curation_routes_before_full_reference_resolution_and_revalidates_before_model_access(self):
+        script = step_script("visual-review.yml", "curate", "Validate and curate exact packaged evidence")
+        start = script.index('if [[ -n "$TARGET_MINECRAFT_VERSION" && "$matrix_kind" == pr-anchors ]]; then')
+        end = script.index("# Resolve the reference only after", start)
+        route = script[start:end] + '\nprintf "full\\n" >> "$RUNNER_TEMP/continued"\n'
+        self.binary("python3", "import json,os,sys\nfrom pathlib import Path\n"
+            "open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n"
+            "selected=os.environ['FIXTURE_SELECTED']=='true'\n"
+            "out=Path(sys.argv[sys.argv.index('--github-output')+1])\n"
+            "out.write_text('selected='+str(selected).lower()+'\\nreview_mode=anchor-semantic\\ngeneration_sha='+os.environ['IMPLEMENTATION_SHA']+'\\n')\n"
+            "print(json.dumps({'selected':selected}))\n")
+        environment = {"TARGET_MINECRAFT_VERSION": "1.20.1", "TARGET_BUNDLE_KEY": "mc1.20.1",
+            "matrix_kind": "pr-anchors", "IMPLEMENTATION_SHA": "b" * 40,
+            "SOURCE_SHA": "c" * 40, "SOURCE_RUN_ID": "55", "FIXTURE_SELECTED": "true",
+            "COMPATIBILITY_IMPACT": '{"schema_version":1,"compatibility_required":true,"paths":[],"impact_paths":[]}'}
+        for changes, expected_calls, continued in (({}, 1, False), ({"FIXTURE_SELECTED": "false"}, 1, True),
+                ({"TARGET_MINECRAFT_VERSION": ""}, 0, True), ({"matrix_kind": "native-anchors"}, 0, True)):
+            with self.subTest(changes=changes):
+                (self.root / "continued").write_text("")
+                result, outputs, calls = self.run_script(route, {**environment, **changes})
+                self.assertEqual(0, result.returncode, result.stderr[:300])
+                self.assertEqual(expected_calls, len(calls))
+                self.assertEqual(continued, bool((self.root / "continued").read_text()))
+                if calls:
+                    self.assertEqual("scripts/ci/feature_review.py", calls[0][0])
+                    self.assertEqual("b" * 40, calls[0][calls[0].index("--source-sha") + 1])
+                    self.assertEqual("55", calls[0][calls[0].index("--source-run-id") + 1])
+                if not continued:
+                    self.assertEqual("true", outputs["selected"])
+                    self.assertEqual("b" * 40, outputs["generation_sha"])
+        drain = job_block("visual-review-drain.yml", "review")
+        self.assertIn('--verify-proof "$proof" --manifest "$manifest"', drain)
+        self.assertLess(drain.index("python3 scripts/ci/feature_review.py"),
+                        drain.index("test -n \"$CLAUDE_CODE_OAUTH_TOKEN\""))
+        self.assertIn('$proof.schema_version == 7 then ["feature_selection"]', drain)
+        self.assertIn('"$(jq -r .schema_version "$proof")" != 7', drain)
+
 
 if __name__ == "__main__":
     unittest.main()
