@@ -314,9 +314,11 @@ def runtime_source(api: Any, run_id: int, coverage_sha: str, *, matrix_kind: str
     require(run.get("event") == "workflow_dispatch" and run.get("head_branch") == "master"
             and run.get("head_sha") == coverage_sha and run.get("path") == WORKFLOWS["e2e"]
             and (run.get("status") == "completed" and run.get("conclusion") == "success"
-                 or allow_in_progress and run.get("status") == "in_progress" and run.get("conclusion") is None)
+                 or allow_in_progress and run.get("status") in {"queued", "in_progress"}
+                    and run.get("conclusion") is None)
             and run.get("head_repository", {}).get("full_name") == api.repository,
             "reused runtime has a foreign or unsuccessful generation")
+    # GitHub can report queued while advisory matrix jobs wait behind a passing gate.
     jobs = successful_jobs(api.jobs(run), {POLICY_JOB, GATE_JOB})
     require(all(job.get("conclusion") == "skipped" for job in jobs
                 if job.get("name") == BUILD_JOB or job.get("name", "").endswith(SCENARIO_SUFFIX))

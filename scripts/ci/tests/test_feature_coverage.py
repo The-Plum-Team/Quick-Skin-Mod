@@ -172,10 +172,10 @@ class FeatureCoverageTest(unittest.TestCase):
         jobs = [{"jobs": [{"name": name, "status": "completed", "conclusion": "success"}
                            for name in (POLICY_JOB, BUILD_JOB, GATE_JOB,
                                         *(row["id"] + SCENARIO_SUFFIX for row in self.rows))]}]
-        def validate(candidate, candidate_jobs=jobs):
+        def validate(candidate, candidate_jobs=jobs, *, allow_in_progress=False):
             return coverage.validate_source_run(candidate, candidate_jobs,
                 github_repository="The-Plum-Team/Quick-Skin-Mod", source_sha=self.source,
-                source_run_id=self.run_id)
+                source_run_id=self.run_id, allow_in_progress=allow_in_progress)
         self.assertEqual("full", validate(run)["runtime_policy"])
         for field, value in (("id", True), ("head_branch", "feature/example"), ("head_sha", "b" * 40),
                              ("event", "pull_request"), ("event", "schedule"), ("conclusion", "failure"),
@@ -185,6 +185,12 @@ class FeatureCoverageTest(unittest.TestCase):
         partial = copy.deepcopy(jobs)
         partial[0]["jobs"].pop()
         with self.assertRaises(ValueError): validate(run, partial)
+        for status in ("queued", "in_progress"):
+            with self.subTest(advisory_status=status):
+                active = {**run, "status": status, "conclusion": None}
+                self.assertEqual("full", validate(active, allow_in_progress=True)["runtime_policy"])
+                with self.assertRaises(ValueError): validate(active)
+                with self.assertRaises(ValueError): validate(active, partial, allow_in_progress=True)
 
     def test_complete_same_run_review_can_seed_coverage_but_foreign_reference_cannot(self):
         target = self.targets[1]
