@@ -84,7 +84,8 @@ def validate_composed(evidence_root: Path, key: str, manifest: dict[str, Any], *
                       expected_target_sha: str | None = None, expected_coverage_sha: str | None = None,
                       catalog_path: Path = evidence.DEFAULT_CATALOG,
                       matrix_path: Path = evidence.DEFAULT_MATRIX) -> dict[str, Any]:
-    if set(manifest) != COMPOSED_FIELDS or expected_kind not in (None, "compact"):
+    origin_fields = {"runtime_source"} if "runtime_source" in manifest else set()
+    if set(manifest) != COMPOSED_FIELDS | origin_fields or expected_kind not in (None, "compact"):
         raise evidence.PublicEvidenceError("composed public evidence requires its exact compact schema")
     components = manifest["components"]
     if (not isinstance(components, dict) or set(components) != COMPONENT_FIELDS
@@ -107,8 +108,7 @@ def validate_composed(evidence_root: Path, key: str, manifest: dict[str, Any], *
         selection=chosen)
     if (any(manifest[field] != baseline[field] for field in ("release", "repository", "contract_sha256"))
             or any(manifest[field] != update[field] for field in ("provenance", "feature_selection", "repository", "contract_sha256"))
-            or baseline["provenance"]["source"] != baseline["provenance"]["target"]
-            or update["provenance"]["source"] != update["provenance"]["target"]):
+            or manifest.get("runtime_source") != update.get("runtime_source")):
         raise evidence.PublicEvidenceError("composed public evidence substituted its tested provenance or inventory")
     entries = evidence._bounded_entries(bundle.rglob("*"), maximum=2 * evidence.MAX_BUNDLE_ENTRIES + 8,
                                         label="composed public evidence")
@@ -156,13 +156,14 @@ def _view(manifest: dict[str, Any], baseline: dict[str, Any], update: dict[str, 
 
 def compose(baseline_root: Path, selected_root: Path, output_root: Path, key: str, *,
             selection: admission.Admission, catalog_path: Path = evidence.DEFAULT_CATALOG,
-            matrix_path: Path = evidence.DEFAULT_MATRIX) -> Path:
+            matrix_path: Path = evidence.DEFAULT_MATRIX, coverage_sha: str | None = None) -> Path:
     """Atomically retain one complete compact baseline and the current cumulative selection."""
     baseline = evidence.validate_bundle(baseline_root, key, only_branch=True, expected_kind="compact",
         expected_target_sha=selection.base_commit, expected_coverage_sha=selection.base_commit,
         catalog_path=catalog_path, matrix_path=matrix_path)
+    covered = coverage_sha or selection.head_commit
     update = evidence.validate_bundle(selected_root, key, only_branch=True, expected_kind="compact",
-        expected_target_sha=selection.head_commit, expected_coverage_sha=selection.head_commit,
+        expected_target_sha=covered, expected_coverage_sha=covered,
         catalog_path=catalog_path, matrix_path=matrix_path, selection=selection)
     if baseline["schema_version"] != evidence.SHARED_COMPACT_SCHEMA_VERSION:
         raise evidence.PublicEvidenceError("feature composition requires an original complete baseline")
@@ -180,8 +181,10 @@ def compose(baseline_root: Path, selected_root: Path, output_root: Path, key: st
             "provenance": update["provenance"], "feature_selection": update["feature_selection"],
             "components": {epoch + "_sha256": evidence.sha256_file(bundle / epoch / key / "manifest.json")
                            for epoch in ("baseline", "selected")}}
+        if "runtime_source" in update:
+            manifest["runtime_source"] = update["runtime_source"]
         (bundle / "manifest.json").write_bytes(admission.canonical(manifest))
         evidence.validate_bundle(root, key, only_branch=True, expected_kind="compact",
-            expected_target_sha=selection.head_commit, catalog_path=catalog_path, matrix_path=matrix_path)
+            expected_target_sha=covered, catalog_path=catalog_path, matrix_path=matrix_path)
         bundle.rename(destination)
     return destination

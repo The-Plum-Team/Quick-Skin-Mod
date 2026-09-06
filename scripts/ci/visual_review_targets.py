@@ -133,9 +133,15 @@ def _review_mode(data: dict[str, Any], rows: list[dict[str, Any]]) -> str:
 
 
 def plan_targets(artifacts: Any, *, source_run_id: int, source_branch: str, source_sha: str,
-                 matrix_path: Path = DEFAULT_MATRIX, matrix_kind: str = "pr-anchors") -> dict[str, Any]:
+                 matrix_path: Path = DEFAULT_MATRIX, matrix_kind: str = "pr-anchors",
+                 runtime_source: dict | None = None) -> dict[str, Any]:
     data, digest, rows = _inventory(matrix_path, matrix_kind)
-    if data["schema_version"] == 3 and source_branch != data["project"]["release_branch"]:
+    if runtime_source is not None:
+        from ci_reuse import validate_reference
+        source = validate_reference(runtime_source, "e2e")
+        if (source_run_id, source_branch, source_sha) != (source["run_id"], source["head_branch"], source["head_sha"]):
+            raise ReviewTargetError("review partition differs from its original tested source")
+    elif data["schema_version"] == 3 and source_branch != data["project"]["release_branch"]:
         raise ReviewTargetError("shared reviews require the real matrix source branch")
     by_name = _validate_artifacts(artifacts, {f"packaged-e2e-{row['id']}" for row in rows},
                                  source_run_id=source_run_id, source_branch=source_branch, source_sha=source_sha)
@@ -185,9 +191,18 @@ def validate_target_proof(proof: Any, *, matrix_path: Path = DEFAULT_MATRIX, sel
             or proof.get("master_source_sha") != proof.get("source_sha")
             or proof.get("review_mode") != _review_mode(data, targets[key])):
         raise ReviewTargetError("curation proof has a stale source or incorrect target review mode")
+    source_id, source_branch, source_sha = proof.get("source_run_id"), proof.get("source_branch"), proof.get("source_sha")
+    tested_sha = source_sha
+    if "runtime_source" in proof:
+        from ci_reuse import validate_reference
+        source = validate_reference(proof["runtime_source"], "e2e")
+        if proof["runtime_source"]["coverage_sha"] != proof["source_sha"] or proof["matrix_kind"] != "pr-anchors":
+            raise ReviewTargetError("reused runtime covers another protected generation")
+        source_id, source_branch, source_sha = source["run_id"], source["head_branch"], source["head_sha"]
+        tested_sha = source["tested_sha"]
     selected = _validate_artifacts(proof.get("artifact_inventory"),
-        {f"packaged-e2e-{row['id']}" for row in targets[key]}, source_run_id=proof.get("source_run_id"),
-        source_branch=proof.get("source_branch"), source_sha=proof.get("source_sha"))
+        {f"packaged-e2e-{row['id']}" for row in targets[key]}, source_run_id=source_id,
+        source_branch=source_branch, source_sha=source_sha)
     if sum(item["size_in_bytes"] for item in selected.values()) > MAX_TARGET_BYTES:
         raise ReviewTargetError("review target exceeds its compressed evidence budget")
     if proof["schema_version"] == 8:
@@ -201,12 +216,12 @@ def validate_target_proof(proof: Any, *, matrix_path: Path = DEFAULT_MATRIX, sel
             if (not isinstance(reference, dict) or set(reference) != {
                     "evidence_kind", "artifact", "artifact_node", "source_sha", "source_run_id"}
                     or reference["evidence_kind"] != "packaged-full" or reference["artifact_node"] != node
-                    or reference["source_sha"] != proof["source_sha"]
+                    or reference["source_sha"] != tested_sha
                     or type(reference["source_run_id"]) is not int
-                    or reference["source_run_id"] != proof["source_run_id"]):
+                    or reference["source_run_id"] != source_id):
                 raise ReviewTargetError("complete shared review needs its exact same-run Fabric reference")
-            _validate_artifacts([reference["artifact"]], names, source_run_id=proof["source_run_id"],
-                source_branch=proof["source_branch"], source_sha=proof["source_sha"])
+            _validate_artifacts([reference["artifact"]], names, source_run_id=source_id,
+                source_branch=source_branch, source_sha=source_sha)
     expected = sorted(row["id"] + SCENARIO_SUFFIX for row in rows)
     graph = proof.get("job_graph")
     if not isinstance(graph, dict) or type(graph.get("schema_version")) is not int or graph != {

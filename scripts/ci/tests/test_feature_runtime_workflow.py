@@ -31,7 +31,8 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.environment = {"PATH": str(binary) + ":/usr/bin:/bin", "RUNNER_TEMP": str(self.root),
             "GITHUB_WORKSPACE": str(self.root), "GITHUB_OUTPUT": str(self.root / "outputs"),
             "GITHUB_STEP_SUMMARY": str(self.root / "summary"), "GITHUB_RUN_ID": "66",
-            "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod", "RECORD": str(self.root / "calls")}
+            "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod", "RECORD": str(self.root / "calls"),
+            "REUSED_RUNTIME": "false"}
         self.binary("xvfb-run", "import json,os,sys\nopen(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n")
         self.binary("sha256sum", "import hashlib,sys\nprint(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest()+'  '+sys.argv[1])\n")
         self.binary("git", "import os,sys\nprint(os.environ['POLICY_SHA'] if sys.argv[2]=='protected-policy' else os.environ['TESTED_SHA'])\n")
@@ -164,12 +165,42 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.assertIn("e2e-out/current/selection.json", action)
         self.assertIn("e2e-out/current/coverage.json", action)
 
+    def test_reused_gates_skip_expensive_jobs_only_with_independent_original_verification(self):
+        script = step_script("build-gate.yml", "build", "Require the complete compilation and policy jobs")
+        environment = {"SOURCE_RESULT": "success", "REUSED": "true",
+                       "COMPILE_RESULT": "skipped", "POLICY_RESULT": "skipped"}
+        result, _, _ = self.run_script(script, environment)
+        self.assertEqual(0, result.returncode, result.stderr)
+        for changes in ({"SOURCE_RESULT": "failure"}, {"REUSED": "false"},
+                        {"COMPILE_RESULT": "failure"}, {"POLICY_RESULT": "cancelled"}):
+            result, _, _ = self.run_script(script, {**environment, **changes})
+            self.assertNotEqual(0, result.returncode)
+        script = step_script("on-demand-e2e.yml", "required-gate", "Require build and packaged behavior")
+        environment = {"POLICY_RESULT": "success", "REUSED": "true", "RUNTIME_POLICY": "full",
+                       "BUILD_RESULT": "skipped", "E2E_RESULT": "skipped"}
+        result, _, _ = self.run_script(script, environment)
+        self.assertEqual(0, result.returncode, result.stderr)
+        for changes in ({"POLICY_RESULT": "failure"}, {"REUSED": "false"}, {"RUNTIME_POLICY": "not-applicable"},
+                        {"BUILD_RESULT": "failure"}, {"E2E_RESULT": "cancelled"}, {"E2E_RESULT": "success"}):
+            result, _, _ = self.run_script(script, {**environment, **changes})
+            self.assertNotEqual(0, result.returncode)
+        for workflow, gate, kind in (("build-gate.yml", "build", "build"),
+                                     ("on-demand-e2e.yml", "required-gate", "e2e")):
+            body = job_block(workflow, gate)
+            self.assertIn(f"ci_reuse.py verify --kind {kind}", body)
+            self.assertIn(f"--reference reuse/reused-source.json", body)
+        self.assertIn("needs.runtime-policy.outputs.reused != 'true'", job_block("on-demand-e2e.yml", "build-source"))
+
     def test_selected_curation_routes_before_full_reference_resolution_and_revalidates_before_model_access(self):
         script = step_script("visual-review.yml", "curate", "Validate and curate exact packaged evidence")
         start = script.index('if [[ -n "$TARGET_MINECRAFT_VERSION" ]]; then',
-                             script.index('mv "$RUNNER_TEMP/target-e2e-matrix.json"'))
-        end = script.index("# Resolve the reference only after", start)
-        route = script[start:end] + '\nprintf "full\\n" >> "$RUNNER_TEMP/continued"\n'
+                             script.index("printf 'review_skipped=false"))
+        end = script.index('source_run="$(github_api_retry', start)
+        route = "set -euo pipefail\n" + script[start:end] + '\nprintf "full\\n" >> "$RUNNER_TEMP/continued"\n'
+        matrix = self.root / "release/release-matrix.json"
+        matrix.parent.mkdir()
+        matrix.write_text('{}\n')
+        self.binary("github_api_retry", "import os\nprint(os.environ['SOURCE_EVENT'])\n")
         self.binary("python3", "import json,os,sys\nfrom pathlib import Path\n"
             "open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n"
             "selected=os.environ['FIXTURE_SELECTED']=='true'\n"
@@ -178,10 +209,11 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
             "print(json.dumps({'curated':True,'selected':selected}))\n")
         environment = {"TARGET_MINECRAFT_VERSION": "1.20.1", "TARGET_BUNDLE_KEY": "mc1.20.1",
             "matrix_kind": "pr-anchors", "IMPLEMENTATION_SHA": "b" * 40,
-            "SOURCE_SHA": "c" * 40, "SOURCE_RUN_ID": "55", "FIXTURE_SELECTED": "true",
+            "SOURCE_SHA": "b" * 40, "SOURCE_RUN_ID": "55", "FIXTURE_SELECTED": "true",
+            "SOURCE_EVENT": "workflow_dispatch", "TARGET_MATRIX_SHA256": hashlib.sha256(matrix.read_bytes()).hexdigest(),
             "COMPATIBILITY_IMPACT": '{"schema_version":1,"compatibility_required":true,"paths":[],"impact_paths":[]}'}
         for changes, expected_calls, continued in (({}, 1, False), ({"FIXTURE_SELECTED": "false"}, 1, False),
-                ({"TARGET_MINECRAFT_VERSION": ""}, 0, True), ({"matrix_kind": "native-anchors", "FIXTURE_SELECTED": "false"}, 1, False)):
+                ({"TARGET_MINECRAFT_VERSION": ""}, 0, True), ({"SOURCE_EVENT": "schedule", "FIXTURE_SELECTED": "false"}, 1, False)):
             with self.subTest(changes=changes):
                 (self.root / "continued").write_text("")
                 result, outputs, calls = self.run_script(route, {**environment, **changes})
@@ -192,9 +224,14 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
                     self.assertEqual("scripts/ci/feature_review.py", calls[0][0])
                     self.assertEqual("b" * 40, calls[0][calls[0].index("--source-sha") + 1])
                     self.assertEqual("55", calls[0][calls[0].index("--source-run-id") + 1])
+                    self.assertEqual("native-anchors" if changes.get("SOURCE_EVENT") == "schedule" else "pr-anchors",
+                                     calls[0][calls[0].index("--matrix-kind") + 1])
                 if not continued:
                     self.assertEqual(changes.get("FIXTURE_SELECTED", "true"), outputs["selected"])
                     self.assertEqual("b" * 40, outputs["generation_sha"])
+        result, _, calls = self.run_script(route, {**environment, "SOURCE_SHA": "c" * 40})
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual([], calls)
         drain = job_block("visual-review-drain.yml", "review")
         self.assertIn('--verify-proof "$proof" --manifest "$manifest"', drain)
         self.assertLess(drain.index("python3 scripts/ci/feature_review.py"),
@@ -314,6 +351,12 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         result, _outputs, calls = self.run_script(script, {**environment, "SELECTION_ENABLED": "false"})
         self.assertEqual(0, result.returncode, result.stderr[:300])
         self.assertNotIn("--selection-admission", calls[0])
+        result, _outputs, calls = self.run_script(script, {**environment, "REUSED_RUNTIME": "true",
+                                                                          "SOURCE_SHA": "c" * 40})
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        self.assertEqual(str(self.root / "public-runtime/runtime-source.json"),
+                         calls[0][calls[0].index("--runtime-source") + 1])
+        self.assertEqual("c" * 40, calls[0][calls[0].index("--source-sha") + 1])
         result, _outputs, calls = self.run_script(script, {**environment, "SELECTION_SHA256": "0" * 64})
         self.assertNotEqual(0, result.returncode)
         self.assertEqual([], calls)

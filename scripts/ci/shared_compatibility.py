@@ -49,7 +49,7 @@ def admit(api: publisher.Api, payload: Any, *, repository: Path, policy_sha: str
     request = request_identity(payload, policy_sha)
     source = api.run(request["source_run_id"])
     kind = "native-anchors" if source.get("event") == "schedule" else "pr-anchors"
-    review.authenticate_full(api, repository, source_sha=policy_sha,
+    runtime = review.authenticate_full(api, repository, source_sha=policy_sha,
         source_run_id=request["source_run_id"], matrix_kind=kind)
     artifact = api.artifact(request["review_artifact_id"])
     if any(artifact.get(key) != request["review_artifact_" + field] for key, field in (
@@ -63,17 +63,17 @@ def admit(api: publisher.Api, payload: Any, *, repository: Path, policy_sha: str
         source_run_id=request["source_run_id"], bundle_key=request["bundle_key"])
     if metadata["owner_run_id"] != request["review_artifact_run_id"]:
         raise coverage.CoverageError("optional-mod report belongs to another protected reviewer")
-    artifacts = api.artifacts(run_id=request["source_run_id"])
+    artifacts = runtime.artifacts
     if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in artifacts):
         raise coverage.CoverageError("optional-mod wave requires a complete base runtime generation")
-    plan = review.targets.plan_targets([item for item in artifacts if item["name"].startswith("packaged-e2e-")],
-        source_run_id=request["source_run_id"], source_branch="master", source_sha=policy_sha, matrix_kind=kind)
+    plan = review.plan_source(runtime, kind)
     target = next(item for item in plan["include"] if item["bundle_key"] == request["bundle_key"])
     files = publisher._review_files(api, metadata, directory / "report")
     record = coverage.validate_clean_target(files, source_sha=policy_sha, source_run_id=request["source_run_id"],
         bundle_key=request["bundle_key"], matrix_kind=kind)
     proof, _digest = coverage._read(files.proof)
-    if (proof["schema_version"] != 8 or proof["compatibility_impact"]["compatibility_required"] is not True
+    if (proof["schema_version"] != 8 or proof.get("runtime_source") != runtime.reference
+            or proof["compatibility_impact"]["compatibility_required"] is not True
             or proof["artifact_inventory"] != [review._artifact_record(item) for item in target["artifact_inventory"]]):
         raise coverage.CoverageError("optional-mod wave needs the exact complete runtime review and affected product")
     if proof["visual_reference"] is not None:
@@ -88,9 +88,9 @@ def admit(api: publisher.Api, payload: Any, *, repository: Path, policy_sha: str
         raise coverage.CoverageError("optional-mod normalized review is incomplete")
     bundles = [item for item in artifacts if item["name"] == "e2e-input-bundle"]
     if (len(bundles) != 1 or bundles[0].get("expired") is not False
-            or bundles[0].get("workflow_run", {}).get("id") != request["source_run_id"]
-            or bundles[0].get("workflow_run", {}).get("head_sha") != policy_sha
-            or bundles[0].get("workflow_run", {}).get("head_branch") != "master"
+            or bundles[0].get("workflow_run", {}).get("id") != runtime.execution["id"]
+            or bundles[0].get("workflow_run", {}).get("head_sha") != runtime.execution["head_sha"]
+            or bundles[0].get("workflow_run", {}).get("head_branch") != runtime.execution["head_branch"]
             or type(bundles[0].get("size_in_bytes")) is not int
             or not 0 < bundles[0]["size_in_bytes"] <= 512 * 1024 * 1024
             or not isinstance(bundles[0].get("digest"), str)
@@ -100,6 +100,9 @@ def admit(api: publisher.Api, payload: Any, *, repository: Path, policy_sha: str
         raise coverage.CoverageError("optional-mod source advanced during admission")
     return {**{key: request[key] for key in SOURCE_FIELDS}, "base_matrix_kind": kind,
             "source_run_attempt": coverage._positive_integer(source.get("run_attempt"), "source attempt"),
+            "runtime_run_id": runtime.execution["id"], "runtime_sha": runtime.tested_sha,
+            "runtime_run_attempt": runtime.execution["run_attempt"],
+            "runtime_reference": coverage.admission.canonical(runtime.reference).decode().strip(),
             "minecraft_target": request["minecraft_target"], "bundle_key": request["bundle_key"]}
 
 
@@ -116,6 +119,11 @@ def validate_plan(plan: Any, policy_sha: str) -> None:
     expected = build_plan(coverage.DEFAULT_MATRIX, base_matrix_kind=plan["base_matrix_kind"],
                           minecraft_target=plan["minecraft_target"])
     expected.update({key: plan[key] for key in SOURCE_FIELDS})
+    if "runtime_source" in plan:
+        review.ci_reuse.validate_reference(plan["runtime_source"], "e2e")
+        if plan["runtime_source"]["coverage_sha"] != policy_sha or plan["base_matrix_kind"] != "pr-anchors":
+            raise coverage.CoverageError("optional-mod plan substituted its original runtime")
+        expected["runtime_source"] = plan["runtime_source"]
     if coverage.admission.canonical(plan) != coverage.admission.canonical(expected):
         raise coverage.CoverageError("optional-mod plan differs from its protected target, mod lock or complete lane inventory")
 

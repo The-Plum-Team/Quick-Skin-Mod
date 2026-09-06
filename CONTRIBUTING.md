@@ -49,6 +49,15 @@ a changed selection policy, or unavailable complete baseline evidence requires t
 CI still builds every target and keeps the complete required lane gate; a valid feature selection
 reduces executed assertions, generated captures, and AI inputs within those lanes.
 
+Merging an already tested PR does not repeat its compilation or Minecraft matrix when the final
+Git tree is identical. Small post-merge jobs authenticate the original successful gates, all
+required lanes, and available artifacts, then pass references to visual review and Pages.
+Repeated review notifications continue only with targets that have no existing capsule or report.
+The original tested commit, run and JAR hashes remain attached to the evidence; the merge commit
+is recorded separately as the covered generation. A changed tree or expired evidence requires
+fresh work. An API failure or a still-running PR check stops admission instead of starting a
+parallel replacement. Explicit `capture_coverage=full` requests and nightly profiles still run.
+
 ## 2. Prepare a checkout
 
 Install these prerequisites:

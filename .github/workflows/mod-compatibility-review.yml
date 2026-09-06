@@ -752,7 +752,8 @@ jobs:
                 "implementation_sha", "kind", "loader", "manifest_sha256", "mod",
                 "mod_name", "mod_version", "mod_version_id", "runtime_version",
                 "scenario_contract_sha256", "schema_version", "source_run_id", "source_sha",
-                "target_branch", "target_sha"] | sort) and
+                "target_branch", "target_sha"] +
+                (if has("runtime_source") then ["runtime_source"] else [] end) | sort) and
                .schema_version == 1 and
                .kind == "quick-skin-mod-compatibility-review-input" and
                .compatibility_run_id == $compatibility_run_id and
@@ -768,6 +769,18 @@ jobs:
                (.manifest_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
                (.frame_count | type == "number" and . > 0 and . <= 512)' \
               "$proof" > /dev/null
+            original_source_sha="$source_sha"
+            original_source_repository="$GITHUB_REPOSITORY"
+            original_run_id="$(jq -er .source_run_id "$proof")"
+            if jq -e 'has("runtime_source")' "$proof" > /dev/null; then
+              jq -c .runtime_source "$proof" > "$RUNNER_TEMP/compatibility-runtime-source.json"
+              python3 scripts/ci/ci_reuse.py verify --kind e2e \
+                --reference "$RUNNER_TEMP/compatibility-runtime-source.json"
+              [[ "$(jq -er .runtime_source.coverage_sha "$proof")" == "$source_sha" ]]
+              original_source_sha="$(jq -er .runtime_source.source.head_sha "$proof")"
+              original_source_repository="$(jq -er .runtime_source.source.head_repository "$proof")"
+              original_run_id="$(jq -er .runtime_source.source.run_id "$proof")"
+            fi
             [[ "$(sha256sum "$manifest" | cut -d ' ' -f 1)" == \
               "$(jq -er .manifest_sha256 "$proof")" ]]
             [[ "$(jq length "$manifest")" == "$(jq -er .frame_count "$proof")" ]]
@@ -809,10 +822,10 @@ jobs:
               fi
               if [[ "$kind" == base ]]; then
                 [[ "$raw_name" == "$base_evidence_name" ]]
-                [[ "$raw_run_id" == "$(jq -er .source_run_id "$proof")" ]]
+                [[ "$raw_run_id" == "$original_run_id" ]]
                 jq -e \
-                  --arg source_sha "$source_sha" \
-                  --arg repository "$GITHUB_REPOSITORY" \
+                  --arg source_sha "$original_source_sha" \
+                  --arg repository "$original_source_repository" \
                   '.status == "completed" and .conclusion == "success" and
                    .head_sha == $source_sha and
                    .path == ".github/workflows/on-demand-e2e.yml" and

@@ -609,6 +609,13 @@ jobs:
             "${kind_argument[@]}"
 
           source_run_id="$(jq -er .provenance.source.run_id "$manifest")"
+          if jq -e 'has("runtime_source")' "$manifest" > /dev/null; then
+            python3 scripts/ci/feature_pages.py --verify-runtime \
+              --github-repository "$GITHUB_REPOSITORY" --repository . \
+              --evidence-root selected-evidence --bundle-key "$BUNDLE_KEY" --source-sha "$target_sha"
+            [[ "$COVERAGE_SHA" == "$HEAD_SHA" && "$target_sha" == "$HEAD_SHA" ]] || exit 1
+            exit 0
+          fi
           source_branch="$(jq -er .provenance.source.branch "$manifest")"
           source_sha="$(jq -er .provenance.source.sha "$manifest")"
           source_created_at="$(jq -er .provenance.source.created_at "$manifest")"
@@ -1046,7 +1053,7 @@ jobs:
             --coverage-sha "$coverage_sha"
           printf 'name=pages-cache-%s--%s\n' "$BUNDLE_KEY" "$coverage_sha" >> "$GITHUB_OUTPUT"
           if [[ "$(jq -r .schema_version "$manifest")" == 4 ]]; then
-            source_run_id="$(jq -er .provenance.source.run_id "$manifest")"
+            source_run_id="$(jq -er .provenance.target.run_id "$manifest")"
             printf 'complete_name=pages-full-baseline-%s--%s--%s\n' \
               "$BUNDLE_KEY" "$target_sha" "$source_run_id" >> "$GITHUB_OUTPUT"
           fi

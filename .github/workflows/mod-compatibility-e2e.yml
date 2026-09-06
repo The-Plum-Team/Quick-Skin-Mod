@@ -40,6 +40,10 @@ jobs:
       source_run_attempt: ${{ steps.admit.outputs.source_run_attempt }}
       source_run_id: ${{ steps.admit.outputs.source_run_id }}
       source_sha: ${{ steps.admit.outputs.source_sha }}
+      runtime_run_id: ${{ steps.admit.outputs.runtime_run_id || steps.admit.outputs.source_run_id }}
+      runtime_sha: ${{ steps.admit.outputs.runtime_sha || steps.admit.outputs.source_sha }}
+      runtime_run_attempt: ${{ steps.admit.outputs.runtime_run_attempt || steps.admit.outputs.source_run_attempt }}
+      runtime_reference: ${{ steps.admit.outputs.runtime_reference || 'null' }}
       target_branch: ${{ steps.admit.outputs.target_branch }}
       target_sha: ${{ steps.admit.outputs.target_sha }}
 
@@ -269,7 +273,7 @@ jobs:
       - name: Check out the exact tested source tree
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.admit.outputs.source_sha }}
+          ref: ${{ needs.admit.outputs.runtime_sha }}
           persist-credentials: false
 
       - name: Install Python
@@ -291,18 +295,36 @@ jobs:
           SOURCE_RUN_ATTEMPT: ${{ needs.admit.outputs.source_run_attempt }}
           SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
           SOURCE_SHA: ${{ needs.admit.outputs.source_sha }}
+          RUNTIME_RUN_ID: ${{ needs.admit.outputs.runtime_run_id }}
+          RUNTIME_SHA: ${{ needs.admit.outputs.runtime_sha }}
+          RUNTIME_RUN_ATTEMPT: ${{ needs.admit.outputs.runtime_run_attempt }}
+          RUNTIME_REFERENCE: ${{ needs.admit.outputs.runtime_reference }}
           TARGET_BRANCH: ${{ needs.admit.outputs.target_branch }}
           TARGET_SHA: ${{ needs.admit.outputs.target_sha }}
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
-          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$RUNTIME_SHA" ]]
           [[ "$BASE_MATRIX_KIND" == pr-anchors || \
              "$BASE_MATRIX_KIND" == native-anchors ]]
           [[ "$SOURCE_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$RUNTIME_RUN_ID" =~ ^[1-9][0-9]*$ && "$RUNTIME_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RUNTIME_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          if [[ "$RUNTIME_REFERENCE" != null ]]; then
+            printf '%s\n' "$RUNTIME_REFERENCE" > "$RUNNER_TEMP/compatibility-runtime-source.json"
+            python3 scripts/ci/ci_reuse.py verify --kind e2e \
+              --reference "$RUNNER_TEMP/compatibility-runtime-source.json"
+            jq -e --arg sha "$RUNTIME_SHA" --argjson run "$RUNTIME_RUN_ID" \
+              --argjson attempt "$RUNTIME_RUN_ATTEMPT" \
+              '.source.tested_sha == $sha and .source.run_id == $run and .source.run_attempt == $attempt' \
+              "$RUNNER_TEMP/compatibility-runtime-source.json" > /dev/null
+          else
+            [[ "$RUNTIME_SHA" == "$SOURCE_SHA" && "$RUNTIME_RUN_ID" == "$SOURCE_RUN_ID" ]]
+            [[ "$RUNTIME_RUN_ATTEMPT" == "$SOURCE_RUN_ATTEMPT" ]]
+          fi
 
           source_artifacts="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+            "repos/$GITHUB_REPOSITORY/actions/runs/$RUNTIME_RUN_ID/artifacts?per_page=100")"
           jq -e '
             (.total_count | type == "number" and . >= 0 and floor == .) and
             (.artifacts | type == "array") and
@@ -312,7 +334,7 @@ jobs:
               ([.artifacts[].id] | unique | length)
           ' <<< "$source_artifacts" > /dev/null
           bundle="$(jq -cer \
-            --argjson source_run_id "$SOURCE_RUN_ID" \
+            --argjson source_run_id "$RUNTIME_RUN_ID" \
             '[.artifacts[] | select(
               .name == "e2e-input-bundle" and .expired == false and
               .workflow_run.id == $source_run_id and
@@ -336,7 +358,7 @@ jobs:
           jq -e \
             --arg digest "$bundle_digest" \
             --argjson artifact_id "$bundle_id" \
-            --argjson run_id "$SOURCE_RUN_ID" \
+            --argjson run_id "$RUNTIME_RUN_ID" \
             --argjson size "$bundle_size" \
             '.id == $artifact_id and .name == "e2e-input-bundle" and
              .digest == $digest and .size_in_bytes == $size and
@@ -358,8 +380,11 @@ jobs:
             --max-file-bytes 67108864 \
             --max-compression-ratio 200 > /dev/null
           rm -f -- "$bundle_archive"
-          GITHUB_SHA="$SOURCE_SHA" \
+          GITHUB_SHA="$RUNTIME_SHA" \
             python3 scripts/release/verify_release.py --verify-staged
+          if [[ "$RUNTIME_REFERENCE" != null ]]; then
+            cp "$RUNNER_TEMP/compatibility-runtime-source.json" build/release/compatibility-runtime-source.json
+          fi
           target_arguments=()
           if [[ -n "$MINECRAFT_TARGET" ]]; then
             target_arguments+=(--minecraft-target "$MINECRAFT_TARGET")
@@ -369,13 +394,15 @@ jobs:
             --base-matrix-kind "$BASE_MATRIX_KIND" \
             > "$RUNNER_TEMP/compatibility-plan.raw.json"
           jq \
+            --argjson runtime_source "$RUNTIME_REFERENCE" \
             --arg source_branch "$SOURCE_BRANCH" \
             --arg source_sha "$SOURCE_SHA" \
             --arg target_branch "$TARGET_BRANCH" \
             --arg target_sha "$TARGET_SHA" \
             --argjson source_run_id "$SOURCE_RUN_ID" \
             '. + {source_run_id:$source_run_id,source_branch:$source_branch,
-              source_sha:$source_sha,target_branch:$target_branch,target_sha:$target_sha}' \
+              source_sha:$source_sha,target_branch:$target_branch,target_sha:$target_sha} |
+             if $runtime_source == null then . else . + {runtime_source:$runtime_source} end' \
             "$RUNNER_TEMP/compatibility-plan.raw.json" \
             > "$RUNNER_TEMP/mod-compatibility-plan.json"
           jq -e \
@@ -423,8 +450,8 @@ jobs:
           # matching the visual reviewer that certified these exact baseline bytes.
           baseline_artifacts="$(jq -cer \
             --argjson artifacts "$source_artifacts" \
-            --argjson source_run_attempt "$SOURCE_RUN_ATTEMPT" \
-            --argjson source_run_id "$SOURCE_RUN_ID" \
+            --argjson source_run_attempt "$RUNTIME_RUN_ATTEMPT" \
+            --argjson source_run_id "$RUNTIME_RUN_ID" \
             '([.runnable[].base_evidence_name] | unique) as $names |
              [$names[] as $name |
                ([$artifacts.artifacts[] | select(
@@ -447,7 +474,7 @@ jobs:
           mkdir -p "$baseline_root"
           jq -n \
             --argjson artifacts "$baseline_artifacts" \
-            --argjson source_run_id "$SOURCE_RUN_ID" \
+            --argjson source_run_id "$RUNTIME_RUN_ID" \
             '{schema_version:1,source_run_id:$source_run_id,artifacts:$artifacts}' \
             > "$baseline_root/inventory.json"
           while IFS=$'\t' read -r artifact_id artifact_name artifact_size artifact_digest; do
@@ -462,7 +489,7 @@ jobs:
               --arg digest "$artifact_digest" \
               --arg name "$artifact_name" \
               --argjson artifact_id "$artifact_id" \
-              --argjson run_id "$SOURCE_RUN_ID" \
+              --argjson run_id "$RUNTIME_RUN_ID" \
               --argjson size "$artifact_size" \
               '.id == $artifact_id and .name == $name and .digest == $digest and
                .size_in_bytes == $size and .expired == false and
@@ -538,7 +565,7 @@ jobs:
       - name: Check out exact tested runtime code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.admit.outputs.source_sha }}
+          ref: ${{ needs.admit.outputs.runtime_sha }}
           persist-credentials: false
 
       - name: Install Python for the protected CPM fixture
@@ -565,7 +592,7 @@ jobs:
         with:
           bundle-name: ${{ needs.prepare.outputs.bundle_name }}
           row-json: ${{ toJSON(matrix) }}
-          source-sha: ${{ needs.admit.outputs.source_sha }}
+          source-sha: ${{ needs.admit.outputs.runtime_sha }}
           scenarios: ${{ matrix.scenarios }}
           compatibility-mod: ${{ matrix.compatibility_mod }}
           cpm-model-path: ${{ matrix.compatibility_mod == 'cpm' && format('{0}/qsm-protected-cpm-fixture/complex-model.bin', runner.temp) || '' }}
@@ -589,7 +616,7 @@ jobs:
           ARTIFACT_RUN_ID: ${{ matrix.base_artifact.run_id }}
           ARTIFACT_SIZE: ${{ matrix.base_artifact.size_in_bytes }}
           BASE_NAME: ${{ matrix.base_evidence_name }}
-          SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
+          SOURCE_RUN_ID: ${{ needs.admit.outputs.runtime_run_id }}
         run: |
           set -euo pipefail
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
@@ -634,6 +661,7 @@ jobs:
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ needs.admit.outputs.source_run_id }}
+          RUNTIME_RUN_ID: ${{ needs.admit.outputs.runtime_run_id }}
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
@@ -657,7 +685,7 @@ jobs:
             --arg candidate_name "$CANDIDATE_NAME" \
             --argjson base "$base_json" \
             --argjson candidate "$current" \
-            --argjson base_run_id "$SOURCE_RUN_ID" \
+            --argjson base_run_id "$RUNTIME_RUN_ID" \
             --argjson candidate_run_id "$GITHUB_RUN_ID" \
             'def record($inventory;$name;$run_id):
                [$inventory.artifacts[] | select(.name == $name and .expired == false and
@@ -673,7 +701,12 @@ jobs:
             > "$inventory"
           capsule="$RUNNER_TEMP/mod-compatibility-capsule"
           mkdir -p "$capsule"
+          runtime_arguments=()
+          if [[ -f build/release/compatibility-runtime-source.json ]]; then
+            runtime_arguments=(--runtime-source build/release/compatibility-runtime-source.json)
+          fi
           python3 e2e/mod_compatibility_visual.py \
+            ${runtime_arguments[@]+"${runtime_arguments[@]}"} \
             --candidate-root e2e-out/current \
             --base-root base-evidence \
             --scenario-contract e2e/scenario-contract.json \

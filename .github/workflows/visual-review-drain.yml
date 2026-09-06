@@ -897,6 +897,7 @@ jobs:
               "scenario_contract_sha256", "schema_version", "source_branch",
               "source_run_id", "source_sha", "visual_reference"] +
               (if $bundle_key != "" then ["bundle_key", "matrix_sha256"] else [] end) +
+              (if $bundle_key != "" and ($proof | has("runtime_source")) then ["runtime_source"] else [] end) +
               (if $bundle_key != "" and $proof.schema_version == 7 then ["feature_selection"] else [] end) | sort) and
              (if $bundle_key != "" then (.schema_version == 6 or .schema_version == 7 or .schema_version == 8) and .bundle_key == $bundle_key
               else .schema_version == 5 end) and .source_run_id == $source_run_id and
@@ -930,7 +931,7 @@ jobs:
                (.size_in_bytes | type == "number" and . > 0 and . <= 67108864) and
                (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
                (.expired == false) and (.workflow_run | type == "object") and
-               (.workflow_run.id == $source_run_id)] | all) and
+               (.workflow_run.id == ($proof.runtime_source.source.run_id // $source_run_id))] | all) and
              ([.artifact_inventory[].size_in_bytes] | add // 0) <= 268435456 and
              (.job_graph | type == "object" and .runtime_policy == "full") and
              .manifest_sha256 == $manifest_sha256 and .frame_count == $frame_count and

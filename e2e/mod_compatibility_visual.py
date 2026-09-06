@@ -8,9 +8,13 @@ import hashlib
 import json
 import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts/ci"))
+import ci_reuse
 
 from mod_compatibility import (
     DEFAULT_CONTRACT as DEFAULT_COMPATIBILITY_CONTRACT,
@@ -275,8 +279,15 @@ def curate(
     target_sha: str,
     compatibility_run_id: int,
     implementation_sha: str,
+    runtime_source: dict[str, Any] | None = None,
 ) -> list[dict[str, object]]:
-    if inventory["base"]["run_id"] != source_run_id:
+    original_run_id = source_run_id
+    if runtime_source is not None:
+        original = ci_reuse.validate_reference(runtime_source, "e2e")
+        if runtime_source["coverage_sha"] != source_sha or source_sha != target_sha or target_branch != "master":
+            raise CompatibilityVisualError("compatibility source differs from the reused runtime generation")
+        original_run_id = original["run_id"]
+    if inventory["base"]["run_id"] != original_run_id:
         raise CompatibilityVisualError("base artifact run disagrees with source_run_id")
     if inventory["candidate"]["run_id"] != compatibility_run_id:
         raise CompatibilityVisualError(
@@ -425,6 +436,7 @@ def curate(
             "manifest_sha256": manifest_sha256,
             "frame_count": len(curated),
             "artifact_inventory": inventory,
+            **({"runtime_source": runtime_source} if runtime_source is not None else {}),
         },
     )
     return curated
@@ -449,6 +461,7 @@ def main() -> int:
     parser.add_argument("--target-sha", required=True)
     parser.add_argument("--compatibility-run-id", type=int, required=True)
     parser.add_argument("--implementation-sha", required=True)
+    parser.add_argument("--runtime-source", type=Path)
     args = parser.parse_args()
     try:
         if (
@@ -476,6 +489,7 @@ def main() -> int:
             target_sha=args.target_sha,
             compatibility_run_id=args.compatibility_run_id,
             implementation_sha=args.implementation_sha,
+            runtime_source=ci_reuse.read_json(args.runtime_source) if args.runtime_source else None,
         )
         print(f"Curated {len(curated)} same-version compatibility frame pairs")
         return 0

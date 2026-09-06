@@ -6,6 +6,7 @@ import json
 import shutil
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -17,6 +18,19 @@ import evidence
 import feature_evidence as feature
 from build_site import build
 from visual_evidence import load_catalog
+
+
+def merged_reference(tested_sha, covered_sha, run_id):
+    """Inert public-format fixture; GitHub source authentication has separate transport tests."""
+    source = {"schema_version": 1, "kind": "quick-skin-tested-source", "repository": "The-Plum-Team/Quick-Skin-Mod",
+        "workflow": ".github/workflows/on-demand-e2e.yml", "run_id": run_id, "run_attempt": 1,
+        "head_sha": "c" * 40, "head_branch": "feature/hud", "head_repository": "The-Plum-Team/Quick-Skin-Mod",
+        "tested_sha": tested_sha, "tree_sha": "d" * 40, "pull_request": 7, "base_sha": "a" * 40}
+    return {"schema_version": 1, "kind": "quick-skin-merged-source", "repository": source["repository"],
+        "workflow": source["workflow"], "coverage_sha": covered_sha, "source": source,
+        "seal_artifact": {"id": 999, "name": "tested-source-e2e", "size_in_bytes": 1024,
+            "digest": "sha256:" + "e" * 64, "expired": False,
+            "workflow_run": {"id": run_id, "head_sha": source["head_sha"], "head_branch": source["head_branch"]}}}
 
 
 class FeaturePagesTest(unittest.TestCase):
@@ -66,13 +80,56 @@ class FeaturePagesTest(unittest.TestCase):
         evidence.compact_bundle(self.root / "selected", self.root / "selected-compact", self.key,
                                  selection=self.selection)
 
-    def prepare(self, output, source, run, selection=None):
+    def prepare(self, output, source, run, selection=None, runtime_source=None):
         return evidence.prepare(e2e_root=self.root / "e2e-1.20.1", matrix_path=evidence.DEFAULT_MATRIX,
             catalog_path=evidence.DEFAULT_CATALOG, output_root=self.root / output,
-            repository="The-Plum-Team/Quick-Skin-Mod", source_run_id=run, source_branch="master",
-            source_sha=source, source_created_at="2026-09-06T02:00:00Z", target_run_id=run,
-            target_branch="master", target_sha=source, target_created_at="2026-09-06T02:00:00Z",
-            minecraft_target="1.20.1", feature_selection=selection)
+            repository="The-Plum-Team/Quick-Skin-Mod", source_run_id=run,
+            source_branch=runtime_source["source"]["head_branch"] if runtime_source else "master",
+            source_sha=source, source_created_at="2026-09-06T02:00:00Z", target_run_id="66" if runtime_source else run,
+            target_branch="master", target_sha=runtime_source["coverage_sha"] if runtime_source else source,
+            target_created_at="2026-09-06T02:00:00Z", minecraft_target="1.20.1",
+            feature_selection=selection, runtime_source=runtime_source)
+
+    def test_reused_full_public_bundle_keeps_original_identity_through_compaction(self):
+        shutil.rmtree(self.root / "evidence/forge-and-fabric-1.20.1")
+        self.fixture.write_branch("forge-and-fabric-1.20.1", "1.20.1")
+        reference = merged_reference(self.source_sha, "f" * 40, 55)
+        raw = self.prepare("reused-full", self.source_sha, "55", runtime_source=reference)
+        compact = evidence.compact_bundle(raw.parent, self.root / "reused-full-compact", self.key)
+        value = evidence.validate_bundle(compact.parent, self.key, expected_kind="compact")
+        self.assertEqual(reference, value["runtime_source"])
+        self.assertEqual((self.source_sha, "55"),
+                         (value["provenance"]["source"]["sha"], value["provenance"]["source"]["run_id"]))
+        self.assertEqual(("f" * 40, "66"),
+                         (value["provenance"]["target"]["sha"], value["provenance"]["target"]["run_id"]))
+        value["provenance"]["source"]["sha"] = "f" * 40
+        (compact / "manifest.json").write_text(json.dumps(value))
+        with self.assertRaisesRegex(evidence.PublicEvidenceError, "original tested"):
+            evidence.validate_bundle(compact.parent, self.key)
+
+    def test_reused_selected_public_bundle_composes_without_relabelling_older_frames(self):
+        self.selection = replace(self.selection, policy_commit=self.baseline_sha)
+        self.feature["admission"] = self.selection.to_dict()
+        self.feature["coverage"]["selection_sha256"] = self.selection.sha256
+        for path in (self.root / "e2e-1.20.1").glob("profiles/*/result.json"):
+            result = json.loads(path.read_bytes())
+            result["selection_sha256"] = self.selection.sha256
+            for report in result["reports"].values(): report["selection_sha256"] = self.selection.sha256
+            path.write_text(json.dumps(result))
+        reference = merged_reference(self.source_sha, "f" * 40, 55)
+        raw = self.prepare("reused-selected", self.source_sha, "55", self.feature, reference)
+        compact = evidence.compact_bundle(raw.parent, self.root / "reused-selected-compact", self.key,
+                                          selection=self.selection)
+        bundle = feature.compose(self.root / "base-compact", compact.parent, self.root / "reused-composed",
+                                  self.key, selection=self.selection, coverage_sha="f" * 40)
+        value = evidence.validate_bundle(bundle.parent, self.key, expected_kind="compact")
+        self.assertEqual(reference, value["runtime_source"])
+        selected = [frame for frame in value["frames"] if frame["evidence_epoch"] == "selected"]
+        older = [frame for frame in value["frames"] if frame["evidence_epoch"] == "baseline"]
+        self.assertEqual(4, len(selected))
+        self.assertEqual({self.source_sha}, {frame["tested_provenance"]["source"]["sha"] for frame in selected})
+        self.assertEqual({self.baseline_sha}, {frame["tested_provenance"]["source"]["sha"] for frame in older})
+        self.assertEqual({"f" * 40}, {frame["coverage_sha"] for frame in value["frames"]})
 
     def compose(self, name="composed"):
         return feature.compose(self.root / "base-compact", self.root / "selected-compact",

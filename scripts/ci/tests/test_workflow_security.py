@@ -209,8 +209,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             action,
         )
         self.assertIn(
-            "evidence-retention-days: ${{ startsWith(github.ref_name, "
-            "'automation/sync/') && '7' || '1' }}",
+            "evidence-retention-days: '7'",
             on_demand,
         )
 
@@ -289,7 +288,12 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "on-demand-e2e.yml",
                 "Upload immutable E2E input bundle",
                 "e2e-input-bundle",
-            ): "${{ startsWith(github.ref_name, 'automation/sync/') && 7 || 1 }}",
+            ): "7",
+            ("build-gate.yml", "Upload the staged release bundle for exact-head reuse", "staged-release-bundle"): "7",
+            ("build-gate.yml", "Preserve original build provenance without copying its binaries", "reused-source-build"): "90",
+            ("build-gate.yml", "Retain the immutable tested-build record", "tested-source-build"): "90",
+            ("on-demand-e2e.yml", "Retain the original runtime reference without copying its captures", "reused-source-e2e"): "90",
+            ("on-demand-e2e.yml", "Retain the immutable tested-runtime record", "tested-source-e2e"): "90",
             (
                 "mod-compatibility-e2e.yml",
                 "Upload the authenticated compatibility plan",
@@ -1015,8 +1019,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("[.runnable[].base_evidence_name] | unique", prepare)
         self.assertIn(".source_branch == .target_branch", enumerate_review)
-        self.assertIn('[[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]', prepare)
-        self.assertIn('GITHUB_SHA="$SOURCE_SHA"', prepare)
+        self.assertIn('[[ "$(git rev-parse HEAD)" == "$RUNTIME_SHA" ]]', prepare)
+        self.assertIn('GITHUB_SHA="$RUNTIME_SHA"', prepare)
+        self.assertIn('ci_reuse.py verify --kind e2e', prepare)
         self.assertIn("not_applicable", prepare)
         self.assertIn(".release_branch == $target_branch", prepare)
         self.assertIn("all(.runnable[];", prepare)
@@ -1030,7 +1035,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             4,
         )
         self.assertIn("cpm-model-path:", runtime)
-        self.assertIn("source-sha: ${{ needs.admit.outputs.source_sha }}", runtime)
+        self.assertIn("source-sha: ${{ needs.admit.outputs.runtime_sha }}", runtime)
         self.assertIn("same-version baseline", runtime)
         self.assertIn("--candidate-root e2e-out/current", runtime)
         self.assertIn(
@@ -1459,8 +1464,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         prepare = job_block("mod-compatibility-e2e.yml", "prepare")
         inventory_block = prepare[prepare.index("baseline_artifacts=") :]
         match = re.search(
-            r'--argjson source_run_attempt "\$SOURCE_RUN_ATTEMPT" \\\n\s+'
-            r'--argjson source_run_id "\$SOURCE_RUN_ID" \\\n\s+\'(?P<program>.*?)\' \\\n\s+"\$RUNNER_TEMP/mod-compatibility-plan\.json"',
+            r'--argjson source_run_attempt "\$RUNTIME_RUN_ATTEMPT" \\\n\s+'
+            r'--argjson source_run_id "\$RUNTIME_RUN_ID" \\\n\s+\'(?P<program>.*?)\' \\\n\s+"\$RUNNER_TEMP/mod-compatibility-plan\.json"',
             inventory_block,
             re.DOTALL,
         )
@@ -2864,7 +2869,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         build = job_block("on-demand-e2e.yml", "build")
 
         self.assertIn("name: staged-release-bundle", gate)
-        self.assertIn("retention-days: 1", gate)
+        self.assertIn("retention-days: 7", gate)
         source = job_block("on-demand-e2e.yml", "build-source")
         consumer = (ROOT / "scripts/ci/staged_build_bundle.py").read_text()
         self.assertIn("scripts/ci/staged_build_bundle.py --wait-seconds 5400", source)
@@ -2888,8 +2893,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('python scripts/release/verify_release.py "${target_args[@]}"', target)
         self.assertIn("needs: target", assemble)
         self.assertIn("scripts/release/assemble_build.py", assemble)
-        self.assertIn("needs: [compile, policy]", gate)
-        self.assertIn('[[ "$COMPILE_RESULT" == success && "$POLICY_RESULT" == success ]]', gate)
+        self.assertIn("needs: [source, compile, policy]", gate)
+        self.assertIn('[[ "$REUSED" == false && "$COMPILE_RESULT" == success && "$POLICY_RESULT" == success ]]', gate)
         self.assertIn("--verify-staged", gate)
         self.assertIn("max-parallel: 16", job_block("on-demand-e2e.yml", "e2e"))
 

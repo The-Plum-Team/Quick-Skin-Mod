@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts/ci"))
+sys.path.insert(0, str(ROOT / "scripts/release/tests"))
 
 import shared_compatibility as shared
 import test_feature_coverage as coverage_fixtures
@@ -68,6 +69,28 @@ class SharedCompatibilityTest(unittest.TestCase):
         self.assertEqual("1.21.1", result["minecraft_target"])
         self.assertEqual(self.fixture.source, result["target_sha"])
         self.assertEqual([self.record["id"]], self.api.downloaded)
+
+    def test_reused_generation_exposes_original_bundle_identity_without_relabelling_the_review(self):
+        from test_feature_pages import merged_reference
+        reference = merged_reference("d" * 40, self.fixture.source, 54)
+        original = {**self.api.runs[55], "id": 54, "head_sha": "c" * 40, "head_branch": "feature/hud"}
+        inventory = copy.deepcopy(self.fixture.artifacts + self.api.records["e2e-input-bundle"])
+        for item in inventory:
+            item["workflow_run"] = {key: original[key] for key in ("id", "head_sha", "head_branch")}
+        runtime = shared.review.ci_reuse.RuntimeSource(self.api.runs[55], original, inventory, {}, reference)
+        by_id = {item["id"]: item for item in inventory}
+        proof = json.loads(self.contents["curation-proof.json"])
+        proof["runtime_source"] = reference
+        proof["artifact_inventory"] = [by_id[item["id"]] for item in proof["artifact_inventory"]]
+        proof["visual_reference"].update(source_sha="d" * 40, source_run_id=54,
+            artifact=by_id[proof["visual_reference"]["artifact"]["id"]])
+        self.contents["curation-proof.json"] = json.dumps(proof).encode()
+        self.replace_archive()
+        with patch.object(shared.review, "authenticate_full", return_value=runtime):
+            result = self.admit()
+        self.assertEqual((54, "d" * 40), (result["runtime_run_id"], result["runtime_sha"]))
+        self.assertEqual((55, self.fixture.source), (result["source_run_id"], result["source_sha"]))
+        self.assertEqual(reference, json.loads(result["runtime_reference"]))
 
     def test_incomplete_source_and_partial_generation_cannot_start_mod_downloads(self):
         self.api.job_lists[55][0]["jobs"][-1]["conclusion"] = "failure"

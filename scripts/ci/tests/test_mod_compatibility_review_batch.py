@@ -175,6 +175,28 @@ class ModCompatibilityReviewBatchTest(unittest.TestCase):
         self.assertEqual(1, len(plan["represented_by_label"]))
         self.assertEqual(1, len(plan["triage_chunks"]))
 
+    def test_reused_runtime_provenance_survives_batching_and_rejects_a_foreign_baseline(self) -> None:
+        sys.path.insert(0, str(ROOT / "scripts/release/tests"))
+        from test_feature_pages import merged_reference
+        reference = merged_reference("d" * 40, SOURCE_SHA, 98)
+        for lane in self.lanes:
+            lane.update(target_branch="master", target_sha=SOURCE_SHA)
+            path = self.lanes_root / lane["id"] / "curation-proof.json"
+            proof = json.loads(path.read_bytes())
+            proof.update(target_branch="master", target_sha=SOURCE_SHA, runtime_source=reference)
+            proof["artifact_inventory"]["base"]["run_id"] = 98
+            write_json(path, proof)
+        write_json(self.matrix_path, {"include": self.lanes})
+        output = self.root / "reused-batch"
+        assemble(self.matrix_path, self.lanes_root, output)
+        validate_batch(output, require_images=True)
+        path = self.lanes_root / self.lanes[0]["id"] / "curation-proof.json"
+        proof = json.loads(path.read_bytes())
+        proof["artifact_inventory"]["base"]["run_id"] = 99
+        write_json(path, proof)
+        with self.assertRaisesRegex(BatchError, "original runtime"):
+            assemble(self.matrix_path, self.lanes_root, self.root / "foreign-batch")
+
     def test_single_frame_may_retain_two_unique_images(self) -> None:
         lane = self.lanes[0]
         matrix_path = self.root / "single-matrix.json"

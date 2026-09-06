@@ -100,6 +100,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "scripts/ci/feature_coverage_github.py",
     "scripts/ci/feature_coverage_consumer.py",
     "scripts/ci/feature_review.py",
+    "scripts/ci/ci_reuse.py",
     "scripts/ci/shared_compatibility.py",
     "scripts/ci/feature_pages.py",
     ".github/workflows/feature-coverage.yml",

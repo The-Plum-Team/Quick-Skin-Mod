@@ -15,6 +15,7 @@ from typing import Any
 
 import feature_coverage as coverage
 import feature_coverage_github as publisher
+import ci_reuse
 from bounded_zip import ExtractionLimits, extract_bounded_zip
 from visual_review_queue import QueueError, parse_artifact, valid_owner
 
@@ -37,10 +38,20 @@ def _hash(value: Any) -> bool:
 
 
 def authenticate_execution(api: publisher.Api, repository: Path, *, run_id: int,
-                           tested_sha: str, policy_sha: str, pull_number: int | None = None) -> None:
+                           tested_sha: str, policy_sha: str, pull_number: int | None = None,
+                           merged_reference: dict | None = None) -> None:
     """Bind a master run or GitHub's actual PR merge tree, including both authenticated parents."""
     coverage.admission._commit(repository, tested_sha)
     coverage.admission._commit(repository, policy_sha)
+    if merged_reference is not None:
+        source = ci_reuse.validate_reference(merged_reference, "e2e")
+        ci_reuse.require((run_id, tested_sha, policy_sha, pull_number) == (
+            source["run_id"], source["tested_sha"], source["base_sha"], source["pull_request"])
+            and api.current_sha() == merged_reference["coverage_sha"],
+            "selected source differs from the merged PR execution")
+        ci_reuse.verify_reference(api, merged_reference, "e2e")
+        coverage.policy_fingerprint(repository, policy_sha, verify_executing=True)
+        return
     if api.current_sha() != policy_sha:
         raise coverage.CoverageError("selection policy is no longer current master")
     run = api.run(run_id)
@@ -231,10 +242,10 @@ def _from_artifact(api: publisher.Api, artifact: Any, *, repository: Path, head:
 
 def verify(api: publisher.Api, selection_path: Path, coverage_path: Path, *, repository: Path,
            head: str, policy: str, run_id: int, directory: Path,
-           pull_number: int | None = None) -> tuple[Any, dict[str, Any]]:
+           pull_number: int | None = None, merged_reference: dict | None = None) -> tuple[Any, dict[str, Any]]:
     """Reauthenticate exact published evidence; supplied identities never choose the tested source."""
     authenticate_execution(api, repository, run_id=run_id, tested_sha=head,
-                           policy_sha=policy, pull_number=pull_number)
+                           policy_sha=policy, pull_number=pull_number, merged_reference=merged_reference)
     source = api.run(run_id)
     if source.get("status") != "completed" or source.get("conclusion") != "success":
         raise coverage.CoverageError("selected evidence requires a successful completed source run")
@@ -253,7 +264,7 @@ def verify(api: publisher.Api, selection_path: Path, coverage_path: Path, *, rep
             or coverage.admission.canonical(selection) != selected.to_bytes()):
         raise coverage.CoverageError("selected evidence differs from its independently authenticated coverage")
     authenticate_execution(api, repository, run_id=run_id, tested_sha=head,
-                           policy_sha=policy, pull_number=pull_number)
+                           policy_sha=policy, pull_number=pull_number, merged_reference=merged_reference)
     return selected, proof
 
 
