@@ -621,6 +621,7 @@
         "appearance-data"
       ],
       "implementation": [
+        "appearance-services",
         "asset-catalog",
         "configuration",
         "content-core",

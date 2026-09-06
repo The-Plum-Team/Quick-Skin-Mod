@@ -62,6 +62,12 @@ The feature Pages consumer separately authenticates baseline and selected compon
 original tested SHA/run/JAR provenance for every reused frame. A consumer expecting full evidence
 must reject a selected report, even when that selection happens to contain all authored steps.
 
+`PlayerOwnSkinBootstrap` belongs to `skin-import`, including its bounded async startup task,
+closed-state guard, and persisted own-skin selection. `SavedAppearanceRestorer` belongs to
+`appearance-services`. `ClientEvents` admits the session/Replay subject and delegates to those
+features; it owns event registration and teardown wiring. The existing catalog E2E checks inspect
+the actual import owner and exercise the same composed saved-appearance path.
+
 `PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
 after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in
 `minecraft-adapter`. That facade selects four implementations by Minecraft API family: immediate

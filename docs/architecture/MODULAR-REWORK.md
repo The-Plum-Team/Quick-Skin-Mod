@@ -693,3 +693,13 @@ from the release matrix and external-mod lock. The target key travels inside the
 report name so GitHub's dispatch payload remains within its ten-property limit. Concurrency is
 per target and generation; one Minecraft target cannot replace another target's pending wave.
 The existing complete optional profiles and compact public compatibility evidence remain intact.
+
+### Appearance lifecycle ownership
+
+The remaining own-skin import and saved-appearance restoration moved out of `ClientEvents` into
+`skin-import` and `appearance-services`. The assembly shrank from 523 to 276 lines; the existing
+import/cancellation guards, native-main-thread commit, persisted identity, Replay subject routing,
+and version-specific restore behavior are preserved. The catalog harness now inspects the real
+import owner instead of silently accepting a missing old field. Module graph and Java/Python
+selection checks pass, as do common tests and both production/harness builds on 1.20.1 and 26.2.
+The full matrix is the next acceptance step.
