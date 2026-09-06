@@ -466,9 +466,11 @@ jobs:
     # Exact wakes remain independent through authentication and release, but only one capsule for
     # one protected implementation may restore, extend and republish its verdict cache at a time.
     # This lets the next version reuse the preceding review instead of paying for the same frames
-    # while concurrent jobs race from the same older cache snapshot.
+    # while concurrent jobs race from the same older cache snapshot. Keep all pending capsules:
+    # GitHub's default single-pending queue would cancel the rest of a multi-version wave.
     concurrency:
       group: quick-skin-visual-review-model-${{ needs.select.outputs.implementation_sha }}
+      queue: max
       cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -2362,71 +2364,3 @@ jobs:
           github_api_retry --method POST \
             "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" \
             > /dev/null
-
-  continue:
-    name: Wake the next queued review
-    needs:
-      - select
-      - review
-      - cleanup
-    if: >-
-      always() && needs.select.outputs.eligible == 'true' &&
-      ((needs.cleanup.result == 'success' &&
-        (needs.review.outputs.review_complete == 'true' ||
-         needs.review.outputs.already_reviewed == 'true' ||
-         (needs.review.outputs.failure_category != '' &&
-          needs.review.outputs.failure_transient == 'false'))) ||
-       needs.review.outputs.failure_category != '' ||
-       needs.review.outputs.cooling == 'true') &&
-      needs.review.outputs.wave_blocked != 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: write
-
-    steps:
-      - name: Dispatch another independently selected drain unless this wave is blocked
-        shell: bash
-        env:
-          ARTIFACT_ID: ${{ needs.select.outputs.artifact_id }}
-          ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
-          GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ \
-            || "$ARTIFACT_NAME" =~ \
-              ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA(--mc[0-9]+([.][0-9]+)+)?$ ]]
-          payload="$(mktemp "$RUNNER_TEMP/visual-review-continuation.XXXXXX")"
-          jq -n \
-            --arg artifact_id "$ARTIFACT_ID" \
-            --arg artifact_name "$ARTIFACT_NAME" \
-            --arg generation_sha "$GENERATION_SHA" \
-            '{event_type:"visual-review-drain-requested",client_payload:{
-              artifact_id:$artifact_id,artifact_name:$artifact_name,
-              generation_sha:$generation_sha}}' \
-            > "$payload"
-          dispatch_error="$(mktemp "$RUNNER_TEMP/visual-review-dispatch.XXXXXX")"
-          for attempt in 1 2 3; do
-            : > "$dispatch_error"
-            if gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
-                --input "$payload" 2>"$dispatch_error"; then
-              exit 0
-            fi
-            # Every curated capsule receives an exact wake when it is enqueued, and the scheduled
-            # sweep can recover a coalesced wake. This continuation is deliberately redundant, so
-            # an exhausted installation quota must not turn a completed clean review red.
-            if grep -Fq 'API rate limit exceeded' "$dispatch_error"; then
-              echo "::warning::GitHub API quota exhausted; queue continuation deferred"
-              exit 0
-            fi
-            if grep -Eq 'secondary rate limit|abuse detection|\(HTTP 429\)' \
-                "$dispatch_error" && (( attempt < 3 )); then
-              sleep $((attempt * 5))
-              continue
-            fi
-            cat "$dispatch_error" >&2
-            exit 1
-          done

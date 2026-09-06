@@ -466,7 +466,6 @@ class WorkflowSecurityTest(unittest.TestCase):
         release_compatibility = job_block(
             "visual-review-drain.yml", "release-mod-compatibility"
         )
-        continuation = job_block("visual-review-drain.yml", "continue")
         pages = job_block("on-demand-e2e.yml", "prepare-pages-evidence")
         notify = job_block("on-demand-e2e.yml", "notify-version-port")
 
@@ -498,7 +497,6 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "cleanup",
                 "release-mod-compatibility",
                 "release-anchor",
-                "continue",
             },
             set(re.findall(r"(?m)^  ([a-z0-9-]+):\n", drain_jobs)),
         )
@@ -516,6 +514,10 @@ class WorkflowSecurityTest(unittest.TestCase):
             review,
         )
         self.assertIn("cancel-in-progress: false", review)
+        # GitHub's default concurrency queue cancels all but the newest pending job.
+        # Preserve different capsules while serializing the shared verdict cache.
+        self.assertRegex(review, r"(?m)^      queue: max$")
+        self.assertNotIn("queue: max", drain_header)
         self.assertNotIn("concurrency:", capacity_check)
         self.assertIn("scripts/ci/claude_capacity_gate.py", capacity_check)
         self.assertIn("needs.select.outputs.direct == 'true'", capacity_check)
@@ -823,11 +825,10 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("for attempt in {1..4}", release_anchor)
         self.assertIn("gh api rate_limit --jq .resources.core.reset", release_anchor)
         self.assertIn("github_api_retry --method POST", release_anchor)
-        self.assertIn("contents: write", continuation)
-        self.assertIn("needs.review.outputs.wave_blocked != 'true'", continuation)
-        self.assertIn("API rate limit exceeded", continuation)
-        self.assertIn("queue continuation deferred", continuation)
-        self.assertIn("visual-review-continuation", continuation)
+        # Completed/deleted capsules must not wake themselves again. Exact curator
+        # wakes, capacity recovery and the scheduled sweep own retry admission.
+        self.assertNotIn("Wake the next queued review", drain_workflow)
+        self.assertNotIn("visual-review-continuation", drain_workflow)
 
         self.assertIn("lossless Minecraft 1.20.1", triage_prompt)
         self.assertIn("becoming softer or blurred", triage_prompt)
