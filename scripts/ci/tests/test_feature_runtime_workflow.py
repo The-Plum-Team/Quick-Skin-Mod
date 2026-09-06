@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import textwrap
+import unittest
+from pathlib import Path
+
+from test_workflow_security import COMPOSITE_ACTIONS, job_block, step_script
+
+
+def action_script(name):
+    text = (COMPOSITE_ACTIONS / "run-packaged-e2e/action.yml").read_text()
+    step = text.split("    - name: " + name + "\n", 1)[1].split("\n    - name:", 1)[0]
+    return textwrap.dedent(step.split("      run: |\n", 1)[1])
+
+
+class FeatureRuntimeWorkflowTest(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        binary = self.root / "bin"
+        binary.mkdir()
+        self.environment = {"PATH": str(binary) + ":/usr/bin:/bin", "RUNNER_TEMP": str(self.root),
+            "GITHUB_WORKSPACE": str(self.root), "GITHUB_OUTPUT": str(self.root / "outputs"),
+            "GITHUB_STEP_SUMMARY": str(self.root / "summary"), "GITHUB_RUN_ID": "66",
+            "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod", "RECORD": str(self.root / "calls")}
+        self.binary("xvfb-run", "import json,os,sys\nopen(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n")
+        self.binary("sha256sum", "import hashlib,sys\nprint(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest()+'  '+sys.argv[1])\n")
+        self.binary("git", "import os,sys\nprint(os.environ['POLICY_SHA'] if sys.argv[2]=='protected-policy' else os.environ['TESTED_SHA'])\n")
+        self.selection = self.root / "feature-selection/selection.json"
+        self.selection.parent.mkdir()
+        self.selection.write_text(json.dumps({"selection": {"runs": [
+            {"scenario": "full"}, {"scenario": "feature-navigation"}]}}) + "\n")
+
+    def binary(self, name, script):
+        path = self.root / "bin" / name
+        path.write_text("#!" + sys.executable + "\n" + script)
+        path.chmod(0o755)
+
+    def run_script(self, script, environment):
+        (self.root / "outputs").write_text("")
+        (self.root / "calls").write_text("")
+        result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
+            cwd=self.root, env={**self.environment, **environment}, text=True, capture_output=True)
+        outputs = dict(line.split("=", 1) for line in (self.root / "outputs").read_text().splitlines())
+        calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
+        return result, outputs, calls
+
+    def runtime_environment(self):
+        return {"E2E_ROW_JSON": "{}", "E2E_SCENARIOS": "phase0-smoke,full,session",
+            "E2E_SELECTION_BASE": "a" * 40, "E2E_SELECTION_POLICY": "b" * 40,
+            "E2E_SELECTION_SHA256": hashlib.sha256(self.selection.read_bytes()).hexdigest(),
+            "RELEASE_TARGET": "", "E2E_COMPATIBILITY_MOD": "", "QUICKSKIN_E2E_CPM_MODEL_PATH": ""}
+
+    def test_runtime_receives_exact_selected_scenarios_and_independent_git_provenance(self):
+        result, outputs, calls = self.run_script(action_script("Run contract-declared packaged scenarios"),
+                                                  self.runtime_environment())
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        self.assertEqual({}, outputs)
+        self.assertEqual(1, len(calls))
+        arguments = calls[0]
+        self.assertEqual("full,feature-navigation", arguments[arguments.index("--scenarios") + 1])
+        self.assertEqual("a" * 40, arguments[arguments.index("--selection-base") + 1])
+        self.assertEqual("b" * 40, arguments[arguments.index("--selection-policy") + 1])
+        self.assertEqual(str(self.selection), arguments[arguments.index("--selection-admission") + 1])
+
+    def test_complete_runtime_keeps_its_authored_scenarios_without_selection_arguments(self):
+        environment = self.runtime_environment()
+        environment.update(E2E_SELECTION_BASE="", E2E_SELECTION_POLICY="", E2E_SELECTION_SHA256="")
+        result, _, calls = self.run_script(action_script("Run contract-declared packaged scenarios"), environment)
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        arguments = calls[0]
+        self.assertEqual(environment["E2E_SCENARIOS"], arguments[arguments.index("--scenarios") + 1])
+        self.assertNotIn("--selection-admission", arguments)
+        self.assertNotIn("", arguments)
+
+    def test_tampered_incomplete_empty_or_compatibility_selection_never_launches_minecraft(self):
+        for changes in ({"E2E_SELECTION_SHA256": "0" * 64}, {"E2E_SELECTION_BASE": ""},
+                        {"E2E_SELECTION_POLICY": "b" * 40 + "\ninjected=true"},
+                        {"E2E_SELECTION_SHA256": ""}, {"RELEASE_TARGET": "1.21.5"},
+                        {"E2E_COMPATIBILITY_MOD": "cpm"}):
+            with self.subTest(changes=changes):
+                result, _, calls = self.run_script(action_script("Run contract-declared packaged scenarios"),
+                    {**self.runtime_environment(), **changes})
+                self.assertNotEqual(0, result.returncode)
+                self.assertEqual([], calls)
+        self.selection.write_text('{"selection":{"runs":[]}}\n')
+        result, _, calls = self.run_script(action_script("Run contract-declared packaged scenarios"),
+                                          self.runtime_environment())
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual([], calls)
+
+    def test_selector_or_upload_failure_cannot_publish_partial_runtime_arguments(self):
+        script = step_script("on-demand-e2e.yml", "feature-policy", "Resolve unavailable selection to complete captures")
+        environment = {"SELECTION_OUTCOME": "success", "UPLOAD_OUTCOME": "success", "SELECTIVE": "true",
+            "SELECTION_BASE": "a" * 40, "SELECTION_POLICY": "b" * 40, "SELECTION_SHA256": "c" * 64}
+        result, outputs, _ = self.run_script(script, environment)
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        self.assertEqual("true", outputs["selective"])
+        for changes in ({"SELECTION_OUTCOME": "failure"}, {"UPLOAD_OUTCOME": "failure"},
+                        {"UPLOAD_OUTCOME": "skipped"}, {"SELECTIVE": "false"},
+                        {"SELECTION_SHA256": "invalid"}, {"SELECTION_BASE": "bad\nhead=bad"}):
+            with self.subTest(changes=changes):
+                result, outputs, _ = self.run_script(script, {**environment, **changes})
+                self.assertEqual(0, result.returncode, result.stderr[:300])
+                self.assertEqual({"selective": "false", "base": "", "policy": "", "selection_sha256": ""}, outputs)
+
+    def test_first_migration_uses_full_coverage_and_only_protected_code_can_run(self):
+        script = step_script("on-demand-e2e.yml", "feature-policy",
+                             "Authenticate complete baseline and cumulative feature impact")
+        environment = {"TESTED_SHA": "a" * 40, "POLICY_SHA": "b" * 40, "PULL_NUMBER": "88"}
+        result, outputs, calls = self.run_script(script, environment)
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        self.assertEqual(({}, []), (outputs, calls))
+        protected = self.root / "protected-policy/scripts/ci/feature_coverage_consumer.py"
+        protected.parent.mkdir(parents=True)
+        protected.write_text("import json,os,sys\nopen(os.environ['RECORD'],'a').write(json.dumps(sys.argv)+'\\n')\n")
+        matrix = self.root / "protected-policy/release/release-matrix.json"
+        matrix.parent.mkdir()
+        matrix.write_text('{"schema_version":3}\n')
+        self.binary("python3", "import os,sys\nos.execv(" + repr(sys.executable) + ", [" + repr(sys.executable) + ", *sys.argv[1:]])\n")
+        result, _, calls = self.run_script(script, environment)
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        self.assertEqual(1, len(calls))
+        self.assertEqual("protected-policy/scripts/ci/feature_coverage_consumer.py", calls[0][0])
+        self.assertEqual("88", calls[0][calls[0].index("--pull-number") + 1])
+        self.assertEqual(str(self.root / "candidate-history"), calls[0][calls[0].index("--repository") + 1])
+        self.assertEqual("a" * 40, calls[0][calls[0].index("--head") + 1])
+        self.assertEqual("b" * 40, calls[0][calls[0].index("--policy") + 1])
+        for changes in ({"POLICY_SHA": "not-a-commit"}, {"PULL_NUMBER": "88\n--unsafe"}):
+            result, _, calls = self.run_script(script, {**environment, **changes})
+            self.assertNotEqual(0, result.returncode)
+            self.assertEqual([], calls)
+
+    def test_workflow_preserves_complete_lane_gate_and_explicit_full_recovery(self):
+        policy = job_block("on-demand-e2e.yml", "feature-policy")
+        runtime = job_block("on-demand-e2e.yml", "e2e")
+        self.assertIn("inputs.capture_coverage != 'full'", policy)
+        self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", policy)
+        self.assertIn("github.ref == 'refs/heads/master'", policy)
+        self.assertIn("inputs.attest_run_id == ''", policy)
+        self.assertEqual(2, policy.count("persist-credentials: false"))
+        self.assertIn("actions: read", policy)
+        self.assertNotIn("write", policy)
+        self.assertIn("always() && needs.runtime-policy.result == 'success'", runtime)
+        self.assertIn("needs.build.result == 'success'", runtime)
+        self.assertIn("needs.feature-policy.outputs.selection_sha256", runtime)
+        self.assertIn("&& '0' || '1'", runtime)
+        action = (COMPOSITE_ACTIONS / "run-packaged-e2e/action.yml").read_text()
+        self.assertIn("name: e2e-feature-selection", action)
+        self.assertIn("e2e-out/current/selection.json", action)
+        self.assertIn("e2e-out/current/coverage.json", action)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -627,3 +627,17 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   the 1.20.1, 1.21.4 and 1.21.6 boundary checks also pass, along with six mixin-policy tests.
   The original failing GitHub logs/artifacts and local red/green reports are preserved in the
   evidence directory. The remote matrix is still testing the preceding published source.
+- The 1.21.5 repair also passes the target build coordinator: common/module tests, both
+  production JARs and both packaged harnesses build successfully in one serial target build.
+  Other production outputs still belong to the previous complete build; a fresh final full build
+  and reproducibility comparison remain required after the runtime repairs settle.
+- Connected protected baseline admission to the packaged workflow. The selector checks out the
+  protected base separately from inert candidate history; missing pre-migration policy, failed
+  admission or failed artifact publication resolve to complete captures. Runtime jobs verify the
+  admission digest, pass independent base/policy identities to the existing Python/Java selector,
+  and retain the coverage provenance beside their results. All matrix lanes remain required.
+  `capture_coverage=full` provides explicit manual recovery; schedules, releases, compatibility
+  lanes and historical ports retain their complete profiles. Six real-shell boundary fixtures,
+  all 363 CI tests and fifteen parsed workflow/action files pass. Selected AI capsules and public
+  evidence reuse must be connected before this migration is integrated; no protected healthy
+  baseline or reduced GitHub runtime has yet been produced.

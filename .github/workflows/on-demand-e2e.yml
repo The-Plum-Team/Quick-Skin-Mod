@@ -32,6 +32,14 @@ on:
         required: false
         default: full
         type: string
+      capture_coverage:
+        description: Use authenticated feature coverage or force every PR-profile capture
+        required: false
+        default: auto
+        type: choice
+        options:
+          - auto
+          - full
 
 permissions:
   actions: read
@@ -204,6 +212,117 @@ jobs:
           printf 'The requested runtime policy could not be authenticated; running full Packaged E2E.\n' \
             >> "$GITHUB_STEP_SUMMARY"
 
+  feature-policy:
+    name: Select affected feature coverage
+    needs: runtime-policy
+    if: >-
+      needs.runtime-policy.outputs.effective == 'full' &&
+      inputs.capture_coverage != 'full' &&
+      ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'master' &&
+        github.event.pull_request.head.repo.full_name == github.repository) ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' &&
+        inputs.attest_run_id == ''))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      selective: ${{ steps.result.outputs.selective }}
+      base: ${{ steps.result.outputs.base }}
+      policy: ${{ steps.result.outputs.policy }}
+      selection_sha256: ${{ steps.result.outputs.selection_sha256 }}
+    steps:
+      - name: Check out protected feature policy
+        id: protected
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: protected-policy
+          persist-credentials: false
+      - name: Read candidate Git history without executing candidate code
+        id: candidate
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: candidate-history
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Authenticate complete baseline and cumulative feature impact
+        id: selection
+        if: steps.protected.outcome == 'success' && steps.candidate.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_SHA: ${{ github.sha }}
+          POLICY_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          controller=protected-policy/scripts/ci/feature_coverage_consumer.py
+          if [[ ! -f "$controller" ]]; then
+            printf 'The protected base predates feature coverage; running the complete profile.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ ! "$TESTED_SHA" =~ ^[0-9a-f]{40}$ || ! "$POLICY_SHA" =~ ^[0-9a-f]{40}$ ||
+                "$(git -C protected-policy rev-parse HEAD)" != "$POLICY_SHA" ||
+                "$(git -C candidate-history rev-parse HEAD)" != "$TESTED_SHA" ]]; then
+            exit 1
+          fi
+          if ! jq -e '.schema_version == 3' protected-policy/release/release-matrix.json > /dev/null; then
+            exit 0
+          fi
+          arguments=(
+            --github-repository "$GITHUB_REPOSITORY"
+            --repository "$GITHUB_WORKSPACE/candidate-history"
+            --head "$TESTED_SHA" --policy "$POLICY_SHA" --run-id "$GITHUB_RUN_ID"
+            --output "$RUNNER_TEMP/feature-selection" --github-output "$GITHUB_OUTPUT"
+          )
+          if [[ -n "$PULL_NUMBER" ]]; then
+            if [[ ! "$PULL_NUMBER" =~ ^[1-9][0-9]*$ ]]; then exit 1; fi
+            arguments+=(--pull-number "$PULL_NUMBER")
+          fi
+          python3 "$controller" "${arguments[@]}"
+      - name: Preserve authenticated selection and original coverage provenance
+        id: upload
+        if: steps.selection.outcome == 'success' && steps.selection.outputs.selective == 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-feature-selection
+          path: ${{ runner.temp }}/feature-selection/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Resolve unavailable selection to complete captures
+        id: result
+        if: always()
+        shell: bash
+        env:
+          SELECTION_OUTCOME: ${{ steps.selection.outcome }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          SELECTIVE: ${{ steps.selection.outputs.selective }}
+          SELECTION_BASE: ${{ steps.selection.outputs.base }}
+          SELECTION_POLICY: ${{ steps.selection.outputs.policy }}
+          SELECTION_SHA256: ${{ steps.selection.outputs.selection_sha256 }}
+        run: |
+          set -euo pipefail
+          if [[ "$SELECTION_OUTCOME" == success && "$UPLOAD_OUTCOME" == success &&
+                "$SELECTIVE" == true && "$SELECTION_BASE" =~ ^[0-9a-f]{40}$ &&
+                "$SELECTION_POLICY" =~ ^[0-9a-f]{40}$ && "$SELECTION_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            printf 'selective=true\nbase=%s\npolicy=%s\nselection_sha256=%s\n' \
+              "$SELECTION_BASE" "$SELECTION_POLICY" "$SELECTION_SHA256" >> "$GITHUB_OUTPUT"
+            printf 'Authenticated cumulative feature captures selected.\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf 'selective=false\nbase=\npolicy=\nselection_sha256=\n' >> "$GITHUB_OUTPUT"
+            printf 'Complete captures required; no reusable feature selection was established.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   build:
     name: Build immutable E2E input bundle
     needs: runtime-policy
@@ -374,8 +493,9 @@ jobs:
     needs:
       - runtime-policy
       - build
+      - feature-policy
     if: >-
-      needs.runtime-policy.result == 'success' &&
+      always() && needs.runtime-policy.result == 'success' &&
       needs.runtime-policy.outputs.effective == 'full' &&
       needs.build.result == 'success'
     runs-on: ubuntu-24.04
@@ -390,6 +510,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: ${{ needs.feature-policy.outputs.selective == 'true' && '0' || '1' }}
           persist-credentials: false
 
       - name: Run contract-selected packaged-JAR scenarios
@@ -399,6 +520,9 @@ jobs:
           row-json: ${{ toJSON(matrix) }}
           source-sha: ${{ github.sha }}
           scenarios: ${{ matrix.scenarios }}
+          selection-base: ${{ needs.feature-policy.outputs.base }}
+          selection-policy: ${{ needs.feature-policy.outputs.policy }}
+          selection-sha256: ${{ needs.feature-policy.outputs.selection_sha256 }}
           evidence-name: packaged-e2e-${{ matrix.id }}
           evidence-retention-days: ${{ startsWith(github.ref_name, 'automation/sync/') && '7' || '1' }}
 

@@ -94,7 +94,11 @@ binds master executions and GitHub PR merge commits, including both authenticate
 rechecks the current source before returning a selection. Missing/expired/foreign evidence and
 changed policy require the complete profile. A second consumer entry point reauthenticates the
 exact immutable baseline and both manifests before selected evidence can enter curation.
-Workflow/AI admission and public-frame reuse still need to be connected to these consumers.
+The packaged workflow now supplies that authenticated selection to every required runtime lane,
+verifies its digest and preserves both manifests with the evidence. Manual
+`capture_coverage=full` keeps complete PR-profile recovery available. Missing protected policy or
+failed selection publication uses complete captures. Selected AI capsules and public-frame reuse
+still need to be connected to these consumers before integration.
 
 These producer, consumer, rotation, review and scheduling paths pass local API/shell fixtures.
 Optional-mod wave admission and selective healthy-baseline reuse still require migration. No
