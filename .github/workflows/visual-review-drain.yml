@@ -1907,6 +1907,41 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  request-feature-coverage:
+    name: Request a complete feature baseline
+    needs:
+      - select
+      - review
+    if: >-
+      always() && needs.select.outputs.bundle_key != '' &&
+      needs.review.outputs.normalized_report_artifact_id != ''
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Wake the protected complete-coverage collector
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/master || ! "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            printf 'Feature coverage wake requires a protected reviewer run.\n' >&2
+            exit 1
+          fi
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            printf 'A newer source generation owns feature coverage.\n'
+            exit 0
+          fi
+          payload="$RUNNER_TEMP/feature-coverage-request.json"
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" \
+            '{event_type:"feature-coverage-requested",client_payload:{source_repository:$repository,
+              review_run_id:$run_id}}' > "$payload"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" > /dev/null
+
   cleanup:
     name: Delete one settled queue entry
     needs:

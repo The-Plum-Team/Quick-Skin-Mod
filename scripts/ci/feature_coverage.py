@@ -26,11 +26,14 @@ from matrix import load_matrix, select_release_target
 from visual_review_queue import (DRAIN_EVENTS, DRAIN_WORKFLOW, REPOSITORY, QueueError,
                                  parse_artifact, valid_owner)
 
-POLICY_PATHS = tuple(sorted(set(PROTECTED_CONTROLLER_PATHS) | {
+POLICY_PATHS = tuple(sorted(set(PROTECTED_CONTROLLER_PATHS) | set(admission.POLICY_PATHS) | {
+    ".github", "scripts", "release", "gradle.properties",
     ".github/workflows/visual-review.yml", ".github/workflows/visual-review-drain.yml",
     "scripts/ci/feature_coverage.py", "scripts/ci/visual_review_targets.py",
+    "scripts/ci/feature_coverage_github.py", ".github/workflows/feature-coverage.yml",
 }))
 BASELINE_KIND = "quick-skin-complete-feature-baseline"
+BASELINE_ARTIFACT_NAME = "healthy-e2e-baseline"
 MAX_REPORT_ARCHIVE_BYTES = 4 * 1024 * 1024
 
 

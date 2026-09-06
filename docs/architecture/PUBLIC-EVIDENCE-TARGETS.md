@@ -77,9 +77,18 @@ fingerprints cover entire module trees, transitive compile/runtime dependencies,
 and composition source. An editor change leaves an independent HUD fingerprint unchanged;
 a provider change reaches its API consumers. Original tested provenance remains explicit.
 
-These are validation primitives. A local payload grants no workflow exemption. Protected
-baseline publication and admission still need to be connected before GitHub can consume a
-reduced selection or Pages can carry unaffected frames forward.
+The protected `feature-coverage.yml` collector authenticates the complete source run and every
+normalized review owner before downloading any report archive. Archives must match their
+immutable IDs, sizes and digests and contain exactly the four normalized JSON files; original
+screenshots never enter this job. It checks the live source again before publishing one small
+`healthy-e2e-baseline` artifact. Its payload binds the issuer run, original source run and attempt,
+complete job graph, target reports and module/policy fingerprints. The fixed artifact name is
+only a discovery key; source identity comes from the authenticated owner and payload.
+
+The collector supports completion events, an explicit protected reviewer wake and manual recovery
+of existing complete reports. It makes no model call. A local payload grants no workflow exemption.
+The baseline consumer and selective workflow admission still need to be connected before GitHub
+can consume a reduced selection or Pages can carry unaffected frames forward.
 
 These producer, consumer, rotation, review and scheduling paths pass local API/shell fixtures.
 Optional-mod wave admission and selective healthy-baseline reuse still require migration. No

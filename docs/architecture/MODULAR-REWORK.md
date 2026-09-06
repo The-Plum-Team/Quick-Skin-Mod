@@ -590,3 +590,20 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   the aggregate CI suite passes 333 tests. These primitives do not yet publish a trusted baseline
   or reduce any required GitHub execution. Baseline publication, workflow admission and selective
   evidence reuse remain part of stage 5.
+- Added the protected full-baseline publisher and explicit reviewer wake. It first authenticates
+  every target's normalized report owner and the complete successful PR-profile source graph,
+  then downloads only bounded JSON archives by immutable ID and digest. Missing or ambiguous
+  reports, foreign owners, incomplete source jobs, extra archive files and a live source advance
+  cannot publish a baseline. The certificate records its issuer and original tested provenance;
+  its fixed `healthy-e2e-baseline` artifact name supports bounded discovery. Manual recovery uses
+  existing reports without another model call. All 346 CI tests pass and fifteen workflow/action
+  YAML files parse. The collector is prepared locally; no protected baseline has been issued yet.
+  Baseline consumption, selected workflow/AI admission and reuse of unaffected public frames remain.
+- GitHub Build gate run `33996911210` completed successfully for PR #1925. Its checkout log proves
+  the tested PR merge commit was `14497892869bc9010421e244059a6205d3554285`, merging head
+  `7b8f29ea25c5f5a666ad6c8bea595daa4ae0fbf7` into base
+  `266d156165d9514499ef7f4cfc905532728a7849`. The Actions API's `head_sha` is the PR source head,
+  so future selection admission must independently bind the tested merge and both parents.
+  Packaged E2E run `33996911180` has built/staged all targets and is executing the complete
+  runtime matrix; the first five lanes have passed at this checkpoint. These remote results
+  belong to the previously published source, not the subsequent CI-only commits.

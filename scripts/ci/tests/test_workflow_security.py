@@ -236,6 +236,11 @@ class WorkflowSecurityTest(unittest.TestCase):
 
         retention_overrides = {
             (
+                "feature-coverage.yml",
+                "Publish the complete feature baseline",
+                "${{ steps.baseline.outputs.artifact_name }}",
+            ): "90",
+            (
                 "pages.yml",
                 "Roll the protected evidence cache forward",
                 "${{ steps.cache.outputs.name }}",
@@ -476,6 +481,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "capacity-probe",
                 "resume-capacity-queue",
                 "review",
+                "request-feature-coverage",
                 "cleanup",
                 "release-mod-compatibility",
                 "release-anchor",

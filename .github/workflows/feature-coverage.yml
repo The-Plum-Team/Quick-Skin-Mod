@@ -1,0 +1,94 @@
+name: Certify complete feature coverage
+
+on:
+  workflow_run:
+    workflows:
+      - AI visual review drain
+    types:
+      - completed
+  repository_dispatch:
+    types:
+      - feature-coverage-requested
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Existing complete shared-source Packaged E2E run to certify without another model call
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: quick-skin-feature-baseline-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  certify:
+    name: Authenticate complete shared feature coverage
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Check out the exact protected baseline policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Authenticate the existing source and all normalized reviews
+        id: baseline
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id || github.event.client_payload.review_run_id }}
+          REQUEST_REPOSITORY: ${{ github.event.client_payload.source_repository }}
+          REQUESTED_SOURCE_RUN: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" || "$GITHUB_REF" != refs/heads/master ]]; then
+            printf 'Feature coverage requires the exact protected master checkout.\n' >&2
+            exit 1
+          fi
+          if [[ "$(python3 scripts/release/release_sources.py --kind mode)" != shared ]]; then
+            printf 'Historical source layouts do not publish shared feature baselines.\n'
+            exit 0
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == repository_dispatch && "$REQUEST_REPOSITORY" != "$GITHUB_REPOSITORY" ]]; then
+            printf 'Feature coverage wake has a foreign repository identity.\n' >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            source_arguments=(--source-run-id "$REQUESTED_SOURCE_RUN")
+          else
+            source_arguments=(--trigger-run-id "$TRIGGER_RUN_ID")
+          fi
+          python3 scripts/ci/feature_coverage_github.py \
+            "${source_arguments[@]}" --github-repository "$GITHUB_REPOSITORY" \
+            --source-sha "$GITHUB_SHA" --issuer-run-id "$GITHUB_RUN_ID" \
+            --output "$RUNNER_TEMP/feature-baseline/baseline.json" --github-output "$GITHUB_OUTPUT"
+      - name: Recheck the source immediately before publishing its baseline
+        id: current
+        if: steps.baseline.outputs.ready == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" == "$GITHUB_SHA" ]]; then
+            printf 'current=true\n' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish the complete feature baseline
+        if: steps.current.outputs.current == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.baseline.outputs.artifact_name }}
+          path: ${{ runner.temp }}/feature-baseline/baseline.json
+          if-no-files-found: error
+          retention-days: 90
