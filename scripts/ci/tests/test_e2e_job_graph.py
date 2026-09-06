@@ -57,6 +57,7 @@ class E2EJobGraphTest(unittest.TestCase):
             set(graph.VERSION_SPECIFIC_CONTROLLER_PATHS),
         )
         self.assertIn("e2e/packaged_runtime.py", protected)
+        self.assertIn("e2e/cape_transparency.py", protected)
         self.assertEqual(
             {"fabric", "forge", "neoforge"},
             set(graph.load_bootstrap_contract(graph.DEFAULT_BOOTSTRAP_CONTRACT).loaders),

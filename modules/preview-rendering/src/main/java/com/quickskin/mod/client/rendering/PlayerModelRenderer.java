@@ -9,6 +9,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
 import com.quickskin.mod.platform.MinecraftCompat;
+import com.quickskin.mod.platform.CapeRenderTypes;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -1108,7 +1109,7 @@ public class PlayerModelRenderer {
 
             if (finalCapeTexture != null) {
                 // Now render the cape using the final texture
-                RenderType capeRenderType = RenderType.entityTranslucent(finalCapeTexture);
+                RenderType capeRenderType = CapeRenderTypes.translucent(finalCapeTexture);
                 var capeVertexConsumer = bufferSource.getBuffer(capeRenderType);
 
                 poseStack.pushPose();
@@ -1128,7 +1129,7 @@ public class PlayerModelRenderer {
 //?} else if <1.21.6 {
 
             if (finalCapeTexture != null) {
-                RenderType capeRenderType = RenderType.entityTranslucent(finalCapeTexture);
+                RenderType capeRenderType = CapeRenderTypes.translucent(finalCapeTexture);
                 var capeVertexConsumer = bufferSource.getBuffer(capeRenderType);
 
                 poseStack.pushPose();

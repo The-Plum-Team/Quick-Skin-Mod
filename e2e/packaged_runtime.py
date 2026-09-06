@@ -37,7 +37,9 @@ from runtime_store import (
     RuntimeStoreError,
     StoreCorruptionError,
 )
-from scenario_contract import OpaqueStarsProbe, RequiredGuiTextProbe, default_contract
+from scenario_contract import (
+    OpaqueStarsProbe, RequiredGuiTextProbe, TranslucentCapeProbe, default_contract,
+)
 from selection import SelectionPlan, project_contract
 from mod_compatibility import CompatibilityLane
 
@@ -122,6 +124,15 @@ OPAQUE_STARS_PROBES: dict[tuple[str, str, str], OpaqueStarsProbe] = {
 }
 OPAQUE_STARS_SCREENSHOT_REGIONS = {
     key: probe.region for key, probe in OPAQUE_STARS_PROBES.items()
+}
+TRANSLUCENT_CAPE_PROBES = {
+    (scenario.scenario, role.role, step.id): probe
+    for scenario in SCENARIO_CONTRACT.scenarios
+    for role in scenario.roles
+    for step in role.steps
+    if step.capture is not None
+    for probe in step.capture.probes
+    if isinstance(probe, TranslucentCapeProbe)
 }
 _PRIMARY_OPAQUE_STARS_PROBE = next(iter(OPAQUE_STARS_PROBES.values()))
 OPAQUE_STARS_BACKGROUND_REGION = _PRIMARY_OPAQUE_STARS_PROBE.region
@@ -1844,6 +1855,16 @@ def inspect_screenshot_for_step(
     if opaque_stars_probe is not None:
         validate_opaque_stars_background(path, opaque_stars_probe)
     validate_required_gui_text(path, scenario, role, step)
+    cape_probe = TRANSLUCENT_CAPE_PROBES.get((scenario, role, step))
+    if cape_probe is not None:
+        from PIL import Image
+        from cape_transparency import inspect_cape_underlay
+
+        try:
+            with Image.open(path) as image:
+                inspect_cape_underlay(image, cape_probe)
+        except (OSError, ValueError) as exc:
+            raise RuntimeFailure(f"invalid worn-cape transparency in {path}: {exc}") from exc
     return metrics
 
 

@@ -942,7 +942,7 @@ class ScenarioContractTest(unittest.TestCase):
     def test_visual_probes_remain_bound_to_their_capture_step(self) -> None:
         self.assertEqual((1600, 900), self.contract.gui_text_reference_size)
         probes = self.contract.probes_for("full", "client_a")
-        self.assertEqual(14, len(probes))
+        self.assertEqual(15, len(probes))
         self.assertEqual(
             probes,
             self.contract.capture(
@@ -956,6 +956,9 @@ class ScenarioContractTest(unittest.TestCase):
             ).probes
             + self.contract.capture(
                 "full", "client_a", "cape_fill_color_picker"
+            ).probes
+            + self.contract.capture(
+                "full", "client_a", "translucent_cape_worn"
             ).probes
             + self.contract.capture(
                 "full", "client_a", "bmo_padded_source_screen"
