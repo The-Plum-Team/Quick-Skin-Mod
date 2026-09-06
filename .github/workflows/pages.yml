@@ -510,6 +510,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Python
@@ -549,6 +550,31 @@ jobs:
           run-id: ${{ steps.artifact.outputs.run_id }}
           digest-mismatch: error
 
+      - name: Compose authenticated feature evidence with its complete baseline
+        shell: bash
+        env:
+          BUNDLE_KEY: ${{ matrix.bundle_key }}
+          ARTIFACT_NAME: ${{ steps.artifact.outputs.name }}
+          OWNER_RUN_ID: ${{ steps.artifact.outputs.run_id }}
+          SOURCE_SHA: ${{ needs.discover.outputs.source_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          manifest="selected-evidence/$BUNDLE_KEY/manifest.json"
+          schema="$(jq -er .schema_version "$manifest")"
+          if [[ "$schema" == 5 || "$schema" == 7 ]]; then
+            owner_argument=()
+            if [[ "$ARTIFACT_NAME" == "pages-e2e-$BUNDLE_KEY" ]]; then
+              owner_argument=(--artifact-run-id "$OWNER_RUN_ID")
+            fi
+            python3 scripts/ci/feature_pages.py --github-repository "$GITHUB_REPOSITORY" \
+              --repository . --evidence-root selected-evidence --output composed-evidence \
+              --bundle-key "$BUNDLE_KEY" --source-sha "$SOURCE_SHA" \
+              ${owner_argument[@]+"${owner_argument[@]}"}
+            mv selected-evidence source-feature-evidence
+            mv composed-evidence selected-evidence
+          fi
+
       - name: Validate the target bundle and recheck its source commit
         shell: bash
         env:
@@ -568,7 +594,9 @@ jobs:
           kind_argument=()
           if [[ "$ARTIFACT_NAME" == "pages-e2e-$BUNDLE_KEY" ]]; then
             target_run_argument=(--target-run-id "$OWNER_RUN_ID")
-            kind_argument=(--kind raw)
+            if [[ "$(jq -r .schema_version "$manifest")" != 7 ]]; then
+              kind_argument=(--kind raw)
+            fi
           fi
           python3 scripts/pages/evidence.py validate \
             --evidence-root selected-evidence \
@@ -637,7 +665,9 @@ jobs:
           input_kind_argument=()
           if [[ "$ARTIFACT_NAME" == "pages-e2e-$BUNDLE_KEY" ]]; then
             target_run_argument=(--target-run-id "$OWNER_RUN_ID")
-            input_kind_argument=(--input-kind raw)
+            if [[ "$(jq -r .schema_version "$manifest")" != 7 ]]; then
+              input_kind_argument=(--input-kind raw)
+            fi
           fi
           python3 scripts/pages/evidence.py compact \
             --evidence-root selected-evidence \
@@ -1015,11 +1045,26 @@ jobs:
             --target-sha "$target_sha" \
             --coverage-sha "$coverage_sha"
           printf 'name=pages-cache-%s--%s\n' "$BUNDLE_KEY" "$coverage_sha" >> "$GITHUB_OUTPUT"
+          if [[ "$(jq -r .schema_version "$manifest")" == 4 ]]; then
+            source_run_id="$(jq -er .provenance.source.run_id "$manifest")"
+            printf 'complete_name=pages-full-baseline-%s--%s--%s\n' \
+              "$BUNDLE_KEY" "$target_sha" "$source_run_id" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Roll the protected evidence cache forward
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.cache.outputs.name }}
+          path: public-evidence/
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 90
+
+      - name: Retain the complete compact generation for feature evidence reuse
+        if: steps.cache.outputs.complete_name != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.cache.outputs.complete_name }}
           path: public-evidence/
           if-no-files-found: error
           compression-level: 6

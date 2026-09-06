@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import tempfile
 import threading
@@ -21,6 +22,8 @@ from bounded_zip import ExtractionLimits, extract_bounded_zip
 from visual_review_queue import REPORT_NAME, REPOSITORY
 
 WORKFLOW = ".github/workflows/feature-coverage.yml"
+PUBLIC_BASELINE_NAME = re.compile(r"^pages-full-baseline-mc[0-9]+(?:\.[0-9]+){1,2}--[0-9a-f]{40}--[1-9][0-9]*$")
+MAX_PUBLIC_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_API_BYTES = 8 * 1024 * 1024
 MAX_INVENTORY = 100
 REPORT_FILES = frozenset({"curation-proof.json", "review-input/visual-review-manifest.json",
@@ -126,7 +129,8 @@ class Api:
             endpoint = f"actions/runs/{run_id}/artifacts?per_page={MAX_INVENTORY}"
         else:
             if (not isinstance(name, str)
-                    or name != coverage.BASELINE_ARTIFACT_NAME and REPORT_NAME.fullmatch(name) is None):
+                    or name != coverage.BASELINE_ARTIFACT_NAME and REPORT_NAME.fullmatch(name) is None
+                    and PUBLIC_BASELINE_NAME.fullmatch(name) is None):
                 raise coverage.CoverageError("artifact query requires an exact report or baseline name")
             endpoint = "actions/artifacts?" + urllib.parse.urlencode({"name": name, "per_page": MAX_INVENTORY})
         record = self.json(endpoint)
@@ -204,6 +208,51 @@ def source_from_trigger(api: Api, trigger_run_id: int, source_sha: str) -> int |
     return source_run_id
 
 
+def public_baseline_name(bundle_key: str, source_sha: str, source_run_id: int) -> str:
+    name = f"pages-full-baseline-{bundle_key}--{source_sha}--{source_run_id}"
+    if PUBLIC_BASELINE_NAME.fullmatch(name) is None or type(source_run_id) is not int:
+        raise coverage.CoverageError("public baseline requires exact target/source/run identity")
+    return name
+
+
+def validate_public_record(value: Any, *, bundle_key: str, source_sha: str, source_run_id: int) -> None:
+    if (not isinstance(value, dict) or set(value) != {"id", "owner_run_id", "name", "digest", "size_in_bytes"}
+            or value["name"] != public_baseline_name(bundle_key, source_sha, source_run_id)
+            or type(value["id"]) is not int or value["id"] <= 0
+            or type(value["owner_run_id"]) is not int or value["owner_run_id"] <= 0
+            or type(value["size_in_bytes"]) is not int or not 0 < value["size_in_bytes"] <= MAX_PUBLIC_ARCHIVE_BYTES
+            or not isinstance(value["digest"], str) or re.fullmatch(r"sha256:[0-9a-f]{64}", value["digest"]) is None):
+        raise coverage.CoverageError("public baseline has malformed or foreign immutable provenance")
+
+
+def validate_public_owner(artifact: Any, owner: Any, jobs: Any, *, github_repository: str,
+                          source_sha: str, source_run_id: int, bundle_key: str) -> dict[str, Any]:
+    if (not isinstance(artifact, dict) or not isinstance(artifact.get("workflow_run"), dict)
+            or artifact.get("expired") is not False or not isinstance(owner, dict)
+            or type(owner.get("id")) is not int or artifact["workflow_run"].get("id") != owner["id"]
+            or type(artifact["workflow_run"].get("id")) is not int
+            or any(item.get("head_branch") != "master" or item.get("head_sha") != source_sha
+                   for item in (owner, artifact["workflow_run"]))
+            or owner.get("path") != ".github/workflows/pages.yml"
+            or owner.get("event") not in {"schedule", "workflow_dispatch", "workflow_run"}
+            or owner.get("status") != "completed" or owner.get("conclusion") != "success"
+            or not isinstance(owner.get("head_repository"), dict)
+            or owner["head_repository"].get("full_name") != github_repository):
+        raise coverage.CoverageError("public baseline lacks a successful protected Pages owner")
+    required = {"Build atomic static site", "Deploy GitHub Pages", f"Refresh evidence cache for {bundle_key}"}
+    if (not isinstance(jobs, list) or any(not isinstance(page, dict) or not isinstance(page.get("jobs"), list) for page in jobs)):
+        raise coverage.CoverageError("public baseline owner has a malformed job inventory")
+    records = [job for page in jobs for job in page["jobs"]]
+    for name in required:
+        matches = [job for job in records if isinstance(job, dict) and job.get("name") == name]
+        if len(matches) != 1 or matches[0].get("status") != "completed" or matches[0].get("conclusion") != "success":
+            raise coverage.CoverageError("public baseline was not built, deployed and retained successfully")
+    result = {key: artifact.get(key) for key in ("id", "name", "digest", "size_in_bytes")}
+    result["owner_run_id"] = owner["id"]
+    validate_public_record(result, bundle_key=bundle_key, source_sha=source_sha, source_run_id=source_run_id)
+    return result
+
+
 def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
             issuer_run_id: int, directory: Path) -> dict[str, Any] | None:
     coverage._positive_integer(issuer_run_id, "baseline issuer run")
@@ -214,7 +263,7 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
                                          source_sha=source_sha, source_run_id=source_run_id)
     if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in api.artifacts(run_id=source_run_id)):
         return None  # Partial generations retain their earlier complete baseline.
-    metadata = {}
+    metadata, public = {}, {}
     for target in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]:
         key = target["bundle_key"]
         candidates = api.artifacts(name=f"visual-review-{source_run_id}--{key}")
@@ -231,6 +280,19 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
             return None
         metadata[key] = coverage.validate_review_owner(candidate, owner, api.jobs(owner),
             github_repository=api.repository, source_sha=source_sha, source_run_id=source_run_id, bundle_key=key)
+        public_candidates = api.artifacts(name=public_baseline_name(key, source_sha, source_run_id))
+        for candidate in sorted(public_candidates, key=lambda item: item.get("id", 0), reverse=True)[:8]:
+            if candidate.get("expired") is True:
+                continue
+            owner_id = coverage._positive_integer(candidate.get("workflow_run", {}).get("id"), "public owner")
+            owner = api.run(owner_id)
+            if owner.get("status") != "completed":
+                continue
+            public[key] = validate_public_owner(candidate, owner, api.jobs(owner),
+                github_repository=api.repository, source_sha=source_sha, source_run_id=source_run_id, bundle_key=key)
+            break
+        if key not in public:
+            return None
     # Only after complete ownership admission may report archives enter the secretless workspace.
     reviews = {key: _review_files(api, metadata[key], directory / key) for key in sorted(metadata)}
     baseline = coverage.create_baseline(reviews, repository=repository, source_sha=source_sha,
@@ -239,7 +301,7 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
         return None
     return {**baseline, "issuer": {"workflow": WORKFLOW, "run_id": issuer_run_id, "sha": source_sha},
             "source_run_attempt": source["run_attempt"], "source_job_graph": graph,
-            "review_artifacts": metadata}
+            "review_artifacts": metadata, "public_artifacts": public}
 
 
 def main() -> int:

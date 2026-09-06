@@ -122,6 +122,20 @@ class FeatureCoverageConsumerTest(unittest.TestCase):
                 self.api.records, self.api.runs, self.api.job_lists = records, runs, jobs
                 self.artifact = self.api.records[coverage.BASELINE_ARTIFACT_NAME][0]
 
+    def test_expired_or_replaced_public_baseline_forces_complete_runtime_coverage(self):
+        record = next(items[0] for name, items in self.api.records.items()
+                      if name.startswith("pages-full-baseline-"))
+        original = copy.deepcopy(record)
+        for change in ({"expired": True}, {"digest": "sha256:" + "0" * 64}):
+            with self.subTest(change=change):
+                record.update(change)
+                selected, proof = self.resolve()
+                self.assertFalse(selected.enabled)
+                self.assertFalse(proof["selective"])
+                self.assertEqual({50000}, set(self.api.downloaded))
+                record.clear()
+                record.update(original)
+
     def test_partial_native_forged_and_duplicate_coverage_cannot_be_reused(self):
         cases = (
             lambda value: value.update(coverage="selected"),
@@ -217,13 +231,14 @@ class FeatureCoverageConsumerTest(unittest.TestCase):
         proof_file = self.fixture.root / "coverage.json"
         selection_file.write_bytes(selected.to_bytes())
         proof_file.write_bytes(coverage.admission.canonical(proof))
-        with patch.object(self.api, "artifact", return_value=self.artifact) as get:
+        with patch.object(self.api, "artifact", wraps=self.api.artifact) as get:
             verified, actual = consumer.verify(self.api, selection_file, proof_file,
                 repository=self.repository, head=self.head, policy=self.head, run_id=66,
                 directory=self.fixture.root / "verified")
             self.assertEqual(proof, actual)
             self.assertEqual(selected.sha256, verified.sha256)
-            get.assert_called_once_with(50000)
+            self.assertEqual({50000, *(item["id"] for item in self.baseline["public_artifacts"].values())},
+                             {call.args[0] for call in get.call_args_list})
             proof["unchanged_module_fingerprints"]["hud-preview"] = "0" * 64
             proof_file.write_bytes(coverage.admission.canonical(proof))
             with self.assertRaises(coverage.CoverageError):

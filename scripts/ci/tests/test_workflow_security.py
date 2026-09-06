@@ -246,6 +246,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "${{ steps.cache.outputs.name }}",
             ): "90",
             (
+                "pages.yml",
+                "Retain the complete compact generation for feature evidence reuse",
+                "${{ steps.cache.outputs.complete_name }}",
+            ): "90",
+            (
                 "release.yml",
                 "Upload immutable release bundle",
                 "release-${{ steps.release.outputs.release_id }}",
@@ -1683,7 +1688,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         # release branch would put untrusted history in a workspace that can write the
         # Actions cache, which is exactly the cache-poisoning shape CodeQL rejects.
         self.assertNotIn("git fetch", collect)
-        self.assertNotIn("fetch-depth", collect)
+        self.assertIn("fetch-depth: 0", collect)
+        self.assertIn("scripts/ci/feature_pages.py", collect)
         self.assertNotIn('/compare/$COVERAGE_SHA...$HEAD_SHA', collect)
         self.assertNotIn('/compare/$EXPECTED_SHA...$HEAD_SHA', collect)
         self.assertNotIn("scripts/pages/evidence.py carry-forward", collect)
@@ -2192,7 +2198,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("not applicable", required)
         inventory = job_block("on-demand-e2e.yml", "pages-inventory")
         self.assertIn("inputs.runtime_policy == 'full'", inventory)
-        self.assertIn("needs: pages-inventory", pages)
+        self.assertIn("      - pages-inventory", pages)
+        self.assertIn("needs.pages-inventory.result == 'success'", pages)
         self.assertIn("--arg runtime_policy", notify)
         self.assertIn("runtime_policy:$runtime_policy", notify)
         self.assertIn("needs.runtime-policy.outputs.effective == 'full'", notify)

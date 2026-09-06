@@ -344,6 +344,7 @@ def build(
         release_source_paths: dict[str, Path] = {}
         for frame in release_frames:
             frame_id = frame["frame_id"]
+            frame_provenance = frame.get("tested_provenance", provenance)
             if frame_id in frame_ids:
                 raise SiteBuildError(f"duplicate frame identity across release bundles: {frame_id}")
             frame_ids.add(frame_id)
@@ -457,7 +458,7 @@ def build(
             }
             public_frame.update(
                 {
-                    "lane_id": f"{frame['artifact_node']}/{frame['scenario']}",
+                    "lane_id": frame.get("lane_id", f"{frame['artifact_node']}/{frame['scenario']}"),
                     "loader_name": loader_name(frame["loader"]),
                     "image": image_relative.relative_to("e2e").as_posix(),
                     "width": rendered_width,
@@ -474,14 +475,16 @@ def build(
                         f"{loader_name(frame['loader'])}, {frame['role'].replace('_', ' ')}. "
                         f"Expected view: {frame['expectation']}"
                     ),
-                    "source_run_url": provenance["source"]["run_url"],
-                    "source_branch": provenance["source"]["branch"],
-                    "source_sha": provenance["source"]["sha"],
-                    "source_created_at": provenance["source"]["created_at"],
-                    "target_run_url": provenance["target"]["run_url"],
-                    "target_branch": provenance["target"]["branch"],
-                    "target_sha": provenance["target"]["sha"],
-                    "target_created_at": provenance["target"]["created_at"],
+                    "source_run_url": frame_provenance["source"]["run_url"],
+                    "source_branch": frame_provenance["source"]["branch"],
+                    "source_sha": frame_provenance["source"]["sha"],
+                    "source_created_at": frame_provenance["source"]["created_at"],
+                    "target_run_url": frame_provenance["target"]["run_url"],
+                    "target_branch": frame_provenance["target"]["branch"],
+                    "target_sha": frame_provenance["target"]["sha"],
+                    "target_created_at": frame_provenance["target"]["created_at"],
+                    **{field: frame[field] for field in ("coverage_sha", "jar_sha256", "evidence_epoch")
+                       if field in frame},
                 }
             )
             gallery_frames.append(public_frame)

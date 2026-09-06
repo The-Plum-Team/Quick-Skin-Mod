@@ -58,9 +58,15 @@ RAW_SCHEMA_VERSION = 1
 COMPACT_SCHEMA_VERSION = 2
 SHARED_RAW_SCHEMA_VERSION = 3
 SHARED_COMPACT_SCHEMA_VERSION = 4
-RAW_SCHEMA_VERSIONS = frozenset({RAW_SCHEMA_VERSION, SHARED_RAW_SCHEMA_VERSION})
-COMPACT_SCHEMA_VERSIONS = frozenset({COMPACT_SCHEMA_VERSION, SHARED_COMPACT_SCHEMA_VERSION})
-SHARED_SCHEMA_VERSIONS = frozenset({SHARED_RAW_SCHEMA_VERSION, SHARED_COMPACT_SCHEMA_VERSION})
+SELECTED_RAW_SCHEMA_VERSION = 5
+SELECTED_COMPACT_SCHEMA_VERSION = 6
+COMPOSED_SCHEMA_VERSION = 7
+SELECTED_SCHEMA_VERSIONS = frozenset({SELECTED_RAW_SCHEMA_VERSION, SELECTED_COMPACT_SCHEMA_VERSION})
+RAW_SCHEMA_VERSIONS = frozenset({RAW_SCHEMA_VERSION, SHARED_RAW_SCHEMA_VERSION, SELECTED_RAW_SCHEMA_VERSION})
+COMPACT_SCHEMA_VERSIONS = frozenset({COMPACT_SCHEMA_VERSION, SHARED_COMPACT_SCHEMA_VERSION,
+                                   SELECTED_COMPACT_SCHEMA_VERSION, COMPOSED_SCHEMA_VERSION})
+SHARED_SCHEMA_VERSIONS = frozenset({SHARED_RAW_SCHEMA_VERSION, SHARED_COMPACT_SCHEMA_VERSION,
+                                  *SELECTED_SCHEMA_VERSIONS, COMPOSED_SCHEMA_VERSION})
 SCHEMA_VERSIONS = RAW_SCHEMA_VERSIONS | COMPACT_SCHEMA_VERSIONS
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -377,6 +383,7 @@ def prepare(
     target_sha: str,
     target_created_at: str,
     minecraft_target: str | None = None,
+    feature_selection: dict[str, Any] | None = None,
 ) -> Path:
     if not REPOSITORY.fullmatch(repository):
         raise PublicEvidenceError(f"invalid owner/repository identity {repository!r}")
@@ -388,7 +395,13 @@ def prepare(
     target_sha = _sha(target_sha, "target_sha")
     source_created_at = _timestamp(source_created_at, "source_created_at")
     target_created_at = _timestamp(target_created_at, "target_created_at")
-    catalog = load_catalog(catalog_path)
+    selected = None
+    if feature_selection is not None:
+        from feature_evidence import read_selection
+        selected = read_selection(feature_selection, catalog_path=catalog_path)
+        if minecraft_target is None or selected.head_commit != source_sha or selected.policy_commit != source_sha:
+            raise PublicEvidenceError("selected public evidence requires its exact shared source")
+    catalog = load_catalog(catalog_path, selection=selected)
     inventory = load_matrix_inventory(
         matrix_path,
         target_branch,
@@ -454,6 +467,7 @@ def prepare(
 
     manifest = {
         "schema_version": (
+            SELECTED_RAW_SCHEMA_VERSION if selected is not None else
             SHARED_RAW_SCHEMA_VERSION if minecraft_target is not None else RAW_SCHEMA_VERSION
         ),
         "contract_sha256": catalog.contract_sha256,
@@ -486,6 +500,8 @@ def prepare(
     }
     if inventory["matrix_sha256"] is not None:
         manifest["release"]["matrix_sha256"] = inventory["matrix_sha256"]
+    if feature_selection is not None:
+        manifest["feature_selection"] = feature_selection
     (bundle / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
@@ -499,6 +515,7 @@ def prepare(
         expected_target_sha=target_sha,
         catalog_path=catalog_path,
         matrix_path=matrix_path,
+        selection=selected,
     )
     return bundle
 
@@ -536,6 +553,7 @@ def validate_bundle(
     expected_coverage_sha: str | None = None,
     catalog_path: Path = DEFAULT_CATALOG,
     matrix_path: Path = DEFAULT_MATRIX,
+    selection: Any = None,
 ) -> dict[str, Any]:
     # This positional argument is the bundle key. Historical keys are branch names;
     # shared-source keys name a Minecraft target and never stand in for a Git ref.
@@ -578,8 +596,23 @@ def validate_bundle(
         "public evidence manifest",
         maximum_bytes=MAX_MANIFEST_BYTES,
     )
-    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_FIELDS:
+    if isinstance(manifest, dict) and type(manifest.get("schema_version")) is int and manifest["schema_version"] == COMPOSED_SCHEMA_VERSION:
+        from feature_evidence import validate_composed
+        return validate_composed(evidence_root, branch, manifest, expected_kind=expected_kind,
+            expected_repository=expected_repository, expected_source_run_id=expected_source_run_id,
+            expected_target_run_id=expected_target_run_id, expected_target_sha=expected_target_sha,
+            expected_coverage_sha=expected_coverage_sha, catalog_path=catalog_path, matrix_path=matrix_path)
+    selected_schema = (isinstance(manifest, dict) and type(manifest.get("schema_version")) is int
+                       and manifest["schema_version"] in SELECTED_SCHEMA_VERSIONS)
+    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_FIELDS | ({"feature_selection"} if selected_schema else set()):
         raise PublicEvidenceError("public evidence manifest fields are invalid")
+    if selected_schema:
+        from feature_evidence import read_selection
+        supplied = read_selection(manifest["feature_selection"], catalog_path=catalog_path)
+        if selection is None or supplied.to_bytes() != selection.to_bytes():
+            raise PublicEvidenceError("partial public evidence requires independently admitted feature selection")
+    elif selection is not None:
+        raise PublicEvidenceError("complete public evidence cannot carry a partial selection")
     schema_version = manifest.get("schema_version")
     if type(schema_version) is not int or schema_version not in SCHEMA_VERSIONS:
         raise PublicEvidenceError(
@@ -676,7 +709,7 @@ def validate_bundle(
     ):
         raise PublicEvidenceError("evidence loaders do not match the release branch name")
 
-    catalog = load_catalog(catalog_path)
+    catalog = load_catalog(catalog_path, selection=selection)
     if manifest.get("contract_sha256") != catalog.contract_sha256:
         raise PublicEvidenceError(
             "public evidence scenario contract hash does not match the protected contract"
@@ -724,6 +757,9 @@ def validate_bundle(
         ):
             raise PublicEvidenceError(f"evidence provenance.{name}.run_id mismatch")
     target = provenance["target"]
+    if selection is not None and (selection.head_commit != target["sha"]
+                                  or selection.policy_commit != target["sha"]):
+        raise PublicEvidenceError("selected public provenance differs from its admitted source")
     if target["branch"] != source_branch:
         raise PublicEvidenceError("evidence target branch mismatch")
     if shared and (
@@ -764,10 +800,12 @@ def validate_bundle(
     for lane in lanes:
         if (
             not isinstance(lane, dict)
-            or set(lane) != LANE_FIELDS
+            or set(lane) != LANE_FIELDS | ({"selection_sha256"} if selection is not None else set())
             or lane.get("status") != "pass"
         ):
             raise PublicEvidenceError("public evidence contains an invalid or non-pass lane")
+        if selection is not None and lane["selection_sha256"] != selection.sha256:
+            raise PublicEvidenceError("selected public lane substituted its capture admission")
         lane_id = _text(lane.get("lane_id"), "lane.lane_id")
         if lane_id in lane_ids:
             raise PublicEvidenceError(f"duplicate public evidence lane {lane_id!r}")
@@ -1260,6 +1298,7 @@ def compact_bundle(
     expected_coverage_sha: str | None = None,
     catalog_path: Path = DEFAULT_CATALOG,
     matrix_path: Path = DEFAULT_MATRIX,
+    selection: Any = None,
 ) -> Path:
     """Atomically copy or convert one validated bundle into the compact cache schema."""
 
@@ -1277,6 +1316,7 @@ def compact_bundle(
         expected_coverage_sha=expected_coverage_sha,
         catalog_path=catalog_path,
         matrix_path=matrix_path,
+        selection=selection,
     )
     destination_root = output_root.resolve()
     if destination_root.exists() and not destination_root.is_dir():
@@ -1379,6 +1419,8 @@ def compact_bundle(
             compact_manifest = {
                 **manifest,
                 "schema_version": (
+                    SELECTED_COMPACT_SCHEMA_VERSION
+                    if manifest["schema_version"] == SELECTED_RAW_SCHEMA_VERSION else
                     SHARED_COMPACT_SCHEMA_VERSION
                     if manifest["schema_version"] in SHARED_SCHEMA_VERSIONS
                     else COMPACT_SCHEMA_VERSION
@@ -1406,6 +1448,7 @@ def compact_bundle(
             expected_coverage_sha=expected_coverage_sha,
             catalog_path=catalog_path,
             matrix_path=matrix_path,
+            selection=selection,
         )
         os.replace(staged_bundle, destination)
     finally:
@@ -1496,6 +1539,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare_parser.add_argument("--target-sha", required=True)
     prepare_parser.add_argument("--target-created-at", required=True)
     prepare_parser.add_argument("--minecraft-target")
+    prepare_parser.add_argument("--selection-admission", type=Path)
+    prepare_parser.add_argument("--selection-coverage", type=Path)
+    prepare_parser.add_argument("--selection-base")
+    prepare_parser.add_argument("--selection-policy")
 
     compact_parser = subparsers.add_parser("compact")
     compact_parser.add_argument("--evidence-root", type=Path, required=True)
@@ -1557,6 +1604,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         if args.command == "prepare":
+            feature = None
+            selection_arguments = (args.selection_admission, args.selection_coverage,
+                                   args.selection_base, args.selection_policy)
+            if any(value is not None for value in selection_arguments):
+                if not all(value is not None for value in selection_arguments):
+                    raise PublicEvidenceError("selected public preparation requires all independent admission inputs")
+                from feature_evidence import admission
+                chosen = admission.verify(args.selection_admission, REPO, base=args.selection_base,
+                                          head=args.source_sha, policy=args.selection_policy)
+                chosen.require_selection()
+                feature = {"admission": chosen.to_dict(), "coverage": _read_json(args.selection_coverage,
+                    "selected feature coverage", maximum_bytes=256 * 1024)}
             bundle = prepare(
                 e2e_root=args.e2e_root,
                 matrix_path=args.matrix,
@@ -1572,6 +1631,7 @@ def main(argv: list[str] | None = None) -> int:
                 target_sha=args.target_sha,
                 target_created_at=args.target_created_at,
                 minecraft_target=args.minecraft_target,
+                feature_selection=feature,
             )
             print(bundle)
         elif args.command == "compact":

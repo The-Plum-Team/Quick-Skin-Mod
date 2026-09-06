@@ -164,7 +164,7 @@ Packaged Minecraft runtime scenarios require a display and the matrix-declared J
 headless Linux and in CI; on a desktop session, macOS included, run the orchestrator directly.
 Follow `e2e/README.md` for what is verified on which platform, and do not substitute Loom
 development runs for packaged-JAR E2E evidence. Gradle and Stonecutter must themselves start on
-JDK 21 or newer; shared CI installs JDK 17, JDK 21, and JDK 25 so each version branch can select
+JDK 21 or newer; shared CI installs JDK 17, JDK 21, and JDK 25 so each matrix target can select
 its matrix-declared toolchain.
 
 The full build coordinator runs one Gradle process per matrix target sequentially; it includes
@@ -175,6 +175,13 @@ explicitly partial build. A successful build report does not replace artifact st
 Release automation always rebuilds `scripts/release/build_matrix.py` with `--rerun-tasks` and
 requires every production and harness SHA-256 to equal the first build. When determinism is in
 scope locally, use `scripts/release/verify_reproducibility.py` against the first staged manifest.
+
+Shared-source feature selection must use the protected complete-baseline consumer, including
+current availability of every retained public baseline. Keep every matrix runtime job required;
+reduce only the scenario actions and captures justified by the authenticated module graph.
+The `capture_coverage=full` manual input restores complete coverage. A selected AI proof or composed
+Pages bundle must retain its separate coverage identity and may never issue a complete baseline.
+Public frames keep their original tested commit/run/JAR when unaffected dependencies permit reuse.
 
 ## Documentation maintenance
 

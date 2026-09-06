@@ -630,8 +630,10 @@ jobs:
 
   prepare-pages-evidence:
     name: Prepare public evidence for ${{ matrix.bundle_key }} (advisory)
-    needs: pages-inventory
-    if: needs.pages-inventory.outputs.targets != ''
+    needs:
+      - pages-inventory
+      - feature-policy
+    if: always() && needs.pages-inventory.result == 'success' && needs.pages-inventory.outputs.targets != ''
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -650,6 +652,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: ${{ needs.feature-policy.outputs.selective == 'true' && '0' || '1' }}
           persist-credentials: false
 
       - name: Install Python
@@ -730,11 +733,26 @@ jobs:
           SOURCE_CREATED_AT: ${{ steps.identity.outputs.source_created_at }}
           TARGET_SHA: ${{ steps.identity.outputs.target_sha }}
           TARGET_CREATED_AT: ${{ steps.identity.outputs.target_created_at }}
+          SELECTION_ENABLED: ${{ needs.feature-policy.outputs.selective }}
+          SELECTION_BASE: ${{ needs.feature-policy.outputs.base }}
+          SELECTION_POLICY: ${{ needs.feature-policy.outputs.policy }}
+          SELECTION_SHA256: ${{ needs.feature-policy.outputs.selection_sha256 }}
         run: |
           set -euo pipefail
           target_argument=()
           if [[ -n "$MINECRAFT_TARGET" ]]; then
             target_argument=(--minecraft-target "$MINECRAFT_TARGET")
+          fi
+          selection_arguments=()
+          if [[ "$SELECTION_ENABLED" == true ]]; then
+            if [[ ! "$SELECTION_SHA256" =~ ^[0-9a-f]{64}$ ||
+                  "$(sha256sum e2e-out/selection.json | cut -d' ' -f1)" != "$SELECTION_SHA256" ]]; then
+              printf 'Public runtime selection differs from protected admission.\n' >&2
+              exit 1
+            fi
+            selection_arguments=(--selection-admission e2e-out/selection.json
+              --selection-coverage e2e-out/coverage.json --selection-base "$SELECTION_BASE"
+              --selection-policy "$SELECTION_POLICY")
           fi
           python3 scripts/pages/evidence.py prepare \
             --e2e-root e2e-out \
@@ -750,7 +768,8 @@ jobs:
             --target-branch "$GITHUB_REF_NAME" \
             --target-sha "$TARGET_SHA" \
             --target-created-at "$TARGET_CREATED_AT" \
-            "${target_argument[@]}"
+            ${target_argument[@]+"${target_argument[@]}"} \
+            ${selection_arguments[@]+"${selection_arguments[@]}"}
 
       - name: Upload stable public evidence for this Minecraft target
         if: steps.identity.outputs.publish == 'true'

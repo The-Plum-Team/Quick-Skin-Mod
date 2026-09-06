@@ -117,9 +117,32 @@ scope proof carrying the selection hash. It cannot certify a complete semantic a
 full-profile validators continue to reject selected reports. A disabled Git admission requires all
 scenarios in its profile, even if a caller attempts to supply a smaller scenario list.
 
-Protected workflow activation, compatibility reference provenance and reuse of unaffected evidence
-remain in progress in [the rework plan](../docs/architecture/MODULAR-REWORK.md). The local path
-preview remains available while these workflow contracts are migrated together.
+Shared-source PRs and manual master runs now obtain that authority through
+`scripts/ci/feature_coverage_consumer.py`. A reusable baseline requires every matrix runtime,
+every normalized clean target review, and a successfully deployed complete compact Pages bundle
+for every target. The selector reauthenticates these immutable artifacts and compares cumulative
+changes against the complete baseline. Unknown coupling, changed policy, missing/expired evidence
+or failed admission uses complete captures. `capture_coverage=full` explicitly requests recovery
+coverage; schedules, release profiles and optional-mod lanes keep their complete profiles.
+
+All loader/version jobs remain required. Their reports carry the protected Git admission and
+coverage proof. `feature_review.py` admits only the selected images before model access; paired
+reviews use the selected Fabric reference from the same runtime. Its schema-7 curation proof
+describes partial coverage separately from semantic/comparison judgment and cannot certify a new
+complete baseline.
+
+Pages uses separate public schemas: complete raw/compact targets remain 3/4, selected raw/compact
+targets use 5/6, and a schema-7 compact composition retains exactly one complete baseline and one
+cumulative selected update. The protected collector reauthenticates their source jobs, baseline
+certificate, immutable deployed baseline archive and dependency fingerprints. Every displayed
+frame retains its actual tested commit, run and JAR; reused frames also expose the newer covered
+commit. A composition never becomes a complete baseline or recursively chains older compositions.
+The exact `pages-full-baseline-<target>--<sha>--<run>` compact artifact has a bounded 90-day lifetime.
+Only a deployed complete generation can publish it; missing retained evidence restores full runs.
+
+The first shared-source migration has no trusted baseline and therefore runs complete coverage.
+Remote activation and optional-mod admission are tracked in
+[the rework plan](../docs/architecture/MODULAR-REWORK.md).
 
 Build and stage the production jars plus separate remapped automation mods:
 

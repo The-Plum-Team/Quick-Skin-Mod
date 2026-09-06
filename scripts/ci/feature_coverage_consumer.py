@@ -26,7 +26,7 @@ ISSUER_JOB = "Authenticate complete shared feature coverage"
 BASELINE_KEYS = frozenset({"schema_version", "kind", "profile", "coverage", "source_sha",
     "source_run_id", "matrix_sha256", "scenario_contract_sha256", "module_graph_sha256",
     "policy_sha256", "module_fingerprints", "targets", "issuer", "source_run_attempt",
-    "source_job_graph", "review_artifacts"})
+    "source_job_graph", "review_artifacts", "public_artifacts"})
 TARGET_KEYS = frozenset({"bundle_key", "artifact_nodes", "source_artifact_ids", "frame_count",
                          "proof_sha256", "manifest_sha256", "report_sha256"})
 REVIEW_KEYS = frozenset({"id", "owner_run_id", "name", "digest", "size_in_bytes"})
@@ -134,7 +134,8 @@ def validate_baseline(value: Any, metadata: dict[str, Any], *, repository: Path,
         raise coverage.CoverageError("baseline does not certify the complete protected source job graph")
     targets = {row["bundle_key"]: row for row in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]}
     if (not isinstance(value["targets"], list) or len(value["targets"]) != len(targets)
-            or not isinstance(value["review_artifacts"], dict) or set(value["review_artifacts"]) != set(targets)):
+            or not isinstance(value["review_artifacts"], dict) or set(value["review_artifacts"]) != set(targets)
+            or not isinstance(value["public_artifacts"], dict) or set(value["public_artifacts"]) != set(targets)):
         raise coverage.CoverageError("baseline lacks the complete target and review inventory")
     matrix = coverage.load_matrix(coverage.DEFAULT_MATRIX)
     captures = sum(step.capture is not None for name in contract.scenarios_for_profile("pr")
@@ -171,6 +172,12 @@ def validate_baseline(value: Any, metadata: dict[str, Any], *, repository: Path,
             raise coverage.CoverageError("baseline has malformed or duplicate review provenance")
         report_ids.add(review["id"])
         owner_ids.add(review["owner_run_id"])
+    public_ids = set()
+    for key, record in value["public_artifacts"].items():
+        publisher.validate_public_record(record, bundle_key=key, source_sha=source, source_run_id=run_id)
+        if record["id"] in public_ids | source_ids | report_ids | {metadata["id"]}:
+            raise coverage.CoverageError("baseline reuses a public artifact identity")
+        public_ids.add(record["id"])
     if source_ids.intersection(report_ids | {metadata["id"]}):
         raise coverage.CoverageError("baseline reuses an artifact identity for different evidence")
     return fingerprints
@@ -204,9 +211,21 @@ def _from_artifact(api: publisher.Api, artifact: Any, *, repository: Path, head:
     unaffected = sorted(set(before) - set(selected.require_selection().affected_modules))
     if any(before[key] != after[key] for key in unaffected):
         raise coverage.CoverageError("selection omitted a changed dependency fingerprint")
+    public_owners = {}
+    for key, record in value["public_artifacts"].items():
+        if record["owner_run_id"] not in public_owners:
+            owner = api.run(record["owner_run_id"])
+            public_owners[record["owner_run_id"]] = (owner, api.jobs(owner))
+        owner, jobs = public_owners[record["owner_run_id"]]
+        actual = publisher.validate_public_owner(api.artifact(record["id"]), owner, jobs,
+            github_repository=api.repository, source_sha=metadata["source_sha"],
+            source_run_id=value["source_run_id"], bundle_key=key)
+        if actual != record:
+            raise coverage.CoverageError("complete public baseline expired or changed after certification")
     return selected, {"schema_version": 1, "selective": True, "reason": selected.reason,
         "selection_sha256": selected.sha256, "baseline": metadata,
         "baseline_sha256": coverage.digest(coverage.admission.canonical(value)),
+        "public_baseline_artifacts": value["public_artifacts"], "baseline_source_run_id": value["source_run_id"],
         "unchanged_module_fingerprints": {key: before[key] for key in unaffected}}
 
 

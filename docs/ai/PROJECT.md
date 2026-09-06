@@ -263,10 +263,14 @@ into those branches. Their source matrices and existing evidence remain intact d
   named seven-day exceptions are automatic-sync packaged evidence/input bundles needed by delayed
   compatibility review, compatibility plans/evidence/capsules/reports/block markers, queued visual
   review capsules, compatibility Pages handoffs, and rolling exact-policy visual verdict caches.
-  Five 90-day current-state artifact classes remain: the semantic certificate, the
+  Named 90-day artifact classes include the semantic certificate, the
   SHA-bound Pages cache, the matrix-derived lossless
   Fabric 1.20.1 anchor handoff, the per-covered-branch mod-compatibility Pages cache, and the
-  immutable `release-<release-id>` bundle. The release bundle
+  immutable `release-<release-id>` bundle. Shared-source feature coverage additionally retains its
+  complete healthy certificate and exact target/source/run compact Pages baselines for at most
+  90 days. Only a successfully deployed complete generation may create those public baselines;
+  partial generations reuse them without extending their lifetime. Missing or expired baseline
+  artifacts restore complete runtime coverage. The release bundle
   spans protected environment
   approvals and provides bounded recovery for an interrupted publication. After a successful Pages
   replacement, protected rotation deletes by exact artifact ID the superseded cache, ordinary

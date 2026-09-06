@@ -658,3 +658,24 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   reproduced the original 1.21.9 failure, passes after the repair, and passes the 1.21.8, 1.21.10,
   1.21.11 and 26.1 boundary checks. Six mixin-policy tests also pass. The complete serial build
   is running with both runtime repairs; remote runtime validation still belongs to head `7b8f29ea`.
+- Both runtime repairs now pass a complete serial build, full production/harness staging and a
+  second forced build. All 64 output SHA-256 values match. The evidence directory records the
+  exact first manifest, both build reports and the reproducibility result for production source
+  `4e5467a4dc1fbb08c2351f84eb102603c9c4cdaf`.
+  GitHub run `33996911180` has finished on the earlier head: 24 runtime lanes pass and eight fail
+  at the two repaired mixin boundaries; the required gate fails accordingly. The fixed source
+  still requires its next complete GitHub execution.
+- Connected public feature evidence to the same authenticated baseline. Selected producers retain
+  their Git admission and coverage sidecar; the collector reauthenticates the complete successful
+  source, baseline issuer, all public baseline identities, successful deployment and exact archive
+  digest before composing images. Complete compact generations have a separately named 90-day
+  artifact, and baseline issuance waits for all of them. Admission rechecks their availability,
+  so expiration or replacement restores full runtime captures before another partial run starts.
+  Public schemas 5/6 describe selected raw/compact evidence; schema 7 retains one complete schema-4
+  baseline and one current cumulative update. Each displayed frame keeps its tested run, commit and
+  JAR while recording current coverage; cross-generation comparisons and recursive compositions
+  are rejected. The HUD fixture updates four loader captures and retains 176 original frames.
+  All 379 aggregate CI tests, 101 Pages tests and the subsequent 12-test consumer suite (including
+  the new public-expiration regression) pass. Nine real-shell routing tests and fifteen parsed
+  workflow/action files also pass. No reduced GitHub generation or protected baseline has been
+  issued yet; optional-mod source admission and final ownership/documentation audits remain.

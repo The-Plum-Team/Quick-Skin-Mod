@@ -55,6 +55,16 @@ class FixtureApi(publisher.Api):
                         "visual-review-completion.json": b'{"review_complete":true}'}
             self.records[name] = [record]
             self.replace_archive(record, contents)
+        pages = {**source, "id": 8000, "path": ".github/workflows/pages.yml", "event": "workflow_dispatch"}
+        self.runs[8000] = pages
+        names = ["Build atomic static site", "Deploy GitHub Pages",
+                 *(f"Refresh evidence cache for {target['bundle_key']}" for target in fixture.targets)]
+        self.job_lists[8000] = [{"jobs": [self.job(name, 80000 + index, pages) for index, name in enumerate(names)]}]
+        for index, target in enumerate(fixture.targets):
+            name = publisher.public_baseline_name(target["bundle_key"], fixture.source, fixture.run_id)
+            self.records[name] = [{"id": 20000 + index, "name": name, "expired": False,
+                "size_in_bytes": 1024, "digest": "sha256:" + "a" * 64,
+                "workflow_run": {"id": 8000, "head_sha": fixture.source, "head_branch": "master"}}]
 
     def job(self, name, identifier, owner):
         return {"id": identifier, "run_id": owner["id"], "run_attempt": 1, "head_sha": owner["head_sha"],
@@ -75,6 +85,11 @@ class FixtureApi(publisher.Api):
 
     def jobs(self, run):
         return self.job_lists[run["id"]]
+
+    def artifact(self, identifier):
+        matches = [item for records in self.records.values() for item in records if item["id"] == identifier]
+        if len(matches) != 1: raise ValueError("fixture artifact is missing or duplicated")
+        return matches[0]
 
     def artifacts(self, *, run_id=None, name=None):
         if name is not None:
@@ -115,14 +130,25 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
         self.assertEqual("full", result["coverage"])
         self.assertEqual({"workflow": publisher.WORKFLOW, "run_id": 9000, "sha": self.fixture.source}, result["issuer"])
         self.assertEqual(len(self.fixture.targets), len(result["review_artifacts"]))
+        self.assertEqual(len(self.fixture.targets), len(result["public_artifacts"]))
         self.assertEqual(len(self.fixture.targets), len(self.api.downloaded))
         self.assertEqual(1, result["source_run_attempt"])
         self.assertEqual([], list((self.fixture.root / "collector").rglob("*.png")))
         self.assertLess(len(publisher.coverage.admission.canonical(result)), 64 * 1024)
 
     def test_missing_target_review_defers_before_downloading_any_report(self):
+        self.api.records.pop(f"visual-review-{self.fixture.run_id}--{self.fixture.targets[-1]['bundle_key']}")
+        self.assertIsNone(self.prepare())
+        self.assertEqual([], self.api.downloaded)
+
+    def test_missing_complete_public_baseline_defers_without_decoding_reports_or_images(self):
         self.api.records.pop(next(reversed(self.api.records)))
         self.assertIsNone(self.prepare())
+        self.assertEqual([], self.api.downloaded)
+
+    def test_public_baseline_must_have_a_successful_deployment_and_exact_source_run_name(self):
+        self.api.job_lists[8000][0]["jobs"][1]["conclusion"] = "skipped"
+        with self.assertRaisesRegex(ValueError, "deployed"): self.prepare()
         self.assertEqual([], self.api.downloaded)
 
     def test_foreign_review_owner_is_rejected_before_any_report_download(self):

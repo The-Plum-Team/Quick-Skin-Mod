@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -193,6 +195,61 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
                         drain.index("test -n \"$CLAUDE_CODE_OAUTH_TOKEN\""))
         self.assertIn('$proof.schema_version == 7 then ["feature_selection"]', drain)
         self.assertIn('"$(jq -r .schema_version "$proof")" != 7', drain)
+
+
+    def test_public_producer_uses_real_selector_outputs_and_independent_admission_inputs(self):
+        producer = job_block("on-demand-e2e.yml", "prepare-pages-evidence")
+        policy = job_block("on-demand-e2e.yml", "feature-policy")
+        declared = set(re.findall(r"^      ([a-z_0-9]+): \$\{\{ steps.result.outputs", policy, re.MULTILINE))
+        self.assertTrue(set(re.findall(r"needs.feature-policy.outputs.([a-z_0-9]+)", producer)) <= declared)
+        self.assertIn("needs.pages-inventory.result == 'success'", producer)
+        script = step_script("on-demand-e2e.yml", "prepare-pages-evidence", "Prepare the curated SHA-bound evidence bundle")
+        e2e = self.root / "e2e-out"
+        e2e.mkdir()
+        (e2e / "selection.json").write_bytes(self.selection.read_bytes())
+        (e2e / "coverage.json").write_text("{}")
+        self.binary("python3", "import json,os,sys\nopen(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n")
+        environment = {"MINECRAFT_TARGET": "1.20.1", "SOURCE_RUN_ID": "55", "SOURCE_BRANCH": "master",
+            "SOURCE_SHA": "b" * 40, "SOURCE_CREATED_AT": "2026-09-06T02:00:00Z", "TARGET_SHA": "b" * 40,
+            "TARGET_CREATED_AT": "2026-09-06T02:00:00Z", "GITHUB_REF_NAME": "master",
+            "SELECTION_ENABLED": "true", "SELECTION_BASE": "a" * 40, "SELECTION_POLICY": "b" * 40,
+            "SELECTION_SHA256": hashlib.sha256(self.selection.read_bytes()).hexdigest()}
+        result, _outputs, calls = self.run_script(script, environment)
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        self.assertEqual(1, len(calls))
+        for argument, value in (("--selection-base", "a" * 40), ("--selection-policy", "b" * 40),
+                                ("--source-sha", "b" * 40), ("--selection-admission", "e2e-out/selection.json")):
+            self.assertEqual(value, calls[0][calls[0].index(argument) + 1])
+        result, _outputs, calls = self.run_script(script, {**environment, "SELECTION_ENABLED": "false"})
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        self.assertNotIn("--selection-admission", calls[0])
+        result, _outputs, calls = self.run_script(script, {**environment, "SELECTION_SHA256": "0" * 64})
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual([], calls)
+
+    def test_pages_routes_selected_handoffs_and_caches_through_reauthentication_before_promotion(self):
+        script = step_script("pages.yml", "collect", "Compose authenticated feature evidence with its complete baseline")
+        self.binary("python3", "import json,os,sys\nfrom pathlib import Path\n"
+            "open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n"
+            "root=Path('composed-evidence/mc1.20.1');root.mkdir(parents=True)\n"
+            "(root/'manifest.json').write_text('{}')\n")
+        for schema, artifact, expected_calls in ((3, "pages-e2e-mc1.20.1", 0),
+                (5, "pages-e2e-mc1.20.1", 1), (7, "pages-cache-mc1.20.1--" + "b" * 40, 1)):
+            with self.subTest(schema=schema):
+                for name in ("selected-evidence", "source-feature-evidence", "composed-evidence"):
+                    path = self.root / name
+                    if path.exists(): shutil.rmtree(path)
+                root = self.root / "selected-evidence/mc1.20.1"
+                root.mkdir(parents=True)
+                (root / "manifest.json").write_text(json.dumps({"schema_version": schema}))
+                result, _outputs, calls = self.run_script(script, {"BUNDLE_KEY": "mc1.20.1",
+                    "ARTIFACT_NAME": artifact, "OWNER_RUN_ID": "55", "SOURCE_SHA": "b" * 40})
+                self.assertEqual(0, result.returncode, result.stderr[:300])
+                self.assertEqual(expected_calls, len(calls))
+                if calls:
+                    self.assertEqual("b" * 40, calls[0][calls[0].index("--source-sha") + 1])
+                    self.assertEqual(schema == 5, "--artifact-run-id" in calls[0])
+                    self.assertTrue((self.root / "source-feature-evidence/mc1.20.1/manifest.json").is_file())
 
 
 if __name__ == "__main__":
