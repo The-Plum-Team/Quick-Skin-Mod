@@ -2448,7 +2448,14 @@
                 "title": "Translucent cape worn",
                 "review_tier": "key",
                 "expectation": "The player is seen from behind wearing the imported cape whose visible face is half-transparent teal inside an opaque yellow border: the plaid back of the skin shows faintly through the cape surface.",
-                "probes": []
+                "probes": [
+                  {
+                    "kind": "translucent-cape-underlay",
+                    "region": [0.43, 0.50, 0.57, 0.74],
+                    "minimum_contrast": 4.0,
+                    "minimum_band_changes": 5
+                  }
+                ]
               },
               "requires": [
                 "cape_import_standard"

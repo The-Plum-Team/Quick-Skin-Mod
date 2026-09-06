@@ -52,6 +52,7 @@ PROTECTED_CONTROLLER_PATHS = (
     "build.gradle.kts",
     "architecture/modules.json",
     "common/src/e2e",
+    "e2e/cape_transparency.py",
     "e2e/check_visual_review.py",
     "e2e/visual_review_cache.py",
     "e2e/visual_similarity.py",

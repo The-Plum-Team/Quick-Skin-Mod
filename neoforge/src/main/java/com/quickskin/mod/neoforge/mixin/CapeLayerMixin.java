@@ -2,6 +2,7 @@
 package com.quickskin.mod.neoforge.mixin;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
+import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
@@ -113,11 +114,11 @@ public class CapeLayerMixin {
         RenderType renderType;
 
         if (finalTexture.getNamespace().equals(QuickSkinInfo.MOD_ID)) {
-            renderType = RenderType.entityTranslucentCull(finalTexture);
+            renderType = CapeRenderTypes.translucent(finalTexture);
         } else {
             boolean hasTransparency = TextureAlphaDetector.hasTransparency(finalTexture);
             if (hasTransparency) {
-                renderType = RenderType.entityTranslucentCull(finalTexture);
+                renderType = CapeRenderTypes.translucent(finalTexture);
             } else {
                 renderType = RenderType.entitySolid(finalTexture);
             }
@@ -166,6 +167,7 @@ package com.quickskin.mod.neoforge.mixin;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.quickskin.mod.platform.QuickSkinInfo;
+import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
@@ -285,7 +287,7 @@ public class CapeLayerMixin {
 
         RenderType renderType = QuickSkinInfo.MOD_ID.equals(finalTexture.getNamespace())
                 || TextureAlphaDetector.hasTransparency(finalTexture)
-                ? RenderType.entityTranslucent(finalTexture)
+                ? CapeRenderTypes.translucent(finalTexture)
                 : RenderType.entitySolid(finalTexture);
         VertexConsumer vertices = buffer.getBuffer(renderType);
 
@@ -302,6 +304,7 @@ public class CapeLayerMixin {
 package com.quickskin.mod.neoforge.mixin;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
+import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
@@ -487,19 +490,11 @@ public class CapeLayerMixin {
         RenderType renderType;
 
         if (finalTexture.getNamespace().equals(QuickSkinInfo.MOD_ID)) {
-//? if <1.21.11 {
-            renderType = RenderType.entityTranslucent(finalTexture);
-//?} else {
-            renderType = RenderTypes.entityTranslucent(finalTexture);
-//?}
+            renderType = CapeRenderTypes.translucent(finalTexture);
         } else {
             boolean hasTransparency = TextureAlphaDetector.hasTransparency(finalTexture);
             if (hasTransparency) {
-//? if <1.21.11 {
-                renderType = RenderType.entityTranslucent(finalTexture);
-//?} else {
-                renderType = RenderTypes.entityTranslucent(finalTexture);
-//?}
+                renderType = CapeRenderTypes.translucent(finalTexture);
             } else {
 //? if <1.21.11 {
                 renderType = RenderType.entitySolid(finalTexture);

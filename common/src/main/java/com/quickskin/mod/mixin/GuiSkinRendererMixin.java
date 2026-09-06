@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 //?}
 import com.mojang.math.Axis;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
+import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
 //? if <26.2 {
 import net.minecraft.client.Minecraft;
@@ -138,11 +139,7 @@ public class GuiSkinRendererMixin {
             return;
         }
 
-//? if <1.21.11 {
-        RenderType capeRenderType = RenderType.entityTranslucent(cape.texture());
-//?} else {
-        RenderType capeRenderType = RenderTypes.entityTranslucent(cape.texture());
-//?}
+        RenderType capeRenderType = CapeRenderTypes.translucent(cape.texture());
 //? if <26.2 {
         VertexConsumer capeConsumer = bufferSource.getBuffer(capeRenderType);
 //?} else {

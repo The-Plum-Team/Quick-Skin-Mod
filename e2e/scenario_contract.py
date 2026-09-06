@@ -111,7 +111,16 @@ class RequiredGuiTextProbe:
     kind: str = "required-gui-text"
 
 
-VisualProbe = OpaqueStarsProbe | RequiredGuiTextProbe
+@dataclass(frozen=True)
+class TranslucentCapeProbe:
+    step: str
+    region: tuple[float, float, float, float]
+    minimum_contrast: float
+    minimum_band_changes: int
+    kind: str = "translucent-cape-underlay"
+
+
+VisualProbe = OpaqueStarsProbe | RequiredGuiTextProbe | TranslucentCapeProbe
 
 
 @dataclass(frozen=True)
@@ -587,10 +596,24 @@ def _probe(
                 "box",
                 "minimum_luma_exclusive",
                 "minimum_pixels",
+                "minimum_contrast",
+                "minimum_band_changes",
             }
         ),
     )
     kind = _text(raw["kind"], f"{label}.kind")
+    if kind == "translucent-cape-underlay":
+        _object(raw, label, frozenset({
+            "kind", "region", "minimum_contrast", "minimum_band_changes",
+        }))
+        return TranslucentCapeProbe(
+            step,
+            _region(raw["region"], f"{label}.region"),
+            _number(raw["minimum_contrast"], f"{label}.minimum_contrast",
+                    minimum=1.0, maximum=255.0),
+            _integer(raw["minimum_band_changes"], f"{label}.minimum_band_changes",
+                     minimum=2, maximum=32),
+        )
     if kind == "opaque-stars-background":
         _object(
             raw,

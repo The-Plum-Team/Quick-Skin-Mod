@@ -252,6 +252,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   must show its import, cancel, batch-limit, and delete messages. Cape-menu evidence must click
   real tiles through the screen's mouse handlers so selection, the None tile, the speed slider,
   the GIF badge, the scrollbar, the tooltip, and Hide Built-in Capes are exercised as a user does.
+  The worn-cape capture must also pass its contract-owned pixel probe: the yellow border encloses
+  a teal surface with repeated plaid bands visible through it. Atlas alpha alone cannot certify
+  framebuffer transparency; a closed cape mesh must cull its opaque inward-facing back surface.
 - Settings evidence must show every tab through the real tab buttons, the keybind capture state,
   the non-admin server notice with inactive server controls, and styled buttons over the vanilla
   in-world background; the captured tab must be the tab whose controls the assertion toggles.

@@ -4,6 +4,7 @@ package com.quickskin.mod.mixin;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.quickskin.mod.platform.QuickSkinInfo;
+import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
@@ -128,7 +129,7 @@ public class CapeLayerMixin {
 
         RenderType renderType = QuickSkinInfo.MOD_ID.equals(finalTexture.getNamespace())
                 || TextureAlphaDetector.hasTransparency(finalTexture)
-                ? RenderType.entityTranslucent(finalTexture)
+                ? CapeRenderTypes.translucent(finalTexture)
                 : RenderType.entitySolid(finalTexture);
         VertexConsumer vertices = buffer.getBuffer(renderType);
 
@@ -147,6 +148,7 @@ public class CapeLayerMixin {
 package com.quickskin.mod.mixin;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
+import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
@@ -408,24 +410,12 @@ public class CapeLayerMixin {
         // If the texture is from our mod (local, network, animated, or known),
         // always use the translucent render type to correctly handle transparency.
         if (finalTexture.getNamespace().equals(QuickSkinInfo.MOD_ID)) {
-//? if <1.21.6 {
-            renderType = RenderType.entityTranslucentCull(finalTexture);
-//?} else if <1.21.11 {
-            renderType = RenderType.entityTranslucent(finalTexture);
-//?} else {
-            renderType = RenderTypes.entityTranslucent(finalTexture);
-//?}
+            renderType = CapeRenderTypes.translucent(finalTexture);
         } else {
             // For vanilla capes or capes from other mods, use the alpha detector.
             boolean hasTransparency = TextureAlphaDetector.hasTransparency(finalTexture);
             if (hasTransparency) {
-//? if <1.21.6 {
-                renderType = RenderType.entityTranslucentCull(finalTexture);
-//?} else if <1.21.11 {
-                renderType = RenderType.entityTranslucent(finalTexture);
-//?} else {
-                renderType = RenderTypes.entityTranslucent(finalTexture);
-//?}
+                renderType = CapeRenderTypes.translucent(finalTexture);
             } else {
 //? if <1.21.6 {
                 renderType = RenderType.entitySolid(finalTexture);
