@@ -502,7 +502,9 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      max-parallel: 2
+      # The shared matrix replaces separate per-version workflows. Bound the wave while allowing
+      # four isolated hosted runners; each runner still executes its Gradle/runtime work serially.
+      max-parallel: 4
       matrix: ${{ fromJSON(needs.build.outputs.anchors) }}
 
     steps:
