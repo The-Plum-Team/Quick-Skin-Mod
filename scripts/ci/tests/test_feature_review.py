@@ -99,7 +99,7 @@ class FeatureReviewTest(unittest.TestCase):
         self.invocations = 0
         # The consumer's own tests authenticate real Git objects and complete baseline reports.
         # Here that boundary is pinned while real archive, row, image and capsule validators run.
-        for replacement in (patch.object(review.consumer, "authenticate_execution"),
+        for replacement in (patch.object(review, "authenticate_full"),
                             patch.object(review, "DEFAULT_CATALOG", self.fixture.catalog_path),
                             patch.object(review.coverage, "default_contract", return_value=contract),
                             patch.object(review.publisher, "_get", side_effect=self.api.get)):
@@ -172,13 +172,65 @@ class FeatureReviewTest(unittest.TestCase):
             review.verify(self.api, output / "curation-proof.json", manifest_path, repository=ROOT,
                 source_sha=self.source, source_run_id=55, bundle_key=self.targets[1]["bundle_key"], scratch=scratch)
 
-    def test_complete_runtime_without_selection_keeps_the_existing_curator_without_downloads(self):
+    def complete_fixture(self, matrix_kind="pr-anchors"):
         self.records.remove(self.selection_record)
-        proof, output = self.curate()
-        self.assertIsNone(proof)
-        self.assertEqual([], self.api.downloaded)
-        self.assertEqual([], list(output.iterdir()))
+        self.fixture.write_catalog([("phase0-smoke", "client_a", "baseline")])
+        contract = load_contract(self.fixture.catalog_path)
+        patcher = patch.object(review.coverage, "default_contract", return_value=contract)
+        patcher.start(); self.addCleanup(patcher.stop)
+        data, digest, rows = review.targets._inventory(review.coverage.DEFAULT_MATRIX, matrix_kind)
+        for record, row in zip(self.records, rows, strict=True):
+            record["name"] = "packaged-e2e-" + row["id"]
+            if record["id"] not in self.archives: continue
+            with zipfile.ZipFile(io.BytesIO(self.archives[record["id"]])) as archive:
+                files = {name: archive.read(name) for name in archive.namelist()
+                         if name not in {"selection.json", "coverage.json"}}
+            for name, raw in list(files.items()):
+                if not name.endswith("result.json"): continue
+                result = json.loads(raw)
+                result.pop("selection_sha256")
+                result["contract_sha256"] = contract.sha256
+                result["reports"]["client_a"].pop("selection_sha256")
+                result["reports"]["client_a"]["contract_sha256"] = contract.sha256
+                files[name] = json.dumps(result).encode()
+            self.archive(record, files)
+        # Keep the real 32-lane partition and job names with a small authored image contract.
+        patcher = patch.object(review.targets, "_inventory", return_value=(data, digest,
+            [{**row, "scenarios": "phase0-smoke"} for row in rows]))
+        patcher.start(); self.addCleanup(patcher.stop)
+
+    def test_complete_capsule_uses_current_runtime_reference_and_reauthenticates(self):
+        self.complete_fixture()
+        proof, output = self.curate(1)
+        self.assertEqual(8, proof["schema_version"])
+        self.assertNotIn("feature_selection", proof)
+        self.assertEqual("packaged-full", proof["visual_reference"]["evidence_kind"])
+        self.assertEqual(3, len(self.api.downloaded))
         self.verifier.assert_not_called()
+        scratch = self.root / "full-verify"
+        scratch.mkdir()
+        self.assertIsNone(review.verify(self.api, output / "curation-proof.json",
+            output / "review-input/visual-review-manifest.json", repository=ROOT,
+            source_sha=self.source, source_run_id=55, bundle_key=self.targets[1]["bundle_key"],
+            scratch=scratch))
+        self.records.append(self.selection_record)
+        with self.assertRaisesRegex(review.coverage.CoverageError, "selected runtime"):
+            review.verify(self.api, output / "curation-proof.json",
+                output / "review-input/visual-review-manifest.json", repository=ROOT,
+                source_sha=self.source, source_run_id=55, bundle_key=self.targets[1]["bundle_key"],
+                scratch=scratch)
+
+    def test_scheduled_complete_capsule_uses_the_native_runtime_partition(self):
+        self.complete_fixture("native-anchors")
+        output, scratch = self.root / "nightly", self.root / "nightly-scratch"
+        output.mkdir(); scratch.mkdir()
+        proof = review.curate(self.api, repository=ROOT, source_sha=self.source, source_run_id=55,
+            bundle_key=self.targets[1]["bundle_key"], compatibility_impact=self.impact,
+            output=output, scratch=scratch, matrix_kind="native-anchors")
+        self.assertEqual(8, proof["schema_version"])
+        self.assertEqual("native-anchors", proof["matrix_kind"])
+        self.assertEqual(3, len(self.api.downloaded))
+
 
     def test_baseline_admission_failure_stops_before_any_raw_image_download(self):
         self.verifier.side_effect = review.coverage.CoverageError("unproven baseline")

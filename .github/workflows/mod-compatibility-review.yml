@@ -228,7 +228,7 @@ jobs:
           # pr-anchors. Admit that shape only when both branch and commit equal the target;
           # every other pr-anchors source remains a bot-owned synchronization branch.
           jq -e \
-            '.schema_version == 1 and
+            '(.schema_version == 1 or .schema_version == 2) and
              (.source_run_id | type == "number" and . > 0) and
              (.base_matrix_kind == "pr-anchors" or
               .base_matrix_kind == "native-anchors") and
@@ -236,8 +236,11 @@ jobs:
              (.source_branch | type == "string" and
               test("^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$")) and
              (.target_sha | type == "string" and test("^[0-9a-f]{40}$")) and
-             (.target_branch | type == "string" and
-              test("^[a-z0-9]+(-and-[a-z0-9]+)*-[0-9]+([.][0-9]+)+$")) and
+             (if .schema_version == 2 then
+                .source_branch == "master" and .target_branch == "master" and
+                .source_sha == .target_sha
+              else (.target_branch | type == "string" and
+                test("^[a-z0-9]+(-and-[a-z0-9]+)*-[0-9]+([.][0-9]+)+$")) end) and
              (if .base_matrix_kind == "pr-anchors" then
                 ((.source_branch |
                   test("^automation/sync/[A-Za-z0-9._/-]+$")) or
@@ -270,6 +273,10 @@ jobs:
                    else endswith("--scheduled-behavior") end)) and
                 .compatibility_contract_sha256 == $lock))' \
             "$plan" > /dev/null
+          if [[ "$(jq -r .schema_version "$plan")" == 2 ]]; then
+            python3 scripts/ci/shared_compatibility.py --policy-sha "$IMPLEMENTATION_SHA" \
+              --validate-plan "$plan" || exit 1
+          fi
           plan_source_sha="$(jq -er .source_sha "$plan")"
           git fetch --no-tags origin "$plan_source_sha"
           expected_lock="$(git show \

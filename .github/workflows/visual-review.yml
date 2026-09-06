@@ -762,19 +762,21 @@ jobs:
             "$RUNNER_TEMP/expected-e2e-matrix.json" > "$RUNNER_TEMP/target-e2e-matrix.json"
           mv "$RUNNER_TEMP/target-e2e-matrix.json" "$RUNNER_TEMP/expected-e2e-matrix.json"
 
-          if [[ -n "$TARGET_MINECRAFT_VERSION" && "$matrix_kind" == pr-anchors ]]; then
+          if [[ -n "$TARGET_MINECRAFT_VERSION" ]]; then
             printf '%s\n' "$COMPATIBILITY_IMPACT" > "$RUNNER_TEMP/selected-compatibility-impact.json"
             python3 scripts/ci/feature_review.py \
               --github-repository "$GITHUB_REPOSITORY" --repository . \
               --source-run-id "$SOURCE_RUN_ID" --source-sha "$IMPLEMENTATION_SHA" \
-              --bundle-key "$TARGET_BUNDLE_KEY" --output "$RUNNER_TEMP" \
+              --bundle-key "$TARGET_BUNDLE_KEY" --matrix-kind "$matrix_kind" --output "$RUNNER_TEMP" \
               --compatibility-impact "$RUNNER_TEMP/selected-compatibility-impact.json" \
               --github-output "$RUNNER_TEMP/selected-review.outputs" \
-              > "$RUNNER_TEMP/selected-review.json"
-            if jq -e '.selected == true' "$RUNNER_TEMP/selected-review.json" > /dev/null; then
+              > "$RUNNER_TEMP/selected-review.json" || exit 1
+            if jq -e '.curated == true' "$RUNNER_TEMP/selected-review.json" > /dev/null; then
               cat "$RUNNER_TEMP/selected-review.outputs" >> "$GITHUB_OUTPUT"
               exit 0
             fi
+            printf 'Shared review did not produce its authenticated capsule.\n' >&2
+            exit 1
           fi
 
           # Resolve the reference only after the candidate run, source commit, controller parity,

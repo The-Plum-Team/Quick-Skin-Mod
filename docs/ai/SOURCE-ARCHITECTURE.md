@@ -53,9 +53,14 @@ supplied commits and require its outer hash on every selected report. `project_c
 their shared exact view of the authored assertions/captures; its contract hash remains unchanged,
 so selection identity must be checked separately. Unknown impact forces every scenario in the
 profile. Selected curation emits a distinct scope proof and cannot certify a full semantic anchor.
-CI still requires complete profiles while GitHub/baseline authentication, selective certification
-and retained unaffected evidence are migrated. A consumer expecting full evidence must reject a
-selected report, including a selected report that happens to contain all authored steps.
+Protected CI resolves a cumulative selection against an authenticated complete healthy baseline.
+It rechecks unchanged module fingerprints, exact Git ancestry, all runtime jobs, normalized clean
+reviews, and available complete public evidence. Missing or expired coverage selects full profiles.
+`feature_review.py` emits schema 7 for partial scope and schema 8 for complete scope; both use the
+same runtime generation's Fabric reference. Only complete coverage can seed a healthy baseline.
+The feature Pages consumer separately authenticates baseline and selected components, preserving
+original tested SHA/run/JAR provenance for every reused frame. A consumer expecting full evidence
+must reject a selected report, even when that selection happens to contain all authored steps.
 
 `PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
 after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in
@@ -281,10 +286,21 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   evidence; `scripts/pages/rotate_artifacts.py` retains one
   current compatibility cache per covered branch and retires older caches, consumed handoffs, and
   fan-in artifacts only after a successful atomic deployment.
+- `scripts/ci/feature_review.py` curates complete and selected shared targets from the exact
+  successful current-master runtime. Both secretless curation and model admission authenticate
+  the complete job graph and immutable artifact partition. Paired targets use the same run's
+  Fabric anchor; shared review does not require a preceding Pages deployment. Scheduled runs
+  remain complete integration checks and cannot issue the manual generation's public baseline.
+- `scripts/ci/shared_compatibility.py` authenticates a clean complete schema-8 target review before
+  optional-mod E2E. Each wave has its own target key, while source and target SHA both name current
+  `master`. Its schema-2 plan is independently recomputed from the full matrix, scenario contract,
+  and pinned external-mod lock before both runtime and AI admission. Selected generations retain
+  their scoped review; optional integrations run full profiles on complete/manual/nightly waves.
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every later-version candidate with the same semantic
-  capture from authenticated lossless raw Pages handoff evidence. For a 1.20.1 source it instead
+  capture from authenticated lossless raw Pages handoff evidence for historical schema-2 sources.
+  Shared-source curation supplies the same-run reference through the same renderer. For a 1.20.1 source it instead
   requires complete, identical Fabric/Forge capture-id sets and exposes each frame without any
   reference. It requires both sides to remain exactly 1920x1080 and atomically re-encodes candidates
   and references as metadata-free RGB PNGs without resizing. `e2e/visual_similarity.py` computes
@@ -385,7 +401,8 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   the separately authenticated continuation after Build and full Packaged E2E; it never becomes a
   semantic certificate.
 - `scripts/ci/mod_compatibility_impact.py` independently classifies the complete server-side
-  synchronization PR inventory. It binds a normalized manifest into the visual curation proof and
+  diff inventory supplied by the protected curator (historical synchronization PRs or the shared
+  generation). It binds a normalized manifest into the visual curation proof and
   permits the optional-mod wave only for product, build, runtime-harness, compatibility-policy, or
   unknown impact. Review-only workflows/prompts, publication, documentation, and policy tests skip
   that expensive wave. Renames classify both old and new paths and malformed or incomplete

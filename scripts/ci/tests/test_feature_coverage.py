@@ -186,6 +186,21 @@ class FeatureCoverageTest(unittest.TestCase):
         partial[0]["jobs"].pop()
         with self.assertRaises(ValueError): validate(run, partial)
 
+    def test_complete_same_run_review_can_seed_coverage_but_foreign_reference_cannot(self):
+        target = self.targets[1]
+        files = self.files(target)
+        proof, manifest, report = [json.loads(path.read_bytes()) for path in (files.proof, files.manifest, files.report)]
+        reference = next(item for item, row in zip(self.artifacts, self.rows, strict=True)
+                         if row["artifact_node"] == "fabric-1.20.1")
+        proof.update(schema_version=8, visual_reference={"evidence_kind": "packaged-full",
+            "artifact": reference, "artifact_node": "fabric-1.20.1", "source_sha": self.source,
+            "source_run_id": self.run_id})
+        self.write(files, proof, manifest, report)
+        self.assertEqual(180, self.validate(files, target)["frame_count"])
+        proof["visual_reference"]["source_run_id"] += 1
+        self.write(files, proof, manifest, report)
+        with self.assertRaises(ValueError): self.validate(files, target)
+
     def test_report_metadata_binds_exact_target_and_protected_successful_review_job(self):
         target = self.targets[0]["bundle_key"]
         artifact = {"id": 42, "name": f"visual-review-{self.run_id}--{target}", "size_in_bytes": 1024,

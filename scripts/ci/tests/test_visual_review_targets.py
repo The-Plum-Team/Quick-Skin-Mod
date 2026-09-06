@@ -70,7 +70,7 @@ class VisualReviewTargetsTest(unittest.TestCase):
     def test_actual_curator_shell_recomputes_one_target_before_downloading_images(self) -> None:
         script = step_script("visual-review.yml", "curate", "Validate and curate exact packaged evidence")
         excerpt = script[script.index("expected_artifacts="):script.index(
-            'if [[ -n "$TARGET_MINECRAFT_VERSION" && "$matrix_kind" == pr-anchors ]]; then')]
+            'if [[ -n "$TARGET_MINECRAFT_VERSION" ]]; then', script.index("expected_artifacts="))]
         target = self.plan()["include"][0]
         arguments = {"ARTIFACT_INVENTORY": json.dumps(target["artifact_inventory"]),
                      "COMPLETE_ARTIFACT_INVENTORY": json.dumps(self.artifacts),

@@ -161,7 +161,8 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
 
     def test_selected_curation_routes_before_full_reference_resolution_and_revalidates_before_model_access(self):
         script = step_script("visual-review.yml", "curate", "Validate and curate exact packaged evidence")
-        start = script.index('if [[ -n "$TARGET_MINECRAFT_VERSION" && "$matrix_kind" == pr-anchors ]]; then')
+        start = script.index('if [[ -n "$TARGET_MINECRAFT_VERSION" ]]; then',
+                             script.index('mv "$RUNNER_TEMP/target-e2e-matrix.json"'))
         end = script.index("# Resolve the reference only after", start)
         route = script[start:end] + '\nprintf "full\\n" >> "$RUNNER_TEMP/continued"\n'
         self.binary("python3", "import json,os,sys\nfrom pathlib import Path\n"
@@ -169,13 +170,13 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
             "selected=os.environ['FIXTURE_SELECTED']=='true'\n"
             "out=Path(sys.argv[sys.argv.index('--github-output')+1])\n"
             "out.write_text('selected='+str(selected).lower()+'\\nreview_mode=anchor-semantic\\ngeneration_sha='+os.environ['IMPLEMENTATION_SHA']+'\\n')\n"
-            "print(json.dumps({'selected':selected}))\n")
+            "print(json.dumps({'curated':True,'selected':selected}))\n")
         environment = {"TARGET_MINECRAFT_VERSION": "1.20.1", "TARGET_BUNDLE_KEY": "mc1.20.1",
             "matrix_kind": "pr-anchors", "IMPLEMENTATION_SHA": "b" * 40,
             "SOURCE_SHA": "c" * 40, "SOURCE_RUN_ID": "55", "FIXTURE_SELECTED": "true",
             "COMPATIBILITY_IMPACT": '{"schema_version":1,"compatibility_required":true,"paths":[],"impact_paths":[]}'}
-        for changes, expected_calls, continued in (({}, 1, False), ({"FIXTURE_SELECTED": "false"}, 1, True),
-                ({"TARGET_MINECRAFT_VERSION": ""}, 0, True), ({"matrix_kind": "native-anchors"}, 0, True)):
+        for changes, expected_calls, continued in (({}, 1, False), ({"FIXTURE_SELECTED": "false"}, 1, False),
+                ({"TARGET_MINECRAFT_VERSION": ""}, 0, True), ({"matrix_kind": "native-anchors", "FIXTURE_SELECTED": "false"}, 1, False)):
             with self.subTest(changes=changes):
                 (self.root / "continued").write_text("")
                 result, outputs, calls = self.run_script(route, {**environment, **changes})
@@ -187,15 +188,76 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
                     self.assertEqual("b" * 40, calls[0][calls[0].index("--source-sha") + 1])
                     self.assertEqual("55", calls[0][calls[0].index("--source-run-id") + 1])
                 if not continued:
-                    self.assertEqual("true", outputs["selected"])
+                    self.assertEqual(changes.get("FIXTURE_SELECTED", "true"), outputs["selected"])
                     self.assertEqual("b" * 40, outputs["generation_sha"])
         drain = job_block("visual-review-drain.yml", "review")
         self.assertIn('--verify-proof "$proof" --manifest "$manifest"', drain)
         self.assertLess(drain.index("python3 scripts/ci/feature_review.py"),
                         drain.index("test -n \"$CLAUDE_CODE_OAUTH_TOKEN\""))
         self.assertIn('$proof.schema_version == 7 then ["feature_selection"]', drain)
-        self.assertIn('"$(jq -r .schema_version "$proof")" != 7', drain)
+        self.assertIn('"$proof_schema" != 7 && "$proof_schema" != 8', drain)
 
+
+    def test_complete_shared_review_dispatches_one_target_with_the_ten_field_github_limit(self):
+        script = step_script("visual-review-drain.yml", "release-mod-compatibility",
+                             "Authenticate the merge, normalized report, and exact release tree")
+        start = script.index('if [[ "$SOURCE_BRANCH" == master ]]; then')
+        end = script.index('[[ "$SOURCE_BRANCH" =~ ^automation/sync/', start)
+        route = "set -euo pipefail\n" + script[start:end]
+        self.binary("github_api_retry", "import json,os,sys\n"
+            "open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n"
+            "if '/branches/master' in sys.argv[1]: print(os.environ['LIVE_SHA'])\n"
+            "elif '/artifacts/' in sys.argv[1]: print(os.environ['REPORT_METADATA'])\n"
+            "else: print('{}')\n")
+        record = {"id": 8000, "name": "visual-review-55--mc1.21.1", "expired": False,
+            "size_in_bytes": 1024, "digest": "sha256:" + "a" * 64,
+            "workflow_run": {"id": 66, "head_branch": "master", "head_sha": "b" * 40}}
+        environment = {"SOURCE_BRANCH": "master", "SOURCE_RUN_ID": "55", "SOURCE_SHA": "b" * 40,
+            "GITHUB_SHA": "b" * 40, "LIVE_SHA": "b" * 40, "REVIEW_ARTIFACT_ID": "8000",
+            "REPORT_METADATA": json.dumps(record)}
+        result, _, calls = self.run_script(route, environment)
+        self.assertEqual(0, result.returncode, result.stderr[:500])
+        self.assertEqual(3, len(calls))
+        payload = json.loads((self.root / "shared-mod-compatibility-dispatch.json").read_text())
+        self.assertEqual("mod-compatibility-requested", payload["event_type"])
+        self.assertEqual(10, len(payload["client_payload"]))
+        self.assertEqual(record["name"], payload["client_payload"]["review_artifact_name"])
+        self.assertEqual("master", payload["client_payload"]["target_branch"])
+        result, _, calls = self.run_script(route, {**environment, "LIVE_SHA": "c" * 40})
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual(1, len(calls))
+        self.assertNotIn("--method", calls[0])
+        result, _, calls = self.run_script(route, {**environment,
+            "REPORT_METADATA": json.dumps({**record, "size_in_bytes": 4194305})})
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual(2, len(calls))
+        self.assertFalse(any("--method" in call for call in calls))
+
+    def test_shared_optional_wave_enters_protected_admission_and_recomputes_the_target_plan(self):
+        script = step_script("mod-compatibility-e2e.yml", "admit",
+                             "Authenticate the normalized report and exact merged tree")
+        start = script.index('if [[ "$SOURCE_BRANCH" == master || "$TARGET_BRANCH" == master ]]; then')
+        end = script.index('[[ "$SOURCE_RUN_ID" =~', start)
+        self.binary("python3", "import json,os,sys\n"
+            "open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n")
+        result, _, calls = self.run_script("set -euo pipefail\n" + script[start:end], {
+            "SOURCE_BRANCH": "master", "TARGET_BRANCH": "master", "GITHUB_SHA": "a" * 40,
+            "GITHUB_EVENT_PATH": str(self.root / "event.json")})
+        self.assertEqual(0, result.returncode, result.stderr[:500])
+        self.assertEqual(1, len(calls))
+        self.assertEqual("scripts/ci/shared_compatibility.py", calls[0][0])
+        self.assertEqual("a" * 40, calls[0][calls[0].index("--policy-sha") + 1])
+        self.binary("python3", "raise SystemExit(2)\n")
+        result, _, _ = self.run_script("set -euo pipefail\n" + script[start:end], {
+            "SOURCE_BRANCH": "master", "TARGET_BRANCH": "master", "GITHUB_SHA": "a" * 40,
+            "GITHUB_EVENT_PATH": str(self.root / "event.json")})
+        self.assertNotEqual(0, result.returncode)
+        prepare = job_block("mod-compatibility-e2e.yml", "prepare")
+        self.assertIn('target_arguments+=(--minecraft-target "$MINECRAFT_TARGET")', prepare)
+        self.assertIn('--validate-plan "$RUNNER_TEMP/mod-compatibility-plan.json"', prepare)
+        reviewer = job_block("mod-compatibility-review.yml", "enumerate")
+        self.assertIn('--validate-plan "$plan"', reviewer)
+        self.assertLess(reviewer.index('--validate-plan "$plan"'), reviewer.index('pending_count='))
 
     def test_public_producer_uses_real_selector_outputs_and_independent_admission_inputs(self):
         producer = job_block("on-demand-e2e.yml", "prepare-pages-evidence")

@@ -75,21 +75,23 @@ class ReviewFiles:
 
 
 def validate_source_run(run: Any, jobs: Any, *, github_repository: str, source_sha: str,
-                        source_run_id: int, matrix_path: Path = DEFAULT_MATRIX) -> dict[str, Any]:
+                        source_run_id: int, matrix_path: Path = DEFAULT_MATRIX,
+                        matrix_kind: str = "pr-anchors") -> dict[str, Any]:
     """Validate API records fetched independently for the requested complete source run."""
-    if (not isinstance(github_repository, str) or REPOSITORY.fullmatch(github_repository) is None
+    if (matrix_kind not in {"pr-anchors", "native-anchors"}
+            or not isinstance(github_repository, str) or REPOSITORY.fullmatch(github_repository) is None
             or not isinstance(source_sha, str) or admission.SHA.fullmatch(source_sha) is None
             or not isinstance(run, dict) or type(run.get("id")) is not int
             or run["id"] != _positive_integer(source_run_id, "source run")
             or run.get("head_sha") != source_sha or run.get("head_branch") != "master"
             or run.get("path") != ".github/workflows/on-demand-e2e.yml"
-            or run.get("event") != "workflow_dispatch"
+            or run.get("event") != ("schedule" if matrix_kind == "native-anchors" else "workflow_dispatch")
             or run.get("status") != "completed" or run.get("conclusion") != "success"
             or not isinstance(run.get("head_repository"), dict)
             or run["head_repository"].get("full_name") != github_repository):
-        raise CoverageError("a baseline requires the exact successful shared-source PR-profile run")
+        raise CoverageError("coverage requires the exact successful shared-source profile run")
     return validate_job_graph(jobs, policy="full", expected_scenarios=expected_scenario_jobs_for(
-        matrix_path, "pr-anchors"))
+        matrix_path, matrix_kind))
 
 
 def validate_review_owner(artifact: Any, owner: Any, jobs: Any, *, github_repository: str,
@@ -136,7 +138,8 @@ def validate_compatibility_impact(impact: Any) -> None:
 
 
 def validate_clean_target(files: ReviewFiles, *, source_sha: str, source_run_id: int,
-                          bundle_key: str, matrix_path: Path = DEFAULT_MATRIX) -> dict[str, Any]:
+                          bundle_key: str, matrix_path: Path = DEFAULT_MATRIX,
+                          matrix_kind: str = "pr-anchors") -> dict[str, Any]:
     """Require every authored PR capture and its clean, exact normalized verdict."""
     proof, proof_digest = _read(files.proof)
     manifest, manifest_digest = _read(files.manifest)
@@ -149,7 +152,8 @@ def validate_clean_target(files: ReviewFiles, *, source_sha: str, source_run_id:
     if (not isinstance(source_sha, str) or admission.SHA.fullmatch(source_sha) is None
             or proof["source_sha"] != source_sha
             or proof["source_run_id"] != _positive_integer(source_run_id, "source run")
-            or proof["bundle_key"] != bundle_key or proof["matrix_kind"] != "pr-anchors"
+            or matrix_kind not in {"pr-anchors", "native-anchors"}
+            or proof["bundle_key"] != bundle_key or proof["matrix_kind"] != matrix_kind
             or proof["scenario_contract_sha256"] != contract.sha256
             or proof["manifest_sha256"] != manifest_digest):
         raise CoverageError("baseline review has another source, target, profile, contract or manifest")
@@ -160,7 +164,7 @@ def validate_clean_target(files: ReviewFiles, *, source_sha: str, source_run_id:
     artifacts = sorted(row["artifact_node"] for row in matrix["artifacts"])
     expected = {}
     for artifact in artifacts:
-        for name in contract.scenarios_for_profile("pr"):
+        for name in contract.scenarios_for_profile("release" if matrix_kind == "native-anchors" else "pr"):
             scenario = contract.scenario(name)
             for role in scenario.roles:
                 for step in role.steps:

@@ -170,7 +170,8 @@ def validate_target_proof(proof: Any, *, matrix_path: Path = DEFAULT_MATRIX, sel
         del complete_scope["feature_selection"]
         validate_target_proof(complete_scope, matrix_path=matrix_path)
         return
-    if not isinstance(proof, dict) or type(proof.get("schema_version")) is not int or proof["schema_version"] != 6:
+    if (not isinstance(proof, dict) or type(proof.get("schema_version")) is not int
+            or proof["schema_version"] not in {6, 8}):
         raise ReviewTargetError("a shared target curation proof is required")
     data, digest, rows = _inventory(matrix_path, proof.get("matrix_kind"))
     if data["schema_version"] != 3 or proof.get("matrix_sha256") != digest:
@@ -189,6 +190,23 @@ def validate_target_proof(proof: Any, *, matrix_path: Path = DEFAULT_MATRIX, sel
         source_branch=proof.get("source_branch"), source_sha=proof.get("source_sha"))
     if sum(item["size_in_bytes"] for item in selected.values()) > MAX_TARGET_BYTES:
         raise ReviewTargetError("review target exceeds its compressed evidence budget")
+    if proof["schema_version"] == 8:
+        reference = proof.get("visual_reference")
+        if proof["review_mode"] == "anchor-semantic":
+            if reference is not None:
+                raise ReviewTargetError("a semantic target cannot carry a paired reference")
+        else:
+            node = "fabric-" + data["unit_test_version"]
+            names = {"packaged-e2e-" + row["id"] for row in rows if row["artifact_node"] == node}
+            if (not isinstance(reference, dict) or set(reference) != {
+                    "evidence_kind", "artifact", "artifact_node", "source_sha", "source_run_id"}
+                    or reference["evidence_kind"] != "packaged-full" or reference["artifact_node"] != node
+                    or reference["source_sha"] != proof["source_sha"]
+                    or type(reference["source_run_id"]) is not int
+                    or reference["source_run_id"] != proof["source_run_id"]):
+                raise ReviewTargetError("complete shared review needs its exact same-run Fabric reference")
+            _validate_artifacts([reference["artifact"]], names, source_run_id=proof["source_run_id"],
+                source_branch=proof["source_branch"], source_sha=proof["source_sha"])
     expected = sorted(row["id"] + SCENARIO_SUFFIX for row in rows)
     graph = proof.get("job_graph")
     if not isinstance(graph, dict) or type(graph.get("schema_version")) is not int or graph != {

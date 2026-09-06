@@ -679,3 +679,17 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   the new public-expiration regression) pass. Nine real-shell routing tests and fifteen parsed
   workflow/action files also pass. No reduced GitHub generation or protected baseline has been
   issued yet; optional-mod source admission and final ownership/documentation audits remain.
+
+### Shared complete review and optional-mod admission
+
+Shared complete reviews now curate the target and Fabric reference directly from the same
+successful runtime generation, with an independently reauthenticated schema-8 proof. Selected
+schema-7 capsules remain ineligible for full baseline or optional-mod admission. Native scheduled
+runs keep their complete profiles without trying to replace the manual public baseline.
+
+Optional-mod workflows now accept per-target current-master reviews and schema-2 shared plans.
+Both the runtime producer and protected AI consumer recompute the complete runnable/N/A inventory
+from the release matrix and external-mod lock. The target key travels inside the exact normalized
+report name so GitHub's dispatch payload remains within its ten-property limit. Concurrency is
+per target and generation; one Minecraft target cannot replace another target's pending wave.
+The existing complete optional profiles and compact public compatibility evidence remain intact.

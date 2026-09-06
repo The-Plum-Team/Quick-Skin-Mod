@@ -259,6 +259,10 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
     if api.current_sha() != source_sha:
         return None
     source = api.run(source_run_id)
+    if source.get("event") == "schedule":
+        coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
+            source_sha=source_sha, source_run_id=source_run_id, matrix_kind="native-anchors")
+        return None  # Nightly integration coverage has no complete Pages-baseline publication.
     graph = coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
                                          source_sha=source_sha, source_run_id=source_run_id)
     if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in api.artifacts(run_id=source_run_id)):
