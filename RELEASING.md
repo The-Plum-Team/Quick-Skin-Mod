@@ -8,8 +8,9 @@ artifact rows. Selecting a target never rewrites that authoritative matrix.
 
 The target-specific release workflow and declared governance now use shared source. See
 [the shared-source command guide](docs/architecture/RELEASING-FROM-SHARED-SOURCE.md) for local
-build/stage/rebuild examples. Protected selective review, Pages and final GitHub image acceptance
-remain in progress in the [migration plan](docs/architecture/MODULAR-REWORK.md). The identity
+build/stage/rebuild examples. Protected selective review and Pages use the shared contracts;
+live rollout and final GitHub image acceptance are tracked in the
+[migration plan](docs/architecture/MODULAR-REWORK.md). The identity
 validator rejects attempts to publish the aggregate bundle.
 
 ## Preconditions

@@ -58,9 +58,20 @@ class WorkflowGuidanceTest(unittest.TestCase):
         source = ":common:1.21.11:test\n:common:1.21.11:test\n"
         rendered = render_guidance(source, data, profile_branch="master")
         self.assertEqual(2, rendered.count(f":common:{data['unit_test_version']}:test"))
+        self.assertEqual(2, rendered.count(f"-PquickskinTarget={data['unit_test_version']}"))
+        self.assertEqual(rendered, render_guidance(rendered, data, profile_branch="master"))
         data["unit_test_version"] = "0.0.0"
         with self.assertRaises(release_matrix.MatrixError):
             render_guidance(source, data, profile_branch="master")
+
+    def test_shared_commands_scope_the_stable_lane_and_remove_scoping_for_historical_matrices(self) -> None:
+        data = release_matrix.load_matrix(ROOT / "release/release-matrix.json")
+        source = "testStableLane\n:common:1.20.1:test\npython scripts/release/build_matrix.py\n"
+        rendered = render_guidance(source, data, profile_branch="master")
+        self.assertIn(f"-PquickskinTarget={data['unit_test_version']} testStableLane", rendered)
+        historical = render_guidance(rendered, self.matrix(), profile_branch="master")
+        self.assertNotIn("-PquickskinTarget", historical)
+        self.assertIn(":common:1.21.11:test", historical)
 
     def test_rejects_wrong_branch_and_mixed_artifact_versions(self) -> None:
         source = ":common:1.20.1:test\n:common:1.20.1:test\n"

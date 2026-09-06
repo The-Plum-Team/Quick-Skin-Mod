@@ -1,11 +1,55 @@
-# Version branches
+# Shared sources and historical version branches
 
-This document preserves the historical schema-2 branch delivery and evidence flow. The current
-schema-3 release matrix builds all targets from shared source; `release_sources.py` resolves no
-version-port work, including delayed/manual recovery events. Existing refs and evidence remain
-historical inputs. See [ADR 0003](docs/architecture/decisions/0003-shared-source-with-independent-target-releases.md)
-and [Releasing Quick Skin](RELEASING.md) for the new source and publication contracts. The remaining
-Pages/selective-evidence migration is tracked in `docs/architecture/MODULAR-REWORK.md`.
+All new feature work and version-specific fixes target `master`. The schema-3
+`release/release-matrix.json` is the only support inventory. Each target selects its Minecraft
+version, loaders, Java toolchain, dependency pins, overlays, and API-family adapters from that
+matrix. There is one compiled production JAR per loader and target, with its feature modules
+bundled once; test harnesses remain separate JARs.
+
+## Developing and validating a target
+
+Feature code belongs in the independently compiled modules declared by
+`architecture/modules.json`. Stable application APIs and API-family adapters keep native API
+differences out of unrelated features. Compile/runtime dependencies and explicit bindings drive
+transitive E2E impact; the scenario contract owns actions, captures, and their prerequisites.
+
+Use a named topic branch from `master`. For a focused target build:
+
+```bash
+./gradlew --no-daemon --no-parallel -PquickskinTarget=1.21.1 buildTargetLanes buildTargetE2EHarnesses
+```
+
+For the complete matrix, use the serial coordinator:
+
+```bash
+python3 scripts/release/build_matrix.py
+```
+
+A PR runs the required Build and Packaged E2E gates. After merge, the protected scheduler tests the
+current shared generation and explicitly requests its per-target visual reviews. An authenticated
+complete healthy baseline permits cumulative feature selections; unknown impact or unavailable
+baseline evidence falls back to full coverage. Nightly and optional-mod integration profiles stay
+complete. Public galleries keep the original tested commit/run/JAR for reused images and identify
+the newer commit whose unchanged dependencies justify their coverage.
+
+## Independent releases and historical recovery
+
+Source consolidation does not turn every build into a simultaneous release. Each matrix target
+has an independent immutable `mc<TARGET>-v<MOD_VERSION>` release identity. See
+[RELEASING.md](RELEASING.md) for target selection, provenance, retry, and rollback rules, and
+[ADR 0003](docs/architecture/decisions/0003-shared-source-with-independent-target-releases.md)
+for the migration decision.
+
+`release_sources.py` returns no version-port work for schema 3, including delayed/manual recovery
+events. Existing branches, tags, and evidence remain available for historical inspection; their
+presence does not add supported targets to the current matrix. Do not develop on the retired
+`automation/sync/*` branches or add a new permanent branch to support a Minecraft version.
+
+## Historical schema-2 delivery
+
+The following describes the previous architecture for auditing old releases and their automation.
+Its per-version PR and synchronization instructions apply only to a checkout whose own matrix is
+schema 2. Read that checkout's instructions before historical recovery.
 
 Quick Skin keeps shared development on `master` and one independently buildable release branch for
 each Minecraft version. A release branch name describes its active loader pair and exact Minecraft

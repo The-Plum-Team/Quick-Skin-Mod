@@ -9,7 +9,7 @@ Stonecutter settings, aggregate Gradle tasks, publication, and E2E.
 Two separate contracts fail closed. [`scenario-contract.json`](scenario-contract.json) owns what
 each packaged lane executes. [`loader-bootstrap-contract.json`](loader-bootstrap-contract.json)
 authenticates the exact loader entrypoint/manifest tree and the complete loader build script allowed
-for each release branch; the matrix still decides which loaders are active. The shared protected
+for each matrix target; the matrix still decides which loaders are active. The shared protected
 Gradle convention replaces all E2E source roots and owns harness packaging. A deliberate loader
 bootstrap or build-script edit therefore updates its contract digest and tests on `master` in the
 same commit.
@@ -369,10 +369,18 @@ not part of the mod behavior being tested. Detection is restricted to the broad 
 chrome area, so denser yellow bees or flower fields in a version-specific panorama cannot be
 mistaken for the splash.
 
-Pull requests and releases run their contract-selected `pr` and `release` profiles on both loader
-lanes against manifest-bound bytes from the exact commit. The same packaged workflow can also be
-dispatched manually, and master-to-version synchronization dispatches it explicitly before an
-automated port is allowed to merge.
+Pull requests and releases run their contract-declared `pr` and `release` profiles against
+manifest-bound bytes from the exact shared commit on every matrix target and loader. A protected
+healthy baseline may reduce a PR or manual shared generation to its cumulative affected feature
+scope. Each lane and the Java harness independently authenticate that selection before running
+actions or generating screenshots. Releases, nightly runs, and optional-mod profiles stay complete;
+manual `capture_coverage=full` also forces complete coverage. Unknown impact or missing, expired,
+or incompatible baseline evidence falls back to full profiles.
+
+The required runtime policy remains `full` for a shared generation: every target/loader job must
+pass even when its capture selection is smaller. Selection changes the authored execution/capture
+product, not the set of required jobs. The following port/N/A and attestation rules describe
+historical schema-2 executions only; schema 3 creates no version-port branches.
 
 The runtime policy is `full` by default for ordinary pull requests, manual and scheduled runs, and
 any runtime-affecting change. `not-applicable` is available only to an authenticated
@@ -392,9 +400,10 @@ shown by each branch-specific Packaged E2E badge in the root README.
 
 Programmatic screenshot probes and comparisons are part of that required runtime gate. AI visual review
 is a separate authenticated prepare/queue/drain pipeline and never changes the conclusion
-of Build, Packaged E2E, or an individual version-port gate. For every automatic `master` generation,
-however, its semantic 1.20.1 certificate is deliberately a scheduling prerequisite for starting
-the remaining version ports. The anchor and two-wave decisions are recorded in
+of Build, Packaged E2E, or an individual version-port gate. For historical schema-2 propagation,
+its semantic 1.20.1 certificate was a scheduling prerequisite for starting remaining version ports.
+Shared reviews instead curate each target with the Fabric reference from their own runtime run.
+The historical anchor and two-wave decisions are recorded in
 [ADR 0004](../docs/architecture/decisions/0004-anchor-ai-visual-review-to-1-20-1.md) and
 [ADR 0005](../docs/architecture/decisions/0005-certify-1-20-1-before-version-fanout.md).
 
@@ -487,7 +496,8 @@ earlier protected `master` commit may be reused across an unrelated merge only w
 still an ancestor and its cache-producing workflow blob is byte-identical; the current codec still
 revalidates the complete policy and every content-addressed verdict key.
 
-A completely clean synchronized 1.20.1 report creates a 90-day certificate only after the
+For historical schema-2 recovery, a completely clean synchronized 1.20.1 report creates a
+90-day certificate only after the
 bot-owned anchor PR is merged and that exact-tree merge is still the current anchor head. The
 certificate binds the `master` source SHA, tested and merged anchor SHAs, source run, protected
 review implementation, scenario contract, curation proof, manifest, and normalized report. The
@@ -504,9 +514,12 @@ evidence are discarded for the same reason.
 
 ## Post-validation optional-mod compatibility
 
-An automatic release-tree run starts this wave only after that exact tree has passed Build, the
-complete packaged suite, and independent semantic AI review. The execution unit is one release
-artifact plus one optional mod. Every applicable unit runs concurrently, first executes the
+A complete shared target review starts this wave only after that exact current-master source has
+passed Build, the complete packaged suite, and independent semantic AI review. Selected schema-7
+reviews do not start it. `shared_compatibility.py` authenticates the normalized schema-8 review and
+recomputes the per-target schema-2 plan from the shared release matrix and pinned mod lock; the
+protected AI consumer recomputes it again before capsule admission. Each target has an independent
+wave identity. The execution unit is one release artifact plus one optional mod. Every applicable unit runs concurrently, first executes the
 `mod-compatibility` activation scenario, adds `mod-compatibility-cpm-first-person` for CPM, adds
 both `mod-compatibility-remote` and `mod-compatibility-late-join` for Ears and CPM, and then
 executes the complete ordinary release scenario set. The live remote scenario keeps Alice
@@ -630,7 +643,7 @@ python3 e2e/orchestrator.py \
 ```
 
 Refreshing external versions is a deliberate maintenance operation, not a test step. From a
-trusted checkout with current remote release branches, run the updater and review every selected
+trusted checkout with the current shared release matrix, run the updater and review every selected
 version, URL, applicability change, and checksum diff before committing it:
 
 ```bash
@@ -691,19 +704,23 @@ tested plus publishing runs, commits and contract hash. `gallery-data.json` carr
 optional-mod records as schema version 3, so the page derives them and never restates an
 unvalidated fact.
 
-The assertion message is the one part a version may still lack: each release branch publishes from
-a rolling cache built by its own checkout, so evidence created before that field existed validates
-without it and the record says so explicitly. It appears for a version once that branch ports and
-republishes its packaged evidence.
+Historical caches created before assertion messages were included can validate without that field;
+the record explicitly marks its absence. Newly captured shared-source evidence includes the
+contract-authored passed assertion.
 
 `visual_review_workflow.js` is an optional manual Workflow adapter, not the GitHub Actions entry
 point. It consumes the generated manifest and emits the same exact verdict-array contract that CI
 extracts from its structured `reviews` result before passing it to `check_visual_review.py`; keep
 that adapter and the CI prompt/checker schema aligned.
 
-After a successful full run on a release branch—or after its exact-tree attestation—the advisory
-`prepare-pages-evidence` job downloads the original packaged artifacts and creates
-`pages-e2e-<branch>`. The handoff contains only contract-selected source PNGs plus a validated
+After a successful shared manual generation, the advisory `prepare-pages-evidence` job creates
+one `pages-e2e-mc<TARGET>` handoff per matrix target. Full raw/compact bundles use schemas 3/4;
+selected raw/compact bundles use schemas 5/6. The protected Pages consumer independently
+authenticates feature admission, the complete baseline and public artifacts before producing a
+schema-7 composition of a full compact baseline and current selected compact evidence. Each frame
+keeps its original tested commit/run/JAR and separate coverage provenance. A partial generation
+cannot refresh the lifetime of the full baseline. Historical schema-2 runs retain their original
+`pages-e2e-<branch>` handoff and attestation contract. The handoff contains only contract-selected source PNGs plus a validated
 manifest; logs, caches, crash reports, Minecraft directories, and AI-authored HTML are never copied.
 Ordinary handoffs retain one day. The release matrix's Fabric 1.20.1 handoff retains 90 days as the
 current lossless visual anchor and is generation-rotated after replacement. The producer then sends
@@ -711,8 +728,8 @@ the explicit authenticated `pages-evidence-ready` event; it does not depend on r
 token-triggered workflow behavior.
 
 The `Project site` controller executes only the protected generator from `master`. It authenticates
-each wake-up, coalesces concurrent events, discovers every release branch, and accepts evidence only
-when the workflow branch and SHA equal the current branch head. It authenticates both recorded
+each wake-up, coalesces concurrent events, derives targets from the shared matrix, and accepts
+evidence only for the authenticated current source generation. It authenticates both recorded
 Actions runs, validates the exact curated tree and every path/hash/dimension/contract identity,
 rechecks all heads, converts each raw bundle to an exact-schema WebP derivative bundle before the
 `collected-pages-*` fan-in, and publishes the complete site as one atomic GitHub Pages artifact. A
@@ -734,10 +751,10 @@ rotation cannot delete a newer cache. For the matrix-derived 1.20.1 anchor it al
 current raw handoff, revalidates it before every deletion, and deletes only older raw generations.
 Original PNG bytes never enter the durable compact cache. Monthly validation can refresh compact
 caches without relaunching Minecraft. The same rotation retains one validated compatibility cache
-per covered release branch and retires older compatibility caches and consumed handoffs only after
-the replacement deploys successfully. Pages and per-port AI reports are not protected release
-checks; the clean semantic anchor certificate is instead a fail-closed prerequisite for scheduling
-the second synchronization wave.
+per covered matrix target and retires older compatibility caches and consumed handoffs only after
+the replacement deploys successfully. Pages and advisory AI reports do not replace the required
+Build or Packaged E2E gates. Full baseline archives have their own bounded retention and must still
+be available before any later feature selection can reuse their coverage.
 
 Run the focused contracts in the project Python environment (CI installs the Linux renderer from
 the hash-locked `scripts/pages/requirements.txt`):

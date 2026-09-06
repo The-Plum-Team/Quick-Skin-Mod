@@ -14,6 +14,9 @@ import matrix as release_matrix
 
 
 COMMON_TEST_TASK = re.compile(r":common:[0-9]+(?:\.[0-9]+)+:test")
+TARGET_ARGUMENT = r"(?:-PquickskinTarget=[0-9]+(?:\.[0-9]+)+[ \t]+)?"
+COMMON_TEST_COMMAND = re.compile(TARGET_ARGUMENT + COMMON_TEST_TASK.pattern)
+STABLE_TEST_COMMAND = re.compile(TARGET_ARGUMENT + r"\btestStableLane\b")
 EXPECTED_TASK_OCCURRENCES = 2
 
 
@@ -79,7 +82,9 @@ def render_guidance(
             "workflow guide must contain exactly "
             + ("one common test task anchor" if expected == 1 else "two identical common test task anchors")
         )
-    return COMMON_TEST_TASK.sub(f":common:{version}:test", guidance)
+    target = f"-PquickskinTarget={version} " if data.get("schema_version") == 3 else ""
+    rendered = COMMON_TEST_COMMAND.sub(f"{target}:common:{version}:test", guidance)
+    return STABLE_TEST_COMMAND.sub(f"{target}testStableLane", rendered)
 
 
 def main(argv: list[str] | None = None) -> int:

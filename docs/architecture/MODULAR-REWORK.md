@@ -89,7 +89,7 @@ dependent behavior.
 - [x] **2. Compiled module foundation.** Introduce one authoritative module graph and
   shared Gradle conventions. Extract independently compilable leaves and their tests;
   verify artifact class/resource parity and production/harness separation.
-- [ ] **3. Feature and compatibility boundaries.** Migrate remaining production code to
+- [x] **3. Feature and compatibility boundaries.** Migrate remaining production code to
   feature modules, isolate Minecraft adapters and loader/mixin bridges, remove dependency
   cycles, and wire services at the client/server composition roots. Compile and test
   every affected target throughout migration.
@@ -101,7 +101,7 @@ dependent behavior.
   exact result validation, anchor certification, optional-mod review, caches, and Pages.
   Prove stale/forged/incomplete selections cannot skip coverage. Show that independent
   feature changes actually produce fewer captures and AI inputs.
-- [ ] **6. Multi-version source consolidation.** Reconcile the latest exact release trees,
+- [x] **6. Multi-version source consolidation.** Reconcile the latest exact release trees,
   import matrix-owned adapter/build inputs, and build all supported artifacts from one
   source revision. Preserve per-target publication/hotfix/rollback identity; replace
   branch-discovery consumers with the single release matrix. Supersede ADR 0001 with
@@ -703,3 +703,29 @@ and version-specific restore behavior are preserved. The catalog harness now ins
 import owner instead of silently accepting a missing old field. Module graph and Java/Python
 selection checks pass, as do common tests and both production/harness builds on 1.20.1 and 26.2.
 The full matrix is the next acceptance step.
+
+### Shared maintainer workflow and final acceptance
+
+Contributor and imported agent instructions now route all new fixes to `master`, including one
+Minecraft target. Matrix-derived unit commands explicitly scope Gradle with `quickskinTarget`;
+historical schema-2 command rendering remains supported. The external-mod lock updater reads
+schema-3 targets from the matrix without requiring remote version branches. Full E2E uses four
+isolated hosted runners for the shared matrix while local Gradle remains strictly serial.
+
+The final module graph still has 37 production modules plus the common assembly. Current local
+selection previews use 2 HUD captures, 5 menu-integration captures, 45 editor captures, and 28
+skin-import captures from the 90-capture PR profile; prerequisite actions remain included. These
+are derived previews, not new Minecraft acceptance results. The final source builds every one of
+the 16 targets. Full GitHub runtime/visual acceptance and protected baseline activation remain
+open under stages 4, 5, and 7.
+
+A read-only live governance audit has one pending change: retire the old release environment's
+`*-and-*-*` branch deployment policy. Readiness correctly refuses application while remote
+`master` still has its historical schema-2 matrix. No governance policy or branch has been removed.
+
+The final local acceptance gate passes: 391 CI tests, 525 release/Pages tests, 39 architecture
+checks, all generated profiles, and all 15 workflow/action YAML documents. All 16 targets build
+and stage 32 production plus 32 harness JARs. A second forced serial build reproduces every one
+of those 64 JARs byte-for-byte. The durable local evidence records the exact source commit,
+matrix/module/scenario hashes, staged manifest hash, and command reports. Routine Minecraft
+image acceptance remains delegated to GitHub, as requested by the maintainer.

@@ -102,9 +102,9 @@ class RepositoryGuidanceTest(unittest.TestCase):
         )
         contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
 
-        self.assertIn("every discovered release branch", project)
-        self.assertIn("exact-head Build", project)
-        self.assertIn("intentional branch exclusion", project)
+        self.assertIn("New work targets `master`", project)
+        self.assertIn("architecture/modules.json", project)
+        self.assertIn("complete required target/loader gate", project)
         self.assertIn("separate ephemeral Git worktree", workflow)
         self.assertIn("never use `--force`", workflow)
         self.assertIn("scripts/release/branch_readme.py", workflow)
@@ -116,7 +116,8 @@ class RepositoryGuidanceTest(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 self.assertIn(command, version_branches)
-        self.assertRegex(contributing, r"per\s+discovered\s+release branch")
+        self.assertIn("All new changes target `master`", contributing)
+        self.assertIn("including a fix for one Minecraft version or loader", contributing)
         self.assertRegex(contributing, r"separate ephemeral\s+worktree")
 
     def test_release_publication_is_recoverable_and_non_destructive(self) -> None:

@@ -42,6 +42,16 @@ class _Response:
 
 
 class ModCompatibilityContractTest(unittest.TestCase):
+    def test_shared_lock_refresh_discovers_only_matrix_targets_without_remote_branches(self) -> None:
+        matrix = mod_compatibility.load_matrix(ROOT / "release/release-matrix.json")
+        with mock.patch.object(update_mod_compatibility_lock.subprocess, "run",
+                               side_effect=AssertionError("shared discovery must not inspect Git branches")):
+            versions = update_mod_compatibility_lock.discover_versions(ROOT)
+        self.assertEqual(sorted({row["artifact_version"] for row in matrix["artifacts"]},
+                                key=update_mod_compatibility_lock._version_tuple), versions)
+        with tempfile.TemporaryDirectory() as temporary, self.assertRaises((ValueError, OSError)):
+            update_mod_compatibility_lock.discover_versions(Path(temporary))
+
     def setUp(self) -> None:
         self.contract_path = ROOT / "e2e" / "mod-compatibility-contract.json"
         self.payload = json.loads(self.contract_path.read_text(encoding="utf-8"))

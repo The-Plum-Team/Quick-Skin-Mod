@@ -68,19 +68,22 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   live `master` independently at both the secretless batch boundary and credential-bearing model
   boundary before capsule download or model admission.
 - Keep deterministic E2E applicability and model applicability separate. A PR to `master` runs
-  deterministic Build and Packaged E2E but defers semantic model work to the cumulative post-merge
-  1.20.1 anchor; a direct release-branch PR retains fail-closed source-PR review because no such
-  anchor is guaranteed. The 1.20.1 synchronization
-  anchor always runs exact Build and full packaged E2E, but a complete allowlisted nonvisual port
-  diff may continue without Claude only through the protected nonimpact certificate. Its consumer
-  must reauthenticate the handler artifact, both gate runs, current Git parents/heads and equal
-  trees, then independently recompute the same protected impact manifest. Certificate-driven later
-  ports may skip repeated prompt/reviewer-policy judgment only after authenticating the exact
-  synchronization run as a post-anchor repository dispatch; manual recovery remains strict.
-  A separate protected compatibility-impact manifest must be true before optional-mod E2E can be
-  released. A nonvisual continuation and a visual-policy-only diff must not launch optional-mod
-  compatibility.
-- Version-port and repair validation must check out candidate code with credentials disabled.
+  Build and Packaged E2E and defers semantic model work to the cumulative protected post-merge
+  generation. Shared source builds every matrix target; the baseline consumer may reduce only
+  the authored execution/capture scope after authenticating exact Git ancestry, unchanged module
+  fingerprints, complete runtime/review evidence, and available full public baseline artifacts.
+  Missing or expired baseline evidence, changed policy/graph, or unknown ownership selects full
+  profiles. A selected capsule cannot certify complete coverage.
+- Shared complete and selected visual capsules use the same run's matrix-derived Fabric anchor.
+  Authenticate the complete source job graph and immutable artifact partition before image reads
+  and reauthenticate before model access. A complete target review may request an optional-mod
+  wave only when its protected compatibility-impact manifest is true. Both runtime and AI
+  consumers independently recompute the per-target plan from the shared matrix and external-mod
+  lock. Optional-mod and nightly profiles remain complete integration checks.
+- Historical schema-2 port/anchor certificates remain available only for historical recovery;
+  schema 3 retires automatic version ports. Never reuse a partial feature proof as either a
+  complete shared baseline or a historical full-anchor certificate.
+- Repair and historical version-port validation must check out candidate code with credentials disabled.
   For a version port, the complete patch goes only into an alternate index; the protected merge
   controller reconstructs the original merge and copies only recomputed AI-conflict entries from
   that authenticated candidate tree. Candidate compilation/tests finish and the reconstructed
@@ -97,8 +100,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Never rewrite commits that may belong to the user or another contributor. Updating an unshared
   topic branch may use rebase when requested; updating a shared branch must use a non-destructive
   merge or a fresh topic branch.
-- A pull request targets `master` for shared changes and the exact release branch for version-only
-  changes. Its title follows the same conventional format, and its body records scope, validation,
+- New pull requests target `master`, including version-only fixes; only historical schema-2
+  recovery uses an old release branch. Its title follows the same conventional format, and its body records scope, validation,
   risks, generated-output status, and material AI assistance.
 
 ## Verification
@@ -109,14 +112,14 @@ handoff. On Windows, use `gradlew.bat`; on Unix-like systems, use `./gradlew`.
 Fast stable unit lane:
 
 ```powershell
-.\gradlew.bat --no-parallel testStableLane
+.\gradlew.bat --no-parallel -PquickskinTarget=1.20.1 testStableLane
 ```
 
 The active common test lane:
 
 ```powershell
 .\gradlew.bat --no-daemon --no-parallel `
-  :common:1.20.1:test
+  -PquickskinTarget=1.20.1 :common:1.20.1:test
 ```
 
 Full production and packaged-harness gate:
@@ -149,12 +152,12 @@ python scripts/release/e2e_readme.py `
   --matrix release/release-matrix.json `
   --contract e2e/scenario-contract.json `
   --readme e2e/README.md `
-  --profile-branch "<master-or-exact-release-branch>" `
+  --profile-branch master `
   --check
 python scripts/release/workflow_guidance.py `
   --matrix release/release-matrix.json `
   --guidance docs/ai/WORKFLOW.md `
-  --profile-branch "<master-or-exact-release-branch>" `
+  --profile-branch master `
   --check
 python -m unittest discover -s scripts/release/tests -p "test_*.py" -v
 python -m unittest discover -s scripts/ci/tests -p "test_*.py" -v
@@ -192,24 +195,23 @@ Public frames keep their original tested commit/run/JAR when unaffected dependen
 - Keep scenario execution and screenshot semantics in `e2e/scenario-contract.json` and public-site
   behavior under `scripts/pages/` plus `site/`; never hand-maintain scenario or version lists in
   consumers.
-- Keep the synchronization and thin-branch contract in `VERSION-BRANCHES.md`.
+- Keep shared-source development and historical branch recovery in `VERSION-BRANCHES.md`.
 - Keep immutable release identity, retry semantics, provenance, and protected-environment operation
   in `RELEASING.md`.
 - Keep the marked README branch profile aligned through `scripts/release/branch_readme.py`. It
-  renders `master` as integration-only and derives each release branch's Minecraft version,
-  loaders, Java target, runtime pins, and overlay routing from that branch's matrix; do not edit the
-  generated block by hand.
+  derives the current shared build and per-target versions, loaders, Java toolchains, runtime pins,
+  and overlay routing from the matrix; do not edit the generated block by hand.
 - Keep the marked packaged-E2E profile aligned through `scripts/release/e2e_readme.py`. It derives
   scenario facts from the contract and lane/version/Java facts from the active matrix; the
-  synchronizer regenerates both marked profiles for every release branch.
+  current shared checkout renders both marked profiles from that one matrix.
 - Keep the active-common test task anchor in this imported guide aligned through
-  `scripts/release/workflow_guidance.py`; their Minecraft version comes from the branch matrix.
+  `scripts/release/workflow_guidance.py`; its Minecraft version comes from the matrix unit lane.
 - Keep the generated README status block aligned through `scripts/release/status_table.py`; never
   hand-maintain its version rows.
 - When user-visible behavior, build commands, source layout, or compatibility facts change, adapt
-  the non-generated README text on every affected branch. For shared changes, verify that one
-  synchronization PR per discovered release branch passes both exact-head gates, merges, and gains
-  its final exact-tree attestations; document any deliberate exclusion and any outstanding port.
+  the non-generated README text for the shared source. Verify the complete required target/loader
+  gate and every affected feature interaction; document intentional exclusions and outstanding
+  runtime or publication evidence.
 - Keep the newcomer and AI-assisted contribution path in `CONTRIBUTING.md`, and keep
   `.github/pull_request_template.md` aligned with it.
 - Keep root `AGENTS.md` limited to one `@path.md` import per line and keep root `CLAUDE.md`
@@ -218,8 +220,8 @@ Public frames keep their original tested commit/run/JAR when unaffected dependen
   composition roots, security boundaries, or mandatory verification commands change.
 - When a packaged scenario adds, renames, or removes a step, edit the scenario contract and its Java
   executable action together, update independent probe canaries where intentional, and let derived
-  gallery/reviewer/README consumers follow the contract. Deliver that shared change to every
-  affected release branch.
+  gallery/reviewer/README consumers follow the contract. Verify every affected matrix target from
+  that shared source revision.
 
 When matrix-owned profile facts change, regenerate the marked README block instead of editing it:
 
@@ -227,6 +229,6 @@ When matrix-owned profile facts change, regenerate the marked README block inste
 python scripts/release/branch_readme.py `
   --matrix release/release-matrix.json `
   --readme README.md `
-  --profile-branch "<master-or-exact-release-branch>" `
+  --profile-branch master `
   --write
 ```

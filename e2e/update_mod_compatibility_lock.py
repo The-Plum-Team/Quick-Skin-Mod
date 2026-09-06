@@ -27,6 +27,7 @@ from mod_compatibility import (
     MAX_DOWNLOAD_BYTES,
     CompatibilityContractError,
     load_contract,
+    load_matrix,
 )
 
 
@@ -55,6 +56,10 @@ def _version_tuple(value: str) -> tuple[int, ...]:
 
 
 def discover_versions(repository: Path) -> list[str]:
+    matrix = load_matrix(repository / "release/release-matrix.json")
+    if matrix["schema_version"] == 3:
+        return sorted({row["artifact_version"] for row in matrix["artifacts"]}, key=_version_tuple)
+    # Historical schema-2 maintenance retains its original remote-branch discovery contract.
     command = [
         "git",
         "for-each-ref",
