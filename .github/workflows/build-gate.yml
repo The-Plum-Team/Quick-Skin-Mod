@@ -256,6 +256,7 @@ jobs:
     name: Request packaged E2E for shared source
     needs: build
     if: >-
+      always() && !cancelled() &&
       needs.build.result == 'success' &&
       github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04

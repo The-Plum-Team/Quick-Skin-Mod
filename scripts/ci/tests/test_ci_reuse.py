@@ -280,6 +280,20 @@ class CiReuseTest(unittest.TestCase):
         self.api.job_lists[30][0]["jobs"][-1]["conclusion"] = "success"
         with self.assertRaisesRegex(reuse.ReuseError, "mixed"): reuse.runtime_source(self.api, 30, self.api.covered)
 
+    def test_advisory_pages_accepts_queued_wrapper_only_after_required_gates_pass(self):
+        reference, _ = self.find()
+        self.api.wrapper(reference)
+        for status in ("queued", "in_progress"):
+            with self.subTest(status=status):
+                self.api.runs[30].update(status=status, conclusion=None)
+                source = reuse.runtime_source(self.api, 30, self.api.covered, allow_in_progress=True)
+                self.assertEqual(20, source.execution["id"])
+                with self.assertRaises(reuse.ReuseError):
+                    reuse.runtime_source(self.api, 30, self.api.covered)
+        self.api.job_lists[30][0]["jobs"][1].update(status="queued", conclusion=None)
+        with self.assertRaisesRegex(reuse.ReuseError, "required source job did not pass"):
+            reuse.runtime_source(self.api, 30, self.api.covered, allow_in_progress=True)
+
     def test_source_references_never_chain(self):
         self.api.add_artifact(20, 999, "reused-source-e2e")
         with self.assertRaisesRegex(reuse.ReuseError, "chain"): self.find()

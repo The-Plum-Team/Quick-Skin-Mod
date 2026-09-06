@@ -111,6 +111,16 @@ else: raise SystemExit("Unexpected API endpoint")
                     self.assertEqual(valid, result.returncode == 0, result.stderr[:1500])
                     self.assertEqual(valid and base == "master", "Deferring PR" in result.stdout)
 
+    def test_shared_build_dispatch_survives_skipped_compile_ancestors(self):
+        dispatch = job_block("build-gate.yml", "request-shared-e2e")
+        condition = " ".join(dispatch.split("if: >-", 1)[1].split("runs-on:", 1)[0].split())
+        # GitHub's implicit success() also considers skipped transitive dependencies.
+        # The successful reused gate must still wake runtime, unless cancelled.
+        self.assertIn("always() && !cancelled()", condition)
+        self.assertIn("needs.build.result == 'success'", condition)
+        self.assertIn("github.event_name == 'push'", condition)
+        self.assertIn("github.ref == 'refs/heads/master'", condition)
+
     def test_shared_build_requests_one_runtime_run_without_reopening_version_ports(self):
         script = step_script("build-gate.yml", "request-shared-e2e", "Request one current shared-source runtime generation")
         sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()

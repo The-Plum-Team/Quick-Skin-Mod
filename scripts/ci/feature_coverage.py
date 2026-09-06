@@ -87,7 +87,8 @@ def validate_source_run(run: Any, jobs: Any, *, github_repository: str, source_s
             or run.get("path") != ".github/workflows/on-demand-e2e.yml"
             or run.get("event") != ("schedule" if matrix_kind == "native-anchors" else "workflow_dispatch")
             or not (run.get("status") == "completed" and run.get("conclusion") == "success"
-                    or allow_in_progress and run.get("status") == "in_progress" and run.get("conclusion") is None)
+                    or allow_in_progress and run.get("status") in {"queued", "in_progress"}
+                       and run.get("conclusion") is None)
             or not isinstance(run.get("head_repository"), dict)
             or run["head_repository"].get("full_name") != github_repository):
         raise CoverageError("coverage requires the exact successful shared-source profile run")
