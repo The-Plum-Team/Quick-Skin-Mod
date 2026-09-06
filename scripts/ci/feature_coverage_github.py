@@ -19,7 +19,7 @@ from typing import Any
 
 import feature_coverage as coverage
 from bounded_zip import ExtractionLimits, extract_bounded_zip
-from visual_review_queue import REPORT_NAME, REPOSITORY
+from visual_review_queue import INPUT_NAME, REPORT_NAME, REPOSITORY
 
 WORKFLOW = ".github/workflows/feature-coverage.yml"
 PAGES_WORKFLOW = ".github/workflows/pages.yml"
@@ -132,7 +132,7 @@ class Api:
         else:
             if (not isinstance(name, str)
                     or name != coverage.BASELINE_ARTIFACT_NAME and REPORT_NAME.fullmatch(name) is None
-                    and PUBLIC_BASELINE_NAME.fullmatch(name) is None):
+                    and INPUT_NAME.fullmatch(name) is None and PUBLIC_BASELINE_NAME.fullmatch(name) is None):
                 raise coverage.CoverageError("artifact query requires an exact report or baseline name")
             endpoint = "actions/artifacts?" + urllib.parse.urlencode({"name": name, "per_page": MAX_INVENTORY})
         record = self.json(endpoint)
@@ -296,9 +296,10 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
         coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
             source_sha=source_sha, source_run_id=source_run_id, matrix_kind="native-anchors")
         return None  # Nightly integration coverage has no complete Pages-baseline publication.
-    graph = coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
-                                         source_sha=source_sha, source_run_id=source_run_id)
-    if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in api.artifacts(run_id=source_run_id)):
+    import ci_reuse
+    runtime = ci_reuse.runtime_source(api, source_run_id, source_sha)
+    graph = runtime.graph
+    if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in runtime.artifacts):
         return None  # Partial generations retain their earlier complete baseline.
     metadata, public = {}, {}
     for target in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]:
@@ -332,6 +333,10 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
             return None
     # Only after complete ownership admission may report archives enter the secretless workspace.
     reviews = {key: _review_files(api, metadata[key], directory / key) for key in sorted(metadata)}
+    for files in reviews.values():
+        proof, _digest = coverage._read(files.proof)
+        if proof.get("runtime_source") != runtime.reference:
+            raise coverage.CoverageError("baseline report substituted the original runtime generation")
     baseline = coverage.create_baseline(reviews, repository=repository, source_sha=source_sha,
                                         source_run_id=source_run_id)
     if api.current_sha() != source_sha:

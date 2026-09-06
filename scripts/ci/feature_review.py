@@ -18,6 +18,7 @@ import feature_coverage as coverage
 import feature_coverage_consumer as consumer
 import feature_coverage_github as publisher
 import visual_review_targets as targets
+import ci_reuse
 from bounded_zip import ExtractionLimits, extract_bounded_zip
 from check_visual_review import validate_input
 from selection import project_contract
@@ -31,15 +32,16 @@ MAX_RAW_ENTRIES = 768
 FEATURE_FIELDS = frozenset({"admission", "coverage"})
 
 
-def _source_artifact(artifact: Any, *, name: str, source_sha: str, source_run_id: int) -> dict[str, Any]:
+def _source_artifact(artifact: Any, *, name: str, source_sha: str, source_run_id: int,
+                     source_branch: str = "master") -> dict[str, Any]:
     return targets._validate_artifacts([artifact], {name}, source_run_id=source_run_id,
-                                       source_branch="master", source_sha=source_sha)[name]
+                                       source_branch=source_branch, source_sha=source_sha)[name]
 
 
 def _selection_files(api: publisher.Api, artifact: Any, *, source_sha: str,
-                     source_run_id: int, directory: Path) -> tuple[Path, Path]:
+                     source_run_id: int, directory: Path, source_branch: str = "master") -> tuple[Path, Path]:
     metadata = _source_artifact(artifact, name=SELECTION_ARTIFACT, source_sha=source_sha,
-                                source_run_id=source_run_id)
+                                source_run_id=source_run_id, source_branch=source_branch)
     if metadata["size_in_bytes"] > MAX_SELECTION_ARCHIVE:
         raise coverage.CoverageError("selected runtime admission exceeds its archive limit")
     directory.mkdir()
@@ -130,14 +132,61 @@ def _artifact_record(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def authenticate_full(api: publisher.Api, repository: Path, *, source_sha: str,
-                      source_run_id: int, matrix_kind: str) -> None:
+                      source_run_id: int, matrix_kind: str) -> ci_reuse.RuntimeSource:
     """Admit the current protected policy and every runtime job before fetching any image."""
     if api.current_sha() != source_sha:
         raise coverage.CoverageError("review source is no longer current master")
     coverage.policy_fingerprint(repository, source_sha, verify_executing=True)
-    source = api.run(source_run_id)
-    coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
-        source_sha=source_sha, source_run_id=source_run_id, matrix_kind=matrix_kind)
+    return ci_reuse.runtime_source(api, source_run_id, source_sha, matrix_kind=matrix_kind)
+
+
+def verify_selection(api: publisher.Api, paths: tuple[Path, Path], source: ci_reuse.RuntimeSource,
+                     *, repository: Path, directory: Path) -> tuple[Any, dict]:
+    arguments = {"repository": repository, "directory": directory,
+        "head": source.generation["head_sha"], "policy": source.generation["head_sha"],
+        "run_id": source.generation["id"]}
+    if source.reference is not None:
+        original = source.reference["source"]
+        ci_reuse.fetch_source_objects(repository, source.reference)
+        arguments.update(head=original["tested_sha"], policy=original["base_sha"], run_id=original["run_id"],
+                         pull_number=original["pull_request"], merged_reference=source.reference)
+    return consumer.verify(api, *paths, **arguments)
+
+
+def plan_source(source: ci_reuse.RuntimeSource, matrix_kind: str = "pr-anchors") -> dict:
+    return targets.plan_targets([item for item in source.artifacts if item["name"].startswith("packaged-e2e-")],
+        source_run_id=source.execution["id"], source_branch=source.execution["head_branch"],
+        source_sha=source.execution["head_sha"], matrix_kind=matrix_kind, runtime_source=source.reference)
+
+
+def pending_plan(api: publisher.Api, source: ci_reuse.RuntimeSource, matrix_kind: str) -> dict:
+    """Coalesced producer wakes curate only targets without an authenticated capsule or report."""
+    from visual_review_queue import parse_artifact, valid_owner
+    pending = []
+    identifier, commit = source.generation["id"], source.generation["head_sha"]
+    for target in plan_source(source, matrix_kind)["include"]:
+        key = target["bundle_key"]
+        existing = False
+        for name, workflow, events in (
+            (f"visual-review-{identifier}--{key}", ".github/workflows/visual-review-drain.yml",
+             frozenset({"repository_dispatch", "schedule", "workflow_dispatch"})),
+            (f"visual-review-input-{identifier}-{commit}--{key}", ".github/workflows/visual-review.yml",
+             frozenset({"repository_dispatch", "workflow_run"})),
+        ):
+            for item in api.artifacts(name=name):
+                artifact = parse_artifact(item)
+                if artifact.expired or artifact.head_sha != commit or artifact.head_branch != "master":
+                    continue
+                owner = api.run(artifact.run_id)
+                if valid_owner(owner, repository=api.repository, artifact=artifact, workflow=workflow,
+                               events=events, conclusions=frozenset({"success", "failure"}), allow_in_progress=True):
+                    existing = True
+                    break
+            if existing:
+                break
+        if not existing:
+            pending.append(target)
+    return {"include": pending}
 
 
 def reference_record(artifact: dict[str, Any], *, node: str, source_sha: str,
@@ -154,22 +203,21 @@ def curate(api: publisher.Api, *, repository: Path, source_sha: str, source_run_
            bundle_key: str, compatibility_impact: Any, output: Path, scratch: Path,
            matrix_kind: str = "pr-anchors") -> dict[str, Any]:
     """Download only the target and, for paired review, its same-run Fabric reference."""
-    authenticate_full(api, repository, source_sha=source_sha, source_run_id=source_run_id,
-                       matrix_kind=matrix_kind)
-    inventory = api.artifacts(run_id=source_run_id)
+    source = authenticate_full(api, repository, source_sha=source_sha, source_run_id=source_run_id,
+                               matrix_kind=matrix_kind)
+    inventory = source.artifacts
     admissions = [item for item in inventory if item["name"] == SELECTION_ARTIFACT]
     if len(admissions) > 1 or admissions and matrix_kind != "pr-anchors":
         raise coverage.CoverageError("shared runtime has ambiguous feature selection artifacts")
     selected, authenticated = None, None
     if admissions:
-        paths = _selection_files(api, admissions[0], source_sha=source_sha, source_run_id=source_run_id,
-                                 directory=scratch / "admission")
-        selected, authenticated = consumer.verify(api, *paths, repository=repository,
-            head=source_sha, policy=source_sha, run_id=source_run_id, directory=scratch / "baseline")
+        paths = _selection_files(api, admissions[0], source_sha=source.execution["head_sha"],
+            source_run_id=source.execution["id"], source_branch=source.execution["head_branch"],
+            directory=scratch / "admission")
+        selected, authenticated = verify_selection(api, paths, source, repository=repository, directory=scratch / "baseline")
     coverage.validate_compatibility_impact(compatibility_impact)
     packaged = [item for item in inventory if item["name"].startswith("packaged-e2e-")]
-    plan = targets.plan_targets(packaged, source_run_id=source_run_id,
-                                source_branch="master", source_sha=source_sha, matrix_kind=matrix_kind)
+    plan = plan_source(source, matrix_kind)
     target = next((item for item in plan["include"] if item["bundle_key"] == bundle_key), None)
     if target is None:
         raise coverage.CoverageError("selected curation names a foreign matrix target")
@@ -240,11 +288,13 @@ def curate(api: publisher.Api, *, repository: Path, source_sha: str, source_run_
         "job_graph": {"schema_version": 1, "runtime_policy": "full",
                       "expected_scenario_jobs": expected_jobs, "observed_scenario_jobs": expected_jobs},
         "visual_reference": (reference_record(reference, node=reference_node,
-            source_sha=source_sha, source_run_id=source_run_id, selected=selected) if reference is not None else None),
+            source_sha=source.tested_sha, source_run_id=source.execution["id"], selected=selected) if reference is not None else None),
         "manifest_sha256": coverage.digest(manifest_path.read_bytes()), "frame_count": len(manifest),
         "image_count": len(images), "image_bytes": image_bytes}
     if selected is not None:
         proof["feature_selection"] = {"admission": selected.to_dict(), "coverage": authenticated}
+    if source.reference is not None:
+        proof["runtime_source"] = source.reference
     targets.validate_target_proof(proof, selection=selected)
     validate_selected_manifest(proof, manifest, selected)
     if api.current_sha() != source_sha:
@@ -260,6 +310,8 @@ def verify(api: publisher.Api, proof_path: Path, manifest_path: Path, *, reposit
     manifest, manifest_digest = coverage._read(manifest_path)
     schema = proof.get("schema_version") if isinstance(proof, dict) else None
     fields = {"feature_selection"} if schema == 7 else set()
+    if isinstance(proof, dict) and "runtime_source" in proof:
+        fields.add("runtime_source")
     if (not isinstance(proof, dict)
             or set(proof) != coverage.PROOF_KEYS | {"bundle_key", "matrix_sha256"} | fields
             or type(schema) is not int or schema not in {7, 8}
@@ -267,23 +319,22 @@ def verify(api: publisher.Api, proof_path: Path, manifest_path: Path, *, reposit
             or type(proof.get("source_run_id")) is not int or proof.get("bundle_key") != bundle_key
             or proof.get("manifest_sha256") != manifest_digest):
         raise coverage.CoverageError("selected curation proof has a foreign source, scope or manifest")
+    source = authenticate_full(api, repository, source_sha=source_sha, source_run_id=source_run_id,
+                               matrix_kind=proof["matrix_kind"])
+    if proof.get("runtime_source") != source.reference:
+        raise coverage.CoverageError("capsule substituted its original runtime provenance")
     selected = None
     if schema == 7:
         paths = _feature_paths(proof["feature_selection"], scratch / "feature")
-        selected, _authenticated = consumer.verify(api, *paths, repository=repository,
-            head=source_sha, policy=source_sha, run_id=source_run_id, directory=scratch / "baseline")
-    else:
-        authenticate_full(api, repository, source_sha=source_sha, source_run_id=source_run_id,
-                           matrix_kind=proof["matrix_kind"])
+        selected, _authenticated = verify_selection(api, paths, source, repository=repository, directory=scratch / "baseline")
     targets.validate_target_proof(proof, selection=selected)
     coverage.validate_compatibility_impact(proof["compatibility_impact"])
     validate_selected_manifest(proof, manifest, selected)
-    source_artifacts = api.artifacts(run_id=source_run_id)
+    source_artifacts = source.artifacts
     if schema == 8 and any(item["name"] == SELECTION_ARTIFACT for item in source_artifacts):
         raise coverage.CoverageError("complete capsule cannot certify a selected runtime")
     packaged = [item for item in source_artifacts if item["name"].startswith("packaged-e2e-")]
-    plan = targets.plan_targets(packaged, source_run_id=source_run_id,
-                                source_branch="master", source_sha=source_sha, matrix_kind=proof["matrix_kind"])
+    plan = plan_source(source, proof["matrix_kind"])
     target = next(item for item in plan["include"] if item["bundle_key"] == bundle_key)
     if proof["artifact_inventory"] != [_artifact_record(item) for item in target["artifact_inventory"]]:
         raise coverage.CoverageError("selected capsule substituted its immutable source artifacts")
@@ -293,7 +344,7 @@ def verify(api: publisher.Api, proof_path: Path, manifest_path: Path, *, reposit
         names = {"packaged-e2e-" + row["id"] for row in rows if row["artifact_node"] == node}
         references = [item for item in packaged if item["name"] in names]
         if len(references) != 1 or proof["visual_reference"] != reference_record(references[0], node=node,
-            source_sha=source_sha, source_run_id=source_run_id, selected=selected):
+            source_sha=source.tested_sha, source_run_id=source.execution["id"], selected=selected):
             raise coverage.CoverageError("selected capsule has a foreign same-run reference")
     elif proof["visual_reference"] is not None:
         raise coverage.CoverageError("semantic selected review cannot carry a comparison reference")
@@ -315,7 +366,8 @@ def main() -> int:
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--source-run-id", type=int, required=True)
-    parser.add_argument("--bundle-key", required=True)
+    parser.add_argument("--bundle-key")
+    parser.add_argument("--plan", action="store_true")
     parser.add_argument("--matrix-kind", choices=("pr-anchors", "native-anchors"), default="pr-anchors")
     parser.add_argument("--compatibility-impact", type=Path)
     parser.add_argument("--output", type=Path)
@@ -323,13 +375,35 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--github-output", type=Path)
     args = parser.parse_args()
-    if args.verify_proof is not None:
+    if args.plan:
+        if any(value is not None for value in (args.bundle_key, args.verify_proof, args.output,
+                                               args.compatibility_impact, args.manifest)):
+            parser.error("shared source planning takes no target, proof or image output")
+    elif args.bundle_key is None:
+        parser.error("curation and verification require an exact target")
+    elif args.verify_proof is not None:
         if args.manifest is None or args.output is not None or args.compatibility_impact is not None:
             parser.error("selected proof verification requires only its manifest")
     elif args.output is None or args.compatibility_impact is None or args.manifest is not None:
         parser.error("selected curation requires an output root and protected compatibility impact")
     try:
         api = publisher.Api(args.github_repository)
+        if args.plan:
+            source = authenticate_full(api, args.repository, source_sha=args.source_sha,
+                source_run_id=args.source_run_id, matrix_kind=args.matrix_kind)
+            plan = pending_plan(api, source, args.matrix_kind)
+            if api.current_sha() != args.source_sha:
+                raise coverage.CoverageError("protected source advanced while planning target reviews")
+            result = {"target_matrix": plan, "eligible": bool(plan["include"]),
+                "artifact_inventory": [item for item in source.artifacts if item["name"].startswith("packaged-e2e-")],
+                "source_sha": args.source_sha, "source_run_id": args.source_run_id}
+            if args.github_output:
+                with args.github_output.open("a", encoding="utf-8") as stream:
+                    for key, value in result.items():
+                        encoded = json.dumps(value, separators=(",", ":")) if not isinstance(value, str) else value
+                        stream.write(f"{key}={encoded}\n")
+            print(json.dumps(result, sort_keys=True))
+            return 0
         with tempfile.TemporaryDirectory(prefix="qsm-selected-review-") as temporary:
             arguments = {"repository": args.repository, "source_sha": args.source_sha,
                          "source_run_id": args.source_run_id, "bundle_key": args.bundle_key,

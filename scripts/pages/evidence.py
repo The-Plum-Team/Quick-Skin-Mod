@@ -22,6 +22,9 @@ from typing import Any, Callable, Iterable
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "e2e"))
 sys.path.insert(0, str(REPO / "scripts" / "release"))
+sys.path.insert(0, str(REPO / "scripts" / "ci"))
+
+import ci_reuse  # noqa: E402
 
 from packaged_runtime import (  # noqa: E402
     MAX_EVIDENCE_SCREENSHOT_BYTES,
@@ -384,6 +387,7 @@ def prepare(
     target_created_at: str,
     minecraft_target: str | None = None,
     feature_selection: dict[str, Any] | None = None,
+    runtime_source: dict[str, Any] | None = None,
 ) -> Path:
     if not REPOSITORY.fullmatch(repository):
         raise PublicEvidenceError(f"invalid owner/repository identity {repository!r}")
@@ -396,10 +400,18 @@ def prepare(
     source_created_at = _timestamp(source_created_at, "source_created_at")
     target_created_at = _timestamp(target_created_at, "target_created_at")
     selected = None
+    original = None
+    if runtime_source is not None:
+        if minecraft_target is None:
+            raise PublicEvidenceError("a reused PR runtime requires a shared Minecraft target")
+        original = validate_runtime_origin(runtime_source, repository=repository,
+            source={"sha": source_sha, "branch": source_branch, "run_id": source_run_id},
+            target={"sha": target_sha, "branch": target_branch})
     if feature_selection is not None:
         from feature_evidence import read_selection
         selected = read_selection(feature_selection, catalog_path=catalog_path)
-        if minecraft_target is None or selected.head_commit != source_sha or selected.policy_commit != source_sha:
+        if (minecraft_target is None or selected.head_commit != source_sha
+                or selected.policy_commit != (original["base_sha"] if original else source_sha)):
             raise PublicEvidenceError("selected public evidence requires its exact shared source")
     catalog = load_catalog(catalog_path, selection=selected)
     inventory = load_matrix_inventory(
@@ -408,7 +420,7 @@ def prepare(
         catalog.contract,
         minecraft_target=minecraft_target,
     )
-    if inventory["matrix_sha256"] is not None and (
+    if inventory["matrix_sha256"] is not None and runtime_source is None and (
         source_branch != target_branch or source_sha != target_sha
     ):
         raise PublicEvidenceError("shared-source evidence must name one tested source commit")
@@ -502,6 +514,8 @@ def prepare(
         manifest["release"]["matrix_sha256"] = inventory["matrix_sha256"]
     if feature_selection is not None:
         manifest["feature_selection"] = feature_selection
+    if runtime_source is not None:
+        manifest["runtime_source"] = runtime_source
     (bundle / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
@@ -518,6 +532,19 @@ def prepare(
         selection=selected,
     )
     return bundle
+
+
+def validate_runtime_origin(reference: Any, *, repository: str, source: dict, target: dict) -> dict:
+    """Bind public tested provenance to an inert source reference; the collector checks GitHub."""
+    try:
+        original = ci_reuse.validate_reference(reference, "e2e")
+    except ValueError as exc:
+        raise PublicEvidenceError(str(exc)) from exc
+    if (reference["repository"] != repository or reference["coverage_sha"] != target.get("sha")
+            or target.get("branch") != "master" or source.get("sha") != original["tested_sha"]
+            or source.get("branch") != original["head_branch"] or source.get("run_id") != str(original["run_id"])):
+        raise PublicEvidenceError("public evidence substituted its original tested commit or coverage provenance")
+    return original
 
 
 def bundle_coverage_sha(manifest: dict[str, Any]) -> str:
@@ -604,7 +631,8 @@ def validate_bundle(
             expected_coverage_sha=expected_coverage_sha, catalog_path=catalog_path, matrix_path=matrix_path)
     selected_schema = (isinstance(manifest, dict) and type(manifest.get("schema_version")) is int
                        and manifest["schema_version"] in SELECTED_SCHEMA_VERSIONS)
-    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_FIELDS | ({"feature_selection"} if selected_schema else set()):
+    origin_fields = {"runtime_source"} if isinstance(manifest, dict) and "runtime_source" in manifest else set()
+    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_FIELDS | ({"feature_selection"} if selected_schema else set()) | origin_fields:
         raise PublicEvidenceError("public evidence manifest fields are invalid")
     if selected_schema:
         from feature_evidence import read_selection
@@ -757,12 +785,18 @@ def validate_bundle(
         ):
             raise PublicEvidenceError(f"evidence provenance.{name}.run_id mismatch")
     target = provenance["target"]
-    if selection is not None and (selection.head_commit != target["sha"]
-                                  or selection.policy_commit != target["sha"]):
+    original = None
+    if origin_fields:
+        if not shared:
+            raise PublicEvidenceError("historical evidence cannot carry a shared PR source reference")
+        original = validate_runtime_origin(manifest["runtime_source"], repository=repository,
+                                            source=provenance["source"], target=target)
+    if selection is not None and (selection.head_commit != (original["tested_sha"] if original else target["sha"])
+                                  or selection.policy_commit != (original["base_sha"] if original else target["sha"])):
         raise PublicEvidenceError("selected public provenance differs from its admitted source")
     if target["branch"] != source_branch:
         raise PublicEvidenceError("evidence target branch mismatch")
-    if shared and (
+    if shared and original is None and (
         provenance["source"]["branch"] != source_branch
         or provenance["source"]["sha"] != target["sha"]
     ):
@@ -1543,6 +1577,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare_parser.add_argument("--selection-coverage", type=Path)
     prepare_parser.add_argument("--selection-base")
     prepare_parser.add_argument("--selection-policy")
+    prepare_parser.add_argument("--runtime-source", type=Path)
 
     compact_parser = subparsers.add_parser("compact")
     compact_parser.add_argument("--evidence-root", type=Path, required=True)
@@ -1632,6 +1667,7 @@ def main(argv: list[str] | None = None) -> int:
                 target_created_at=args.target_created_at,
                 minecraft_target=args.minecraft_target,
                 feature_selection=feature,
+                runtime_source=ci_reuse.read_json(args.runtime_source) if args.runtime_source else None,
             )
             print(bundle)
         elif args.command == "compact":

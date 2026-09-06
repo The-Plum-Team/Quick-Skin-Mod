@@ -5,6 +5,7 @@ import json
 import sys
 import unittest
 import zipfile
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -97,9 +98,13 @@ class FeatureReviewTest(unittest.TestCase):
         self.api = FixtureApi(self.records, self.archives, self.source)
         self.impact = {"schema_version": 1, "compatibility_required": True, "paths": [], "impact_paths": []}
         self.invocations = 0
+        self.repository = ROOT
         # The consumer's own tests authenticate real Git objects and complete baseline reports.
         # Here that boundary is pinned while real archive, row, image and capsule validators run.
-        for replacement in (patch.object(review, "authenticate_full"),
+        run = {"id": 55, "head_sha": self.source, "head_branch": "master"}
+        self.runtime = review.ci_reuse.RuntimeSource(run, run, self.records, {})
+        self.authentication_patch = patch.object(review, "authenticate_full", return_value=self.runtime)
+        for replacement in (self.authentication_patch,
                             patch.object(review, "DEFAULT_CATALOG", self.fixture.catalog_path),
                             patch.object(review.coverage, "default_contract", return_value=contract),
                             patch.object(review.publisher, "_get", side_effect=self.api.get)):
@@ -121,10 +126,73 @@ class FeatureReviewTest(unittest.TestCase):
         self.invocations += 1
         output, scratch = self.root / f"capsule-{self.invocations}", self.root / f"scratch-{self.invocations}"
         output.mkdir(); scratch.mkdir()
-        proof = review.curate(self.api, repository=ROOT, source_sha=self.source, source_run_id=55,
+        proof = review.curate(self.api, repository=self.repository, source_sha=self.source, source_run_id=55,
             bundle_key=self.targets[target_index]["bundle_key"], compatibility_impact=self.impact,
             output=output, scratch=scratch)
         return proof, output
+
+    def reuse_original_pr(self, selected=False):
+        from test_ci_reuse import FixtureApi as SourceApi
+        self.repository = self.root / "git-source"
+        self.repository.mkdir()
+        api = SourceApi(self.repository, self.api.repository)
+        self.source = api.covered
+        if selected:
+            self.selected = replace(self.selected, head_commit=api.tested, policy_commit=api.base)
+            self.coverage["selection_sha256"] = self.selected.sha256
+            self.verifier.return_value = (self.selected, self.coverage)
+        for record in self.records:
+            record["workflow_run"] = {key: api.runs[20][key] for key in ("id", "head_sha", "head_branch")}
+            if not selected or record["id"] not in self.archives: continue
+            with zipfile.ZipFile(io.BytesIO(self.archives[record["id"]])) as archive:
+                files = {name: archive.read(name) for name in archive.namelist()}
+            files.update({"selection.json": self.selected.to_bytes(),
+                          "coverage.json": review.coverage.admission.canonical(self.coverage)})
+            for name, raw in list(files.items()):
+                if not name.endswith("result.json"): continue
+                result = json.loads(raw)
+                result["selection_sha256"] = self.selected.sha256
+                result["reports"]["client_a"]["selection_sha256"] = self.selected.sha256
+                files[name] = json.dumps(result).encode()
+            self.archive(record, files)
+        api.inventories[20] = [item for item in api.inventories[20]
+                              if not item["name"].startswith("packaged-e2e-")] + self.records
+        api.archives.update(self.archives)
+        reference, _ = review.ci_reuse.find_reference(api, self.source, "e2e")
+        api.wrapper(reference, 55)
+        self.api = api
+        self.authentication_patch.stop()
+        policy = patch.object(review.coverage, "policy_fingerprint", return_value="f" * 64)
+        policy.start(); self.addCleanup(policy.stop)
+        return reference
+
+    def test_reused_complete_capsule_keeps_original_images_and_reauthenticates_after_merge(self):
+        self.complete_fixture()
+        reference = self.reuse_original_pr()
+        proof, output = self.curate(1)
+        self.assertEqual(reference, proof["runtime_source"])
+        self.assertEqual((self.source, 55), (proof["source_sha"], proof["source_run_id"]))
+        self.assertEqual((self.api.tested, 20),
+            (proof["visual_reference"]["source_sha"], proof["visual_reference"]["source_run_id"]))
+        self.assertEqual({20}, {item["workflow_run"]["id"] for item in proof["artifact_inventory"]})
+        scratch = self.root / "reused-verify"; scratch.mkdir()
+        arguments = {"repository": self.repository, "source_sha": self.source, "source_run_id": 55,
+                     "bundle_key": self.targets[1]["bundle_key"], "scratch": scratch}
+        review.verify(self.api, output / "curation-proof.json", output / "review-input/visual-review-manifest.json", **arguments)
+        self.api.job_lists[20][0]["jobs"][-1]["conclusion"] = "failure"
+        with self.assertRaises(ValueError):
+            review.verify(self.api, output / "curation-proof.json", output / "review-input/visual-review-manifest.json", **arguments)
+
+    def test_reused_selected_capsule_retains_original_admission_and_policy(self):
+        reference = self.reuse_original_pr(selected=True)
+        proof, output = self.curate(1)
+        self.assertEqual(7, proof["schema_version"])
+        self.assertEqual(reference, proof["runtime_source"])
+        self.assertEqual(self.selected.to_dict(), proof["feature_selection"]["admission"])
+        self.assertEqual(self.api.tested, self.verifier.call_args.kwargs["head"])
+        self.assertEqual(self.api.base, self.verifier.call_args.kwargs["policy"])
+        self.assertEqual(20, self.verifier.call_args.kwargs["run_id"])
+        self.assertEqual(reference, self.verifier.call_args.kwargs["merged_reference"])
 
     def test_semantic_capsule_contains_only_selected_loader_frames_and_cannot_certify_full_coverage(self):
         proof, output = self.curate()

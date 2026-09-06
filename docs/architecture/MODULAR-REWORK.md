@@ -796,3 +796,25 @@ concrete injection target, and rejects that unsafe cast. It reproduces the origi
 1.21.5 and passes after the correction; adjacent 1.21.4 and 1.21.6 checks also pass. The corrected
 1.21.5 production and harness JARs build successfully. Full GitHub runtime confirmation remains
 pending, and the ongoing preceding wave is retained long enough to collect other failures.
+
+### Reuse after an identical-tree merge
+
+PR #1926 passed all 16 compilation targets and 32 packaged runtime lanes, then its identical
+merged tree started another Build and runtime matrix. The duplicate runtime was cancelled before
+semantic AI review. The fix records the actual tested PR merge, its parents and Git tree at each
+passing gate. Protected post-merge jobs authenticate those records, the merged PR, all original
+jobs and immutable artifacts before skipping compilation and Minecraft. They retain small source
+references; they do not copy or relabel the original JARs and captures.
+
+Complete and selected review, Pages composition, complete-baseline publication and optional-mod
+baselines resolve the original evidence through that reference. Selected admissions still name
+the actual PR merge and protected base that authorized their scope. Original artifact identities
+remain separate from the protected coverage generation. Duplicate visual producer notifications
+skip targets with a trusted existing capsule or report. Missing/expired evidence or a changed tree
+requires fresh work; pending checks and uncertain API responses cannot start parallel replacements.
+Nightly and explicit full recovery remain available.
+
+Local regression coverage includes real Git merge objects, bounded descriptor archives, the full
+job graph, source substitution, expiry, pending executions, complete/selected visual curation,
+and public provenance through compaction/composition. GitHub rollout is accepted only after the
+protected merge is observed to allocate no duplicate compilation or Minecraft workers.

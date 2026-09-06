@@ -234,8 +234,16 @@ def _validate_proof(
     frame_count: int,
 ) -> None:
     lane_id = lane["id"]
-    if not isinstance(proof, dict) or set(proof) != PROOF_FIELDS:
+    origin_fields = {"runtime_source"} if isinstance(proof, dict) and "runtime_source" in proof else set()
+    if not isinstance(proof, dict) or set(proof) != PROOF_FIELDS | origin_fields:
         raise BatchError(f"lane {lane_id} curation proof has an unexpected schema")
+    if origin_fields:
+        import ci_reuse
+        original = ci_reuse.validate_reference(proof["runtime_source"], "e2e")
+        if (proof["runtime_source"]["coverage_sha"] != lane["source_sha"]
+                or lane["source_sha"] != lane["target_sha"] or lane["target_branch"] != "master"
+                or proof.get("artifact_inventory", {}).get("base", {}).get("run_id") != original["run_id"]):
+            raise BatchError(f"lane {lane_id} substituted its original runtime")
     expected = {
         "artifact_node": lane["artifact_node"],
         "compatibility_run_id": lane["source_run_id"],

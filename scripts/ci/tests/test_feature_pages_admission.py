@@ -21,7 +21,14 @@ class PublicApi(pages.publisher.Api):
     def __init__(self, fixture):
         super().__init__("The-Plum-Team/Quick-Skin-Mod")
         self.current = fixture.source_sha
-        self.source = {"id": 55, "created_at": "2026-09-06T02:00:00Z"}
+        self.source = {"id": 55, "created_at": "2026-09-06T02:00:00Z", "head_branch": "master",
+            "head_sha": fixture.source_sha, "head_repository": {"full_name": self.repository},
+            "path": ".github/workflows/on-demand-e2e.yml", "event": "workflow_dispatch",
+            "status": "completed", "conclusion": "success"}
+        names = [pages.ci_reuse.POLICY_JOB, pages.ci_reuse.BUILD_JOB, pages.ci_reuse.GATE_JOB,
+                 *pages.ci_reuse.expected_scenario_jobs_for(pages.coverage.DEFAULT_MATRIX, "pr-anchors")]
+        self.runtime_jobs = [{"jobs": [{"name": name, "status": "completed", "conclusion": "success"}
+                                      for name in names]}]
         self.owner = {"id": 8000, "head_branch": "master", "head_sha": fixture.baseline_sha,
             "head_repository": {"full_name": self.repository}, "path": ".github/workflows/pages.yml",
             "event": "workflow_dispatch", "status": "completed", "conclusion": "success"}
@@ -48,8 +55,13 @@ class PublicApi(pages.publisher.Api):
         return self.record
 
     def jobs(self, owner):
+        if owner["id"] == 55: return self.runtime_jobs
         if owner["id"] != 8000: raise AssertionError("unexpected job owner")
         return self.jobs_record
+
+    def artifacts(self, *, run_id=None, name=None):
+        if run_id != 55 or name is not None: raise AssertionError("unexpected artifact inventory")
+        return []  # Admission and the retained baseline are exercised below; no reused-source wrapper.
 
     def current_sha(self):
         return self.current

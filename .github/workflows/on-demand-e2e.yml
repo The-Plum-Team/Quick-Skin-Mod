@@ -62,19 +62,23 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      actions: read
       contents: read
       pull-requests: read
     outputs:
       effective: ${{ steps.policy.outputs.effective }}
       manifest: ${{ steps.policy.outputs.manifest }}
+      reused: ${{ steps.reuse.outputs.reused || 'false' }}
+      source_run_id: ${{ steps.reuse.outputs.source_run_id }}
 
     steps:
-      # Only the not-applicable revalidation reads Git history below; the full-policy
-      # path short-circuits before touching the repository, so skip the full clone there.
+      # Ordinary PRs need no policy checkout here. Protected master runs also resolve
+      # original PR evidence before any compilation or Minecraft worker is allocated.
       - name: Check out the exact requested head without credentials
         if: >-
           github.event_name == 'workflow_dispatch' &&
-          inputs.runtime_policy == 'not-applicable'
+          (inputs.runtime_policy == 'not-applicable' ||
+           (github.ref == 'refs/heads/master' && inputs.capture_coverage != 'full'))
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -210,11 +214,29 @@ jobs:
           printf 'The requested runtime policy could not be authenticated; running full Packaged E2E.\n' \
             >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Reuse the exact merged PR runtime before allocating Minecraft runners
+        id: reuse
+        if: >-
+          steps.policy.outputs.effective == 'full' && github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/master' && inputs.capture_coverage != 'full'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/ci_reuse.py resolve --kind e2e --output reuse/reused-source.json
+      - name: Retain the original runtime reference without copying its captures
+        if: steps.reuse.outputs.reused == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reused-source-e2e
+          path: reuse/reused-source.json
+          if-no-files-found: error
+          retention-days: 90
+
   feature-policy:
     name: Select affected feature coverage
     needs: runtime-policy
     if: >-
       needs.runtime-policy.outputs.effective == 'full' &&
+      needs.runtime-policy.outputs.reused != 'true' &&
       inputs.capture_coverage != 'full' &&
       ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'master' &&
         github.event.pull_request.head.repo.full_name == github.repository) ||
@@ -326,7 +348,7 @@ jobs:
     needs: runtime-policy
     if: >-
       needs.runtime-policy.result == 'success' &&
-      needs.runtime-policy.outputs.effective == 'full'
+      needs.runtime-policy.outputs.effective == 'full' && needs.runtime-policy.outputs.reused != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 100
     permissions:
@@ -426,7 +448,7 @@ jobs:
           path: build/release/
           if-no-files-found: error
           compression-level: 0
-          retention-days: ${{ startsWith(github.ref_name, 'automation/sync/') && 7 || 1 }}
+          retention-days: 7
 
   e2e:
     name: ${{ matrix.id }} - contract scenarios
@@ -465,7 +487,7 @@ jobs:
           selection-policy: ${{ needs.feature-policy.outputs.policy }}
           selection-sha256: ${{ needs.feature-policy.outputs.selection_sha256 }}
           evidence-name: packaged-e2e-${{ matrix.id }}
-          evidence-retention-days: ${{ startsWith(github.ref_name, 'automation/sync/') && '7' || '1' }}
+          evidence-retention-days: '7'
 
   required-gate:
     name: Packaged E2E gate
@@ -487,19 +509,26 @@ jobs:
           RUNTIME_POLICY: ${{ needs.runtime-policy.outputs.effective }}
           BUILD_RESULT: ${{ needs.build.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
+          REUSED: ${{ needs.runtime-policy.outputs.reused }}
         run: |
           set -euo pipefail
-          [[ "$POLICY_RESULT" == success ]]
+          [[ "$POLICY_RESULT" == success ]] || exit 1
+          if [[ "$REUSED" == true ]]; then
+            [[ "$RUNTIME_POLICY" == full && "$BUILD_RESULT" == skipped && "$E2E_RESULT" == skipped ]] || exit 1
+            printf 'Reusing the original successful PR runtime for the identical merged tree.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [[ "$REUSED" == false ]] || exit 1
           case "$RUNTIME_POLICY" in
             full)
-              [[ "$BUILD_RESULT" == success ]]
-              [[ "$E2E_RESULT" == success ]]
+              [[ "$BUILD_RESULT" == success ]] || exit 1
+              [[ "$E2E_RESULT" == success ]] || exit 1
               printf 'Packaged Minecraft was required and passed.\n' \
                 >> "$GITHUB_STEP_SUMMARY"
               ;;
             not-applicable)
-              [[ "$BUILD_RESULT" == skipped ]]
-              [[ "$E2E_RESULT" == skipped ]]
+              [[ "$BUILD_RESULT" == skipped ]] || exit 1
+              [[ "$E2E_RESULT" == skipped ]] || exit 1
               printf 'Packaged Minecraft was not applicable to this authenticated non-runtime port.\n' \
                 >> "$GITHUB_STEP_SUMMARY"
               ;;
@@ -507,6 +536,35 @@ jobs:
               exit 1
               ;;
           esac
+
+      - name: Check out the actual tested source record policy
+        if: github.event_name == 'pull_request' || needs.runtime-policy.outputs.reused == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download this generation's original runtime reference
+        if: needs.runtime-policy.outputs.reused == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: reused-source-e2e
+          path: reuse
+      - name: Reauthenticate every original runtime lane and the merged tree
+        if: needs.runtime-policy.outputs.reused == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/ci_reuse.py verify --kind e2e --reference reuse/reused-source.json
+      - name: Record the actual PR commit that passed packaged Minecraft
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/ci/ci_reuse.py seal --kind e2e --output tested-source/tested-source.json
+      - name: Retain the immutable tested-runtime record
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tested-source-e2e
+          path: tested-source/tested-source.json
+          if-no-files-found: error
+          retention-days: 90
 
   attest:
     name: Attest tested E2E on release branch
@@ -574,6 +632,7 @@ jobs:
     needs:
       - pages-inventory
       - feature-policy
+      - runtime-policy
     if: always() && !cancelled() && needs.pages-inventory.result == 'success' && needs.pages-inventory.outputs.targets != ''
     strategy:
       fail-fast: false
@@ -593,7 +652,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          fetch-depth: ${{ needs.feature-policy.outputs.selective == 'true' && '0' || '1' }}
+          fetch-depth: ${{ (needs.feature-policy.outputs.selective == 'true' || needs.runtime-policy.outputs.reused == 'true') && '0' || '1' }}
           persist-credentials: false
 
       - name: Install Python
@@ -626,6 +685,14 @@ jobs:
           if [[ "$SOURCE_BRANCH" != "$GITHUB_REF_NAME" || "$canonical_branch" != "$SOURCE_BRANCH" ]]; then
             printf 'Public evidence source identity changed.\n' >&2
             exit 1
+          fi
+
+          if [[ -z "$ATTEST_RUN_ID" && "$(python3 scripts/release/release_sources.py --kind mode)" == shared ]]; then
+            python3 scripts/ci/feature_pages.py --runtime-identity \
+              --github-repository "$GITHUB_REPOSITORY" --repository . \
+              --source-sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" \
+              --output "$RUNNER_TEMP/public-runtime" --github-output "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           source_run_id="${ATTEST_RUN_ID:-$GITHUB_RUN_ID}"
@@ -674,10 +741,11 @@ jobs:
           SOURCE_CREATED_AT: ${{ steps.identity.outputs.source_created_at }}
           TARGET_SHA: ${{ steps.identity.outputs.target_sha }}
           TARGET_CREATED_AT: ${{ steps.identity.outputs.target_created_at }}
-          SELECTION_ENABLED: ${{ needs.feature-policy.outputs.selective }}
-          SELECTION_BASE: ${{ needs.feature-policy.outputs.base }}
-          SELECTION_POLICY: ${{ needs.feature-policy.outputs.policy }}
-          SELECTION_SHA256: ${{ needs.feature-policy.outputs.selection_sha256 }}
+          SELECTION_ENABLED: ${{ steps.identity.outputs.selective || needs.feature-policy.outputs.selective }}
+          SELECTION_BASE: ${{ steps.identity.outputs.selection_base || needs.feature-policy.outputs.base }}
+          SELECTION_POLICY: ${{ steps.identity.outputs.selection_policy || needs.feature-policy.outputs.policy }}
+          SELECTION_SHA256: ${{ steps.identity.outputs.selection_sha256 || needs.feature-policy.outputs.selection_sha256 }}
+          REUSED_RUNTIME: ${{ steps.identity.outputs.reused }}
         run: |
           set -euo pipefail
           target_argument=()
@@ -695,6 +763,10 @@ jobs:
               --selection-coverage e2e-out/coverage.json --selection-base "$SELECTION_BASE"
               --selection-policy "$SELECTION_POLICY")
           fi
+          source_arguments=()
+          if [[ "$REUSED_RUNTIME" == true ]]; then
+            source_arguments=(--runtime-source "$RUNNER_TEMP/public-runtime/runtime-source.json")
+          fi
           python3 scripts/pages/evidence.py prepare \
             --e2e-root e2e-out \
             --matrix release/release-matrix.json \
@@ -710,6 +782,7 @@ jobs:
             --target-sha "$TARGET_SHA" \
             --target-created-at "$TARGET_CREATED_AT" \
             ${target_argument[@]+"${target_argument[@]}"} \
+            ${source_arguments[@]+"${source_arguments[@]}"} \
             ${selection_arguments[@]+"${selection_arguments[@]}"}
 
       - name: Upload stable public evidence for this Minecraft target

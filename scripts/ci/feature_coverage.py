@@ -76,7 +76,7 @@ class ReviewFiles:
 
 def validate_source_run(run: Any, jobs: Any, *, github_repository: str, source_sha: str,
                         source_run_id: int, matrix_path: Path = DEFAULT_MATRIX,
-                        matrix_kind: str = "pr-anchors") -> dict[str, Any]:
+                        matrix_kind: str = "pr-anchors", allow_in_progress: bool = False) -> dict[str, Any]:
     """Validate API records fetched independently for the requested complete source run."""
     if (matrix_kind not in {"pr-anchors", "native-anchors"}
             or not isinstance(github_repository, str) or REPOSITORY.fullmatch(github_repository) is None
@@ -86,7 +86,8 @@ def validate_source_run(run: Any, jobs: Any, *, github_repository: str, source_s
             or run.get("head_sha") != source_sha or run.get("head_branch") != "master"
             or run.get("path") != ".github/workflows/on-demand-e2e.yml"
             or run.get("event") != ("schedule" if matrix_kind == "native-anchors" else "workflow_dispatch")
-            or run.get("status") != "completed" or run.get("conclusion") != "success"
+            or not (run.get("status") == "completed" and run.get("conclusion") == "success"
+                    or allow_in_progress and run.get("status") == "in_progress" and run.get("conclusion") is None)
             or not isinstance(run.get("head_repository"), dict)
             or run["head_repository"].get("full_name") != github_repository):
         raise CoverageError("coverage requires the exact successful shared-source profile run")
@@ -144,7 +145,8 @@ def validate_clean_target(files: ReviewFiles, *, source_sha: str, source_run_id:
     proof, proof_digest = _read(files.proof)
     manifest, manifest_digest = _read(files.manifest)
     report, report_digest = _read(files.report)
-    if not isinstance(proof, dict) or set(proof) != PROOF_KEYS | {"bundle_key", "matrix_sha256"}:
+    reuse_fields = {"runtime_source"} if isinstance(proof, dict) and "runtime_source" in proof else set()
+    if not isinstance(proof, dict) or set(proof) != PROOF_KEYS | {"bundle_key", "matrix_sha256"} | reuse_fields:
         raise CoverageError("only a complete shared-target curation proof can supply a baseline")
     validate_target_proof(proof, matrix_path=matrix_path)
     validate_compatibility_impact(proof["compatibility_impact"])

@@ -85,6 +85,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   wave only when its protected compatibility-impact manifest is true. Both runtime and AI
   consumers independently recompute the per-target plan from the shared matrix and external-mod
   lock. Optional-mod and nightly profiles remain complete integration checks.
+- A protected merge may reuse its original PR Build and Packaged E2E only through
+  `scripts/ci/ci_reuse.py`. Require the actual merged PR, the sealed tested merge and both parents,
+  identical complete Git trees, the exact successful original job graphs and available immutable
+  artifacts. Never use a lightweight reuse job as evidence that Minecraft executed there. Preserve
+  the original commit/run/artifact identities through review, optional-mod baselines and Pages;
+  the protected merge is a separate coverage generation. Missing or expired evidence permits
+  fresh execution; an API failure, pending original execution or malformed proof stops admission.
+  Repeated producer wakes must skip targets with an authenticated existing capsule or report.
 - Historical schema-2 port/anchor certificates remain available only for historical recovery;
   schema 3 retires automatic version ports. Never reuse a partial feature proof as either a
   complete shared baseline or a historical full-anchor certificate.
@@ -188,6 +196,16 @@ gate. A PR's Packaged E2E waits for that exact source Build and downloads its im
 by ID, then reverifies it against the tested merge commit. It never starts a second PR compilation.
 Standalone runs without an available bundle use the same complete isolated compiler. Runtime
 coverage uses up to sixteen isolated runners and retains every required target/loader job.
+
+After an identical-tree PR merge, Build and Packaged E2E independently authenticate the original
+PR records and skip their compilation and Minecraft workers. The post-merge generation contains
+small `reused-source-build` / `reused-source-e2e` references rather than copied JARs or screenshots.
+The original passing PR gates emit `tested-source-build` / `tested-source-e2e`. These JSON records
+are retained for 90 days; source Build/E2E bundles and raw runtime evidence are retained for seven
+days. Review and Pages reauthenticate the source reference before consuming its original bytes.
+Shared proof/public schemas keep an optional `runtime_source` binding; selected admissions retain
+their original PR merge and policy base. These references never chain. Explicit full recovery
+requests bypass runtime reuse and may rebuild if no current source bundle is available.
 
 Release automation always rebuilds `scripts/release/build_matrix.py` with `--rerun-tasks` and
 requires every production and harness SHA-256 to equal the first build. When determinism is in
