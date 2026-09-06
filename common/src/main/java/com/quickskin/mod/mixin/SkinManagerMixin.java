@@ -363,13 +363,8 @@ public class SkinManagerMixin {
             at = @At("RETURN"),
             cancellable = true,
             require = 1,
-//? if <26.1 {
-            expect = 3,
-            allow = 3
-//?} else {
             expect = 2,
             allow = 2
-//?}
     )
     private void quickskin$modifyGet(GameProfile profile, CallbackInfoReturnable<CompletableFuture<Optional<PlayerSkin>>> cir) {
         UUID uuid = profile.id();

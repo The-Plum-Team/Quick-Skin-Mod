@@ -107,7 +107,7 @@ INJECTION_COUNT_OVERRIDES = {
         "quickskin$modifyInsecureSkinLegacy",
     ): {2},
     # Audited mapped Minecraft JARs: createLookup has three returns from 1.21.9 onward.
-    # Its async get method has three in 1.21.9-1.21.11 and two from 26.1 onward.
+    # Its async get method has two returns from 1.21.9 onward.
     (
         "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
         "quickskin$modifyCreateLookup",
@@ -115,7 +115,7 @@ INJECTION_COUNT_OVERRIDES = {
     (
         "main:com/quickskin/mod/mixin/SkinManagerMixin.java",
         "quickskin$modifyGet",
-    ): {2, 3},
+    ): {2},
 }
 
 ALLOW_COUNT_OVERRIDES = {

@@ -651,3 +651,10 @@ tasks do not configure or resolve unrelated Minecraft module/version nodes.
   generations retain the preceding complete baseline. All 372 CI tests and fifteen workflow/action
   YAML files pass, including real-shell routing and bounded selected-capsule mutation fixtures.
   Public evidence composition remains the next stage; no reduced GitHub run has occurred yet.
+- GitHub also exposed an incorrect `SkinManager.get` return-count bound on both loaders in
+  Minecraft 1.21.9–1.21.11. The mapped vanilla methods have two returns, as does the 26.1 family;
+  both loader bridges now declare that exact bound. `SkinManagerReturnCountTest` reads actual
+  dependency bytecode and the compiled injection annotation without booting Minecraft. It
+  reproduced the original 1.21.9 failure, passes after the repair, and passes the 1.21.8, 1.21.10,
+  1.21.11 and 26.1 boundary checks. Six mixin-policy tests also pass. The complete serial build
+  is running with both runtime repairs; remote runtime validation still belongs to head `7b8f29ea`.
