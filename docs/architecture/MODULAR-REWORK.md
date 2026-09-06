@@ -749,3 +749,13 @@ run was force-cancelled after checking its repository, branch, workflow and comm
 public-evidence producer jobs now also require `!cancelled()`; the required result gate and
 completion notifications retain their failure-reporting behavior. Workflow-security checks pass
 all 49 tests, and all 15 workflow/action files parse. No production or harness bytes changed.
+
+### Shared Build gate duration
+
+GitHub built, staged and uploaded the complete immutable E2E input bundle for PR source
+`60c75ad36` in run `34011487053`. Its separate Build gate reached the inherited one-hour job
+limit after passing repository-policy validation and while compiling the same serial matrix;
+GitHub's annotation explicitly identifies that timeout. The Build job now allows 90 minutes,
+matching the runtime input builder while accommodating its additional policy suites and staging.
+The 49 workflow-security tests and all 15 YAML documents pass. Runtime acceptance remains pending;
+this scheduling correction changes no production or harness source.
