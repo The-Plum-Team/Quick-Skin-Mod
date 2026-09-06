@@ -338,7 +338,9 @@ def _authenticate_base_runtime(api: GitHubClient, plan: dict[str, Any]) -> ci_re
     try:
         runtime = ci_reuse.runtime_source(_RuntimeSourceClient(api), plan["source_run_id"],
             plan["source_sha"], matrix_kind=plan["base_matrix_kind"])
-    except ci_reuse.ReuseError as exc:
+    except ValueError as exc:
+        # ReuseError, CoverageError, JobGraphError and ReviewTargetError all derive from
+        # ValueError; every one is a classified publication failure, never a traceback.
         raise CollectionError(f"compatibility base runtime could not be authenticated: {exc}") from exc
     if runtime.reference != plan.get("runtime_source"):
         raise CollectionError("compatibility plan differs from its authenticated base runtime")
@@ -347,10 +349,16 @@ def _authenticate_base_runtime(api: GitHubClient, plan: dict[str, Any]) -> ci_re
 
 def _validate_base_artifact(proof: Any, row: dict[str, Any], runtime: ci_reuse.RuntimeSource) -> None:
     prefix = "packaged-e2e-" + row["artifact_node"].replace(".", "_") + "--" + row["runtime_version"].replace(".", "_") + "--"
-    candidates = [artifact for artifact in runtime.artifacts if artifact["name"].startswith(prefix)]
+    candidates = [artifact for artifact in runtime.artifacts
+                  if isinstance(artifact, dict) and isinstance(artifact.get("name"), str)
+                  and artifact["name"].startswith(prefix)]
     if len(candidates) != 1:
         raise CollectionError("compatibility lane has no unique authenticated base artifact")
     artifact = candidates[0]
+    if (type(artifact.get("id")) is not int or type(artifact.get("size_in_bytes")) is not int
+            or not isinstance(artifact.get("digest"), str)
+            or SHA256_DIGEST.fullmatch(artifact["digest"]) is None):
+        raise CollectionError("authenticated base artifact record is malformed")
     expected = {"id": artifact["id"], "name": artifact["name"], "run_id": runtime.execution["id"],
                 "size_in_bytes": artifact["size_in_bytes"], "digest": artifact["digest"]}
     inventory = proof.get("artifact_inventory") if isinstance(proof, dict) else None

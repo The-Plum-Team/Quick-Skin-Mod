@@ -16,6 +16,8 @@ sys.path.insert(0, str(ROOT / "scripts/release/tests"))
 import compatibility_evidence as evidence
 import collect_compatibility as collector
 import mod_compatibility
+import ci_reuse
+import feature_coverage as coverage
 from test_feature_pages import merged_reference
 
 
@@ -103,6 +105,34 @@ class CompatibilityRuntimeProvenanceTest(unittest.TestCase):
             changed.pop("runtime_source")
             with self.assertRaisesRegex(collector.CollectionError, "authenticated base runtime"):
                 collector._authenticate_base_runtime(api, changed)
+
+    def test_collection_classifies_every_base_authentication_failure(self):
+        api = SimpleNamespace(repository=self.reference["repository"])
+        for failure in (ci_reuse.ReuseError("reuse"), coverage.CoverageError("coverage"),
+                        ValueError("job graph")):
+            with patch.object(collector.ci_reuse, "runtime_source", side_effect=failure):
+                with self.subTest(failure=type(failure).__name__):
+                    with self.assertRaisesRegex(collector.CollectionError, "could not be authenticated"):
+                        collector._authenticate_base_runtime(api, self.plan)
+
+    def test_collection_rejects_malformed_base_artifact_records(self):
+        _, rows, _ = self.validate_plan()
+        row = next(iter(rows.values()))
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = Path(temporary) / "manifest.json"
+            manifest.write_text("[]\n")
+            proof = self.proof(row, manifest)
+            base = proof["artifact_inventory"]["base"]
+            for artifacts in ([{"name": base["name"], "id": base["id"]}],
+                              [{**base, "digest": "md5:" + "d" * 32}],
+                              [{**base, "size_in_bytes": "123"}],
+                              [{**base, "id": True}],
+                              ["not-a-record"],
+                              [base, base]):
+                runtime = SimpleNamespace(reference=self.reference, execution={"id": 54}, artifacts=artifacts)
+                with self.subTest(artifacts=artifacts):
+                    with self.assertRaises(collector.CollectionError):
+                        collector._validate_base_artifact(proof, row, runtime)
 
     def test_collection_rejects_another_lane_or_substituted_base_artifact(self):
         _, rows, _ = self.validate_plan()
