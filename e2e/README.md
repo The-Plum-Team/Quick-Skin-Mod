@@ -353,6 +353,9 @@ that a second skin change stays on the real cooldown button and unacknowledged, 
 change during the cooldown is still accepted. `session` proves the pause menu, inventory paper
 doll, player-list head, and the post-disconnect title preview all consume the saved look and that
 the client session state is cleared after leaving the server.
+The disconnect driver shows a neutral temporary screen until vanilla finishes teardown, then
+opens the title screen. Its assertion also rejects a cached preview entity from the closed world;
+opening the title during teardown can repopulate that cache after the player-quit callback.
 
 `propagation` now propagates an auto-detected slim skin plus a bundled cape id, while
 `propagation-live` witnesses four further live transitions from the same fixed rear vantage: both

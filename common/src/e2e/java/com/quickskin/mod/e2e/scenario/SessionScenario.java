@@ -5,6 +5,7 @@ import com.quickskin.mod.client.compat.EssentialCompatIntegration;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.IconActionButton;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
+import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewPlayerData;
 import com.quickskin.mod.client.services.CapeService;
 import com.quickskin.mod.client.services.LocalAssetManager;
@@ -250,6 +251,12 @@ public final class SessionScenario implements Scenario {
                     String problem = titleProblem(mc, essential);
                     if (problem != null) return Step.Result.fail(problem);
 
+                    UUID cachedPreviewPlayer = PlayerModelRenderer.getCachedPlayerUUID();
+                    if (cachedPreviewPlayer != null) {
+                        return Step.Result.fail("session teardown retained a preview player: "
+                                + cachedPreviewPlayer);
+                    }
+
                     PlayerAppearance retained = PlayerAppearanceRepository.getInstance().getAppearance(uuid);
                     if (retained != null) {
                         // Essential's title model is fed by re-registering the saved look after the
@@ -275,7 +282,7 @@ public final class SessionScenario implements Scenario {
                             + "; ClientConfig activeSkinHash=" + ClientConfig.getInstance().activeSkinHash
                             + " activeCapeHash=" + ClientConfig.getInstance().activeCapeHash
                             + "; appearance repository " + (retained == null ? "cleared" : "holds only the Essential menu look")
-                            + "; network texture cache size=0");
+                            + "; network texture cache size=0; cached preview player=null");
                 }));
 
         return steps;

@@ -816,12 +816,14 @@ public final class VanillaShim {
      * {@link TitleScreen}.
      *
      * <p>Vanilla first disconnects the level, then enters {@code Minecraft.disconnect}, which
-     * clears the client level and installs the next screen. Both operations changed shape across
+     * clears the client level while rendering a temporary screen. Both operations changed shape across
      * the supported range: the level disconnect gained a reason component, while the Minecraft
      * boundary gained a screen and resource-pack flag. Architectury's player-quit event fires from
      * that Minecraft boundary, which is where Quick Skin ends its session; calling
      * {@code clearClientLevel(Screen)} directly would clear vanilla state while silently bypassing
-     * the product callback.</p>
+     * the product callback. Only after teardown does vanilla open its final menu: rendering a title
+     * preview during disconnect would let it recache the outgoing player after the quit callback
+     * cleared session state, before Minecraft clears its renderer's level.</p>
      *
      * @return {@code null} on success, otherwise a bounded fail-closed diagnostic.
      */
@@ -844,19 +846,21 @@ public final class VanillaShim {
                 disconnect.invoke(level, reason);
             }
 
-            TitleScreen title = new TitleScreen();
+            // The disconnect screen is rendered before level/player teardown finishes. It must
+            // have no title/pause widgets that could repopulate the outgoing session's caches.
+            Screen teardown = new Screen(reason) {};
             Method disconnectClient = findPublicMethod(
                     mc.getClass(), new Class<?>[]{Screen.class, boolean.class},
                     "disconnect", "method_18096", "method_76795");
             if (disconnectClient != null) {
-                disconnectClient.invoke(mc, title, false);
+                disconnectClient.invoke(mc, teardown, false);
             } else {
                 Method disconnectClientWithEngineReset = findPublicMethod(
                         mc.getClass(),
                         new Class<?>[]{Screen.class, boolean.class, boolean.class},
                         "disconnect", "method_18096");
                 if (disconnectClientWithEngineReset != null) {
-                    disconnectClientWithEngineReset.invoke(mc, title, false, true);
+                    disconnectClientWithEngineReset.invoke(mc, teardown, false, true);
                 } else {
                     Method legacyDisconnect = findNoArg(
                             mc.getClass(), "clearLevel", "disconnect",
@@ -865,7 +869,6 @@ public final class VanillaShim {
                         return "Minecraft has no supported disconnect method";
                     }
                     legacyDisconnect.invoke(mc);
-                    if (!setScreen(mc, title)) return "could not open the title screen";
                 }
             }
             if (mc.level != null || mc.player != null) {
@@ -873,6 +876,8 @@ public final class VanillaShim {
                         + " player=" + mc.player;
             }
 
+            TitleScreen title = new TitleScreen();
+            if (!setScreen(mc, title)) return "could not open the title screen";
             Screen current = currentScreen(mc);
             if (!(current instanceof TitleScreen)) {
                 return "title screen did not become current: "
