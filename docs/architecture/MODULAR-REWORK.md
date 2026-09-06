@@ -740,3 +740,12 @@ archives; partial, mixed, failed, stale, and intermediate Pages wakes cannot cer
 Targeted validation passes 20 publisher tests, 12 executable workflow-routing tests, and 49
 workflow-security tests. This changes orchestration only; the verified production/harness bytes
 remain the same.
+
+### Superseded runtime cancellation
+
+The final GitHub queue exposed an existing orchestration problem: an `always()` runtime matrix
+kept executing after ordinary cancellation and held the PR concurrency group. The obsolete owned
+run was force-cancelled after checking its repository, branch, workflow and commit. Runtime and
+public-evidence producer jobs now also require `!cancelled()`; the required result gate and
+completion notifications retain their failure-reporting behavior. Workflow-security checks pass
+all 49 tests, and all 15 workflow/action files parse. No production or harness bytes changed.

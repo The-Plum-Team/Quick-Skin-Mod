@@ -495,7 +495,7 @@ jobs:
       - build
       - feature-policy
     if: >-
-      always() && needs.runtime-policy.result == 'success' &&
+      always() && !cancelled() && needs.runtime-policy.result == 'success' &&
       needs.runtime-policy.outputs.effective == 'full' &&
       needs.build.result == 'success'
     runs-on: ubuntu-24.04
@@ -594,7 +594,7 @@ jobs:
     # Only complete public-profile runs may emit handoffs. Scheduled release-profile
     # and pull-request evidence have different coverage/provenance and stay private.
     if: >-
-      always() &&
+      always() && !cancelled() &&
       ((inputs.attest_run_id == '' &&
       ((github.ref_name == 'master' && github.event_name == 'workflow_dispatch') ||
       startsWith(github.ref_name, 'fabric-and-neoforge-') ||
@@ -635,7 +635,7 @@ jobs:
     needs:
       - pages-inventory
       - feature-policy
-    if: always() && needs.pages-inventory.result == 'success' && needs.pages-inventory.outputs.targets != ''
+    if: always() && !cancelled() && needs.pages-inventory.result == 'success' && needs.pages-inventory.outputs.targets != ''
     strategy:
       fail-fast: false
       max-parallel: 3
