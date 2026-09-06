@@ -48,6 +48,8 @@ from scenario_contract import (  # noqa: E402
     ScenarioContractError,
     load_contract as load_scenario_contract,
 )
+import ci_reuse  # noqa: E402
+from feature_coverage_github import Api as RuntimeSourceApi  # noqa: E402
 
 
 SOURCE_WORKFLOW = ".github/workflows/mod-compatibility-e2e.yml"
@@ -308,6 +310,63 @@ class GitHubClient:
             archive.unlink(missing_ok=True)
 
 
+class _RuntimeSourceClient(RuntimeSourceApi):
+    """Use the publisher's bounded authenticated transport for the shared reuse validator."""
+
+    def __init__(self, api: GitHubClient) -> None:
+        super().__init__(api.repository)
+        self.client = api
+
+    def json(self, endpoint: str) -> Any:
+        return self.client._request("/" + endpoint)
+
+    def download(self, metadata: dict[str, Any], destination: Path, *, maximum: int) -> None:
+        size = metadata.get("size_in_bytes")
+        if type(size) is not int or not 0 < size <= maximum:
+            raise CollectionError("runtime descriptor exceeds its authenticated byte limit")
+        self.client._request(f"/actions/artifacts/{metadata['id']}/zip",
+                             destination=destination, maximum_bytes=size)
+        if (destination.stat().st_size != size
+                or "sha256:" + hashlib.sha256(destination.read_bytes()).hexdigest() != metadata["digest"]):
+            destination.unlink(missing_ok=True)
+            raise CollectionError("runtime descriptor differs from its authenticated digest")
+
+
+def _authenticate_base_runtime(api: GitHubClient, plan: dict[str, Any]) -> ci_reuse.RuntimeSource | None:
+    if plan["schema_version"] != 2:
+        return None
+    try:
+        runtime = ci_reuse.runtime_source(_RuntimeSourceClient(api), plan["source_run_id"],
+            plan["source_sha"], matrix_kind=plan["base_matrix_kind"])
+    except ValueError as exc:
+        # ReuseError, CoverageError, JobGraphError and ReviewTargetError all derive from
+        # ValueError; every one is a classified publication failure, never a traceback.
+        raise CollectionError(f"compatibility base runtime could not be authenticated: {exc}") from exc
+    if runtime.reference != plan.get("runtime_source"):
+        raise CollectionError("compatibility plan differs from its authenticated base runtime")
+    return runtime
+
+
+def _validate_base_artifact(proof: Any, row: dict[str, Any], runtime: ci_reuse.RuntimeSource) -> None:
+    prefix = "packaged-e2e-" + row["artifact_node"].replace(".", "_") + "--" + row["runtime_version"].replace(".", "_") + "--"
+    candidates = [artifact for artifact in runtime.artifacts
+                  if isinstance(artifact, dict) and isinstance(artifact.get("name"), str)
+                  and artifact["name"].startswith(prefix)]
+    if len(candidates) != 1:
+        raise CollectionError("compatibility lane has no unique authenticated base artifact")
+    artifact = candidates[0]
+    if (type(artifact.get("id")) is not int or type(artifact.get("size_in_bytes")) is not int
+            or not isinstance(artifact.get("digest"), str)
+            or SHA256_DIGEST.fullmatch(artifact["digest"]) is None):
+        raise CollectionError("authenticated base artifact record is malformed")
+    expected = {"id": artifact["id"], "name": artifact["name"], "run_id": runtime.execution["id"],
+                "size_in_bytes": artifact["size_in_bytes"], "digest": artifact["digest"]}
+    inventory = proof.get("artifact_inventory") if isinstance(proof, dict) else None
+    if (not isinstance(inventory, dict) or inventory.get("base") != expected
+            or proof.get("runtime_source") != runtime.reference):
+        raise CollectionError("compatibility capsule substituted its authenticated base runtime artifact")
+
+
 def _validate_run(
     run: dict[str, Any],
     *,
@@ -560,6 +619,7 @@ def collect(
             contract=compatibility_contract,
             scenario_contract=scenario_contract,
         )
+        runtime = _authenticate_base_runtime(api, plan)
         _fetch_commits(
             repository_root,
             identity["source_sha"],
@@ -651,6 +711,9 @@ def collect(
                     compression_ratio=200,
                 ),
             )
+            if runtime is not None:
+                _validate_base_artifact(read_json(lane_root / "capsule" / "curation-proof.json",
+                                                "compatibility curation proof"), plan_rows[lane_id], runtime)
             lane_completion_name = (
                 f"mod-compatibility-lane-complete-{source_run_id}-{lane_id}"
             )

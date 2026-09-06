@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "scripts/release/tests"))
 
 import test_pages_site as fixtures  # noqa: E402
 import test_pages_artifact_rotation as artifact_fixtures  # noqa: E402
+from test_feature_pages import merged_reference  # noqa: E402
 from build_site import SiteBuildError, build  # noqa: E402
 from evidence import (  # noqa: E402
     PublicEvidenceError,
@@ -255,6 +256,7 @@ class SharedPagesTargetsTest(unittest.TestCase):
         value["release"].update(branch="master", loaders=list(target_for_key("mc1.20.1").loaders),
                                 matrix_sha256=hashlib.sha256(DEFAULT_MATRIX.read_bytes()).hexdigest())
         value["provenance"].update(source_sha=SOURCE_SHA, target_sha=SOURCE_SHA, coverage_sha=SOURCE_SHA)
+        value["provenance"]["runtime_source"] = merged_reference("b" * 40, SOURCE_SHA, 41)
         path.write_text(json.dumps(value))
         compatibility_evidence.validate_bundle(compatibility_root, "mc1.20.1",
                                                 expected_coverage_sha=SOURCE_SHA)
@@ -263,6 +265,26 @@ class SharedPagesTargetsTest(unittest.TestCase):
               repository=REPOSITORY, require_compact=True, expected_branches={"mc1.20.1"})
         gallery = json.loads((output / "e2e/gallery-data.json").read_bytes())
         self.assertTrue(gallery["compatibility"]["lanes"])
+        self.assertEqual({f"https://github.com/{REPOSITORY}/actions/runs/41"},
+                         {lane["base_run_url"] for lane in gallery["compatibility"]["lanes"]})
+        carried = compatibility_evidence.carry_forward(
+            evidence_root=compatibility_root, output_root=self.root / "carried-compatibility",
+            branch="mc1.20.1", coverage_sha="c" * 40, expected_repository=REPOSITORY,
+            scenario_contract_path=ROOT / "e2e/scenario-contract.json",
+            compatibility_contract_path=ROOT / "e2e/mod-compatibility-contract.json")
+        carried_provenance = json.loads((carried / "manifest.json").read_bytes())["provenance"]
+        self.assertEqual(value["provenance"]["runtime_source"], carried_provenance["runtime_source"])
+        self.assertEqual((SOURCE_SHA, "c" * 40),
+                         (carried_provenance["source_sha"], carried_provenance["coverage_sha"]))
+        for field, foreign in (("coverage_sha", "f" * 40), ("repository", "foreign/repository")):
+            reference = value["provenance"]["runtime_source"]
+            original = reference[field]
+            reference[field] = foreign
+            path.write_text(json.dumps(value))
+            with self.subTest(field=field):
+                with self.assertRaises(compatibility_evidence.CompatibilityEvidenceError):
+                    compatibility_evidence.validate_bundle(compatibility_root, "mc1.20.1")
+            reference[field] = original
         value["release"]["matrix_sha256"] = "0" * 64
         path.write_text(json.dumps(value))
         with self.assertRaisesRegex(compatibility_evidence.CompatibilityEvidenceError, "matrix hash"):

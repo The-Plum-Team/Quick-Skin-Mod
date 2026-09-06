@@ -66,6 +66,8 @@ final class CapeMenuSteps {
     private static final double SCROLL_NOTCH = 1.0;
     /** {@code getCapePosition} truncates the offset, so anything below one pixel is "at the top". */
     private static final double SCROLL_SETTLED_BELOW = 1.0;
+    /** The surviving GIF's red motif, held while the unrelated static cape deletion is captured. */
+    private static final int DELETE_EVIDENCE_FRAME = 0;
 
 
     private final FullScenario owner;
@@ -524,6 +526,18 @@ final class CapeMenuSteps {
                     }
                     PlayerCapeMenuScreen screen = openCapeMenu(mc);
                     if (screen == null) return false;
+                    // The slider step restored playback. Hold the same GIF frame on every loader
+                    // so a red/blue phase difference cannot masquerade as a deletion regression.
+                    String animationId = menuAnimationId();
+                    if (animationId == null) return false;
+                    AnimatedTextureManager animations = AnimatedTextureManager.getInstance();
+                    animations.setAnimationSpeed(animationId, 0.0f);
+                    if (!animations.setAnimationFrame(animationId, DELETE_EVIDENCE_FRAME)) return false;
+                    String parked = VanillaShim.moveMouseTo(mc, NEUTRAL_MOUSE_X, NEUTRAL_MOUSE_Y);
+                    if (parked != null) {
+                        deleteFailure.compareAndSet(null, "parking the mouse after deletion: " + parked);
+                        return true;
+                    }
                     String expected = Component.translatable("quickskin.cape.deleted").getString();
                     return expected.equals(stringField(screen, "importMessage"))
                             && intField(screen, "importMessageTimer") > 0
@@ -566,11 +580,24 @@ final class CapeMenuSteps {
                         return Step.Result.fail("active cape changed by deleting another tile: "
                                 + (app == null ? null : app.getCapeId()) + " / "
                                 + ClientConfig.getInstance().activeCapeHash);
+                    CapeEntry selected = selectedCape(screen);
+                    if (selected == null || !selected.isAnimated()
+                            || !sameCape(selected.getCapeId(), owner.gifCapeHash))
+                        return Step.Result.fail("deletion lost the selected animated GIF tile");
+                    int capturedFrame = owner.frameOf(animationState(menuAnimationId()));
+                    if (capturedFrame != DELETE_EVIDENCE_FRAME || animationSpeed() != 0.0f)
+                        return Step.Result.fail("deletion capture did not hold GIF frame "
+                                + DELETE_EVIDENCE_FRAME + ": frame=" + capturedFrame
+                                + "; live speed=" + animationSpeed());
+                    String restore = restoreExactDefaultSpeed(screen, gifId);
+                    if (restore != null)
+                        return Step.Result.fail("restoring playback after deletion: " + restore);
                     int[] button = deleteButton.get();
                     return Step.Result.pass("delete button (" + button[0] + "," + button[1]
                             + ") -> DeletionConfirmScreen -> confirm removed " + contrastId
                             + " (" + path.getFileName() + " gone from uploads/capes); \"" + message
-                            + "\" shown with timer=" + timer + "; active cape still " + gifId);
+                            + "\" shown with timer=" + timer + "; active GIF cape still " + gifId
+                            + "; captured frame=" + capturedFrame + " (red motif); playback restored to 100%");
                 }));
 
         // 9f. click the None tile through the real handler ----------------------------------------
@@ -995,8 +1022,7 @@ final class CapeMenuSteps {
 
     /**
      * The animation id the menu itself registers and drives: {@code "cape_" + <hash inside the
-     * CapeEntry id>}, i.e. the catalog primary. FullScenario's earlier animated steps registered a
-     * sibling state under the SHA-1 alias; that one is not what the slider writes to.
+     * CapeEntry id>}, i.e. the catalog primary shared with FullScenario's earlier animated steps.
      */
     private String menuAnimationId() {
         String primary = primaryHash(owner.gifCapeHash);

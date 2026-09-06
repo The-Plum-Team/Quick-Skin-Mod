@@ -538,6 +538,9 @@ def build(
             branch = release["branch"]
             bundle_key = manifest_key(manifest)
             provenance = manifest["provenance"]
+            base_run_id = provenance["base_run_id"]
+            if "runtime_source" in provenance:
+                base_run_id = provenance["runtime_source"]["source"]["run_id"]
             compatibility_releases.append(
                 {
                     "version": release["version"],
@@ -571,7 +574,7 @@ def build(
             release_urls = {
                 "base_run_url": (
                     f"https://github.com/{repository}/actions/runs/"
-                    f"{provenance['base_run_id']}"
+                    f"{base_run_id}"
                 ),
                 "compatibility_run_url": (
                     f"https://github.com/{repository}/actions/runs/"
