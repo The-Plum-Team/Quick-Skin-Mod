@@ -30,7 +30,7 @@ public final class CapeRenderTypes {
         return RenderType.entityTranslucentCull(texture);
         //?} else if <1.21.11 {
         return RenderType.itemEntityTranslucentCull(texture);
-        //?} else if <26.2 {
+        //?} else if <26.1 {
         return RenderTypes.itemEntityTranslucentCull(texture);
         //?} else {
         return RenderTypes.entityTranslucentCullItemTarget(texture);
