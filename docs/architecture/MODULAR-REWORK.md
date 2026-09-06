@@ -818,3 +818,36 @@ Local regression coverage includes real Git merge objects, bounded descriptor ar
 job graph, source substitution, expiry, pending executions, complete/selected visual curation,
 and public provenance through compaction/composition. GitHub rollout is accepted only after the
 protected merge is observed to allocate no duplicate compilation or Minecraft workers.
+
+### Optional-mod publication of a reused runtime
+
+The first post-merge generation that reused its PR runtime (`5fe67066`) ran its 1.21.6 optional-mod
+wave cleanly, but the protected publisher rejected the wave with "compatibility plan fields are
+invalid": its exact-field codecs for the schema-2 plan, the curation proofs and the public manifest
+did not admit the `runtime_source` reference that the reuse rollout had already added to the
+producer side. The publisher now validates that optional reference wherever it appears, requires
+the plan, every lane proof and the manifest to carry the same reference bound to the covered
+source commit and repository, reauthenticates the base runtime through the shared reuse validator
+for every schema-2 wave, binds each lane's base artifact record to the unique authenticated
+packaged-E2E artifact of the original execution, and links the gallery to the run that actually
+produced the pixels. Historical schema-1 bundles cannot carry the field, and carry-forward keeps it
+intact. Every authentication failure exits through the classified publication error. A local replay
+of the real seven-lane 1.21.6 wave authenticated and compacted in about one minute with no new
+runtime, model call or GitHub write.
+
+### Deterministic animated-cape frame in deletion evidence
+
+The same generation's semantic review of the 1.21.11 lanes reported the `cape_delete_local`
+checkpoint as defective on both loaders: the surviving animated GIF cape showed its blue frame
+while the 1.20.1 reference showed the red one, and the reviewer read that as a wrongly coloured
+contrast cape. The deleted contrast cape was verifiably absent in every lane, so this was a
+wall-clock frame lottery rather than a product defect, and the generation-bound block stopped the
+remaining model calls before more capacity was spent. The deletion step now holds the GIF on its
+first frame with playback paused until the deleted message settles, records the pinned frame and
+speed in its passed assertion, and restores default playback after the capture. The scenario
+contract is deliberately unchanged, so only that capture's runtime evidence changes and every other
+cached verdict remains reusable. The later `cape_none_selected` and `cape_menu_hidden_builtin`
+captures still show that tile unpinned; their expectations name no colour, and pinning a deselected
+animation was not runtime-validated locally, so that remains a follow-up. The corrected generation
+still has to complete Build, Packaged E2E, semantic review and Pages before it can seed the healthy
+baseline that the pending HUD-only acceptance requires.
