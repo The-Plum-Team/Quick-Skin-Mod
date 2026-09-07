@@ -880,3 +880,16 @@ no longer start the wave while product, build, harness and compatibility-policy 
 The review queue also paused on a provider quota at 01:59 UTC and resumed only when GitHub
 delivered the next scheduled sweep at 06:06 UTC; the 30-minute cron is delivered every two to
 five hours in this repository, so a quota pause currently costs several hours of idle queue.
+
+### Deterministic cape-menu captures
+
+The `ce78a6cb` generation, whose JARs were byte-identical to the certified `d65c672b` build, was
+blocked by a confirmed "defect" in `neoforge-1.21.7 cape_tile_tooltip`: the local GIF cape and a
+bundled animated default cape had reached different playback frames than in the Fabric anchor, and
+the reviewer rationalized the phase difference into a red-channel error. Pixel comparison of the
+authenticated frames showed no difference outside those animated tiles. Every cape-menu checkpoint
+draws animated tiles and the 3D preview from the live animation frame, so the harness now holds
+every registered cape animation at its first frame with playback paused while a capture step is
+ready on a cape-menu screen, releases the remembered speeds before the assertion runs so
+speed-slider and deletion assertions still observe real playback, and records the hold in the
+passed message. The explicit deletion-step pin remains and is preserved by the hold.
