@@ -56,7 +56,8 @@ Repeated review notifications continue only with targets that have no existing c
 The original tested commit, run and JAR hashes remain attached to the evidence; the merge commit
 is recorded separately as the covered generation. A changed tree or expired evidence requires
 fresh work. An API failure or a still-running PR check stops admission instead of starting a
-parallel replacement. Explicit `capture_coverage=full` requests and nightly profiles still run.
+parallel replacement. Explicit `capture_coverage=full` requests still run the complete profile,
+and so does any change whose modules can reach the optional-mod compatibility scenarios.
 
 ## 2. Prepare a checkout
 
@@ -224,8 +225,8 @@ isolated runners, then verifies the complete set before passing Build. Packaged 
 exact compilation; changes within one feature can then reduce its authenticated scenario scope.
 
 You normally do not need to launch packaged Minecraft E2E locally. Use the `capture_coverage=full`
-manual recovery option when complete coverage is needed; nightly and optional-mod profiles remain
-complete integration checks. The pull-request workflow
+manual recovery option when complete coverage is needed; optional-mod profiles remain complete
+integration checks. The pull-request workflow
 builds immutable jars and runs the declared scenarios on GitHub. Fork pull requests do not receive
 repository secrets, so secret-dependent AI review may be skipped while programmatic checks still
 run.

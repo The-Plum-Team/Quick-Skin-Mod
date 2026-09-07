@@ -812,7 +812,7 @@ the actual PR merge and protected base that authorized their scope. Original art
 remain separate from the protected coverage generation. Duplicate visual producer notifications
 skip targets with a trusted existing capsule or report. Missing/expired evidence or a changed tree
 requires fresh work; pending checks and uncertain API responses cannot start parallel replacements.
-Nightly and explicit full recovery remain available.
+Explicit full recovery remains available.
 
 Local regression coverage includes real Git merge objects, bounded descriptor archives, the full
 job graph, source substitution, expiry, pending executions, complete/selected visual curation,
@@ -893,3 +893,25 @@ every registered cape animation at its first frame with playback paused while a 
 ready on a cape-menu screen, releases the remembered speeds before the assertion runs so
 speed-slider and deletion assertions still observe real playback, and records the hold in the
 passed message. The explicit deletion-step pin remains and is preserved by the hold.
+
+
+### Compatibility admission from module coverage
+
+The first selective merge (`760d39ed`, HUD only) left the public optional-mod gallery empty: a
+selected generation runs no compatibility wave, and the path-allowlist classifier refused to carry
+the previous evidence forward because the HUD source is a product path. The compatibility
+scenarios now declare the product modules their harness actually exercises, and the classifier
+judges module-owned changes through `selection.compatibility_affected`: a change whose reverse
+dependency closure reaches a compatibility step or a clean reference capture requires the wave and
+keeps the packaged profile complete (`compatibility-coverage`), while a change proven outside that
+closure carries the published evidence forward. The unattended nightly Packaged E2E schedule is
+retired; a generation is complete when its own diff is unproven or reaches that closure, and
+releases plus explicit complete-capture runs stay complete. See ADR 0007. Changing the contract's
+coverage changes its hash, so the next generation re-reviews every frame and regenerates every
+compatibility bundle once. On the current graph only `hud-preview` sits outside the compatibility
+closure: the skin menu, which the 3D Skin Layers lane captures, compiles against the cape menu,
+settings, upload and import modules, and the cape menu against the cape editor, so changes there
+keep the complete profile until those navigations become declared bindings. The wave is admitted
+from the generation's own first-parent diff, so evidence whose wave never completed is restored by
+the next covering change rather than by the following merge; classifying the cumulative diff since
+the published `coverage_sha` is the recorded follow-up.

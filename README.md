@@ -94,8 +94,9 @@ transitive consumers, runtime bindings, setup and comparison dependencies. Local
 exercise just the HUD's disabled/enabled pair or the menu integration's own checkpoints. Shared
 rendering/API changes reach their consumers; unknown impact uses full coverage.
 
-Protected CI currently retains complete profiles while baseline authentication, selective AI
-review and reuse of unaffected evidence are integrated. See the
+Protected CI admits that reduced scope only after authenticating a complete healthy baseline,
+exact ancestry and unchanged module fingerprints. Unproven impact, a change that can move
+optional-mod compatibility evidence, and releases keep the complete profile. See the
 [modular migration plan](docs/architecture/MODULAR-REWORK.md) for measured results and unfinished
 gates. Routine new image E2E runs on GitHub during this migration; local compile results do not
 certify those images. Version-branch synchronization is retired under the shared-source matrix.

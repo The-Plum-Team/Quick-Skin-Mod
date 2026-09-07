@@ -360,10 +360,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   concurrent newer generation.
 - Compatibility evidence may be rebound from its tested target to a current descendant only when
   both commits are authenticated ancestors and the protected complete-diff classifier returns
-  non-impacting. A product, runtime, loader, harness, contract, lock, workflow, classifier, mixed,
-  malformed, or unknown change invalidates that carry-forward and requires a new compatibility
-  wave. Publication-only review workflow changes are explicitly non-impacting so generating the
-  compact bundle cannot recursively schedule the expensive matrix.
+  non-impacting. A runtime, loader, assembly, harness, contract, lock, workflow, classifier,
+  mixed, malformed, or unknown change invalidates that carry-forward and requires a new
+  compatibility wave; a change made only of module-owned sources invalidates it exactly when the
+  module graph proves its reverse dependency closure reaches a compatibility scenario step or a
+  clean reference capture, and is carried forward otherwise. A change that invalidates the
+  carry-forward also keeps the complete packaged profile, so the generation that invalidated the
+  published evidence is the generation that regenerates it. Evidence that no generation has
+  produced yet, or whose wave never completed, is restored by the next change that reaches that
+  closure or by a manual complete run, not by a later non-impacting merge. Publication-only review
+  workflow changes are explicitly non-impacting so
+  generating the compact bundle cannot recursively schedule the expensive matrix.
 - A selected compatibility cache bound to a superseded scenario or optional-mod contract is
   unavailable, not a failure of the atomic ordinary site. Omit that branch's optional gallery until
   a current wave replaces it. Any malformed bundle or validation failure under the current contract
