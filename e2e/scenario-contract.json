@@ -3850,8 +3850,30 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
                   "common",
-                  "menu-integration"
+                  "configuration",
+                  "content-core",
+                  "cpm-integration",
+                  "customnpcs-integration",
+                  "ears-integration",
+                  "essential-integration",
+                  "image-core",
+                  "menu-integration",
+                  "minecraft-adapter",
+                  "networking",
+                  "player-preview",
+                  "preview-rendering",
+                  "replay-integration",
+                  "skin-import",
+                  "skin-menu",
+                  "skinlayers-integration",
+                  "texture-state",
+                  "ui-foundation"
                 ],
                 "bindings": []
               }
@@ -3872,8 +3894,30 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
                   "common",
-                  "menu-integration"
+                  "configuration",
+                  "content-core",
+                  "cpm-integration",
+                  "customnpcs-integration",
+                  "ears-integration",
+                  "essential-integration",
+                  "image-core",
+                  "menu-integration",
+                  "minecraft-adapter",
+                  "networking",
+                  "player-preview",
+                  "preview-rendering",
+                  "replay-integration",
+                  "skin-import",
+                  "skin-menu",
+                  "skinlayers-integration",
+                  "texture-state",
+                  "ui-foundation"
                 ],
                 "bindings": []
               }
@@ -3894,8 +3938,30 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
                   "common",
-                  "menu-integration"
+                  "configuration",
+                  "content-core",
+                  "cpm-integration",
+                  "customnpcs-integration",
+                  "ears-integration",
+                  "essential-integration",
+                  "image-core",
+                  "menu-integration",
+                  "minecraft-adapter",
+                  "networking",
+                  "player-preview",
+                  "preview-rendering",
+                  "replay-integration",
+                  "skin-import",
+                  "skin-menu",
+                  "skinlayers-integration",
+                  "texture-state",
+                  "ui-foundation"
                 ],
                 "bindings": []
               }
@@ -3936,7 +4002,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -3950,7 +4032,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -3964,7 +4062,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -3978,7 +4092,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -3996,7 +4126,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -4010,7 +4156,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -4031,7 +4193,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -4052,7 +4230,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -4098,7 +4292,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -4112,7 +4322,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -4130,7 +4356,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -4144,7 +4386,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -4165,7 +4423,23 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "common"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-foundation",
+                  "client-textures",
+                  "client-transfer",
+                  "common",
+                  "configuration",
+                  "cpm-integration",
+                  "ears-integration",
+                  "image-core",
+                  "networking",
+                  "protocol-core",
+                  "server-appearance",
+                  "skin-import",
+                  "texture-state",
+                  "transfer-core"
                 ],
                 "bindings": []
               }
@@ -4195,7 +4469,13 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "cpm-integration"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-textures",
+                  "configuration",
+                  "cpm-integration",
+                  "skin-import"
                 ],
                 "bindings": []
               }
@@ -4209,7 +4489,13 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "cpm-integration"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-textures",
+                  "configuration",
+                  "cpm-integration",
+                  "skin-import"
                 ],
                 "bindings": [
                   "cpm-assets"
@@ -4232,9 +4518,17 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "cpm-integration"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-textures",
+                  "configuration",
+                  "cpm-integration",
+                  "skin-import"
                 ],
-                "bindings": []
+                "bindings": [
+                  "cpm-assets"
+                ]
               }
             },
             {
@@ -4253,9 +4547,17 @@
               "requires_captures": [],
               "covers": {
                 "modules": [
-                  "cpm-integration"
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-textures",
+                  "configuration",
+                  "cpm-integration",
+                  "skin-import"
                 ],
-                "bindings": []
+                "bindings": [
+                  "cpm-assets"
+                ]
               }
             }
           ],
