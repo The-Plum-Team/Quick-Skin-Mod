@@ -309,6 +309,8 @@ public final class E2EHarness {
         Step s = steps.get(stepIndex);
 
         if (captureDispatched) {
+            // The captured frame is on disk; give the assertion the real playback state back.
+            AnimationHold.release();
             completeStep(s, captureSucceeded ? s.screenshot : null, !captureSucceeded);
             return;
         }
@@ -330,6 +332,9 @@ public final class E2EHarness {
         }
 
         int waited = tick - actionTick;
+        // Predicates observe the real playback state; the hold below is re-applied after them so
+        // only the rendered passes between ticks see the pinned frames.
+        AnimationHold.release();
         boolean ready = waited >= s.minTicks && (s.ready == null || safe(s.ready));
 
         if (waited > s.timeoutTicks) {
@@ -351,6 +356,9 @@ public final class E2EHarness {
                     && VanillaShim.currentScreen(mc) == null
                     && mc.player != null) {
                 DefaultSkinEvidenceView.pinStandingMotion(mc.player);
+            }
+            if (s.screenshot != null && AnimationHold.applies(mc)) {
+                AnimationHold.hold();
             }
             if (readyTick < 0) readyTick = tick;
             // Screenshot.grab reads the last PRESENTED frame, so capturing on the tick the predicate
@@ -392,6 +400,10 @@ public final class E2EHarness {
             result = Step.Result.fail("screenshot dispatch failed: " + step.screenshot
                     + "; assertion=" + result.message());
         }
+        String hold = AnimationHold.consumeSummary();
+        if (hold != null && screenshot != null && result.pass()) {
+            result = Step.Result.pass(result.message() + "; " + hold);
+        }
         E2ELog.info("step[" + stepIndex + "] " + step.name + " : "
                 + (result.pass() ? "PASS" : "FAIL") + " - " + result.message());
         report.record(
@@ -412,6 +424,11 @@ public final class E2EHarness {
      * size. This also covers a missing/0-byte last frame.
      */
     private void tickFlush(Minecraft mc) {
+        // A re-grab of a final cape-menu capture must show the same held frames its recorded
+        // message describes, so the hold stays in force while the last screenshot flushes.
+        if (lastShot != null && AnimationHold.applies(mc)) {
+            AnimationHold.hold();
+        }
         if (lastShot != null && lastShotRetries < MAX_SHOT_RETRIES && tick - lastShotRegrabTick >= 20) {
             int[] dimensions = pngDimensions(screenshotFile(lastShot));
             if (!expectedDimensions(dimensions)) {
@@ -474,6 +491,7 @@ public final class E2EHarness {
     }
 
     private void advance() {
+        AnimationHold.reset();
         stepIndex++;
         actionRun = false;
         readyTick = -1;
