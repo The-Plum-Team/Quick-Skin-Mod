@@ -248,6 +248,34 @@ jobs:
               --github-repository "$GITHUB_REPOSITORY" --repository . \
               --source-run-id "$source_run_id" --source-sha "$source_sha" \
               --matrix-kind "$matrix_kind" --github-output "$GITHUB_OUTPUT"
+            # A shared-source generation classifies the complete first-parent diff of its exact
+            # protected source commit, so a documentation, policy or workflow-only merge cannot
+            # start the optional-mod wave. A root commit, an unavailable or paged (100+ file)
+            # inventory, or any classifier failure keeps the fail-closed default above.
+            source_commit="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/commits/$source_sha" 2>/dev/null || true)"
+            parent_sha="$(jq -r '.parents[0].sha // empty' <<< "$source_commit" 2>/dev/null || true)"
+            if [[ "$parent_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              generation_comparison="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/compare/$parent_sha...$source_sha?per_page=100" \
+                2>/dev/null || true)"
+              generation_changed_files="$(jq -r \
+                '.files | if type == "array" then length else -1 end' \
+                <<< "$generation_comparison" 2>/dev/null || true)"
+              if [[ "$generation_changed_files" =~ ^[1-9][0-9]?$ ]]; then
+                generation_files_path="$(mktemp \
+                  "$RUNNER_TEMP/shared-compatibility-files.XXXXXX.json")"
+                jq '.files' <<< "$generation_comparison" > "$generation_files_path"
+                compatibility_manifest="$(mktemp \
+                  "$RUNNER_TEMP/shared-compatibility-impact.XXXXXX.json")"
+                if python3 scripts/ci/mod_compatibility_impact.py \
+                    --files "$generation_files_path" \
+                    --changed-files "$generation_changed_files" \
+                    --manifest-output "$compatibility_manifest"; then
+                  compatibility_impact="$(jq -c . "$compatibility_manifest")"
+                fi
+              fi
+            fi
             printf 'compatibility_impact=%s\n' "$compatibility_impact" >> "$GITHUB_OUTPUT"
             exit 0
           fi

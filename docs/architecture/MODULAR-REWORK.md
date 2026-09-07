@@ -851,3 +851,32 @@ captures still show that tile unpinned; their expectations name no colour, and p
 animation was not runtime-validated locally, so that remains a follow-up. The corrected generation
 still has to complete Build, Packaged E2E, semantic review and Pages before it can seed the healthy
 baseline that the pending HUD-only acceptance requires.
+
+### Selective feature acceptance on GitHub
+
+With the complete healthy baseline issued for `master` `d65c672b` (16 clean semantic reviews,
+16 public `pages-full-baseline` archives), the HUD-only refactor PR #1935 was admitted
+selectively by the protected `Select affected feature coverage` job: reason
+`affected-module-coverage`, direct owner `hud-preview`, the `full` scenario reduced to the
+`baseline`, `local_skin_apply`, `hud_preview_disabled` and `hud_preview_overlay` actions with the
+two HUD captures per client. All 32 packaged lanes passed with that scope. Against the complete
+profile of PR #1932 on the same lanes, the mean lane time fell from 12.1 to 2.3 minutes and the
+total from 387 to 74 runner-minutes; each lane report carries the selection hash and exactly the
+four steps and two screenshots.
+
+### Optional-mod wave admission for shared generations
+
+The first workflow-only merge after that baseline (`ce78a6cb`) exposed two orchestration gaps.
+The compact compatibility publisher's Pages wake carried eleven `client_payload` properties,
+which GitHub rejects; the artifact name is now derived from the bundle key on both sides and a
+policy test caps every dispatch payload at ten properties. All sixteen clean waves of `d65c672b`
+were then republished through the `publish` recovery operation without model calls and carried
+forward to the descendant. Separately, the curator's schema-3 route never classified the shared
+generation's diff and published the fail-closed default manifest, so every complete master
+generation released all sixteen optional-mod waves; the redundant waves of `ce78a6cb` were
+cancelled by hand. The route now classifies the complete first-parent diff of the exact source
+commit with the existing fail-closed classifier, so documentation, policy and workflow-only merges
+no longer start the wave while product, build, harness and compatibility-policy changes still do.
+The review queue also paused on a provider quota at 01:59 UTC and resumed only when GitHub
+delivered the next scheduled sweep at 06:06 UTC; the 30-minute cron is delivered every two to
+five hours in this repository, so a quota pause currently costs several hours of idle queue.

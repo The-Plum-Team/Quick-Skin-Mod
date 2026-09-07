@@ -12,7 +12,7 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from test_workflow_security import COMPOSITE_ACTIONS, job_block, step_script
+from test_workflow_security import COMPOSITE_ACTIONS, ROOT, job_block, step_script
 
 
 def action_script(name):
@@ -239,6 +239,51 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.assertIn('$proof.schema_version == 7 then ["feature_selection"]', drain)
         self.assertIn('"$proof_schema" != 7 && "$proof_schema" != 8', drain)
 
+
+    def test_shared_generation_classifies_its_first_parent_diff_before_the_optional_mod_wave(self):
+        script = step_script("visual-review.yml", "authenticate", "Resolve the exact trusted source run")
+        start = script.index("# A shared-source generation classifies the complete first-parent diff")
+        end = script.index("printf 'compatibility_impact=%s", start)
+        end = script.index("\n", end) + 1
+        default = '{"compatibility_required":true,"impact_paths":[],"paths":[],"schema_version":1}'
+        route = ("set -euo pipefail\ncompatibility_impact='" + default + "'\n"
+                 'source_sha="$SOURCE_SHA"\n' + script[start:end])
+        (self.root / "scripts").symlink_to(ROOT / "scripts")
+        self.binary("python3", "import runpy,sys\nsys.argv = sys.argv[1:]\n"
+            "runpy.run_path(sys.argv[0], run_name='__main__')\n")
+        self.binary("github_api_retry", "import json,os,sys\n"
+            "open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n"
+            "if '/commits/' in sys.argv[-1]: print(os.environ['COMMIT'])\n"
+            "elif '/compare/' in sys.argv[-1]: print(os.environ['COMPARISON'])\n"
+            "else: sys.exit(1)\n")
+
+        def classify(files, *, parents=1):
+            commit = {"sha": "c" * 40, "parents": [{"sha": "b" * 40}][:parents]}
+            comparison = {"files": [{"filename": name, "status": "modified"} for name in files]}
+            # BSD mktemp keeps a suffixed template literal, so every run gets its own directory.
+            scratch = Path(tempfile.mkdtemp(dir=self.root))
+            result, outputs, calls = self.run_script(route, {"SOURCE_SHA": "c" * 40,
+                "RUNNER_TEMP": str(scratch), "COMMIT": json.dumps(commit),
+                "COMPARISON": json.dumps(comparison)})
+            self.assertEqual(0, result.returncode, result.stderr[:500])
+            return json.loads(outputs["compatibility_impact"]), calls
+
+        manifest, calls = classify([".github/workflows/pages.yml", "docs/ai/PROJECT.md",
+                                    "scripts/ci/tests/test_workflow_security.py"])
+        self.assertFalse(manifest["compatibility_required"])
+        self.assertEqual([], manifest["impact_paths"])
+        self.assertEqual(3, len(manifest["paths"]))
+        self.assertEqual([f"repos/The-Plum-Team/Quick-Skin-Mod/commits/{'c' * 40}"], calls[0])
+        self.assertEqual([f"repos/The-Plum-Team/Quick-Skin-Mod/compare/{'b' * 40}...{'c' * 40}?per_page=100"],
+                         calls[1])
+        hud = "modules/hud-preview/src/main/java/com/quickskin/mod/client/gui/overlay/HudPreviewIntegration.java"
+        manifest, _ = classify([hud, "README.md"])
+        self.assertTrue(manifest["compatibility_required"])
+        self.assertEqual([hud], manifest["impact_paths"])
+        for files, parents in (([f"docs/{index}.md" for index in range(100)], 1), (["docs/x.md"], 0)):
+            manifest, _ = classify(files, parents=parents)
+            with self.subTest(files=len(files), parents=parents):
+                self.assertEqual(json.loads(default), manifest)
 
     def test_complete_shared_review_dispatches_one_target_with_the_ten_field_github_limit(self):
         script = step_script("visual-review-drain.yml", "release-mod-compatibility",
