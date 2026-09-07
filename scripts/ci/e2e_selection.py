@@ -30,8 +30,14 @@ MAX_GIT_BYTES = 2 * 1024 * 1024
 MAX_POLICY_BYTES = 1024 * 1024
 MAX_MANIFEST_BYTES = 1024 * 1024
 GIT_TIMEOUT_SECONDS = 30
+# Every input the selector reads. The reviewed optional-mod lock and its reader belong here
+# because selection resolves the clean reference captures that lock substitutes per mod, so a
+# consumer recomputing the plan under a different lock must see a policy change, not a narrower
+# selection.
 POLICY_PATHS = (
     "architecture/modules.json",
+    "e2e/mod-compatibility-contract.json",
+    "e2e/mod_compatibility.py",
     "e2e/scenario-contract.json",
     "e2e/scenario_contract.py",
     "e2e/selection.py",
