@@ -1900,10 +1900,11 @@ jobs:
           [[ "$ARTIFACT_NAME" == "pages-mod-compatibility-$BUNDLE_KEY" ]]
           [[ "$ARTIFACT_URL" == \
              "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts/$ARTIFACT_ID" ]]
+          # GitHub accepts at most ten client_payload properties. The artifact name is
+          # derived from the bundle key on both sides, so it is not transmitted.
           payload="$RUNNER_TEMP/pages-compatibility-evidence-ready.json"
           jq -n \
             --arg artifact_digest "sha256:$ARTIFACT_DIGEST" \
-            --arg artifact_name "$ARTIFACT_NAME" \
             --arg branch "$BRANCH" \
             --arg bundle_key "$BUNDLE_KEY" \
             --arg coverage_sha "$COVERAGE_SHA" \
@@ -1915,7 +1916,7 @@ jobs:
             '{event_type:"pages-compatibility-evidence-ready",client_payload:{
               repository:$repository,publication_run_id:$publication_run_id,
               publication_sha:env.GITHUB_SHA,artifact_id:$artifact_id,
-              artifact_name:$artifact_name,artifact_digest:$artifact_digest,
+              artifact_digest:$artifact_digest,
               compatibility_run_id:$compatibility_run_id,branch:$branch,bundle_key:$bundle_key,
               target_sha:$target_sha,coverage_sha:$coverage_sha}}' > "$payload"
           github_api_retry --method POST "repos/$GITHUB_REPOSITORY/dispatches" \

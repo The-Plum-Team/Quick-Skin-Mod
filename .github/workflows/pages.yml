@@ -194,7 +194,8 @@ jobs:
         env:
           ARTIFACT_DIGEST: ${{ github.event.client_payload.artifact_digest }}
           ARTIFACT_ID: ${{ github.event.client_payload.artifact_id }}
-          ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
+          # Derived on both sides: the wake payload stays within GitHub's ten-property limit.
+          ARTIFACT_NAME: pages-mod-compatibility-${{ github.event.client_payload.bundle_key }}
           BRANCH: ${{ github.event.client_payload.branch }}
           BUNDLE_KEY: ${{ github.event.client_payload.bundle_key }}
           COVERAGE_SHA: ${{ github.event.client_payload.coverage_sha }}
