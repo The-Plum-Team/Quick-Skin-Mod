@@ -648,6 +648,15 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('protected post-merge anchor generation', authenticate)
         self.assertIn('scripts/ci/mod_compatibility_impact.py', authenticate)
         self.assertIn('compatibility_impact=', authenticate)
+        # The shared generation classifies its exact first-parent diff after planning and before
+        # the manifest is published; a paged inventory keeps the fail-closed default.
+        self.assertIn('compare/$parent_sha...$source_sha?per_page=100', authenticate)
+        self.assertIn('--files "$generation_files_path"', authenticate)
+        self.assertIn('"$generation_changed_files" =~ ^[1-9][0-9]?$', authenticate)
+        self.assertLess(authenticate.index('feature_review.py --plan'),
+                        authenticate.index('compare/$parent_sha...$source_sha'))
+        self.assertLess(authenticate.index('compare/$parent_sha...$source_sha'),
+                        authenticate.rindex("printf 'compatibility_impact=%s"))
         self.assertIn('.event == "repository_dispatch"', authenticate)
         self.assertIn('.path == ".github/workflows/sync-version-branches.yml"', authenticate)
         self.assertIn('outside ordinary visual review', authenticate)
