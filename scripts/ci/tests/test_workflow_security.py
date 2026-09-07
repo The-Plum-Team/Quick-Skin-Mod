@@ -2041,6 +2041,31 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("pages-mod-compatibility-cache-%s", refresh)
         self.assertIn("retention-days: 90", refresh)
 
+
+    def test_every_repository_dispatch_payload_fits_the_ten_property_github_limit(self):
+        """GitHub rejects a repository_dispatch whose client_payload has more than ten keys."""
+        seen = 0
+        for path in workflow_paths():
+            text = path.read_text(encoding="utf-8")
+            for match in re.finditer(r"client_payload:\s*\{(.*?)\}\s*\}", text, re.S):
+                keys = re.findall(r"(?:^|[,{\s])([a-z_]+):", match.group(1))
+                seen += 1
+                with self.subTest(workflow=path.name, keys=keys):
+                    self.assertTrue(1 <= len(keys) <= 10)
+                    self.assertEqual(len(keys), len(set(keys)))
+        self.assertGreaterEqual(seen, 15)
+        publish = job_block("mod-compatibility-review.yml", "publish-evidence")
+        wake = re.search(r"client_payload:\s*\{(.*?)\}\s*\}", publish, re.S).group(1)
+        keys = re.findall(r"(?:^|[,{\s])([a-z_]+):", wake)
+        self.assertEqual(10, len(keys))
+        self.assertNotIn("artifact_name", keys)
+        self.assertIn("bundle_key", keys)
+        self.assertIn('[[ "$ARTIFACT_NAME" == "pages-mod-compatibility-$BUNDLE_KEY" ]]', publish)
+        pages_wake = job_block("pages.yml", "wake-compatibility")
+        self.assertIn("ARTIFACT_NAME: pages-mod-compatibility-"
+                      "${{ github.event.client_payload.bundle_key }}", pages_wake)
+        self.assertNotIn("client_payload.artifact_name", pages_wake)
+
     def test_pages_evidence_rotation_is_post_success_bounded_and_exact(self) -> None:
         workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
         request = job_block("pages.yml", "request-rotation")
