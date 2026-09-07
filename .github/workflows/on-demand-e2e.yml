@@ -5,8 +5,6 @@ name: Packaged E2E
 # isolated target compiler. Semantic visual review remains a separate protected workflow.
 on:
   pull_request:
-  schedule:
-    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       attest_run_id:
@@ -431,7 +429,7 @@ jobs:
         id: matrix
         shell: bash
         env:
-          MATRIX_KIND: ${{ github.event_name == 'schedule' && 'native-anchors' || 'pr-anchors' }}
+          MATRIX_KIND: pr-anchors
         run: |
           set -euo pipefail
           matrix="$(python scripts/release/matrix.py \
@@ -588,8 +586,8 @@ jobs:
       - runtime-policy
       - required-gate
       - attest
-    # Only complete public-profile runs may emit handoffs. Scheduled release-profile
-    # and pull-request evidence have different coverage/provenance and stay private.
+    # Only complete public-profile runs may emit handoffs. Pull-request evidence has a
+    # different coverage/provenance and stays private.
     if: >-
       always() && !cancelled() &&
       ((inputs.attest_run_id == '' &&

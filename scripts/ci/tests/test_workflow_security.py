@@ -254,11 +254,13 @@ class WorkflowSecurityTest(unittest.TestCase):
             on_demand,
         )
 
-    def test_pr_and_nightly_e2e_select_matrix_owned_coverage(self) -> None:
+    def test_packaged_e2e_has_no_unattended_schedule_and_selects_matrix_owned_coverage(self) -> None:
         workflow = (WORKFLOWS / "on-demand-e2e.yml").read_text(encoding="utf-8")
-        self.assertIn('cron: "17 3 * * *"', workflow)
-        self.assertIn("github.event_name == 'schedule'", workflow)
-        self.assertIn("'native-anchors' || 'pr-anchors'", workflow)
+        # Complete coverage comes from the protected post-merge dispatch and explicit manual
+        # runs; an unattended nightly would repeat 32 Minecraft lanes for evidence nobody consumes.
+        self.assertNotIn("schedule:", workflow.split("jobs:", 1)[0])
+        self.assertNotIn('cron: "17 3 * * *"', workflow)
+        self.assertIn("MATRIX_KIND: pr-anchors", workflow)
         self.assertIn('--kind "$MATRIX_KIND"', workflow)
 
     def test_upload_artifact_retention_is_bounded_with_named_exceptions(
