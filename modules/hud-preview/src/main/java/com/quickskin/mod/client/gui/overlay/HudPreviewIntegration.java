@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.overlay;
 
+import com.quickskin.mod.config.ClientConfig;
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.client.ClientGuiEvent;
 import dev.architectury.event.events.client.ClientScreenInputEvent;
@@ -89,12 +90,12 @@ public final class HudPreviewIntegration {
         // HUD render (for potential skin preview overlay)
         ClientGuiEvent.RENDER_HUD.register((guiGraphics, tickDelta) -> {
             // Get the setting from the client configuration
-            boolean showOverlay = com.quickskin.mod.config.ClientConfig.getInstance().showSkinPreviewOverlay;
+            boolean showOverlay = ClientConfig.getInstance().showSkinPreviewOverlay;
             if (showOverlay) {
                 //? if <1.21 {
-                com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay.render(guiGraphics, tickDelta);
+                SkinPreviewOverlay.render(guiGraphics, tickDelta);
                 //?} else {
-                com.quickskin.mod.client.gui.overlay.SkinPreviewOverlay.render(guiGraphics, tickDelta.getGameTimeDeltaPartialTick(false));
+                SkinPreviewOverlay.render(guiGraphics, tickDelta.getGameTimeDeltaPartialTick(false));
                 //?}
             }
         });
