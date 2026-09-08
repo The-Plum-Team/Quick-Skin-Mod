@@ -269,7 +269,15 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   or confidence below high to Opus, and publishes a durable source-wave block before
   cancelling siblings after a confirmed defect. Its authenticated source queue shares the global
   Claude capacity circuit, requires a fresh probe for each source, preserves one completion marker
-  per clean lane, and reschedules only unfinished lanes after a provider pause. A secretless
+  per clean lane, and reschedules only unfinished lanes after a provider pause. Clean lane markers
+  bind the immutable capsule artifact id; queue admission can reuse historical unbound markers
+  only for a preserved first-attempt capsule. The public collector can recover historical markers
+  from any attempt only after comparing the report manifest and proof byte-for-byte with the exact
+  selected capsule. Source enumeration authenticates the complete bounded artifact
+  inventory before selecting those capsules. A settlement marker binds the source run and attempt
+  after every available capsule has been reviewed, so a partial runtime failure does not loop in
+  the review queue and a later runtime attempt reopens recovery. Only the entire runnable plan
+  earns the separate source completion marker and publication wake. A secretless
   protected batcher first validates and merges those unfinished capsules, deduplicating exact image
   bytes and exposing cross-lane semantic equivalence to one globally packed runner. Protected
   admission fields directly bound its parallel calls and space their starts; a later secretless

@@ -29,6 +29,10 @@ REVIEW_EVENTS = frozenset({"repository_dispatch"})
 COMPLETE_NAME = re.compile(
     r"^mod-compatibility-review-complete-(?P<source>[1-9][0-9]*)$"
 )
+SETTLED_NAME = re.compile(
+    r"^mod-compatibility-review-settled-(?P<source>[1-9][0-9]*)-"
+    r"(?P<attempt>[1-9][0-9]*)$"
+)
 BLOCK_NAME = re.compile(
     r"^mod-compatibility-wave-block-(?P<source>[1-9][0-9]*)$"
 )
@@ -110,6 +114,7 @@ def _has_authenticated_marker(
     *,
     repository: str,
     source_run_id: int,
+    source_sha: str,
     name: str,
     workflow: str,
     conclusions: frozenset[str],
@@ -120,17 +125,21 @@ def _has_authenticated_marker(
         raise QueueError(
             f"mod compatibility marker exceeds {MAX_MARKERS_PER_SOURCE} artifacts"
         )
-    pattern = (
-        COMPLETE_NAME
-        if name.startswith("mod-compatibility-review-complete-")
-        else BLOCK_NAME
+    pattern = next(
+        (pattern for pattern in (COMPLETE_NAME, SETTLED_NAME, BLOCK_NAME)
+         if pattern.fullmatch(name)),
+        None,
     )
+    if pattern is None:
+        raise QueueError("unexpected mod compatibility marker name")
     run_cache: dict[int, dict[str, Any]] = {}
     for artifact in artifacts:
         match = pattern.fullmatch(artifact.name)
         if (
             match is None
+            or artifact.name != name
             or int(match.group("source")) != source_run_id
+            or artifact.head_sha != source_sha
             or artifact.expired
             or artifact.size_in_bytes > MAX_MARKER_BYTES
         ):
@@ -194,20 +203,35 @@ def list_pending(
         ):
             continue
         source_ids.add(source_run_id)
+        source_attempt = owner.get("run_attempt")
+        if type(source_attempt) is not int or source_attempt <= 0:
+            raise QueueError(f"source run {source_run_id} has an invalid attempt")
+        settled_name = f"mod-compatibility-review-settled-{source_run_id}-{source_attempt}"
         complete_name = f"mod-compatibility-review-complete-{source_run_id}"
         block_name = f"mod-compatibility-wave-block-{source_run_id}"
         if _has_authenticated_marker(
             api,
             repository=repository,
             source_run_id=source_run_id,
+            source_sha=current_master,
+            name=settled_name,
+            workflow=REVIEW_WORKFLOW,
+            conclusions=frozenset({"success", "failure"}),
+            allow_in_progress=True,
+        ) or (source_attempt == 1 and _has_authenticated_marker(
+            api,
+            repository=repository,
+            source_run_id=source_run_id,
+            source_sha=current_master,
             name=complete_name,
             workflow=REVIEW_WORKFLOW,
             conclusions=frozenset({"success", "failure"}),
             allow_in_progress=True,
-        ) or _has_authenticated_marker(
+        )) or _has_authenticated_marker(
             api,
             repository=repository,
             source_run_id=source_run_id,
+            source_sha=current_master,
             name=block_name,
             workflow=REVIEW_WORKFLOW,
             conclusions=frozenset({"failure", "cancelled"}),

@@ -146,6 +146,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   published field is a schema change: validate it fail-closed in the same strict frame contract
   rather than letting a consumer read an unvalidated string.
 - Public optional-mod evidence is admitted only from a complete clean compatibility source wave.
+  Finishing every available capsule in a failed runtime attempt settles only that attempt; missing
+  runnable lanes forbid the source completion marker and publication. A later source attempt must
+  reopen recovery while preserving good first-attempt capsules. Every new lane completion binds
+  its immutable capsule artifact id, so a replacement capsule cannot inherit an earlier verdict.
   Authenticate and validate the full runnable/N/A plan, every exact compatibility-profile paired
   review manifest and normalized report, every clean lane marker, and the source completion marker
   before publishing. Publish exactly the two local `mod-compatibility` checkpoints and, only when

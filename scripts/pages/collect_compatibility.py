@@ -501,17 +501,20 @@ def _select_review_artifact(
     maximum_size: int,
     required_run_id: int | None = None,
     required_owner_sha: str | None = None,
+    fallback_name: str | None = None,
 ) -> tuple[RemoteArtifact, str]:
+    names = [name] if fallback_name is None else [name, fallback_name]
     candidates = sorted(
         (
             artifact
-            for artifact in api.list_named_artifacts(name)
-            if artifact.name == name
+            for selected_name in names
+            for artifact in api.list_named_artifacts(selected_name)
+            if artifact.name == selected_name
             and not artifact.expired
             and artifact.size <= maximum_size
             and (required_run_id is None or artifact.run_id == required_run_id)
         ),
-        key=lambda artifact: (artifact.created_at, artifact.artifact_id),
+        key=lambda artifact: (artifact.name == name, artifact.created_at, artifact.artifact_id),
         reverse=True,
     )
     authenticated: list[tuple[RemoteArtifact, str]] = []
@@ -545,6 +548,33 @@ def _write_json(path: Path, value: Any) -> None:
     path.write_text(
         json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n",
         encoding="utf-8",
+    )
+
+
+def _select_lane_completion(
+    api: GitHubClient,
+    *,
+    capsule: RemoteArtifact,
+    source_run_id: int,
+    lane_id: str,
+    repository: str,
+    current_sha: str,
+    repository_root: Path,
+    source_implementation_sha: str,
+) -> tuple[RemoteArtifact, str]:
+    legacy_name = f"mod-compatibility-lane-complete-{source_run_id}-{lane_id}"
+    # Historical publication can recover any attempt: build_bundle independently requires the
+    # retained report manifest and proof to equal this exact capsule byte-for-byte. Queue
+    # admission lacks those bytes and therefore uses a stricter first-attempt-only fallback.
+    return _select_review_artifact(
+        api,
+        name=f"{legacy_name}--{capsule.artifact_id}",
+        fallback_name=legacy_name,
+        repository=repository,
+        current_sha=current_sha,
+        repository_root=repository_root,
+        maximum_size=MAX_MARKER_ARCHIVE_BYTES,
+        required_owner_sha=source_implementation_sha,
     )
 
 
@@ -714,17 +744,15 @@ def collect(
             if runtime is not None:
                 _validate_base_artifact(read_json(lane_root / "capsule" / "curation-proof.json",
                                                 "compatibility curation proof"), plan_rows[lane_id], runtime)
-            lane_completion_name = (
-                f"mod-compatibility-lane-complete-{source_run_id}-{lane_id}"
-            )
-            lane_completion_artifact, review_owner_sha = _select_review_artifact(
+            lane_completion_artifact, review_owner_sha = _select_lane_completion(
                 api,
-                name=lane_completion_name,
+                capsule=capsule_artifact,
+                source_run_id=source_run_id,
+                lane_id=lane_id,
                 repository=repository,
                 current_sha=current_implementation_sha,
                 repository_root=repository_root,
-                maximum_size=MAX_MARKER_ARCHIVE_BYTES,
-                required_owner_sha=source_implementation_sha,
+                source_implementation_sha=source_implementation_sha,
             )
             if review_owner_sha != source_implementation_sha:
                 raise CollectionError(f"lane {lane_id} reviewer implementation drifted")

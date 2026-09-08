@@ -399,7 +399,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             (
                 "mod-compatibility-review.yml",
                 "Upload the durable clean lane marker",
-                "mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}",
+                "mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}--${{ matrix.artifact_id }}",
             ): "7",
             (
                 "mod-compatibility-review.yml",
@@ -410,6 +410,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "mod-compatibility-review.yml",
                 "Upload the durable source completion marker",
                 "mod-compatibility-review-complete-${{ needs.enumerate.outputs.source_run_id }}",
+            ): "7",
+            (
+                "mod-compatibility-review.yml",
+                "Upload the durable source attempt settlement marker",
+                "mod-compatibility-review-settled-${{ needs.enumerate.outputs.source_run_id }}-${{ needs.enumerate.outputs.source_run_attempt }}",
             ): "7",
             (
                 "mod-compatibility-review.yml",
@@ -1360,7 +1365,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             review_gate,
         )
         self.assertIn("mod-compatibility-review-sweep-requested", review_continue)
-        self.assertIn("needs.gate.outputs.complete == 'true'", review_continue)
+        self.assertIn("needs.gate.outputs.settled == 'true'", review_continue)
         self.assertNotIn("base-evidence", review)
         self.assertNotIn("candidate-evidence", review)
         self.assertEqual(prepare_review.count("actions/download-artifact@"), 0)

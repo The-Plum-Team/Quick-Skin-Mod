@@ -127,6 +127,7 @@ jobs:
       model_call_spacing_seconds: ${{ steps.matrix.outputs.model_call_spacing_seconds }}
       model_parallelism: ${{ steps.matrix.outputs.model_parallelism }}
       pending_count: ${{ steps.matrix.outputs.pending_count }}
+      runnable_count: ${{ steps.matrix.outputs.runnable_count }}
       source_run_id: ${{ steps.owner.outputs.source_run_id }}
       source_run_attempt: ${{ steps.owner.outputs.source_run_attempt }}
       implementation_sha: ${{ steps.owner.outputs.implementation_sha }}
@@ -290,8 +291,29 @@ jobs:
             "repos/$GITHUB_REPOSITORY/branches/$target_branch" \
             --jq .commit.sha)" == "$target_sha" ]]
 
-          artifacts="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+          artifacts='{"artifacts":[]}'
+          inventory_total=''
+          for inventory_page in {1..3}; do
+            page="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100&page=$inventory_page")"
+            jq -e \
+              '(.total_count | type == "number" and floor == . and . >= 1 and . <= 300) and
+               (.artifacts | type == "array" and length > 0 and length <= 100)' \
+              <<< "$page" > /dev/null
+            page_total="$(jq -er .total_count <<< "$page")"
+            [[ -z "$inventory_total" || "$inventory_total" == "$page_total" ]]
+            inventory_total="$page_total"
+            artifacts="$(jq -c --argjson page "$page" \
+              '.artifacts += $page.artifacts' <<< "$artifacts")"
+            inventory_count="$(jq '.artifacts | length' <<< "$artifacts")"
+            (( inventory_count <= inventory_total ))
+            (( inventory_count < inventory_total )) || break
+          done
+          (( inventory_count == inventory_total ))
+          jq -e \
+            'all(.artifacts[]; .id | type == "number" and floor == . and . > 0) and
+             ([.artifacts[].id] | unique | length) == (.artifacts | length)' \
+            <<< "$artifacts" > /dev/null
           matrix="$(jq -c \
             --argjson artifacts "$artifacts" \
             --argjson compatibility_run_id "$SOURCE_RUN_ID" \
@@ -332,44 +354,56 @@ jobs:
               end] | {include:.}' "$plan")"
           count="$(jq '.include | length' <<< "$matrix")"
           [[ "$count" =~ ^[0-9]+$ ]]
-          (( count <= $(jq '.runnable | length' "$plan") ))
+          runnable_count="$(jq '.runnable | length' "$plan")"
+          (( count <= runnable_count ))
           pending='{"include":[]}'
           completed_count=0
           while IFS= read -r lane; do
             lane_id="$(jq -er .id <<< "$lane")"
-            completion_name="mod-compatibility-lane-complete-$SOURCE_RUN_ID-$lane_id"
-            completions="$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$completion_name&per_page=100")"
-            jq -e --arg name "$completion_name" \
-              '(.artifacts | type == "array" and length <= 100) and
-               all(.artifacts[]; .name == $name)' <<< "$completions" > /dev/null
+            capsule_id="$(jq -er .artifact_id <<< "$lane")"
+            capsule_name="$(jq -er .artifact_name <<< "$lane")"
+            legacy_name="mod-compatibility-lane-complete-$SOURCE_RUN_ID-$lane_id"
+            completion_names=("$legacy_name--$capsule_id")
+            if [[ "$capsule_name" == \
+                "mod-compatibility-review-input-$SOURCE_RUN_ID-$lane_id-1" ]]; then
+              completion_names+=("$legacy_name")
+            fi
             authenticated=0
-            while IFS=$'\t' read -r completion_run_id expired size digest head_sha; do
-              [[ -n "$completion_run_id" && "$expired" == false ]] || continue
-              [[ "$size" =~ ^[1-9][0-9]*$ ]] || continue
-              (( size <= 1048576 )) || continue
-              [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || continue
-              [[ "$head_sha" == "$GITHUB_SHA" ]] || continue
-              completion_owner="$(github_api_retry \
-                "repos/$GITHUB_REPOSITORY/actions/runs/$completion_run_id" \
-                2>/dev/null || true)"
-              if [[ -n "$completion_owner" ]] && jq -e \
-                  --arg implementation_sha "$GITHUB_SHA" \
-                  --arg repository "$GITHUB_REPOSITORY" \
-                  '.status == "completed" and
-                   (.conclusion == "success" or .conclusion == "failure") and
-                   .event == "repository_dispatch" and .head_branch == "master" and
-                   .head_sha == $implementation_sha and
-                   .path == ".github/workflows/mod-compatibility-review.yml" and
-                   .head_repository.full_name == $repository' \
-                  <<< "$completion_owner" > /dev/null; then
-                authenticated=$((authenticated + 1))
-              fi
-            done < <(jq -r --arg name "$completion_name" \
+            for completion_name in "${completion_names[@]}"; do
+              completions="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$completion_name&per_page=100")"
+              jq -e --arg name "$completion_name" \
+                '(.artifacts | type == "array" and length <= 100) and
+                 .total_count == (.artifacts | length) and
+                 all(.artifacts[]; .name == $name)' <<< "$completions" > /dev/null
+              while IFS=$'\t' read -r completion_run_id expired size digest head_sha; do
+                [[ -n "$completion_run_id" && "$expired" == false ]] || continue
+                [[ "$size" =~ ^[1-9][0-9]*$ ]] || continue
+                (( size <= 1048576 )) || continue
+                [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || continue
+                [[ "$head_sha" == "$GITHUB_SHA" ]] || continue
+                completion_owner="$(github_api_retry \
+                  "repos/$GITHUB_REPOSITORY/actions/runs/$completion_run_id" \
+                  2>/dev/null || true)"
+                if [[ -n "$completion_owner" ]] && jq -e \
+                    --arg implementation_sha "$GITHUB_SHA" \
+                    --arg repository "$GITHUB_REPOSITORY" \
+                    '.status == "completed" and
+                     (.conclusion == "success" or .conclusion == "failure") and
+                     .event == "repository_dispatch" and .head_branch == "master" and
+                     .head_sha == $implementation_sha and
+                     .path == ".github/workflows/mod-compatibility-review.yml" and
+                     .head_repository.full_name == $repository' \
+                    <<< "$completion_owner" > /dev/null; then
+                  authenticated=1
+                  break
+                fi
+              done < <(jq -r --arg name "$completion_name" \
               '.artifacts[] | select(.name == $name) |
                [.workflow_run.id, .expired, .size_in_bytes, .digest,
                 .workflow_run.head_sha] | @tsv' <<< "$completions")
-            (( authenticated <= 1 ))
+              (( authenticated == 0 )) || break
+            done
             if (( authenticated == 1 )); then
               completed_count=$((completed_count + 1))
             else
@@ -401,6 +435,7 @@ jobs:
             model_call_spacing_seconds=0
           fi
           printf 'count=%s\n' "$count" >> "$GITHUB_OUTPUT"
+          printf 'runnable_count=%s\n' "$runnable_count" >> "$GITHUB_OUTPUT"
           printf 'completed_count=%s\n' "$completed_count" >> "$GITHUB_OUTPUT"
           printf 'pending_count=%s\n' "$pending_count" >> "$GITHUB_OUTPUT"
           printf 'matrix=%s\n' "$pending" >> "$GITHUB_OUTPUT"
@@ -1589,7 +1624,7 @@ jobs:
       - name: Upload the durable clean lane marker
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}
+          name: mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}--${{ matrix.artifact_id }}
           path: ${{ runner.temp }}/mod-compatibility-lane-result/mod-compatibility-lane-complete.json
           if-no-files-found: error
           retention-days: 7
@@ -1611,6 +1646,7 @@ jobs:
       contents: read
     outputs:
       complete: ${{ steps.result.outputs.complete }}
+      settled: ${{ steps.result.outputs.settled }}
 
     steps:
       - name: Download sanitized failed-batch markers from this attempt
@@ -1686,18 +1722,31 @@ jobs:
           PROBE_RESULT: ${{ needs.capacity-probe.result }}
           PUBLISH_RESULT: ${{ needs.publish-lanes.result }}
           REVIEW_RESULT: ${{ needs.review.result }}
+          RUNNABLE_COUNT: ${{ needs.enumerate.outputs.runnable_count }}
         run: |
           set -euo pipefail
           [[ "$COUNT" =~ ^[0-9]+$ ]]
           [[ "$COMPLETED_COUNT" =~ ^[0-9]+$ ]]
           [[ "$PENDING_COUNT" =~ ^[0-9]+$ ]]
+          [[ "$RUNNABLE_COUNT" =~ ^[0-9]+$ ]]
           (( COMPLETED_COUNT + PENDING_COUNT == COUNT ))
+          (( COUNT <= RUNNABLE_COUNT ))
           printf 'complete=false\n' >> "$GITHUB_OUTPUT"
+          printf 'settled=false\n' >> "$GITHUB_OUTPUT"
+          settle_available_lanes() {
+            printf 'settled=true\n' >> "$GITHUB_OUTPUT"
+            if (( COUNT == RUNNABLE_COUNT )); then
+              printf 'complete=true\n' >> "$GITHUB_OUTPUT"
+            else
+              printf '%s of %s runnable compatibility lanes have capsules; publication waits for the missing runtime lanes.\n' \
+                "$COUNT" "$RUNNABLE_COUNT" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          }
           if (( PENDING_COUNT == 0 )); then
             [[ "$PREPARE_RESULT" == skipped ]]
             [[ "$REVIEW_RESULT" == skipped ]]
             [[ "$PUBLISH_RESULT" == skipped ]]
-            printf 'complete=true\n' >> "$GITHUB_OUTPUT"
+            settle_available_lanes
             printf 'All %s available compatibility lanes were already reviewed.\n' \
               "$COUNT" >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -1724,7 +1773,7 @@ jobs:
             [[ "$PREPARE_RESULT" == success ]]
             [[ "$REVIEW_RESULT" == success ]]
             [[ "$PUBLISH_RESULT" == success ]]
-            printf 'complete=true\n' >> "$GITHUB_OUTPUT"
+            settle_available_lanes
             printf 'All %s compatibility lanes passed packed review and independent publication.\n' \
               "$COUNT" >> "$GITHUB_STEP_SUMMARY"
           else
@@ -1734,6 +1783,34 @@ jobs:
             printf 'Claude capacity is paused; %s unfinished compatibility lanes remain queued.\n' \
               "$PENDING_COUNT" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Create the authenticated source attempt settlement marker
+        if: always() && steps.result.outputs.settled == 'true'
+        shell: bash
+        env:
+          COUNT: ${{ needs.enumerate.outputs.count }}
+          IMPLEMENTATION_SHA: ${{ needs.enumerate.outputs.implementation_sha }}
+          RUNNABLE_COUNT: ${{ needs.enumerate.outputs.runnable_count }}
+          SOURCE_RUN_ATTEMPT: ${{ needs.enumerate.outputs.source_run_attempt }}
+          SOURCE_RUN_ID: ${{ needs.enumerate.outputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$COUNT" =~ ^[0-9]+$ && "$RUNNABLE_COUNT" =~ ^[0-9]+$ ]]
+          (( COUNT <= RUNNABLE_COUNT ))
+          [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$SOURCE_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          jq -n \
+            --arg implementation_sha "$IMPLEMENTATION_SHA" \
+            --argjson lane_count "$COUNT" \
+            --argjson runnable_count "$RUNNABLE_COUNT" \
+            --argjson source_run_id "$SOURCE_RUN_ID" \
+            --argjson source_run_attempt "$SOURCE_RUN_ATTEMPT" \
+            '{schema_version:1,kind:"quick-skin-mod-compatibility-review-settled",
+              source_run_id:$source_run_id,source_run_attempt:$source_run_attempt,
+              implementation_sha:$implementation_sha,lane_count:$lane_count,
+              runnable_count:$runnable_count}' \
+            > "$RUNNER_TEMP/mod-compatibility-review-settled.json"
 
       - name: Create the authenticated source completion marker
         if: always() && steps.result.outputs.complete == 'true'
@@ -1766,6 +1843,15 @@ jobs:
         with:
           name: mod-compatibility-review-complete-${{ needs.enumerate.outputs.source_run_id }}
           path: ${{ runner.temp }}/mod-compatibility-review-complete.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload the durable source attempt settlement marker
+        if: success() && steps.result.outputs.settled == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mod-compatibility-review-settled-${{ needs.enumerate.outputs.source_run_id }}-${{ needs.enumerate.outputs.source_run_attempt }}
+          path: ${{ runner.temp }}/mod-compatibility-review-settled.json
           if-no-files-found: error
           retention-days: 7
 
@@ -1929,7 +2015,7 @@ jobs:
       - gate
     if: >-
       always() && needs.gate.result == 'success' &&
-      needs.gate.outputs.complete == 'true'
+      needs.gate.outputs.settled == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
