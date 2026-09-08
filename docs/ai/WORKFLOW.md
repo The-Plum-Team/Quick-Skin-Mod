@@ -86,7 +86,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   and reauthenticate before model access. A complete target review may request an optional-mod
   wave only when its protected compatibility-impact manifest is true. Both runtime and AI
   consumers independently recompute the per-target plan from the shared matrix and external-mod
-  lock. Optional-mod and nightly profiles remain complete integration checks.
+  lock. Optional-mod profiles remain complete integration checks; a change whose module closure
+  reaches the compatibility scenarios keeps the complete packaged profile so those lanes can pair
+  against it, while a change proven outside that closure carries the published evidence forward.
 - A protected merge may reuse its original PR Build and Packaged E2E only through
   `scripts/ci/ci_reuse.py`. Require the actual merged PR, the sealed tested merge and both parents,
   identical complete Git trees, the exact successful original job graphs and available immutable

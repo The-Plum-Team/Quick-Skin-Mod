@@ -29,6 +29,46 @@ def changed(
 
 
 class ModCompatibilityImpactTest(unittest.TestCase):
+    def test_module_owned_sources_outside_the_compatibility_closure_carry_forward(self) -> None:
+        hud = "modules/hud-preview/src/main/java/com/quickskin/mod/client/gui/overlay/HudPreviewIntegration.java"
+        result = classify_paths([hud, "docs/ai/PROJECT.md"])
+        self.assertFalse(result.compatibility_required)
+        self.assertEqual([], list(result.impact_paths))
+        self.assertEqual(["docs/ai/PROJECT.md", hud], list(result.paths))
+
+    def test_module_owned_sources_inside_the_compatibility_closure_require_the_wave(self) -> None:
+        for path in (
+            "modules/client-textures/src/main/java/com/quickskin/mod/client/services/AnimatedTextureManager.java",
+            "modules/networking/src/main/java/com/quickskin/mod/network/ClientNetworkHandler.java",
+            "modules/cpm-integration/src/main/java/com/quickskin/mod/client/compat/CPMCompatIntegration.java",
+            "modules/cape-menu/src/main/java/com/quickskin/mod/client/gui/screen/PlayerCapeMenuScreen.java",
+        ):
+            with self.subTest(path=path):
+                result = classify_paths([path])
+                self.assertTrue(result.compatibility_required)
+                self.assertEqual([path], list(result.impact_paths))
+
+    def test_assembly_harness_resource_and_unknown_paths_stay_fail_closed(self) -> None:
+        for path in (
+            "common/src/main/java/com/quickskin/mod/QuickSkin.java",
+            "common/src/e2e/java/com/quickskin/mod/e2e/E2EHarness.java",
+            "modules/hud-preview/src/main/resources/assets/quickskin/lang/en_us.json",
+            "modules/hud-preview/src/test/java/com/quickskin/mod/HudTest.java",
+            "modules/unknown-module/src/main/java/X.java",
+            "fabric/src/main/java/com/quickskin/mod/fabric/QuickSkinFabric.java",
+            "e2e/mod-compatibility-contract.json",
+        ):
+            with self.subTest(path=path):
+                result = classify_paths([path])
+                self.assertTrue(result.compatibility_required)
+                self.assertEqual([path], list(result.impact_paths))
+
+    def test_unprovable_coverage_requires_the_wave(self) -> None:
+        hud = "modules/hud-preview/src/main/java/com/quickskin/mod/client/gui/overlay/HudPreviewIntegration.java"
+        result = classify_paths([hud], graph=object())
+        self.assertTrue(result.compatibility_required)
+        self.assertEqual([hud], list(result.impact_paths))
+
     def test_visual_policy_and_docs_do_not_repeat_the_compatibility_wave(self) -> None:
         paths = [
             ".github/workflows/visual-review.yml",

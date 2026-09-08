@@ -63,7 +63,9 @@ schema-2 snapshots retain their original branch/tag validation contract.
   partial coverage cannot seed a complete healthy baseline or authorize optional-mod testing.
 - Full optional-mod waves are per Minecraft target and current source SHA. Their producer and
   AI consumer independently recompute runnable/N/A lanes from the shared matrix and mod lock.
-  Nightly integration profiles stay complete; they do not replace the manual public baseline.
+  There is no unattended scheduled runtime. A protected post-merge generation is complete only
+  when its own diff is unproven or reaches the optional-mod coverage closure; the release profile
+  and an explicit complete-capture manual run are always complete.
 - Pages publishes one atomic matrix-derived site. Selected evidence can cover unchanged features
   only through independently authenticated full and selected components. Every reused image
   retains the original tested commit/run/JAR and its separate coverage provenance.
@@ -240,8 +242,14 @@ into those branches. Their source matrices and existing evidence remain intact d
 - A clean semantic review of an exact synchronized release tree starts a separate optional-mod
   compatibility wave only when its protected curation proof carries a complete fail-closed
   product/integration impact manifest. Visual-review workflows, prompts, documentation, and their
-  policy tests cannot request that wave; product, build, runtime-harness, compatibility-policy,
-  malformed, renamed-from-unknown, and unknown paths do. Protected planning derives every
+  policy tests cannot request that wave. A change made only of module-owned sources requests it
+  exactly when the module graph proves that its reverse dependency closure reaches a step of a
+  compatibility scenario or one of the clean reference captures those lanes are paired against;
+  a module change proven outside that closure keeps the already published compatibility evidence.
+  Build, loader, assembly, runtime-harness, compatibility-policy, malformed, renamed-from-unknown,
+  and unknown paths always request the wave. The same closure keeps the packaged E2E selection on
+  the complete profile, so the wave always finds the complete clean runtime it pairs against
+  instead of leaving that evidence missing. Protected planning derives every
   `version x loader x mod` lane from the
   release matrix and `e2e/mod-compatibility-contract.json`, including explicit N/A rows. Applicable
   lanes run concurrently, prove that the selected integration activated, and execute both the

@@ -252,7 +252,7 @@ class FeatureCoverageTest(unittest.TestCase):
         base = fixture.commit(files)
         before = coverage.module_fingerprints(fixture.repository, base)
         changed = dict(files)
-        changed[fixture.editor] = ("100644", b"class Editor { int zoom; }\n")
+        changed["modules/cape-editor/src/main/java/example/Editor.java"] = ("100644", b"class Editor { int zoom; }\n")
         after = coverage.module_fingerprints(fixture.repository, fixture.commit(changed, base))
         self.assertNotEqual(before["cape-editor"], after["cape-editor"])
         self.assertNotEqual(before["skin-menu"], after["skin-menu"])
@@ -279,7 +279,7 @@ class FeatureCoverageTest(unittest.TestCase):
             self.assertNotEqual(before, coverage.policy_fingerprint(fixture.repository, head))
             with self.assertRaises(coverage.CoverageError):
                 coverage.policy_fingerprint(fixture.repository, head, verify_executing=True)
-        files.pop("modules/hud-preview/build.gradle.kts")
+        files.pop("modules/settings-ui/build.gradle.kts")
         with self.assertRaises(coverage.CoverageError):
             coverage.module_fingerprints(fixture.repository, fixture.commit(files, base))
 

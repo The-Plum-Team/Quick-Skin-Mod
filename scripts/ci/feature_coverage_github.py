@@ -295,7 +295,7 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
     if source.get("event") == "schedule":
         coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
             source_sha=source_sha, source_run_id=source_run_id, matrix_kind="native-anchors")
-        return None  # Nightly integration coverage has no complete Pages-baseline publication.
+        return None  # A scheduled integration run has no complete Pages-baseline publication.
     import ci_reuse
     runtime = ci_reuse.runtime_source(api, source_run_id, source_sha)
     graph = runtime.graph

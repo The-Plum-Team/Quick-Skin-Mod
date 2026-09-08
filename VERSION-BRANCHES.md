@@ -28,8 +28,9 @@ python3 scripts/release/build_matrix.py
 A PR runs the required Build and Packaged E2E gates. After merge, the protected scheduler tests the
 current shared generation and explicitly requests its per-target visual reviews. An authenticated
 complete healthy baseline permits cumulative feature selections; unknown impact or unavailable
-baseline evidence falls back to full coverage. Nightly and optional-mod integration profiles stay
-complete. Public galleries keep the original tested commit/run/JAR for reused images and identify
+baseline evidence falls back to full coverage. Optional-mod integration profiles stay complete,
+and a change whose modules can reach them keeps the complete packaged profile. Public galleries
+keep the original tested commit/run/JAR for reused images and identify
 the newer commit whose unchanged dependencies justify their coverage.
 
 ## Independent releases and historical recovery

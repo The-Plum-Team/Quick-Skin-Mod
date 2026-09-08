@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import json
 import sys
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "e2e"))
 sys.path.insert(0, str(ROOT / "scripts" / "architecture"))
 
+import selection as selection_module
 from module_graph import Module, ModuleGraph, load_graph
 from scenario_contract import ScenarioContractError, default_contract, load_contract
 from selection import SelectionError, load_selection, project_contract, select
@@ -36,6 +38,16 @@ class E2ESelectionTest(unittest.TestCase):
         path.write_text(json.dumps(payload))
         return load_contract(path)
 
+    @contextlib.contextmanager
+    def without_optional_mod_admission(self):
+        """Isolate the module/binding selection algorithm from the separate optional-mod
+        admission gate (ADR 0007), which keeps every module whose reverse dependency closure
+        reaches a compatibility capture or reference on the complete profile. The gate itself is
+        asserted by test_optional_mod_coverage_keeps_the_complete_profile and by
+        scripts/release/tests/test_compatibility_coverage_selection.py."""
+        with patch.object(selection_module, "_compatibility_touched", return_value=False):
+            yield
+
     def isolated(self, scenario, role, step):
         for s in self.payload["scenarios"]:
             for r in s["roles"]:
@@ -49,7 +61,8 @@ class E2ESelectionTest(unittest.TestCase):
         return select(self.parse(self.payload), graph, ["modules/feature/src/main/java/Feature.java"])
 
     def test_editor_selects_consumers_and_real_navigation_bindings(self):
-        result = select(self.contract, self.graph, [self.editor_path])
+        with self.without_optional_mod_admission():
+            result = select(self.contract, self.graph, [self.editor_path])
         self.assertEqual("affected", result.mode)
         self.assertEqual(("cape-editor",), result.direct_modules)
         self.assertEqual({"cape-editor", "cape-menu", "skin-menu", "common"}, set(result.affected_modules))
@@ -65,7 +78,8 @@ class E2ESelectionTest(unittest.TestCase):
         self.assertEqual(4, len(result.role("feature-navigation", "client_a").captures))
 
     def test_projected_contract_keeps_assertions_and_hash_but_only_selected_images(self):
-        plan = select(self.contract, self.graph, [self.editor_path])
+        with self.without_optional_mod_admission():
+            plan = select(self.contract, self.graph, [self.editor_path])
         projected = project_contract(self.contract, plan)
         self.assertEqual(self.contract.sha256, projected.sha256)
         self.assertEqual(45, len(projected.captures))
@@ -78,9 +92,10 @@ class E2ESelectionTest(unittest.TestCase):
                 self.assertTrue(all(step.assertion_required for step in projected.role(run.scenario, role.role).steps))
 
     def test_menu_integration_keeps_its_preview_controls_without_running_cape_editor(self):
-        plan = select(self.contract, self.graph, [
-            "modules/menu-integration/src/main/java/com/quickskin/mod/client/gui/integration/MenuIntegration.java"
-        ])
+        with self.without_optional_mod_admission():
+            plan = select(self.contract, self.graph, [
+                "modules/menu-integration/src/main/java/com/quickskin/mod/client/gui/integration/MenuIntegration.java"
+            ])
         self.assertEqual("affected", plan.mode)
         self.assertEqual({"menu-integration", "common"}, set(plan.affected_modules))
         title = plan.role("full", "client_a")
@@ -138,9 +153,22 @@ class E2ESelectionTest(unittest.TestCase):
             for role in scenario["roles"]:
                 for step in role["steps"]:
                     step["covers"]["bindings"] = []
-        result = select(self.parse(self.payload), self.graph, [self.editor_path])
+        with self.without_optional_mod_admission():
+            result = select(self.parse(self.payload), self.graph, [self.editor_path])
         self.assertEqual("incomplete-module-or-binding-coverage", result.reason)
         self.assertEqual("full", result.mode)
+
+    def test_optional_mod_coverage_keeps_the_complete_profile(self):
+        """A change whose closure reaches a compatibility capture or one of its clean references
+        keeps the complete profile, so the optional-mod wave has the runtime it pairs against."""
+        result = select(self.contract, self.graph, [self.editor_path])
+        self.assertEqual("full", result.mode)
+        self.assertEqual("compatibility-coverage", result.reason)
+        self.assertEqual({"cape-editor", "cape-menu", "skin-menu", "common"}, set(result.affected_modules))
+        self.assertEqual(self.contract.scenarios_for_profile("pr"),
+                         tuple(run.scenario for run in result.runs))
+        self.assertEqual(self.contract.expected_capture_steps("full", "client_a"),
+                         result.role("full", "client_a").captures)
 
     def test_capture_comparison_partners_are_required_in_both_directions(self):
         for step in ("baseline", "apply_local_skin"):
@@ -211,27 +239,34 @@ class E2ESelectionTest(unittest.TestCase):
                 select(self.parse(payload), self.graph, [self.editor_path])
 
     def test_serialized_plan_is_recomputed_not_trusted(self):
-        result = select(self.contract, self.graph, [self.editor_path])
-        path = self.root / "selection.json"
+        with self.without_optional_mod_admission():
+            result = select(self.contract, self.graph, [self.editor_path])
+            path = self.root / "selection.json"
+            path.write_bytes(result.to_bytes())
+            self.assertEqual(result, load_selection(path, self.contract, self.graph))
+            mutations = [
+                lambda data: data["runs"][0]["roles"][0]["captures"].pop(),
+                lambda data: data["runs"][0]["roles"][0]["steps"].pop(0),
+                lambda data: data.__setitem__("contract_sha256", "0" * 64),
+                lambda data: data.__setitem__("module_graph_sha256", "0" * 64),
+                lambda data: data.__setitem__("input_kind", "authenticated-git-diff"),
+                lambda data: data.__setitem__("schema_version", True),
+            ]
+            for mutate in mutations:
+                data = json.loads(result.to_bytes())
+                mutate(data)
+                path.write_text(json.dumps(data))
+                with self.assertRaises(SelectionError):
+                    load_selection(path, self.contract, self.graph)
+        # The recorded plan is bound to the executing policy, so a selection produced under a
+        # different optional-mod admission is refused rather than silently narrowed.
         path.write_bytes(result.to_bytes())
-        self.assertEqual(result, load_selection(path, self.contract, self.graph))
-        mutations = [
-            lambda data: data["runs"][0]["roles"][0]["captures"].pop(),
-            lambda data: data["runs"][0]["roles"][0]["steps"].pop(0),
-            lambda data: data.__setitem__("contract_sha256", "0" * 64),
-            lambda data: data.__setitem__("module_graph_sha256", "0" * 64),
-            lambda data: data.__setitem__("input_kind", "authenticated-git-diff"),
-            lambda data: data.__setitem__("schema_version", True),
-        ]
-        for mutate in mutations:
-            data = json.loads(result.to_bytes())
-            mutate(data)
-            path.write_text(json.dumps(data))
-            with self.assertRaises(SelectionError):
-                load_selection(path, self.contract, self.graph)
+        with self.assertRaises(SelectionError):
+            load_selection(path, self.contract, self.graph)
 
     def test_partial_report_requires_exact_selection_and_keeps_assertions_without_captures(self):
-        result = select(self.contract, self.graph, [self.editor_path])
+        with self.without_optional_mod_admission():
+            result = select(self.contract, self.graph, [self.editor_path])
         selected = result.role("full", "client_a")
         report = {"version": "1.20.1", "role": "client_a", "scenario": "full",
                   "contract_sha256": self.contract.sha256, "selection_sha256": result.sha256,

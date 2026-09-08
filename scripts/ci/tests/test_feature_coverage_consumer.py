@@ -83,11 +83,11 @@ class FeatureCoverageConsumerTest(unittest.TestCase):
         self.assertTrue(selected.enabled)
         self.assertEqual(self.base, selected.base_commit)
         self.assertEqual(self.head, selected.head_commit)
-        self.assertEqual(45, sum(len(role.captures) for run in selected.runs for role in run.roles))
+        self.assertEqual(2, sum(len(role.captures) for run in selected.runs for role in run.roles))
         self.assertEqual(50000, proof["baseline"]["id"])
         self.assertEqual(selected.sha256, proof["selection_sha256"])
-        self.assertIn("hud-preview", proof["unchanged_module_fingerprints"])
-        self.assertNotIn("cape-editor", proof["unchanged_module_fingerprints"])
+        self.assertIn("cape-editor", proof["unchanged_module_fingerprints"])
+        self.assertNotIn("hud-preview", proof["unchanged_module_fingerprints"])
         self.assertEqual([50000], self.api.downloaded)
 
     def test_cumulative_baseline_keeps_an_earlier_editor_change_when_the_tip_only_changes_hud(self):
@@ -99,7 +99,7 @@ class FeatureCoverageConsumerTest(unittest.TestCase):
         selected, proof = self.resolve(head=head, policy=head)
         self.assertTrue(selected.enabled)
         self.assertEqual(self.base, selected.base_commit)
-        self.assertEqual({"cape-editor", "hud-preview"}, set(selected.require_selection().direct_modules))
+        self.assertEqual({"hud-preview"}, set(selected.require_selection().direct_modules))
         self.assertNotIn("hud-preview", proof["unchanged_module_fingerprints"])
 
     def test_missing_expired_foreign_and_failed_issuers_never_download_or_reduce(self):
@@ -196,7 +196,7 @@ class FeatureCoverageConsumerTest(unittest.TestCase):
         real = coverage.module_fingerprints
         def fingerprints(repository, commit, *args):
             result = real(repository, commit, *args)
-            if commit == self.head: result["hud-preview"] = "0" * 64
+            if commit == self.head: result["cape-editor"] = "0" * 64
             return result
         with patch.object(coverage, "module_fingerprints", side_effect=fingerprints):
             self.assertFalse(self.resolve()[0].enabled)

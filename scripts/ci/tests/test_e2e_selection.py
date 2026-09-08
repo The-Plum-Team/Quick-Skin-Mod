@@ -29,7 +29,9 @@ class E2ESelectionAdmissionTest(unittest.TestCase):
                         GIT_AUTHOR_DATE="2001-01-01T00:00:00Z", GIT_COMMITTER_DATE="2001-01-01T00:00:00Z")
         self.git("init", "--bare", "--quiet")
         self.files = {name: ("100644", (ROOT / name).read_bytes()) for name in admission.POLICY_PATHS}
-        self.editor = "modules/cape-editor/src/main/java/example/Editor.java"
+        # hud-preview is the one feature module whose reverse closure reaches no compatibility
+        # capture, so it is the fixture that exercises selective admission end to end.
+        self.editor = "modules/hud-preview/src/main/java/example/Editor.java"
         self.files[self.editor] = ("100644", b"class Editor {}\n")
         self.base = self.commit(self.files)
         changed = dict(self.files)
@@ -72,8 +74,7 @@ class E2ESelectionAdmissionTest(unittest.TestCase):
         self.assertEqual((self.base, self.head), (result.base_commit, result.head_commit))
         self.assertTrue(result.diff_complete)
         self.assertEqual((self.editor,), result.require_selection().changed_paths)
-        self.assertEqual({"cape-editor", "cape-menu", "common", "skin-menu"},
-                         set(result.require_selection().affected_modules))
+        self.assertEqual({"common", "hud-preview"}, set(result.require_selection().affected_modules))
         self.assertEqual(64, len(result.policy_sha256))
         self.assertEqual(64, len(result.diff_sha256))
         other = dict(self.files)
@@ -87,9 +88,16 @@ class E2ESelectionAdmissionTest(unittest.TestCase):
         destination = "modules/skin-menu/src/main/java/example/Editor.java"
         moved[destination] = self.files[self.editor]
         result = self.admit(head=self.commit(moved, self.base))
-        self.assertTrue(result.enabled)
-        self.assertEqual({self.editor, destination}, set(result.require_selection().changed_paths))
-        self.assertEqual({"cape-editor", "skin-menu"}, set(result.require_selection().direct_modules))
+        # Both sides are classified: the destination module can move a compatibility capture
+        # (the 3D Skin Layers lane captures the skin menu), so the admission keeps the complete
+        # profile for the optional-mod wave instead of a smaller selection.
+        self.assertFalse(result.enabled)
+        self.assertEqual("compatibility-coverage", result.reason)
+        preview = admission.select(admission.load_contract(), admission.load_graph(),
+                                   [self.editor, destination])
+        self.assertEqual(("full", "compatibility-coverage"), (preview.mode, preview.reason))
+        self.assertEqual({self.editor, destination}, set(preview.changed_paths))
+        self.assertEqual({"hud-preview", "skin-menu"}, set(preview.direct_modules))
 
     def test_missing_nonancestor_and_empty_baselines_keep_complete_coverage(self):
         for base in (None, "0" * 40, self.head):
@@ -109,6 +117,12 @@ class E2ESelectionAdmissionTest(unittest.TestCase):
                 result = self.admit(head=self.commit(changed, self.base))
                 self.assertFalse(result.enabled)
                 self.assertEqual("selection-policy-changed", result.reason)
+
+    def test_optional_mod_lock_and_reader_are_part_of_the_executing_policy(self):
+        # select() resolves the clean reference captures the reviewed lock substitutes per mod,
+        # so a lock change must be a policy change instead of a differently recomputed plan.
+        self.assertLessEqual({"e2e/mod-compatibility-contract.json", "e2e/mod_compatibility.py"},
+                             set(admission.POLICY_PATHS))
 
     def test_old_baseline_policy_cannot_hide_a_migration_in_the_diff(self):
         old = dict(self.files)
@@ -194,12 +208,12 @@ class E2ESelectionAdmissionTest(unittest.TestCase):
         path = self.repository / "selection.json"
         path.write_bytes(selected.to_bytes())
         args = Namespace(selection=None, selection_admission=path, selection_base=self.base,
-                         selection_policy=self.base, scenarios="full,feature-navigation",
+                         selection_policy=self.base, scenarios="full",
                          compatibility_mod=None, row_json="{}")
         with patch.object(orchestrator, "REPO", self.repository):
             args.selection_plan = orchestrator.resolve_selection(args, self.head)
             self.assertEqual(selected, args.selection_plan)
-            self.assertEqual(["full", "feature-navigation"], orchestrator.scenarios_for({}, {}, args))
+            self.assertEqual(["full"], orchestrator.scenarios_for({}, {}, args))
             with self.assertRaises(admission.AdmissionError):
                 orchestrator.resolve_selection(args, self.base)
             args.scenarios = "phase0-smoke"
@@ -218,26 +232,28 @@ class E2ESelectionAdmissionTest(unittest.TestCase):
                                       "minecraft_launcher_lib.command": command,
                                       "minecraft_launcher_lib.utils": utils}):
             launched = packaged_runtime.client_command(self.repository, "fixture", self.repository,
-                row, "feature-navigation", "client_a", "Alice", 25565, "java", selection=selected)
+                row, "full", "client_a", "Alice", 25565, "java", selection=selected)
         self.assertIn("-Dquickskin.e2e.selection=" + selected.sha256, launched)
         self.assertNotEqual(selected.sha256, selected.require_selection().sha256)
-        chosen = selected.role("feature-navigation", "client_a")
+        chosen = selected.role("full", "client_a")
         self.assertIn("-Dquickskin.e2e.steps=" + ",".join(chosen.steps), launched)
         self.assertIn("-Dquickskin.e2e.captures=" + ",".join(chosen.captures), launched)
-        report = {"version": "1.20.1", "role": "client_a", "scenario": "feature-navigation",
+        report = {"version": "1.20.1", "role": "client_a", "scenario": "full",
                   "contract_sha256": selected.contract_sha256, "selection_sha256": selected.sha256,
                   "status": "pass", "steps": [{"name": step, "status": "pass", "message": "checked",
-                      "screenshot": step + ".png"} for step in chosen.steps]}
+                      "screenshot": step + ".png" if step in chosen.captures else None}
+                      for step in chosen.steps]}
         report_path = self.repository / "e2e-report/report.json"
         report_path.parent.mkdir()
         report_path.write_text(json.dumps(report))
-        with patch.object(packaged_runtime, "inspect_screenshot_for_step", return_value={}) as inspect:
-            packaged_runtime.validate_report(self.repository, row, "feature-navigation", "client_a", selected)
-            self.assertEqual(4, inspect.call_count)
+        with patch.object(packaged_runtime, "inspect_screenshot_for_step", return_value={}) as inspect, \
+                patch.object(packaged_runtime, "compare_screenshots", return_value={}):
+            packaged_runtime.validate_report(self.repository, row, "full", "client_a", selected)
+            self.assertEqual(len(chosen.captures), inspect.call_count)
         report["selection_sha256"] = selected.require_selection().sha256
         report_path.write_text(json.dumps(report))
         with self.assertRaisesRegex(packaged_runtime.RuntimeFailure, "selection identity mismatch"):
-            packaged_runtime.validate_report(self.repository, row, "feature-navigation", "client_a", selected)
+            packaged_runtime.validate_report(self.repository, row, "full", "client_a", selected)
 
         full = self.admit(base=None)
         path.write_bytes(full.to_bytes())

@@ -278,8 +278,13 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
                          calls[1])
         hud = "modules/hud-preview/src/main/java/com/quickskin/mod/client/gui/overlay/HudPreviewIntegration.java"
         manifest, _ = classify([hud, "README.md"])
+        # A module change proven outside the compatibility closure carries the evidence forward.
+        self.assertFalse(manifest["compatibility_required"])
+        self.assertEqual([], manifest["impact_paths"])
+        textures = "modules/client-textures/src/main/java/com/quickskin/mod/client/services/AnimatedTextureManager.java"
+        manifest, _ = classify([textures, "README.md"])
         self.assertTrue(manifest["compatibility_required"])
-        self.assertEqual([hud], manifest["impact_paths"])
+        self.assertEqual([textures], manifest["impact_paths"])
         for files, parents in (([f"docs/{index}.md" for index in range(100)], 1), (["docs/x.md"], 0)):
             manifest, _ = classify(files, parents=parents)
             with self.subTest(files=len(files), parents=parents):

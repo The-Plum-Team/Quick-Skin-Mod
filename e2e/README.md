@@ -53,7 +53,7 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.2` | `26.2` | Fabric | `25` | `11` |
 | `neoforge-26.2` | `26.2` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `a8ff18b9a0a902d88e1449f4bc6247c3933c6e844b3ef1d66cda32e848935a2b`
+Scenario contract SHA-256: `657467215cf9d3dab34f2c4e22687605044fe31fbad6b4ff96b28fc68c75a9b6`
 Contract totals: `128` ordered steps, `97` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -123,7 +123,8 @@ every normalized clean target review, and a successfully deployed complete compa
 for every target. The selector reauthenticates these immutable artifacts and compares cumulative
 changes against the complete baseline. Unknown coupling, changed policy, missing/expired evidence
 or failed admission uses complete captures. `capture_coverage=full` explicitly requests recovery
-coverage; schedules, release profiles and optional-mod lanes keep their complete profiles.
+coverage; release profiles and optional-mod lanes keep their complete profiles, and a change whose
+module closure reaches the compatibility scenarios keeps the complete profile too.
 
 All loader/version jobs remain required. Their reports carry the protected Git admission and
 coverage proof. `feature_review.py` admits only the selected images before model access; paired
@@ -382,8 +383,9 @@ Pull requests and releases run their contract-declared `pr` and `release` profil
 manifest-bound bytes from the exact shared commit on every matrix target and loader. A protected
 healthy baseline may reduce a PR or manual shared generation to its cumulative affected feature
 scope. Each lane and the Java harness independently authenticate that selection before running
-actions or generating screenshots. Releases, nightly runs, and optional-mod profiles stay complete;
-manual `capture_coverage=full` also forces complete coverage. Unknown impact or missing, expired,
+actions or generating screenshots. Releases and optional-mod profiles stay complete; manual
+`capture_coverage=full` also forces complete coverage, and so does a change whose module closure
+reaches a compatibility scenario or its clean reference. Unknown impact or missing, expired,
 or incompatible baseline evidence falls back to full profiles.
 
 The required runtime policy remains `full` for a shared generation: every target/loader job must
@@ -391,7 +393,7 @@ pass even when its capture selection is smaller. Selection changes the authored 
 product, not the set of required jobs. The following port/N/A and attestation rules describe
 historical schema-2 executions only; schema 3 creates no version-port branches.
 
-The runtime policy is `full` by default for ordinary pull requests, manual and scheduled runs, and
+The runtime policy is `full` by default for ordinary pull requests, manual runs, and
 any runtime-affecting change. `not-applicable` is available only to an authenticated
 `automation/sync/*` port whose exact tree matches the protected allowlist for documentation,
 static-site presentation, or isolated administration changes. Build, unit, and security checks

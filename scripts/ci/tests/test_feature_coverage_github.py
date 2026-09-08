@@ -125,7 +125,7 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
         self.assertIsNone(self.prepare())
         self.assertEqual([], self.api.downloaded)
 
-    def test_nightly_full_reviews_keep_the_manual_public_baseline_without_report_downloads(self):
+    def test_scheduled_full_reviews_keep_the_manual_public_baseline_without_report_downloads(self):
         source = self.api.runs[self.fixture.run_id]
         source["event"] = "schedule"
         names = [POLICY_JOB, BUILD_JOB, GATE_JOB, *sorted(publisher.coverage.expected_scenario_jobs_for(

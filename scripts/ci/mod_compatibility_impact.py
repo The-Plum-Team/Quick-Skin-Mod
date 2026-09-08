@@ -2,9 +2,13 @@
 """Fail-closed classifier for diffs that need optional-mod compatibility E2E.
 
 The allowlist contains only review, publication, documentation, and test-policy paths
-that cannot change the packaged game or an optional-mod integration. Product, build,
+that cannot change the packaged game or an optional-mod integration. A change made only
+of module-owned source files is then judged through the module graph and the scenario
+contract: it requires the wave when its reverse dependency closure reaches a step of a
+compatibility scenario or one of the clean reference captures those lanes are paired
+against, and otherwise carries the existing evidence forward. Build, loader, assembly,
 runtime-harness, compatibility-policy, malformed, renamed-from-unknown, and otherwise
-unknown paths require the compatibility wave.
+unknown paths always require the compatibility wave.
 """
 
 from __future__ import annotations
@@ -12,9 +16,12 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
+
+REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 MAX_CHANGED_FILES = 100
@@ -118,11 +125,32 @@ def is_safe_path(path: str) -> bool:
     )
 
 
-def classify_paths(paths: Iterable[str]) -> Classification:
+def _module_coverage_touched(paths: tuple[str, ...], graph: Any, contract: Any) -> bool | None:
+    """Module-graph verdict for module-owned sources; None keeps the caller fail-closed."""
+    try:
+        for root in (REPOSITORY / "e2e", REPOSITORY / "scripts" / "architecture"):
+            # Appended, and only once, so repeated classification cannot grow the import path or
+            # shadow a library caller's own roots.
+            if str(root) not in sys.path:
+                sys.path.append(str(root))
+        from scenario_contract import default_contract  # noqa: WPS433
+        from selection import compatibility_affected  # noqa: WPS433
+        from module_graph import load_graph  # noqa: WPS433
+
+        return compatibility_affected(contract or default_contract(), graph or load_graph(), paths)
+    except Exception as exc:  # noqa: BLE001 - any failure to prove coverage requires the wave
+        print(f"compatibility coverage could not be proven; requiring the wave: {exc}",
+              file=sys.stderr)
+        return None
+
+
+def classify_paths(paths: Iterable[str], *, graph: Any = None, contract: Any = None) -> Classification:
     normalized = tuple(sorted({normalize_path(path) for path in paths}))
     if not normalized or len(normalized) > MAX_CHANGED_FILES * 2:
         raise ImpactError("an empty or oversized diff cannot skip compatibility E2E")
     impact_paths = tuple(path for path in normalized if not is_safe_path(path))
+    if impact_paths and _module_coverage_touched(impact_paths, graph, contract) is False:
+        impact_paths = ()
     return Classification(bool(impact_paths), normalized, impact_paths)
 
 

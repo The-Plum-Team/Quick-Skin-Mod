@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Protocol
 
-from scenario_contract import ScenarioContract, default_contract
+from scenario_contract import COMPATIBILITY_EXECUTION_PROFILES, ScenarioContract, default_contract
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY / "scripts" / "architecture"))
@@ -150,17 +150,8 @@ def project_contract(contract: ScenarioContract, selected: SelectionPlan) -> Sce
                             scenarios=tuple(scenarios), sha256=contract.sha256)
 
 
-def select(contract: ScenarioContract, graph: ModuleGraph, paths: Iterable[str],
-           profile: str = "pr") -> Selection:
-    """Compute a deterministic local preview; unknown impact expands to the full profile."""
-    validate_coverage(contract, graph)
-    values = list(paths)
-    if len(values) > MAX_CHANGED_PATHS:
-        raise SelectionError("changed path input exceeds its limit")
-    changed = tuple(sorted({repository_path(path) for path in values}))
-    scenarios = [contract.scenario(item) for item in contract.scenarios_for_profile(profile)]
-    if not scenarios:
-        raise SelectionError(f"execution profile has no scenarios: {profile}")
+def _ownership(graph: ModuleGraph, changed: tuple[str, ...]) -> tuple[set[str], list[str]]:
+    """Directly owning feature modules and the paths whose impact cannot be proven."""
     direct: set[str] = set()
     unknown: list[str] = []
     for path in changed:
@@ -174,10 +165,97 @@ def select(contract: ScenarioContract, graph: ModuleGraph, paths: Iterable[str],
             unknown.append(path)
         else:
             direct.add(owner.id)
+    return direct, unknown
+
+
+def _feature_impact(graph: ModuleGraph, changed: tuple[str, ...],
+                    unknown: list[str]) -> tuple[tuple[str, ...], set[str], tuple[str, ...]]:
     affected = graph.affected_modules(path for path in changed if path not in unknown) or ()
     # An assembly packages its dependencies; merely being rebuilt does not modify all its wiring.
     feature_impact = {item for item in affected if graph.by_id[item].kind != "minecraft-assembly"}
-    bindings = graph.affected_bindings(affected)
+    return affected, feature_impact, graph.affected_bindings(affected)
+
+
+def _lock_reference_captures() -> tuple[str, ...]:
+    """Clean reference captures that the reviewed optional-mod lock substitutes per mod."""
+    from mod_compatibility import load_contract as load_lock  # noqa: WPS433 - sibling module
+
+    references: set[str] = set()
+    for mod in load_lock().mods:
+        overrides = mod.reference_captures
+        if overrides is not None:
+            references.update(value for value in vars(overrides).values() if isinstance(value, str))
+    return tuple(sorted(references))
+
+
+def compatibility_targets(contract: ScenarioContract) -> tuple[tuple[str, str, str], ...]:
+    """Every checkpoint whose pixels the published optional-mod evidence depends on: the
+    compatibility captures plus the clean reference captures they are paired against, including
+    the references the reviewed mod lock substitutes for particular mods."""
+    targets: list[tuple[str, str, str]] = []
+    references: set[str] = set(_lock_reference_captures())
+    for profile in sorted(COMPATIBILITY_EXECUTION_PROFILES):
+        for scenario_id in contract.scenarios_for_profile(profile):
+            scenario = contract.scenario(scenario_id)
+            for role in scenario.roles:
+                for step in role.steps:
+                    if step.capture is None:
+                        continue
+                    targets.append((scenario.scenario, role.role, step.id))
+                    if step.capture.compatibility_reference_capture_id:
+                        references.add(step.capture.compatibility_reference_capture_id)
+    for reference in sorted(references):
+        scenario_id, role_id, step_id = reference.split(".", 2)
+        targets.append((scenario_id, role_id, step_id))
+    return tuple(dict.fromkeys(targets))
+
+
+def _compatibility_touched(contract: ScenarioContract, feature_impact: set[str],
+                           bindings: Iterable[str]) -> bool:
+    binding_set = set(bindings)
+    for scenario_id, role_id, step_id in compatibility_targets(contract):
+        step = next((item for item in contract.role(scenario_id, role_id).steps
+                     if item.id == step_id), None)
+        if step is None:
+            raise SelectionError(
+                f"optional-mod reference names an unknown checkpoint: {scenario_id}.{role_id}.{step_id}")
+        if feature_impact.intersection(step.modules) or binding_set.intersection(step.bindings):
+            return True
+    return False
+
+
+def compatibility_affected(contract: ScenarioContract, graph: ModuleGraph,
+                           paths: Iterable[str]) -> bool | None:
+    """Whether a change can move an optional-mod compatibility capture or its clean reference.
+
+    Returns None when any path is not a module-owned source file, so the caller must stay
+    fail-closed; an empty change is also unproven.
+    """
+    validate_coverage(contract, graph)
+    values = list(paths)
+    if not values or len(values) > MAX_CHANGED_PATHS:
+        return None
+    changed = tuple(sorted({repository_path(path) for path in values}))
+    _, unknown = _ownership(graph, changed)
+    if unknown:
+        return None
+    _, feature_impact, bindings = _feature_impact(graph, changed, unknown)
+    return _compatibility_touched(contract, feature_impact, bindings)
+
+
+def select(contract: ScenarioContract, graph: ModuleGraph, paths: Iterable[str],
+           profile: str = "pr") -> Selection:
+    """Compute a deterministic local preview; unknown impact expands to the full profile."""
+    validate_coverage(contract, graph)
+    values = list(paths)
+    if len(values) > MAX_CHANGED_PATHS:
+        raise SelectionError("changed path input exceeds its limit")
+    changed = tuple(sorted({repository_path(path) for path in values}))
+    scenarios = [contract.scenario(item) for item in contract.scenarios_for_profile(profile)]
+    if not scenarios:
+        raise SelectionError(f"execution profile has no scenarios: {profile}")
+    direct, unknown = _ownership(graph, changed)
+    affected, feature_impact, bindings = _feature_impact(graph, changed, unknown)
     covered_modules = {module for scenario in scenarios for role in scenario.roles
                        for step in role.steps for module in step.modules}
     covered_bindings = {binding for scenario in scenarios for role in scenario.roles
@@ -189,6 +267,11 @@ def select(contract: ScenarioContract, graph: ModuleGraph, paths: Iterable[str],
         reason = "missing-change-input"
     elif unknown:
         reason = "unknown-path-or-policy-change"
+    elif _compatibility_touched(contract, feature_impact, bindings):
+        # The optional-mod wave pairs its frames with a complete clean runtime of the same
+        # generation, so a change that can move a compatibility capture or its reference keeps
+        # the complete profile instead of leaving that evidence missing.
+        reason = "compatibility-coverage"
     elif missing or missing_bindings:
         reason = "incomplete-module-or-binding-coverage"
     full = reason != "affected-module-coverage"

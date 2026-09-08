@@ -303,13 +303,17 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
 - `scripts/ci/feature_review.py` curates complete and selected shared targets from the exact
   successful current-master runtime. Both secretless curation and model admission authenticate
   the complete job graph and immutable artifact partition. Paired targets use the same run's
-  Fabric anchor; shared review does not require a preceding Pages deployment. Scheduled runs
-  remain complete integration checks and cannot issue the manual generation's public baseline.
+  Fabric anchor; shared review does not require a preceding Pages deployment. No unattended
+  scheduled runtime exists. A protected post-merge generation is complete only when its own diff
+  is unproven or reaches the optional-mod coverage closure; releases and explicit complete-capture
+  manual runs remain complete.
 - `scripts/ci/shared_compatibility.py` authenticates a clean complete schema-8 target review before
   optional-mod E2E. Each wave has its own target key, while source and target SHA both name current
   `master`. Its schema-2 plan is independently recomputed from the full matrix, scenario contract,
   and pinned external-mod lock before both runtime and AI admission. Selected generations retain
-  their scoped review; optional integrations run full profiles on complete/manual/nightly waves.
+  their scoped review; optional integrations run full profiles on complete and manual waves, and
+  `e2e/selection.py` keeps a generation complete whenever the changed modules' closure reaches
+  the compatibility scenarios or their reference captures (`compatibility-coverage`).
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every later-version candidate with the same semantic
@@ -416,11 +420,16 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   semantic certificate.
 - `scripts/ci/mod_compatibility_impact.py` independently classifies the complete server-side
   diff inventory supplied by the protected curator (historical synchronization PRs or the shared
-  generation). It binds a normalized manifest into the visual curation proof and
-  permits the optional-mod wave only for product, build, runtime-harness, compatibility-policy, or
-  unknown impact. Review-only workflows/prompts, publication, documentation, and policy tests skip
-  that expensive wave. Renames classify both old and new paths and malformed or incomplete
-  inventories fail closed.
+  generation's first-parent diff). It binds a normalized manifest into the visual curation proof.
+  Review-only workflows/prompts, publication, documentation, and policy tests skip the expensive
+  wave. A diff made only of module-owned source files is judged through
+  `selection.compatibility_affected`: the module graph's reverse dependency closure must reach a
+  compatibility-scenario step or a clean reference capture for the wave to be required, and a
+  change proven outside that closure carries the published compatibility evidence forward. Build,
+  loader, assembly, runtime-harness, compatibility-policy, and unknown paths require the wave;
+  renames classify both old and new paths and malformed, incomplete, or unprovable inventories
+  fail closed. The compatibility scenarios therefore declare in `covers.modules` every product
+  module their harness exercises, not only the assembly.
 - `scripts/ci/github_api_retry.sh` is the protected Pages-side wrapper for read-only GitHub API
   calls after checkout. It keeps response bytes isolated on stdout and retries only classified
   rate-limit, transport, and server failures with bounded run-skewed backoff; provenance and exact
