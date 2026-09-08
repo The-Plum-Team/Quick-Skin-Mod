@@ -293,8 +293,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   policy, but they do not prove that a version created no passive entity while preparing its first
   superflat chunks; ambient mobs must never enter deterministic screenshot comparisons.
 - Reusable Minecraft installations and downloads belong to `RuntimeStore/v1`, not an evidence
-  directory. Recipe identity includes schema, host OS/architecture, Java major, Minecraft and
-  loader versions, exact installer hash, launcher-library revision, and normalizer revision.
+  directory. Both the installed client and the installed loader server are store-backed, so a
+  scenario reuses them instead of repeating an install whose loader downloads unpinned Maven
+  libraries. Recipe identity includes schema, host OS/architecture, Java major, Minecraft and
+  loader versions, exact installer hash, launcher-library revision, normalizer revision, and the
+  client/server role that keeps those two trees in separate identity namespaces.
   Publish verified immutable trees under a recipe lock, hold an OS-backed lease continuously from
   lookup/build through materialization, and materialize a fresh mutable copy. Collection
   non-blockingly probes the paired lock, preserves live cross-process builders/leases, and reaps

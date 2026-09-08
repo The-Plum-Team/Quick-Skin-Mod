@@ -178,6 +178,10 @@ LOADER_SERVER_INSTALL_BACKOFF_SECONDS = (5, 15)
 LAUNCHER_LIBRARY_VERSION = "8.0"
 LAUNCHER_LIBRARY_REVISION = "minecraft-launcher-lib==8.0"
 PROFILE_NORMALIZER_REVISION = "normalize-inherited-profile-v1"
+# The server install runs the loader installer directly; it never uses the launcher library,
+# and its only post-install step is the run-script contract asserted by prepare_server.
+SERVER_INSTALLER_REVISION = "loader-server-installer-v1"
+SERVER_NORMALIZER_REVISION = "server-run-script-v1"
 DEFAULT_RUNTIME_STORE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60
 DEFAULT_RUNTIME_STORE_MAX_BYTES = 20 * 1024 * 1024 * 1024
 RUNTIME_STORE_ENV = "QUICKSKIN_E2E_RUNTIME_STORE"
@@ -477,6 +481,30 @@ def client_runtime_recipe(
         installer_sha256=installer_sha256,
         launcher_library_revision=LAUNCHER_LIBRARY_REVISION,
         normalizer_revision=PROFILE_NORMALIZER_REVISION,
+        role="client",
+    )
+
+
+def server_runtime_recipe(
+    matrix: dict[str, Any], row: dict[str, Any]
+) -> RuntimeRecipe:
+    """Identity of one installed loader server tree, in its own role namespace."""
+
+    installer = matrix.get("installers", {}).get(row.get("installer"))
+    if not isinstance(installer, dict):
+        raise RuntimeFailure(f"runtime installer is missing for {row.get('installer')!r}")
+    installer_sha256 = installer.get("sha256")
+    if not isinstance(installer_sha256, str) or SHA256_PATTERN.fullmatch(installer_sha256) is None:
+        raise RuntimeFailure("runtime installer must have one exact lowercase SHA-256")
+    return RuntimeRecipe.for_host(
+        java_major=int(row["java"]),
+        minecraft_version=row["runtime_version"],
+        loader=row["loader"],
+        loader_version=row["loader_version"],
+        installer_sha256=installer_sha256,
+        launcher_library_revision=SERVER_INSTALLER_REVISION,
+        normalizer_revision=SERVER_NORMALIZER_REVISION,
+        role="server",
     )
 
 
@@ -946,79 +974,113 @@ def prepare_server(
     java: str,
     log: Path,
 ) -> list[str]:
+    """Materialize one installed loader server tree, installing it at most once per recipe.
+
+    Both loader installers download Maven dependencies at install time, so every scenario that
+    reinstalled the same server repeated that download. The install now runs once behind the
+    runtime store's recipe identity; later scenarios materialize a verified copy instead.
+    """
+
     env = process_env(java)
+    loader = row["loader"]
+    if loader not in {"fabric", "forge", "neoforge"}:
+        raise RuntimeFailure(f"unsupported loader {loader!r}")
+    recipe = server_runtime_recipe(matrix, row)
+    if server.exists():
+        # materialize refuses an existing destination; an already populated one is never ours.
+        if any(server.iterdir()):
+            raise RuntimeFailure(f"refusing to replace non-empty server directory {server}")
+        server.rmdir()
+
     with leased_installer(matrix, row, store) as installer:
-        if row["loader"] == "fabric":
-            arguments = [
-                java,
-                "-jar",
-                str(installer),
-                "server",
-                "-dir",
-                str(server),
-                "-mcversion",
-                row["runtime_version"],
-                "-loader",
-                row["loader_version"],
-                "-downloadMinecraft",
-            ]
-            run_checked(arguments, server, log, env)
-            launcher = server / "fabric-server-launch.jar"
-            if not launcher.is_file():
-                raise RuntimeFailure(f"Fabric server launcher was not created at {launcher}")
-            return [java, "-Xms512M", "-Xmx1024M", "-jar", str(launcher), "nogui"]
 
-        if row["loader"] not in {"forge", "neoforge"}:
-            raise RuntimeFailure(f"unsupported loader {row['loader']!r}")
-        loader = row["loader"]
-        loader_name = "Forge" if loader == "forge" else "NeoForge"
-        install_flag = "--installServer" if loader == "forge" else "--install-server"
-
-        # Both loader installers download Maven dependencies at install time. A transient CDN
-        # failure must not leave a half-populated server tree for the retry (or for a later
-        # scenario) to consume, so every attempt gets an isolated staging directory.
-        last_error: Exception | None = None
-        for attempt_number in range(1, LOADER_SERVER_INSTALL_ATTEMPTS + 1):
-            attempt = Path(
-                tempfile.mkdtemp(
-                    prefix=f".{loader}-server-attempt-{attempt_number}-",
-                    dir=server.parent,
-                )
-            )
-            try:
+        def build(staging: Path) -> None:
+            if loader == "fabric":
                 run_checked(
-                    [java, "-jar", str(installer), install_flag, str(attempt)],
-                    attempt,
+                    [
+                        java,
+                        "-jar",
+                        str(installer),
+                        "server",
+                        "-dir",
+                        str(staging),
+                        "-mcversion",
+                        row["runtime_version"],
+                        "-loader",
+                        row["loader_version"],
+                        "-downloadMinecraft",
+                    ],
+                    staging,
                     log,
                     env,
-                    append=attempt_number > 1,
                 )
-                expected_script = attempt / ("run.bat" if os.name == "nt" else "run.sh")
-                if not expected_script.is_file():
+                launcher = staging / "fabric-server-launch.jar"
+                if not launcher.is_file():
                     raise RuntimeFailure(
-                        f"{loader_name} server installer did not create {expected_script}"
+                        f"Fabric server launcher was not created at {launcher}"
                     )
-                if any(server.iterdir()):
-                    raise RuntimeFailure(
-                        f"refusing to replace non-empty server directory {server}"
+                return
+
+            loader_name = "Forge" if loader == "forge" else "NeoForge"
+            install_flag = "--installServer" if loader == "forge" else "--install-server"
+            # A transient CDN failure must not leave a half-populated tree for the retry, or for
+            # the published tree, to consume, so every attempt gets an isolated staging directory.
+            last_error: Exception | None = None
+            for attempt_number in range(1, LOADER_SERVER_INSTALL_ATTEMPTS + 1):
+                attempt = Path(
+                    tempfile.mkdtemp(
+                        prefix=f".{loader}-server-attempt-{attempt_number}-",
+                        dir=staging,
                     )
-                server.rmdir()
-                os.replace(attempt, server)
-                last_error = None
-                break
-            except Exception as exc:
-                last_error = exc
-                if attempt_number < LOADER_SERVER_INSTALL_ATTEMPTS:
-                    time.sleep(
-                        LOADER_SERVER_INSTALL_BACKOFF_SECONDS[attempt_number - 1]
+                )
+                try:
+                    run_checked(
+                        [java, "-jar", str(installer), install_flag, str(attempt)],
+                        attempt,
+                        log,
+                        env,
+                        append=attempt_number > 1,
                     )
-            finally:
-                shutil.rmtree(attempt, ignore_errors=True)
-        if last_error is not None:
+                    expected_script = attempt / ("run.bat" if os.name == "nt" else "run.sh")
+                    if not expected_script.is_file():
+                        raise RuntimeFailure(
+                            f"{loader_name} server installer did not create {expected_script}"
+                        )
+                    for child in list(attempt.iterdir()):
+                        child.replace(staging / child.name)
+                    attempt.rmdir()
+                    return
+                except Exception as exc:
+                    last_error = exc
+                    # Discard every partial child, including this attempt, so a later attempt
+                    # can never inherit or overwrite mixed content.
+                    for partial in list(staging.iterdir()):
+                        remove_install_path(partial)
+                    if attempt_number < LOADER_SERVER_INSTALL_ATTEMPTS:
+                        time.sleep(
+                            LOADER_SERVER_INSTALL_BACKOFF_SECONDS[attempt_number - 1]
+                        )
             raise RuntimeFailure(
                 f"{loader_name} server installation failed after "
                 f"{LOADER_SERVER_INSTALL_ATTEMPTS} isolated attempts: {last_error}"
             ) from last_error
+
+        # Keep the recipe/tree/blob lease continuously from lookup through materialization, so a
+        # concurrent RuntimeStore collection can never observe a gap.
+        try:
+            store.materialize_get_or_create(recipe, build, server)
+        except Exception:
+            # A failed install leaves the caller's directory exactly as it was handed over:
+            # present and empty, never a partial tree.
+            server.mkdir(parents=True, exist_ok=True)
+            raise
+
+    if loader == "fabric":
+        launcher = server / "fabric-server-launch.jar"
+        if not launcher.is_file():
+            raise RuntimeFailure(f"Fabric server launcher was not created at {launcher}")
+        return [java, "-Xms512M", "-Xmx1024M", "-jar", str(launcher), "nogui"]
+
     (server / "user_jvm_args.txt").write_text("-Xms512M\n-Xmx1024M\n", encoding="utf-8")
     if os.name == "nt":
         script = server / "run.bat"

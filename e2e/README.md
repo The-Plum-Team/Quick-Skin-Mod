@@ -244,7 +244,8 @@ logging; the exporter waits for the complete group and force-stops it as a unit 
 
 - downloaded blobs and canonical installation trees are content-addressed by SHA-256;
 - a recipe binds schema, operating system, architecture, Java major, Minecraft version, loader and
-  loader version, installer SHA-256, launcher-library revision, and normalizer revision;
+  loader version, installer SHA-256, launcher-library revision, normalizer revision, and the
+  client/server role, so the two installed trees never share an identity;
 - recipe locks, same-filesystem staging, verified tree manifests, and atomic publication prevent a
   partial installation from becoming reusable;
 - active recipe, tree, and blob leases protect material from age-and-size garbage collection;
@@ -268,7 +269,11 @@ production and harness JAR hashes remain manifest-owned. GitHub-hosted jobs do n
 `RuntimeStore`; persistence is useful only on a developer machine or an explicitly managed
 self-hosted runner. Forge and NeoForge server installation retry bounded transient Maven failures
 in a fresh isolated directory each time and publish only a complete tree with its launcher script,
-so an incomplete download can never contaminate the next attempt.
+so an incomplete download can never contaminate the next attempt. That install now runs once per
+recipe rather than once per scenario: both loader installers download their own Maven libraries,
+which Quick Skin does not pin, so repeating the install for every scenario multiplied an
+unpinned third-party download by the whole scenario product. A failed install still hands the
+caller back an existing empty directory, never a partial tree.
 
 ## Fail-closed contract
 
