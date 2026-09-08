@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import os
@@ -802,7 +803,34 @@ class PackagedRuntimeDependencyTest(unittest.TestCase):
                     self.fail("altered dependency was yielded")
         self.assertEqual([], list((self.store.blobs_dir / "sha256").rglob("?" * 64)))
 
-    def test_server_installer_runs_from_one_leased_blob_in_each_isolated_scenario(self) -> None:
+    def test_server_recipe_never_shares_an_identity_with_the_client_tree(self) -> None:
+        matrix = {
+            "installers": {
+                "neoforge": {
+                    "url": "https://example.invalid/neoforge-installer.jar",
+                    "sha256": "a" * 64,
+                }
+            }
+        }
+        row = {
+            "installer": "neoforge",
+            "java": 21,
+            "loader": "neoforge",
+            "runtime_version": "1.21.6",
+            "loader_version": "21.6.20-beta",
+        }
+        server = packaged_runtime.server_runtime_recipe(matrix, row)
+        self.assertEqual("server", server.role)
+        # The same Minecraft version, loader and installer produce different content for a
+        # client and for a server, so their identities must not collide in one store.
+        client = dataclasses.replace(server, role="client")
+        self.assertNotEqual(server.digest(), client.digest())
+        other_loader = packaged_runtime.server_runtime_recipe(
+            matrix, {**row, "loader": "forge", "installer": "neoforge"}
+        )
+        self.assertNotEqual(server.digest(), other_loader.digest())
+
+    def test_server_install_runs_once_per_recipe_and_materializes_isolated_scenarios(self) -> None:
         installer = self.root / "forge-installer.jar"
         installer.write_bytes(b"forge installer")
         installer_sha = hashlib.sha256(installer.read_bytes()).hexdigest()
@@ -816,6 +844,7 @@ class PackagedRuntimeDependencyTest(unittest.TestCase):
         }
         row = {
             "installer": "forge",
+            "java": 21,
             "loader": "forge",
             "runtime_version": "1.20.1",
             "loader_version": "1.20.1-47.4.9",
@@ -849,10 +878,16 @@ class PackagedRuntimeDependencyTest(unittest.TestCase):
                 )
 
         self.assertEqual(1, fetched)
-        self.assertEqual(2, len(commands))
-        self.assertNotEqual(commands[0][1], commands[1][1])
+        # One install per recipe, not per scenario: the second scenario materializes a verified
+        # copy of the published tree instead of downloading the loader's libraries again.
+        self.assertEqual(1, len(commands))
         self.assertEqual(self.store.path_for_blob(installer_sha), Path(commands[0][0][2]))
-        self.assertEqual(self.store.path_for_blob(installer_sha), Path(commands[1][0][2]))
+        for name in ("scenario-a", "scenario-b"):
+            self.assertTrue((self.root / name / "run.sh").is_file())
+        self.assertNotEqual(
+            (self.root / "scenario-a" / "run.sh").stat().st_ino,
+            (self.root / "scenario-b" / "run.sh").stat().st_ino,
+        )
 
     def test_forge_server_retry_discards_partial_install_before_publish(self) -> None:
         installer = self.root / "forge-installer.jar"
@@ -868,6 +903,7 @@ class PackagedRuntimeDependencyTest(unittest.TestCase):
         }
         row = {
             "installer": "forge",
+            "java": 21,
             "loader": "forge",
             "runtime_version": "1.20.1",
             "loader_version": "1.20.1-47.4.9",
@@ -920,6 +956,7 @@ class PackagedRuntimeDependencyTest(unittest.TestCase):
         }
         row = {
             "installer": "forge",
+            "java": 21,
             "loader": "forge",
             "runtime_version": "1.20.1",
             "loader_version": "1.20.1-47.4.9",
@@ -972,6 +1009,7 @@ class PackagedRuntimeDependencyTest(unittest.TestCase):
         }
         row = {
             "installer": "neoforge",
+            "java": 21,
             "loader": "neoforge",
             "runtime_version": "1.21.7",
             "loader_version": "21.7.25-beta",
@@ -1024,6 +1062,7 @@ class PackagedRuntimeDependencyTest(unittest.TestCase):
         }
         row = {
             "installer": "neoforge",
+            "java": 21,
             "loader": "neoforge",
             "runtime_version": "1.21.7",
             "loader_version": "21.7.25-beta",

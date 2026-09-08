@@ -45,7 +45,8 @@ from typing import Any, BinaryIO
 
 STORE_DIRECTORY = "RuntimeStore"
 STORE_VERSION = "v1"
-RECIPE_SCHEMA = 1
+RECIPE_SCHEMA = 2
+RECIPE_ROLES = frozenset({"client", "server"})
 TREE_SCHEMA = 1
 RECIPE_RECORD_SCHEMA = 1
 LEASE_SCHEMA = 1
@@ -247,7 +248,11 @@ def _require_timestamp(value: object, label: str) -> float:
 
 @dataclass(frozen=True)
 class RuntimeRecipe:
-    """Every input that may change an installed Minecraft client tree."""
+    """Every input that may change an installed Minecraft client or server tree.
+
+    `role` keeps the two installed trees in separate identity namespaces: the same Minecraft
+    version, loader and installer produce different content for a client and for a server.
+    """
 
     os_name: str
     architecture: str
@@ -258,6 +263,7 @@ class RuntimeRecipe:
     installer_sha256: str
     launcher_library_revision: str
     normalizer_revision: str
+    role: str
     schema: int = RECIPE_SCHEMA
 
     def __post_init__(self) -> None:
@@ -275,8 +281,13 @@ class RuntimeRecipe:
             "loader_version",
             "launcher_library_revision",
             "normalizer_revision",
+            "role",
         ):
             _require_nonempty_string(getattr(self, field_name), f"recipe {field_name}")
+        if self.role not in RECIPE_ROLES:
+            raise RuntimeStoreError(
+                f"recipe role must be one of {sorted(RECIPE_ROLES)}"
+            )
         if isinstance(self.java_major, bool) or not isinstance(self.java_major, int):
             raise RuntimeStoreError("recipe java_major must be a positive integer")
         if self.java_major <= 0:
@@ -297,6 +308,7 @@ class RuntimeRecipe:
         installer_sha256: str,
         launcher_library_revision: str,
         normalizer_revision: str,
+        role: str,
         os_name: str | None = None,
         architecture: str | None = None,
     ) -> RuntimeRecipe:
@@ -314,6 +326,7 @@ class RuntimeRecipe:
             installer_sha256=installer_sha256,
             launcher_library_revision=launcher_library_revision,
             normalizer_revision=normalizer_revision,
+            role=role,
         )
 
     @classmethod
@@ -333,6 +346,7 @@ class RuntimeRecipe:
                 "installer_sha256",
                 "launcher_library_revision",
                 "normalizer_revision",
+                "role",
             },
             "recipe",
         )
@@ -348,6 +362,7 @@ class RuntimeRecipe:
                 installer_sha256=payload["installer_sha256"],
                 launcher_library_revision=payload["launcher_library_revision"],
                 normalizer_revision=payload["normalizer_revision"],
+                role=payload["role"],
             )
         except RuntimeStoreError as exc:
             raise StoreCorruptionError(f"invalid recipe payload: {exc}") from exc
@@ -364,6 +379,7 @@ class RuntimeRecipe:
             "installer_sha256": self.installer_sha256,
             "launcher_library_revision": self.launcher_library_revision,
             "normalizer_revision": self.normalizer_revision,
+            "role": self.role,
         }
 
     def digest(self) -> str:

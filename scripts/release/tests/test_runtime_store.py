@@ -55,6 +55,7 @@ class RuntimeStoreTest(unittest.TestCase):
             "installer_sha256": "f" * 64,
             "launcher_library_revision": "minecraft-launcher-lib-8.0",
             "normalizer_revision": "quickskin-profile-normalizer-v2",
+            "role": "client",
         }
         values.update(changes)
         return runtime_store.RuntimeRecipe(**values)  # type: ignore[arg-type]
@@ -132,6 +133,7 @@ class RuntimeStoreTest(unittest.TestCase):
             "installer_sha256": "e" * 64,
             "launcher_library_revision": "minecraft-launcher-lib-8.1",
             "normalizer_revision": "quickskin-profile-normalizer-v3",
+            "role": "server",
         }
         for field, value in mutations.items():
             with self.subTest(field=field):
@@ -139,13 +141,19 @@ class RuntimeStoreTest(unittest.TestCase):
                 self.assertNotEqual(recipe.digest(), changed.digest())
 
         payload = recipe.payload()
-        self.assertEqual(1, payload["schema"])
+        self.assertEqual(2, payload["schema"])
         changed_schema = dict(payload)
-        changed_schema["schema"] = 2
+        changed_schema["schema"] = 3
         self.assertNotEqual(
             recipe.digest(),
             hashlib.sha256(runtime_store.canonical_json_bytes(changed_schema)).hexdigest(),
         )
+
+    def test_recipe_role_is_restricted_to_the_reviewed_namespaces(self) -> None:
+        for role in ("", "  ", "servers", "CLIENT", "harness"):
+            with self.subTest(role=role), self.assertRaises(runtime_store.RuntimeStoreError):
+                self.recipe(role=role)
+        self.assertEqual({"client", "server"}, set(runtime_store.RECIPE_ROLES))
 
     def test_workspace_promotion_preserves_siblings_and_rolls_back_to_last_good(self) -> None:
         parent = self.root / "evidence"
