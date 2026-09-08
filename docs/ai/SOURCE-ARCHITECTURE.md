@@ -269,7 +269,15 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   or confidence below high to Opus, and publishes a durable source-wave block before
   cancelling siblings after a confirmed defect. Its authenticated source queue shares the global
   Claude capacity circuit, requires a fresh probe for each source, preserves one completion marker
-  per clean lane, and reschedules only unfinished lanes after a provider pause. A secretless
+  per clean lane, and reschedules only unfinished lanes after a provider pause. Clean lane markers
+  bind the immutable capsule artifact id; queue admission can reuse historical unbound markers
+  only for a preserved first-attempt capsule. The public collector can recover historical markers
+  from any attempt only after comparing the report manifest and proof byte-for-byte with the exact
+  selected capsule. Source enumeration authenticates the complete bounded artifact
+  inventory before selecting those capsules. A settlement marker binds the source run and attempt
+  after every available capsule has been reviewed, so a partial runtime failure does not loop in
+  the review queue and a later runtime attempt reopens recovery. Only the entire runnable plan
+  earns the separate source completion marker and publication wake. A secretless
   protected batcher first validates and merges those unfinished capsules, deduplicating exact image
   bytes and exposing cross-lane semantic equivalence to one globally packed runner. Protected
   admission fields directly bound its parallel calls and space their starts; a later secretless
@@ -392,9 +400,15 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
 - `scripts/pages/rotate_artifacts.py` owns post-deployment retention. It may delete only exact
   Actions artifact IDs whose protected run provenance, branch, SHA, age, and successful replacement
   have all been revalidated, including Pages-run intermediates; it never implements screenshot or
-  version discovery itself. It preserves exactly the current validated raw visual-anchor handoff
-  and retires only its older generations. Raw packaged-E2E artifacts remain retention-bound inputs
-  for concurrent attestations and are outside rotation ownership.
+  version discovery itself. Exact-name queries cover legacy caches and duplicate uploads under the
+  replacement's current SHA name. Other SHA names and complete baseline archives retain their
+  independent expiry policy without a repository-wide prefix scan. Cache and handoff candidates
+  undergo separate provenance validation, so an invalid historical handoff cannot prevent retiring
+  authenticated duplicate caches. The shared deletion budget counts attempts only after owner and
+  replacement validation; final metadata or deletion failures still spend an attempt. Summaries
+  retain confirmed deletions when later work is deferred. It preserves exactly the current validated
+  raw visual-anchor handoff and retires only its older generations. Raw packaged-E2E artifacts remain
+  retention-bound inputs for concurrent attestations and are outside rotation ownership.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
   the oldest eligible source except that a completed certifiable automatic 1.20.1 anchor preempts

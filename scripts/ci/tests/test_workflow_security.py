@@ -399,7 +399,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             (
                 "mod-compatibility-review.yml",
                 "Upload the durable clean lane marker",
-                "mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}",
+                "mod-compatibility-lane-complete-${{ matrix.source_run_id }}-${{ matrix.id }}--${{ matrix.artifact_id }}",
             ): "7",
             (
                 "mod-compatibility-review.yml",
@@ -410,6 +410,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "mod-compatibility-review.yml",
                 "Upload the durable source completion marker",
                 "mod-compatibility-review-complete-${{ needs.enumerate.outputs.source_run_id }}",
+            ): "7",
+            (
+                "mod-compatibility-review.yml",
+                "Upload the durable source attempt settlement marker",
+                "mod-compatibility-review-settled-${{ needs.enumerate.outputs.source_run_id }}-${{ needs.enumerate.outputs.source_run_attempt }}",
             ): "7",
             (
                 "mod-compatibility-review.yml",
@@ -1360,7 +1365,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             review_gate,
         )
         self.assertIn("mod-compatibility-review-sweep-requested", review_continue)
-        self.assertIn("needs.gate.outputs.complete == 'true'", review_continue)
+        self.assertIn("needs.gate.outputs.settled == 'true'", review_continue)
         self.assertNotIn("base-evidence", review)
         self.assertNotIn("candidate-evidence", review)
         self.assertEqual(prepare_review.count("actions/download-artifact@"), 0)
@@ -2156,7 +2161,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--compatibility-evidence-root", rotate)
         self.assertIn("steps.owner.outputs.pages_run_sha", rotate)
         self.assertNotIn("list_artifacts_with_prefix", rotator)
-        self.assertIn("api.list_artifacts(cache_name)", rotator)
+        self.assertIn(
+            "_list_replaced_caches(api, legacy_name=cache_name, keep=generation.keep)",
+            rotator,
+        )
+        self.assertIn("api.list_artifacts(name)", rotator)
         self.assertIn("MAX_ROTATION_DELETIONS", rotator)
         self.assertIn("deletion_budget=deletion_budget", rotator)
         self.assertIn("MAX_TRANSIENT_KEEP_VALIDATIONS", rotator)
@@ -2175,7 +2184,11 @@ class WorkflowSecurityTest(unittest.TestCase):
             'f"collected-pages-{generation.key}" for generation in generations',
             rotator,
         )
-        self.assertIn("candidates = [*old_caches, *handoffs]", rotator)
+        retirement = rotator.split("def _rotate_candidate_groups(", 1)[1].split(
+            "\ndef rotate_branch(", 1
+        )[0]
+        self.assertLess(retirement.index("_validate_run("), retirement.index("validate_keep()"))
+        self.assertLess(retirement.index("validate_keep()"), retirement.index("_delete_exact_artifact("))
         self.assertIn("for artifact in candidates:", rotator)
         self.assertIn("select_old_handoffs(", rotator)
         self.assertIn("lossless visual reference changed", rotator)

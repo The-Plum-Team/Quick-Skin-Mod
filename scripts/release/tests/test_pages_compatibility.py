@@ -20,10 +20,15 @@ from collect_compatibility import (  # noqa: E402
     REVIEW_WORKFLOW,
     _CredentialStrippingRedirect,
     _latest_attempt_artifact,
+    _select_lane_completion,
     _select_review_artifact,
     RemoteArtifact,
 )
-from compatibility_evidence import _verdict_is_clean  # noqa: E402
+from compatibility_evidence import (  # noqa: E402
+    CompatibilityEvidenceError,
+    _verdict_is_clean,
+    build_bundle,
+)
 
 
 REPOSITORY = "AkaNebur/Quick-Skin-Mod"
@@ -81,6 +86,56 @@ class FakeReviewApi:
 
 
 class PagesCompatibilityTest(unittest.TestCase):
+    def test_lane_completion_prefers_exact_capsule_markers_and_retains_historical_attempts(self) -> None:
+        legacy_name = "mod-compatibility-lane-complete-123-fabric-ears"
+        legacy = artifact(20, 11, "2026-08-22T19:17:27Z", name=legacy_name)
+        exact = artifact(21, 12, "2026-08-22T19:16:27Z", name=f"{legacy_name}--100")
+        cases = ((1, [legacy], legacy), (2, [legacy], legacy),
+                 (1, [legacy, exact], exact), (2, [legacy, exact], exact))
+        for attempt, markers, expected in cases:
+            with self.subTest(attempt=attempt, markers=len(markers)):
+                capsule = artifact(100, 123, "2026-08-22T19:14:27Z",
+                    name=f"mod-compatibility-review-input-123-fabric-ears-{attempt}")
+                api = FakeReviewApi(markers, {11: run(11, SOURCE_SHA), 12: run(12, SOURCE_SHA)})
+                arguments = dict(capsule=capsule, source_run_id=123, lane_id="fabric-ears",
+                    repository=REPOSITORY, current_sha=CURRENT_SHA,
+                    repository_root=ROOT, source_implementation_sha=SOURCE_SHA)
+                with patch("collect_compatibility._fetch_commits"), patch(
+                        "collect_compatibility._require_nonimpacting_ancestor"):
+                    selected, _sha = _select_lane_completion(api, **arguments)
+                    self.assertEqual(expected, selected)
+
+    def test_publication_rejects_a_legacy_report_for_a_different_capsule(self) -> None:
+        lane_id = "fabric-ears"
+        files = (
+            "capsule/review-input/visual-review-manifest.json", "capsule/curation-proof.json",
+            "report/visual-review-report.json", "report/review-input/visual-review-manifest.json",
+            "report/curation-proof.json", "report/visual-review-completion.json",
+            "completion/mod-compatibility-lane-complete.json", "metadata.json",
+        )
+        for drift, error in (("report/curation-proof.json", "report proof drifted"),
+                             ("report/review-input/visual-review-manifest.json", "report manifest drifted")):
+            with self.subTest(drift=drift), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                plan = root / "plan.json"
+                plan.write_text("{}")
+                lane = root / "lanes" / lane_id
+                for name in files:
+                    path = lane / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("{}")
+                (lane / drift).write_text('{"old_capsule":true}')
+                # Admission is already independently authenticated; exercise the actual
+                # publication boundary with the old normalized report and new capsule bytes.
+                with patch("compatibility_evidence.validate_plan", return_value=(
+                    {"bundle_key": "mc1.20.1"}, {lane_id: {"compatibility_mod": "ears"}}, []
+                )), self.assertRaisesRegex(CompatibilityEvidenceError, error):
+                    build_bundle(plan_path=plan, lanes_root=root / "lanes", output_root=root / "public",
+                        repository=REPOSITORY, compatibility_run_id=123, implementation_sha=SOURCE_SHA,
+                        publication_run_id=456, scenario_contract_path=ROOT / "e2e/scenario-contract.json",
+                        compatibility_contract_path=ROOT / "e2e/mod-compatibility-contract.json")
+                self.assertFalse((root / "public/mc1.20.1").exists())
+
     def test_latest_attempt_artifact_selects_the_newest_completed_lane_attempt(
         self,
     ) -> None:

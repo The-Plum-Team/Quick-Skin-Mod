@@ -53,6 +53,7 @@ def owner(
     status: str = "completed",
     conclusion: str | None = "success",
     head_sha: str = SHA,
+    attempt: int = 1,
 ) -> dict[str, Any]:
     return {
         "id": run_id,
@@ -63,6 +64,7 @@ def owner(
         "head_branch": "master",
         "head_sha": head_sha,
         "head_repository": {"full_name": REPOSITORY},
+        "run_attempt": attempt,
     }
 
 
@@ -91,6 +93,45 @@ class FakeApi:
 
 
 class ModCompatibilityReviewQueueTest(unittest.TestCase):
+    def test_partial_attempt_settles_until_a_source_rerun_reopens_it(self) -> None:
+        plan = artifact(1, PLAN_NAME, run_id=10, minutes_ago=5)
+        settled = artifact(2, "mod-compatibility-review-settled-10-1", run_id=20,
+                           minutes_ago=2)
+        old_complete = artifact(3, "mod-compatibility-review-complete-10", run_id=20,
+                                minutes_ago=2)
+        api = FakeApi([plan, settled, old_complete],
+                      {10: owner(10, SOURCE_WORKFLOW, conclusion="failure"),
+                       20: owner(20, REVIEW_WORKFLOW)})
+        self.assertEqual([], list_pending(api, repository=REPOSITORY))
+
+        api.runs[10] = owner(10, SOURCE_WORKFLOW, attempt=2)
+        self.assertEqual([10], [item.source_run_id for item in
+                                list_pending(api, repository=REPOSITORY)])
+        api.artifacts.append(artifact(4, "mod-compatibility-review-settled-10-2",
+                                      run_id=30, minutes_ago=1))
+        api.runs[30] = owner(30, REVIEW_WORKFLOW, status="in_progress", conclusion=None)
+        self.assertEqual([], list_pending(api, repository=REPOSITORY))
+
+    def test_settlement_requires_the_exact_protected_source_implementation(self) -> None:
+        plan = artifact(1, PLAN_NAME, run_id=10, minutes_ago=5)
+        for sha, workflow in (("c" * 40, REVIEW_WORKFLOW),
+                              (SHA, ".github/workflows/build-gate.yml")):
+            with self.subTest(sha=sha, workflow=workflow):
+                marker = artifact(2, "mod-compatibility-review-settled-10-1",
+                                  run_id=20, minutes_ago=1, head_sha=sha)
+                pending = list_pending(FakeApi([plan, marker],
+                    {10: owner(10, SOURCE_WORKFLOW),
+                     20: owner(20, workflow, head_sha=sha)}), repository=REPOSITORY)
+                self.assertEqual([10], [item.source_run_id for item in pending])
+
+    def test_source_attempt_must_be_authenticated(self) -> None:
+        plan = artifact(1, PLAN_NAME, run_id=10, minutes_ago=5)
+        for attempt in (None, True, 0, "2"):
+            with self.subTest(attempt=attempt), self.assertRaises(QueueError):
+                list_pending(FakeApi([plan], {10: owner(10, SOURCE_WORKFLOW) |
+                                             {"run_attempt": attempt}}),
+                             repository=REPOSITORY)
+
     def test_selects_oldest_authenticated_current_master_plan(self) -> None:
         newer = artifact(2, PLAN_NAME, run_id=20, minutes_ago=2)
         older = artifact(1, PLAN_NAME, run_id=10, minutes_ago=5)

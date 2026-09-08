@@ -146,6 +146,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   published field is a schema change: validate it fail-closed in the same strict frame contract
   rather than letting a consumer read an unvalidated string.
 - Public optional-mod evidence is admitted only from a complete clean compatibility source wave.
+  Finishing every available capsule in a failed runtime attempt settles only that attempt; missing
+  runnable lanes forbid the source completion marker and publication. A later source attempt must
+  reopen recovery while preserving good first-attempt capsules. Every new lane completion binds
+  its immutable capsule artifact id, so a replacement capsule cannot inherit an earlier verdict.
   Authenticate and validate the full runnable/N/A plan, every exact compatibility-profile paired
   review manifest and normalized report, every clean lane marker, and the source completion marker
   before publishing. Publish exactly the two local `mod-compatibility` checkpoints and, only when
@@ -348,10 +352,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   not preselect every artifact and repeat selection in the collector. The collector owns exact
   current-head selection; retryable GitHub API and installation-rate-limit failures use bounded
   jittered backoff and remain distinguishable from authenticated evidence absence.
-- Retention is current-state, not longitudinal history. Keep exactly one durable Pages cache per
-  release branch and exactly one lossless raw handoff for the matrix-derived Fabric 1.20.1 visual
-  anchor. Keep at most one durable mod-compatibility Pages cache for each branch that has published
-  evidence. Treat raw packaged-E2E uploads, every other `pages-e2e-<branch>`, compatibility
+- Published current state selects one durable Pages cache per matrix bundle key and exactly one
+  lossless raw handoff for the matrix-derived Fabric 1.20.1 visual anchor. Select at most one durable
+  mod-compatibility Pages cache for each key that has published evidence. Rotation retires duplicate
+  uploads under the replacement's exact SHA name; other SHA generations and complete baseline
+  archives retain their independent expiry policy. Treat raw packaged-E2E uploads, every other
+  `pages-e2e-<branch>`, compatibility
   handoffs, Pages fan-in, and the
   deploy artifact as short-lived handoffs. Rotation happens in a separate protected workflow after
   the owning Pages run is `completed/success`; it must recheck run provenance, the release head,
