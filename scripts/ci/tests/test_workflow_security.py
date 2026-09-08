@@ -1694,7 +1694,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('.event == "workflow_dispatch"', discover)
         self.assertIn('.path == ".github/workflows/on-demand-e2e.yml"', discover)
         self.assertIn("DISPATCH_OPERATION", discover)
-        self.assertIn("pages-cache-$bundle_key--$current_sha", discover)
+        self.assertIn("pages-cache-$bundle_key--$source_sha", discover)
+        self.assertIn('"$current_sha" != "$source_sha"', discover)
         self.assertIn("Every Minecraft target already belongs", discover)
         self.assertIn("Deferring publication while", discover)
         self.assertNotIn("--probe", discover)
@@ -1745,8 +1746,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('cache_name = f"pages-cache-{key}--{current_sha}"', selector)
         self.assertIn('key = bundle_key if bundle_key is not None else branch', selector)
         self.assertIn('legacy_name = f"pages-cache-{branch}"', selector)
-        self.assertIn("max(exact, key=lambda item: item.order)", selector)
-        self.assertIn("if exact:", selector)
+        self.assertIn("sorted([*handoffs, *caches], key=lambda item: item.order, reverse=True)", selector)
+        self.assertIn("if selected is not None:", selector)
         self.assertIn("^[0-9a-f]{40}$", refresh)
         self.assertIn("name=pages-cache-%s--%s", refresh)
         # The rolling cache is keyed by the covered head so a continued branch can still be
@@ -1785,6 +1786,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("git fetch", collect)
         self.assertIn("fetch-depth: 0", collect)
         self.assertIn("scripts/ci/feature_pages.py", collect)
+        self.assertNotIn("feature_pages.py --verify-runtime ", collect)
+        self.assertIn('"$schema" == 5 || "$schema" == 7', collect)
+        self.assertIn("feature_pages.py --verify-runtime-tree", build)
+        self.assertLess(build.index("--verify-runtime-tree"), build.index("Render the landing page"))
+        self.assertLess(build.index("--verify-runtime-tree"), build.index("Upload the complete Pages artifact"))
         self.assertNotIn('/compare/$COVERAGE_SHA...$HEAD_SHA', collect)
         self.assertNotIn('/compare/$EXPECTED_SHA...$HEAD_SHA', collect)
         self.assertNotIn("scripts/pages/evidence.py carry-forward", collect)
@@ -1820,9 +1826,15 @@ class WorkflowSecurityTest(unittest.TestCase):
                 encoding="utf-8",
             )
             arguments = temp / "validate-arguments"
+            runtime_arguments = temp / "runtime-arguments"
             fake_python = temp / "python3"
             fake_python.write_text(
-                "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$VALIDATE_ARGUMENTS\"\n",
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$1\" == scripts/pages/evidence.py ]]; then\n"
+                "  printf '%s\\n' \"$@\" > \"$VALIDATE_ARGUMENTS\"\n"
+                "elif [[ \"$1\" == scripts/ci/feature_pages.py ]]; then\n"
+                "  printf '%s\\n' \"$@\" > \"$RUNTIME_ARGUMENTS\"\n"
+                "else\n  exit 2\nfi\n",
                 encoding="utf-8",
             )
             fake_python.chmod(0o755)
@@ -1837,6 +1849,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                     "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
                     "PATH": f"{temp}{os.pathsep}{environment.get('PATH', '')}",
                     "VALIDATE_ARGUMENTS": str(arguments),
+                    "RUNTIME_ARGUMENTS": str(runtime_arguments),
                 }
             )
 
@@ -1854,6 +1867,10 @@ class WorkflowSecurityTest(unittest.TestCase):
             coverage_index = validate_arguments.index("--coverage-sha")
             self.assertEqual(validate_arguments[target_index + 1], target_sha)
             self.assertEqual(validate_arguments[coverage_index + 1], coverage_sha)
+            runtime_flags = runtime_arguments.read_text(encoding="utf-8").splitlines()
+            self.assertIn("--verify-runtime-tree", runtime_flags)
+            self.assertEqual(runtime_flags[runtime_flags.index("--source-sha") + 1], coverage_sha)
+            self.assertNotIn("--bundle-key", runtime_flags)
 
             environment["CURRENT_SHA"] = "a" * 40
             stale = subprocess.run(

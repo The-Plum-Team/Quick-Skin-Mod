@@ -349,6 +349,7 @@ jobs:
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
 
+          github_api_budget_snapshot
           source_branch="$(python3 scripts/pages/evidence_target.py --kind source-branch)"
           source_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$source_branch" --jq .commit.sha)"
           if [[ "$source_sha" != "$GITHUB_SHA" ]]; then
@@ -415,32 +416,41 @@ jobs:
             pages_workflow_id="$(github_api_retry \
               "repos/$GITHUB_REPOSITORY/actions/workflows/pages.yml" --jq .id)"
             all_current=true
+            verified_owners='{}'
             while IFS= read -r bundle_key; do
-              current_sha="$(github_api_retry \
-                "repos/$GITHUB_REPOSITORY/branches/$source_branch" \
-                --jq .commit.sha)"
-              cache_name="pages-cache-$bundle_key--$current_sha"
+              cache_name="pages-cache-$bundle_key--$source_sha"
               cache_artifacts="$(github_api_retry --paginate --slurp \
-                "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$cache_name&per_page=100")"
+                "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$cache_name&per_page=100")" || exit "$?"
               cached=false
               while IFS=$'\t' read -r cache_run_id cache_branch cache_sha expired; do
                 [[ -n "$cache_run_id" ]] || continue
                 [[ "$expired" == false && "$cache_branch" == master ]] || continue
                 [[ "$cache_sha" =~ ^[0-9a-f]{40}$ ]] || continue
-                if owner_run="$(github_api_retry \
-                    "repos/$GITHUB_REPOSITORY/actions/runs/$cache_run_id" 2>/dev/null)" \
-                    && jq -e \
+                owner_run="$(jq -c --arg id "$cache_run_id" '.[$id] // empty' \
+                  <<< "$verified_owners")"
+                if [[ -z "$owner_run" ]]; then
+                  # A transport failure stops discovery; it cannot nominate an expensive fan-out.
+                  owner_run="$(github_api_retry \
+                    "repos/$GITHUB_REPOSITORY/actions/runs/$cache_run_id")" || exit "$?"
+                fi
+                if jq -e \
                       --arg repository "$GITHUB_REPOSITORY" \
                       --arg sha "$cache_sha" \
+                      --argjson run_id "$cache_run_id" \
                       --argjson expected_workflow_id "$pages_workflow_id" \
-                      '.workflow_id == $expected_workflow_id and
+                      '.id == $run_id and .workflow_id == $expected_workflow_id and
                        .status == "completed" and .conclusion == "success" and
                        (.event == "schedule" or .event == "workflow_dispatch" or
                         .event == "workflow_run") and
                        .head_branch == "master" and .head_sha == $sha and
                        .path == ".github/workflows/pages.yml" and
-                       .head_repository.full_name == $repository' \
+                      .head_repository.full_name == $repository' \
                       <<< "$owner_run" > /dev/null; then
+                  # This step-local snapshot is reused only after every artifact's owner fields
+                  # pass the same validation; live source checks remain outside this memo.
+                  verified_owners="$(jq -cn --argjson previous "$verified_owners" \
+                    --arg id "$cache_run_id" --argjson owner "$owner_run" \
+                    '$previous + {($id): $owner}')"
                   cached=true
                   break
                 fi
@@ -453,6 +463,12 @@ jobs:
                 break
               fi
             done < <(jq -r '.[]' <<< "$bundle_keys")
+            current_sha="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/branches/$source_branch" --jq .commit.sha)" || exit "$?"
+            if [[ "$current_sha" != "$source_sha" ]]; then
+              printf 'Shared source advanced during cache discovery; retaining the deployed site.\n'
+              exit 0
+            fi
             if [[ "$all_current" == true ]]; then
               printf 'Every Minecraft target already belongs to a successful deployed cache.\n'
               exit 0
@@ -611,9 +627,8 @@ jobs:
 
           source_run_id="$(jq -er .provenance.source.run_id "$manifest")"
           if jq -e 'has("runtime_source")' "$manifest" > /dev/null; then
-            python3 scripts/ci/feature_pages.py --verify-runtime \
-              --github-repository "$GITHUB_REPOSITORY" --repository . \
-              --evidence-root selected-evidence --bundle-key "$BUNDLE_KEY" --source-sha "$target_sha"
+            # Build authenticates shared runtime sources once across the complete fan-in before
+            # any site artifact is rendered or uploaded. Selected composition still admits above.
             [[ "$COVERAGE_SHA" == "$HEAD_SHA" && "$target_sha" == "$HEAD_SHA" ]] || exit 1
             exit 0
           fi
@@ -896,6 +911,13 @@ jobs:
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
+          current_sha="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" --jq .commit.sha)"
+          if [[ "$current_sha" != "$SOURCE_SHA" ]]; then
+            printf 'Shared source moved from covered SHA %s to %s before rendering.\n' \
+              "$SOURCE_SHA" "$current_sha" >&2
+            exit 1
+          fi
           found=0
           for manifest in public-evidence/*/manifest.json; do
             test -f "$manifest"
@@ -904,8 +926,6 @@ jobs:
             target_sha="$(jq -er .provenance.target.sha "$manifest")"
             coverage_sha="$(jq -er \
               '.provenance.coverage_sha // .provenance.target.sha' "$manifest")"
-            current_sha="$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" --jq .commit.sha)"
             if [[ "$current_sha" != "$coverage_sha" || "$coverage_sha" != "$SOURCE_SHA" || "$target_sha" != "$SOURCE_SHA" ]]; then
               printf 'Branch %s moved from covered SHA %s to %s before rendering.\n' \
                 "$bundle_key" "$coverage_sha" "$current_sha" >&2
@@ -920,6 +940,16 @@ jobs:
               --coverage-sha "$coverage_sha"
           done
           [[ "$found" -gt 0 ]]
+          current_sha="$(github_api_retry \
+            "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" --jq .commit.sha)"
+          if [[ "$current_sha" != "$SOURCE_SHA" ]]; then
+            printf 'Shared source moved from covered SHA %s to %s during validation.\n' \
+              "$SOURCE_SHA" "$current_sha" >&2
+            exit 1
+          fi
+          python3 scripts/ci/feature_pages.py --verify-runtime-tree \
+            --github-repository "$GITHUB_REPOSITORY" \
+            --evidence-root public-evidence --source-sha "$SOURCE_SHA"
 
       - name: Render the landing page and comparison gallery
         env:

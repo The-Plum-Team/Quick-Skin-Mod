@@ -20,13 +20,17 @@ import evidence
 import feature_evidence
 
 
-def verify_runtime_provenance(api: publisher.Api, manifest: dict, source_sha: str) -> ci_reuse.RuntimeSource:
+def _runtime_run_id(manifest: dict, source_sha: str) -> int:
     provenance = manifest.get("provenance")
     if (not isinstance(provenance, dict) or set(provenance) != {"source", "target"}
             or not isinstance(provenance["target"], dict) or provenance["target"].get("sha") != source_sha):
         raise coverage.CoverageError("public evidence has another coverage generation")
-    run_id = int(evidence._run_id(provenance["target"].get("run_id"), "public generation"))
-    source = ci_reuse.runtime_source(api, run_id, source_sha)
+    return int(evidence._run_id(provenance["target"].get("run_id"), "public generation"))
+
+
+def _check_runtime_provenance(api: publisher.Api, manifest: dict, source_sha: str,
+                              source: ci_reuse.RuntimeSource) -> None:
+    provenance = manifest["provenance"]
     if manifest.get("runtime_source") != source.reference:
         raise coverage.CoverageError("public handoff substituted its original runtime reference")
     for key, run, tested in (("source", source.execution, source.tested_sha),
@@ -35,7 +39,54 @@ def verify_runtime_provenance(api: publisher.Api, manifest: dict, source_sha: st
                     "branch": run["head_branch"], "sha": tested, "created_at": run["created_at"]}
         if provenance[key] != expected:
             raise coverage.CoverageError("public provenance differs from its authenticated runtime")
+
+
+def verify_runtime_provenance(api: publisher.Api, manifest: dict, source_sha: str) -> ci_reuse.RuntimeSource:
+    run_id = _runtime_run_id(manifest, source_sha)
+    source = ci_reuse.runtime_source(api, run_id, source_sha)
+    _check_runtime_provenance(api, manifest, source_sha, source)
     return source
+
+
+def verify_runtime_tree(api: publisher.Api, *, evidence_root: Path, source_sha: str) -> dict[str, int]:
+    """Admit the complete private Pages fan-in before any site upload or deployment.
+
+    Collectors still authenticate their artifact owners and bounded image bundles. This final
+    gate reauthenticates each shared runtime once, then compares every manifest to that result.
+    Its cache lives only during this invocation; no recorded provenance can replace a live check
+    in another publication. Selective composition keeps its earlier per-target admission too.
+    """
+    if api.current_sha() != source_sha:
+        raise coverage.CoverageError("source advanced before public runtime verification")
+    expected = {target["bundle_key"] for target in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]}
+    if evidence_root.is_symlink() or not evidence_root.is_dir():
+        raise coverage.CoverageError("public runtime fan-in must be a real directory")
+    entries = list(evidence_root.iterdir())
+    if ({entry.name for entry in entries} != expected
+            or any(entry.is_symlink() or not entry.is_dir() for entry in entries)):
+        raise coverage.CoverageError("public runtime fan-in differs from the complete target inventory")
+    sources: dict[tuple[int, str], ci_reuse.RuntimeSource] = {}
+    verified = 0
+    for key in sorted(expected):
+        path = evidence_root / key / "manifest.json"
+        if path.is_symlink():
+            raise coverage.CoverageError("public runtime manifest must not be a symlink")
+        manifest, _digest = coverage._read(path)
+        if not isinstance(manifest, dict) or manifest.get("repository") != api.repository:
+            raise coverage.CoverageError("public runtime manifest belongs to another repository")
+        if "runtime_source" not in manifest:
+            continue  # Historical direct-source provenance retains its existing collector gate.
+        run_id = _runtime_run_id(manifest, source_sha)
+        identity = (run_id, source_sha)
+        source = sources.get(identity)
+        if source is None:
+            source = ci_reuse.runtime_source(api, run_id, source_sha)
+            sources[identity] = source
+        _check_runtime_provenance(api, manifest, source_sha, source)
+        verified += 1
+    if api.current_sha() != source_sha:
+        raise coverage.CoverageError("source advanced during public runtime verification")
+    return {"targets": len(expected), "runtime_manifests": verified, "runtime_sources": len(sources)}
 
 
 def runtime_identity(api: publisher.Api, *, repository: Path, source_sha: str, run_id: int,
@@ -163,11 +214,18 @@ def main() -> int:
     parser.add_argument("--artifact-run-id", type=int)
     parser.add_argument("--runtime-identity", action="store_true")
     parser.add_argument("--verify-runtime", action="store_true")
+    parser.add_argument("--verify-runtime-tree", action="store_true")
     parser.add_argument("--run-id", type=int)
     parser.add_argument("--github-output", type=Path)
     args = parser.parse_args()
     try:
         api = publisher.Api(args.github_repository)
+        if args.verify_runtime_tree:
+            if args.evidence_root is None or args.bundle_key is not None or args.runtime_identity or args.verify_runtime:
+                parser.error("public runtime fan-in requires only its complete input root")
+            result = verify_runtime_tree(api, evidence_root=args.evidence_root, source_sha=args.source_sha)
+            print(json.dumps(result, sort_keys=True))
+            return 0
         if args.runtime_identity:
             if args.run_id is None or args.output is None or args.github_output is None:
                 parser.error("public runtime identity requires a run, private output directory and GitHub outputs")

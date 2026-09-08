@@ -151,6 +151,41 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
         self.assertIsNone(self.prepare())
         self.assertEqual([], self.api.downloaded)
 
+    def test_partial_inventory_does_not_resolve_runtime_or_owner_graphs(self):
+        self.api.records.pop(f"visual-review-{self.fixture.run_id}--{self.fixture.targets[-1]['bundle_key']}")
+        with patch("ci_reuse.runtime_source", side_effect=AssertionError("partial inventory resolved runtime")), \
+             patch.object(self.api, "run", wraps=self.api.run) as runs, \
+             patch.object(self.api, "jobs", side_effect=AssertionError("partial inventory resolved jobs")):
+            self.assertIsNone(self.prepare())
+        self.assertEqual([self.fixture.run_id], [call.args[0] for call in runs.call_args_list])
+        self.assertEqual([], self.api.downloaded)
+
+    def test_missing_public_inventory_defers_before_runtime_descriptors(self):
+        self.api.records.pop(next(reversed(self.api.records)))
+        with patch("ci_reuse.runtime_source", side_effect=AssertionError("partial public inventory resolved runtime")), \
+             patch.object(self.api, "jobs", side_effect=AssertionError("partial public inventory resolved jobs")):
+            self.assertIsNone(self.prepare())
+        self.assertEqual([], self.api.downloaded)
+
+    def test_complete_preflight_reuses_each_exact_inventory_without_caching_live_head(self):
+        with patch.object(self.api, "artifacts", wraps=self.api.artifacts) as inventories, \
+             patch.object(self.api, "current_sha", wraps=self.api.current_sha) as live:
+            self.assertIsNotNone(self.prepare())
+        queries = [tuple(sorted(call.kwargs.items())) for call in inventories.call_args_list]
+        self.assertEqual(2 + 2 * len(self.fixture.targets), len(queries))
+        self.assertEqual(len(queries), len(set(queries)))
+        self.assertEqual(2, live.call_count)
+        self.assertEqual(len(self.fixture.targets), len(self.api.downloaded))
+
+    def test_feature_wake_waits_for_the_remaining_owner_jobs_without_requiring_their_success(self):
+        block = job_block("visual-review-drain.yml", "request-feature-coverage")
+        for dependency in ("select", "review", "cleanup", "release-mod-compatibility", "release-anchor"):
+            self.assertIn(f"      - {dependency}\n", block)
+        self.assertIn("always() &&", block)
+        self.assertIn("needs.review.outputs.normalized_report_artifact_id != ''", block)
+        self.assertNotIn("needs.cleanup.result == 'success'", block)
+        self.assertNotIn("needs.release-mod-compatibility.result == 'success'", block)
+
     def test_missing_complete_public_baseline_defers_without_decoding_reports_or_images(self):
         self.api.records.pop(next(reversed(self.api.records)))
         self.assertIsNone(self.prepare())

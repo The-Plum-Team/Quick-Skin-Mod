@@ -3,6 +3,24 @@
 # Bounded retry wrappers for GitHub CLI calls in protected workflows. Successful textual responses
 # are the only stdout; diagnostics stay on stderr so callers may safely use command substitution or
 # pipelines. Authentication/provenance validation remains the caller's job.
+github_api_budget_snapshot() {
+  # One advisory read using the caller's credential, never a permission or admission check.
+  # /rate_limit does not spend primary quota. Whitelist counters instead of printing headers,
+  # bodies or signed artifact URLs; an unavailable snapshot cannot replace actual API checks.
+  local snapshot counters
+  if snapshot="$(gh api rate_limit --jq '.resources.core | {limit,used,remaining,reset}' 2>/dev/null)" \
+      && counters="$(jq -ce '
+        if type == "object" and
+           ([.limit,.used,.remaining,.reset] | all(type == "number" and floor == . and . >= 0)) and
+           .limit > 0 and .reset > 0 and .remaining <= .limit
+        then {limit,used,remaining,reset} else error("invalid budget counters") end
+      ' <<< "$snapshot" 2>/dev/null)"; then
+    printf 'GitHub REST core budget: %s\n' "$counters" >&2
+  else
+    printf 'GitHub REST core budget telemetry unavailable.\n' >&2
+  fi
+}
+
 _github_retry_bounds_valid() {
   local max_attempts="$1" max_delay="$2" max_wait="$3"
   [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]] \

@@ -32,6 +32,10 @@ REPORT_FILES = frozenset({"curation-proof.json", "review-input/visual-review-man
                           "visual-review-report.json", "visual-review-completion.json"})
 
 
+class ArtifactInventoryLimit(coverage.CoverageError):
+    """A valid inventory exceeds this reader's bounded first page."""
+
+
 def _get(endpoint: str, *, maximum: int) -> bytes:
     process = subprocess.Popen(["gh", "api", "--method", "GET", endpoint],
                                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -136,6 +140,13 @@ class Api:
                 raise coverage.CoverageError("artifact query requires an exact report or baseline name")
             endpoint = "actions/artifacts?" + urllib.parse.urlencode({"name": name, "per_page": MAX_INVENTORY})
         record = self.json(endpoint)
+        if (isinstance(record, dict) and type(record.get("total_count")) is int
+                and record["total_count"] > MAX_INVENTORY
+                and isinstance(record.get("artifacts"), list)
+                and len(record["artifacts"]) == MAX_INVENTORY
+                and all(isinstance(item, dict) and isinstance(item.get("name"), str)
+                        and (name is None or item["name"] == name) for item in record["artifacts"])):
+            raise ArtifactInventoryLimit("artifact inventory exceeds its limit")
         if (not isinstance(record, dict) or type(record.get("total_count")) is not int
                 or not isinstance(record.get("artifacts"), list)
                 or not 0 <= record["total_count"] <= MAX_INVENTORY
@@ -286,6 +297,53 @@ def validate_public_owner(artifact: Any, owner: Any, jobs: Any, *, github_reposi
     return result
 
 
+def _existing_baseline(api: Api, *, repository: Path, source: dict[str, Any],
+                       source_sha: str, directory: Path) -> dict[str, Any] | None:
+    """Use the consumer's issuer and certificate admission before omitting a duplicate upload."""
+    import feature_coverage_consumer as consumer
+    try:
+        candidates = api.artifacts(name=coverage.BASELINE_ARTIFACT_NAME)
+    except ArtifactInventoryLimit:
+        # This optional optimization must not make a large historical inventory prevent fresh
+        # certification. Transport errors and malformed responses still propagate unchanged.
+        return None
+    current = [item for item in candidates if item.get("expired") is False
+               and type(item.get("id")) is int and item["id"] > 0
+               and isinstance(item.get("workflow_run"), dict)
+               and type(item["workflow_run"].get("id")) is int and item["workflow_run"]["id"] > 0
+               and item["workflow_run"].get("head_sha") == source_sha
+               and item["workflow_run"].get("head_branch") == "master"]
+    for candidate in sorted(current, key=lambda item: item["id"], reverse=True)[:consumer.MAX_CANDIDATES]:
+        owner = api.run(coverage._positive_integer(candidate["workflow_run"].get("id"), "baseline issuer"))
+        if owner.get("status") != "completed":
+            continue
+        jobs = api.jobs(owner)
+        try:
+            metadata = consumer.validate_owner(candidate, owner, jobs, github_repository=api.repository)
+        except (coverage.CoverageError, consumer.QueueError):
+            continue
+        value = consumer.read_baseline(api, metadata, directory / f"existing-{metadata['id']}")
+        if (not isinstance(value, dict) or value.get("source_run_id") != source["id"]
+                or value.get("source_run_attempt") != source.get("run_attempt")):
+            continue
+        try:
+            consumer.validate_baseline(value, metadata, repository=repository, head=source_sha, policy=source_sha)
+        except coverage.CoverageError:
+            continue
+        public_inventory = {}
+        for record in value["public_artifacts"].values():
+            matches = [item for item in api.artifacts(name=record["name"]) if item.get("id") == record["id"]]
+            if len(matches) != 1:
+                return None
+            public_inventory[record["id"]] = matches[0]
+        try:
+            consumer.validate_public_artifacts(api, value, inventory=public_inventory)
+        except consumer.PublicArtifactUnavailable:
+            return None
+        return value
+    return None
+
+
 def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
             issuer_run_id: int, directory: Path) -> dict[str, Any] | None:
     coverage._positive_integer(issuer_run_id, "baseline issuer run")
@@ -296,20 +354,65 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
         coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
             source_sha=source_sha, source_run_id=source_run_id, matrix_kind="native-anchors")
         return None  # A scheduled integration run has no complete Pages-baseline publication.
-    import ci_reuse
-    runtime = ci_reuse.runtime_source(api, source_run_id, source_sha)
-    graph = runtime.graph
-    if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in runtime.artifacts):
+    source_artifacts = api.artifacts(run_id=source_run_id)
+    if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in source_artifacts):
         return None  # Partial generations retain their earlier complete baseline.
-    metadata, public = {}, {}
-    for target in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]:
+
+    public_inventories = {}
+
+    class SourceInventory:
+        """Reuse only this invocation's source inventory; runtime owners/jobs stay live."""
+
+        def artifacts(self, *, run_id: int | None = None, name: str | None = None) -> list[dict[str, Any]]:
+            if run_id == source_run_id and name is None:
+                return source_artifacts
+            if name in public_inventories:
+                return public_inventories[name]
+            result = api.artifacts(run_id=run_id, name=name)
+            if name is not None and PUBLIC_BASELINE_NAME.fullmatch(name) is not None:
+                public_inventories[name] = result
+            return result
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(api, name)
+
+    import ci_reuse
+    invocation_api = SourceInventory()
+    existing = _existing_baseline(invocation_api, repository=repository, source=source,
+                                  source_sha=source_sha, directory=directory)
+    if existing is not None:
+        runtime = ci_reuse.runtime_source(invocation_api, source_run_id, source_sha)
+        if (runtime.generation.get("run_attempt") != existing["source_run_attempt"]
+                or runtime.graph != existing["source_job_graph"]):
+            raise coverage.CoverageError("certified baseline source changed during admission")
+        if api.current_sha() != source_sha:
+            return None
+        print("The current source already has an authenticated complete feature baseline.")
+        return None
+    targets = coverage.inventory(coverage.DEFAULT_MATRIX)["include"]
+    reports, public_candidates_by_key = {}, {}
+    # Every target must exist before any runtime descriptor, owner graph or report archive is
+    # resolved. An early wake cannot certify a partial generation, so defer at its first gap.
+    for target in targets:
         key = target["bundle_key"]
         candidates = api.artifacts(name=f"visual-review-{source_run_id}--{key}")
         if not candidates:
             return None
         if len(candidates) != 1:
             raise coverage.CoverageError("baseline target has ambiguous normalized review reports")
-        candidate = candidates[0]
+        reports[key] = candidates[0]
+        public_candidates_by_key[key] = invocation_api.artifacts(name=public_baseline_name(key, source_sha, source_run_id))
+        if not any(candidate.get("expired") is not True for candidate in public_candidates_by_key[key]):
+            return None
+
+    runtime = ci_reuse.runtime_source(invocation_api, source_run_id, source_sha)
+    graph = runtime.graph
+    if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in runtime.artifacts):
+        return None  # Partial generations retain their earlier complete baseline.
+    metadata, public = {}, {}
+    for target in targets:
+        key = target["bundle_key"]
+        candidate = reports[key]
         owner_record = candidate.get("workflow_run")
         if not isinstance(owner_record, dict):
             raise coverage.CoverageError("normalized report has no owner")
@@ -318,7 +421,7 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
             return None
         metadata[key] = coverage.validate_review_owner(candidate, owner, api.jobs(owner),
             github_repository=api.repository, source_sha=source_sha, source_run_id=source_run_id, bundle_key=key)
-        public_candidates = api.artifacts(name=public_baseline_name(key, source_sha, source_run_id))
+        public_candidates = public_candidates_by_key[key]
         for candidate in sorted(public_candidates, key=lambda item: item.get("id", 0), reverse=True)[:8]:
             if candidate.get("expired") is True:
                 continue
@@ -377,7 +480,7 @@ def main() -> int:
                              source_run_id=source_run_id, issuer_run_id=args.issuer_run_id,
                              directory=Path(temporary).resolve())
         if result is None:
-            print("Complete current-source clean review coverage is not available yet.")
+            print("No new complete feature baseline was emitted.")
             return 0
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("xb") as stream:

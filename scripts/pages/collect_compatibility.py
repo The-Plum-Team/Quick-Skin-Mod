@@ -502,6 +502,7 @@ def _select_review_artifact(
     required_run_id: int | None = None,
     required_owner_sha: str | None = None,
     fallback_name: str | None = None,
+    validated_owners: dict[tuple[str, str, int], dict[str, Any]] | None = None,
 ) -> tuple[RemoteArtifact, str]:
     names = [name] if fallback_name is None else [name, fallback_name]
     candidates = sorted(
@@ -517,29 +518,42 @@ def _select_review_artifact(
         key=lambda artifact: (artifact.name == name, artifact.created_at, artifact.artifact_id),
         reverse=True,
     )
-    authenticated: list[tuple[RemoteArtifact, str]] = []
     for artifact in candidates:
+        owner_key = (repository, current_sha, artifact.run_id)
+        run = validated_owners.get(owner_key) if validated_owners is not None else None
+        owner_validated = run is not None
+        if run is None:
+            # Transport failure is not an invalid owner or evidence absence. Stop immediately
+            # instead of spending more requests on older candidates after an API failure.
+            run = api.get_run(artifact.run_id)
         try:
             run_sha = _validate_run(
-                api.get_run(artifact.run_id),
+                run,
                 repository=repository,
                 workflow=REVIEW_WORKFLOW,
                 events=REVIEW_EVENTS,
                 head_sha=required_owner_sha,
                 conclusions=frozenset({"success", "failure"}),
             )
-            _fetch_commits(repository_root, run_sha)
-            _require_nonimpacting_ancestor(
-                repository_root, run_sha, current_sha, "review implementation"
-            )
+            if (
+                run.get("id") != artifact.run_id
+                or artifact.head_branch != run.get("head_branch")
+                or artifact.head_sha != run_sha
+            ):
+                raise CollectionError("review artifact differs from its authenticated owner")
+            if not owner_validated:
+                _fetch_commits(repository_root, run_sha)
+                _require_nonimpacting_ancestor(
+                    repository_root, run_sha, current_sha, "review implementation"
+                )
         except CollectionError:
             continue
-        authenticated.append((artifact, run_sha))
-    if not authenticated:
-        raise CollectionError(
-            f"no authenticated review artifact exists for {name}"
-        )
-    return authenticated[0]
+        if validated_owners is not None:
+            # Only fully admitted terminal owners enter this invocation-local memo. Every
+            # artifact still rechecks its identity and caller constraints against that owner.
+            validated_owners[owner_key] = run
+        return artifact, run_sha
+    raise CollectionError(f"no authenticated review artifact exists for {name}")
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -561,6 +575,7 @@ def _select_lane_completion(
     current_sha: str,
     repository_root: Path,
     source_implementation_sha: str,
+    validated_owners: dict[tuple[str, str, int], dict[str, Any]] | None = None,
 ) -> tuple[RemoteArtifact, str]:
     legacy_name = f"mod-compatibility-lane-complete-{source_run_id}-{lane_id}"
     # Historical publication can recover any attempt: build_bundle independently requires the
@@ -575,6 +590,7 @@ def _select_lane_completion(
         repository_root=repository_root,
         maximum_size=MAX_MARKER_ARCHIVE_BYTES,
         required_owner_sha=source_implementation_sha,
+        validated_owners=validated_owners,
     )
 
 
@@ -668,6 +684,7 @@ def collect(
             "release branch",
         )
 
+        validated_review_owners: dict[tuple[str, str, int], dict[str, Any]] = {}
         completion_name = f"mod-compatibility-review-complete-{source_run_id}"
         completion_artifact, completion_owner_sha = _select_review_artifact(
             api,
@@ -677,6 +694,7 @@ def collect(
             repository_root=repository_root,
             maximum_size=MAX_MARKER_ARCHIVE_BYTES,
             required_owner_sha=source_implementation_sha,
+            validated_owners=validated_review_owners,
         )
         completion_root = temporary_root / "source-completion"
         api.download_and_extract(
@@ -753,6 +771,7 @@ def collect(
                 current_sha=current_implementation_sha,
                 repository_root=repository_root,
                 source_implementation_sha=source_implementation_sha,
+                validated_owners=validated_review_owners,
             )
             if review_owner_sha != source_implementation_sha:
                 raise CollectionError(f"lane {lane_id} reviewer implementation drifted")
@@ -766,6 +785,7 @@ def collect(
                 maximum_size=MAX_REPORT_ARCHIVE_BYTES,
                 required_run_id=lane_completion_artifact.run_id,
                 required_owner_sha=source_implementation_sha,
+                validated_owners=validated_review_owners,
             )
             if report_owner_sha != review_owner_sha:
                 raise CollectionError(f"lane {lane_id} report owner drifted")

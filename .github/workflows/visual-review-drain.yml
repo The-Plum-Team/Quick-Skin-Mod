@@ -1943,6 +1943,9 @@ jobs:
     needs:
       - select
       - review
+      - cleanup
+      - release-mod-compatibility
+      - release-anchor
     if: >-
       always() && needs.select.outputs.bundle_key != '' &&
       needs.review.outputs.normalized_report_artifact_id != ''

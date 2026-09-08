@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import shlex
+import shutil
 import subprocess
 import tempfile
 import textwrap
@@ -27,6 +29,8 @@ class GitHubApiRetryTest(unittest.TestCase):
             gh = temp / "gh"
             gh.write_text("#!/usr/bin/env bash\n" + textwrap.dedent(fake_gh), encoding="utf-8")
             gh.chmod(0o755)
+            if jq := shutil.which("jq"):
+                (temp / "jq").symlink_to(jq)
             environment = {
                 # A developer shell can inject a real gh function through BASH_ENV,
                 # overriding the fixture executable even with a prepended PATH.
@@ -51,6 +55,34 @@ class GitHubApiRetryTest(unittest.TestCase):
                 stderr=subprocess.PIPE,
                 check=False,
             )
+
+    @unittest.skipUnless(shutil.which("jq"), "budget telemetry uses the workflow's jq")
+    def test_budget_snapshot_uses_callers_credential_and_prints_only_numeric_counters(self) -> None:
+        completed = self._run('''
+            [[ "$1 $2" == "api rate_limit" && "$GH_TOKEN" == "fixture-token" ]] || exit 98
+            [[ ! -e "$RETRY_TEST_STATE" ]] || exit 99
+            touch "$RETRY_TEST_STATE"
+            printf '%s\\n' '{"limit":1000,"used":100,"remaining":900,"reset":1800000000,"token":"must-not-print","Location":"signed-secret"}'
+        ''', invocation="github_api_budget_snapshot", environment_overrides={"GH_TOKEN": "fixture-token"})
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual("", completed.stdout)
+        prefix = "GitHub REST core budget: "
+        self.assertTrue(completed.stderr.startswith(prefix), completed.stderr)
+        self.assertEqual({"limit": 1000, "used": 100, "remaining": 900, "reset": 1800000000},
+                         json.loads(completed.stderr.removeprefix(prefix)))
+        self.assertNotIn("secret", completed.stderr)
+        self.assertNotIn("token", completed.stderr)
+
+    @unittest.skipUnless(shutil.which("jq"), "budget telemetry uses the workflow's jq")
+    def test_unavailable_or_malformed_budget_never_leaks_diagnostics_or_changes_admission(self) -> None:
+        for body in ('exit 1', 'printf \'signed-secret\\n\'',
+                     'printf \'{"limit":1000,"used":true,"remaining":900,"reset":1800000000}\\n\''):
+            with self.subTest(body=body):
+                completed = self._run('printf \'sensitive diagnostics\\n\' >&2\n' + body,
+                    invocation="github_api_budget_snapshot; printf 'actual-admission-still-required\\n'")
+                self.assertEqual(0, completed.returncode)
+                self.assertEqual("actual-admission-still-required\n", completed.stdout)
+                self.assertEqual("GitHub REST core budget telemetry unavailable.\n", completed.stderr)
 
     def test_inherited_shell_hooks_and_credentials_cannot_replace_fake_cli(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

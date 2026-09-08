@@ -208,6 +208,29 @@ def read_baseline(api: publisher.Api, metadata: dict[str, Any], directory: Path)
     return value
 
 
+class PublicArtifactUnavailable(coverage.CoverageError):
+    """Authenticated certificate metadata no longer describes available public evidence."""
+
+
+def validate_public_artifacts(api: publisher.Api, value: dict[str, Any], *,
+                              inventory: dict[int, dict[str, Any]] | None = None) -> None:
+    public_owners = {}
+    for key, record in value["public_artifacts"].items():
+        if record["owner_run_id"] not in public_owners:
+            owner = api.run(record["owner_run_id"])
+            public_owners[record["owner_run_id"]] = (owner, api.jobs(owner))
+        owner, jobs = public_owners[record["owner_run_id"]]
+        artifact = api.artifact(record["id"]) if inventory is None else inventory.get(record["id"])
+        try:
+            actual = publisher.validate_public_owner(artifact, owner, jobs,
+                github_repository=api.repository, source_sha=value["source_sha"],
+                source_run_id=value["source_run_id"], bundle_key=key)
+        except coverage.CoverageError as error:
+            raise PublicArtifactUnavailable(str(error)) from error
+        if actual != record:
+            raise PublicArtifactUnavailable("complete public baseline expired or changed after certification")
+
+
 def _from_artifact(api: publisher.Api, artifact: Any, *, repository: Path, head: str,
                    policy: str, directory: Path) -> tuple[Any, dict[str, Any]]:
     candidate = parse_artifact(artifact)
@@ -222,17 +245,7 @@ def _from_artifact(api: publisher.Api, artifact: Any, *, repository: Path, head:
     unaffected = sorted(set(before) - set(selected.require_selection().affected_modules))
     if any(before[key] != after[key] for key in unaffected):
         raise coverage.CoverageError("selection omitted a changed dependency fingerprint")
-    public_owners = {}
-    for key, record in value["public_artifacts"].items():
-        if record["owner_run_id"] not in public_owners:
-            owner = api.run(record["owner_run_id"])
-            public_owners[record["owner_run_id"]] = (owner, api.jobs(owner))
-        owner, jobs = public_owners[record["owner_run_id"]]
-        actual = publisher.validate_public_owner(api.artifact(record["id"]), owner, jobs,
-            github_repository=api.repository, source_sha=metadata["source_sha"],
-            source_run_id=value["source_run_id"], bundle_key=key)
-        if actual != record:
-            raise coverage.CoverageError("complete public baseline expired or changed after certification")
+    validate_public_artifacts(api, value)
     return selected, {"schema_version": 1, "selective": True, "reason": selected.reason,
         "selection_sha256": selected.sha256, "baseline": metadata,
         "baseline_sha256": coverage.digest(coverage.admission.canonical(value)),

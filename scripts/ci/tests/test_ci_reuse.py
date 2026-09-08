@@ -141,7 +141,7 @@ class FixtureApi(publisher.Api):
         self.job_lists[identifier] = [{"jobs": [self.job(run, reuse.POLICY_JOB, 1), self.job(run, reuse.GATE_JOB, 2),
             self.job(run, reuse.BUILD_JOB, 3, "skipped"),
             self.job(run, "${{ matrix.id }}" + reuse.SCENARIO_SUFFIX, 4, "skipped")]}]
-        self.add_descriptor(identifier, 300, "reused-source-e2e", "reused-source.json", reference)
+        self.add_descriptor(identifier, identifier * 10, "reused-source-e2e", "reused-source.json", reference)
 
 
 class CiReuseTest(unittest.TestCase):

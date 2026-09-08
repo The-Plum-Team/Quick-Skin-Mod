@@ -286,6 +286,12 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   delayed stale wake, the direct consumer requires its source implementation to equal the protected
   current `master`, and both protected batch boundaries recheck live `master` before capsule or
   model admission.
+  Direct producer wakes settle only their exact source. Only a scheduled/manual recovery chain
+  continues with another queue sweep; every redispatched source retains that chain identity.
+  Within one admission, clean lane markers may share a previously validated completed owner,
+  while each marker still passes its own capsule, digest, size and implementation checks.
+  Capsule preparation authenticates each distinct complete runtime reference once per invocation,
+  retains every capsule's own proof checks, and rechecks live `master` after the complete batch.
   `scripts/ci/mod_compatibility_review_batch.py` owns the fail-closed merge and split codecs: it
   preserves each authenticated proof and manifest byte-for-byte, copies content-addressed images
   only once, binds every label to one lane, and reconstructs complete lane reports from a clean
@@ -293,7 +299,10 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
 - `scripts/pages/collect_compatibility.py` is the protected post-review publisher. It authenticates
   the exact compatibility source plan, every source capsule, every complete normalized lane report,
   and the source completion marker before `scripts/pages/compatibility_evidence.py` projects the
-  complete clean wave into a strict public bundle. That projection retains the two local
+  complete clean wave into a strict public bundle. It selects the first valid candidate in its
+  existing order and shares only fully admitted terminal review owners within that collection;
+  each artifact still binds its own metadata and immutable bytes, and API errors stop collection.
+  That projection retains the two local
   `mod-compatibility` checkpoints and, for integrations that opt in through the lock, the two CPM
   `mod-compatibility-cpm-first-person` hand checkpoints, the two live
   `mod-compatibility-remote` observer checkpoints, plus the one sequential
@@ -426,6 +435,9 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   concurrently with its direct wake. Queue selection also authenticates generation-block artifacts
   from failed/in-progress protected drains and skips only inputs carrying the exact blocked master
   generation; the marker's owner still binds it to its exact protected reviewer implementation.
+  Full recovery parses and bounds the complete artifact inventory, then authenticates only
+  reports, attempts, blocks and certificates relevant to eligible current-generation capsules.
+  Capsule age and an older producer commit cannot exclude otherwise eligible historical work.
 - `scripts/ci/visual_review_impact.py` is the narrow fail-closed cost and domain filter. PRs to
   `master` defer model work to their post-merge anchor; its `source-pr` scope protects direct
   release-branch PRs, where that automatic second stage is absent. `replicated-port` recognizes
@@ -453,7 +465,9 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
 - `scripts/ci/github_api_retry.sh` is the protected Pages-side wrapper for read-only GitHub API
   calls after checkout. It keeps response bytes isolated on stdout and retries only classified
   rate-limit, transport, and server failures with bounded run-skewed backoff; provenance and exact
-  identity checks remain in each caller.
+  identity checks remain in each caller. Pages discovery records one advisory snapshot of the
+  calling Actions token's REST core limit, usage, remaining requests and reset time. Only validated
+  numeric counters reach the log; unavailable telemetry cannot authorize or reject evidence.
 - `scripts/ci/gradle_cache_policy.py` is the fail-closed writer policy for Gradle state. It permits
   writes only from protected `master`; release branches, packaged E2E, and release jobs remain
   read-only.

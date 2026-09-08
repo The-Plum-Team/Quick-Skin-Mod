@@ -130,6 +130,35 @@ class FakeApi:
 
 
 class VisualReviewQueueTest(unittest.TestCase):
+    def test_history_unrelated_to_pending_targets_does_not_query_its_owners(self) -> None:
+        pending = artifact(1, f"visual-review-input-55-{SHA}--mc1.21.8", run_id=10, minutes_ago=15)
+        history = [artifact(100 + index, f"visual-review-{1000 + index}--mc1.21.8",
+                            run_id=2000 + index, minutes_ago=60 * 24 * 100) for index in range(250)]
+        runs = {10: owner(10, PREPARE_WORKFLOW),
+                **{item.run_id: owner(item.run_id, DRAIN_WORKFLOW) for item in history}}
+        api = FakeApi([*history, pending], runs)
+        with patch.object(api, "get_run", wraps=api.get_run) as owners:
+            self.assertEqual([(pending, 55)], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+        self.assertEqual([10], [call.args[0] for call in owners.call_args_list])
+
+    def test_aged_legacy_capsules_and_older_current_generation_producers_stay_eligible(self) -> None:
+        for generation, suffix in ((SHA, ""), ("d" * 40, "-" + "d" * 40)):
+            with self.subTest(generation=generation):
+                pending = artifact(1, "visual-review-input-55" + suffix, run_id=10,
+                                   minutes_ago=60 * 24 * 200)
+                api = FakeApi([pending], {10: owner(10, PREPARE_WORKFLOW)}, branch_sha=generation)
+                self.assertEqual([(pending, 55)], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+
+    def test_related_markers_still_authenticate_foreign_owners(self) -> None:
+        pending = artifact(1, f"visual-review-input-55-{SHA}--mc1.21.8", run_id=10, minutes_ago=15)
+        report = artifact(2, "visual-review-55--mc1.21.8", run_id=20, minutes_ago=10)
+        foreign = owner(20, DRAIN_WORKFLOW)
+        foreign["head_repository"] = {"full_name": "foreign/repository"}
+        api = FakeApi([pending, report], {10: owner(10, PREPARE_WORKFLOW), 20: foreign})
+        with patch.object(api, "get_run", wraps=api.get_run) as owners:
+            self.assertEqual([(pending, 55)], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+        self.assertEqual({10, 20}, {call.args[0] for call in owners.call_args_list})
+
     def test_shared_targets_keep_independent_newest_capsules_for_one_source(self) -> None:
         capsules = [
             artifact(1, f"visual-review-input-55-{SHA}--mc1.20.1", run_id=10, minutes_ago=15),
