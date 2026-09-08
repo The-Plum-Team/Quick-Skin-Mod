@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
 import unittest
 import urllib.error
 from dataclasses import replace
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -25,6 +26,7 @@ from rotate_artifacts import (  # noqa: E402
     RotationError,
     load_generations,
     load_compatibility_generations,
+    main as rotate_main,
     retire_pages_run_transients,
     rotate_branch,
     rotate_generations,
@@ -1430,6 +1432,226 @@ class PagesArtifactRotationTest(unittest.TestCase):
         )
         self.assertEqual(deleted, [])
 
+    def test_rejected_compatibility_owner_preserves_budget_for_the_next_generation(self) -> None:
+        next_key = "mc1.21.1"
+        next_keep = replace(
+            self.compatibility_keep, artifact_id=211,
+            name=f"pages-mod-compatibility-cache-{next_key}--{TARGET_SHA}",
+        )
+        next_generation = replace(
+            self.compatibility_generation, keep=next_keep, bundle_key=next_key
+        )
+        old = replace(
+            self.compatibility_keep, artifact_id=100, run_id=700, head_sha=OLD_PAGES_SHA,
+            created_at="2026-08-03T11:00:00Z",
+        )
+        rejected_handoff = replace(
+            old, artifact_id=101, run_id=820, name=f"pages-mod-compatibility-{BRANCH}"
+        )
+        later_caches = [replace(old, artifact_id=value, name=next_keep.name) for value in (120, 121)]
+        api = FakeApi(
+            keep=self.compatibility_keep,
+            inventories={
+                old.name: [old], rejected_handoff.name: [rejected_handoff],
+                next_keep.name: [next_keep, *later_caches],
+            },
+            runs={
+                700: run(
+                    700, workflow=".github/workflows/pages.yml", event="schedule",
+                    branch="master", sha=OLD_PAGES_SHA,
+                ),
+                820: run(
+                    820, workflow=".github/workflows/mod-compatibility-review.yml",
+                    event="repository_dispatch", branch="master", sha=OLD_PAGES_SHA,
+                    conclusion="failure",
+                ),
+                900: run(
+                    900, workflow=".github/workflows/pages.yml", event="workflow_dispatch",
+                    branch="master", sha=PAGES_SHA,
+                ),
+            },
+        )
+        budget = DeletionBudget(3)
+
+        summary, deferred = rotate_compatibility_generations(
+            api, [self.compatibility_generation, next_generation], repository=REPOSITORY,
+            pages_run_id=900, pages_run_sha=PAGES_SHA, delete_delay_seconds=0,
+            deletion_budget=budget,
+        )
+
+        self.assertEqual({BRANCH: [100], next_key: [120, 121]}, summary)
+        self.assertEqual([BRANCH], deferred)
+        self.assertEqual([100, 120, 121], api.deleted)
+        self.assertEqual(0, budget.remaining)
+
+    def compatibility_family_fixture(
+        self, *, cache_count: int = 2, handoff_count: int = 2
+    ) -> tuple[FakeApi, CompatibilityGeneration, list[Artifact], list[Artifact]]:
+        key = "mc1.21.1"
+        keep = replace(
+            self.compatibility_keep, name=f"pages-mod-compatibility-cache-{key}--{TARGET_SHA}"
+        )
+        generation = replace(self.compatibility_generation, branch="master", bundle_key=key, keep=keep)
+        caches = [
+            replace(
+                keep, artifact_id=1000 + index, run_id=700 + index, head_sha=OLD_PAGES_SHA,
+                created_at="2026-08-03T11:00:00Z",
+            )
+            for index in range(cache_count)
+        ]
+        handoffs = [
+            replace(
+                keep, artifact_id=2000 + index, run_id=820 + index, head_sha=OLD_PAGES_SHA,
+                name=f"pages-mod-compatibility-{key}", created_at="2026-08-03T11:00:00Z",
+            )
+            for index in range(handoff_count)
+        ]
+        runs = {
+            item.run_id: run(
+                item.run_id, workflow=".github/workflows/pages.yml", event="schedule",
+                branch="master", sha=OLD_PAGES_SHA,
+            )
+            for item in caches
+        }
+        runs.update({
+            item.run_id: run(
+                item.run_id, workflow=".github/workflows/mod-compatibility-review.yml",
+                event="repository_dispatch", branch="master", sha=OLD_PAGES_SHA,
+            )
+            for item in handoffs
+        })
+        runs[900] = run(
+            900, workflow=".github/workflows/pages.yml", event="workflow_dispatch",
+            branch="master", sha=PAGES_SHA,
+        )
+        api = FakeApi(
+            keep=keep,
+            inventories={keep.name: caches, f"pages-mod-compatibility-{key}": handoffs},
+            runs=runs, branch_shas={"master": TARGET_SHA},
+        )
+        return api, generation, caches, handoffs
+
+    def test_rejected_family_preserves_its_members_and_records_other_family_deletions(self) -> None:
+        for rejected_family in ("cache", "handoff"):
+            with self.subTest(rejected_family=rejected_family):
+                api, generation, caches, handoffs = self.compatibility_family_fixture()
+                if rejected_family == "cache":
+                    api.runs[caches[-1].run_id]["path"] = ".github/workflows/build-gate.yml"
+                    expected = [item.artifact_id for item in handoffs]
+                else:
+                    api.runs[handoffs[-1].run_id]["conclusion"] = "failure"
+                    expected = [item.artifact_id for item in caches]
+                budget = DeletionBudget(32)
+
+                summary, deferred = rotate_compatibility_generations(
+                    api, [generation], repository=REPOSITORY, pages_run_id=900,
+                    pages_run_sha=PAGES_SHA, delete_delay_seconds=0, deletion_budget=budget,
+                )
+
+                self.assertEqual({generation.key: expected}, summary)
+                self.assertEqual([generation.key], deferred)
+                self.assertEqual(expected, api.deleted)
+                self.assertEqual(30, budget.remaining)
+
+    def test_keep_head_and_exact_id_changes_stop_before_the_next_delete_and_keep_partial_ids(self) -> None:
+        for changed in ("head", "keep", "candidate"):
+            with self.subTest(changed=changed):
+                api, generation, caches, handoffs = self.compatibility_family_fixture()
+                get_artifact = api.get_artifact
+                get_branch_sha = api.get_branch_sha
+
+                def changed_artifact(artifact_id: int) -> Artifact:
+                    current = get_artifact(artifact_id)
+                    if api.deleted and (
+                        (changed == "keep" and artifact_id == generation.keep.artifact_id)
+                        or (changed == "candidate" and artifact_id == caches[1].artifact_id)
+                    ):
+                        return replace(current, size_in_bytes=current.size_in_bytes + 1)
+                    return current
+
+                def changed_head(branch: str) -> str:
+                    return OLD_PAGES_SHA if api.deleted and changed == "head" else get_branch_sha(branch)
+
+                budget = DeletionBudget(32)
+                with patch.object(api, "get_artifact", side_effect=changed_artifact), \
+                     patch.object(api, "get_branch_sha", side_effect=changed_head), \
+                     patch.object(api, "get_run", wraps=api.get_run) as owners:
+                    summary, deferred = rotate_compatibility_generations(
+                        api, [generation], repository=REPOSITORY, pages_run_id=900,
+                        pages_run_sha=PAGES_SHA, delete_delay_seconds=0, deletion_budget=budget,
+                    )
+
+                self.assertEqual({generation.key: [caches[0].artifact_id]}, summary)
+                self.assertEqual([generation.key], deferred)
+                self.assertEqual([caches[0].artifact_id], api.deleted)
+                self.assertEqual(30 if changed == "candidate" else 31, budget.remaining)
+                self.assertTrue(
+                    {item.run_id for item in handoffs}.isdisjoint(
+                        call.args[0] for call in owners.call_args_list
+                    )
+                )
+
+    def test_caches_take_priority_with_one_attempt_budget_shared_by_both_families(self) -> None:
+        api, generation, caches, handoffs = self.compatibility_family_fixture(cache_count=31, handoff_count=3)
+        budget = DeletionBudget(32)
+
+        summary, deferred = rotate_compatibility_generations(
+            api, [generation], repository=REPOSITORY, pages_run_id=900,
+            pages_run_sha=PAGES_SHA, delete_delay_seconds=0, deletion_budget=budget,
+        )
+
+        expected = [item.artifact_id for item in caches] + [handoffs[0].artifact_id]
+        self.assertEqual({generation.key: expected}, summary)
+        self.assertEqual([generation.key], deferred)
+        self.assertEqual(expected, api.deleted)
+        self.assertEqual(0, budget.remaining)
+        self.assertEqual(2, budget.last_deferred_count)
+
+    def test_deletion_attempt_budget_still_counts_404_and_failure_across_generations(self) -> None:
+        for status in (404, 500):
+            with self.subTest(status=status):
+                next_key = "mc1.21.1"
+                next_keep = replace(self.keep, artifact_id=201, name=f"pages-cache-{next_key}--{TARGET_SHA}")
+                next_generation = replace(self.generation, keep=next_keep, bundle_key=next_key)
+                old = replace(
+                    self.keep, artifact_id=100, run_id=700, head_sha=OLD_PAGES_SHA,
+                    created_at="2026-08-03T11:00:00Z",
+                )
+                first = [replace(old, artifact_id=value) for value in range(100, 140)]
+                second = [replace(old, artifact_id=value, name=next_keep.name) for value in range(300, 340)]
+                api = FakeApi(
+                    keep=self.keep,
+                    inventories={self.keep.name: first, next_keep.name: [next_keep, *second]},
+                    runs={
+                        700: run(
+                            700, workflow=".github/workflows/pages.yml", event="schedule",
+                            branch="master", sha=OLD_PAGES_SHA,
+                        ),
+                        900: run(
+                            900, workflow=".github/workflows/pages.yml", event="workflow_dispatch",
+                            branch="master", sha=PAGES_SHA,
+                        ),
+                    },
+                )
+                budget = DeletionBudget(32)
+                delete = api.delete_artifact
+
+                def fail_first(artifact_id: int) -> None:
+                    if artifact_id == 100:
+                        raise ApiError(status, "injected deletion failure")
+                    delete(artifact_id)
+
+                with patch.object(api, "delete_artifact", side_effect=fail_first) as attempted:
+                    rotate_generations(
+                        api, [self.generation, next_generation], repository=REPOSITORY,
+                        pages_run_id=900, pages_run_sha=PAGES_SHA, delete_delay_seconds=0,
+                        deletion_budget=budget,
+                    )
+
+                self.assertEqual(32, attempted.call_count)
+                self.assertEqual(31, len(api.deleted))
+                self.assertEqual(0, budget.remaining)
+
     def test_pages_run_transients_retire_only_after_every_keep_is_revalidated(self) -> None:
         collected = artifact(
             300,
@@ -1503,6 +1725,41 @@ class PagesArtifactRotationTest(unittest.TestCase):
                 )
 
         self.assertEqual(api.deleted, [])
+
+    def test_main_preserves_confirmed_transient_deletions_when_the_head_changes(self) -> None:
+        collected = replace(
+            self.keep, artifact_id=300, name=f"collected-pages-{BRANCH}",
+            created_at="2026-08-03T11:30:00Z",
+        )
+        deploy = replace(collected, artifact_id=301, name="github-pages", created_at="2026-08-03T11:40:00Z")
+        api = FakeApi(
+            keep=self.keep,
+            inventories={},
+            runs={
+                900: run(
+                    900, workflow=".github/workflows/pages.yml", event="workflow_dispatch",
+                    branch="master", sha=PAGES_SHA,
+                ),
+            },
+            run_artifacts={900: [self.keep, collected, deploy]},
+        )
+        stdout = StringIO()
+        with patch.dict(os.environ, {"GH_TOKEN": "test-token"}), \
+             patch("rotate_artifacts.GitHubApi", return_value=api), \
+             patch("rotate_artifacts.load_generations", return_value=[self.generation]), \
+             patch.object(api, "get_branch_sha", side_effect=lambda _branch: OLD_PAGES_SHA if api.deleted else TARGET_SHA), \
+             patch("sys.stdout", stdout):
+            code = rotate_main([
+                "--evidence-root", ".", "--repository", REPOSITORY,
+                "--pages-run-id", "900", "--pages-run-sha", PAGES_SHA,
+                "--delete-delay-seconds", "0",
+            ])
+
+        self.assertEqual(0, code)
+        summary = json.loads(stdout.getvalue())
+        self.assertEqual([300], summary["deleted_pages_run_artifact_ids"])
+        self.assertEqual([300], api.deleted)
+        self.assertEqual(31, summary["remaining_rotation_deletions"])
 
     def test_pages_run_transients_defer_before_exceeding_deletion_budget(self) -> None:
         collected = artifact(

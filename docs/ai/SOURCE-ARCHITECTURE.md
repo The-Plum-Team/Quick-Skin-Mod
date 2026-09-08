@@ -402,10 +402,13 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   have all been revalidated, including Pages-run intermediates; it never implements screenshot or
   version discovery itself. Exact-name queries cover legacy caches and duplicate uploads under the
   replacement's current SHA name. Other SHA names and complete baseline archives retain their
-  independent expiry policy without a repository-wide prefix scan. It preserves exactly the current
-  validated raw visual-anchor handoff
-  and retires only its older generations. Raw packaged-E2E artifacts remain retention-bound inputs
-  for concurrent attestations and are outside rotation ownership.
+  independent expiry policy without a repository-wide prefix scan. Cache and handoff candidates
+  undergo separate provenance validation, so an invalid historical handoff cannot prevent retiring
+  authenticated duplicate caches. The shared deletion budget counts attempts only after owner and
+  replacement validation; final metadata or deletion failures still spend an attempt. Summaries
+  retain confirmed deletions when later work is deferred. It preserves exactly the current validated
+  raw visual-anchor handoff and retires only its older generations. Raw packaged-E2E artifacts remain
+  retention-bound inputs for concurrent attestations and are outside rotation ownership.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
   the oldest eligible source except that a completed certifiable automatic 1.20.1 anchor preempts

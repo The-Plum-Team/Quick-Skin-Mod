@@ -2184,7 +2184,11 @@ class WorkflowSecurityTest(unittest.TestCase):
             'f"collected-pages-{generation.key}" for generation in generations',
             rotator,
         )
-        self.assertIn("candidates = [*old_caches, *handoffs]", rotator)
+        retirement = rotator.split("def _rotate_candidate_groups(", 1)[1].split(
+            "\ndef rotate_branch(", 1
+        )[0]
+        self.assertLess(retirement.index("_validate_run("), retirement.index("validate_keep()"))
+        self.assertLess(retirement.index("validate_keep()"), retirement.index("_delete_exact_artifact("))
         self.assertIn("for artifact in candidates:", rotator)
         self.assertIn("select_old_handoffs(", rotator)
         self.assertIn("lossless visual reference changed", rotator)

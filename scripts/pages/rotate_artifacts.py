@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from itertools import islice
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 
 REPO = Path(__file__).resolve().parents[2]
@@ -59,9 +59,17 @@ class ApiError(RotationError):
         self.status = status
 
 
+class RotationDeferred(RotationError):
+    """A generation retained some candidates after completing these exact deletions."""
+
+    def __init__(self, message: str, deleted_artifact_ids: list[int]) -> None:
+        super().__init__(message)
+        self.deleted_artifact_ids = list(deleted_artifact_ids)
+
+
 @dataclass
 class DeletionBudget:
-    """Bound authenticated artifact deletions across one rotation invocation."""
+    """Bound authenticated deletion attempts across one rotation invocation."""
 
     remaining: int
     last_deferred_count: int = 0
@@ -71,9 +79,13 @@ class DeletionBudget:
 
     def select(self, artifacts: list[Artifact]) -> list[Artifact]:
         selected = artifacts[: self.remaining]
-        self.remaining -= len(selected)
-        self.last_deferred_count = len(artifacts) - len(selected)
+        self.last_deferred_count += len(artifacts) - len(selected)
         return selected
+
+    def consume(self) -> None:
+        if self.remaining <= 0:
+            raise RotationError("global deletion budget exhausted before artifact retirement")
+        self.remaining -= 1
 
 
 @dataclass(frozen=True)
@@ -553,9 +565,16 @@ def _validate_compatibility_keep(
     )
 
 
-def _delete_exact_artifact(api: ArtifactApi, artifact: Artifact) -> bool:
+def _delete_exact_artifact(
+    api: ArtifactApi, artifact: Artifact, *, deletion_budget: DeletionBudget | None = None
+) -> bool:
     """Delete one immutable snapshot entry, treating a concurrent 404 as success."""
 
+    # Owners and replacements have already passed their guards. Count this bounded retirement
+    # attempt even if its final metadata read or DELETE fails, but never charge a rejected scope's
+    # unattempted candidates against the next scope's budget.
+    if deletion_budget is not None:
+        deletion_budget.consume()
     try:
         current = api.get_artifact(artifact.artifact_id)
     except ApiError as exc:
@@ -593,6 +612,63 @@ def _list_replaced_caches(
                 raise RotationError("cache inventory has conflicting artifact identities")
             artifacts[artifact.artifact_id] = artifact
     return list(artifacts.values())
+
+
+@dataclass(frozen=True)
+class _RetirementGroup:
+    label: str
+    artifacts: list[Artifact]
+    workflow: str
+    branch: str
+    events: frozenset[str]
+    require_success: bool
+
+
+def _rotate_candidate_groups(
+    api: ArtifactApi,
+    groups: tuple[_RetirementGroup, ...],
+    *,
+    repository: str,
+    validate_keep: Callable[[], None],
+    deletion_budget: DeletionBudget | None,
+    delete_delay_seconds: float,
+) -> list[int]:
+    deleted: list[int] = []
+    deferred: list[str] = []
+    for group in groups:
+        candidates = group.artifacts
+        if deletion_budget is not None:
+            candidates = deletion_budget.select(candidates)
+        try:
+            # Authenticate the complete selected family before deleting any of it. A rejected
+            # historical handoff must remain intact without stranding an independent valid cache.
+            for artifact in candidates:
+                _validate_run(
+                    api.get_run(artifact.run_id),
+                    repository=repository,
+                    workflow=group.workflow,
+                    branch=group.branch,
+                    sha=artifact.head_sha,
+                    events=group.events,
+                    require_success=group.require_success,
+                )
+        except RotationError as exc:
+            deferred.append(f"{group.label} retirement: {exc}")
+            continue
+        try:
+            for artifact in candidates:
+                # Replacement/head and exact-ID failures stop the whole generation; only a
+                # family's owner rejection above permits the other family to proceed.
+                validate_keep()
+                if _delete_exact_artifact(api, artifact, deletion_budget=deletion_budget):
+                    deleted.append(artifact.artifact_id)
+                if delete_delay_seconds:
+                    time.sleep(delete_delay_seconds)
+        except RotationError as exc:
+            raise RotationDeferred("; ".join([*deferred, str(exc)]), deleted) from exc
+    if deferred:
+        raise RotationDeferred("; ".join(deferred), deleted)
+    return deleted
 
 
 def rotate_branch(
@@ -656,38 +732,8 @@ def rotate_branch(
         )
     else:
         handoffs = consumed_handoffs
-    candidates = [*old_caches, *handoffs]
-    if deletion_budget is not None:
-        candidates = deletion_budget.select(candidates)
-    selected_ids = {artifact.artifact_id for artifact in candidates}
-    selected_old_caches = [
-        artifact for artifact in old_caches if artifact.artifact_id in selected_ids
-    ]
-    selected_handoffs = [
-        artifact for artifact in handoffs if artifact.artifact_id in selected_ids
-    ]
-    for artifact in selected_old_caches:
-        _validate_run(
-            api.get_run(artifact.run_id),
-            repository=repository,
-            workflow=PAGES_WORKFLOW,
-            branch="master",
-            sha=artifact.head_sha,
-            events=PAGES_EVENTS,
-            require_success=False,
-        )
-    for artifact in selected_handoffs:
-        _validate_run(
-            api.get_run(artifact.run_id),
-            repository=repository,
-            workflow=E2E_WORKFLOW,
-            branch=generation.branch,
-            sha=artifact.head_sha,
-            events=frozenset({"workflow_dispatch"}),
-            require_success=True,
-        )
-    deleted: list[int] = []
-    for artifact in candidates:
+
+    def validate_keep() -> None:
         _validate_keep(
             api,
             generation,
@@ -701,11 +747,21 @@ def rotate_branch(
                 raise RotationError(
                     f"lossless visual reference changed while rotating {generation.branch}"
                 )
-        if _delete_exact_artifact(api, artifact):
-            deleted.append(artifact.artifact_id)
-        if delete_delay_seconds:
-            time.sleep(delete_delay_seconds)
-    return deleted
+
+    return _rotate_candidate_groups(
+        api,
+        (
+            _RetirementGroup("cache", old_caches, PAGES_WORKFLOW, "master", PAGES_EVENTS, False),
+            _RetirementGroup(
+                "handoff", handoffs, E2E_WORKFLOW, generation.branch,
+                frozenset({"workflow_dispatch"}), True,
+            ),
+        ),
+        repository=repository,
+        validate_keep=validate_keep,
+        deletion_budget=deletion_budget,
+        delete_delay_seconds=delete_delay_seconds,
+    )
 
 
 def rotate_compatibility_branch(
@@ -734,39 +790,8 @@ def rotate_compatibility_branch(
     old_handoffs = select_old_compatibility_handoffs(
         api.list_artifacts(handoff_name), branch=generation.key, keep=generation.keep
     )
-    candidates = [*old_caches, *old_handoffs]
-    if deletion_budget is not None:
-        candidates = deletion_budget.select(candidates)
-    selected_ids = {artifact.artifact_id for artifact in candidates}
-    selected_old_caches = [
-        artifact for artifact in old_caches if artifact.artifact_id in selected_ids
-    ]
-    selected_old_handoffs = [
-        artifact for artifact in old_handoffs if artifact.artifact_id in selected_ids
-    ]
-    for artifact in selected_old_caches:
-        _validate_run(
-            api.get_run(artifact.run_id),
-            repository=repository,
-            workflow=PAGES_WORKFLOW,
-            branch="master",
-            sha=artifact.head_sha,
-            events=PAGES_EVENTS,
-            require_success=False,
-        )
-    for artifact in selected_old_handoffs:
-        _validate_run(
-            api.get_run(artifact.run_id),
-            repository=repository,
-            workflow=COMPATIBILITY_REVIEW_WORKFLOW,
-            branch="master",
-            sha=artifact.head_sha,
-            events=COMPATIBILITY_REVIEW_EVENTS,
-            require_success=True,
-        )
 
-    deleted: list[int] = []
-    for artifact in candidates:
+    def validate_keep() -> None:
         _validate_compatibility_keep(
             api,
             generation,
@@ -774,11 +799,21 @@ def rotate_compatibility_branch(
             pages_run_id=pages_run_id,
             pages_run_sha=pages_run_sha,
         )
-        if _delete_exact_artifact(api, artifact):
-            deleted.append(artifact.artifact_id)
-        if delete_delay_seconds:
-            time.sleep(delete_delay_seconds)
-    return deleted
+
+    return _rotate_candidate_groups(
+        api,
+        (
+            _RetirementGroup("cache", old_caches, PAGES_WORKFLOW, "master", PAGES_EVENTS, False),
+            _RetirementGroup(
+                "handoff", old_handoffs, COMPATIBILITY_REVIEW_WORKFLOW, "master",
+                COMPATIBILITY_REVIEW_EVENTS, True,
+            ),
+        ),
+        repository=repository,
+        validate_keep=validate_keep,
+        deletion_budget=deletion_budget,
+        delete_delay_seconds=delete_delay_seconds,
+    )
 
 
 def rotate_generations(
@@ -833,7 +868,9 @@ def rotate_generations(
                 f"Pages evidence rotation deferred for {generation.key}: {exc}",
                 file=sys.stderr,
             )
-            summary[generation.key] = []
+            summary[generation.key] = (
+                exc.deleted_artifact_ids if isinstance(exc, RotationDeferred) else []
+            )
             deferred.append(generation.key)
     return summary, deferred
 
@@ -883,7 +920,9 @@ def rotate_compatibility_generations(
                 f"Pages compatibility rotation deferred for {generation.key}: {exc}",
                 file=sys.stderr,
             )
-            summary[generation.key] = []
+            summary[generation.key] = (
+                exc.deleted_artifact_ids if isinstance(exc, RotationDeferred) else []
+            )
             deferred.append(generation.key)
     return summary, deferred
 
@@ -925,27 +964,30 @@ def retire_pages_run_transients(
             )
         transients = deletion_budget.select(transients)
     deleted: list[int] = []
-    for artifact in transients:
-        for generation in generations:
-            _validate_keep(
-                api,
-                generation,
-                repository=repository,
-                pages_run_id=pages_run_id,
-                pages_run_sha=pages_run_sha,
-            )
-        for generation in compatibility:
-            _validate_compatibility_keep(
-                api,
-                generation,
-                repository=repository,
-                pages_run_id=pages_run_id,
-                pages_run_sha=pages_run_sha,
-            )
-        if _delete_exact_artifact(api, artifact):
-            deleted.append(artifact.artifact_id)
-        if delete_delay_seconds:
-            time.sleep(delete_delay_seconds)
+    try:
+        for artifact in transients:
+            for generation in generations:
+                _validate_keep(
+                    api,
+                    generation,
+                    repository=repository,
+                    pages_run_id=pages_run_id,
+                    pages_run_sha=pages_run_sha,
+                )
+            for generation in compatibility:
+                _validate_compatibility_keep(
+                    api,
+                    generation,
+                    repository=repository,
+                    pages_run_id=pages_run_id,
+                    pages_run_sha=pages_run_sha,
+                )
+            if _delete_exact_artifact(api, artifact, deletion_budget=deletion_budget):
+                deleted.append(artifact.artifact_id)
+            if delete_delay_seconds:
+                time.sleep(delete_delay_seconds)
+    except RotationError as exc:
+        raise RotationDeferred(str(exc), deleted) from exc
     return deleted
 
 
@@ -1223,7 +1265,9 @@ def main(argv: list[str] | None = None) -> int:
             # Same defer-not-abort posture: the fan-in and deploy transients are short-lived
             # uploads, so a mid-rotation keep change leaves them to their own retention.
             print(f"Pages run transient retirement deferred: {exc}", file=sys.stderr)
-            pages_run_deleted = []
+            pages_run_deleted = (
+                exc.deleted_artifact_ids if isinstance(exc, RotationDeferred) else []
+            )
         print(
             json.dumps(
                 {
