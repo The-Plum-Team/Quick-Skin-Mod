@@ -49,6 +49,9 @@ elif command == "python3":
     else:
         raise AssertionError(arguments)
 elif command == "gh":
+    if arguments[:2] == ["api", "rate_limit"]:
+        print(json.dumps({"limit": 1000, "used": 100, "remaining": 900, "reset": 1800000000}))
+        sys.exit(0)
     endpoint = next(arg for arg in arguments if arg.startswith("repos/"))
     if "/branches/master" in endpoint:
         count = sum(row[0] == "gh" and any("/branches/master" in arg for arg in row) for row in calls)
@@ -136,6 +139,9 @@ class PagesWorkflowApiBudgetTest(unittest.TestCase):
     def test_duplicate_deploy_queries_each_name_but_reads_one_validated_owner(self):
         result, calls, output = self.run_step("discover")
         self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(1, len(self.requests(calls, "rate_limit")))
+        self.assertIn('GitHub REST core budget: {"limit":1000,"used":100,"remaining":900,"reset":1800000000}',
+                      result.stderr)
         self.assertEqual(len(KEYS), len(self.requests(calls, "/actions/artifacts?")))
         self.assertEqual(1, len(self.requests(calls, "/actions/runs/900")))
         self.assertEqual(3, len(self.requests(calls, "/branches/master")))

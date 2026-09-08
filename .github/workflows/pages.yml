@@ -349,6 +349,7 @@ jobs:
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
 
+          github_api_budget_snapshot
           source_branch="$(python3 scripts/pages/evidence_target.py --kind source-branch)"
           source_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$source_branch" --jq .commit.sha)"
           if [[ "$source_sha" != "$GITHUB_SHA" ]]; then

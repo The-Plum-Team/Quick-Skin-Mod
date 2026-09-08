@@ -732,6 +732,7 @@ jobs:
           lanes_root="$RUNNER_TEMP/mod-compatibility-batch-lanes"
           api_cache="$RUNNER_TEMP/mod-compatibility-api-cache"
           mkdir -p "$lanes_root" "$api_cache"
+          authenticated_runtime_sources='{}'
 
           while IFS= read -r lane; do
             lane_id="$(jq -er .id <<< "$lane")"
@@ -823,9 +824,18 @@ jobs:
             original_source_repository="$GITHUB_REPOSITORY"
             original_run_id="$(jq -er .source_run_id "$proof")"
             if jq -e 'has("runtime_source")' "$proof" > /dev/null; then
-              jq -c .runtime_source "$proof" > "$RUNNER_TEMP/compatibility-runtime-source.json"
-              python3 scripts/ci/ci_reuse.py verify --kind e2e \
-                --reference "$RUNNER_TEMP/compatibility-runtime-source.json"
+              # Cache only a complete reference authenticated in this preparation. Every
+              # capsule still passes its own provenance, manifest and raw artifact checks.
+              runtime_reference="$(jq -Sc .runtime_source "$proof")"
+              if ! jq -e --arg reference "$runtime_reference" 'has($reference)' \
+                  <<< "$authenticated_runtime_sources" > /dev/null; then
+                printf '%s\n' "$runtime_reference" \
+                  > "$RUNNER_TEMP/compatibility-runtime-source.json"
+                python3 scripts/ci/ci_reuse.py verify --kind e2e \
+                  --reference "$RUNNER_TEMP/compatibility-runtime-source.json"
+                authenticated_runtime_sources="$(jq -c --arg reference "$runtime_reference" \
+                  '.[$reference] = true' <<< "$authenticated_runtime_sources")"
+              fi
               [[ "$(jq -er .runtime_source.coverage_sha "$proof")" == "$source_sha" ]]
               original_source_sha="$(jq -er .runtime_source.source.head_sha "$proof")"
               original_source_repository="$(jq -er .runtime_source.source.head_repository "$proof")"
@@ -910,6 +920,11 @@ jobs:
               --validate-input-only
           done < <(jq -c '.include[]' "$pending")
 
+          # References may be shared across capsules, but the protected generation must
+          # still be current after all capsule checks and before exposing the batch.
+          current_master="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" \
+            --jq .commit.sha)"
+          [[ "$current_master" == "$GITHUB_SHA" ]]
           batch="$RUNNER_TEMP/mod-compatibility-review-batch"
           python3 scripts/ci/mod_compatibility_review_batch.py assemble \
             --matrix "$pending" \

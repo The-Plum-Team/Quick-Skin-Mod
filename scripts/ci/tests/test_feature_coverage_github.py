@@ -172,7 +172,7 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
              patch.object(self.api, "current_sha", wraps=self.api.current_sha) as live:
             self.assertIsNotNone(self.prepare())
         queries = [tuple(sorted(call.kwargs.items())) for call in inventories.call_args_list]
-        self.assertEqual(1 + 2 * len(self.fixture.targets), len(queries))
+        self.assertEqual(2 + 2 * len(self.fixture.targets), len(queries))
         self.assertEqual(len(queries), len(set(queries)))
         self.assertEqual(2, live.call_count)
         self.assertEqual(len(self.fixture.targets), len(self.api.downloaded))

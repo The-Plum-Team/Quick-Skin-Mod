@@ -103,6 +103,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   availability of every exact target report and public archive, stopping at the first gap before
   expensive runtime and owner admission. A complete certificate still requires every original
   provenance, job, archive and report check; API failures never count as missing evidence.
+  Before issuing a duplicate baseline for the same source attempt, authenticate the existing
+  issuer and complete certificate against the current policy, verify its public artifacts remain
+  available, reauthenticate its runtime and job graph, and recheck the live source head. Later
+  baseline consumers still require their own availability checks. Observe the affected Actions
+  token's recorded quota counters rather than
+  inferring its budget or reset from a developer token.
 - Historical schema-2 port/anchor certificates remain available only for historical recovery;
   schema 3 retires automatic version ports. Never reuse a partial feature proof as either a
   complete shared baseline or a historical full-anchor certificate.
