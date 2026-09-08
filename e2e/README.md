@@ -265,9 +265,11 @@ checksum inventory. A leased dependency is installed into a game directory under
 artifact name rather than the store blob's digest name, because loaders discover only `*.jar`;
 installing a content-addressed name is refused instead of silently producing a mod the loader
 ignores. Installer hashes and runtime/version facts remain matrix-owned; the staged
-production and harness JAR hashes remain manifest-owned. GitHub-hosted jobs do not upload
-`RuntimeStore`; persistence is useful only on a developer machine or an explicitly managed
-self-hosted runner. Forge and NeoForge server installation retry bounded transient Maven failures
+production and harness JAR hashes remain manifest-owned. `RuntimeStore` is never uploaded as
+evidence. The installed Forge/NeoForge server keeps its own store and is the one piece of runtime
+material transported between GitHub jobs, under its exact recipe digest and only from a protected
+`master` generation, because its installer downloads unpinned Maven libraries on every install.
+The client install stays job-local. Forge and NeoForge server installation retry bounded transient Maven failures
 in a fresh isolated directory each time and publish only a complete tree with its launcher script,
 so an incomplete download can never contaminate the next attempt. That install now runs once per
 recipe rather than once per scenario: both loader installers download their own Maven libraries,

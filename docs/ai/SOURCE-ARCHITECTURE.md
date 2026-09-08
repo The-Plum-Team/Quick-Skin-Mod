@@ -237,8 +237,14 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   expected graphs under `build/generated`; generated Java is never tracked. Do not add a second
   partial JSON parser to Gradle.
 - `e2e/runtime_store.py` separates immutable reusable runtime blobs/trees from mutable run state.
-  Its content-addressed recipes include every compatibility input, and callers materialize a fresh
-  copy before launch. `RuntimeStore` is never uploaded as evidence.
+  Its content-addressed recipes include every compatibility input and a client/server role, and
+  callers materialize a fresh copy before launch. `RuntimeStore` is never uploaded as evidence.
+  The installed loader server lives in its own store so it can be transported between jobs.
+  `e2e/runtime_store_cache.py` derives that transport identity, always the exact server recipe
+  digest and never a commit, and names the immutable directories that may travel;
+  `scripts/ci/runtime_store_cache_policy.py` is the fail-closed writer policy that admits only a
+  protected `master` dispatch. A restore that fails validation is a cache miss and a fresh
+  install. See [ADR 0008](../architecture/decisions/0008-transport-the-installed-loader-server-between-jobs.md).
 - `e2e/visual_evidence.py` reads successful `result.json` reports, verifies the scenario-contract
   hash and exact graph, bounded printable passed-assertion messages, PNG containment, full decode,
   dimensions, SHA-256, probes, and comparisons, and exposes the shared evidence model used by the

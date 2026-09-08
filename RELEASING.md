@@ -98,6 +98,12 @@ discovers live branches directly. It deletes absent-branch caches and superseded
 SHA-bound Gradle-home generations by exact cache ID, while retaining the newest generation per
 OS/job/cache-version restore family whose SHA completed the real `Build and verify` job successfully.
 A family without that proof is not pruned. Unknown cache formats and non-branch refs are preserved.
+Packaged runtime keeps the second cache family, the installed Forge/NeoForge server, under its
+exact recipe digest rather than a commit; only a protected `master` dispatch may publish one, and
+every other context restores read-only with no prefix fallback. It is deliberately outside that
+cleanup: a recipe that leaves the release matrix is never restored again and expires under the
+platform's unused-entry policy, and teaching the pruner to read the matrix would give it the
+version inventory it must never infer.
 Because any workflow may restore the default branch and pull-request workflows may restore their
 base branch, any potentially cache-consuming active run preserves the complete cache inventory for
 that invocation. The protected cleanup run itself is ignored because it does not configure Gradle;
