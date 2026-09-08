@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -1071,6 +1072,77 @@ class PagesArtifactRotationTest(unittest.TestCase):
 
         self.assertEqual(deleted, [])
         self.assertEqual(api.deleted, [])
+
+    def test_shared_rotation_discovers_only_legacy_and_exact_generation_duplicates(self) -> None:
+        key = "mc1.21.1"
+        for compatibility in (False, True):
+            with self.subTest(compatibility=compatibility):
+                prefix = "pages-mod-compatibility" if compatibility else "pages"
+                legacy_name = f"{prefix}-cache-{key}"
+                keep = replace(self.keep, name=f"{legacy_name}--{TARGET_SHA}")
+                old = replace(
+                    keep, artifact_id=100, run_id=700, head_sha=OLD_PAGES_SHA,
+                    created_at="2026-08-03T11:00:00Z",
+                )
+                legacy = replace(old, artifact_id=90, name=legacy_name)
+                newer = replace(
+                    keep, artifact_id=300, run_id=901, created_at="2026-08-03T13:00:00Z"
+                )
+                other_generation = replace(
+                    old, artifact_id=80, name=f"{legacy_name}--{OLD_PAGES_SHA}"
+                )
+                foreign_owner = replace(old, artifact_id=81, head_branch="feature/other")
+                expired = replace(old, artifact_id=82, expired=True)
+                api = FakeApi(
+                    keep=keep,
+                    inventories={
+                        legacy_name: [legacy],
+                        keep.name: [old, old, keep, newer, foreign_owner, expired],
+                        other_generation.name: [other_generation],
+                    },
+                    runs={
+                        700: run(
+                            700, workflow=".github/workflows/pages.yml", event="schedule",
+                            branch="master", sha=OLD_PAGES_SHA,
+                        ),
+                        900: run(
+                            900, workflow=".github/workflows/pages.yml", event="workflow_dispatch",
+                            branch="master", sha=PAGES_SHA,
+                        ),
+                    },
+                    branch_shas={"master": TARGET_SHA},
+                )
+                if compatibility:
+                    generation = replace(
+                        self.compatibility_generation, branch="master", bundle_key=key, keep=keep
+                    )
+                    rotate = rotate_compatibility_branch
+                    handoff_name = f"pages-mod-compatibility-{key}"
+                    self.assertEqual(
+                        [old],
+                        select_old_compatibility_caches(
+                            [old, keep, newer, other_generation, foreign_owner, expired],
+                            branch=key, keep=keep,
+                        ),
+                    )
+                else:
+                    generation = replace(self.generation, branch="master", bundle_key=key, keep=keep)
+                    rotate = rotate_branch
+                    handoff_name = f"pages-e2e-{key}"
+                budget = DeletionBudget(32)
+                with patch.object(api, "list_artifacts", wraps=api.list_artifacts) as inventory:
+                    deleted = rotate(
+                        api, generation, repository=REPOSITORY, pages_run_id=900,
+                        pages_run_sha=PAGES_SHA, delete_delay_seconds=0, deletion_budget=budget,
+                    )
+                self.assertEqual([90, 100], deleted)
+                self.assertEqual([90, 100], api.deleted)
+                self.assertEqual(30, budget.remaining)
+                self.assertEqual(
+                    [legacy_name, keep.name, handoff_name],
+                    [call.args[0] for call in inventory.call_args_list],
+                )
+                self.assertEqual(0, api.commit_requests)
 
     def test_rotation_replaces_but_never_compacts_the_lossless_reference(self) -> None:
         old_cache = artifact(

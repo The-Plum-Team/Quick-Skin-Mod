@@ -2161,7 +2161,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--compatibility-evidence-root", rotate)
         self.assertIn("steps.owner.outputs.pages_run_sha", rotate)
         self.assertNotIn("list_artifacts_with_prefix", rotator)
-        self.assertIn("api.list_artifacts(cache_name)", rotator)
+        self.assertIn(
+            "_list_replaced_caches(api, legacy_name=cache_name, keep=generation.keep)",
+            rotator,
+        )
+        self.assertIn("api.list_artifacts(name)", rotator)
         self.assertIn("MAX_ROTATION_DELETIONS", rotator)
         self.assertIn("deletion_budget=deletion_budget", rotator)
         self.assertIn("MAX_TRANSIENT_KEEP_VALIDATIONS", rotator)

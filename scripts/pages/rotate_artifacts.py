@@ -266,11 +266,14 @@ def select_old_compatibility_caches(
     artifacts: list[Artifact], *, branch: str, keep: Artifact
 ) -> list[Artifact]:
     expected_name = f"pages-mod-compatibility-cache-{branch}"
+    allowed_names = {expected_name}
+    if re.fullmatch(rf"{re.escape(expected_name)}--[0-9a-f]{{40}}", keep.name):
+        allowed_names.add(keep.name)
     return sorted(
         (
             artifact
             for artifact in artifacts
-            if artifact.name == expected_name
+            if artifact.name in allowed_names
             and not artifact.expired
             and artifact.artifact_id != keep.artifact_id
             and artifact.head_branch == "master"
@@ -570,6 +573,28 @@ def _delete_exact_artifact(api: ArtifactApi, artifact: Artifact) -> bool:
     return True
 
 
+def _list_replaced_caches(
+    api: ArtifactApi, *, legacy_name: str, keep: Artifact
+) -> list[Artifact]:
+    """Find legacy caches and duplicates of this replacement's exact generation."""
+
+    names = [legacy_name]
+    if keep.name != legacy_name:
+        if re.fullmatch(rf"{re.escape(legacy_name)}--[0-9a-f]{{40}}", keep.name) is None:
+            raise RotationError("replacement cache has an unexpected name")
+        names.append(keep.name)
+    artifacts: dict[int, Artifact] = {}
+    for name in names:
+        for artifact in api.list_artifacts(name):
+            if artifact.name != name:
+                continue
+            previous = artifacts.get(artifact.artifact_id)
+            if previous is not None and previous != artifact:
+                raise RotationError("cache inventory has conflicting artifact identities")
+            artifacts[artifact.artifact_id] = artifact
+    return list(artifacts.values())
+
+
 def rotate_branch(
     api: ArtifactApi,
     generation: BranchGeneration,
@@ -591,10 +616,12 @@ def rotate_branch(
     handoff_name = f"pages-e2e-{generation.key}"
     # GitHub supports exact artifact-name filtering but not prefixes. A repository-wide prefix
     # scan grows with every unrelated artifact and can exhaust the installation quota before a
-    # single branch is rotated. Retire legacy exact-name caches here; SHA-namespaced caches remain
-    # bounded by their 90-day retention policy.
+    # single branch is rotated. Query the replacement's exact SHA name as well to retire its
+    # duplicate uploads; other SHA generations remain bounded by their 90-day retention policy.
     old_caches = select_old_caches(
-        api.list_artifacts(cache_name), branch=generation.key, keep=generation.keep
+        _list_replaced_caches(api, legacy_name=cache_name, keep=generation.keep),
+        branch=generation.key,
+        keep=generation.keep,
     )
     handoff_inventory = api.list_artifacts(handoff_name)
     consumed_handoffs = select_consumed_handoffs(
@@ -700,7 +727,9 @@ def rotate_compatibility_branch(
     cache_name = f"pages-mod-compatibility-cache-{generation.key}"
     handoff_name = f"pages-mod-compatibility-{generation.key}"
     old_caches = select_old_compatibility_caches(
-        api.list_artifacts(cache_name), branch=generation.key, keep=generation.keep
+        _list_replaced_caches(api, legacy_name=cache_name, keep=generation.keep),
+        branch=generation.key,
+        keep=generation.keep,
     )
     old_handoffs = select_old_compatibility_handoffs(
         api.list_artifacts(handoff_name), branch=generation.key, keep=generation.keep
