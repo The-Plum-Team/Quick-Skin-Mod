@@ -259,6 +259,13 @@ logging; the exporter waits for the complete group and force-stops it as a unit 
 - missing, corrupt, or recipe-mismatched content is always a cache miss. Garbage collection is
   bounded housekeeping, never a correctness mechanism.
 
+Session metrics include both client and server stores, counting a shared store only once.
+Housekeeping applies `QUICKSKIN_E2E_RUNTIME_STORE_MAX_AGE_SECONDS` to both stores (14 days by
+default) and shares `QUICKSKIN_E2E_RUNTIME_STORE_MAX_BYTES` between them (20 GiB by default).
+After removing expired material, it evicts client recipes before server recipes to avoid repeating
+the loader's Maven downloads. Active leases in either store remain protected and can temporarily
+keep the total above that byte budget.
+
 Loader and Architectury Maven JAR hashes come from the strict SHA-256 entries in
 [`gradle/verification-metadata.xml`](../gradle/verification-metadata.xml), rather than a second
 checksum inventory. A leased dependency is installed into a game directory under its real Maven

@@ -1109,6 +1109,125 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def runtime_recipe(self, role: str) -> runtime_store.RuntimeRecipe:
+        return runtime_store.RuntimeRecipe.for_host(
+            java_major=21,
+            minecraft_version="1.21.4",
+            loader="neoforge",
+            loader_version="21.4.156",
+            installer_sha256="a" * 64,
+            launcher_library_revision="test-installer-v1",
+            normalizer_revision="test-normalizer-v1",
+            role=role,
+        )
+
+    def publish_runtime(
+        self, store: runtime_store.RuntimeStore, role: str, content: bytes
+    ) -> runtime_store.RuntimeRecipe:
+        recipe = self.runtime_recipe(role)
+
+        def build(staging: Path) -> None:
+            (staging / "runtime.jar").write_bytes(content)
+
+        with store.get_or_create_lease(recipe, build):
+            pass
+        return recipe
+
+    def test_session_counts_and_collects_client_and_server_stores_once(self) -> None:
+        for separate in (False, True):
+            with self.subTest(separate=separate):
+                root = self.root / str(separate)
+                client_store = runtime_store.RuntimeStore(root / "client")
+                server_store = (
+                    runtime_store.RuntimeStore(root / "server") if separate else client_store
+                )
+                session = packaged_runtime.PackagedRuntimeSession(
+                    client_store,
+                    root / "scratch",
+                    server_store=server_store,
+                    gc_max_age=0,
+                )
+                client = self.publish_runtime(client_store, "client", b"client")
+                server = self.publish_runtime(server_store, "server", b"server")
+                self.assertIsNotNone(client_store.lookup(client))
+                self.assertIsNotNone(server_store.lookup(server))
+
+                self.assertEqual(
+                    {
+                        "hits": 2,
+                        "misses": 2,
+                        "pruned_entries": 0,
+                        "pruned_bytes": 0,
+                        "total_bytes": 12,
+                    },
+                    session.metrics(),
+                )
+                self.assertEqual(
+                    {
+                        "hits": 2,
+                        "misses": 2,
+                        "pruned_entries": 2,
+                        "pruned_bytes": 12,
+                        "total_bytes": 0,
+                    },
+                    session.gc(),
+                )
+                self.assertEqual(0, client_store.total_blob_bytes())
+                self.assertEqual(0, server_store.total_blob_bytes())
+
+    def test_session_byte_budget_is_shared_and_prefers_retaining_server(self) -> None:
+        session = packaged_runtime.PackagedRuntimeSession.from_environment(
+            self.root / "scratch",
+            {
+                packaged_runtime.RUNTIME_STORE_ENV: str(self.root / "client"),
+                packaged_runtime.SERVER_STORE_ENV: str(self.root / "server"),
+                packaged_runtime.RUNTIME_STORE_MAX_BYTES_ENV: "8",
+            },
+        )
+        client = self.publish_runtime(session.store, "client", b"client")
+        server = self.publish_runtime(session.server_store, "server", b"server")
+
+        after = session.gc()
+
+        self.assertEqual(6, after["total_bytes"])
+        self.assertEqual(6, after["pruned_bytes"])
+        self.assertEqual(1, after["pruned_entries"])
+        self.assertEqual(0, session.store.total_blob_bytes())
+        self.assertEqual(6, session.server_store.total_blob_bytes())
+        self.assertIsNone(session.store.lookup(client))
+        self.assertIsNotNone(session.server_store.lookup(server))
+
+    def test_session_byte_collection_preserves_live_leases_in_either_store(self) -> None:
+        for leased_role in ("client", "server"):
+            with self.subTest(leased_role=leased_role):
+                root = self.root / leased_role
+                session = packaged_runtime.PackagedRuntimeSession.from_environment(
+                    root / "scratch",
+                    {
+                        packaged_runtime.RUNTIME_STORE_ENV: str(root / "client"),
+                        packaged_runtime.RUNTIME_STORE_MAX_BYTES_ENV: "0",
+                    },
+                )
+                client = self.publish_runtime(session.store, "client", b"client")
+                server = self.publish_runtime(session.server_store, "server", b"server")
+                leased_store, leased_recipe = (
+                    (session.store, client)
+                    if leased_role == "client"
+                    else (session.server_store, server)
+                )
+
+                with leased_store.lease(leased_recipe):
+                    after = session.gc()
+                    self.assertEqual(6, after["total_bytes"])
+                    self.assertEqual(6, after["pruned_bytes"])
+                    self.assertEqual(1, after["pruned_entries"])
+                    self.assertEqual(6, leased_store.total_blob_bytes())
+
+                after = session.gc()
+                self.assertEqual(0, after["total_bytes"])
+                self.assertEqual(12, after["pruned_bytes"])
+                self.assertEqual(2, after["pruned_entries"])
+
     def test_environment_store_root_gc_and_summary_metrics_are_bounded(self) -> None:
         configured = self.root / "persistent-cache"
         env = {

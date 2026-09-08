@@ -356,18 +356,37 @@ class PackagedRuntimeSession:
     def install_log(self, recipe: RuntimeRecipe) -> Path:
         return self.logs_root / f"{recipe.digest()}.log"
 
+    def _runtime_stores(self) -> tuple[RuntimeStore, ...]:
+        if self.server_store is self.store:
+            return (self.store,)
+        return (self.store, self.server_store)
+
     def metrics(self) -> dict[str, int]:
-        metrics = self.store.metrics
+        stores = self._runtime_stores()
+        metrics = [store.metrics for store in stores]
         return {
-            "hits": metrics.hits,
-            "misses": metrics.misses,
-            "pruned_entries": metrics.pruned,
-            "pruned_bytes": metrics.pruned_bytes,
-            "total_bytes": self.store.total_blob_bytes(),
+            "hits": sum(metric.hits for metric in metrics),
+            "misses": sum(metric.misses for metric in metrics),
+            "pruned_entries": sum(metric.pruned for metric in metrics),
+            "pruned_bytes": sum(metric.pruned_bytes for metric in metrics),
+            "total_bytes": sum(store.total_blob_bytes() for store in stores),
         }
 
     def gc(self) -> dict[str, int]:
-        self.store.gc(max_age=self.gc_max_age, max_bytes=self.gc_max_bytes)
+        stores = self._runtime_stores()
+        for store in stores:
+            store.gc(max_age=self.gc_max_age)
+
+        # Splitting the store must not multiply the configured byte budget. Collect expired
+        # material from both stores first, then prefer evicting client recipes because rebuilding
+        # a server repeats the loader's Maven downloads. Each store still protects live leases.
+        sizes = [store.total_blob_bytes() for store in stores]
+        for index, store in enumerate(stores):
+            excess = sum(sizes) - self.gc_max_bytes
+            if excess <= 0:
+                break
+            store.gc(max_bytes=max(0, sizes[index] - excess))
+            sizes[index] = store.total_blob_bytes()
         return self.metrics()
 
 

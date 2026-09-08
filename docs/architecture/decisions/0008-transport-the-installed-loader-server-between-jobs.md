@@ -27,8 +27,10 @@ net.neoforged.installertools:cli-utils:3.0.5
 The stack ends in the TLS socket while parsing the HTTP response header, so the connection died
 mid-response rather than returning a 404, and sibling libraries from the same host validated their
 checksums seconds earlier. Measured directly, `cli-utils-3.0.5.jar` is nine kilobytes and answered
-in 5.08 s against a cold CDN edge and in 0.056 s once warm. This is edge-cache and connection
-shedding under load, and the load is ours: sixteen waves start at once, each with several lanes.
+in 5.08 s on the first request and in 0.056 s on the next. These observations establish variable
+download latency and connection failures; they do not establish a CDN-cache or throttling cause.
+Sixteen waves start at once, each with several lanes, so avoiding repeated downloads reduces
+exposure to those failures regardless of their upstream cause.
 
 `prepare_server` previously ran that install once per scenario, so a compatibility lane performed
 eleven of them. That is fixed separately by routing the install through `RuntimeStore`, which

@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
+import shutil
 import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import Mock
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "e2e"))
 
 import runtime_store_cache as cache
+from packaged_runtime import server_runtime_recipe
+from runtime_store import RuntimeStore
 
 
 MATRIX = {
@@ -182,6 +187,93 @@ class RuntimeStoreCacheIdentityTest(unittest.TestCase):
             )
         self.assertEqual(2, code)
         self.assertIn("Runtime store cache identity error", stderr.getvalue())
+
+
+class RuntimeStoreCacheTransportTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.recipe = server_runtime_recipe(
+            MATRIX, NEOFORGE_ROW, os_name="linux", architecture="x86_64"
+        )
+        self.files = {
+            "run.sh": b"#!/bin/sh\nexec java @user_jvm_args.txt\n",
+            "user_jvm_args.txt": b"-Xmx1G\n",
+            "libraries/example/server.jar": b"fixture server library\n",
+        }
+
+    def build_fixture(self, staging: Path) -> None:
+        self.assertEqual([], list(staging.iterdir()))
+        for relative, content in self.files.items():
+            path = staging / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        (staging / "run.sh").chmod(0o755)
+
+    def transport(self) -> Path:
+        producer = RuntimeStore(self.root / "producer")
+        consumer_root = self.root / "consumer"
+        with producer.get_or_create_lease(self.recipe, self.build_fixture):
+            self.assertTrue(any((producer.leases_dir / "active").glob("*.json")))
+            (producer.tmp_dir / "unfinished-install").write_bytes(b"local staging")
+            # Copy exactly the workflow's cache paths while the producer still owns a live lease.
+            # The new runner must reconstruct its own locks and staging from an empty root.
+            for source in map(Path, cache.store_paths(producer.cache_root)):
+                shutil.copytree(source, consumer_root / source.relative_to(producer.cache_root))
+        transported_root = consumer_root / "RuntimeStore" / "v1"
+        self.assertEqual(
+            {"blobs", "recipes", "trees"},
+            {path.name for path in transported_root.iterdir()},
+        )
+        return consumer_root
+
+    def assert_materialized_fixture(self, destination: Path) -> None:
+        self.assertEqual(
+            self.files,
+            {
+                path.relative_to(destination).as_posix(): path.read_bytes()
+                for path in destination.rglob("*")
+                if path.is_file()
+            },
+        )
+
+    def test_transported_server_materializes_on_a_new_runner_without_installing(self) -> None:
+        consumer = RuntimeStore(self.transport())
+        builder = Mock(side_effect=AssertionError("a valid transported server was reinstalled"))
+        destination = self.root / "server-run"
+
+        consumer.materialize_get_or_create(self.recipe, builder, destination)
+
+        builder.assert_not_called()
+        self.assert_materialized_fixture(destination)
+        self.assertEqual(1, consumer.metrics.hits)
+        self.assertEqual(0, consumer.metrics.misses)
+        # A game's writable instance is isolated from the transported immutable content.
+        (destination / "libraries/example/server.jar").write_bytes(b"runtime mutation")
+        another_run = self.root / "another-server-run"
+        consumer.materialize_get_or_create(self.recipe, builder, another_run)
+        builder.assert_not_called()
+        self.assert_materialized_fixture(another_run)
+
+    def test_corrupt_transported_blob_rebuilds_in_fresh_staging_before_materialization(self) -> None:
+        consumer = RuntimeStore(self.transport())
+        library = self.files["libraries/example/server.jar"]
+        digest = hashlib.sha256(library).hexdigest()
+        blob = consumer.path_for_blob(digest)
+        blob.chmod(0o644)
+        blob.write_bytes(b"x" * len(library))
+        builder = Mock(side_effect=self.build_fixture)
+        destination = self.root / "repaired-server-run"
+
+        consumer.materialize_get_or_create(self.recipe, builder, destination)
+
+        builder.assert_called_once()
+        self.assert_materialized_fixture(destination)
+        self.assertEqual(library, blob.read_bytes())
+        self.assertEqual(0, consumer.metrics.hits)
+        self.assertEqual(1, consumer.metrics.misses)
+        self.assertEqual(self.recipe, consumer.validate(self.recipe).recipe)
 
 
 if __name__ == "__main__":
