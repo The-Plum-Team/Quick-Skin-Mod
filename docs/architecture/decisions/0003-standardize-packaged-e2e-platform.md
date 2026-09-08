@@ -76,8 +76,11 @@ Separate mutable execution state from reusable runtime material:
 - dependency JARs use the existing strict Gradle verification metadata as their SHA-256 authority,
   avoiding a second checksum inventory.
 
-Do not upload `RuntimeStore` from GitHub-hosted jobs. It is job-local there and persistent only for
-developers or explicitly managed self-hosted runners. Upload only the current run's bounded evidence.
+Do not upload `RuntimeStore` as evidence. Upload only the current run's bounded evidence.
+This decision originally kept the whole store job-local on GitHub-hosted runners; the installed
+loader server is now transported between jobs under the restrictions in
+[ADR 0008](0008-transport-the-installed-loader-server-between-jobs.md), because its installer
+downloads unpinned Maven libraries on every install. The client install remains job-local.
 
 Move Minecraft API drift behind `VanillaShim` (or a later typed E2E driver) and enforce that known
 drift seams do not return to scenario classes. Quick Skin private-state probes may remain reflective

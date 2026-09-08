@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -235,6 +236,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('[[ "$(git rev-parse HEAD)" == "$EXPECTED_SOURCE_SHA" ]]', action)
         self.assertIn('GITHUB_SHA="$EXPECTED_SOURCE_SHA"', action)
         self.assertIn("QUICKSKIN_E2E_RUNTIME_STORE", action)
+        self.assertIn("QUICKSKIN_E2E_SERVER_STORE", action)
         self.assertIn("xvfb-run --auto-servernum", action)
         self.assertNotIn("-noreset", action)
         self.assertIn("e2e/ci_summary.py", action)
@@ -253,6 +255,32 @@ class WorkflowSecurityTest(unittest.TestCase):
             "evidence-retention-days: '7'",
             on_demand,
         )
+
+    def test_installed_server_cache_is_exact_read_only_and_immutable_only(self) -> None:
+        action = (
+            COMPOSITE_ACTIONS / "run-packaged-e2e" / "action.yml"
+        ).read_text(encoding="utf-8")
+
+        # The transported material is the installed loader server, keyed by its recipe digest.
+        self.assertIn("e2e/runtime_store_cache.py", action)
+        self.assertIn("scripts/ci/runtime_store_cache_policy.py", action)
+        # An exact key with no prefix fallback: a near miss must never satisfy an exact lookup.
+        self.assertNotIn("restore-keys", action)
+        for step in ("actions/cache/restore@", "actions/cache/save@"):
+            self.assertIn(step, action)
+            pinned = action.split(step, 1)[1][:40]
+            self.assertRegex(pinned, r"^[0-9a-f]{40}$")
+        # Publishing is restricted to a protected generation the policy approves.
+        self.assertIn("steps.server-store-policy.outputs.read-only == 'false'", action)
+        self.assertIn("steps.server-store.outputs.transported == 'true'", action)
+        # Machine-local run state must never travel: its OS locks and device/inode identities
+        # are meaningless on another runner.
+        sys.path.insert(0, str(ROOT / "e2e"))
+        import runtime_store_cache as identity
+
+        self.assertEqual(("blobs", "recipes", "trees"), identity.IMMUTABLE_SUBDIRECTORIES)
+        for machine_local in ("leases", "tmp", "trash"):
+            self.assertNotIn(machine_local, identity.IMMUTABLE_SUBDIRECTORIES)
 
     def test_packaged_e2e_has_no_unattended_schedule_and_selects_matrix_owned_coverage(self) -> None:
         workflow = (WORKFLOWS / "on-demand-e2e.yml").read_text(encoding="utf-8")

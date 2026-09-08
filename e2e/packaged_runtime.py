@@ -185,6 +185,7 @@ SERVER_NORMALIZER_REVISION = "server-run-script-v1"
 DEFAULT_RUNTIME_STORE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60
 DEFAULT_RUNTIME_STORE_MAX_BYTES = 20 * 1024 * 1024 * 1024
 RUNTIME_STORE_ENV = "QUICKSKIN_E2E_RUNTIME_STORE"
+SERVER_STORE_ENV = "QUICKSKIN_E2E_SERVER_STORE"
 RUNTIME_STORE_MAX_AGE_ENV = "QUICKSKIN_E2E_RUNTIME_STORE_MAX_AGE_SECONDS"
 RUNTIME_STORE_MAX_BYTES_ENV = "QUICKSKIN_E2E_RUNTIME_STORE_MAX_BYTES"
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
@@ -251,23 +252,37 @@ class PackagedRuntimeSession:
         store: RuntimeStore,
         run_root: Path,
         *,
+        server_store: RuntimeStore | None = None,
         gc_max_age: int = DEFAULT_RUNTIME_STORE_MAX_AGE_SECONDS,
         gc_max_bytes: int = DEFAULT_RUNTIME_STORE_MAX_BYTES,
     ) -> None:
         self.store = store
+        # The installed server tree lives in its own store so it can be retained, bounded and
+        # transported independently from the much larger client install that shares no lifetime
+        # with it. Both remain content-addressed stores with identical validation.
+        self.server_store = store if server_store is None else server_store
         self.run_root = Path(run_root)
         self.run_root.mkdir(parents=True, exist_ok=True)
         run_stat = self.run_root.lstat()
         if stat.S_ISLNK(run_stat.st_mode) or not stat.S_ISDIR(run_stat.st_mode):
             raise RuntimeFailure(f"runtime session root is not a real directory: {run_root}")
-        store_root = self.store.root.resolve()
         resolved_run_root = self.run_root.resolve()
-        if (
-            store_root == resolved_run_root
-            or store_root in resolved_run_root.parents
-            or resolved_run_root in store_root.parents
+        roots = [self.store.root.resolve()]
+        if self.server_store is not self.store:
+            roots.append(self.server_store.root.resolve())
+        for store_root in roots:
+            if (
+                store_root == resolved_run_root
+                or store_root in resolved_run_root.parents
+                or resolved_run_root in store_root.parents
+            ):
+                raise RuntimeFailure("RuntimeStore and scratch run roots must not overlap")
+        if len(roots) == 2 and (
+            roots[0] == roots[1]
+            or roots[0] in roots[1].parents
+            or roots[1] in roots[0].parents
         ):
-            raise RuntimeFailure("RuntimeStore and scratch run roots must not overlap")
+            raise RuntimeFailure("client and server RuntimeStore roots must not overlap")
         self.gc_max_age = _bounded_configuration_integer(
             gc_max_age, "runtime store max age", maximum=365 * 24 * 60 * 60
         )
@@ -309,6 +324,7 @@ class PackagedRuntimeSession:
         return cls(
             RuntimeStore(cache_root),
             run_root,
+            server_store=RuntimeStore(server_store_cache_root(selected_env)),
             gc_max_age=max_age,
             gc_max_bytes=max_bytes,
         )
@@ -378,6 +394,23 @@ def _configuration_from_environment(
     if not isinstance(raw, str) or not raw or raw != raw.strip() or not raw.isdecimal():
         raise RuntimeFailure(f"{name} must be a non-negative decimal integer")
     return _bounded_configuration_integer(int(raw), name, maximum=maximum)
+
+
+def server_store_cache_root(env: Mapping[str, str] | None = None) -> Path:
+    """Resolve the installed-server store root, always disjoint from the client store.
+
+    The server tree is the one a scenario reinstalls from a loader installer that downloads
+    unpinned Maven libraries, so it is kept in its own store and can be transported on its own.
+    """
+
+    selected_env = os.environ if env is None else env
+    configured = selected_env.get(SERVER_STORE_ENV)
+    if configured is not None:
+        if not isinstance(configured, str) or not configured or configured != configured.strip():
+            raise RuntimeFailure(f"{SERVER_STORE_ENV} must be a non-empty trimmed path")
+        return Path(configured).expanduser().resolve()
+    client_root = runtime_store_cache_root(selected_env)
+    return client_root.with_name(client_root.name + "-server")
 
 
 def runtime_store_cache_root(env: Mapping[str, str] | None = None) -> Path:
@@ -486,9 +519,17 @@ def client_runtime_recipe(
 
 
 def server_runtime_recipe(
-    matrix: dict[str, Any], row: dict[str, Any]
+    matrix: dict[str, Any],
+    row: dict[str, Any],
+    *,
+    os_name: str | None = None,
+    architecture: str | None = None,
 ) -> RuntimeRecipe:
-    """Identity of one installed loader server tree, in its own role namespace."""
+    """Identity of one installed loader server tree, in its own role namespace.
+
+    ``os_name`` and ``architecture`` default to this host. A caller that derives the identity
+    for another host, such as the protected cache pruner, must name them explicitly.
+    """
 
     installer = matrix.get("installers", {}).get(row.get("installer"))
     if not isinstance(installer, dict):
@@ -505,6 +546,8 @@ def server_runtime_recipe(
         launcher_library_revision=SERVER_INSTALLER_REVISION,
         normalizer_revision=SERVER_NORMALIZER_REVISION,
         role="server",
+        os_name=os_name,
+        architecture=architecture,
     )
 
 
@@ -2456,7 +2499,7 @@ def run_packaged_row(
                 matrix,
                 row,
                 server,
-                runtime_session.store,
+                runtime_session.server_store,
                 java,
                 server_install_log,
             )

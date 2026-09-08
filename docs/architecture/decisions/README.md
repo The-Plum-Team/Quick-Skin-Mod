@@ -10,6 +10,7 @@ Accepted project decisions:
 - [ADR 0005: Certify Minecraft 1.20.1 before version fan-out](0005-certify-1-20-1-before-version-fanout.md)
 - [ADR 0006: Admit AI review by generation and product impact](0006-admit-ai-by-generation-and-product-impact.md)
 - [ADR 0007: Admit optional-mod compatibility waves from module coverage](0007-admit-optional-mod-waves-from-module-coverage.md)
+- [ADR 0008: Transport the installed loader server between jobs](0008-transport-the-installed-loader-server-between-jobs.md)
 
 An ADR records the evidence and trade-offs behind a decision. Operational instructions remain in
 the focused human and AI documentation linked from the repository root.

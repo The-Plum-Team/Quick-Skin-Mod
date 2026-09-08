@@ -297,7 +297,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   scenario reuses them instead of repeating an install whose loader downloads unpinned Maven
   libraries. Recipe identity includes schema, host OS/architecture, Java major, Minecraft and
   loader versions, exact installer hash, launcher-library revision, normalizer revision, and the
-  client/server role that keeps those two trees in separate identity namespaces.
+  client/server role that keeps those two trees in separate identity namespaces. The installed
+  server keeps its own store and is the only runtime material transported between jobs: under its
+  exact recipe digest with no prefix fallback, carrying only immutable content-addressed material,
+  published only by a protected `master` generation, and always optional because a restore that
+  fails the store's own validation is a cache miss and a fresh install.
   Publish verified immutable trees under a recipe lock, hold an OS-backed lease continuously from
   lookup/build through materialization, and materialize a fresh mutable copy. Collection
   non-blockingly probes the paired lock, preserves live cross-process builders/leases, and reaps

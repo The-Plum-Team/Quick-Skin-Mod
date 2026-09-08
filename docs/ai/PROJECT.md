@@ -332,6 +332,12 @@ into those branches. Their source matrices and existing evidence remain intact d
   `master` may write. Release branches restore their last known branch cache read-only; pull
   requests, ephemeral branches, Packaged E2E, and Release are also read-only. This bounds immutable
   generations without making the release-branch inventory another cache-policy input.
+- Packaged runtime owns the second cache family, the installed Forge/NeoForge server, keyed by its
+  exact recipe digest rather than a commit. Only a protected `master` dispatch may publish an
+  entry; every other context restores read-only, with no prefix fallback, and a restore that fails
+  the store's own validation is a cache miss and a fresh install. Retention is the platform's
+  unused-entry expiry: a recipe that leaves the matrix is never restored again. The cache pruner
+  stays narrow and must never read the release matrix.
 - Shared behavior changes start on `master`. A version-only fix starts on its release branch and
   must be reflected in canonical `master` sources when the same behavior applies elsewhere.
 - A shared change is not repository-wide delivery merely because it reached `master`. The
