@@ -97,6 +97,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   the protected merge is a separate coverage generation. Missing or expired evidence permits
   fresh execution; an API failure, pending original execution or malformed proof stops admission.
   Repeated producer wakes must skip targets with an authenticated existing capsule or report.
+- Budget GitHub API work by its exact consumer. A direct compatibility source wake must not
+  start a full recovery sweep after settling; only the scheduled/manual recovery chain continues
+  that sweep. Baseline requests follow all review-owner tail jobs. The collector first checks
+  availability of every exact target report and public archive, stopping at the first gap before
+  expensive runtime and owner admission. A complete certificate still requires every original
+  provenance, job, archive and report check; API failures never count as missing evidence.
 - Historical schema-2 port/anchor certificates remain available only for historical recovery;
   schema 3 retires automatic version ports. Never reuse a partial feature proof as either a
   complete shared baseline or a historical full-anchor certificate.

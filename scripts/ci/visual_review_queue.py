@@ -422,12 +422,41 @@ def list_pending_candidates(
     artifacts = api.list_artifacts()
     if len(artifacts) > MAX_ARTIFACTS:
         raise QueueError(f"visual review artifact inventory exceeds {MAX_ARTIFACTS}")
-    reviewed = reviewed_entries(api, artifacts, repository=repository)
-    blocked = blocked_generations(api, artifacts, repository=repository)
-    certified = certified_generations(api, artifacts, repository=repository)
+    current_master = api.get_branch_sha("master")
+    inputs = [
+        artifact for artifact in artifacts
+        if INPUT_NAME.fullmatch(artifact.name) and not artifact.expired
+        and artifact.size_in_bytes <= MAX_INPUT_BYTES
+        and input_generation(artifact) == current_master
+    ]
+    if not inputs:
+        return []
+    candidate_keys = {
+        (int(INPUT_NAME.fullmatch(artifact.name).group("source")), input_target(artifact))
+        for artifact in inputs
+    }
+
+    def related_marker(artifact: Artifact) -> bool:
+        for pattern in (REPORT_NAME, ATTEMPT_NAME):
+            match = pattern.fullmatch(artifact.name)
+            if match is not None:
+                return (int(match.group("source")), match.group("target")) in candidate_keys
+        for pattern in (WAVE_BLOCK_NAME, CERTIFICATE_NAME):
+            match = pattern.fullmatch(artifact.name)
+            if match is not None:
+                return match.group("generation") == current_master
+        return False
+
+    # Parse and bound the full repository inventory, but authenticate only markers that can
+    # affect an eligible source/target. Capsule age and its producer's SHA are not filters:
+    # legacy capsules and older protected producers may still own the current generation.
+    markers = [artifact for artifact in artifacts if related_marker(artifact)]
+    reviewed = reviewed_entries(api, markers, repository=repository)
+    blocked = blocked_generations(api, markers, repository=repository)
+    certified = certified_generations(api, markers, repository=repository)
     attempts = _valid_sources(
         api,
-        artifacts,
+        markers,
         repository=repository,
         pattern=ATTEMPT_NAME,
         workflow=DRAIN_WORKFLOW,
@@ -444,7 +473,7 @@ def list_pending_candidates(
     }
     pending = _valid_sources(
         api,
-        artifacts,
+        inputs,
         repository=repository,
         pattern=INPUT_NAME,
         workflow=PREPARE_WORKFLOW,

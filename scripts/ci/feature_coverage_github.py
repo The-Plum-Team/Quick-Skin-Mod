@@ -296,20 +296,45 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
         coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
             source_sha=source_sha, source_run_id=source_run_id, matrix_kind="native-anchors")
         return None  # A scheduled integration run has no complete Pages-baseline publication.
-    import ci_reuse
-    runtime = ci_reuse.runtime_source(api, source_run_id, source_sha)
-    graph = runtime.graph
-    if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in runtime.artifacts):
+    source_artifacts = api.artifacts(run_id=source_run_id)
+    if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in source_artifacts):
         return None  # Partial generations retain their earlier complete baseline.
-    metadata, public = {}, {}
-    for target in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]:
+    targets = coverage.inventory(coverage.DEFAULT_MATRIX)["include"]
+    reports, public_candidates_by_key = {}, {}
+    # Every target must exist before any runtime descriptor, owner graph or report archive is
+    # resolved. An early wake cannot certify a partial generation, so defer at its first gap.
+    for target in targets:
         key = target["bundle_key"]
         candidates = api.artifacts(name=f"visual-review-{source_run_id}--{key}")
         if not candidates:
             return None
         if len(candidates) != 1:
             raise coverage.CoverageError("baseline target has ambiguous normalized review reports")
-        candidate = candidates[0]
+        reports[key] = candidates[0]
+        public_candidates_by_key[key] = api.artifacts(name=public_baseline_name(key, source_sha, source_run_id))
+        if not any(candidate.get("expired") is not True for candidate in public_candidates_by_key[key]):
+            return None
+
+    class SourceInventory:
+        """Reuse only this invocation's source inventory; runtime owners/jobs stay live."""
+
+        def artifacts(self, *, run_id: int | None = None, name: str | None = None) -> list[dict[str, Any]]:
+            if run_id == source_run_id and name is None:
+                return source_artifacts
+            return api.artifacts(run_id=run_id, name=name)
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(api, name)
+
+    import ci_reuse
+    runtime = ci_reuse.runtime_source(SourceInventory(), source_run_id, source_sha)
+    graph = runtime.graph
+    if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in runtime.artifacts):
+        return None  # Partial generations retain their earlier complete baseline.
+    metadata, public = {}, {}
+    for target in targets:
+        key = target["bundle_key"]
+        candidate = reports[key]
         owner_record = candidate.get("workflow_run")
         if not isinstance(owner_record, dict):
             raise coverage.CoverageError("normalized report has no owner")
@@ -318,7 +343,7 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
             return None
         metadata[key] = coverage.validate_review_owner(candidate, owner, api.jobs(owner),
             github_repository=api.repository, source_sha=source_sha, source_run_id=source_run_id, bundle_key=key)
-        public_candidates = api.artifacts(name=public_baseline_name(key, source_sha, source_run_id))
+        public_candidates = public_candidates_by_key[key]
         for candidate in sorted(public_candidates, key=lambda item: item.get("id", 0), reverse=True)[:8]:
             if candidate.get("expired") is True:
                 continue

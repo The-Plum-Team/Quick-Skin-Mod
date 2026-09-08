@@ -82,48 +82,45 @@ def select_source(
     cache_name = f"pages-cache-{key}--{current_sha}"
     legacy_name = f"pages-cache-{branch}"
 
-    handoff = _newest_valid(
-        api,
-        [
-            artifact
-            for artifact in api.list_artifacts(handoff_name)
-            if artifact.name == handoff_name
-            and not artifact.expired
-            and artifact.head_branch == branch
-            and artifact.head_sha == current_sha
-        ],
-        repository=repository,
-        workflow=E2E_WORKFLOW,
-        branch=branch,
-        sha_from_artifact=False,
-        sha=current_sha,
-        events=frozenset({"workflow_dispatch"}),
-    )
+    handoffs = [
+        artifact
+        for artifact in api.list_artifacts(handoff_name)
+        if artifact.name == handoff_name
+        and not artifact.expired
+        and artifact.head_branch == branch
+        and artifact.head_sha == current_sha
+    ]
     if require_raw:
+        handoff = _newest_valid(
+            api, handoffs, repository=repository, workflow=E2E_WORKFLOW,
+            branch=branch, sha_from_artifact=False, sha=current_sha,
+            events=frozenset({"workflow_dispatch"}),
+        )
         if handoff is None:
             raise RotationError(
                 f"no authenticated lossless current-head evidence exists for {branch}"
             )
         return handoff
-    cache = _newest_valid(
-        api,
-        [
-            artifact
-            for artifact in api.list_artifacts(cache_name)
-            if artifact.name == cache_name
-            and not artifact.expired
-            and artifact.head_branch == "master"
-        ],
-        repository=repository,
-        workflow=PAGES_WORKFLOW,
-        branch="master",
-        sha_from_artifact=True,
-        sha=current_sha,
-        events=PAGES_EVENTS,
-    )
-    exact = [candidate for candidate in (handoff, cache) if candidate is not None]
-    if exact:
-        return max(exact, key=lambda item: item.order)
+    caches = [
+        artifact
+        for artifact in api.list_artifacts(cache_name)
+        if artifact.name == cache_name
+        and not artifact.expired
+        and artifact.head_branch == "master"
+    ]
+    # Both exact-name inventories are complete before selection. Once the newest candidate
+    # authenticates, older owners cannot change the result and need no additional API reads.
+    for candidate in sorted([*handoffs, *caches], key=lambda item: item.order, reverse=True):
+        is_handoff = candidate.name == handoff_name
+        selected = _newest_valid(
+            api, [candidate], repository=repository,
+            workflow=E2E_WORKFLOW if is_handoff else PAGES_WORKFLOW,
+            branch=branch if is_handoff else "master",
+            sha_from_artifact=not is_handoff, sha=current_sha,
+            events=frozenset({"workflow_dispatch"}) if is_handoff else PAGES_EVENTS,
+        )
+        if selected is not None:
+            return selected
     if bundle_key is not None:
         raise RotationError(f"no authenticated current evidence exists for {key} on {branch}")
 

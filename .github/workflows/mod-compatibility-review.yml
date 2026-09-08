@@ -103,7 +103,7 @@ jobs:
             --arg source_sha "$source_sha" \
             '{event_type:"mod-compatibility-review-requested",client_payload:{
               source_repository:$source_repository,source_run_id:$source_run_id,
-              source_sha:$source_sha}}' > "$payload"
+              source_sha:$source_sha,recovery_chain:true}}' > "$payload"
           github_api_retry --method POST \
             "repos/$GITHUB_REPOSITORY/dispatches" \
             --input "$payload" > /dev/null
@@ -358,6 +358,10 @@ jobs:
           (( count <= runnable_count ))
           pending='{"include":[]}'
           completed_count=0
+          # A source-wide review owns several lane markers. Reuse only owners that have
+          # already passed every terminal-owner check in this admission; transient or
+          # invalid owners must be rechecked and cannot enter the cache.
+          authenticated_completion_owners='{}'
           while IFS= read -r lane; do
             lane_id="$(jq -er .id <<< "$lane")"
             capsule_id="$(jq -er .artifact_id <<< "$lane")"
@@ -378,23 +382,34 @@ jobs:
                  all(.artifacts[]; .name == $name)' <<< "$completions" > /dev/null
               while IFS=$'\t' read -r completion_run_id expired size digest head_sha; do
                 [[ -n "$completion_run_id" && "$expired" == false ]] || continue
+                [[ "$completion_run_id" =~ ^[1-9][0-9]*$ ]] || continue
                 [[ "$size" =~ ^[1-9][0-9]*$ ]] || continue
                 (( size <= 1048576 )) || continue
                 [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || continue
                 [[ "$head_sha" == "$GITHUB_SHA" ]] || continue
+                if jq -e --arg id "$completion_run_id" 'has($id)' \
+                    <<< "$authenticated_completion_owners" > /dev/null; then
+                  authenticated=1
+                  break
+                fi
+                # Transport failure leaves this admission unresolved; it must not turn
+                # authenticated lane markers into new model work or fan out more lookups.
                 completion_owner="$(github_api_retry \
-                  "repos/$GITHUB_REPOSITORY/actions/runs/$completion_run_id" \
-                  2>/dev/null || true)"
+                  "repos/$GITHUB_REPOSITORY/actions/runs/$completion_run_id")"
                 if [[ -n "$completion_owner" ]] && jq -e \
                     --arg implementation_sha "$GITHUB_SHA" \
                     --arg repository "$GITHUB_REPOSITORY" \
-                    '.status == "completed" and
+                    --argjson run_id "$completion_run_id" \
+                    '.id == $run_id and .status == "completed" and
                      (.conclusion == "success" or .conclusion == "failure") and
                      .event == "repository_dispatch" and .head_branch == "master" and
                      .head_sha == $implementation_sha and
                      .path == ".github/workflows/mod-compatibility-review.yml" and
                      .head_repository.full_name == $repository' \
                     <<< "$completion_owner" > /dev/null; then
+                  authenticated_completion_owners="$(jq -c \
+                    --arg id "$completion_run_id" '.[$id] = true' \
+                    <<< "$authenticated_completion_owners")"
                   authenticated=1
                   break
                 fi
@@ -2008,6 +2023,8 @@ jobs:
           github_api_retry --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
             --input "$payload" > /dev/null
 
+  # Exact producer wakes already cover fresh sources. Only a scheduled/manual recovery
+  # chain needs another full queue sweep to drain older eligible sources after settling.
   continue:
     name: Wake the next pending compatibility review
     needs:
@@ -2015,7 +2032,8 @@ jobs:
       - gate
     if: >-
       always() && needs.gate.result == 'success' &&
-      needs.gate.outputs.settled == 'true'
+      needs.gate.outputs.settled == 'true' &&
+      github.event.client_payload.recovery_chain == true
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

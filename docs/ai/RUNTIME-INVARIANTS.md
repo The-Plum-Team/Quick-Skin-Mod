@@ -352,6 +352,13 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   not preselect every artifact and repeat selection in the collector. The collector owns exact
   current-head selection; retryable GitHub API and installation-rate-limit failures use bounded
   jittered backoff and remain distinguishable from authenticated evidence absence.
+- Shared Pages collectors authenticate artifact owners and complete bounded bundles. Before
+  rendering or uploading the site, Build reauthenticates each distinct runtime generation once
+  across the complete matrix fan-in and compares every manifest's original and target provenance
+  with that result. This reuse lasts only for that invocation; fresh source-head checks bracket
+  admission and deployment. Selected components retain their separate baseline authentication,
+  and historical direct-source bundles retain their collector gate. Private collected artifacts
+  cannot substitute for successful final admission or become reusable public caches themselves.
 - Published current state selects one durable Pages cache per matrix bundle key and exactly one
   lossless raw handoff for the matrix-derived Fabric 1.20.1 visual anchor. Select at most one durable
   mod-compatibility Pages cache for each key that has published evidence. Rotation retires duplicate

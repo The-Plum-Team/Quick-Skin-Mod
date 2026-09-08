@@ -42,9 +42,11 @@ def _newest_valid(
     events: frozenset[str],
 ) -> Artifact | None:
     for artifact in sorted(artifacts, key=lambda item: item.order, reverse=True):
+        # An unavailable API is not an invalid owner or absent optional evidence.
+        run = api.get_run(artifact.run_id)
         try:
             _validate_run(
-                api.get_run(artifact.run_id),
+                run,
                 repository=repository,
                 workflow=workflow,
                 branch="master",
@@ -73,35 +75,31 @@ def select_source(
     cache_name = f"pages-mod-compatibility-cache-{key}"
     if bundle_key is not None:
         cache_name += f"--{current_sha}"
-    handoff = _newest_valid(
-        api,
-        [
-            artifact
-            for artifact in api.list_artifacts(handoff_name)
-            if artifact.name == handoff_name
-            and not artifact.expired
-            and artifact.head_branch == "master"
-            and (bundle_key is None or artifact.head_sha == current_sha)
-        ],
-        repository=repository,
-        workflow=COMPATIBILITY_REVIEW_WORKFLOW,
-        events=COMPATIBILITY_REVIEW_EVENTS,
-    )
-    cache = _newest_valid(
-        api,
-        [
-            artifact
-            for artifact in api.list_artifacts(cache_name)
-            if artifact.name == cache_name
-            and not artifact.expired
-            and artifact.head_branch == "master"
-        ],
-        repository=repository,
-        workflow=PAGES_WORKFLOW,
-        events=PAGES_EVENTS,
-    )
-    candidates = [artifact for artifact in (handoff, cache) if artifact is not None]
-    return max(candidates, key=lambda item: item.order) if candidates else None
+    handoffs = [
+        artifact
+        for artifact in api.list_artifacts(handoff_name)
+        if artifact.name == handoff_name
+        and not artifact.expired
+        and artifact.head_branch == "master"
+        and (bundle_key is None or artifact.head_sha == current_sha)
+    ]
+    caches = [
+        artifact
+        for artifact in api.list_artifacts(cache_name)
+        if artifact.name == cache_name
+        and not artifact.expired
+        and artifact.head_branch == "master"
+    ]
+    for candidate in sorted([*handoffs, *caches], key=lambda item: item.order, reverse=True):
+        is_handoff = candidate.name == handoff_name
+        selected = _newest_valid(
+            api, [candidate], repository=repository,
+            workflow=COMPATIBILITY_REVIEW_WORKFLOW if is_handoff else PAGES_WORKFLOW,
+            events=COMPATIBILITY_REVIEW_EVENTS if is_handoff else PAGES_EVENTS,
+        )
+        if selected is not None:
+            return selected
+    return None
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
