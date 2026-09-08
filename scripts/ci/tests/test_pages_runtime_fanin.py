@@ -158,10 +158,10 @@ class PagesRuntimeFaninTest(unittest.TestCase):
             self.verify()
 
     def test_distinct_runtime_generations_do_not_share_admission_by_sha_alone(self):
-        self.api.wrapper(self.manifest['runtime_source'], identifier=31)
-        artifact = self.api.inventories[31][0]
-        artifact['id'] = 301
-        self.api.archives[301] = self.api.archives[300]
+        # Different ZIP timestamps must not overwrite the first wrapper's immutable bytes.
+        with patch('zipfile.time.localtime', return_value=(2001, 1, 1, 0, 0, 0, 0, 1, -1)):
+            self.api.wrapper(self.manifest['runtime_source'], identifier=31)
+        self.assertNotEqual(self.api.archives[300], self.api.archives[310])
         manifest = copy.deepcopy(self.manifest)
         manifest['provenance']['target'].update(
             run_id='31', run_url=f'https://github.com/{self.api.repository}/actions/runs/31')
