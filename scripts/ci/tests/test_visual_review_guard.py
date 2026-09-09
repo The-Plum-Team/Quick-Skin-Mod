@@ -130,11 +130,14 @@ class VisualReviewGuardTest(unittest.TestCase):
                 self.assertNotIn("        if:", step)
                 self.assertIn("ref: ${{ github.sha }}", step)
                 self.assertIn("persist-credentials: false", step)
-                self.assertIn("sparse-checkout-cone-mode: false", step)
-                sparse = step.split("          sparse-checkout: |\n", 1)[1]
-                files = [line.strip() for line in sparse.splitlines()
-                         if line.startswith("            ")]
-                self.assertEqual(["scripts/ci/bounded_zip.py"], files)
+                if "          sparse-checkout: |\n" in step:
+                    sparse = step.split("          sparse-checkout: |\n", 1)[1]
+                    files = [line.strip() for line in sparse.splitlines()
+                             if line.startswith("            ")]
+                else:
+                    # Representative files from a full checkout. The separate Git regression
+                    # exercises how both checkouts actually populate and retain these paths.
+                    files = ["scripts/ci/bounded_zip.py", "scripts/pages/requirements.txt"]
                 for name in files:
                     destination = workspace / name
                     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -148,6 +151,72 @@ class VisualReviewGuardTest(unittest.TestCase):
                 "generation_sha": "a" * 40, "implementation_sha": "a" * 40,
                 "source_run_id": 55, "source_sha": "a" * 40,
                 "report_sha256": "c" * 64, **changes}
+
+    def test_both_checkouts_leave_the_exact_reviewers_requirements_available(self):
+        origin = self.folder / "checkout-origin"
+        workspace = self.folder / "checkout-workspace"
+        origin.mkdir()
+        environment = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1",
+                       "GIT_CONFIG_GLOBAL": os.devnull, "GIT_TERMINAL_PROMPT": "0"}
+
+        def git(directory, *arguments, accepted=(0,)):
+            result = subprocess.run(["git", *arguments], cwd=directory, env=environment,
+                                    capture_output=True, text=True)
+            self.assertIn(result.returncode, accepted, result.stderr)
+            return result.stdout.strip()
+
+        git(origin, "init", "--quiet")
+        required_files = ("scripts/ci/bounded_zip.py", "scripts/pages/requirements.txt",
+                          "e2e/visual_review_runner.py")
+        for name in required_files:
+            destination = origin / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / name, destination)
+        requirements = "scripts/pages/requirements.txt"
+        (origin / requirements).write_text("# An older bootstrap revision.\n")
+        git(origin, "add", ".")
+        git(origin, "-c", "user.name=Checkout regression", "-c",
+            "user.email=checkout@example.invalid", "commit", "--quiet", "-m", "bootstrap")
+        bootstrap = git(origin, "rev-parse", "HEAD")
+        shutil.copyfile(ROOT / requirements, origin / requirements)
+        git(origin, "add", requirements)
+        git(origin, "-c", "user.name=Checkout regression", "-c",
+            "user.email=checkout@example.invalid", "commit", "--quiet", "-m", "reviewer")
+        reviewer = git(origin, "rev-parse", "HEAD")
+        git(self.folder, "clone", "--quiet", "--no-checkout", str(origin), str(workspace))
+        self.assertFalse((workspace / requirements).exists())
+
+        checkouts = [step for step in job_block("visual-review-drain.yml", "review").split(
+            "      - name: ")[1:] if "uses: actions/checkout@" in step]
+        self.assertEqual(2, len(checkouts))
+        self.assertIn("ref: ${{ github.sha }}", checkouts[0])
+        self.assertIn("ref: ${{ needs.select.outputs.implementation_sha }}", checkouts[1])
+        self.assertIn("if: steps.guard.outputs.reviewable == 'true'", checkouts[1])
+        for step, revision in zip(checkouts, (bootstrap, reviewer), strict=True):
+            self.assertIn("persist-credentials: false", step)
+            if "          sparse-checkout: |\n" in step:
+                self.assertIn("sparse-checkout-cone-mode: false", step)
+                patterns = step.split("          sparse-checkout: |\n", 1)[1]
+                patterns = [line.strip() for line in patterns.splitlines()
+                            if line.startswith("            ")]
+                git(workspace, "config", "core.sparseCheckout", "true")
+                sparse_file = git(workspace, "rev-parse", "--git-path", "info/sparse-checkout")
+                (workspace / sparse_file).write_text("\n".join(patterns) + "\n")
+            else:
+                # Replay the pinned action's observed transition, including its cleanup of
+                # extensions.worktreeConfig. With a prior non-cone checkout, that cleanup
+                # exposes core.sparseCheckout=true in local config again on the next checkout.
+                git(workspace, "sparse-checkout", "disable")
+                git(workspace, "config", "--local", "--unset-all",
+                    "extensions.worktreeConfig", accepted=(0, 5))
+            git(workspace, "checkout", "--force", revision)
+            self.assertTrue((workspace / "scripts/ci/bounded_zip.py").is_file())
+
+        self.assertEqual(reviewer, git(workspace, "rev-parse", "HEAD"))
+        self.assertTrue((workspace / requirements).is_file(),
+                        "The second checkout must retain the image decoder's requirements")
+        for name in required_files:
+            self.assertEqual((ROOT / name).read_bytes(), (workspace / name).read_bytes())
 
     def test_fresh_runner_authenticates_a_real_block_before_any_capsule_or_model_work(self):
         result, output, requests = self.guard(wave_block=self.block(), fresh_workspace=True)
