@@ -1432,7 +1432,7 @@
               "capture": {
                 "title": "Live observer after",
                 "review_tier": "key",
-                "expectation": "From the same fixed rear view, Alice still faces away from the observer and has changed to the custom skin: the plain brown back of her head, dark charcoal-and-gray plaid shoulders and sleeves, and blue trousers are visible while a dark animated cape whose light face contains a complete red vertical motif hangs from her back. Her eyes and chest must not face the camera, and the cape must not cross the front of her torso.",
+                "expectation": "From the same fixed rear view, Alice still faces away from the observer and has changed to the custom skin: the plain brown back of her head, dark charcoal-and-gray plaid shoulders and sleeves, and blue trousers are visible while an animated cape whose light gray face has dark trim and contains a complete red vertical motif hangs from her back. Her eyes and chest must not face the camera, and the cape must not cross the front of her torso.",
                 "probes": []
               },
               "requires": [
@@ -1459,7 +1459,7 @@
               "capture": {
                 "title": "Live observer animated frame B",
                 "review_tier": "key",
-                "expectation": "From the same fixed rear view, Alice's dark animated cape shows its second frozen frame: the complete motif has changed from red to blue and moved horizontally while remaining fully inside the cape surface received over the network.",
+                "expectation": "From the same fixed rear view, Alice's animated cape keeps its light gray face and dark trim in its second frozen frame: the complete motif has changed from red to blue and moved horizontally while remaining fully inside the cape surface received over the network.",
                 "probes": []
               },
               "requires": [
@@ -2731,7 +2731,7 @@
               "capture": {
                 "title": "Animated cape frame A",
                 "review_tier": "key",
-                "expectation": "The player wears a real dark animated cape whose light face contains a complete red vertical motif fully inside the cape surface; it is not clipped, blank, black or garbled.",
+                "expectation": "The player wears a real animated cape whose light gray face has dark trim and contains a complete red vertical motif fully inside the cape surface; it is not clipped, blank, black or garbled.",
                 "probes": []
               },
               "requires": [
@@ -2759,7 +2759,7 @@
               "capture": {
                 "title": "Animated cape frame B",
                 "review_tier": "key",
-                "expectation": "A later frozen frame of the same dark cape is visible; the complete motif has changed from red to blue and moved horizontally while remaining fully inside the cape surface.",
+                "expectation": "A later frozen frame of the same cape is visible, with its light gray face and dark trim unchanged; the complete motif has changed from red to blue and moved horizontally while remaining fully inside the cape surface.",
                 "probes": []
               },
               "requires": [
