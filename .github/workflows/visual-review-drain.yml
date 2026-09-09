@@ -502,9 +502,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            scripts/ci/bounded_zip.py
 
       - name: Revalidate the artifact-scoped queue entry
         id: guard
