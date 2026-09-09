@@ -8,9 +8,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
-from scripts.ci.tests.test_workflow_security import ROOT, step_script
+from scripts.ci.tests.test_workflow_security import ROOT, job_block, step_script
 
 
 class VisualReviewGuardTest(unittest.TestCase):
@@ -34,7 +35,10 @@ class VisualReviewGuardTest(unittest.TestCase):
             "    log.write(json.dumps(route) + '\\n')\n"
             "responses = json.loads((root / 'responses.json').read_text())\n"
             "if route not in responses: raise SystemExit('Unexpected API route: ' + route)\n"
-            "print(json.dumps(responses[route]))\n"
+            "value = responses[route]\n"
+            "if isinstance(value, dict) and '__archive' in value:\n"
+            "    sys.stdout.buffer.write((root / value['__archive']).read_bytes())\n"
+            "else: print(json.dumps(value))\n"
         )
         self.script = step_script(
             "visual-review-drain.yml", "review", "Revalidate the artifact-scoped queue entry"
@@ -56,7 +60,8 @@ class VisualReviewGuardTest(unittest.TestCase):
             "ARTIFACT_SIZE": "1024",
         }
 
-    def guard(self, bundle="mc1.20.1", *, legacy=False, overrides=None, marker=None, marker_key=None):
+    def guard(self, bundle="mc1.20.1", *, legacy=False, overrides=None, marker=None, marker_key=None,
+              wave_block=None, archive_path="visual-review-wave-block.json", fresh_workspace=False):
         review_key = "55" + (f"--{bundle}" if bundle else "")
         name = "visual-review-input-55"
         if not legacy:
@@ -91,14 +96,84 @@ class VisualReviewGuardTest(unittest.TestCase):
                 **owner, "id": 99, "conclusion": "failure",
                 "path": ".github/workflows/visual-review-drain.yml",
             }
+        if wave_block is not None:
+            archive = self.folder / "block.zip"
+            with zipfile.ZipFile(archive, "w") as stream:
+                stream.writestr(archive_path, json.dumps(wave_block))
+            marker_name = "visual-review-wave-block-" + "a" * 40
+            responses[prefix + f"artifacts?name={marker_name}&per_page=100"] = [{
+                "artifacts": [{"id": 99, "name": marker_name, "expired": False,
+                    "size_in_bytes": archive.stat().st_size,
+                    "workflow_run": {"id": 99, "head_sha": "a" * 40}}]
+            }]
+            responses[prefix + "runs/99"] = {
+                **owner, "id": 99, "conclusion": "failure",
+                "path": ".github/workflows/visual-review-drain.yml",
+            }
+            responses[prefix + "artifacts/99/zip"] = {"__archive": archive.name}
         (self.folder / "responses.json").write_text(json.dumps(responses))
         output = Path(env["GITHUB_OUTPUT"])
         output.write_text("")
         requests = self.folder / "requests.jsonl"
         requests.write_text("")
-        result = subprocess.run(["bash", "-c", self.script], env=env, cwd=ROOT,
+        workspace = ROOT
+        if fresh_workspace:
+            workspace = self.folder / "workspace"
+            workspace.mkdir()
+            # Materialize only files requested by actual unconditional pre-guard checkouts.
+            # The old ordering leaves this fresh runner empty and reproduces the live Errno2.
+            prefix_steps = job_block("visual-review-drain.yml", "review").split(
+                "      - name: Revalidate the artifact-scoped queue entry", 1)[0]
+            for step in prefix_steps.split("      - name: ")[1:]:
+                if "uses: actions/checkout@" not in step:
+                    continue
+                self.assertNotIn("        if:", step)
+                self.assertIn("ref: ${{ github.sha }}", step)
+                self.assertIn("persist-credentials: false", step)
+                self.assertIn("sparse-checkout-cone-mode: false", step)
+                sparse = step.split("          sparse-checkout: |\n", 1)[1]
+                files = [line.strip() for line in sparse.splitlines()
+                         if line.startswith("            ")]
+                self.assertEqual(["scripts/ci/bounded_zip.py"], files)
+                for name in files:
+                    destination = workspace / name
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(ROOT / name, destination)
+        result = subprocess.run(["bash", "-c", self.script], env=env, cwd=workspace,
                                 capture_output=True, text=True)
         return result, output.read_text(), requests.read_text()
+
+    def block(self, **changes):
+        return {"schema_version": 1, "kind": "quick-skin-visual-review-wave-block",
+                "generation_sha": "a" * 40, "implementation_sha": "a" * 40,
+                "source_run_id": 55, "source_sha": "a" * 40,
+                "report_sha256": "c" * 64, **changes}
+
+    def test_fresh_runner_authenticates_a_real_block_before_any_capsule_or_model_work(self):
+        result, output, requests = self.guard(wave_block=self.block(), fresh_workspace=True)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("wave_blocked=true", output)
+        self.assertIn("reviewable=false", output)
+        self.assertIn("/artifacts/99/zip", requests)
+        self.assertNotIn("/artifacts/77", requests)
+        self.assertNotIn("visual-review-55--", requests)
+
+    def test_fresh_runner_rejects_a_traversal_block_without_extracting_outside_its_root(self):
+        result, output, requests = self.guard(wave_block=self.block(), fresh_workspace=True,
+                                              archive_path="../escaped.json")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("unsafe archive path", result.stderr)
+        self.assertNotIn("wave_blocked=true", output)
+        self.assertNotIn("/artifacts/77", requests)
+        self.assertFalse((self.folder / "escaped.json").exists())
+
+    def test_fresh_runner_rejects_a_block_payload_for_another_generation(self):
+        result, output, requests = self.guard(
+            wave_block=self.block(generation_sha="d" * 40), fresh_workspace=True)
+        self.assertNotEqual(0, result.returncode)
+        self.assertNotIn("can't open file", result.stderr)
+        self.assertNotIn("wave_blocked=true", output)
+        self.assertNotIn("/artifacts/77", requests)
 
     def test_admits_every_shared_target_through_the_actual_guard(self) -> None:
         matrix = json.loads((ROOT / "release/release-matrix.json").read_text())
