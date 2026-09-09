@@ -1,5 +1,5 @@
 {
   "schema_version": 1,
-  "baseline": "2026-08-17-cape-elytra-and-optional-mod-compatibility",
-  "purpose": "Carry one complete post-fix visual and optional-mod validation wave into the new admission policy. Future policy-only changes leave this marker unchanged."
+  "baseline": "2026-09-09-github-api-and-visual-review-recovery",
+  "purpose": "Request one complete post-fix visual and optional-mod validation wave after GitHub API amplification, the cape expectation mismatch, and reviewer checkout failures interrupted acceptance. This explicit recovery exercises the complete workload; routine policy-only changes leave this marker unchanged."
 }

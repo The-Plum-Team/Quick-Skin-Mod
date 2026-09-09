@@ -439,9 +439,13 @@ not have that automatic second stage. Once an authenticated semantic anchor rele
 visual-policy-only diffs do not repeat the same model review on every version; product, scenario,
 packaged-harness, malformed, or unknown diffs still do. A distinct protected compatibility-impact
 manifest prevents clean review-policy, prompt, documentation, or publication changes from
-launching the optional-mod matrix. The one-time `full-validation-baseline.json` marker intentionally
-carries the quota-paused cape/Elytra generation through this transition and is not edited by future
-policy-only work.
+launching the optional-mod matrix. `full-validation-baseline.json` explicitly requests a complete
+recovery wave. Its original 2026-08-17 request carried the quota-paused cape/Elytra rollout; the
+2026-09-09 request restores complete acceptance after GitHub API, cape-expectation, and reviewer
+checkout fixes. A clean non-impacting review does not itself restore missing optional evidence,
+and archives from a superseded scenario contract cannot supply that evidence. Routine policy-only
+work leaves the marker unchanged. Refresh it only for an explicitly requested complete recovery,
+recording the unfinished validation; the existing classifiers and all evidence checks still apply.
 
 That workflow never exposes raw packaged artifacts to the model credential. A secretless curator
 authenticates every artifact and exact matrix row. It imports the exact source commit only as inert
