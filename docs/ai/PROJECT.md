@@ -282,9 +282,12 @@ into those branches. Their source matrices and existing evidence remain intact d
   direct review admission binds
   the source SHA to the protected current implementation, and both the secretless batcher and
   credential-bearing runner recheck live `master` before capsules or a model are admitted.
-  `e2e/full-validation-baseline.json` is an intentionally runtime-impacting one-time marker for the
-  2026-08-17 cape/Elytra and compatibility rollout. It carries the previously quota-paused full
-  wave across this admission-policy change; normal policy-only changes leave it untouched.
+  `e2e/full-validation-baseline.json` is an intentionally runtime-impacting marker for an explicitly
+  requested complete recovery. The 2026-09-09 recovery validates the full workload after GitHub API,
+  cape-expectation, and reviewer-checkout fixes; its preceding generations did not finish that
+  workload. The earlier 2026-08-17 marker covered the quota-paused cape/Elytra rollout. Routine
+  policy-only changes leave this marker untouched; an exceptional refresh records the unfinished
+  validation it restores and retains every ordinary admission and coverage check.
   Authored loader/version exclusions
   remain explicit N/A records and survive lock refreshes. This post-validation signal does not
   replace or weaken Build,

@@ -73,3 +73,18 @@ provenance remains on the expensive fail-closed path.
 The transition intentionally incurs one complete baseline wave after provider capacity returns.
 Afterward, routine review-orchestration changes no longer create the pre-/post-merge duplicate or
 the full later-version and optional-mod amplification.
+
+## Explicit recovery on 2026-09-09
+
+The requested complete validation after #1942, #1943, and #1944 remained unfinished. The GitHub API
+fixes were integrated, but the cape expectation mismatch and then the reviewer checkout failure
+interrupted their generations. The checkout-only fix correctly classified its own diff as
+non-impacting for optional mods; older compatibility evidence used a superseded scenario contract.
+
+Refresh the existing marker once for this explicit recovery, so the normal protected classifiers
+request complete visual and optional-mod coverage. This preserves the original reports and their
+impact classifications. The new PR must pass its own complete Build and Packaged E2E; an identical
+post-merge tree may reuse those exact results through the existing authenticated reference path.
+Routine policy-only changes still leave the marker untouched. A green ordinary publication alone
+does not close this recovery: verify the complete reviews, optional runtimes, public evidence and
+publication-linked rotation, and inspect the affected Actions token's actual API observations.
