@@ -160,9 +160,10 @@ def render_shared_status_section(
         "",
         f"{build} {e2e}",
         "",
-        "Each target has an independent canonical release tag; listing a tag does not imply it is published.",
+        "The table lists build targets and their release identifiers. "
+        f"Check [GitHub Releases](https://github.com/{repository}/releases) for published downloads.",
         "",
-        "| Minecraft | Loaders | Java | Release tag |",
+        "| Minecraft | Loaders | Java | Release identifier |",
         "|---|---|---:|---|",
     ]
     versions = {row["artifact_version"] for row in data["artifacts"]}
@@ -173,8 +174,7 @@ def render_shared_status_section(
         java_versions = sorted({row["java"] for row in rows})
         java = " / ".join(str(value) for value in java_versions)
         tag = release_matrix.release_id(data, mod_version, target=version)
-        tag_url = f"https://github.com/{repository}/releases/tag/{quote(tag, safe='')}"
-        lines.append(f"| {version} | {loaders} | {java} | [`{tag}`]({tag_url}) |")
+        lines.append(f"| {version} | {loaders} | {java} | `{tag}` |")
     lines.append(END_MARKER)
     return "\n".join(lines)
 

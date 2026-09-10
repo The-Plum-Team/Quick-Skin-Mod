@@ -29,7 +29,7 @@ def matrix_for(version: str, loaders: tuple[str, ...], java: int) -> dict[str, o
 
 
 class ReleaseStatusTableTest(unittest.TestCase):
-    def test_shared_source_lists_exact_matrix_targets_with_shared_badges_and_independent_tags(self):
+    def test_shared_source_lists_targets_and_identifiers_without_assuming_publication(self):
         path = ROOT / "release/release-matrix.json"
         data = release_matrix.load_matrix(path)
         version = release_matrix.read_mod_version(path, data)
@@ -41,8 +41,10 @@ class ReleaseStatusTableTest(unittest.TestCase):
         self.assertEqual(2, section.count("/badge.svg?branch=master"))
         self.assertNotIn("fabric-and-neoforge-", section)
         self.assertNotIn("forge-and-fabric-", section)
+        self.assertIn("[GitHub Releases](https://github.com/The-Plum-Team/Quick-Skin-Mod/releases)", section)
+        self.assertNotIn("/releases/tag/", section)
         for target in targets:
-            self.assertIn(f"/releases/tag/mc{target}-v{version}", section)
+            self.assertIn(f"| `mc{target}-v{version}` |", section)
         invalid = copy.deepcopy(data)
         invalid["artifacts"][-1]["java"] = 0
         with self.assertRaises(release_matrix.MatrixError):
