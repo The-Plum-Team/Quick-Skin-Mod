@@ -160,11 +160,14 @@ def render_shared_status_section(
         "",
         f"{build} {e2e}",
         "",
-        "The table lists build targets and their release identifiers. "
+        "Each row reports that target's Build and E2E jobs, including shared prerequisites. "
+        "Snapshots update on CI transitions; caching may delay the displayed badges. "
+        "Open a badge for its covered commit, observation time and original execution.",
+        "",
         f"Check [GitHub Releases](https://github.com/{repository}/releases) for published downloads.",
         "",
-        "| Minecraft | Loaders | Java | Release identifier |",
-        "|---|---|---:|---|",
+        "| Minecraft | Loaders | Java | Build | E2E |",
+        "|---|---|---:|:---:|:---:|",
     ]
     versions = {row["artifact_version"] for row in data["artifacts"]}
     for version in sorted(versions, key=lambda value: tuple(map(int, value.split("."))), reverse=True):
@@ -173,8 +176,11 @@ def render_shared_status_section(
                              for name in dict.fromkeys(row["loader"] for row in rows))
         java_versions = sorted({row["java"] for row in rows})
         java = " / ".join(str(value) for value in java_versions)
-        tag = release_matrix.release_id(data, mod_version, target=version)
-        lines.append(f"| {version} | {loaders} | {java} | `{tag}` |")
+        image_root = f"https://raw.githubusercontent.com/{repository}/refs/heads/automation/ci-status"
+        details = f"https://github.com/{repository}/blob/automation/ci-status/targets/{version}.md"
+        target_build = f"[![Build {version}]({image_root}/badges/{version}/build.svg)]({details}#build)"
+        target_e2e = f"[![E2E {version}]({image_root}/badges/{version}/e2e.svg)]({details}#e2e)"
+        lines.append(f"| {version} | {loaders} | {java} | {target_build} | {target_e2e} |")
     lines.append(END_MARKER)
     return "\n".join(lines)
 

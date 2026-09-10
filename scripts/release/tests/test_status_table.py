@@ -29,7 +29,7 @@ def matrix_for(version: str, loaders: tuple[str, ...], java: int) -> dict[str, o
 
 
 class ReleaseStatusTableTest(unittest.TestCase):
-    def test_shared_source_lists_targets_and_identifiers_without_assuming_publication(self):
+    def test_shared_source_lists_target_badges_separately_from_global_workflow_badges(self):
         path = ROOT / "release/release-matrix.json"
         data = release_matrix.load_matrix(path)
         version = release_matrix.read_mod_version(path, data)
@@ -43,8 +43,14 @@ class ReleaseStatusTableTest(unittest.TestCase):
         self.assertNotIn("forge-and-fabric-", section)
         self.assertIn("[GitHub Releases](https://github.com/The-Plum-Team/Quick-Skin-Mod/releases)", section)
         self.assertNotIn("/releases/tag/", section)
+        self.assertIn("| Minecraft | Loaders | Java | Build | E2E |", section)
+        self.assertIn("Snapshots update on CI transitions", section)
         for target in targets:
-            self.assertIn(f"| `mc{target}-v{version}` |", section)
+            image_root = "https://raw.githubusercontent.com/The-Plum-Team/Quick-Skin-Mod/refs/heads/automation/ci-status"
+            details = f"https://github.com/The-Plum-Team/Quick-Skin-Mod/blob/automation/ci-status/targets/{target}.md"
+            for kind, label in (("build", "Build"), ("e2e", "E2E")):
+                self.assertIn(f"[![{label} {target}]({image_root}/badges/{target}/{kind}.svg)]({details}#{kind})", section)
+        self.assertEqual(len(targets) * 2, section.count("https://raw.githubusercontent.com/"))
         invalid = copy.deepcopy(data)
         invalid["artifacts"][-1]["java"] = 0
         with self.assertRaises(release_matrix.MatrixError):

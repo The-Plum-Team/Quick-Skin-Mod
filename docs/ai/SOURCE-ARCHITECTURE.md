@@ -51,6 +51,25 @@ distinct tested merge commit must equal the consumer checkout. Missing PR builds
 advanced PR parents and malformed bundles cannot authorize runtime. Standalone runs without an
 available bundle use the same compiler.
 
+`scripts/ci/target_status.py` projects Build and Packaged E2E into an informational status for
+each target in the schema-3 release matrix. It collects one bounded snapshot per gate, authenticates
+the current `master` generation and exact run attempts, and includes each target's required jobs
+and shared prerequisites. A target may pass while a sibling fails; the repository-wide gates
+remain separate. Reused execution is resolved through `ci_reuse.py` once per gate and retains the
+original tested SHA, run and attempt alongside the covered merge. Missing or unauthenticated data
+projects `unknown`; skipped jobs alone cannot produce green and an old event cannot restore a
+previous generation's success. This projection never admits evidence or issues a certificate.
+
+`scripts/ci/target_status_render.py` renders bounded, escaped JSON, Markdown details and SVG badges
+from that snapshot. Targets, loaders and Java versions come only from the release matrix. Each
+badge shows its covered SHA; details record observation time and distinguish original execution
+from reuse. `scripts/ci/target_status_publish.py` validates the complete output inventory and
+publishes only data to `automation/ci-status`, using an ordinary fast-forward commit guarded by
+the previous status head and fresh `master` SHA. It never checks out or executes the data branch.
+Unchanged logical snapshots create no commit and retain their published observation time.
+README target badges read that branch without rebuilding Pages or committing status to `master`;
+the existing global workflow badges and required gates remain authoritative for overall CI.
+
 The version-3 scenario contract declares each step's module/binding coverage, earlier action
 prerequisites, and earlier captures consumed by assertions. Coordinated multiplayer scenarios
 retain all clients and actions through `execution_scope: scenario`. `e2e/selection.py` computes
