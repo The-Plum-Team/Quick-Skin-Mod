@@ -1,6 +1,6 @@
 {
   "coverage_sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-  "observed_at": "2026-09-10T18:21:31Z",
+  "observed_at": "2026-09-10T18:21:51Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -11,7 +11,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -25,21 +25,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -74,7 +81,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -88,21 +95,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -137,7 +151,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -151,21 +165,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -200,7 +221,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -214,21 +235,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -263,7 +291,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -277,21 +305,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -326,7 +361,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -340,21 +375,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -389,7 +431,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -403,21 +445,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -452,7 +501,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -466,21 +515,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -515,7 +571,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -529,21 +585,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -578,7 +641,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -592,21 +655,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -641,7 +711,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -655,21 +725,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -704,7 +781,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -718,21 +795,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -767,7 +851,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -781,21 +865,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -830,7 +921,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -844,21 +935,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -893,7 +991,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -907,21 +1005,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
@@ -956,7 +1061,7 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "expected_jobs": [
@@ -970,21 +1075,28 @@
           "conclusion": null,
           "id": 34513808056,
           "sha": "b1e375915a22202f78670e75d01fff799db99cb4",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 102994161145,
             "name": "Resolve tested build reuse",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994161145"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 102994323543,
+            "name": "Validate repository policy",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34513808056/job/102994323543"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are queued.",
         "reused": false,
-        "state": "running",
+        "state": "pending",
         "tested_sha": "b1e375915a22202f78670e75d01fff799db99cb4"
       },
       "e2e": {
