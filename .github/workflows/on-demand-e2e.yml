@@ -840,6 +840,70 @@ jobs:
             "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" \
             > /dev/null
 
+  notify-target-status-start:
+    name: Refresh target status after runtime policy (advisory)
+    needs: runtime-policy
+    if: >-
+      always() && !cancelled() && github.event_name == 'workflow_dispatch' &&
+      inputs.attest_run_id == '' && github.ref == 'refs/heads/master'
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: write
+    steps:
+      - name: Wake the protected status reader
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/master ]]
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ && "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            printf 'A newer master generation owns target status.\n'
+            exit 0
+          fi
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" \
+            --arg sha "$GITHUB_SHA" \
+            '{event_type:"target-ci-status",client_payload:{source_repository:$repository,
+              source_run_id:$run_id,source_sha:$sha}}' > "$RUNNER_TEMP/target-status-start.json"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+            --input "$RUNNER_TEMP/target-status-start.json" > /dev/null
+
+  notify-target-status-complete:
+    name: Refresh target status after required gate (advisory)
+    needs: required-gate
+    if: >-
+      always() && !cancelled() && github.event_name == 'workflow_dispatch' &&
+      inputs.attest_run_id == '' && github.ref == 'refs/heads/master'
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: write
+    steps:
+      - name: Wake the protected status reader
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/master ]]
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ && "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            printf 'A newer master generation owns target status.\n'
+            exit 0
+          fi
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" \
+            --arg sha "$GITHUB_SHA" \
+            '{event_type:"target-ci-status",client_payload:{source_repository:$repository,
+              source_run_id:$run_id,source_sha:$sha}}' > "$RUNNER_TEMP/target-status-complete.json"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+            --input "$RUNNER_TEMP/target-status-complete.json" > /dev/null
+
   notify-shared-review:
     name: Wake shared-source visual review (advisory)
     needs:

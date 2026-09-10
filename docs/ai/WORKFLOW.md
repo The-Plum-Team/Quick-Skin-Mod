@@ -97,6 +97,19 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   the protected merge is a separate coverage generation. Missing or expired evidence permits
   fresh execution; an API failure, pending original execution or malformed proof stops admission.
   Repeated producer wakes must skip targets with an authenticated existing capsule or report.
+- Target Build/E2E badges are advisory snapshots, not live acceptance or baseline certificates.
+  `.github/workflows/target-ci-status.yml` refreshes the complete matrix on `master` pushes and
+  gate transitions, with explicit E2E advisory wakes for token-created runs plus manual and hourly
+  recovery. Each invocation collects bounded gate data once; it never polls per target or launches
+  compilation, Minecraft, Pages or a model. Use protected `master` code and authenticate exact run
+  attempts, current coverage and any original execution reused through `ci_reuse.py`.
+  Publish validated JSON, Markdown and SVG only to `automation/ci-status`, serially without
+  cancellation during a push. Recheck `master` and the previous data-branch head before the atomic
+  fast-forward update; a race aborts rather than overwriting another publisher. Never execute
+  data-branch content, treat a skipped job as success without an authenticated reference, or reuse
+  old green when current gate data is unknown. Badge caches may delay display: inspect the covered
+  SHA, observation time and exact run links in the details, and use the required global gates for
+  acceptance.
 - Budget GitHub API work by its exact consumer. A direct compatibility source wake must not
   start a full recovery sweep after settling; only the scheduled/manual recovery chain continues
   that sweep. Baseline requests follow all review-owner tail jobs. The collector first checks
@@ -255,7 +268,9 @@ Public frames keep their original tested commit/run/JAR when unaffected dependen
 - Keep the active-common test task anchor in this imported guide aligned through
   `scripts/release/workflow_guidance.py`; its Minecraft version comes from the matrix unit lane.
 - Keep the generated README status block aligned through `scripts/release/status_table.py`; never
-  hand-maintain its version rows.
+  hand-maintain its version rows. Shared target badges link to the generated data branch; their
+  published snapshots belong to `target_status.py`, `target_status_render.py` and
+  `target_status_publish.py`, with no second inventory of supported versions.
 - When user-visible behavior, build commands, source layout, or compatibility facts change, adapt
   the non-generated README text for the shared source. Verify the complete required target/loader
   gate and every affected feature interaction; document intentional exclusions and outstanding
