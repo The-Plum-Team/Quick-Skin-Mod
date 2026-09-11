@@ -10,30 +10,11 @@ Quick Skin is a client-and-server Minecraft mod for changing skins and capes in-
 
 ## Shared multi-version source
 
-Features and compatibility adapters compile as separate Gradle modules. The selected modules are assembled into one production JAR per Minecraft and loader target. `architecture/modules.json` owns module dependencies; `release/release-matrix.json` owns the targets currently configured in this checkout:
-
-| Minecraft | Loaders | Java |
-|---|---|---:|
-| `1.20.1` | Fabric + Forge | `17` |
-| `1.21.1` | Fabric + NeoForge | `21` |
-| `1.21.2` | Fabric + NeoForge | `21` |
-| `1.21.3` | Fabric + NeoForge | `21` |
-| `1.21.4` | Fabric + NeoForge | `21` |
-| `1.21.5` | Fabric + NeoForge | `21` |
-| `1.21.6` | Fabric + NeoForge | `21` |
-| `1.21.7` | Fabric + NeoForge | `21` |
-| `1.21.8` | Fabric + NeoForge | `21` |
-| `1.21.9` | Fabric + NeoForge | `21` |
-| `1.21.10` | Fabric + NeoForge | `21` |
-| `1.21.11` | Fabric + NeoForge | `21` |
-| `26.1` | Fabric + NeoForge | `25` |
-| `26.1.1` | Fabric + NeoForge | `25` |
-| `26.1.2` | Fabric + NeoForge | `25` |
-| `26.2` | Fabric + NeoForge | `25` |
+Features and compatibility adapters compile as separate Gradle modules. The selected modules are assembled into one production JAR per Minecraft and loader target. `architecture/modules.json` owns module dependencies; `release/release-matrix.json` owns the targets currently configured in this checkout. Every configured target is listed with its loaders, Java version and current gate results under [Release status](#release-status); this profile does not repeat that inventory.
 
 All targets build from the same source revision. Publication identity remains per Minecraft version (`mc<version>-v<mod_version>`); the complete build bundle is not a publishable release. Dependency ranges remain in the matrix and generated JAR metadata.
 
-The [migration plan](docs/architecture/MODULAR-REWORK.md) records remaining API, selective CI, governance and evidence work. The status table derives target release identities from this same matrix.
+The [migration plan](docs/architecture/MODULAR-REWORK.md) records remaining API, selective CI, governance and evidence work. The status table derives its rows from this same matrix.
 <!-- branch-profile:end -->
 
 ## Release status
