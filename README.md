@@ -2,7 +2,7 @@
 
 Repository: [The-Plum-Team/Quick-Skin-Mod](https://github.com/The-Plum-Team/Quick-Skin-Mod).
 Covered commit: `e7032bef3c5af90fe4122e850103e67c7037baf2`.
-Observed: 2026-09-11T09:41:35Z (UTC).
+Observed: 2026-09-11T09:41:57Z (UTC).
 
 Each row summarizes target jobs and shared prerequisites. Open a target for the separate overall workflow result and original execution provenance. Snapshots update on CI transitions; caching may delay displayed badges. A badge is a status summary, not an acceptance certificate.
 
