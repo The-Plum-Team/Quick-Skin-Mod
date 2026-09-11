@@ -73,6 +73,26 @@ class BranchReadmeTest(unittest.TestCase):
         with self.assertRaisesRegex(branch_readme.BranchReadmeError, "does not match"):
             branch_readme.render_branch_profile(data, profile_branch="fabric-and-neoforge-1.21.1")
 
+    def test_unified_profile_leaves_the_gate_badges_to_the_status_block(self) -> None:
+        data = json.loads((ROOT / "release/release-matrix.json").read_bytes())
+        section = branch_readme.render_branch_profile(data, profile_branch="master")
+        # status_table.py renders Build and packaged E2E together under one label. A second
+        # copy here shows the same image without its E2E half, in the more prominent slot.
+        self.assertNotIn("badge.svg", section)
+        self.assertNotIn("actions/workflows", section)
+        # The schema-2 renderer keeps its badge: released branch READMEs are historical
+        # evidence and must not be reflowed by a shared-source presentation change.
+        legacy = branch_readme.render_branch_profile(
+            matrix_for_branch(), profile_branch="fabric-and-neoforge-1.21.1"
+        )
+        self.assertIn("build-gate.yml/badge.svg?branch=fabric-and-neoforge-1.21.1", legacy)
+
+    def test_unified_profile_still_rejects_a_non_canonical_repository_url(self) -> None:
+        data = json.loads((ROOT / "release/release-matrix.json").read_bytes())
+        data["project"]["sources"] = "https://example.invalid/The-Plum-Team/Quick-Skin-Mod"
+        with self.assertRaisesRegex(branch_readme.BranchReadmeError, "canonical GitHub"):
+            branch_readme.render_branch_profile(data, profile_branch="master")
+
     def test_renders_release_specific_compatibility_delta(self) -> None:
         section = branch_readme.render_branch_profile(
             matrix_for_branch(),
