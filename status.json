@@ -1,6 +1,6 @@
 {
   "coverage_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-  "observed_at": "2026-09-11T09:40:51Z",
+  "observed_at": "2026-09-11T09:41:14Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -8,11 +8,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -22,35 +22,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303492,
+            "name": "compile / Compile Minecraft 26.2",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303492"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -58,12 +79,27 @@
           "fabric-26_2--26_2--pr-behavior - contract scenarios",
           "neoforge-26_2--26_2--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         25
@@ -78,11 +114,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -92,35 +128,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303412,
+            "name": "compile / Compile Minecraft 26.1.2",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303412"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -128,12 +185,27 @@
           "fabric-26_1_2--26_1_2--pr-behavior - contract scenarios",
           "neoforge-26_1_2--26_1_2--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         25
@@ -148,11 +220,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -162,35 +234,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303499,
+            "name": "compile / Compile Minecraft 26.1.1",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303499"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -198,12 +291,27 @@
           "fabric-26_1_1--26_1_1--pr-behavior - contract scenarios",
           "neoforge-26_1_1--26_1_1--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         25
@@ -218,11 +326,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -232,35 +340,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303395,
+            "name": "compile / Compile Minecraft 26.1",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303395"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -268,12 +397,27 @@
           "fabric-26_1--26_1--pr-behavior - contract scenarios",
           "neoforge-26_1--26_1--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         25
@@ -288,11 +432,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -302,35 +446,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303493,
+            "name": "compile / Compile Minecraft 1.21.11",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303493"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -338,12 +503,27 @@
           "fabric-1_21_11--1_21_11--pr-behavior - contract scenarios",
           "neoforge-1_21_11--1_21_11--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -358,11 +538,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -372,35 +552,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303505,
+            "name": "compile / Compile Minecraft 1.21.10",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303505"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -408,12 +609,27 @@
           "fabric-1_21_10--1_21_10--pr-behavior - contract scenarios",
           "neoforge-1_21_10--1_21_10--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -428,11 +644,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -442,35 +658,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303462,
+            "name": "compile / Compile Minecraft 1.21.9",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303462"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -478,12 +715,27 @@
           "fabric-1_21_9--1_21_9--pr-behavior - contract scenarios",
           "neoforge-1_21_9--1_21_9--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -498,11 +750,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -512,35 +764,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303473,
+            "name": "compile / Compile Minecraft 1.21.8",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303473"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -548,12 +821,27 @@
           "fabric-1_21_8--1_21_8--pr-behavior - contract scenarios",
           "neoforge-1_21_8--1_21_8--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -568,11 +856,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -582,35 +870,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303441,
+            "name": "compile / Compile Minecraft 1.21.7",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303441"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -618,12 +927,27 @@
           "fabric-1_21_7--1_21_7--pr-behavior - contract scenarios",
           "neoforge-1_21_7--1_21_7--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -638,11 +962,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -652,35 +976,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303498,
+            "name": "compile / Compile Minecraft 1.21.6",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303498"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -688,12 +1033,27 @@
           "fabric-1_21_6--1_21_6--pr-behavior - contract scenarios",
           "neoforge-1_21_6--1_21_6--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -708,11 +1068,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -722,35 +1082,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303375,
+            "name": "compile / Compile Minecraft 1.21.5",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303375"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -758,12 +1139,27 @@
           "fabric-1_21_5--1_21_5--pr-behavior - contract scenarios",
           "neoforge-1_21_5--1_21_5--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -778,11 +1174,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -792,35 +1188,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303372,
+            "name": "compile / Compile Minecraft 1.21.4",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303372"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -828,12 +1245,27 @@
           "fabric-1_21_4--1_21_4--pr-behavior - contract scenarios",
           "neoforge-1_21_4--1_21_4--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -848,11 +1280,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -862,35 +1294,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303477,
+            "name": "compile / Compile Minecraft 1.21.3",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303477"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -898,12 +1351,27 @@
           "fabric-1_21_3--1_21_3--pr-behavior - contract scenarios",
           "neoforge-1_21_3--1_21_3--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -918,11 +1386,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -932,35 +1400,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303436,
+            "name": "compile / Compile Minecraft 1.21.2",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303436"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -968,12 +1457,27 @@
           "fabric-1_21_2--1_21_2--pr-behavior - contract scenarios",
           "neoforge-1_21_2--1_21_2--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -988,11 +1492,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -1002,35 +1506,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303359,
+            "name": "compile / Compile Minecraft 1.21.1",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303359"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -1038,12 +1563,27 @@
           "fabric-1_21_1--1_21_1--pr-behavior - contract scenarios",
           "neoforge-1_21_1--1_21_1--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         21
@@ -1058,11 +1598,11 @@
       "build": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 34585380153,
-          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
+          "conclusion": "success",
+          "id": 34581301612,
+          "sha": "18ec8380d7840f26a4d6b35029f44d544b91c754",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/attempts/1"
         },
         "expected_jobs": [
           "Resolve tested build reuse",
@@ -1072,35 +1612,56 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 34585380153,
           "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 103218258881,
+            "id": 103205229912,
             "name": "Resolve tested build reuse",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218258881"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205229912"
           },
           {
-            "conclusion": "skipped",
-            "id": 103218341824,
+            "conclusion": "success",
+            "id": 103205263836,
             "name": "Validate repository policy",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585380153/job/103218341824"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205263836"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205264009,
+            "name": "compile / Plan every supported build target",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205264009"
+          },
+          {
+            "conclusion": "success",
+            "id": 103205303458,
+            "name": "compile / Compile Minecraft 1.20.1",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34581301612/job/103205303458"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "f30022cd56c901eb16942865c88f8ddc9a2642b9"
       },
       "e2e": {
-        "execution": null,
+        "execution": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
         "expected_jobs": [
           "Classify packaged runtime impact",
           "Resolve the exact source Build bundle",
@@ -1108,12 +1669,27 @@
           "fabric-1_20_1--1_20_1--pr-behavior - contract scenarios",
           "forge-1_20_1--1_20_1--pr-behavior - contract scenarios"
         ],
-        "generation": null,
-        "jobs": [],
-        "reason": "No workflow execution has been observed for this commit.",
+        "generation": {
+          "attempt": 1,
+          "conclusion": null,
+          "id": 34585445869,
+          "sha": "e7032bef3c5af90fe4122e850103e67c7037baf2",
+          "status": "in_progress",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/attempts/1"
+        },
+        "jobs": [
+          {
+            "conclusion": null,
+            "id": 103218478079,
+            "name": "Classify packaged runtime impact",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/34585445869/job/103218478079"
+          }
+        ],
+        "reason": "Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
-        "tested_sha": null
+        "state": "running",
+        "tested_sha": "e7032bef3c5af90fe4122e850103e67c7037baf2"
       },
       "java": [
         17
