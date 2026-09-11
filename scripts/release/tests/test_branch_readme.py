@@ -57,15 +57,19 @@ def matrix_for_branch() -> dict[str, object]:
 
 
 class BranchReadmeTest(unittest.TestCase):
-    def test_unified_profile_derives_every_target_and_rejects_version_branch_identity(self) -> None:
+    def test_unified_profile_defers_the_target_inventory_and_rejects_version_branch_identity(self) -> None:
         data = json.loads((ROOT / "release/release-matrix.json").read_bytes())
         section = branch_readme.render_branch_profile(data, profile_branch="master")
         self.assertIn("same source revision", section)
         self.assertIn("mc<version>-v<mod_version>", section)
+        self.assertIn("[Release status](#release-status)", section)
+        # The status table is the single rendered target inventory. A second one here would
+        # drift silently, because only one of the two is regenerated on a matrix change.
+        self.assertNotIn("| Minecraft | Loaders | Java |", section)
         for version in {row["artifact_version"] for row in data["artifacts"]}:
             rows = [row for row in data["artifacts"] if row["artifact_version"] == version]
             names = " + ".join(branch_readme.release_matrix.LOADER_DISPLAY_NAMES[row["loader"]] for row in rows)
-            self.assertIn(f"| `{version}` | {names} | `{rows[0]['java']}` |", section)
+            self.assertNotIn(f"| `{version}` | {names} | `{rows[0]['java']}` |", section)
         with self.assertRaisesRegex(branch_readme.BranchReadmeError, "does not match"):
             branch_readme.render_branch_profile(data, profile_branch="fabric-and-neoforge-1.21.1")
 
