@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -126,6 +127,25 @@ def write_checksums(contract: ReleaseContract, destination: Path) -> Path:
     return checksums
 
 
+def expected_remote_assets(
+    contract: ReleaseContract, checksums: Path,
+) -> dict[str, tuple[Path, str]]:
+    """Bind GitHub's normalized names to the unchanged local manifest bytes."""
+    expected: dict[str, tuple[Path, str]] = {}
+    assets = [(asset, contract.hashes[asset.name]) for asset in contract.assets]
+    assets.append((checksums, sha256(checksums)))
+    for asset, digest in assets:
+        # GitHub replaces spaces with periods even when the requested upload name is exact.
+        # Keep the mapping narrow to our ASCII filenames; never guess other transformations.
+        name = asset.name.replace(" ", ".").strip(".")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
+            raise GitHubReleaseError(f"unsupported GitHub release asset name: {asset.name}")
+        if name in expected:
+            raise GitHubReleaseError(f"GitHub asset names collide after normalization: {name}")
+        expected[name] = (asset, digest)
+    return expected
+
+
 def run(command: list[str], *, text: bool = True, check: bool = True) -> subprocess.CompletedProcess[Any]:
     return subprocess.run(
         command,
@@ -229,6 +249,7 @@ def stage_release(
     checksums: Path,
 ) -> None:
     assert_tag_commit(contract.tag, contract.commit)
+    expected = expected_remote_assets(contract, checksums)
     release = release_view(contract.tag)
     if release is None:
         run([
@@ -244,11 +265,6 @@ def stage_release(
     if release is None or release.get("tagName") != contract.tag:
         raise GitHubReleaseError("unable to create the canonical draft release")
 
-    expected = {
-        asset.name: (asset, contract.hashes[asset.name])
-        for asset in contract.assets
-    }
-    expected[checksums.name] = (checksums, sha256(checksums))
     release_id = int(release["databaseId"])
     missing = verify_remote_assets(
         repository, release_id, expected, allow_missing=bool(release.get("isDraft"))
@@ -269,14 +285,10 @@ def publish_release(
     checksums: Path,
 ) -> None:
     assert_tag_commit(contract.tag, contract.commit)
+    expected = expected_remote_assets(contract, checksums)
     release = release_view(contract.tag)
     if release is None:
         raise GitHubReleaseError("draft release has not been staged")
-    expected = {
-        asset.name: (asset, contract.hashes[asset.name])
-        for asset in contract.assets
-    }
-    expected[checksums.name] = (checksums, sha256(checksums))
     verify_remote_assets(
         repository, int(release["databaseId"]), expected, allow_missing=False
     )
