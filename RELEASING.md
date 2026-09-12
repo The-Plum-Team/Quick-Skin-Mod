@@ -57,7 +57,9 @@ The workflow then performs this fixed sequence:
    SHA-256 bytes for every production and harness JAR;
 2. record source identity plus SHA-1, SHA-256, and SHA-512 for every production artifact, then
    generate a deterministic CycloneDX SBOM from those records, the matrix, each lane's strict
-   `shadowBundle` lock, and the matching SHA-256 entries in Gradle verification metadata;
+   `shadowBundle` lock, and the matching SHA-256 entries in Gradle verification metadata.
+   The `serialNumber` required by the attestation action is derived from the document content, so
+   identical inputs retain identical SBOM bytes;
 3. attest the production JARs twice with the same pinned GitHub action: once for build provenance
    and once with the exact staged CycloneDX document as the SBOM predicate;
 4. run all release-profile scenarios for that target's matrix-declared runtimes against the staged bytes;
