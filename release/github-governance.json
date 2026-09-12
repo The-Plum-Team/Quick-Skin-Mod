@@ -24,6 +24,10 @@
       {
         "type": "tag",
         "name": "mc*-v*"
+      },
+      {
+        "type": "branch",
+        "name": "master"
       }
     ],
     "retired_deployment_policies": [
@@ -62,8 +66,15 @@
       ".github/workflows/sync-version-branches.yml": [
         "scripts/release/release_sources.py --kind mode",
         "version-branch porting is retired"
+      ],
+      ".github/workflows/release-recovery.yml": [
+        "environment: release",
+        "scripts/release/recover_sbom_release.py prepare",
+        "scripts/release/recover_sbom_release.py verify",
+        "needs.prepare.outputs.source_sha"
       ]
     }
   },
-  "source_matrix": "release/release-matrix.json"
+  "source_matrix": "release/release-matrix.json",
+  "sbom_recovery_workflow": ".github/workflows/release-recovery.yml"
 }

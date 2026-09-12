@@ -326,6 +326,11 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "release-${{ steps.release.outputs.release_id }}",
             ): "90",
             (
+                "release-recovery.yml",
+                "Upload the exact recovered release bundle",
+                "release-recovery-${{ steps.recovery.outputs.release_id }}",
+            ): "90",
+            (
                 "on-demand-e2e.yml",
                 "Upload stable public evidence for this Minecraft target",
                 "pages-e2e-${{ matrix.bundle_key }}",
@@ -3191,35 +3196,60 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("node_modules/.bin/claude --version", capacity)
 
     def test_marketplace_jobs_receive_only_the_selected_secret(self) -> None:
-        workflow = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
-        self.assertEqual(
-            workflow.count(
-                "MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' "
-                "&& secrets.MODRINTH_TOKEN || '' }}"
-            ),
-            2,
-        )
-        # CurseForge reconciliation reads only unauthenticated first-party endpoints, so the
-        # upload step is the single place that may see the token at all.
-        self.assertNotIn("CURSEFORGE_TOKEN: ", workflow)
-        self.assertEqual(
-            workflow.count("curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}"), 1
-        )
+        for filename in ("release.yml", "release-recovery.yml"):
+            with self.subTest(workflow=filename):
+                workflow = (WORKFLOWS / filename).read_text(encoding="utf-8")
+                self.assertEqual(
+                    workflow.count(
+                        "MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' "
+                        "&& secrets.MODRINTH_TOKEN || '' }}"
+                    ),
+                    2,
+                )
+                # Only the upload action needs the CurseForge credential.
+                self.assertNotIn("CURSEFORGE_TOKEN: ", workflow)
+                self.assertEqual(
+                    workflow.count("curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}"), 1
+                )
 
     def test_curseforge_upload_is_never_retried_inside_the_action(self) -> None:
-        workflow = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
+        for filename in ("release.yml", "release-recovery.yml"):
+            with self.subTest(workflow=filename):
+                workflow = (WORKFLOWS / filename).read_text(encoding="utf-8")
 
-        def publish_step(marketplace: str) -> str:
-            tail = workflow.split(
-                f"Publish exact verified artifact to {marketplace}", 1
-            )[1]
-            return tail.split("- name: ", 1)[0]
+                def publish_step(marketplace: str) -> str:
+                    tail = workflow.split(
+                        f"Publish exact verified artifact to {marketplace}", 1
+                    )[1]
+                    return tail.split("- name: ", 1)[0]
 
-        # CurseForge approves asynchronously and deduplicates only against an approved file, so a
-        # retried upload can publish a second live copy that no pre-publish gate can prevent.
-        self.assertIn("retry-attempts: 1", publish_step("CurseForge"))
-        # Modrinth rejects a duplicate synchronously, so its retries stay safe.
-        self.assertIn("retry-attempts: 3", publish_step("Modrinth"))
+                # CurseForge approves asynchronously; only the reconciler may retry.
+                self.assertIn("retry-attempts: 1", publish_step("CurseForge"))
+                # Modrinth rejects duplicates synchronously.
+                self.assertIn("retry-attempts: 3", publish_step("Modrinth"))
+
+    def test_sbom_recovery_preserves_source_identity_and_publication_boundaries(self) -> None:
+        workflow = (WORKFLOWS / "release-recovery.yml").read_text(encoding="utf-8")
+        prepare = job_block("release-recovery.yml", "prepare")
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("group: release", workflow)
+        self.assertIn("cancel-in-progress: false", workflow)
+        self.assertIn("recover_sbom_release.py prepare", prepare)
+        self.assertIn("SOURCE_RUN_ID: ${{ inputs.source_run_id }}", prepare)
+        self.assertIn("SOURCE_ARTIFACT_ID: ${{ inputs.source_artifact_id }}", prepare)
+        self.assertNotIn("secrets.", prepare)
+        self.assertIn("sbom-path: build/release/sbom/quick-skin.cdx.json", prepare)
+        for name in ("stage-github-release", "publish-marketplace", "publish-github-release"):
+            block = job_block("release-recovery.yml", name)
+            self.assertIn("environment: release", block)
+            self.assertIn("recover_sbom_release.py verify", block)
+            self.assertIn("MANIFEST_SHA256: ${{ needs.prepare.outputs.manifest_sha256 }}", block)
+            self.assertIn("fetch-tags: true", block)
+            self.assertIn("persist-credentials: false", block)
+        for name in ("stage-github-release", "publish-github-release"):
+            block = job_block("release-recovery.yml", name)
+            self.assertIn('--commit "${{ needs.prepare.outputs.source_sha }}"', block)
+            self.assertNotIn('--commit "$GITHUB_SHA"', block)
 
 
 if __name__ == "__main__":

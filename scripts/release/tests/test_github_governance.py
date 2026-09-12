@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import copy
 import json
+import tempfile
 import unittest
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -26,6 +27,7 @@ class LocalGovernanceRemote:
                          enumerate(github_governance.desired_rulesets(config), 1)}
         self.rulesets[99] = {"id": 99, "name": "Quick Skin release branches", "historical": True}
         self.policies = [{"id": 10, "type": "tag", "name": "mc*-v*"},
+                         {"id": 12, "type": "branch", "name": "master"},
                          {"id": 11, "type": "branch", "name": "*-and-*-*"}]
 
     def json(self, endpoint, *, method="GET", payload=None, **kwargs):
@@ -123,8 +125,37 @@ class GitHubGovernanceTest(unittest.TestCase):
                 github_governance.policy_identity(item)
                 for item in self.config["release_environment"]["deployment_policies"]
             },
-            {("mc*-v*", "tag")},
+            {("mc*-v*", "tag"), ("master", "branch")},
         )
+
+    def test_recovery_branch_requires_explicit_workflow_and_complete_readiness(self) -> None:
+        mutations = []
+        undeclared = copy.deepcopy(self.config)
+        undeclared.pop("sbom_recovery_workflow")
+        mutations.append(undeclared)
+        foreign = copy.deepcopy(self.config)
+        foreign["sbom_recovery_workflow"] = ".github/workflows/untrusted.yml"
+        mutations.append(foreign)
+        incomplete = copy.deepcopy(self.config)
+        incomplete["readiness"]["release_source"][self.config["sbom_recovery_workflow"]] = []
+        mutations.append(incomplete)
+        broad = copy.deepcopy(self.config)
+        broad["release_environment"]["deployment_policies"][-1]["name"] = "*"
+        mutations.append(broad)
+        for config in mutations:
+            with self.subTest(config=config), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "governance.json"
+                path.write_text(json.dumps(config))
+                with self.assertRaises(github_governance.GovernanceError):
+                    github_governance.load_config(path)
+
+        original = copy.deepcopy(self.config)
+        original.pop("sbom_recovery_workflow")
+        original["release_environment"]["deployment_policies"].pop()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "governance.json"
+            path.write_text(json.dumps(original))
+            self.assertEqual(github_governance.load_config(path), original)
 
     def test_historical_governance_can_still_be_loaded_without_retiring_its_policies(self):
         legacy = github_governance.load_config(Path(__file__).parent / "fixtures/legacy-governance-schema1.json")
@@ -150,7 +181,8 @@ class GitHubGovernanceTest(unittest.TestCase):
         github_governance.apply(remote, self.config)
         self.assertEqual([], github_governance.plan(remote, self.config))
         self.assertEqual(original_rules, remote.rulesets)
-        self.assertEqual([{"id": 10, "type": "tag", "name": "mc*-v*"}], remote.policies)
+        self.assertEqual([{"id": 10, "type": "tag", "name": "mc*-v*"},
+                          {"id": 12, "type": "branch", "name": "master"}], remote.policies)
         self.assertEqual(1, sum(method == "DELETE" for method, _ in remote.calls))
         self.assertNotIn(("GET", remote.prefix + "/rulesets/99"), remote.calls)
 
