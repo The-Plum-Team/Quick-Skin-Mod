@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 import sys
+import uuid
 import xml.etree.ElementTree as ElementTree
 from pathlib import Path
 from typing import Any
@@ -168,6 +169,15 @@ def index_by_artifact_node(rows: Any, label: str) -> dict[str, dict[str, Any]]:
     return result
 
 
+def serial_number(sbom: dict[str, Any]) -> str:
+    document = {key: value for key, value in sbom.items() if key != "serialNumber"}
+    payload = json.dumps(
+        document, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+    digest = hashlib.sha256(payload).hexdigest()
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"urn:quickskin:sbom:sha256:{digest}").urn
+
+
 def validate_cyclonedx(sbom: dict[str, Any]) -> None:
     # This is deliberately the deterministic subset of CycloneDX that Quick Skin emits, not a
     # replacement for the complete upstream JSON Schema. Full offline validation should vendor a
@@ -213,6 +223,11 @@ def validate_cyclonedx(sbom: dict[str, Any]) -> None:
         require(isinstance(depends_on, list), f"CycloneDX dependency {reference} has invalid dependsOn")
         require(len(depends_on) == len(set(depends_on)), f"CycloneDX dependency {reference} is duplicated")
         require(set(depends_on) <= reference_set, f"CycloneDX dependency {reference} points to an unknown ref")
+
+    require(
+        sbom.get("serialNumber") == serial_number(sbom),
+        "CycloneDX serialNumber does not match document content",
+    )
 
 
 def build_cyclonedx(
@@ -363,6 +378,9 @@ def build_cyclonedx(
         ),
         "dependencies": dependencies,
     }
+    # actions/attest requires serialNumber to recognize CycloneDX. Derive its UUID from the
+    # complete document so identical release inputs retain identical bytes without randomness.
+    sbom["serialNumber"] = serial_number(sbom)
     validate_cyclonedx(sbom)
     return sbom
 

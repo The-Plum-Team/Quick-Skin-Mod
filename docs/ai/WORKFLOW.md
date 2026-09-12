@@ -240,6 +240,11 @@ Release automation always rebuilds `scripts/release/build_matrix.py` with `--rer
 requires every production and harness SHA-256 to equal the first build. When determinism is in
 scope locally, use `scripts/release/verify_reproducibility.py` against the first staged manifest.
 
+The separate SBOM recovery workflow may retain a canonical tag's already tested JARs only after
+authenticating its full release rehearsal and original tag-push provenance. Its bounded metadata
+repair preserves the original source SHA and requires the protected release environment's human
+review. See `RELEASING.md`; ordinary release dispatches remain validation-only.
+
 Shared-source feature selection must use the protected complete-baseline consumer, including
 current availability of every retained public baseline. Keep every matrix runtime job required;
 reduce only the scenario actions and captures justified by the authenticated module graph.

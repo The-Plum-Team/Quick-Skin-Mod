@@ -5,6 +5,7 @@ import json
 import sys
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 
@@ -163,7 +164,10 @@ class CycloneDxSbomTest(unittest.TestCase):
         self.assertEqual(sbom["bomFormat"], "CycloneDX")
         self.assertEqual(sbom["specVersion"], "1.6")
         self.assertNotIn("timestamp", sbom["metadata"])
-        self.assertNotIn("serialNumber", sbom)
+        serial = uuid.UUID(sbom["serialNumber"])
+        self.assertEqual(serial.urn, sbom["serialNumber"])
+        self.assertEqual(serial.version, 5)
+        self.assertEqual(serial.variant, uuid.RFC_4122)
 
         files = [component for component in sbom["components"] if component["type"] == "file"]
         libraries = [component for component in sbom["components"] if component["type"] == "library"]
@@ -186,6 +190,35 @@ class CycloneDxSbomTest(unittest.TestCase):
                 graph[component["bom-ref"]],
                 ["pkg:maven/org.sejda.imageio/webp-imageio@0.1.6"],
             )
+
+    def test_serial_number_changes_with_dependencies_and_source_identity(self) -> None:
+        original = json.loads(self.build())["serialNumber"]
+        verification = self.repository / "gradle" / "verification-metadata.xml"
+        verification.write_text(
+            verification.read_text(encoding="utf-8").replace(
+                "3d30473ef5cadf126a25b2613cbe36218ba7d4184be873edc8f28a183a9fb29d",
+                "4" * 64,
+            ),
+            encoding="utf-8",
+        )
+        changed_dependencies = json.loads(self.build())["serialNumber"]
+        self.assertNotEqual(original, changed_dependencies)
+        self.assertEqual(changed_dependencies, json.loads(self.build())["serialNumber"])
+
+        self.manifest["git_commit"] = "b" * 40
+        changed_source = json.loads(self.build())["serialNumber"]
+        self.assertNotEqual(changed_dependencies, changed_source)
+
+    def test_rejects_missing_or_stale_serial_number(self) -> None:
+        sbom = json.loads(self.build())
+        serial = sbom.pop("serialNumber")
+        with self.assertRaisesRegex(generate_sbom.SbomError, "serialNumber"):
+            generate_sbom.validate_cyclonedx(sbom)
+
+        sbom["serialNumber"] = serial
+        sbom["metadata"]["component"]["description"] = "Changed release description"
+        with self.assertRaisesRegex(generate_sbom.SbomError, "serialNumber"):
+            generate_sbom.validate_cyclonedx(sbom)
 
     def test_staged_record_binds_exact_canonical_bytes_and_all_inputs(self) -> None:
         self.manifest["sbom"] = generate_sbom.stage_sbom(
