@@ -1,0 +1,304 @@
+name: Recover release SBOM
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing canonical tag whose publication failed on a missing SBOM serialNumber
+        required: true
+        type: string
+      source_run_id:
+        description: Successful release rehearsal run for that exact tagged source
+        required: true
+        type: string
+      source_artifact_id:
+        description: Immutable release bundle artifact ID from that rehearsal
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Authenticate and repair the original release SBOM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    outputs:
+      tag: ${{ steps.recovery.outputs.tag }}
+      release_id: ${{ steps.recovery.outputs.release_id }}
+      source_sha: ${{ steps.recovery.outputs.source_sha }}
+      target: ${{ steps.recovery.outputs.target }}
+      publications: ${{ steps.recovery.outputs.publications }}
+      manifest_sha256: ${{ steps.recovery.outputs.manifest_sha256 }}
+    steps:
+      - name: Check out the exact protected recovery implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Authenticate original source, full release E2E, archive and tag provenance
+        id: recovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_ARTIFACT_ID: ${{ inputs.source_artifact_id }}
+        run: >-
+          python scripts/release/recover_sbom_release.py prepare
+          --tag "$RELEASE_TAG"
+          --source-run-id "$SOURCE_RUN_ID"
+          --source-artifact-id "$SOURCE_ARTIFACT_ID"
+
+      - name: Attest the corrected SBOM for the unchanged production JARs
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: build/release/files/*.jar
+          sbom-path: build/release/sbom/quick-skin.cdx.json
+
+      - name: Upload the exact recovered release bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-recovery-${{ steps.recovery.outputs.release_id }}
+          path: build/release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+
+  stage-github-release:
+    name: Stage exact GitHub Release assets
+    needs:
+      - prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out exact release source and tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Download immutable release bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-recovery-${{ needs.prepare.outputs.release_id }}
+          path: build/release
+
+      - name: Reverify staged bytes before creating a draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          MANIFEST_SHA256: ${{ needs.prepare.outputs.manifest_sha256 }}
+        run: >-
+          python scripts/release/recover_sbom_release.py verify
+          --tag "$RELEASE_TAG" --manifest-sha256 "$MANIFEST_SHA256"
+
+      - name: Reconcile or create the draft and upload exact assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/release/github_release.py stage
+          --repository "$GITHUB_REPOSITORY"
+          --tag "${{ needs.prepare.outputs.tag }}"
+          --commit "${{ needs.prepare.outputs.source_sha }}"
+          --title "Quick Skin ${{ needs.prepare.outputs.release_id }}"
+
+  publish-marketplace:
+    name: Publish ${{ matrix.artifact_node }} to ${{ matrix.marketplace }}
+    needs:
+      - prepare
+      - stage-github-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.prepare.outputs.publications) }}
+
+    steps:
+      - name: Check out release metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Download immutable release bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-recovery-${{ needs.prepare.outputs.release_id }}
+          path: build/release
+
+      - name: Reverify staged bytes before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          MANIFEST_SHA256: ${{ needs.prepare.outputs.manifest_sha256 }}
+        run: >-
+          python scripts/release/recover_sbom_release.py verify
+          --tag "$RELEASE_TAG" --manifest-sha256 "$MANIFEST_SHA256"
+
+      - name: Reconcile existing marketplace publication by identity and hash
+        id: reconcile
+        env:
+          MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' && secrets.MODRINTH_TOKEN || '' }}
+        run: >-
+          python scripts/release/reconcile_publication.py
+          --artifact-node "${{ matrix.artifact_node }}"
+          --marketplace "${{ matrix.marketplace }}"
+          --publication-id "${{ matrix.publication_id }}"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Publish exact verified artifact to Modrinth
+        if: ${{ matrix.marketplace == 'modrinth' && steps.reconcile.outputs.publish == 'true' }}
+        uses: Kira-NT/mc-publish@52307b03863581dec6b652b83e597aec02ebb075 # v3.3.1
+        with:
+          modrinth-id: ${{ matrix.modrinth_id }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: ${{ matrix.file }}
+          name: ${{ matrix.name }}
+          version: ${{ matrix.publication_id }}
+          version-type: release
+          changelog-file: CHANGELOG.md
+          loaders: ${{ matrix.loader }}
+          game-versions: ${{ matrix.game_versions }}
+          game-version-filter: none
+          dependencies: ${{ matrix.dependencies }}
+          java: ${{ matrix.java }}
+          retry-attempts: 3
+          retry-delay: 10000
+          fail-mode: fail
+
+      - name: Publish exact verified artifact to CurseForge
+        if: ${{ matrix.marketplace == 'curseforge' && steps.reconcile.outputs.publish == 'true' }}
+        uses: Kira-NT/mc-publish@52307b03863581dec6b652b83e597aec02ebb075 # v3.3.1
+        with:
+          curseforge-id: ${{ matrix.curseforge_id }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          files: ${{ matrix.file }}
+          name: ${{ matrix.name }}
+          version: ${{ matrix.publication_id }}
+          version-type: release
+          changelog-file: CHANGELOG.md
+          loaders: ${{ matrix.loader }}
+          game-versions: ${{ matrix.game_versions }}
+          game-version-filter: none
+          dependencies: ${{ matrix.dependencies }}
+          java: ${{ matrix.java }}
+          # CurseForge deduplicates only against an already approved file, so an in-action retry
+          # can land a second live copy of the same jar. The reconciler is the only safe retry
+          # authority here; Modrinth keeps three attempts because it rejects duplicates
+          # synchronously.
+          retry-attempts: 1
+          retry-delay: 10000
+          fail-mode: fail
+
+      - name: Verify marketplace ID and exact bytes after publication
+        env:
+          MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' && secrets.MODRINTH_TOKEN || '' }}
+        run: >-
+          python scripts/release/reconcile_publication.py
+          --artifact-node "${{ matrix.artifact_node }}"
+          --marketplace "${{ matrix.marketplace }}"
+          --publication-id "${{ matrix.publication_id }}"
+          --attempts "${{ matrix.marketplace == 'curseforge' && 40 || 6 }}"
+          --delay-seconds "${{ matrix.marketplace == 'curseforge' && 20 || 10 }}"
+          --verify
+          --record "build/publication/${{ matrix.id }}.json"
+
+      - name: Upload publication receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: publication-${{ matrix.id }}
+          path: build/publication/${{ matrix.id }}.json
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-github-release:
+    name: Publish immutable GitHub Release
+    needs:
+      - prepare
+      - stage-github-release
+      - publish-marketplace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out exact release source and tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Download immutable release bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-recovery-${{ needs.prepare.outputs.release_id }}
+          path: build/release
+
+      - name: Reverify staged bytes before final publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          MANIFEST_SHA256: ${{ needs.prepare.outputs.manifest_sha256 }}
+        run: >-
+          python scripts/release/recover_sbom_release.py verify
+          --tag "$RELEASE_TAG" --manifest-sha256 "$MANIFEST_SHA256"
+
+      - name: Publish the fully reconciled GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/release/github_release.py publish
+          --repository "$GITHUB_REPOSITORY"
+          --tag "${{ needs.prepare.outputs.tag }}"
+          --commit "${{ needs.prepare.outputs.source_sha }}"
+          --title "Quick Skin ${{ needs.prepare.outputs.release_id }}"

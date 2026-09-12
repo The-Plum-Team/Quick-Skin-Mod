@@ -23,7 +23,7 @@ Before creating a release tag:
    source branch (`master`) head;
 3. confirm the working tree is clean and the branch head has not moved;
 4. run the release workflow manually from `master` with an explicit `minecraft_target` if a
-   validation-only rehearsal is useful; `workflow_dispatch` never publishes;
+   validation-only rehearsal is useful; a manual run of `release.yml` never publishes;
 5. derive and inspect the only accepted identity:
 
    ```bash
@@ -85,6 +85,40 @@ failed workflow from GitHub Actions. Exact existing uploads are accepted; missin
 an identity or byte conflict fails closed. Never delete the tag or release, use an asset-clobber
 flag, or invent a second version ID to hide a partial release. A genuine byte conflict requires a
 new logical version and therefore a new immutable identity.
+
+### Recover an unpublished release with a missing SBOM serial number
+
+When tag publication failed because its CycloneDX SBOM omitted `serialNumber`, retain the tag,
+mod version and exact production/harness bytes. Merge the generator repair through the required
+PR gates. The separate `release-recovery.yml` workflow accepts an existing canonical tag plus the
+numeric run and artifact IDs of its successful validation-only release rehearsal:
+
+```bash
+gh workflow run release-recovery.yml --ref master \
+  -f release_tag=mc26.1-v3.0.0 \
+  -f source_run_id=34712044977 \
+  -f source_artifact_id=10303697152
+```
+
+The recovery authenticates the exact protected implementation and immutable tag, the tagged source's
+required gates, every rehearsal release-runtime job, and the archive's owner, size and digest.
+It verifies the original tag-push provenance for each production JAR. Every tracked input outside
+the explicit metadata-repair allowlist must still equal the tagged source. It accepts only the
+addition of the deterministic `serialNumber`; changes to dependency records, JARs, harnesses,
+version, matrix, game code or build inputs fail closed. No tagged code executes in this recovery.
+
+The corrected bundle retains the original source SHA and receives a new SBOM attestation; the
+original production provenance and packaged E2E evidence remain authoritative for its unchanged
+JARs. Publication jobs independently reauthenticate the tag and protected implementation, require
+the exact prepared manifest hash, and reverify every staged artifact before the ordinary immutable
+GitHub/marketplace reconciliation. The workflow uses the same `release` concurrency group.
+
+The declared `release` environment permits protected `master` for this explicit recovery as well
+as canonical tag runs, with the same required human reviewer. Apply the reviewed governance change
+before dispatching recovery. Ordinary `release.yml` dispatches remain validation-only. Recovery
+cannot move a tag, create another version identity, replace an existing conflicting asset, or
+claim that its current orchestration commit produced the original JARs. An advancing `master`,
+unavailable source archive, changed non-repair input or byte conflict stops recovery.
 
 Actions storage follows the same recovery boundary. Ordinary build, diagnostics, packaged-E2E,
 review, publication-receipt, synchronization, and Pages handoff artifacts are transient and expire
