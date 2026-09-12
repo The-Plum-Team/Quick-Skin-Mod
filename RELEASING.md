@@ -78,6 +78,12 @@ deterministic `SHA256SUMS`. The artifact manifest binds the SBOM's path, size, a
 `--target <minecraft> --verify-staged` regenerates it and requires byte-for-byte equality before any publication step.
 Published releases are immutable at the repository level.
 
+GitHub replaces spaces in uploaded asset filenames with periods. GitHub reconciliation maps
+those remote names to the original manifest records and still downloads and verifies every
+asset's SHA-256. The manifest and `SHA256SUMS` retain the original filenames used by the staged
+bundle and marketplaces; restore those names when checking GitHub downloads with `SHA256SUMS`.
+Names that collide after GitHub's normalization are rejected before creating or uploading assets.
+
 ## Recovery and verification
 
 Publication is retryable, not rollback-based. If a marketplace or GitHub API fails, rerun the

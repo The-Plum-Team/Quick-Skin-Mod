@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -92,6 +93,88 @@ class GitHubReleaseContractTest(unittest.TestCase):
             manifest.write_text(json.dumps(data), encoding="utf-8")
             with self.assertRaisesRegex(github_release.GitHubReleaseError, "no CycloneDX SBOM"):
                 github_release.load_contract(manifest, stage, tag, commit)
+
+    def test_stage_resumes_normalized_uploads_and_publishes_only_verified_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            stage, manifest, tag, commit = self.fixture(Path(temporary))
+            contract = github_release.load_contract(manifest, stage, tag, commit)
+            checksums = github_release.write_checksums(contract, stage)
+            remote_files = {
+                "Quick.Skin.jar": stage / "files" / "Quick Skin.jar",
+                "quick-skin.cdx.json": stage / "sbom" / "quick-skin.cdx.json",
+                "artifacts.json": manifest,
+                "SHA256SUMS": checksums,
+            }
+            remote = [
+                {"id": index, "name": name}
+                for index, name in enumerate(remote_files, start=1)
+            ]
+            uploaded = remote[1:]
+            downloads = {row["id"]: remote_files[row["name"]].read_bytes() for row in remote}
+            uploads: list[str] = []
+            edits: list[list[str]] = []
+            draft = {"databaseId": 123, "tagName": tag, "isDraft": True}
+
+            def api(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+                if command[:3] == ["gh", "release", "upload"]:
+                    uploads.append(command[4])
+                    self.assertEqual(Path(command[4]).name, "Quick Skin.jar")
+                    uploaded.append(remote[0])
+                    return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+                if command[:3] == ["gh", "release", "edit"]:
+                    edits.append(command)
+                    return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+                self.assertEqual(command[:2], ["gh", "api"])
+                self.assertIs(kwargs.get("text"), False)
+                asset_id = int(command[-1].rsplit("/", 1)[1])
+                return subprocess.CompletedProcess(command, 0, stdout=downloads[asset_id], stderr=b"")
+
+            with mock.patch.object(github_release, "assert_tag_commit"), mock.patch.object(
+                github_release, "release_view", return_value=draft
+            ) as view, mock.patch.object(
+                github_release, "release_assets", side_effect=lambda *args: list(uploaded)
+            ), mock.patch.object(github_release, "run", side_effect=api):
+                github_release.stage_release("owner/repo", contract, "release", manifest, checksums)
+                github_release.stage_release("owner/repo", contract, "release", manifest, checksums)
+                self.assertEqual(len(uploads), 1)
+                self.assertEqual(edits, [])
+                view.side_effect = [draft, {**draft, "isDraft": False}]
+                github_release.publish_release("owner/repo", contract, checksums)
+                self.assertEqual(len(edits), 1)
+                self.assertIn("--draft=false", edits[0])
+
+    def test_normalized_asset_with_different_bytes_still_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            stage, manifest, tag, commit = self.fixture(Path(temporary))
+            contract = github_release.load_contract(manifest, stage, tag, commit)
+            checksums = github_release.write_checksums(contract, stage)
+            expected = github_release.expected_remote_assets(contract, checksums)
+            with mock.patch.object(
+                github_release, "release_assets", return_value=[{"id": 1, "name": "Quick.Skin.jar"}]
+            ), mock.patch.object(
+                github_release, "run", return_value=subprocess.CompletedProcess([], 0, stdout=b"other-jar")
+            ):
+                with self.assertRaisesRegex(github_release.GitHubReleaseError, "different bytes"):
+                    github_release.verify_remote_assets("owner/repo", 123, expected, allow_missing=True)
+
+    def test_normalization_collision_is_rejected_before_creating_a_release(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            stage, manifest, tag, commit = self.fixture(Path(temporary))
+            contract = github_release.load_contract(manifest, stage, tag, commit)
+            checksums = github_release.write_checksums(contract, stage)
+            alias = stage / "Quick.Skin.jar"
+            alias.write_bytes(b"another-artifact")
+            conflicting = github_release.ReleaseContract(
+                tag, commit, (*contract.assets, alias),
+                {**contract.hashes, alias.name: github_release.sha256(alias)},
+            )
+            with mock.patch.object(github_release, "assert_tag_commit"), mock.patch.object(
+                github_release, "release_view"
+            ) as view, mock.patch.object(github_release, "run") as mutation:
+                with self.assertRaisesRegex(github_release.GitHubReleaseError, "collide"):
+                    github_release.stage_release("owner/repo", conflicting, "release", manifest, checksums)
+                view.assert_not_called()
+                mutation.assert_not_called()
 
 
 class ReleaseViewAfterCreateTest(unittest.TestCase):

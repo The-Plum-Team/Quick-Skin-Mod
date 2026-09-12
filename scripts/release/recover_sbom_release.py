@@ -36,9 +36,11 @@ METADATA_REPAIR_PATHS = frozenset({
     ".github/workflows/release-recovery.yml",
     "scripts/release/generate_sbom.py",
     "scripts/release/github_governance.py",
+    "scripts/release/github_release.py",
     "scripts/release/recover_sbom_release.py",
     "scripts/release/tests/test_sbom.py",
     "scripts/release/tests/test_github_governance.py",
+    "scripts/release/tests/test_github_release.py",
     "scripts/release/tests/test_recover_sbom_release.py",
     "scripts/ci/tests/test_workflow_security.py",
 })
