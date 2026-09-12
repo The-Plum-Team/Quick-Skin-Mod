@@ -28,10 +28,8 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Locale;
-//? if <1.21.4 {
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-//?}
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -897,8 +895,47 @@ public final class CPMCompatIntegration {
         //?}
     }
 
+    private static final int MAX_RESOLVED_SKIN_FILES = 256;
+    /** Positive {@code hash -> file:///} resolutions handed to CPM's skin-information override. */
+    private static final Map<String, String> resolvedSkinFileUrls = new ConcurrentHashMap<>();
+
+    /**
+     * Resolves the {@code file:///} URL CPM reads for a Quick Skin content id. The skin-information
+     * override runs on the skull render path once per rendered player head and frame, so a
+     * positive resolution is cached per hash instead of checking the disk every call. Entries
+     * leave through {@link #evictHttpTextureCache} and {@link #clearHttpTextureCache}, which
+     * already fire when the local catalog entry or the network texture behind the hash changes.
+     * Returns null while no readable file exists; that miss is not cached.
+     */
+    public static String resolveSkinFileUrl(String hash) {
+        if (!isAvailable() || hash == null || hash.isEmpty()) {
+            return null;
+        }
+        String cached = resolvedSkinFileUrls.get(hash);
+        if (cached != null) {
+            return cached;
+        }
+        Path sourcePath = assets().localSource(hash);
+        if (sourcePath == null || !Files.exists(sourcePath)) {
+            sourcePath = assets().networkSkinFile(hash);
+        }
+        if (sourcePath == null || !Files.exists(sourcePath)) {
+            return null;
+        }
+        String url = "file:///" + sourcePath.toFile().getAbsolutePath().replace('\\', '/');
+        if (resolvedSkinFileUrls.size() >= MAX_RESOLVED_SKIN_FILES) {
+            resolvedSkinFileUrls.clear();
+        }
+        resolvedSkinFileUrls.put(hash, url);
+        CPMLOG.debug("Resolved CPM skin file for {} -> {}", hash, url);
+        return url;
+    }
+
     /** Releases a legacy bridge texture, or logs the modern degraded no-op once. */
     public static void evictHttpTextureCache(String hash) {
+        if (hash != null) {
+            resolvedSkinFileUrls.remove(hash);
+        }
         if (!CpmCapabilities.current().supportsHttpTextureBridge()) {
             if (isAvailable()) {
                 logDegradedEmbeddedBridge();
@@ -921,6 +958,7 @@ public final class CPMCompatIntegration {
 
     /** Releases every connection-owned legacy CPM bridge texture. */
     public static void clearHttpTextureCache() {
+        resolvedSkinFileUrls.clear();
         //? if <1.21.4 {
         for (ResourceLocation location : httpTextureCache.values()) {
             try {
