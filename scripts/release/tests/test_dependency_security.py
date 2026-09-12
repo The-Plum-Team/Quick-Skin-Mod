@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 import unittest
 import xml.etree.ElementTree as ElementTree
 from pathlib import Path
@@ -76,6 +77,34 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ROOT / "gradle" / "wrapper" / "gradle-wrapper.jar.sha256"
         ).read_text(encoding="utf-8").split()[0]
         self.assertEqual(hashlib.sha256(wrapper_jar.read_bytes()).hexdigest(), expected_jar_hash)
+
+    def test_windows_wrapper_crlf_survives_the_port_whitespace_gate(self) -> None:
+        """A wrapper bump must not fail a staged whitespace gate on its own line endings.
+
+        Gradle ships gradlew.bat with CRLF, as a Windows batch file must have. Git reads a bare
+        carriage return as a trailing space, so without an attribute every changed line of that
+        file is an error under `git diff --check`.
+
+        Nothing else pins this. An ordinary `git diff --check` on a wrapper bump compares within
+        the file's existing line endings and never sees the added CRLF lines, which is why the
+        9.7.1 bump stayed green on its own Build gate and still aborted the 1.20.1 port while
+        packaging, blocking the wave to every other release branch (ec1975e2).
+
+        Schema 3 retired automatic ports, but the gate is still live: `ai_patch_policy` rejects
+        an AI patch that fails `git diff --check`, and the schema-2 port controllers are retained
+        for recovery.
+        """
+        wrapper_bat = ROOT / "gradlew.bat"
+        self.assertIn(b"\r\n", wrapper_bat.read_bytes())
+
+        attribute = subprocess.run(
+            ("git", "check-attr", "whitespace", "--", "gradlew.bat"),
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        self.assertIn("cr-at-eol", attribute)
 
     def test_verification_is_strict_sha256_without_weak_hashes(self) -> None:
         root, namespace = _verification_tree()
