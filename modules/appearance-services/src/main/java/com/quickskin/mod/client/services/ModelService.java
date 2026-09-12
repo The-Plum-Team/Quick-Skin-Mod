@@ -61,7 +61,7 @@ public class ModelService implements IModelService {
         }
 
         // Fallback: check for override
-        if (modelOverrides.containsKey(playerId)) {
+        if (playerId != null && modelOverrides.containsKey(playerId)) {
             String override = modelOverrides.get(playerId);
             if (!"auto".equals(override != null ? override.toLowerCase(Locale.ROOT) : null)) {
                 return override;
@@ -100,12 +100,14 @@ public class ModelService implements IModelService {
 
     @Override
     @Nullable
-    public String getModelOverride(UUID playerId) {
+    public String getModelOverride(@Nullable UUID playerId) {
+        if (playerId == null) return null;
         return modelOverrides.get(playerId);
     }
 
     @Override
-    public boolean hasModelOverride(UUID playerId) {
+    public boolean hasModelOverride(@Nullable UUID playerId) {
+        if (playerId == null) return false;
         return modelOverrides.containsKey(playerId);
     }
 

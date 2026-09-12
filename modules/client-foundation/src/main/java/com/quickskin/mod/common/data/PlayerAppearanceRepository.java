@@ -27,11 +27,15 @@ public class PlayerAppearanceRepository {
 
     /**
      * Gets a player's appearance data
-     * @param playerId The player's UUID
-     * @return The appearance data, or null if not set
+     * @param playerId The player's UUID, or null for a name-only profile
+     * @return The appearance data, or null if not set or the id is null
      */
     @Nullable
-    public PlayerAppearance getAppearance(UUID playerId) {
+    public PlayerAppearance getAppearance(@Nullable UUID playerId) {
+        // A name-only GameProfile (a player_head whose SkullOwner is a bare name, or an
+        // unresolved skull lookup) has no UUID. Appearances are keyed by UUID, so there is
+        // nothing to find, and ConcurrentHashMap rejects a null key.
+        if (playerId == null) return null;
         return appearances.get(playerId);
     }
 
