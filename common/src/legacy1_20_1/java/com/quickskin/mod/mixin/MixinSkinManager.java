@@ -15,6 +15,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -33,6 +34,8 @@ import java.util.UUID;
 public class MixinSkinManager {
 
     private static final Logger CPMLOG = LoggerFactory.getLogger("QuickSkin-CPM");
+    @Unique
+    private static final Map<String, String> SLIM_MODEL_METADATA = Map.of("model", "slim");
 
     @Inject(
             method = "registerSkins",
@@ -209,7 +212,7 @@ public class MixinSkinManager {
         if (profile == null || profile.getId() == null) return;
 
         String hash = null;
-        Map<String, String> meta = new HashMap<>();
+        boolean slim = false;
 
         // Check local player
         UUID localUuid = null;
@@ -230,11 +233,11 @@ public class MixinSkinManager {
             LocalAssetManager assetManager = LocalAssetManager.getInstance();
             String modelType = assetManager.getSkinModelPreference(hash);
             if ("slim".equals(modelType)) {
-                meta.put("model", "slim");
+                slim = true;
             } else if ("auto".equals(modelType)) {
                 AssetMetadata skinMeta = assetManager.getMetadata(hash);
                 if (skinMeta != null && "slim".equals(skinMeta.skinModel())) {
-                    meta.put("model", "slim");
+                    slim = true;
                 }
             }
         } else {
@@ -246,34 +249,22 @@ public class MixinSkinManager {
             if (!skinId.startsWith("local_skin:")) return;
             hash = skinId.substring("local_skin:".length());
             if ("slim".equals(appearance.getModel())) {
-                meta.put("model", "slim");
+                slim = true;
             }
         }
 
         if (hash == null || hash.isEmpty()) return;
 
-        // Find the skin file on disk
-        java.nio.file.Path sourcePath = LocalAssetManager.getInstance().getSourcePath(hash);
-        if (sourcePath == null || !sourcePath.toFile().exists()) {
-            sourcePath = com.quickskin.mod.client.storage.NetworkTextureCache.getInstance()
-                    .getOrCreateTempFile(hash, "skin");
-        }
-
-        String textureUrl;
-        if (sourcePath != null && sourcePath.toFile().exists()) {
-            textureUrl = "file:///" + sourcePath.toFile().getAbsolutePath().replace('\\', '/');
-        } else {
-            return; // No file available, let Mojang skin through
-        }
-
-        CPMLOG.info("getInsecureSkinInformation OVERRIDE for {} hash={} url={}",
-                profile.getName(), hash, textureUrl);
+        // SkullBlockRenderer asks for this map every frame for each rendered player head, so the
+        // file lookup is cached per hash by the CPM bridge and nothing is logged here.
+        String textureUrl = CPMCompatIntegration.resolveSkinFileUrl(hash);
+        if (textureUrl == null) return; // No file available, let Mojang skin through
 
         // Create modified map with our skin replacing the Mojang SKIN entry
         Map<MinecraftProfileTexture.Type, MinecraftProfileTexture> original = cir.getReturnValue();
         Map<MinecraftProfileTexture.Type, MinecraftProfileTexture> modified = new HashMap<>(original);
         modified.put(MinecraftProfileTexture.Type.SKIN,
-                new MinecraftProfileTexture(textureUrl, meta));
+                new MinecraftProfileTexture(textureUrl, slim ? SLIM_MODEL_METADATA : Map.of()));
         cir.setReturnValue(modified);
     }
 
