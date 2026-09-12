@@ -1,8 +1,6 @@
 # Changelog
 
-## 3.0.1 (2026-09-12)
-
-This release is published only for supported Minecraft versions from 26.1 onward.
+## 3.0.0 (2026-08-09)
 
 ### Added
 
