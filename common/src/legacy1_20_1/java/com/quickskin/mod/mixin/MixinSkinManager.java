@@ -48,6 +48,12 @@ public class MixinSkinManager {
             boolean requireSecure,
             CallbackInfo ci) {
 
+        // A name-only GameProfile (a player_head whose SkullOwner is a bare name, handed to
+        // registerSkins by CPM's profile loader) carries no UUID. Quick Skin keys appearances
+        // by UUID, so there is nothing to override: let vanilla and CPM register the skin
+        // exactly as if Quick Skin were absent. Mirrors the guard in quickskin$overrideSkinInfo.
+        if (profile == null || profile.getId() == null) return;
+
         CPMLOG.info("registerSkins called for profile={} name={} CPM={}",
                 profile.getId(), profile.getName(), CPMCompatIntegration.isAvailable());
 
