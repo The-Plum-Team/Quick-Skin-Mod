@@ -151,6 +151,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 Use the smallest relevant check while iterating, then run the proportional aggregate gate before
 handoff. On Windows, use `gradlew.bat`; on Unix-like systems, use `./gradlew`.
 
+For long-running acceptance, use the [recoverable local observer](../ci/ACCEPTANCE-OBSERVER.md).
+One coordinator owns the bounded exact run/attempt/SHA inventory and persists its last successful
+snapshot; other observers read local status. Read errors and a stale heartbeat must remain visible,
+and restarting observation must not dispatch new work or grant merge/publication authority.
+
 Fast stable unit lane:
 
 ```powershell
