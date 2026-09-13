@@ -253,7 +253,7 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.assertIn('"$proof_schema" != 7 && "$proof_schema" != 8', prepare)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", prepare)
         self.assertIn('--run-attempt "$GITHUB_RUN_ATTEMPT"', drain)
-        self.assertLess(drain.index("python3 scripts/ci/visual_review_preparation.py"),
+        self.assertLess(drain.index('python3 "$RUNNER_TEMP/protected-drain-control/scripts/ci/visual_review_preparation.py"'),
                         drain.index("python3 scripts/ci/feature_review.py"))
 
 

@@ -42,6 +42,24 @@ the **original ZIP bytes**, not a rewritten manifest or image set. Its name incl
 current drain run, attempt and original capsule ID; retention is one day. The original
 seven-day queued capsule remains the durable retry source.
 
+Preparation initially checks out the immutable executing workflow `github.sha`, never
+a selector output. Before any API access, an inline guard checks the selected immutable
+IDs, hashes, name and byte bound. It then authenticates the exact capsule metadata and
+protected curator owner with two read-only metadata requests. Only an implementation
+already present in the fetched Git history and ancestral to that workflow revision may
+be checked out locally, with hooks and network protocols disabled, before dependency
+installation or capsule validation. Historical protected ancestors remain eligible;
+newer or unrelated implementations fail closed and leave the input for a fresh wake.
+Current-generation eligibility alone does not authorize executing arbitrary policy.
+
+The model job retains the current workflow's control helpers and their data dependencies
+from an explicit `git archive "$GITHUB_SHA"` before its existing exact historical
+reviewer checkout. Preparation restoration and completed-result/cache authentication
+execute from that isolated snapshot, even when the old checkout lacks those helpers.
+The wrapper owner is bound to the executing **workflow SHA**, while the unchanged
+original capsule and model/proof policy remain bound to the selected **implementation
+SHA**. These identities need not be equal for eligible historical work.
+
 One global `quick-skin-visual-review-model` owner serializes cache restoration, model
 execution, independent validation, report/cache publication and cache rotation across
 ordinary review generations. Each runner allows at most 32 simultaneous provider calls,
@@ -79,6 +97,11 @@ attempt's steps, or a merely present report filename. A valid cancelled report w
 another proof/manifest is skipped without reusing any verdict: the same source run ID
 can have a newer runtime attempt, and the historical report must not block its newly
 authenticated capsule. Malformed or partial reports and API failures remain errors.
+The cancelled report owner must be exactly the selected implementation or the current
+executing workflow SHA. This preserves legacy implementation-owned reports and a current
+workflow's completed review of an older capsule, without admitting an arbitrary third
+revision. Fresh metadata must bind that same authenticated owner head; the proof and
+manifest must still be byte-identical to the original capsule.
 
 The recovered result passes the ordinary independent validator and cache publisher;
 the model step exits successfully before consulting provider credentials or invoking a
@@ -144,7 +167,12 @@ The first 29 s preparation cannot be hidden, leaving at most 420 s of modeled se
 savings. Break-even is approximately 26.25 s additional serialized overhead per report.
 Queue ordering, runner availability, downloads and model variability can change this.
 The change adds one preparation job and one short-lived wrapper upload/download per
-report. Restore adds exact owner, exact-attempt jobs and artifact metadata GETs plus one
+report. The pre-checkout guard adds two normal metadata GETs per preparation, or 32 for
+a 16-target wave; bounded transient retries are additional. The current control snapshot
+copies local checkout content, not another download: the four archived trees contained
+247 tracked files / 4,295,919 bytes at the pre-final-head measurement, and this size
+changes with the protected source revision. Restore adds exact owner, exact-attempt
+jobs and artifact metadata GETs plus one
 bounded archive GET; source proof/current-head reauthentication is retained. Completed
 report recovery adds one exact-name inventory and bounded owner checks only when there
 are candidates. Cache commit authentication adds bounded exact-attempt job and exact-ID
@@ -200,3 +228,7 @@ The actual cleanup shell also proves successful zero-API retention after fresh r
 and after an in-progress other-owner report, while exact-ID invalid/missing cleanup
 continues and mismatched metadata cannot authorize deletion. A late-cancellation replay
 executes cleanup before recovering the original capsule without provider access.
+Real local two-revision Git tests admit an authenticated protected ancestor, reject
+newer/sibling revisions and malformed identities before checkout, preserve current
+control helpers across an old tree missing those files, and distinguish the current
+wrapper owner from the original historical curator policy.

@@ -63,9 +63,14 @@ def _time(value: str) -> datetime:
     return result
 
 
-def recover(api: Api, *, capsule: Path, implementation_sha: str, review_key: str) -> bool:
-    if not isinstance(implementation_sha, str) or SHA.fullmatch(implementation_sha) is None:
-        raise ValueError("report recovery requires an exact protected implementation")
+def recover(api: Api, *, capsule: Path, implementation_sha: str, workflow_sha: str, review_key: str) -> bool:
+    if any(not isinstance(value, str) or SHA.fullmatch(value) is None
+           for value in (implementation_sha, workflow_sha)):
+        raise ValueError("report recovery requires exact protected implementation and workflow identities")
+    # A current workflow can review an authenticated historical capsule without changing
+    # its proof/model policy. Admit that exact workflow owner or the legacy policy owner,
+    # never an arbitrary third revision; content and successful upload checks remain below.
+    owner_heads = {implementation_sha, workflow_sha}
     proof_path = capsule / "curation-proof.json"
     manifest_path = capsule / "review-input/visual-review-manifest.json"
     manifest = load(manifest_path, "current prepared manifest")
@@ -84,7 +89,7 @@ def recover(api: Api, *, capsule: Path, implementation_sha: str, review_key: str
             raise ValueError("cancelled report exceeds its byte limit")
         owner_id = parsed.run_id
         owner = api.run(owner_id)
-        if (parsed.head_sha != implementation_sha or not valid_owner(
+        if (parsed.head_sha not in owner_heads or not valid_owner(
                 owner, repository=api.repository, artifact=parsed, workflow=WORKFLOW,
                 events=coverage.DRAIN_EVENTS, conclusions=frozenset({"cancelled"}))):
             continue
@@ -103,7 +108,7 @@ def recover(api: Api, *, capsule: Path, implementation_sha: str, review_key: str
             continue
         metadata = api.artifact(candidate["id"])
         if (metadata != candidate or metadata.get("name") != name
-                or metadata["workflow_run"].get("head_sha") != implementation_sha
+                or metadata["workflow_run"].get("head_sha") != parsed.head_sha
                 or metadata["workflow_run"].get("head_branch") != "master"):
             raise ValueError("cancelled report metadata changed before recovery")
         # Reports predate attempt-bound names. Bind this immutable artifact to the successful
@@ -151,6 +156,7 @@ def main() -> int:
     parser.add_argument("--cache-metadata", type=Path)
     parser.add_argument("--capsule", type=Path)
     parser.add_argument("--implementation-sha")
+    parser.add_argument("--workflow-sha")
     parser.add_argument("--review-key")
     parser.add_argument("--github-output", type=Path)
     args = parser.parse_args()
@@ -160,10 +166,12 @@ def main() -> int:
         metadata = load(args.cache_metadata, "candidate cache inventory metadata")
         return 0 if cache_owner_complete(Api(args.repository), args.cache_owner_run_id,
             args.cache_artifact_id, expected_metadata=metadata) else 1
-    if any(value is None for value in (args.capsule, args.implementation_sha, args.review_key, args.github_output)):
-        parser.error("report recovery requires capsule, implementation, review key and output")
+    if any(value is None for value in (args.capsule, args.implementation_sha, args.workflow_sha,
+                                       args.review_key, args.github_output)):
+        parser.error("report recovery requires capsule, implementation, workflow, review key and output")
     recovered = recover(Api(args.repository), capsule=args.capsule,
-                        implementation_sha=args.implementation_sha, review_key=args.review_key)
+                        implementation_sha=args.implementation_sha, workflow_sha=args.workflow_sha,
+                        review_key=args.review_key)
     with args.github_output.open("a") as stream:
         stream.write(f"recovered={str(recovered).lower()}\n")
     return 0

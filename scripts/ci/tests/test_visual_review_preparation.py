@@ -87,7 +87,7 @@ class VisualReviewPreparationTest(unittest.TestCase):
         self.inner = archive({"curation-proof.json": "{}", "review-input/visual-review-manifest.json": "[]"})
         self.outer = archive({"prepared-visual-review.zip": self.inner})
         self.api = ApiFixture(self.outer, "visual-review-prepared-10-1-30")
-        self.args = dict(run_id=10, run_attempt=1, implementation_sha=SHA, artifact_id=20,
+        self.args = dict(run_id=10, run_attempt=1, workflow_sha=SHA, artifact_id=20,
                          artifact_digest=hashlib.sha256(self.outer).hexdigest(), capsule_id=30,
                          capsule_digest=hashlib.sha256(self.inner).hexdigest(), capsule_size=len(self.inner),
                          output=self.folder / "restored")
@@ -152,6 +152,163 @@ class VisualReviewPreparationTest(unittest.TestCase):
         model = step_script("visual-review-drain.yml", "review", "Review bounded chunks with selective escalation")
         self.assertLess(model.index('if [[ "$RECOVERED" == true ]]'), model.index('test -n "$CLAUDE_CODE_OAUTH_TOKEN"'))
 
+    def test_preparation_authenticates_protected_history_before_dependencies_or_capsules(self):
+        prepare = job_block("visual-review-drain.yml", "prepare")
+        checkout = prepare.split("      - name: Check out the protected preparation policy\n", 1)[1].split("      - name:", 1)[0]
+        self.assertIn("ref: ${{ github.sha }}", checkout)
+        self.assertNotIn("needs.select.outputs.implementation_sha", checkout)
+        self.assertIn("persist-credentials: false", checkout)
+        self.assertEqual(1, prepare.count("uses: actions/checkout@"))
+        guard = "Authenticate the selected historical preparation policy"
+        for later in ("Install Python", "Install hash-locked image decoder", "Fetch and verify the exact curated capsule"):
+            self.assertLess(prepare.index(guard), prepare.index(later))
+        self.assertNotIn("if: always()", prepare.split("      - name: " + guard, 1)[1])
+        script = step_script("visual-review-drain.yml", "prepare", guard)
+        self.assertIn('[[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]', script)
+        self.assertIn('--is-ancestor "$IMPLEMENTATION_SHA" "$GITHUB_SHA" || exit 1', script)
+        self.assertIn('checkout --detach "$IMPLEMENTATION_SHA"', script)
+        self.assertLess(script.index(".head_repository.full_name == $repository"), script.index("checkout --detach"))
+        self.assertNotIn("git fetch", script)
+
+    def policy_git(self, repository, *args):
+        return subprocess.check_output(
+            ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+             "-c", "core.hooksPath=" + os.devnull, *args], cwd=repository,
+            env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"},
+            stderr=subprocess.DEVNULL, text=True, timeout=10,
+        ).strip()
+
+    def policy_history(self, *, controls=False):
+        repository = self.folder / "policy"
+        repository.mkdir()
+        self.policy_git(repository, "init", "-q")
+        (repository / "scripts/ci").mkdir(parents=True)
+        shutil.copy2(ROOT / "scripts/ci/github_api_retry.sh", repository / "scripts/ci/github_api_retry.sh")
+        (repository / "policy.txt").write_text("historical protected policy\n")
+        self.policy_git(repository, "add", ".")
+        self.policy_git(repository, "commit", "-qm", "historical")
+        historical = self.policy_git(repository, "rev-parse", "HEAD")
+        if controls:
+            for name in ("scripts", "e2e", "release", "architecture"):
+                shutil.copytree(ROOT / name, repository / name, dirs_exist_ok=True,
+                                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        (repository / "policy.txt").write_text("current protected workflow\n")
+        self.policy_git(repository, "add", ".")
+        self.policy_git(repository, "commit", "-qm", "current")
+        current = self.policy_git(repository, "rev-parse", "HEAD")
+        self.policy_git(repository, "checkout", "-q", "--detach", historical)
+        (repository / "policy.txt").write_text("unrelated sibling policy\n")
+        self.policy_git(repository, "commit", "-qam", "sibling")
+        sibling = self.policy_git(repository, "rev-parse", "HEAD")
+        self.policy_git(repository, "checkout", "-q", "--detach", current)
+        return repository, historical, current, sibling
+
+    def run_policy_guard(self, repository, implementation, workflow_sha, *, changes=None, metadata_changes=None, owner_changes=None):
+        script = step_script("visual-review-drain.yml", "prepare", "Authenticate the selected historical preparation policy")
+        runtime = self.folder / "runtime"
+        runtime.mkdir(exist_ok=True)
+        metadata = {"id": 30, "name": f"visual-review-input-100-{workflow_sha}", "size_in_bytes": 100,
+                    "expired": False, "digest": "sha256:" + "a" * 64,
+                    "workflow_run": {"id": 10, "head_sha": implementation, "head_branch": "master"}}
+        owner = {"id": 10, "status": "completed", "conclusion": "success", "event": "repository_dispatch",
+                 "head_branch": "master", "head_sha": implementation, "path": ".github/workflows/visual-review.yml",
+                 "head_repository": {"full_name": "example/repository"}}
+        metadata.update(metadata_changes or {})
+        owner.update(owner_changes or {})
+        mock = '''gh() {
+          printf '%s\\n' "$*" >> "$RUNNER_TEMP/api-reads"
+          case "$*" in
+            *actions/artifacts/30*) printf '%s\\n' "$FIXTURE_METADATA" ;;
+            *actions/runs/10*) printf '%s\\n' "$FIXTURE_OWNER" ;;
+            *) return 97 ;;
+          esac
+        }
+        '''
+        env = {**os.environ, "GITHUB_SHA": workflow_sha, "GITHUB_REPOSITORY": "example/repository",
+               "RUNNER_TEMP": str(runtime), "GITHUB_RUN_ID": "20", "GH_TOKEN": "fixture",
+               "ARTIFACT_ID": "30", "ARTIFACT_RUN_ID": "10", "SOURCE_RUN_ID": "100",
+               "ARTIFACT_NAME": metadata["name"], "ARTIFACT_SIZE": "100", "ARTIFACT_DIGEST": "a" * 64,
+               "IMPLEMENTATION_SHA": implementation, "GENERATION_SHA": workflow_sha, "BUNDLE_KEY": "",
+               "FIXTURE_METADATA": json.dumps(metadata), "FIXTURE_OWNER": json.dumps(owner), **(changes or {})}
+        return subprocess.run(["bash", "-c", mock + script + "\nprintf 'preparation-admitted\\n'\n"],
+                              cwd=repository, env=env, capture_output=True, text=True, timeout=10)
+
+    def test_preparation_guard_accepts_authenticated_ancestor_but_not_newer_or_sibling_policy(self):
+        repository, historical, current, sibling = self.policy_history()
+        for implementation, workflow_sha, accepted in ((historical, current, True), (current, current, True),
+                                                       (current, historical, False), (sibling, current, False)):
+            with self.subTest(implementation=implementation, workflow_sha=workflow_sha):
+                self.policy_git(repository, "checkout", "-q", "--detach", workflow_sha)
+                result = self.run_policy_guard(repository, implementation, workflow_sha)
+                self.assertEqual(accepted, result.returncode == 0, result.stderr)
+                self.assertEqual(accepted, "preparation-admitted" in result.stdout)
+                self.assertEqual(implementation if accepted else workflow_sha,
+                                 self.policy_git(repository, "rev-parse", "HEAD"))
+
+    def test_preparation_guard_rejects_hostile_selector_values_before_api_or_checkout(self):
+        repository, historical, current, _sibling = self.policy_history()
+        cases = {"ARTIFACT_ID": "0", "ARTIFACT_RUN_ID": "../10", "SOURCE_RUN_ID": "-1",
+                 "ARTIFACT_SIZE": "99999999999999999999999", "ARTIFACT_DIGEST": "wrong",
+                 "IMPLEMENTATION_SHA": "$(exit 77)", "GENERATION_SHA": "refs/heads/master",
+                 "ARTIFACT_NAME": "visual-review-input-foreign", "BUNDLE_KEY": "../mc1.20.1"}
+        for name, value in cases.items():
+            with self.subTest(name=name):
+                result = self.run_policy_guard(repository, historical, current, changes={name: value})
+                self.assertNotEqual(0, result.returncode)
+                self.assertFalse((self.folder / "runtime/api-reads").exists())
+                self.assertEqual(current, self.policy_git(repository, "rev-parse", "HEAD"))
+
+    def test_preparation_guard_rejects_foreign_immutable_artifact_or_protected_owner(self):
+        repository, historical, current, _sibling = self.policy_history()
+        for changes in ({"id": 31}, {"digest": "sha256:" + "b" * 64}, {"expired": True},
+                        {"size_in_bytes": 101}, {"workflow_run": {"id": 11, "head_sha": historical, "head_branch": "master"}}):
+            with self.subTest(metadata=changes):
+                self.assertNotEqual(0, self.run_policy_guard(repository, historical, current, metadata_changes=changes).returncode)
+                self.assertEqual(current, self.policy_git(repository, "rev-parse", "HEAD"))
+        for changes in ({"head_sha": current}, {"head_branch": "topic"}, {"event": "pull_request"},
+                        {"path": ".github/workflows/other.yml"}, {"status": "in_progress"},
+                        {"conclusion": "cancelled"}, {"head_repository": {"full_name": "foreign/repository"}}):
+            with self.subTest(owner=changes):
+                self.assertNotEqual(0, self.run_policy_guard(repository, historical, current, owner_changes=changes).returncode)
+                self.assertEqual(current, self.policy_git(repository, "rev-parse", "HEAD"))
+
+    def test_current_control_helpers_survive_an_exact_old_checkout_without_those_files(self):
+        repository, historical, current, _sibling = self.policy_history(controls=True)
+        runtime = self.folder / "control-runtime"
+        runtime.mkdir()
+        script = step_script("visual-review-drain.yml", "review", "Retain this workflow's protected drain control helpers")
+        result = subprocess.run(["bash", "-c", script], cwd=repository,
+                                env={**os.environ, "GITHUB_SHA": current, "RUNNER_TEMP": str(runtime)},
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.policy_git(repository, "checkout", "-q", "--detach", historical)
+        self.assertFalse((repository / "scripts/ci/visual_review_preparation.py").exists())
+        self.assertFalse((repository / "scripts/ci/visual_review_completed.py").exists())
+        for helper in ("visual_review_preparation.py", "visual_review_completed.py"):
+            retained = runtime / "protected-drain-control/scripts/ci" / helper
+            self.assertEqual((ROOT / "scripts/ci" / helper).read_bytes(), retained.read_bytes())
+            help_result = subprocess.run([sys.executable, str(retained), "--help"], cwd=repository,
+                                         env={key: value for key, value in os.environ.items() if key != "PYTHONPATH"},
+                                         capture_output=True, text=True, timeout=10)
+            self.assertEqual(0, help_result.returncode, help_result.stderr)
+        review = job_block("visual-review-drain.yml", "review")
+        self.assertLess(review.index("Retain this workflow's protected drain control helpers"),
+                        review.index("Check out the exact protected reviewer"))
+        self.assertEqual(2, review.count('$RUNNER_TEMP/protected-drain-control/scripts/ci/visual_review_completed.py'))
+        self.assertIn('--workflow-sha "$GITHUB_SHA"', review)
+
+    def test_wrapper_workflow_identity_is_separate_from_original_curator_policy(self):
+        historical = "b" * 40
+        inner = archive({"curation-proof.json": json.dumps({"implementation_sha": historical}),
+                         "review-input/visual-review-manifest.json": "[]"})
+        outer = archive({"prepared-visual-review.zip": inner})
+        api = ApiFixture(outer, "visual-review-prepared-10-1-30")
+        args = {**self.args, "artifact_digest": hashlib.sha256(outer).hexdigest(),
+                "capsule_digest": hashlib.sha256(inner).hexdigest(), "capsule_size": len(inner)}
+        restore(api, **args)
+        self.assertEqual(historical, json.loads((args["output"] / "curation-proof.json").read_text())["implementation_sha"])
+        self.assertEqual(1, api.downloads)
+
 
 class CompletedReviewRecoveryTest(unittest.TestCase):
     def setUp(self):
@@ -174,8 +331,9 @@ class CompletedReviewRecoveryTest(unittest.TestCase):
                  for name in ("Independently validate the normalized result", "Upload the source-bound normalized report")]
         self.api.job_list = [{"name": "Review one queued capsule", "status": "completed", "conclusion": "cancelled", "steps": steps}]
 
-    def recover(self):
-        return recover(self.api, capsule=self.capsule, implementation_sha=SHA, review_key="100--mc1.21.1")
+    def recover(self, *, workflow_sha=SHA):
+        return recover(self.api, capsule=self.capsule, implementation_sha=SHA,
+                       workflow_sha=workflow_sha, review_key="100--mc1.21.1")
 
     def replace_archive(self):
         self.api.raw = archive(self.files)
@@ -211,6 +369,56 @@ class CompletedReviewRecoveryTest(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertEqual("model_status=0\n", output.read_text())
         self.assertIn("model calls=0", completed.stdout)
+
+    def test_current_workflow_report_for_historical_capsule_recovers_without_provider(self):
+        workflow_sha = "b" * 40
+        self.api.owner["head_sha"] = workflow_sha
+        self.api.metadata["workflow_run"]["head_sha"] = workflow_sha
+        self.assertTrue(self.recover(workflow_sha=workflow_sha))
+        self.assertEqual(1, self.api.downloads)
+        self.assertEqual(SHA, json.loads((self.capsule / "curation-proof.json").read_text())["implementation_sha"])
+        telemetry = json.loads((self.capsule / "visual-review-telemetry.json").read_text())
+        self.assertEqual(0, telemetry["model_attempts"]["total"])
+        script = step_script("visual-review-drain.yml", "review", "Review bounded chunks with selective escalation")
+        output = self.capsule / "step-output"
+        completed = subprocess.run(["bash", "-c", script], cwd=self.capsule,
+            env={"PATH": os.environ["PATH"], "RECOVERED": "true", "GITHUB_OUTPUT": str(output)},
+            capture_output=True, text=True, timeout=10)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual("model_status=0\n", output.read_text())
+        self.assertIn("model calls=0", completed.stdout)
+        recovery = step_script("visual-review-drain.yml", "review", "Recover a complete result after publication cancellation")
+        self.assertIn('--workflow-sha "$GITHUB_SHA"', recovery)
+
+    def test_current_workflow_recovery_keeps_legacy_owner_but_rejects_third_head(self):
+        workflow_sha = "b" * 40
+        self.api.owner["head_sha"] = "c" * 40
+        self.api.metadata["workflow_run"]["head_sha"] = "c" * 40
+        self.assertFalse(self.recover(workflow_sha=workflow_sha))
+        self.assertEqual(0, self.api.downloads)
+        self.api.owner["head_sha"] = SHA
+        self.api.metadata["workflow_run"]["head_sha"] = SHA
+        self.assertTrue(self.recover(workflow_sha=workflow_sha))
+
+    def test_current_workflow_owner_does_not_authorize_changed_proof_or_manifest(self):
+        workflow_sha = "b" * 40
+        self.api.owner["head_sha"] = workflow_sha
+        self.api.metadata["workflow_run"]["head_sha"] = workflow_sha
+        original = copy.deepcopy(self.files)
+        for name, value in (("curation-proof.json", json.dumps({**self.proof, "source_run_id": 999})),
+                            ("review-input/visual-review-manifest.json", json.dumps(self.manifest, indent=2))):
+            with self.subTest(name=name):
+                self.files = {**original, name: value}
+                self.replace_archive()
+                self.assertFalse(self.recover(workflow_sha=workflow_sha))
+                self.assertFalse((self.capsule / "visual-review-report.staged.json").exists())
+
+    def test_recovery_rejects_malformed_workflow_identity_before_download(self):
+        for workflow_sha in (None, 42, "refs/heads/master", "B" * 40, "b" * 39):
+            with self.subTest(workflow_sha=workflow_sha):
+                with self.assertRaisesRegex(ValueError, "workflow identities"):
+                    self.recover(workflow_sha=workflow_sha)
+        self.assertEqual(0, self.api.downloads)
 
     def test_cancelled_upload_or_later_attempt_does_not_admit_completed_state(self):
         self.api.job_list[0]["steps"][1]["conclusion"] = "cancelled"

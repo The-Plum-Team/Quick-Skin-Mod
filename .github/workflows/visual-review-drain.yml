@@ -493,9 +493,69 @@ jobs:
       - name: Check out the protected preparation policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.select.outputs.implementation_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Authenticate the selected historical preparation policy
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.select.outputs.artifact_id }}
+          ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
+          ARTIFACT_RUN_ID: ${{ needs.select.outputs.artifact_run_id }}
+          ARTIFACT_DIGEST: ${{ needs.select.outputs.artifact_digest }}
+          ARTIFACT_SIZE: ${{ needs.select.outputs.artifact_size }}
+          IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
+          GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
+          SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
+          BUNDLE_KEY: ${{ needs.select.outputs.bundle_key }}
+        run: |
+          set -euo pipefail
+          # Selector output alone cannot choose executable policy. Authenticate the exact
+          # protected curator before loading its historical implementation on this fresh runner.
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || exit 1
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]{0,19}$ ]] || exit 1
+          [[ "$ARTIFACT_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]] || exit 1
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]] || exit 1
+          [[ "$ARTIFACT_SIZE" =~ ^[1-9][0-9]{0,8}$ ]] || exit 1
+          (( ARTIFACT_SIZE <= 536870912 )) || exit 1
+          [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]] || exit 1
+          [[ "$IMPLEMENTATION_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          if [[ -n "$BUNDLE_KEY" ]]; then
+            [[ "$BUNDLE_KEY" =~ ^mc[0-9]+([.][0-9]+)+$ && "${#BUNDLE_KEY}" -le 32 ]] || exit 1
+            [[ "$ARTIFACT_NAME" == "visual-review-input-$SOURCE_RUN_ID-$GENERATION_SHA--$BUNDLE_KEY" ]] || exit 1
+          else
+            [[ "$ARTIFACT_NAME" == "visual-review-input-$SOURCE_RUN_ID" ||
+               "$ARTIFACT_NAME" == "visual-review-input-$SOURCE_RUN_ID-$GENERATION_SHA" ]] || exit 1
+          fi
+          source scripts/ci/github_api_retry.sh
+          metadata="$(github_api_retry "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
+          jq -e --arg name "$ARTIFACT_NAME" --arg sha "$IMPLEMENTATION_SHA" \
+            --arg digest "sha256:$ARTIFACT_DIGEST" --argjson id "$ARTIFACT_ID" \
+            --argjson run_id "$ARTIFACT_RUN_ID" --argjson size "$ARTIFACT_SIZE" \
+            '.id == $id and .name == $name and .expired == false and
+             .size_in_bytes == $size and .digest == $digest and
+             .workflow_run.id == $run_id and .workflow_run.head_sha == $sha and
+             .workflow_run.head_branch == "master"' <<< "$metadata" > /dev/null
+          owner="$(github_api_retry "repos/$GITHUB_REPOSITORY/actions/runs/$ARTIFACT_RUN_ID")"
+          jq -e --arg repository "$GITHUB_REPOSITORY" --arg sha "$IMPLEMENTATION_SHA" \
+            --argjson run_id "$ARTIFACT_RUN_ID" \
+            '.id == $run_id and .status == "completed" and
+             (.conclusion == "success" or .conclusion == "failure") and
+             (.event == "repository_dispatch" or .event == "workflow_run") and
+             .head_branch == "master" and .head_sha == $sha and
+             .path == ".github/workflows/visual-review.yml" and
+             .head_repository.full_name == $repository' <<< "$owner" > /dev/null
+          # Only authenticated protected ancestors already fetched with this workflow can
+          # supply historical policy. An old workflow selecting a newer capsule retains it
+          # for a fresh wake; never fetch or execute an arbitrary selector-provided revision.
+          GIT_NO_LAZY_FETCH=1 git -c protocol.allow=never merge-base \
+            --is-ancestor "$IMPLEMENTATION_SHA" "$GITHUB_SHA" || exit 1
+          GIT_NO_LAZY_FETCH=1 git -c protocol.allow=never -c core.hooksPath=/dev/null \
+            -c core.fsmonitor=false checkout --detach "$IMPLEMENTATION_SHA"
+          [[ "$(git rev-parse HEAD)" == "$IMPLEMENTATION_SHA" ]] || exit 1
 
       - name: Install Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -1102,6 +1162,19 @@ jobs:
              .head_repository.full_name == $repository' \
             <<< "$owner" > /dev/null
 
+      - name: Retain this workflow's protected drain control helpers
+        if: steps.guard.outputs.reviewable == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || exit 1
+          control="$RUNNER_TEMP/protected-drain-control"
+          [[ ! -e "$control" && ! -L "$control" ]] || exit 1
+          mkdir "$control"
+          # Only this immutable workflow commit supplies orchestration helpers. Its import
+          # graph stays self-contained when the next checkout restores an older review policy.
+          git archive "$GITHUB_SHA" scripts e2e release architecture | tar -x -C "$control"
+
       - name: Check out the exact protected reviewer
         if: steps.guard.outputs.reviewable == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1146,9 +1219,9 @@ jobs:
             printf 'The authenticated queue capsule disappeared before preparation; no model session started.\n'
             exit 0
           fi
-          python3 scripts/ci/visual_review_preparation.py \
+          python3 "$RUNNER_TEMP/protected-drain-control/scripts/ci/visual_review_preparation.py" \
             --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" \
-            --run-attempt "$GITHUB_RUN_ATTEMPT" --implementation-sha "$IMPLEMENTATION_SHA" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" --workflow-sha "$GITHUB_SHA" \
             --artifact-id "$PREPARED_ARTIFACT_ID" --artifact-digest "$PREPARED_ARTIFACT_DIGEST" \
             --capsule-id "$ARTIFACT_ID" --capsule-digest "$ARTIFACT_DIGEST" \
             --capsule-size "$ARTIFACT_SIZE" --output "$RUNNER_TEMP/visual-review-capsule"
@@ -1275,7 +1348,7 @@ jobs:
               cache_metadata_path="$RUNNER_TEMP/verdict-cache-candidate-$candidate_id.json"
               printf '%s\n' "$cache_metadata" > "$cache_metadata_path"
               # Exact successful cache upload commits the union even if a later step is cancelled.
-              if ! python3 "$GITHUB_WORKSPACE/scripts/ci/visual_review_completed.py" \
+              if ! python3 "$RUNNER_TEMP/protected-drain-control/scripts/ci/visual_review_completed.py" \
                   --repository "$GITHUB_REPOSITORY" --cache-owner-run-id "$candidate_run_id" \
                   --cache-artifact-id "$candidate_id" --cache-metadata "$cache_metadata_path"; then
                 continue
@@ -1462,9 +1535,10 @@ jobs:
           REVIEW_KEY: ${{ needs.select.outputs.review_key }}
         run: |
           set -euo pipefail
-          python3 scripts/ci/visual_review_completed.py \
+          python3 "$RUNNER_TEMP/protected-drain-control/scripts/ci/visual_review_completed.py" \
             --repository "$GITHUB_REPOSITORY" --capsule "$RUNNER_TEMP/visual-review-capsule" \
-            --implementation-sha "$IMPLEMENTATION_SHA" --review-key "$REVIEW_KEY" \
+            --implementation-sha "$IMPLEMENTATION_SHA" --workflow-sha "$GITHUB_SHA" \
+            --review-key "$REVIEW_KEY" \
             --github-output "$GITHUB_OUTPUT"
           source scripts/ci/github_api_retry.sh
           [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)" == "$GENERATION_SHA" ]]

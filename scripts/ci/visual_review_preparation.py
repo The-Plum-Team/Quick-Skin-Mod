@@ -34,18 +34,18 @@ def archive_digest(path: Path) -> str:
     return result.hexdigest()
 
 
-def restore(api: Api, *, run_id: int, run_attempt: int, implementation_sha: str,
+def restore(api: Api, *, run_id: int, run_attempt: int, workflow_sha: str,
             artifact_id: int, artifact_digest: str, capsule_id: int, capsule_digest: str,
             capsule_size: int, output: Path) -> None:
     for value in (run_id, run_attempt, artifact_id, capsule_id, capsule_size):
         _positive(value)
-    if (not SHA.fullmatch(implementation_sha) or not DIGEST.fullmatch(artifact_digest)
+    if (not SHA.fullmatch(workflow_sha) or not DIGEST.fullmatch(artifact_digest)
             or not DIGEST.fullmatch(capsule_digest) or capsule_size > MAX_CAPSULE_BYTES):
         raise ValueError("preparation has an invalid digest or byte limit")
     if output.exists() or output.is_symlink():
         raise ValueError("preparation output already exists")
     owner = api.run(run_id)
-    if (owner.get("run_attempt") != run_attempt or owner.get("head_sha") != implementation_sha
+    if (owner.get("run_attempt") != run_attempt or owner.get("head_sha") != workflow_sha
             or owner.get("head_branch") != "master" or owner.get("path") != WORKFLOW
             or owner.get("status") != "in_progress" or owner.get("conclusion") is not None
             or owner.get("event") not in {"repository_dispatch", "schedule", "workflow_dispatch"}
@@ -61,7 +61,7 @@ def restore(api: Api, *, run_id: int, run_attempt: int, implementation_sha: str,
     size = _positive(metadata.get("size_in_bytes"))
     if (metadata.get("name") != expected_name or metadata.get("expired") is not False
             or size > MAX_PREPARED_BYTES or metadata.get("digest") != "sha256:" + artifact_digest
-            or artifact_owner.get("id") != run_id or artifact_owner.get("head_sha") != implementation_sha
+            or artifact_owner.get("id") != run_id or artifact_owner.get("head_sha") != workflow_sha
             or artifact_owner.get("head_branch") != "master"):
         raise ValueError("prepared artifact differs from its authenticated handoff")
     with tempfile.TemporaryDirectory(prefix="visual-prepared-", dir=output.parent) as temporary:
@@ -98,7 +98,7 @@ def main() -> int:
     parser.add_argument("--repository", required=True)
     for name in ("run-id", "run-attempt", "artifact-id", "capsule-id", "capsule-size"):
         parser.add_argument("--" + name, type=int, required=True)
-    for name in ("implementation-sha", "artifact-digest", "capsule-digest"):
+    for name in ("workflow-sha", "artifact-digest", "capsule-digest"):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = vars(parser.parse_args())
