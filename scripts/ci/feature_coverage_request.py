@@ -79,13 +79,16 @@ def validate_run(run: Any, *, repository: str, source_sha: str, workflows: set[s
         raise coverage.CoverageError("baseline request has a foreign or malformed protected execution")
 
 
-def source_from_producer(api: publisher.Api, producer_id: int, source_sha: str) -> int | None:
+def source_from_producer(api: publisher.Api, producer_id: int, source_sha: str, *,
+                         owner: dict[str, Any] | None = None) -> int | None:
     """Resolve only a wake identity, allowing its own final request job to be in progress."""
-    owner = api.run(producer_id)
+    owner = api.run(producer_id) if owner is None else owner
     if owner.get("head_sha") != source_sha:
         return None
     validate_run(owner, repository=api.repository, source_sha=source_sha,
                  workflows={coverage.DRAIN_WORKFLOW, publisher.PAGES_WORKFLOW})
+    if owner["id"] != producer_id:
+        raise coverage.CoverageError("baseline request substituted its producer owner")
     pages = owner["path"] == publisher.PAGES_WORKFLOW
     if owner.get("event") not in (publisher.PAGES_EVENTS if pages else coverage.DRAIN_EVENTS):
         # Pages repository wakes own no published evidence.
@@ -117,6 +120,31 @@ def source_from_producer(api: publisher.Api, producer_id: int, source_sha: str) 
     if len(sources) != 1 or not pages and len(targets) != 1:
         raise coverage.CoverageError("producer wake has an ambiguous runtime source")
     return sources.pop()
+
+
+def active_tail(api: publisher.Api, producer_id: int | None, source_sha: str, *,
+                owner: dict[str, Any] | None = None) -> int | None:
+    """Only an authenticated running tail may need the collector's producer wait.
+
+    Terminal recovery nominates the source, never the cancelled/failed trigger as evidence.
+    The CLI shares its already authenticated owner snapshot within this invocation only.
+    """
+    if producer_id is None:
+        if owner is not None:
+            raise coverage.CoverageError("baseline request has an owner without a producer")
+        return None
+    coverage._positive_integer(producer_id, "request producer")
+    owner = api.run(producer_id) if owner is None else owner
+    validate_run(owner, repository=api.repository, source_sha=source_sha,
+                 workflows={coverage.DRAIN_WORKFLOW, publisher.PAGES_WORKFLOW})
+    events = publisher.PAGES_EVENTS if owner["path"] == publisher.PAGES_WORKFLOW else coverage.DRAIN_EVENTS
+    if (owner["id"] != producer_id or owner.get("event") not in events
+            or (owner["status"] == "in_progress" and owner.get("conclusion") is not None)
+            or (owner["status"] == "completed" and owner.get("conclusion") not in
+                {"success", "failure", "cancelled", "timed_out"})
+            or owner["status"] not in {"in_progress", "completed"}):
+        raise coverage.CoverageError("baseline request has an invalid producer tail or recovery owner")
+    return producer_id if owner["status"] == "in_progress" else None
 
 
 def title(source_id: int, attempt: int) -> str:
@@ -181,6 +209,12 @@ def metadata_ready(api: publisher.Api, source_sha: str, source_id: int,
                 expired = parsed.expired
             if not expired:
                 available.append(candidate)
+        if public:
+            # Match the collector's exact newest-eight window before skipping expired
+            # records. An older success outside that window cannot authorize a wake.
+            available = [candidate for candidate in
+                         sorted(candidates, key=lambda item: item["id"], reverse=True)[:8]
+                         if not candidate["expired"]]
         if not available:
             return False
         if not public:
@@ -207,6 +241,10 @@ def metadata_ready(api: publisher.Api, source_sha: str, source_id: int,
             events = publisher.PAGES_EVENTS if public else coverage.DRAIN_EVENTS
             if owner.get("event") not in events or owner["id"] != owner_id:
                 raise coverage.CoverageError("readiness has a foreign protected owner")
+            if public and owner["status"] == "completed" and owner.get("conclusion") != "success":
+                # Canonical public admission rejects this newer terminal owner instead of
+                # falling back to an older success. Do not start a collector it would reject.
+                return False
             if ((owner["status"] == "completed" and owner.get("conclusion") in
                     ({"success"} if public else {"success", "failure"})) or
                     owner_id == producer_id and owner["status"] == "in_progress"):
@@ -233,7 +271,8 @@ def existing_available(api: publisher.Api, *, repository: Path, source: dict[str
 
 
 def request(api: Api, *, repository: Path, source_sha: str, source_id: int,
-            producer_id: int | None, directory: Path, sleep=time.sleep) -> str:
+            producer_id: int | None, directory: Path, sleep=time.sleep,
+            producer_owner: dict[str, Any] | None = None) -> str:
     if api.current_sha() != source_sha:
         return "stale-generation"
     source = api.run(source_id)
@@ -244,20 +283,21 @@ def request(api: Api, *, repository: Path, source_sha: str, source_id: int,
         return "source-not-successful"
     if any(record["name"] == coverage.SELECTION_ARTIFACT_NAME for record in api.artifacts(run_id=source_id)):
         return "selected-source"
+    tail_id = active_tail(api, producer_id, source_sha, owner=producer_owner)
     attempt = source["run_attempt"]
     collectors = api.runs(publisher.WORKFLOW, source_sha)
     if any(run["status"] in ACTIVE and matching_collector(run, source_id, attempt) for run in collectors):
         return "collector-active"
     if existing_available(api, repository=repository, source=source, source_sha=source_sha, directory=directory):
         return "certificate-available" if api.current_sha() == source_sha else "stale-generation"
-    if not metadata_ready(api, source_sha, source_id, producer_id):
+    if not metadata_ready(api, source_sha, source_id, tail_id):
         return "evidence-incomplete"
     if api.current_sha() != source_sha or api.run(source_id).get("run_attempt") != attempt:
         return "source-advanced"
     payload = {"event_type": "feature-coverage-requested", "client_payload": {
         "source_repository": api.repository, "source_run_id": str(source_id),
         "source_run_attempt": str(attempt), "source_sha": source_sha,
-        "producer_run_id": str(producer_id) if producer_id is not None else ""}}
+        "producer_run_id": str(tail_id) if tail_id is not None else ""}}
     api.dispatch(payload)
     # Retain the short request lock until the POST is visible; another producer must not race
     # an eventually-consistent list result and start the same collector again.
@@ -288,10 +328,13 @@ def main() -> int:
         if api.current_sha() != args.source_sha:
             print("baseline_request outcome=stale-generation")
             return 0
+        producer_owner = None
         if args.recover:
             source_id = recover_source(api, args.source_sha)
         elif args.producer_run_id is not None:
-            source_id = source_from_producer(api, args.producer_run_id, args.source_sha)
+            producer_owner = api.run(args.producer_run_id)
+            source_id = source_from_producer(api, args.producer_run_id, args.source_sha,
+                                            owner=producer_owner)
         else:
             source_id = args.source_run_id
         if source_id is None:
@@ -299,7 +342,8 @@ def main() -> int:
             return 0
         with tempfile.TemporaryDirectory(prefix="quickskin-baseline-request-") as temporary:
             outcome = request(api, repository=args.repository, source_sha=args.source_sha,
-                              source_id=source_id, producer_id=args.producer_run_id, directory=Path(temporary))
+                              source_id=source_id, producer_id=args.producer_run_id, directory=Path(temporary),
+                              producer_owner=producer_owner)
         print(f"baseline_request outcome={outcome} source_run={source_id}")
     except (OSError, ValueError, QueueError, subprocess.SubprocessError) as exc:
         parser.exit(2, f"Baseline request failed: {exc}\n")

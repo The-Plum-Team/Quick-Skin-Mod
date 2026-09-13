@@ -335,6 +335,72 @@ class CanonicalRequestTests(unittest.TestCase):
         self.assertEqual(len(self.api.payloads), 1)
         self.assertEqual(self.fixture.api.downloaded, [self.fixture.artifact["id"]])
 
+    def test_cancelled_producer_recovery_uses_replacement_through_complete_canonical_admission(self):
+        inner = self.fixture.api
+        inner.records.pop(scheduler.coverage.BASELINE_ARTIFACT_NAME)
+        name = next(name for name in inner.records if name.startswith("visual-review-"))
+        original = inner.records[name][0]
+        cancelled_id = original["workflow_run"]["id"]
+        replacement = copy.deepcopy(original)
+        replacement["id"] += 100000
+        replacement["workflow_run"]["id"] = 1900
+        inner.runs[1900] = {**inner.runs[cancelled_id], "id": 1900}
+        inner.job_lists[1900] = [{"jobs": [inner.job("Review one queued capsule", 19000, inner.runs[1900])]}]
+        inner.archives[replacement["id"]] = inner.archives[original["id"]]
+        inner.records[name].append(replacement)
+        inner.runs[cancelled_id].update(status="completed", conclusion="cancelled")
+        with self.assertRaisesRegex(ValueError, "unfinished owner"):
+            scheduler.publisher.source_from_trigger(self.api, cancelled_id, self.fixture.base)
+        source_id = scheduler.source_from_producer(self.api, cancelled_id, self.fixture.base)
+        self.assertEqual(55, source_id)
+        self.assertEqual("collector-dispatched", scheduler.request(self.api,
+            repository=self.fixture.repository, source_sha=self.fixture.base, source_id=source_id,
+            producer_id=cancelled_id, directory=self.fixture.fixture.root / "request", sleep=lambda _: None))
+        payload = self.api.payloads[0]["client_payload"]
+        self.assertEqual("", payload["producer_run_id"])
+        self.assertEqual(("55", "1"), (payload["source_run_id"], payload["source_run_attempt"]))
+        directory = self.fixture.fixture.root / "recovered-collector"
+        directory.mkdir()
+        result = scheduler.publisher.prepare(self.api, repository=self.fixture.repository,
+            source_sha=self.fixture.base, source_run_id=int(payload["source_run_id"]),
+            expected_source_attempt=int(payload["source_run_attempt"]), issuer_run_id=9000,
+            directory=directory)
+        self.assertEqual(16, len(result["targets"]))
+        self.assertEqual(2880, sum(target["frame_count"] for target in result["targets"]))
+        key = name.split("--", 1)[1]
+        self.assertEqual(replacement["id"], result["review_artifacts"][key]["id"])
+        self.assertNotIn(original["id"], inner.downloaded)
+
+    def test_older_failed_pages_wake_composes_with_newer_successful_publication(self):
+        inner = self.fixture.api
+        inner.records.pop(scheduler.coverage.BASELINE_ARTIFACT_NAME)
+        inner.runs[7900] = {**inner.runs[8000], "id": 7900, "conclusion": "failure"}
+        for name, records in inner.records.items():
+            if name.startswith("pages-full-baseline-"):
+                older = copy.deepcopy(records[0])
+                older["id"] -= 1000
+                older["workflow_run"]["id"] = 7900
+                records.append(older)
+        with self.assertRaisesRegex(ValueError, "successful protected Pages owner"):
+            inner.job_lists[7900] = inner.job_lists[8000]
+            scheduler.publisher.source_from_trigger(self.api, 7900, self.fixture.base)
+        source_id = scheduler.source_from_producer(self.api, 7900, self.fixture.base)
+        self.assertEqual(55, source_id)
+        self.assertEqual("collector-dispatched", scheduler.request(self.api,
+            repository=self.fixture.repository, source_sha=self.fixture.base, source_id=source_id,
+            producer_id=7900, directory=self.fixture.fixture.root / "request", sleep=lambda _: None))
+        payload = self.api.payloads[0]["client_payload"]
+        self.assertEqual("", payload["producer_run_id"])
+        directory = self.fixture.fixture.root / "recovered-pages-collector"
+        directory.mkdir()
+        result = scheduler.publisher.prepare(self.api, repository=self.fixture.repository,
+            source_sha=self.fixture.base, source_run_id=int(payload["source_run_id"]),
+            expected_source_attempt=int(payload["source_run_attempt"]), issuer_run_id=9000,
+            directory=directory)
+        self.assertEqual(16, len(result["targets"]))
+        self.assertEqual(2880, sum(target["frame_count"] for target in result["targets"]))
+        self.assertEqual({8000}, {record["owner_run_id"] for record in result["public_artifacts"].values()})
+
 
 if __name__ == "__main__":
     unittest.main()

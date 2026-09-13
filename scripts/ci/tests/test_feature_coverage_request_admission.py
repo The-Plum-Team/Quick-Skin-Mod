@@ -266,6 +266,144 @@ class CancelledReportAdmissionTest(unittest.TestCase):
             source_sha=SHA, source_run_id=10, bundle_key=key))
 
 
+class TerminalProducerRecoveryTest(unittest.TestCase):
+    class Api(RequestFixture):
+        @property
+        def reads(self):
+            return len(self.queries)
+
+        @property
+        def mutations(self):
+            return len(self.payloads)
+
+        def artifacts(self, *, run_id=None, name=None):
+            if run_id is None or run_id == self.source["id"]:
+                return super().artifacts(run_id=run_id, name=name)
+            self.queries.append(("artifacts", run_id, name))
+            return copy.deepcopy([record for records in self.records.values() for record in records
+                                  if record["workflow_run"]["id"] == run_id])
+
+    def setUp(self):
+        self.api = self.Api()
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.directory = Path(self.temporary.name)
+        self.existing = patch.object(scheduler, "existing_available", return_value=False).start()
+        self.addCleanup(patch.stopall)
+
+    def request(self, producer=100, *, owner=None):
+        source_id = scheduler.source_from_producer(self.api, producer, SHA, owner=owner)
+        self.assertEqual(10, source_id)
+        return scheduler.request(self.api, repository=ROOT, source_sha=SHA, source_id=source_id,
+            producer_id=producer, producer_owner=owner, directory=self.directory, sleep=lambda _: None)
+
+    def test_own_running_tail_keeps_its_exact_trigger_and_terminal_success_does_not(self):
+        self.api.owners[100].update(status="in_progress", conclusion=None)
+        self.assertEqual("collector-dispatched", self.request())
+        self.assertEqual("100", self.api.payloads[-1]["client_payload"]["producer_run_id"])
+        self.api.collectors = []
+        self.api.owners[100].update(status="completed", conclusion="success")
+        self.assertEqual("collector-dispatched", self.request())
+        self.assertEqual("", self.api.payloads[-1]["client_payload"]["producer_run_id"])
+
+    def test_terminal_recovery_never_exempts_a_still_running_replacement(self):
+        name = next(name for name in self.api.records if name.startswith("visual-review-"))
+        old = self.api.records[name][0]
+        replacement = copy.deepcopy(old)
+        replacement.update(id=9900)
+        replacement["workflow_run"]["id"] = 999
+        self.api.records[name].append(replacement)
+        self.api.owners[100].update(status="completed", conclusion="cancelled")
+        self.api.owners[999] = {**self.api.owners[100], "id": 999,
+                              "status": "in_progress", "conclusion": None}
+        self.assertEqual("evidence-incomplete", self.request())
+        self.assertEqual([], self.api.payloads)
+        self.api.owners[999].update(status="completed", conclusion="success")
+        self.assertEqual("collector-dispatched", self.request())
+        self.assertEqual({"source_repository": REPOSITORY, "source_run_id": "10",
+            "source_run_attempt": "1", "source_sha": SHA, "producer_run_id": ""},
+            self.api.payloads[-1]["client_payload"])
+
+    def test_older_failed_cancelled_or_timed_out_pages_wake_uses_newer_successful_owner(self):
+        for conclusion in ("failure", "cancelled", "timed_out"):
+            with self.subTest(conclusion=conclusion):
+                self.api = self.Api()
+                self.api.owners[999] = {**self.api.owners[50], "id": 999, "conclusion": conclusion}
+                for name, records in self.api.records.items():
+                    if name.startswith("pages-"):
+                        old = copy.deepcopy(records[0])
+                        old["id"] -= 500
+                        old["workflow_run"]["id"] = 999
+                        records.append(old)
+                self.assertEqual("collector-dispatched", self.request(999))
+                self.assertEqual("", self.api.payloads[-1]["client_payload"]["producer_run_id"])
+
+    def test_newer_failed_cancelled_or_timed_out_pages_owner_blocks_older_success(self):
+        for conclusion in ("failure", "cancelled", "timed_out"):
+            with self.subTest(conclusion=conclusion):
+                self.api = self.Api()
+                self.api.owners[999] = {**self.api.owners[50], "id": 999, "conclusion": conclusion}
+                for name, records in self.api.records.items():
+                    if name.startswith("pages-"):
+                        newer = copy.deepcopy(records[0])
+                        newer["id"] += 9000
+                        newer["workflow_run"]["id"] = 999
+                        records.append(newer)
+                self.assertEqual("evidence-incomplete", self.request(999))
+                self.assertEqual([], self.api.payloads)
+
+    def test_public_candidate_window_counts_expired_newer_records_before_filtering(self):
+        name = next(name for name in self.api.records if name.startswith("pages-"))
+        original = self.api.records[name][0]
+        self.api.records[name].extend({**original, "id": original["id"] + 10000 + index,
+                                      "expired": True} for index in range(8))
+        self.assertEqual("evidence-incomplete", self.request())
+        self.assertEqual([], self.api.payloads)
+
+    def test_own_active_pages_tail_is_not_hidden_by_its_older_failed_publication(self):
+        self.api.owners[50].update(status="in_progress", conclusion=None)
+        self.api.owners[999] = {**self.api.owners[50], "id": 999,
+                              "status": "completed", "conclusion": "failure"}
+        for name, records in self.api.records.items():
+            if name.startswith("pages-"):
+                older = copy.deepcopy(records[0])
+                older["id"] -= 500
+                older["workflow_run"]["id"] = 999
+                records.append(older)
+        self.assertEqual("collector-dispatched", self.request(50))
+        self.assertEqual("50", self.api.payloads[-1]["client_payload"]["producer_run_id"])
+
+    def test_missing_or_cancelled_only_report_cannot_schedule_a_collector(self):
+        self.api.owners[100].update(status="completed", conclusion="cancelled")
+        self.assertEqual("evidence-incomplete", self.request())
+        self.assertEqual([], self.api.payloads)
+
+    def test_foreign_malformed_and_nonterminal_recovery_owners_fail_closed(self):
+        original = self.api.owners[100]
+        for changes in ({"id": 999}, {"id": True}, {"head_branch": "feature"},
+                {"head_repository": {"full_name": "foreign/repository"}},
+                {"path": scheduler.SOURCE_WORKFLOW}, {"event": "pull_request"},
+                {"run_attempt": True}, {"status": "queued", "conclusion": None},
+                {"status": "in_progress", "conclusion": "cancelled"},
+                {"status": "completed", "conclusion": None}, {"conclusion": "unknown"}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                self.api.owners[100] = {**original, **changes}
+                self.request()
+        self.assertEqual([], self.api.payloads)
+
+    def test_cli_reuses_only_its_existing_invocation_local_owner_read(self):
+        self.api.records.pop(next(name for name in self.api.records if name.startswith("pages-")))
+        arguments = ["feature_coverage_request.py", "--producer-run-id", "100",
+                     "--github-repository", REPOSITORY, "--source-sha", SHA]
+        with patch.object(sys, "argv", arguments), patch.object(scheduler, "Api", return_value=self.api), \
+                patch.object(scheduler.coverage, "policy_fingerprint"), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(0, scheduler.main())
+        self.assertIn("outcome=evidence-incomplete", output.getvalue())
+        self.assertEqual(1, self.api.queries.count(("run", 100)))
+        self.assertEqual([], self.api.payloads)
+
+
 class CollectorAttemptAdmissionTest(unittest.TestCase):
     def test_recovery_skips_newer_selected_source_without_hiding_complete_current_head(self):
         api = Mock()
