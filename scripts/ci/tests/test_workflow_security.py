@@ -2489,7 +2489,7 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_release_test_jobs_install_locked_pages_dependency(self) -> None:
         for workflow, job in (
-            ("build-gate.yml", "policy"),
+            ("build-gate.yml", "policy-release"),
             ("refresh-release-status.yml", "refresh"),
             ("sync-version-branches.yml", "validate"),
             ("handle-version-port-result.yml", "validate-repair"),
@@ -2506,6 +2506,11 @@ class WorkflowSecurityTest(unittest.TestCase):
             "--requirement controller/scripts/pages/requirements.txt",
             sync_publish,
         )
+        ci_policy = job_block("build-gate.yml", "policy-ci")
+        self.assertLess(ci_policy.index("scripts/pages/requirements.txt"),
+                        ci_policy.index("scripts/ci/tests"))
+        self.assertIn("--require-hashes", ci_policy)
+        self.assertIn("--only-binary=:all:", ci_policy)
 
     def test_python_compilation_covers_the_entire_tooling_tree(self) -> None:
         for workflow, job in (
@@ -3034,8 +3039,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('python scripts/release/verify_release.py "${target_args[@]}"', target)
         self.assertIn("needs: target", assemble)
         self.assertIn("scripts/release/assemble_build.py", assemble)
-        self.assertIn("needs: [source, compile, policy]", gate)
-        self.assertIn('[[ "$REUSED" == false && "$COMPILE_RESULT" == success && "$POLICY_RESULT" == success ]]', gate)
+        self.assertIn("needs: [source, compile, policy, policy-release, policy-ci]", gate)
+        self.assertIn('[[ "$REUSED" == false ]]', gate)
+        self.assertIn('"$COMPILE_RESULT" "$POLICY_RESULT" "$RELEASE_POLICY_RESULT" "$CI_POLICY_RESULT"', gate)
         self.assertIn("--verify-staged", gate)
         self.assertIn("max-parallel: 16", job_block("on-demand-e2e.yml", "e2e"))
 

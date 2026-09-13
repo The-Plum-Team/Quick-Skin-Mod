@@ -25,7 +25,7 @@ DEFAULT_MATRIX = Path(__file__).resolve().parents[2] / "release/release-matrix.j
 STATUSES = {"queued", "in_progress", "completed", "waiting", "requested", "pending"}
 CONCLUSIONS = {"success", "failure", "neutral", "cancelled", "skipped", "timed_out",
                "action_required", "stale", "startup_failure"}
-BUILD_SHARED = ["Resolve tested build reuse", "Validate repository policy",
+BUILD_SHARED = ["Resolve tested build reuse", *sorted(reuse.BUILD_POLICY_JOBS),
                 "compile / Plan every supported build target"]
 E2E_SHARED = ["Classify packaged runtime impact", "Resolve the exact source Build bundle",
               "Build immutable E2E input bundle"]
@@ -214,7 +214,11 @@ def collect_gate(api: StatusApi, kind: str, sha: str, target_rows: list[dict], m
                          else [E2E_SHARED[0], "Packaged E2E gate"])
         wrapper_state = project(wrapper_names, jobs, generation)
         if wrapper_state[0] == "success":
-            skipped = lambda name: (name == "Validate repository policy" or name.startswith("compile /")) if kind == "build" else (
+            if kind == "build":
+                require({job["name"] for job in jobs if job["name"] in reuse.BUILD_POLICY_JOBS}
+                        == reuse.BUILD_POLICY_JOBS,
+                        "reference wrapper omitted a policy partition")
+            skipped = lambda name: (name in reuse.BUILD_POLICY_JOBS or name.startswith("compile /")) if kind == "build" else (
                 name in [*E2E_SHARED[1:], "Select affected feature coverage"] or name.endswith(SCENARIO_SUFFIX))
             require(all(job["conclusion"] == "skipped" for job in jobs if skipped(job["name"]))
                     and not any(item["name"] == "staged-release-bundle" if kind == "build" else (
