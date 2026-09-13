@@ -114,6 +114,8 @@ retains the latest error and at most 20 error records. Raw response bodies, stde
 by the provider, request headers and credentials are never logged or persisted. The normalized
 inventory is capped at 2 MiB. Both CLI output streams share a 512 KiB in-memory limit; excess
 output terminates the read and reports `invalid_response` without saving those bytes.
+Both local and remote JSON are limited to 64 nested containers before decoding, independently
+of the Python version's recursion behavior; quoted brackets do not consume that depth budget.
 `requests_started` is durably incremented before each CLI invocation;
 `requests_completed` records returns, so a killed in-flight call leaves an honest uncertainty gap.
 These are local request-attempt counters, not a claim about the credential's remaining quota.

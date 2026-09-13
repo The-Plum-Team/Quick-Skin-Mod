@@ -26,6 +26,7 @@ from typing import Any
 MAX_RUNS = 100
 MAX_BYTES = 2 * 1024 * 1024
 MAX_RESPONSE_BYTES = 512 * 1024
+MAX_JSON_DEPTH = 64
 MAX_ERRORS = 20
 STATUSES = {"queued", "in_progress", "completed", "waiting", "requested", "pending"}
 CONCLUSIONS = {"success", "failure", "neutral", "cancelled", "skipped", "timed_out",
@@ -126,12 +127,37 @@ def unique_object(pairs: list) -> dict:
     return result
 
 
+def parse_json(payload: str | bytes) -> Any:
+    """Bound container depth before decoding, independently of Python's recursion limit."""
+    text = payload.decode("utf-8") if isinstance(payload, bytes) else payload
+    depth = 0
+    quoted = escaped = False
+    for char in text:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char in "[{":
+            depth += 1
+            require(depth <= MAX_JSON_DEPTH, "observer JSON exceeds its nesting budget")
+        elif char in "]}":
+            depth -= 1
+            require(depth >= 0, "observer JSON has unbalanced containers")
+    # The decoder still owns JSON grammar and duplicate-key validation.
+    return json.loads(text, object_pairs_hook=unique_object)
+
+
 def read_state(path: Path) -> dict:
     require(not path.is_symlink(), "observer state must not be a symbolic link")
     with path.open("rb") as stream:
         payload = stream.read(MAX_BYTES + 1)
     require(len(payload) <= MAX_BYTES, "observer snapshot exceeds its byte budget")
-    return validate(json.loads(payload, object_pairs_hook=unique_object))
+    return validate(parse_json(payload))
 
 
 def write_state(path: Path, state: dict) -> None:
@@ -348,7 +374,8 @@ class GitHubReader:
                 category = "cli_exit"
             raise ReadFailure(category, completed.returncode, status, retry_at)
         try:
-            result = json.loads(body, object_pairs_hook=unique_object)
+            result = parse_json(body)
+            require(type(result) is dict)
         except (ValueError, TypeError, RecursionError):
             raise ReadFailure("invalid_response", completed.returncode, status) from None
         return result, retry_at

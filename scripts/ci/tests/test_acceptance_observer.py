@@ -281,6 +281,47 @@ class AcceptanceObserverTest(unittest.TestCase):
         self.assertNotIn("private detail", self.path.read_text())
         self.assertNotIn("arbitrary", self.path.read_text())
 
+    def test_json_depth_has_an_explicit_limit_before_any_decoder_allocation(self):
+        for opening, closing in (("[", "]"), ('{"child":[', "]}")):
+            levels = observer.MAX_JSON_DEPTH // len(closing)
+            accepted = opening * levels + "0" + closing * levels
+            self.assertIsNotNone(observer.parse_json(accepted))
+            excessive = opening + accepted + closing
+            with mock.patch.object(observer.json, "loads") as decoder:
+                with self.assertRaisesRegex(observer.ObserverError, "nesting budget"):
+                    observer.parse_json(excessive)
+                decoder.assert_not_called()
+            self.path.write_text(excessive)
+            with mock.patch.object(observer.json, "loads") as decoder:
+                with self.assertRaisesRegex(observer.ObserverError, "nesting budget"):
+                    observer.read_state(self.path)
+                decoder.assert_not_called()
+
+    def test_json_depth_ignores_escaped_string_content_and_preserves_grammar_checks(self):
+        value = {"quoted": '[{\\"' * 2000, "backslash": "\\", "child": ["]}"]}
+        self.assertEqual(value, observer.parse_json(json.dumps(value)))
+        for malformed in ('{"id":1,"id":2}', "[}", "]", '{"x":"unterminated'):
+            with self.subTest(malformed=malformed), self.assertRaises(ValueError):
+                observer.parse_json(malformed)
+
+    def test_excessive_remote_extension_depth_preserves_snapshot_and_sanitizes_failure(self):
+        with observer.coordinator_lock(self.path):
+            self.coordinator(Reader(remote())).poll()
+            previous = self.view()["runs"][0]["snapshot"]
+            self.clock.now += 10
+            nested = "[" * observer.MAX_JSON_DEPTH + '"private nested detail"' + "]" * observer.MAX_JSON_DEPTH
+            body = json.dumps(remote())[:-1] + ',"extension":' + nested + "}"
+            result = subprocess.CompletedProcess([], 0, ("HTTP/2.0 200 OK\n\n" + body).encode(), b"")
+            with mock.patch.object(observer, "bounded_command", return_value=result):
+                self.coordinator(observer.GitHubReader()).poll()
+        view = self.view()
+        self.assertEqual("read_error", view["state"])
+        self.assertEqual(previous, view["runs"][0]["snapshot"])
+        self.assertEqual("invalid_response", view["runs"][0]["error"]["category"])
+        self.assertEqual(2, view["requests_started"])
+        self.assertEqual(2, view["requests_completed"])
+        self.assertNotIn("private nested detail", self.path.read_text())
+
     def test_slow_sibling_timeouts_share_one_interval_budget(self):
         self.state = observer.initialize(REPOSITORY, [SPEC, f"124:1:{SHA}"], 10, 10, self.clock())
         calls = []
