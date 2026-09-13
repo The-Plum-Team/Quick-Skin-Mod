@@ -344,12 +344,52 @@ def _existing_baseline(api: Api, *, repository: Path, source: dict[str, Any],
     return None
 
 
+def select_review_candidate(api: Api, candidates: list[dict[str, Any]], *,
+                            source_sha: str, source_run_id: int, bundle_key: str) -> dict[str, Any] | None:
+    """Retain cancelled-owner evidence without letting it shadow a recovered exact report.
+
+    The ordinary one-report path performs no additional owner reads. Only ambiguous exact-name
+    inventories may omit a terminal cancelled protected owner; every retained report still
+    requires the collector's independent complete owner/job/content admission.
+    """
+    available = [candidate for candidate in candidates if candidate.get("expired") is not True]
+    if len(available) > 1:
+        eligible = []
+        for candidate in available:
+            parsed = coverage.parse_artifact(candidate)
+            owner = api.run(parsed.run_id)
+            if (parsed.name != f"visual-review-{source_run_id}--{bundle_key}"
+                    or parsed.head_sha != source_sha or parsed.head_branch != "master"
+                    or parsed.size_in_bytes > coverage.MAX_REPORT_ARCHIVE_BYTES
+                    or owner.get("id") != parsed.run_id or type(owner.get("id")) is not int
+                    or owner.get("head_sha") != source_sha or owner.get("head_branch") != "master"
+                    or owner.get("path") != coverage.DRAIN_WORKFLOW
+                    or owner.get("event") not in coverage.DRAIN_EVENTS
+                    or not isinstance(owner.get("head_repository"), dict)
+                    or owner["head_repository"].get("full_name") != api.repository):
+                raise coverage.CoverageError("ambiguous review has a foreign protected owner")
+            if owner.get("status") == "completed" and owner.get("conclusion") == "cancelled":
+                continue
+            eligible.append(candidate)
+        available = eligible
+    if len(available) > 1:
+        raise coverage.CoverageError("baseline target has ambiguous normalized review reports")
+    return available[0] if available else None
+
+
 def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
-            issuer_run_id: int, directory: Path) -> dict[str, Any] | None:
+            issuer_run_id: int, directory: Path,
+            expected_source_attempt: int | None = None) -> dict[str, Any] | None:
     coverage._positive_integer(issuer_run_id, "baseline issuer run")
     if api.current_sha() != source_sha:
         return None
     source = api.run(source_run_id)
+    if expected_source_attempt is not None:
+        coverage._positive_integer(expected_source_attempt, "requested source attempt")
+        if expected_source_attempt > 100:
+            raise coverage.CoverageError("requested source attempt exceeds its limit")
+        if source.get("run_attempt") != expected_source_attempt:
+            return None
     if source.get("event") == "schedule":
         coverage.validate_source_run(source, api.jobs(source), github_repository=api.repository,
             source_sha=source_sha, source_run_id=source_run_id, matrix_kind="native-anchors")
@@ -396,16 +436,18 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
     for target in targets:
         key = target["bundle_key"]
         candidates = api.artifacts(name=f"visual-review-{source_run_id}--{key}")
-        if not candidates:
+        candidate = select_review_candidate(api, candidates, source_sha=source_sha,
+                                             source_run_id=source_run_id, bundle_key=key)
+        if candidate is None:
             return None
-        if len(candidates) != 1:
-            raise coverage.CoverageError("baseline target has ambiguous normalized review reports")
-        reports[key] = candidates[0]
+        reports[key] = candidate
         public_candidates_by_key[key] = invocation_api.artifacts(name=public_baseline_name(key, source_sha, source_run_id))
         if not any(candidate.get("expired") is not True for candidate in public_candidates_by_key[key]):
             return None
 
     runtime = ci_reuse.runtime_source(invocation_api, source_run_id, source_sha)
+    if runtime.generation.get("run_attempt") != source.get("run_attempt"):
+        raise coverage.CoverageError("runtime source attempt changed during complete admission")
     graph = runtime.graph
     if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in runtime.artifacts):
         return None  # Partial generations retain their earlier complete baseline.
@@ -451,7 +493,8 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
             raise coverage.CoverageError("baseline report substituted the original runtime generation")
     baseline = coverage.create_baseline(reviews, repository=repository, source_sha=source_sha,
                                         source_run_id=source_run_id)
-    if api.current_sha() != source_sha:
+    if (api.current_sha() != source_sha
+            or api.run(source_run_id).get("run_attempt") != source.get("run_attempt")):
         return None
     return {**baseline, "issuer": {"workflow": WORKFLOW, "run_id": issuer_run_id, "sha": source_sha},
             "source_run_attempt": source["run_attempt"], "source_job_graph": graph,
@@ -463,6 +506,8 @@ def main() -> int:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--trigger-run-id", type=int)
     source.add_argument("--source-run-id", type=int)
+    parser.add_argument("--expected-source-run-id", type=int)
+    parser.add_argument("--expected-source-attempt", type=int)
     parser.add_argument("--github-repository", required=True)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--issuer-run-id", type=int, required=True)
@@ -484,10 +529,12 @@ def main() -> int:
         if source_run_id is None:
             print("No current shared-source normalized review to certify.")
             return 0
+        if args.expected_source_run_id is not None and source_run_id != args.expected_source_run_id:
+            raise coverage.CoverageError("readiness wake substituted its authenticated runtime source")
         with tempfile.TemporaryDirectory(prefix="quickskin-feature-baseline-") as temporary:
             result = prepare(api, repository=args.repository, source_sha=args.source_sha,
                              source_run_id=source_run_id, issuer_run_id=args.issuer_run_id,
-                             directory=Path(temporary).resolve())
+                             directory=Path(temporary).resolve(), expected_source_attempt=args.expected_source_attempt)
         if result is None:
             print("No new complete feature baseline was emitted.")
             return 0
@@ -497,6 +544,7 @@ def main() -> int:
         if args.github_output:
             with args.github_output.open("a") as stream:
                 stream.write(f"ready=true\nartifact_name={coverage.BASELINE_ARTIFACT_NAME}\n")
+                stream.write(f"source_run_id={result['source_run_id']}\nsource_run_attempt={result['source_run_attempt']}\n")
         print(f"Validated complete feature baseline for {len(result['targets'])} targets.")
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         parser.exit(2, f"Feature baseline validation failed: {exc}\n")

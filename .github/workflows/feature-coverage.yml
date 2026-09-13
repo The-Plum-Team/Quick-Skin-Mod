@@ -1,12 +1,7 @@
 name: Certify complete feature coverage
+run-name: Complete baseline ${{ github.event.client_payload.source_run_id || inputs.source_run_id }} attempt ${{ github.event.client_payload.source_run_attempt || inputs.source_run_attempt }}
 
 on:
-  workflow_run:
-    workflows:
-      - AI visual review drain
-      - Project site
-    types:
-      - completed
   repository_dispatch:
     types:
       - feature-coverage-requested
@@ -15,6 +10,11 @@ on:
       source_run_id:
         description: Existing complete shared-source Packaged E2E run to certify without another model call
         required: true
+        type: string
+      source_run_attempt:
+        description: Exact current attempt of the complete source run
+        required: true
+        default: "1"
         type: string
 
 permissions: {}
@@ -47,9 +47,11 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id || github.event.client_payload.review_run_id || github.event.client_payload.pages_run_id }}
+          TRIGGER_RUN_ID: ${{ github.event.client_payload.producer_run_id }}
           REQUEST_REPOSITORY: ${{ github.event.client_payload.source_repository }}
-          REQUESTED_SOURCE_RUN: ${{ inputs.source_run_id }}
+          REQUESTED_SOURCE_RUN: ${{ inputs.source_run_id || github.event.client_payload.source_run_id }}
+          REQUESTED_SOURCE_ATTEMPT: ${{ inputs.source_run_attempt || github.event.client_payload.source_run_attempt }}
+          REQUESTED_SOURCE_SHA: ${{ github.event.client_payload.source_sha }}
         run: |
           set -euo pipefail
           if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" || "$GITHUB_REF" != refs/heads/master ]]; then
@@ -60,17 +62,20 @@ jobs:
             printf 'Historical source layouts do not publish shared feature baselines.\n'
             exit 0
           fi
-          if [[ "$GITHUB_EVENT_NAME" == repository_dispatch && "$REQUEST_REPOSITORY" != "$GITHUB_REPOSITORY" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == repository_dispatch &&
+                ( "$REQUEST_REPOSITORY" != "$GITHUB_REPOSITORY" || "$REQUESTED_SOURCE_SHA" != "$GITHUB_SHA" ) ]]; then
             printf 'Feature coverage wake has a foreign repository identity.\n' >&2
             exit 1
           fi
-          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
-            source_arguments=(--source-run-id "$REQUESTED_SOURCE_RUN")
-          else
+          if [[ -n "$TRIGGER_RUN_ID" ]]; then
             source_arguments=(--trigger-run-id "$TRIGGER_RUN_ID")
+          else
+            source_arguments=(--source-run-id "$REQUESTED_SOURCE_RUN")
           fi
           python3 scripts/ci/feature_coverage_github.py \
             "${source_arguments[@]}" --github-repository "$GITHUB_REPOSITORY" \
+            --expected-source-run-id "$REQUESTED_SOURCE_RUN" \
+            --expected-source-attempt "$REQUESTED_SOURCE_ATTEMPT" \
             --source-sha "$GITHUB_SHA" --issuer-run-id "$GITHUB_RUN_ID" \
             --output "$RUNNER_TEMP/feature-baseline/baseline.json" --github-output "$GITHUB_OUTPUT"
       - name: Recheck the source immediately before publishing its baseline
@@ -79,10 +84,16 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          BASELINE_SOURCE_RUN: ${{ steps.baseline.outputs.source_run_id }}
+          BASELINE_SOURCE_ATTEMPT: ${{ steps.baseline.outputs.source_run_attempt }}
         run: |
           set -euo pipefail
+          if [[ ! "$BASELINE_SOURCE_RUN" =~ ^[1-9][0-9]*$ || ! "$BASELINE_SOURCE_ATTEMPT" =~ ^[1-9][0-9]*$ ]]; then
+            exit 1
+          fi
           current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
-          if [[ "$current_sha" == "$GITHUB_SHA" ]]; then
+          current_attempt="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BASELINE_SOURCE_RUN" --jq .run_attempt)"
+          if [[ "$current_sha" == "$GITHUB_SHA" && "$current_attempt" == "$BASELINE_SOURCE_ATTEMPT" ]]; then
             printf 'current=true\n' >> "$GITHUB_OUTPUT"
           fi
       - name: Publish the complete feature baseline
