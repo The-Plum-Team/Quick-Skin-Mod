@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from dataclasses import dataclass
@@ -214,6 +215,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--bundle-key")
     parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     parser.add_argument("--expected-source-sha")
+    parser.add_argument("--preferred-artifact-id", type=int)
     parser.add_argument("--github-output", type=Path)
     parser.add_argument(
         "--probe",
@@ -260,7 +262,20 @@ def main(argv: list[str] | None = None) -> int:
         current_sha = api.get_branch_sha(branch)
         if args.expected_source_sha is not None and current_sha != args.expected_source_sha:
             raise RotationError("source branch advanced after Pages discovery")
-        if args.probe:
+        if args.preferred_artifact_id is not None:
+            if args.bundle_key is None or args.expected_source_sha is None or args.probe or args.allow_continuation:
+                raise RotationError("preferred ordinary handoff requires exact shared-source collection")
+            from publication_progress import CoverageError, ProgressApi, preferred_handoff
+            progress_api = ProgressApi(repository)
+            try:
+                metadata = preferred_handoff(progress_api, identifier=args.preferred_artifact_id,
+                    name=f"pages-e2e-{args.bundle_key}", sha=current_sha, ordinary=True)
+            except CoverageError as exc:
+                raise RotationError(str(exc)) from exc
+            finally:
+                print(json.dumps({"ordinary_handoff_admission_GETs": progress_api.operations}, sort_keys=True))
+            evidence = Evidence(Artifact.parse(metadata), current_sha)
+        elif args.probe:
             # The probe authenticates exactly like a selection but downloads nothing and
             # reports a missing source as a distinct clean outcome for defer decisions.
             try:
@@ -285,15 +300,16 @@ def main(argv: list[str] | None = None) -> int:
                 f"at {evidence.coverage_sha}"
             )
             return 0
-        evidence = resolve_evidence(
-            api,
-            repository=repository,
-            branch=branch,
-            current_sha=current_sha,
-            require_raw=args.require_raw,
-            allow_continuation=args.allow_continuation,
-            bundle_key=args.bundle_key,
-        )
+        else:
+            evidence = resolve_evidence(
+                api,
+                repository=repository,
+                branch=branch,
+                current_sha=current_sha,
+                require_raw=args.require_raw,
+                allow_continuation=args.allow_continuation,
+                bundle_key=args.bundle_key,
+            )
         selected = evidence.artifact
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write(f"artifact_id={selected.artifact_id}\n")

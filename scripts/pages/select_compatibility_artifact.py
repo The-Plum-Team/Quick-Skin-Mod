@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -109,6 +110,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--bundle-key")
     parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     parser.add_argument("--expected-source-sha")
+    parser.add_argument("--preferred-artifact-id", type=int)
     parser.add_argument("--github-output", type=Path, required=True)
     return parser.parse_args(argv)
 
@@ -137,8 +139,25 @@ def main(argv: list[str] | None = None) -> int:
         current_sha = api.get_branch_sha(branch)
         if args.expected_source_sha is not None and current_sha != args.expected_source_sha:
             raise RotationError("source branch advanced after Pages discovery")
-        selected = select_source(api, repository=repository, branch=branch,
-                                 bundle_key=args.bundle_key, current_sha=current_sha)
+        if args.preferred_artifact_id is not None:
+            if args.bundle_key is None or args.expected_source_sha is None:
+                raise RotationError("preferred compatibility requires an exact shared-source target")
+            # A just-completed producer can be newer evidence than a cache uploaded after an
+            # earlier collector missed it. Reauthenticate the scheduler's exact ID independently;
+            # never silently fall back to that stale cache if the preferred handoff disappeared.
+            from publication_progress import CoverageError, ProgressApi, preferred_handoff
+            progress_api = ProgressApi(repository)
+            try:
+                metadata = preferred_handoff(progress_api, identifier=args.preferred_artifact_id,
+                    name=f"pages-mod-compatibility-{args.bundle_key}", sha=current_sha)
+            except CoverageError as exc:
+                raise RotationError(str(exc)) from exc
+            finally:
+                print(json.dumps({"compatibility_handoff_admission_GETs": progress_api.operations}, sort_keys=True))
+            selected = Artifact.parse(metadata)
+        else:
+            selected = select_source(api, repository=repository, branch=branch,
+                                     bundle_key=args.bundle_key, current_sha=current_sha)
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write(f"available={'true' if selected is not None else 'false'}\n")
             output.write(f"sha={current_sha}\n")
