@@ -370,27 +370,37 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
 
     def test_pages_completion_wakes_baseline_collection_and_stale_heads_do_not_dispatch(self):
         script = step_script("pages.yml", "request-feature-coverage",
-                             "Wake the collector after complete public evidence becomes available")
-        self.binary("gh", "import json,os,sys\n"
-            "open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n"
-            "print(os.environ['LIVE_SHA'] if '/branches/master' in sys.argv[2] else '{}')\n")
-        environment = {"GITHUB_REF": "refs/heads/master", "GITHUB_SHA": "b" * 40, "LIVE_SHA": "b" * 40}
+                             "Request a collector only for complete unscheduled readiness")
+        self.binary("python3", "import json,os,sys\n"
+            "if sys.argv[1]=='scripts/release/release_sources.py': print('shared')\n"
+            "else: open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n")
+        self.binary("gh", "raise SystemExit('the producer tail must not dispatch directly')\n")
+        environment = {"GITHUB_REF": "refs/heads/master", "GITHUB_SHA": "b" * 40, "TESTED_SHA": "b" * 40}
         result, _, calls = self.run_script(script, environment)
         self.assertEqual(0, result.returncode, result.stderr[:500])
-        self.assertEqual(2, len(calls))
-        payload = json.loads((self.root / "pages-feature-coverage-request.json").read_text())
-        self.assertEqual({"event_type": "feature-coverage-requested", "client_payload": {
-            "source_repository": "The-Plum-Team/Quick-Skin-Mod", "pages_run_id": "66"}}, payload)
-        result, _, calls = self.run_script(script, {**environment, "LIVE_SHA": "c" * 40})
-        self.assertEqual(0, result.returncode, result.stderr[:500])
-        self.assertEqual(1, len(calls))
+        self.assertEqual([["scripts/ci/feature_coverage_request.py", "--producer-run-id", "66",
+            "--github-repository", "The-Plum-Team/Quick-Skin-Mod", "--source-sha", "b" * 40]], calls)
+        result, _, calls = self.run_script(script, {**environment, "TESTED_SHA": "c" * 40})
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual([], calls)
+        # Live-head admission moved into the shared gate, not into the producer's shell.
+        # Exercise that actual boundary as well as the exact shell-to-helper argument contract.
+        from test_feature_coverage_request import Api as RequestApi
+        import feature_coverage_request as scheduler
+        api = RequestApi()
+        api.sha = "c" * 40
+        self.assertEqual("stale-generation", scheduler.request(api, repository=ROOT,
+            source_sha="b" * 40, source_id=10, producer_id=66, directory=self.root))
+        self.assertEqual([], api.payloads)
         job = job_block("pages.yml", "request-feature-coverage")
         self.assertIn("needs.refresh-cache.result == 'success'", job)
         self.assertIn("- refresh-compatibility-cache", job)
         self.assertIn("- request-rotation", job)
         self.assertIn("continue-on-error: true", job)
         consumer = job_block("feature-coverage.yml", "certify")
-        self.assertIn("github.event.client_payload.pages_run_id", consumer)
+        self.assertIn("github.event.client_payload.producer_run_id", consumer)
+        self.assertIn("--expected-source-run-id", consumer)
+        self.assertIn("--expected-source-attempt", consumer)
 
     def test_public_producer_uses_real_selector_outputs_and_independent_admission_inputs(self):
         producer = job_block("on-demand-e2e.yml", "prepare-pages-evidence")
