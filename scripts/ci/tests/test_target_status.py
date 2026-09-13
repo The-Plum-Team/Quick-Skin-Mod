@@ -112,6 +112,23 @@ class TargetStatusTest(unittest.TestCase):
                 job["conclusion"] = "failure"
         self.assertEqual({"failure"}, set(self.states(self.transport.collect(), "build").values()))
 
+    def test_both_policy_partitions_are_shared_fail_closed_prerequisites(self):
+        endpoint = self.transport.jobs_endpoint("build")
+        original = copy.deepcopy(self.transport.responses[endpoint])
+        for name in ("Validate release policy", "Validate CI policy"):
+            for conclusion in ("failure", "cancelled", "skipped", "missing"):
+                with self.subTest(partition=name, conclusion=conclusion):
+                    page = copy.deepcopy(original)
+                    self.transport.responses[endpoint] = page
+                    job = next(job for job in page["jobs"] if job["name"] == name)
+                    if conclusion == "missing":
+                        page["jobs"].remove(job)
+                        page["total_count"] -= 1
+                    else:
+                        job["conclusion"] = conclusion
+                    expected = "failure" if conclusion == "failure" else "unknown"
+                    self.assertEqual({expected}, set(self.states(self.transport.collect(), "build").values()))
+
     def test_full_runtime_does_not_require_optional_feature_selection(self):
         page = self.transport.responses[self.transport.jobs_endpoint("e2e")]
         page["jobs"].append({"id": 1000, "run_id": 20, "run_attempt": 1, "head_sha": SHA,
@@ -239,6 +256,9 @@ class ReusedTargetStatusTest(unittest.TestCase):
         self.api.runs[40], self.api.inventories[40] = run, []
         self.api.job_lists[40] = [{"jobs": [self.api.job(run, name, index) for index, name in enumerate(
             [status.BUILD_SHARED[0], "Build and verify"])]}]
+        jobs = self.api.job_lists[40][0]["jobs"]
+        for name in ("Validate repository policy", "Validate release policy", "Validate CI policy"):
+            jobs.append(self.api.job(run, name, len(jobs), "skipped"))
         self.api.add_descriptor(40, 400, "reused-source-build", "reused-source.json", self.references["build"])
         original_json = self.api.json
 
@@ -282,6 +302,24 @@ class ReusedTargetStatusTest(unittest.TestCase):
                 if mutation == "mixed": self.api.add_artifact(30, 900, "packaged-e2e-unexpected")
                 result = self.collect()
                 self.assertEqual({"unknown"}, {row["e2e"]["state"] for row in result["targets"]})
+
+    def test_reused_build_requires_explicit_skips_and_passing_original_partitions(self):
+        for run_id in (10, 40):
+            page = self.api.job_lists[run_id][0]
+            original = copy.deepcopy(page["jobs"])
+            for name in ("Validate release policy", "Validate CI policy"):
+                conclusions = ("failure", "cancelled", "skipped", "missing") if run_id == 10 else (
+                    "failure", "cancelled", "success", "missing")
+                for conclusion in conclusions:
+                    with self.subTest(run_id=run_id, partition=name, conclusion=conclusion):
+                        page["jobs"] = copy.deepcopy(original)
+                        job = next(job for job in page["jobs"] if job["name"] == name)
+                        if conclusion == "missing":
+                            page["jobs"].remove(job)
+                        else:
+                            job["conclusion"] = conclusion
+                        self.assertEqual({"unknown"}, {row["build"]["state"] for row in self.collect()["targets"]})
+            page["jobs"] = original
 
     def test_wrapper_must_pass_its_own_gate_before_reusing_source(self):
         self.api.runs[30].update(status="in_progress", conclusion=None)
