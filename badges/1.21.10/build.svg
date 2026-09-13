@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="218" height="24" viewBox="0 0 218 24" role="img" aria-label="Build: Pending; covered commit fdd3fd277287f85e05f6f6efceb4d0669fdf32fa; observed 2026-09-13T21:37:18Z">
-  <title>Build: Pending; covered commit fdd3fd277287f85e05f6f6efceb4d0669fdf32fa; observed 2026-09-13T21:37:18Z</title>
-  <rect width="218" height="24" rx="4" fill="#9a6700"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="218" height="24" viewBox="0 0 218 24" role="img" aria-label="Build: Unknown; covered commit fdd3fd277287f85e05f6f6efceb4d0669fdf32fa; observed 2026-09-13T21:37:39Z">
+  <title>Build: Unknown; covered commit fdd3fd277287f85e05f6f6efceb4d0669fdf32fa; observed 2026-09-13T21:37:39Z</title>
+  <rect width="218" height="24" rx="4" fill="#57606a"/>
   <path d="M4 0H48V24H4Q0 24 0 20V4Q0 0 4 0" fill="#24292f"/>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11">
     <text x="24" y="16">Build</text>
-    <text x="133" y="16">Pending · fdd3fd277287</text>
+    <text x="133" y="16">Unknown · fdd3fd277287</text>
   </g>
 </svg>
