@@ -410,6 +410,7 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
     if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in runtime.artifacts):
         return None  # Partial generations retain their earlier complete baseline.
     metadata, public = {}, {}
+    admitted_pages_owners = {}
     for target in targets:
         key = target["bundle_key"]
         candidate = reports[key]
@@ -426,11 +427,19 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
             if candidate.get("expired") is True:
                 continue
             owner_id = coverage._positive_integer(candidate.get("workflow_run", {}).get("id"), "public owner")
-            owner = api.run(owner_id)
-            if owner.get("status") != "completed":
-                continue
-            public[key] = validate_public_owner(candidate, owner, api.jobs(owner),
+            admitted = admitted_pages_owners.get(owner_id)
+            if admitted is None:
+                owner = api.run(owner_id)
+                if owner.get("status") != "completed":
+                    continue
+                owner_jobs = api.jobs(owner)
+            else:
+                owner, owner_jobs = admitted
+            public[key] = validate_public_owner(candidate, owner, owner_jobs,
                 github_repository=api.repository, source_sha=source_sha, source_run_id=source_run_id, bundle_key=key)
+            # Only a successful admission enters this invocation's reuse map. Every later target
+            # still validates its own archive identity and required retention job against it.
+            admitted_pages_owners[owner_id] = (owner, owner_jobs)
             break
         if key not in public:
             return None
