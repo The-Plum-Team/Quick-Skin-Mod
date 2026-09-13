@@ -125,6 +125,33 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
         self.assertIsNone(self.prepare())
         self.assertEqual([], self.api.downloaded)
 
+    def test_cancelled_original_report_does_not_shadow_authenticated_replacement(self):
+        key = self.fixture.targets[0]["bundle_key"]
+        name = f"visual-review-{self.fixture.run_id}--{key}"
+        original = self.api.records[name][0]
+        cancelled = copy.deepcopy(original)
+        cancelled["id"] = 99000
+        cancelled["workflow_run"]["id"] = 9900
+        self.api.runs[9900] = {**self.api.runs[1000], "id": 9900, "conclusion": "cancelled"}
+        self.api.records[name] = [cancelled, original]
+        result = self.prepare()
+        self.assertEqual(result["review_artifacts"][key]["id"], original["id"])
+        self.assertNotIn(cancelled["id"], self.api.downloaded)
+
+    def test_foreign_cancelled_owner_cannot_resolve_an_ambiguous_report(self):
+        key = self.fixture.targets[0]["bundle_key"]
+        name = f"visual-review-{self.fixture.run_id}--{key}"
+        original = self.api.records[name][0]
+        cancelled = copy.deepcopy(original)
+        cancelled["id"] = 99000
+        cancelled["workflow_run"]["id"] = 9900
+        self.api.runs[9900] = {**self.api.runs[1000], "id": 9900, "conclusion": "cancelled",
+                               "head_repository": {"full_name": "foreign/repository"}}
+        self.api.records[name] = [cancelled, original]
+        with self.assertRaisesRegex(ValueError, "foreign protected owner"):
+            self.prepare()
+        self.assertEqual(self.api.downloaded, [])
+
     def test_scheduled_full_reviews_keep_the_manual_public_baseline_without_report_downloads(self):
         source = self.api.runs[self.fixture.run_id]
         source["event"] = "schedule"
@@ -322,7 +349,7 @@ else: raise SystemExit("Unexpected protected command")
             python = folder / "python3"
             python.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + " " + shlex.quote(str(program)) + ' "$@"\n')
             python.chmod(0o755)
-            for case in ("dispatch", "manual", "stale", "foreign", "wrong-ref"):
+            for case in ("dispatch", "manual", "stale", "foreign", "wrong-ref", "foreign-source"):
                 with self.subTest(case=case):
                     called = folder / "called.json"
                     called.unlink(missing_ok=True)
@@ -332,7 +359,10 @@ else: raise SystemExit("Unexpected protected command")
                            "GITHUB_EVENT_NAME": "workflow_dispatch" if case == "manual" else "repository_dispatch",
                            "GITHUB_REPOSITORY": self.api.repository, "GITHUB_RUN_ID": "99",
                            "REQUEST_REPOSITORY": "foreign/repository" if case == "foreign" else self.api.repository,
-                           "REQUESTED_SOURCE_RUN": "55", "TRIGGER_RUN_ID": "66", "RUNNER_TEMP": str(folder),
+                           "REQUESTED_SOURCE_RUN": "55", "TRIGGER_RUN_ID": "" if case == "manual" else "66",
+                           "REQUESTED_SOURCE_ATTEMPT": "2",
+                           "REQUESTED_SOURCE_SHA": "c" * 40 if case == "foreign-source" else sha,
+                           "RUNNER_TEMP": str(folder),
                            "GITHUB_OUTPUT": str(folder / "output"), "FIXTURE_CALLED": str(called)}
                     result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
                                             cwd=ROOT, env=env, text=True, capture_output=True, timeout=10)
@@ -342,6 +372,8 @@ else: raise SystemExit("Unexpected protected command")
                         args = json.loads(called.read_bytes())
                         self.assertEqual(["--source-run-id", "55"] if case == "manual" else ["--trigger-run-id", "66"], args[1:3])
                         self.assertEqual(sha, args[args.index("--source-sha") + 1])
+                        self.assertEqual("55", args[args.index("--expected-source-run-id") + 1])
+                        self.assertEqual("2", args[args.index("--expected-source-attempt") + 1])
         block = job_block("feature-coverage.yml", "certify")
         self.assertIn("actions: read", block)
         self.assertIn("contents: read", block)

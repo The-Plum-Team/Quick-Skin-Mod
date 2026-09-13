@@ -357,6 +357,13 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   publication, and joins all workers on success, failure or cancellation. There are still only
   three target runners and every wake retains the whole-producer completion boundary. Sanitized
   stage wall/CPU times and logical API/archive counts are diagnostics, never admission evidence.
+- `scripts/ci/feature_coverage_request.py` coalesces advisory review/Pages requests under one
+  short request lock, checking complete immutable readiness and terminal producer ownership
+  before starting the separately locked canonical collector. An existing certificate suppresses
+  duplicate work only after current canonical certificate/public/runtime admission. The
+  failed-owner workflow-run/manual/hourly recovery path uses the same gate; successful owner
+  echoes are skipped because their final tails already requested readiness. No persistent success flag,
+  producer-side report assembly or model call can substitute for full baseline certification.
 - `scripts/ci/shared_compatibility.py` authenticates a clean complete schema-8 target review before
   optional-mod E2E. Each wave has its own target key, while source and target SHA both name current
   `master`. Its schema-2 plan is independently recomputed from the full matrix, scenario contract,

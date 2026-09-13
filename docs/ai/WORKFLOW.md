@@ -133,6 +133,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   baseline consumers still require their own availability checks. Observe the affected Actions
   token's recorded quota counters rather than
   inferring its budget or reset from a developer token.
+  Review and Pages tail jobs share the separate short baseline-request lock. They may dispatch
+  only after exact complete readiness and terminal sibling owners, retaining the lock until
+  the new source/attempt collector is observable. The collector still authenticates every
+  runtime, report and public artifact; cancelled-owner report recovery must not be blocked by
+  a preserved old cancelled report. Failed-owner workflow-run/manual/hourly recovery uses the
+  same gate; successful completion echoes allocate no extra runner. A lost/failed tail in an
+  otherwise-successful owner converges through hourly/manual recovery, not an immediate echo.
+  Report scheduled recovery overhead separately from suppressed collector starts; see
+  [baseline request coalescing](../ci/BASELINE-REQUESTS.md).
 - Historical schema-2 port/anchor certificates remain available only for historical recovery;
   schema 3 retires automatic version ports. Never reuse a partial feature proof as either a
   complete shared baseline or a historical full-anchor certificate.

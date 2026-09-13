@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "repository": "The-Plum-Team/Quick-Skin-Mod",
+  "generation_sha": "ec802e0f0d022b16620460d87001dd9fcecb6267",
+  "source_run_id": 34318669930,
+  "source_run_attempt": 1,
+  "issuer_run_id": 34327444822,
+  "issuer_completed_at": "2026-09-09T08:09:20Z",
+  "notes": "Saved actual collector creation timestamps. Sixteen review producers matched exact verified owner completion within three seconds; eight remaining requests are Pages publications. Timestamps replay readiness notifications, not an assertion that their owner had already reached terminal success.",
+  "events": [
+    {
+      "collector_run_id": 34320427779,
+      "at": "2026-09-09T06:44:18Z",
+      "kind": "pages"
+    },
+    {
+      "collector_run_id": 34321038963,
+      "at": "2026-09-09T06:52:08Z",
+      "kind": "review",
+      "target": "mc26.1.1",
+      "producer_run_id": 34320617261
+    },
+    {
+      "collector_run_id": 34321358666,
+      "at": "2026-09-09T06:56:08Z",
+      "kind": "review",
+      "target": "mc26.2",
+      "producer_run_id": 34320671331
+    },
+    {
+      "collector_run_id": 34321775920,
+      "at": "2026-09-09T07:01:17Z",
+      "kind": "review",
+      "target": "mc1.21.2",
+      "producer_run_id": 34320767831
+    },
+    {
+      "collector_run_id": 34322250793,
+      "at": "2026-09-09T07:07:04Z",
+      "kind": "review",
+      "target": "mc1.21.1",
+      "producer_run_id": 34320767876
+    },
+    {
+      "collector_run_id": 34322625104,
+      "at": "2026-09-09T07:11:42Z",
+      "kind": "review",
+      "target": "mc1.20.1",
+      "producer_run_id": 34320767353
+    },
+    {
+      "collector_run_id": 34323187601,
+      "at": "2026-09-09T07:18:32Z",
+      "kind": "review",
+      "target": "mc26.1",
+      "producer_run_id": 34320771430
+    },
+    {
+      "collector_run_id": 34323606461,
+      "at": "2026-09-09T07:23:36Z",
+      "kind": "review",
+      "target": "mc26.1.2",
+      "producer_run_id": 34320771473
+    },
+    {
+      "collector_run_id": 34323865315,
+      "at": "2026-09-09T07:26:40Z",
+      "kind": "pages"
+    },
+    {
+      "collector_run_id": 34324048530,
+      "at": "2026-09-09T07:28:48Z",
+      "kind": "review",
+      "target": "mc1.21.11",
+      "producer_run_id": 34320770982
+    },
+    {
+      "collector_run_id": 34324469565,
+      "at": "2026-09-09T07:33:37Z",
+      "kind": "review",
+      "target": "mc1.21.5",
+      "producer_run_id": 34320769222
+    },
+    {
+      "collector_run_id": 34324943894,
+      "at": "2026-09-09T07:39:11Z",
+      "kind": "review",
+      "target": "mc1.21.3",
+      "producer_run_id": 34320768507
+    },
+    {
+      "collector_run_id": 34324964431,
+      "at": "2026-09-09T07:39:26Z",
+      "kind": "pages"
+    },
+    {
+      "collector_run_id": 34325356435,
+      "at": "2026-09-09T07:44:00Z",
+      "kind": "review",
+      "target": "mc1.21.10",
+      "producer_run_id": 34320770565
+    },
+    {
+      "collector_run_id": 34325845465,
+      "at": "2026-09-09T07:49:40Z",
+      "kind": "review",
+      "target": "mc1.21.7",
+      "producer_run_id": 34320769805
+    },
+    {
+      "collector_run_id": 34325940401,
+      "at": "2026-09-09T07:50:45Z",
+      "kind": "pages"
+    },
+    {
+      "collector_run_id": 34326268443,
+      "at": "2026-09-09T07:54:34Z",
+      "kind": "review",
+      "target": "mc1.21.9",
+      "producer_run_id": 34320769893
+    },
+    {
+      "collector_run_id": 34326689400,
+      "at": "2026-09-09T07:59:30Z",
+      "kind": "review",
+      "target": "mc1.21.8",
+      "producer_run_id": 34320769736
+    },
+    {
+      "collector_run_id": 34326944617,
+      "at": "2026-09-09T08:02:17Z",
+      "kind": "pages"
+    },
+    {
+      "collector_run_id": 34327149193,
+      "at": "2026-09-09T08:04:38Z",
+      "kind": "review",
+      "target": "mc1.21.4",
+      "producer_run_id": 34320768413
+    },
+    {
+      "collector_run_id": 34327444822,
+      "at": "2026-09-09T08:07:57Z",
+      "kind": "review",
+      "target": "mc1.21.6",
+      "producer_run_id": 34320769843
+    },
+    {
+      "collector_run_id": 34328448281,
+      "at": "2026-09-09T08:19:04Z",
+      "kind": "pages"
+    },
+    {
+      "collector_run_id": 34330657990,
+      "at": "2026-09-09T08:43:10Z",
+      "kind": "pages"
+    },
+    {
+      "collector_run_id": 34331800991,
+      "at": "2026-09-09T08:55:27Z",
+      "kind": "pages"
+    }
+  ]
+}
