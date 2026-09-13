@@ -26,6 +26,7 @@ from e2e_job_graph import (BUILD_JOB, GATE_JOB, POLICY_JOB, SCENARIO_SUFFIX,
 
 WORKFLOWS = {"build": ".github/workflows/build-gate.yml",
              "e2e": ".github/workflows/on-demand-e2e.yml"}
+BUILD_POLICY_JOBS = frozenset({"Validate repository policy", "Validate release policy", "Validate CI policy"})
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
@@ -211,7 +212,7 @@ def verify_reference(api: Any, value: Any, kind: str, *, matrix_path: Path = DEF
     if kind == "build":
         from matrix import load_matrix
         versions = {item["artifact_version"] for item in load_matrix(matrix_path)["artifacts"]}
-        successful_jobs(pages, {"Build and verify", "Validate repository policy",
+        successful_jobs(pages, {"Build and verify", *BUILD_POLICY_JOBS,
             "compile / Plan every supported build target", "compile / Reverify the complete compiled matrix",
             *(f"compile / Compile Minecraft {version}" for version in versions)})
         validate_artifact(one_artifact(inventory, "staged-release-bundle"), name="staged-release-bundle",

@@ -168,13 +168,25 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
     def test_reused_gates_skip_expensive_jobs_only_with_independent_original_verification(self):
         script = step_script("build-gate.yml", "build", "Require the complete compilation and policy jobs")
         environment = {"SOURCE_RESULT": "success", "REUSED": "true",
-                       "COMPILE_RESULT": "skipped", "POLICY_RESULT": "skipped"}
+                       "COMPILE_RESULT": "skipped", "POLICY_RESULT": "skipped",
+                       "RELEASE_POLICY_RESULT": "skipped", "CI_POLICY_RESULT": "skipped"}
         result, _, _ = self.run_script(script, environment)
         self.assertEqual(0, result.returncode, result.stderr)
         for changes in ({"SOURCE_RESULT": "failure"}, {"REUSED": "false"},
-                        {"COMPILE_RESULT": "failure"}, {"POLICY_RESULT": "cancelled"}):
+                        {"COMPILE_RESULT": "failure"}, {"POLICY_RESULT": "cancelled"},
+                        {"RELEASE_POLICY_RESULT": "failure"}, {"CI_POLICY_RESULT": "cancelled"}):
             result, _, _ = self.run_script(script, {**environment, **changes})
             self.assertNotEqual(0, result.returncode)
+        for partition in ("RELEASE_POLICY_RESULT", "CI_POLICY_RESULT"):
+            for conclusion in ("failure", "cancelled", "skipped", "", "neutral"):
+                values = {key: "success" for key in environment if key.endswith("_RESULT")}
+                values.update(REUSED="false")
+                values[partition] = conclusion
+                result, _, _ = self.run_script(script, values)
+                self.assertNotEqual(0, result.returncode, (partition, conclusion))
+        values = {key: "success" for key in environment if key.endswith("_RESULT")}
+        result, _, _ = self.run_script(script, {**values, "REUSED": "false"})
+        self.assertEqual(0, result.returncode, result.stderr)
         script = step_script("on-demand-e2e.yml", "required-gate", "Require build and packaged behavior")
         environment = {"POLICY_RESULT": "success", "REUSED": "true", "RUNTIME_POLICY": "full",
                        "BUILD_RESULT": "skipped", "E2E_RESULT": "skipped"}
