@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="218" height="24" viewBox="0 0 218 24" role="img" aria-label="Build: Unknown; covered commit ef7754197c3f5aeab87166886dcc4553b30464b3; observed 2026-09-13T10:31:53Z">
-  <title>Build: Unknown; covered commit ef7754197c3f5aeab87166886dcc4553b30464b3; observed 2026-09-13T10:31:53Z</title>
-  <rect width="218" height="24" rx="4" fill="#57606a"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="211" height="24" viewBox="0 0 211 24" role="img" aria-label="Build: Passed; covered commit ef7754197c3f5aeab87166886dcc4553b30464b3; observed 2026-09-13T10:32:18Z">
+  <title>Build: Passed; covered commit ef7754197c3f5aeab87166886dcc4553b30464b3; observed 2026-09-13T10:32:18Z</title>
+  <rect width="211" height="24" rx="4" fill="#238636"/>
   <path d="M4 0H48V24H4Q0 24 0 20V4Q0 0 4 0" fill="#24292f"/>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11">
     <text x="24" y="16">Build</text>
-    <text x="133" y="16">Unknown · ef7754197c3f</text>
+    <text x="129.5" y="16">Passed · ef7754197c3f</text>
   </g>
 </svg>
