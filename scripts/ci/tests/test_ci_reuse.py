@@ -59,7 +59,8 @@ class FixtureApi(publisher.Api):
             self.seals[kind] = seal
             self.add_descriptor(identifier, 100 + identifier, "tested-source-" + kind, "tested-source.json", seal)
             if kind == "build":
-                names = ["Build and verify", "Validate repository policy", "compile / Plan every supported build target",
+                names = ["Build and verify", "Validate repository policy", "Validate release policy", "Validate CI policy",
+                         "compile / Plan every supported build target",
                          "compile / Reverify the complete compiled matrix"]
                 names += ["compile / Compile Minecraft " + version for version in
                           sorted({row["artifact_version"] for row in load_matrix(reuse.DEFAULT_MATRIX)["artifacts"]})]
@@ -165,6 +166,27 @@ class CiReuseTest(unittest.TestCase):
     def test_changed_merged_tree_requires_new_work(self):
         self.api.commits[self.api.covered]["tree"]["sha"] = "f" * 40
         self.assertEqual((None, "merged-tree-changed"), self.find())
+
+    def test_build_reuse_requires_both_complete_policy_partitions(self):
+        page = self.api.job_lists[10][0]
+        original = copy.deepcopy(page["jobs"])
+        for name in ("Validate release policy", "Validate CI policy"):
+            for conclusion in ("failure", "cancelled", "skipped", "missing", "duplicate", None):
+                with self.subTest(partition=name, conclusion=conclusion):
+                    page["jobs"] = copy.deepcopy(original)
+                    job = next(job for job in page["jobs"] if job["name"] == name)
+                    if conclusion == "missing":
+                        page["jobs"].remove(job)
+                    elif conclusion == "duplicate":
+                        page["jobs"].append(copy.deepcopy(job))
+                    else:
+                        job["conclusion"] = conclusion
+                        if conclusion is None:
+                            job["status"] = "in_progress"
+                    with self.assertRaisesRegex(reuse.ReuseError, name):
+                        self.find("build")
+        page["jobs"] = original
+        self.assertEqual("identical-tested-tree", self.find("build")[1])
 
     def test_failed_latest_run_cannot_reuse_prior_success(self):
         for result in ("failure", "cancelled", "skipped"):

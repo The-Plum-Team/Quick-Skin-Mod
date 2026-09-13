@@ -94,13 +94,6 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install hash-locked Pages image dependency
-        run: >-
-          python -m pip install
-          --only-binary=:all:
-          --require-hashes
-          --requirement scripts/pages/requirements.txt
-
       - name: Validate central matrix
         run: python scripts/release/matrix.py --matrix release/release-matrix.json > /dev/null
 
@@ -144,13 +137,11 @@ jobs:
             --profile-branch "$profile_branch" \
             --check
 
-      - name: Validate release tooling and repository policy
+      - name: Validate Python and JavaScript syntax
         run: |
           python -m compileall -q e2e scripts
           node --check site/assets/site.js
           node --check site/assets/gallery.js
-          python -m unittest discover -s scripts/release/tests -p 'test_*.py' -v
-          python -m unittest discover -s scripts/ci/tests -p 'test_*.py' -v
 
       - name: Upload build diagnostics
         if: failure()
@@ -166,11 +157,121 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
+  policy-release:
+    name: Validate release policy
+    needs: source
+    if: >-
+      needs.source.result == 'success' && needs.source.outputs.reused == 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install hash-locked Pages image dependency
+        run: >-
+          python -m pip install
+          --only-binary=:all:
+          --require-hashes
+          --requirement scripts/pages/requirements.txt
+      - name: Record discovered release test inventory
+        run: |
+          python - <<'PY'
+          import os
+          import unittest
+          from pathlib import Path
+          loader = unittest.TestLoader()
+          count = loader.discover('scripts/release/tests', pattern='test_*.py').countTestCases()
+          assert count > 0 and not loader.errors, loader.errors
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as summary:
+              summary.write(f"Release policy: {count} discovered tests at {os.environ['GITHUB_SHA']}.\n")
+          print(f"Discovered {count} release policy tests.")
+          PY
+      - name: Run the complete release policy suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s scripts/release/tests -p 'test_*.py' -v 2>&1 | tee "$RUNNER_TEMP/release-policy-tests.log"
+      - name: Retain release policy results and diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-policy-diagnostics
+          path: |
+            ${{ runner.temp }}/release-policy-tests.log
+            **/build/reports/
+            **/build/test-results/
+            **/build/*.log
+            **/run/logs/
+          if-no-files-found: ignore
+          retention-days: 1
+
+  policy-ci:
+    name: Validate CI policy
+    needs: source
+    if: >-
+      needs.source.result == 'success' && needs.source.outputs.reused == 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install hash-locked Pages image dependency
+        run: >-
+          python -m pip install
+          --only-binary=:all:
+          --require-hashes
+          --requirement scripts/pages/requirements.txt
+      - name: Record discovered CI test inventory
+        run: |
+          python - <<'PY'
+          import os
+          import unittest
+          from pathlib import Path
+          loader = unittest.TestLoader()
+          count = loader.discover('scripts/ci/tests', pattern='test_*.py').countTestCases()
+          assert count > 0 and not loader.errors, loader.errors
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as summary:
+              summary.write(f"CI policy: {count} discovered tests at {os.environ['GITHUB_SHA']}.\n")
+          print(f"Discovered {count} CI policy tests.")
+          PY
+      - name: Run the complete CI policy suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s scripts/ci/tests -p 'test_*.py' -v 2>&1 | tee "$RUNNER_TEMP/ci-policy-tests.log"
+      - name: Retain CI policy results and diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-policy-diagnostics
+          path: |
+            ${{ runner.temp }}/ci-policy-tests.log
+            **/build/reports/
+            **/build/test-results/
+            **/build/*.log
+            **/run/logs/
+          if-no-files-found: ignore
+          retention-days: 1
+
   build:
     name: Build and verify
-    needs: [source, compile, policy]
+    needs: [source, compile, policy, policy-release, policy-ci]
     if: >-
-      always() && !cancelled() &&
+      always() &&
       (github.event_name != 'workflow_dispatch' || inputs.attest_run_id == '')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -180,16 +281,22 @@ jobs:
         env:
           COMPILE_RESULT: ${{ needs.compile.result }}
           POLICY_RESULT: ${{ needs.policy.result }}
+          RELEASE_POLICY_RESULT: ${{ needs.policy-release.result }}
+          CI_POLICY_RESULT: ${{ needs.policy-ci.result }}
           SOURCE_RESULT: ${{ needs.source.result }}
           REUSED: ${{ needs.source.outputs.reused }}
         run: |
           set -euo pipefail
           [[ "$SOURCE_RESULT" == success ]] || exit 1
           if [[ "$REUSED" == true ]]; then
-            [[ "$COMPILE_RESULT" == skipped && "$POLICY_RESULT" == skipped ]] || exit 1
+            expected=skipped
           else
-            [[ "$REUSED" == false && "$COMPILE_RESULT" == success && "$POLICY_RESULT" == success ]] || exit 1
+            [[ "$REUSED" == false ]] || exit 1
+            expected=success
           fi
+          for result in "$COMPILE_RESULT" "$POLICY_RESULT" "$RELEASE_POLICY_RESULT" "$CI_POLICY_RESULT"; do
+            [[ "$result" == "$expected" ]] || exit 1
+          done
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
