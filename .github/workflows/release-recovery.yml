@@ -20,7 +20,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: release
+  group: release-recovery-${{ inputs.release_tag }}
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -41,6 +42,7 @@ jobs:
       target: ${{ steps.recovery.outputs.target }}
       publications: ${{ steps.recovery.outputs.publications }}
       manifest_sha256: ${{ steps.recovery.outputs.manifest_sha256 }}
+      bundle_id: ${{ steps.bundle.outputs.artifact-id }}
     steps:
       - name: Check out the exact protected recovery implementation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,6 +70,9 @@ jobs:
           --source-run-id "$SOURCE_RUN_ID"
           --source-artifact-id "$SOURCE_ARTIFACT_ID"
 
+      - name: Rehearse publication and interrupted recovery
+        run: python scripts/release/rehearse_publication.py --stage build/release
+
       - name: Attest the corrected SBOM for the unchanged production JARs
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -75,6 +80,7 @@ jobs:
           sbom-path: build/release/sbom/quick-skin.cdx.json
 
       - name: Upload the exact recovered release bundle
+        id: bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-recovery-${{ steps.recovery.outputs.release_id }}
@@ -85,6 +91,10 @@ jobs:
 
   stage-github-release:
     name: Stage exact GitHub Release assets
+    concurrency:
+      group: release-publish
+      queue: max
+      cancel-in-progress: false
     needs:
       - prepare
     runs-on: ubuntu-24.04
@@ -92,6 +102,7 @@ jobs:
     environment: release
     permissions:
       contents: write
+      actions: read
 
     steps:
       - name: Check out exact release source and tag
@@ -132,16 +143,28 @@ jobs:
           --commit "${{ needs.prepare.outputs.source_sha }}"
           --title "Quick Skin ${{ needs.prepare.outputs.release_id }}"
 
+      - name: Persist resumable publication identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/release/publication_state.py register
+          --tag "${{ needs.prepare.outputs.tag }}"
+          --artifact-id "${{ needs.prepare.outputs.bundle_id }}"
+
   publish-marketplace:
     name: Publish ${{ matrix.artifact_node }} to ${{ matrix.marketplace }}
+    concurrency:
+      group: release-publish
+      queue: max
+      cancel-in-progress: false
     needs:
       - prepare
       - stage-github-release
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     environment: release
     permissions:
-      contents: read
+      contents: write
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -176,16 +199,17 @@ jobs:
           python scripts/release/recover_sbom_release.py verify
           --tag "$RELEASE_TAG" --manifest-sha256 "$MANIFEST_SHA256"
 
-      - name: Reconcile existing marketplace publication by identity and hash
+      - name: Reconcile and persist upload intent before any marketplace write
         id: reconcile
         env:
+          GH_TOKEN: ${{ github.token }}
           MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' && secrets.MODRINTH_TOKEN || '' }}
         run: >-
-          python scripts/release/reconcile_publication.py
-          --artifact-node "${{ matrix.artifact_node }}"
-          --marketplace "${{ matrix.marketplace }}"
-          --publication-id "${{ matrix.publication_id }}"
+          python scripts/release/publication_state.py begin
+          --tag "${{ needs.prepare.outputs.tag }}"
+          --row "${{ matrix.id }}"
           --github-output "$GITHUB_OUTPUT"
+          --record "build/publication/${{ matrix.id }}.json"
 
       - name: Publish exact verified artifact to Modrinth
         if: ${{ matrix.marketplace == 'modrinth' && steps.reconcile.outputs.publish == 'true' }}
@@ -231,17 +255,15 @@ jobs:
           retry-delay: 10000
           fail-mode: fail
 
-      - name: Verify marketplace ID and exact bytes after publication
+      - name: Persist accepted upload and check visibility once
+        if: ${{ steps.reconcile.outputs.publish == 'true' }}
         env:
+          GH_TOKEN: ${{ github.token }}
           MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' && secrets.MODRINTH_TOKEN || '' }}
         run: >-
-          python scripts/release/reconcile_publication.py
-          --artifact-node "${{ matrix.artifact_node }}"
-          --marketplace "${{ matrix.marketplace }}"
-          --publication-id "${{ matrix.publication_id }}"
-          --attempts "${{ matrix.marketplace == 'curseforge' && 40 || 6 }}"
-          --delay-seconds "${{ matrix.marketplace == 'curseforge' && 20 || 10 }}"
-          --verify
+          python scripts/release/publication_state.py accept
+          --tag "${{ needs.prepare.outputs.tag }}"
+          --row "${{ matrix.id }}"
           --record "build/publication/${{ matrix.id }}.json"
 
       - name: Upload publication receipt
@@ -254,6 +276,10 @@ jobs:
 
   publish-github-release:
     name: Publish immutable GitHub Release
+    concurrency:
+      group: release-publish
+      queue: max
+      cancel-in-progress: false
     needs:
       - prepare
       - stage-github-release
@@ -293,7 +319,17 @@ jobs:
           python scripts/release/recover_sbom_release.py verify
           --tag "$RELEASE_TAG" --manifest-sha256 "$MANIFEST_SHA256"
 
+      - name: Check whether every marketplace file is now approved
+        id: settled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/release/publication_state.py check
+          --tag "${{ needs.prepare.outputs.tag }}"
+          --github-output "$GITHUB_OUTPUT"
+
       - name: Publish the fully reconciled GitHub Release
+        if: ${{ steps.settled.outputs.ready == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-

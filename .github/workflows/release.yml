@@ -17,9 +17,10 @@ permissions:
   contents: read
 
 concurrency:
-  # One constant group serializes tag and validation runs. The former per-ref group let a
-  # validation dispatch and a canonical tag publish run fully concurrently.
-  group: release
+  # Rehearsals have no publication authority. Distinct targets may prepare concurrently;
+  # all remote writes retain their separate, short publication lock.
+  group: release-${{ github.event_name == 'push' && github.ref_name || format('rehearsal-{0}', inputs.minecraft_target) }}
+  queue: max
   cancel-in-progress: false
 
 env:
@@ -29,8 +30,31 @@ env:
   __GLX_VENDOR_LIBRARY_NAME: mesa
 
 jobs:
+  admit:
+    name: Assign bounded release preparation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      slot: ${{ steps.plan.outputs.slot }}
+    steps:
+      - name: Check out the exact release planner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Derive the target's isolated preparation slot
+        id: plan
+        env:
+          REQUESTED_TARGET: ${{ inputs.minecraft_target || '' }}
+        run: python3 scripts/release/release_schedule.py --target "$REQUESTED_TARGET" --github-output "$GITHUB_OUTPUT"
+
   build:
     name: Build immutable release bundle
+    needs: admit
+    concurrency:
+      group: release-build-${{ needs.admit.outputs.slot }}
+      queue: max
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -47,6 +71,8 @@ jobs:
       runtimes: ${{ steps.matrices.outputs.runtimes }}
       artifacts: ${{ steps.matrices.outputs.artifacts }}
       publications: ${{ steps.matrices.outputs.publications }}
+      preparation_slot: ${{ needs.admit.outputs.slot }}
+      bundle_id: ${{ steps.bundle.outputs.artifact-id }}
 
     steps:
       - name: Check out tagged source
@@ -143,6 +169,9 @@ jobs:
           --target "$RELEASE_TARGET"
           --manifest build/release/artifacts.json
 
+      - name: Rehearse publication and interrupted recovery
+        run: python scripts/release/rehearse_publication.py --stage build/release
+
       - name: Resolve release matrices
         id: matrices
         shell: bash
@@ -190,6 +219,7 @@ jobs:
           test -z "$(git status --porcelain --untracked-files=no)"
 
       - name: Upload immutable release bundle
+        id: bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-${{ steps.release.outputs.release_id }}
@@ -213,6 +243,10 @@ jobs:
   runtime-behavior:
     name: ${{ matrix.id }} - packaged release behavior
     needs: build
+    concurrency:
+      group: release-runtime-${{ needs.build.outputs.preparation_slot }}-${{ matrix.loader == 'fabric' && 'fabric' || 'fml' }}
+      queue: max
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     strategy:
@@ -239,6 +273,10 @@ jobs:
 
   stage-github-release:
     name: Stage exact GitHub Release assets
+    concurrency:
+      group: release-publish
+      queue: max
+      cancel-in-progress: false
     needs:
       - build
       - runtime-behavior
@@ -248,6 +286,7 @@ jobs:
     environment: release
     permissions:
       contents: write
+      actions: read
 
     steps:
       - name: Check out exact release source and tag
@@ -284,18 +323,30 @@ jobs:
           --commit "$GITHUB_SHA"
           --title "Quick Skin ${{ needs.build.outputs.release_id }}"
 
+      - name: Persist resumable publication identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/release/publication_state.py register
+          --tag "${{ needs.build.outputs.tag }}"
+          --artifact-id "${{ needs.build.outputs.bundle_id }}"
+
   publish-marketplace:
     name: Publish ${{ matrix.artifact_node }} to ${{ matrix.marketplace }}
+    concurrency:
+      group: release-publish
+      queue: max
+      cancel-in-progress: false
     needs:
       - build
       - runtime-behavior
       - stage-github-release
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     environment: release
     permissions:
-      contents: read
+      contents: write
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -324,16 +375,17 @@ jobs:
           RELEASE_TARGET: ${{ needs.build.outputs.target }}
         run: python scripts/release/verify_release.py --target "$RELEASE_TARGET" --verify-staged
 
-      - name: Reconcile existing marketplace publication by identity and hash
+      - name: Reconcile and persist upload intent before any marketplace write
         id: reconcile
         env:
+          GH_TOKEN: ${{ github.token }}
           MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' && secrets.MODRINTH_TOKEN || '' }}
         run: >-
-          python scripts/release/reconcile_publication.py
-          --artifact-node "${{ matrix.artifact_node }}"
-          --marketplace "${{ matrix.marketplace }}"
-          --publication-id "${{ matrix.publication_id }}"
+          python scripts/release/publication_state.py begin
+          --tag "${{ needs.build.outputs.tag }}"
+          --row "${{ matrix.id }}"
           --github-output "$GITHUB_OUTPUT"
+          --record "build/publication/${{ matrix.id }}.json"
 
       - name: Publish exact verified artifact to Modrinth
         if: ${{ matrix.marketplace == 'modrinth' && steps.reconcile.outputs.publish == 'true' }}
@@ -379,17 +431,15 @@ jobs:
           retry-delay: 10000
           fail-mode: fail
 
-      - name: Verify marketplace ID and exact bytes after publication
+      - name: Persist accepted upload and check visibility once
+        if: ${{ steps.reconcile.outputs.publish == 'true' }}
         env:
+          GH_TOKEN: ${{ github.token }}
           MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' && secrets.MODRINTH_TOKEN || '' }}
         run: >-
-          python scripts/release/reconcile_publication.py
-          --artifact-node "${{ matrix.artifact_node }}"
-          --marketplace "${{ matrix.marketplace }}"
-          --publication-id "${{ matrix.publication_id }}"
-          --attempts "${{ matrix.marketplace == 'curseforge' && 40 || 6 }}"
-          --delay-seconds "${{ matrix.marketplace == 'curseforge' && 20 || 10 }}"
-          --verify
+          python scripts/release/publication_state.py accept
+          --tag "${{ needs.build.outputs.tag }}"
+          --row "${{ matrix.id }}"
           --record "build/publication/${{ matrix.id }}.json"
 
       - name: Upload publication receipt
@@ -402,6 +452,10 @@ jobs:
 
   publish-github-release:
     name: Publish immutable GitHub Release
+    concurrency:
+      group: release-publish
+      queue: max
+      cancel-in-progress: false
     needs:
       - build
       - stage-github-release
@@ -438,7 +492,17 @@ jobs:
           RELEASE_TARGET: ${{ needs.build.outputs.target }}
         run: python scripts/release/verify_release.py --target "$RELEASE_TARGET" --verify-staged
 
+      - name: Check whether every marketplace file is now approved
+        id: settled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/release/publication_state.py check
+          --tag "${{ needs.build.outputs.tag }}"
+          --github-output "$GITHUB_OUTPUT"
+
       - name: Publish the fully reconciled GitHub Release
+        if: ${{ steps.settled.outputs.ready == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
