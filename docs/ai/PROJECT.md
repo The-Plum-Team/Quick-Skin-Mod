@@ -225,8 +225,9 @@ into those branches. Their source matrices and existing evidence remain intact d
   status, known limit type, and utilization
   band rather than provider text or exact account usage. Unpaired anchor cache entries also bind
   the full content-addressed canonical PNG and never cross a lane label. It keeps provider output private and uploads only the
-  protected normalized report or a sanitized retry marker, and deletes a settled queue entry by
-  exact artifact id. If an authenticated capsule disappears between the final guard and its
+  protected normalized report or a sanitized retry marker. Completed and already-reviewed inputs
+  retain their seven-day recovery window across late owner cancellation; only missing or terminally
+  invalid inputs enter exact-ID cleanup. If an authenticated capsule disappears between the final guard and its
   download, that exact wake settles without starting a model; every other download or validation
   failure remains visible. Build and
   Packaged E2E remain the required exact-head checks for every individual port, and their
@@ -322,8 +323,11 @@ into those branches. Their source matrices and existing evidence remain intact d
   Ordinary raw packaged-E2E
   proof retains its one-day window because a concurrent branch attestation may still consume it;
   an automatic synchronization source retains seven days for the post-semantic compatibility wave.
-  A completed or terminally invalid AI queue entry is deleted immediately, while a transiently
-  failed entry remains bounded for retry. A
+  Completed and already-reviewed AI queue entries retain seven days so late publication-tail
+  cancellation can recover them; authenticated reports suppress duplicate review while available.
+  Terminally invalid entries retain exact-ID cleanup, while transient failures remain for retry.
+  Retention is bounded per input, not by an aggregate storage cap; the pipeline document quantifies
+  its storage and scheduled owner-read tradeoff. A
   protected schedule also deletes by exact cache ID Actions caches scoped to branch
   refs that no longer exist. On live branches it recognizes only SHA-bearing `setup-gradle` home
   keys, preserves the newest restorable generation per OS/job/cache-version family that has a

@@ -93,6 +93,37 @@ queue admission before recovery executes. Recovery itself requires no inference;
 does not bypass the shared capacity scheduler or claim immediate dispatch during an
 open circuit.
 
+Freshly completed inputs and inputs skipped as already reviewed remain until their
+existing seven-day expiry. The cleanup job succeeds without any API call for either
+case, preserving release-tail dependencies. A fresh owner can still be cancelled after
+cleanup, and an already-reviewed report can belong to another still-running drain;
+neither is proof that the recovery input can be deleted. Missing and terminally invalid
+inputs retain their existing exact-ID cleanup. Canonical certificate admission still
+rejects cancelled report owners; it has not been relaxed to compensate for lost inputs.
+
+Both generic and exact queue selectors suppress retained inputs while their authenticated
+reports have successful, failed or in-progress owners, and reopen them after cancellation.
+Fresh reports start their own seven-day retention after their reviewed input's upload,
+so those markers outlive their inputs and suppress another review. An already-reviewed
+input from a later recuration can instead outlive the other owner's older report; if that
+marker expires first, the remaining bounded input window can admit review again. There
+is no new scheduled cleanup dispatch, and suppression while a marker exists is not a
+claim of zero future inference after marker expiry.
+Expiry, not a guaranteed later wake, is normal retirement for completed inputs.
+
+This durability has an explicit storage/API cost. Admission allows at most 512 MiB per
+input: one 16-target generation can retain up to 8 GiB for seven days (up to 56 GiB with
+one such generation daily), excluding reports, caches and one-day prepared wrappers.
+This is a per-input/per-wave bound, not a repository-wide aggregate storage cap. The
+16-target queue regression observes 17 unique owner lookups per settled generic sweep
+(16 report owners plus one shared curator); the real client memoizes those owner GETs.
+At the existing 48 daily sweeps, a still-current retained generation therefore adds
+816 owner GETs/day versus an empty input queue, plus any additional artifact-list pages.
+Historical non-current generations do not trigger those owner reads. Each fresh completion
+avoids its previous cleanup metadata GET and DELETE, but that does not establish net API
+or storage savings. Retention itself adds no runner, dispatch or polling loop; the possible
+older-marker expiry retry above must not be counted as guaranteed zero added inference.
+
 ## Offline replay, overhead and live acceptance
 
 `HistoricalStageReplayTest` checks every matrix target and all reference counters. Its
@@ -165,3 +196,7 @@ regression proves that an earlier key A remains reusable after the replacement A
 is committed and the writer is cancelled, fails or times out; recovering current report
 B alone would not preserve A. Failed validation/build/upload, changed metadata and an
 artifact outside the exact upload interval cannot authorize that replacement.
+The actual cleanup shell also proves successful zero-API retention after fresh review
+and after an in-progress other-owner report, while exact-ID invalid/missing cleanup
+continues and mismatched metadata cannot authorize deletion. A late-cancellation replay
+executes cleanup before recovering the original capsule without provider access.

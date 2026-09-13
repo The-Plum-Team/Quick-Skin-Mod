@@ -7,6 +7,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -181,6 +182,15 @@ class CompletedReviewRecoveryTest(unittest.TestCase):
         self.api.metadata.update(size_in_bytes=len(self.api.raw), digest="sha256:" + hashlib.sha256(self.api.raw).hexdigest())
 
     def test_cancellation_during_cache_publication_recovers_without_provider(self):
+        # Execute the real later cleanup first: its successful no-op must preserve the input
+        # even if the owner is cancelled after leaving the model/cache job and cleanup itself.
+        cleanup = step_script("visual-review-drain.yml", "cleanup",
+                              "Reauthenticate and delete only the selected queue artifact")
+        completed = subprocess.run(["bash", "-c", "gh() { exit 97; }\n" + cleanup],
+            cwd=self.capsule, env={"PATH": os.defpath, "FRESH_REVIEW_COMPLETE": "true"},
+            capture_output=True, text=True, timeout=10)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertTrue((self.capsule / "curation-proof.json").is_file())
         self.assertTrue(self.recover())
         result = json.loads((self.capsule / "visual-review-report.staged.json").read_text())
         cache = merge_cache(None, self.manifest, result, policy_sha256=POLICY, review_mode="reference-comparison")
@@ -317,6 +327,81 @@ class CompletedReviewRecoveryTest(unittest.TestCase):
         malformed["entries"][0]["key"] = "f" * 64
         with self.assertRaises(ValueError):
             validate_cache(malformed, POLICY)
+
+
+class CompletedInputRetentionTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.folder = Path(self.temporary.name)
+        self.script = step_script("visual-review-drain.yml", "cleanup",
+                                  "Reauthenticate and delete only the selected queue artifact")
+        self.metadata = {"id": 77, "name": f"visual-review-input-55-{SHA}--mc1.20.1",
+                         "digest": "sha256:" + "b" * 64, "expired": False,
+                         "workflow_run": {"id": 88}}
+
+    def cleanup(self, *, fresh="false", reviewed="false", missing=False):
+        jq = shutil.which("jq")
+        self.assertIsNotNone(jq)
+        requests = self.folder / "requests"
+        requests.write_text("")
+        # Intercept every gh invocation, including DELETE; no request can escape this shell.
+        mock = '''gh() {
+          printf '%s\\n' "$*" >> "$REQUESTS"
+          if [[ "$*" == "api repos/example/quick-skin/actions/artifacts/77" ]]; then
+            if [[ "$MISSING" == true ]]; then printf '(HTTP 404)\\n' >&2; return 1; fi
+            printf '%s\\n' "$METADATA"
+          elif [[ "$*" == "api --method DELETE repos/example/quick-skin/actions/artifacts/77" ]]; then
+            return 0
+          else return 98; fi
+        }
+'''
+        result = subprocess.run(["bash", "-c", mock + self.script], cwd=self.folder,
+            env={"PATH": os.pathsep.join((str(Path(jq).parent), os.defpath)),
+                 "RUNNER_TEMP": str(self.folder), "GITHUB_REPOSITORY": "example/quick-skin",
+                 "ARTIFACT_ID": "77", "ARTIFACT_RUN_ID": "88", "ARTIFACT_DIGEST": "b" * 64,
+                 "ARTIFACT_NAME": f"visual-review-input-55-{SHA}--mc1.20.1",
+                 "FRESH_REVIEW_COMPLETE": fresh, "ALREADY_REVIEWED": reviewed,
+                 "REQUESTS": str(requests), "METADATA": json.dumps(self.metadata),
+                 "MISSING": str(missing).lower()},
+            capture_output=True, text=True, timeout=10)
+        return result, requests.read_text().splitlines()
+
+    def test_fresh_or_other_owner_completion_retains_input_with_success_and_zero_api_calls(self):
+        # already_reviewed includes another in-progress owner: neither flag may delete an input.
+        for fresh, reviewed in (("true", "false"), ("false", "true"), ("true", "true")):
+            with self.subTest(fresh=fresh, reviewed=reviewed):
+                result, calls = self.cleanup(fresh=fresh, reviewed=reviewed)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual([], calls)
+        job = job_block("visual-review-drain.yml", "cleanup")
+        self.assertIn("ALREADY_REVIEWED: ${{ needs.review.outputs.already_reviewed }}", job)
+        self.assertIn("FRESH_REVIEW_COMPLETE: ${{ needs.review.outputs.review_complete }}", job)
+        self.assertIn("needs.review.outputs.review_complete == 'true'", job)
+        self.assertIn("needs.review.outputs.already_reviewed == 'true'", job)
+        self.assertIn("needs.cleanup.result == 'success'",
+                      job_block("visual-review-drain.yml", "release-mod-compatibility"))
+
+    def test_terminal_invalid_and_missing_cleanup_keep_exact_identity_behavior(self):
+        result, calls = self.cleanup()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(["api repos/example/quick-skin/actions/artifacts/77",
+                          "api --method DELETE repos/example/quick-skin/actions/artifacts/77"], calls)
+        result, calls = self.cleanup(missing=True)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(["api repos/example/quick-skin/actions/artifacts/77"], calls)
+
+    def test_terminal_invalid_cleanup_never_deletes_changed_immutable_identity(self):
+        for key, value in (("id", 78), ("name", "visual-review-input-999"),
+                           ("digest", "sha256:" + "c" * 64), ("expired", True),
+                           ("workflow_run", {"id": 89})):
+            with self.subTest(key=key):
+                original = copy.deepcopy(self.metadata)
+                self.metadata[key] = value
+                result, calls = self.cleanup()
+                self.assertNotEqual(0, result.returncode)
+                self.assertEqual(["api repos/example/quick-skin/actions/artifacts/77"], calls)
+                self.metadata = original
 
 
 def replay_reference(rows, *, handoff_seconds=0, slots=2):

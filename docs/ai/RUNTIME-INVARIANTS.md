@@ -408,7 +408,7 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   size-limit violations. Protected rendering must decode and recompute screenshot/comparison pixel
   metrics before publishing. Presentation code must use escaped/text DOM APIs and local assets.
 - Secret-bearing visual review has the fixed boundary `authenticate -> curate without secrets ->
-  durable queue -> artifact-scoped review in a fresh capsule -> exact-id cleanup`. Curating
+  durable queue -> artifact-scoped review in a fresh capsule -> retention-safe cleanup`. Curating
   must authenticate every source artifact by numeric id, size, digest, run, protected matrix row,
   complete scenario product, and one JAR;
   it must import the authenticated source commit only as inert Git objects and never check out or
@@ -451,7 +451,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   differ only when all of that reusable identity is exact. It revalidates the
   capsule after the model exits, publishes only a bounded normalized report or sanitized attempt
   marker, never uploads raw provider text, and
-  deletes only a completed or terminally invalid queue artifact. A transient failure retains the
+  retains completed and already-reviewed queue artifacts through their seven-day expiry. The
+  cleanup job must succeed without deletion for both branches: its own or another in-progress
+  report owner can still cancel during later tails, requiring the original input for recovery.
+  Only missing/terminally invalid inputs enter exact-ID cleanup. A transient failure retains the
   entry for cooldown and retry. Each exact artifact ID locks its complete protected drain, from
   exact selection through cleanup, so duplicate wakes cannot overlap. The model/cache job admits
   one ordinary capsule globally at a time, with at most 32 concurrent calls and up to 100 pending
@@ -471,9 +474,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   other download or validation failure remains visible. Once a normalized report or durable block
   makes a source ineligible, an explicit
   GitHub installation-rate-limit response may defer input cleanup without turning the completed
-  review red. The normalized report or block must outlive its
-  durable input so deferred cleanup can never make reviewed work eligible again; artifact retention
-  and the scheduled sweep own eventual housekeeping/recovery, while every other API error remains visible. A separately locked
+  review red. A newly normalized report or block must outlive the input it reviewed so deferred
+  cleanup cannot make that work eligible again. A later recuration skipped for another owner's
+  older report can outlive that marker and become eligible again within its remaining bounded
+  input lifetime; never treat marker expiry as proof of completed review. Artifact retention
+  owns completed-input retirement and scheduled sweeps own recovery, while every other API error remains visible. A separately locked
   scheduled/manual sweep never reviews directly: it converts
   one authenticated oldest-entry selection into an exact wake. Pending-run coalescing remains safe
   because queue state is durable and curator/capacity wakes plus scheduled sweeps admit pending work.

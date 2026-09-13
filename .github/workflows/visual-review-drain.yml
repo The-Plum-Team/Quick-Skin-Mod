@@ -16,7 +16,7 @@ permissions: {}
 # Deduplicate wakes for one immutable artifact without serializing unrelated capsules. Generic
 # sweeps share their own lock and never review directly, so they cannot race an exact wake after
 # selecting the oldest fallback entry. GitHub may coalesce duplicate wakes because queue state is
-# durable and exact-id cleanup, rather than any pending workflow run, owns completion.
+# durable and authenticated reports, rather than any pending workflow run, own completion.
 concurrency:
   group: quick-skin-visual-review-${{ github.event.client_payload.artifact_id || 'queue-sweep' }}
   cancel-in-progress: false
@@ -1757,8 +1757,8 @@ jobs:
             ${{ runner.temp }}/visual-review-capsule/visual-review-report.json
             ${{ runner.temp }}/visual-review-capsule/visual-review-completion.json
           if-no-files-found: error
-          # Match the durable input's recovery window. If GitHub rate-limits the exact cleanup,
-          # this authenticated marker must outlive that input so it can never become eligible again.
+          # The authenticated marker must outlive the fresh input reviewed here: start its seven-day
+          # window after that input's upload. A different, later recuration can have a newer input.
           retention-days: 7
 
       - name: Publish the protected exact-policy verdict cache
@@ -2189,9 +2189,22 @@ jobs:
           ARTIFACT_ID: ${{ needs.select.outputs.artifact_id }}
           ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
           ARTIFACT_RUN_ID: ${{ needs.select.outputs.artifact_run_id }}
+          ALREADY_REVIEWED: ${{ needs.review.outputs.already_reviewed }}
+          FRESH_REVIEW_COMPLETE: ${{ needs.review.outputs.review_complete }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # This workflow can still be cancelled during its later release/request jobs. Its
+          # report then has a cancelled owner and must be recovered through the original input.
+          # An already-reviewed report can also belong to another still-running drain. Neither
+          # branch proves terminal publication. Keep this job successful for release dependencies,
+          # but retain both inputs until their existing seven-day expiry. Queue selection suppresses
+          # authenticated reports without retiring their inputs; cancelled owners reopen recovery.
+          if [[ "${FRESH_REVIEW_COMPLETE:-false}" == true ||
+                "${ALREADY_REVIEWED:-false}" == true ]]; then
+            printf 'Retaining the completed capsule across publication-tail cancellation.\n'
+            exit 0
+          fi
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$ARTIFACT_NAME" =~ \
             ^visual-review-input-[1-9][0-9]*(-[0-9a-f]{40}(--mc[0-9]+([.][0-9]+)+)?)?$ ]]

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 import urllib.error
+from dataclasses import replace
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -130,6 +132,44 @@ class FakeApi:
 
 
 class VisualReviewQueueTest(unittest.TestCase):
+    def test_newer_already_reviewed_input_can_reopen_only_during_older_marker_expiry_window(self) -> None:
+        newer_input = artifact(1, f"visual-review-input-55-{SHA}--mc1.21.1",
+                               run_id=10, minutes_ago=10)
+        older_report = artifact(2, "visual-review-55--mc1.21.1", run_id=20, minutes_ago=20)
+        api = FakeApi([newer_input, older_report],
+                      {10: owner(10, PREPARE_WORKFLOW), 20: owner(20, DRAIN_WORKFLOW)})
+        self.assertEqual([], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+        api.artifacts = [newer_input, replace(older_report, expired=True)]
+        self.assertEqual([(newer_input, 55)], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+        api.artifacts = [replace(newer_input, expired=True), replace(older_report, expired=True)]
+        self.assertEqual([], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+
+    def test_retained_full_wave_is_suppressed_until_cancelled_owner_reopens_recovery(self) -> None:
+        rows = json.loads((Path(__file__).parent / "fixtures/visual-review-stage-reference.json").read_text())["rows"]
+        inputs = [artifact(index + 1, f"visual-review-input-55-{SHA}--{row['bundle']}",
+                           run_id=10, minutes_ago=20) for index, row in enumerate(rows)]
+        reports = [artifact(index + 101, f"visual-review-55--{row['bundle']}",
+                            run_id=index + 201, minutes_ago=10) for index, row in enumerate(rows)]
+        self.assertEqual(16, len(inputs))
+        for status, conclusion in (("completed", "success"), ("completed", "failure"),
+                                   ("in_progress", None), ("completed", "cancelled")):
+            with self.subTest(status=status, conclusion=conclusion):
+                runs = {10: owner(10, PREPARE_WORKFLOW)}
+                runs.update({item.run_id: owner(item.run_id, DRAIN_WORKFLOW,
+                                                status=status, conclusion=conclusion)
+                             for item in reports})
+                api = FakeApi(inputs + reports, runs)
+                with patch.object(api, "get_run", wraps=api.get_run) as get_run:
+                    pending = list_pending_candidates(api, repository=REPOSITORY, now=NOW)
+                    self.assertEqual(16 if conclusion == "cancelled" else 0, len(pending))
+                    # The production GitHubApi memoizes owners: one curator plus 16 reviewers.
+                    self.assertEqual(17, len({call.args[0] for call in get_run.call_args_list}))
+                with patch.object(api, "list_artifacts", side_effect=AssertionError("exact wake must not scan")):
+                    for item in inputs:
+                        selected = select_requested(api, repository=REPOSITORY,
+                                                    requested_artifact_id=item.artifact_id, now=NOW)
+                        self.assertEqual((item, 55) if conclusion == "cancelled" else None, selected)
+
     def test_history_unrelated_to_pending_targets_does_not_query_its_owners(self) -> None:
         pending = artifact(1, f"visual-review-input-55-{SHA}--mc1.21.8", run_id=10, minutes_ago=15)
         history = [artifact(100 + index, f"visual-review-{1000 + index}--mc1.21.8",

@@ -48,8 +48,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   code must independently extract every result and enforce exact count, labels, bounds, and
   coherence before it emits the only normalized report eligible for upload. Durable queue state
   must not depend on a pending workflow run: a sanitized marker may cool a failed entry, raw
-  provider text must never be uploaded, and a final `actions: write` job may delete only a
-  completed handoff reauthenticated by exact id. A repository-wide capacity circuit may serialize
+  provider text must never be uploaded. The final `actions: write` cleanup job must retain fresh
+  and already-reviewed inputs through seven-day expiry, succeeding without deletion so a later
+  cancelled report owner can recover the original capsule. Only missing/terminally invalid inputs
+  enter exact-ID cleanup; authenticated reports suppress completed-input redispatch. A repository-wide capacity circuit may serialize
   its tool-free preflight and marker publication independently from the model/cache job. The latter
   serializes ordinary capsules globally so subsequent targets reuse the latest verdicts, with
   at most 32 concurrent calls across ordinary reviewers. Two secretless preparation slots may

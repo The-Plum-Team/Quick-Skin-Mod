@@ -248,8 +248,13 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.assertIn('--verify-proof "$proof" --manifest "$manifest"', drain)
         self.assertLess(drain.index("python3 scripts/ci/feature_review.py"),
                         drain.index("test -n \"$CLAUDE_CODE_OAUTH_TOKEN\""))
-        self.assertIn('$proof.schema_version == 7 then ["feature_selection"]', drain)
-        self.assertIn('"$proof_schema" != 7 && "$proof_schema" != 8', drain)
+        prepare = job_block("visual-review-drain.yml", "prepare")
+        self.assertIn('$proof.schema_version == 7 then ["feature_selection"]', prepare)
+        self.assertIn('"$proof_schema" != 7 && "$proof_schema" != 8', prepare)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", prepare)
+        self.assertIn('--run-attempt "$GITHUB_RUN_ATTEMPT"', drain)
+        self.assertLess(drain.index("python3 scripts/ci/visual_review_preparation.py"),
+                        drain.index("python3 scripts/ci/feature_review.py"))
 
 
     def test_shared_generation_classifies_its_first_parent_diff_before_the_optional_mod_wave(self):

@@ -476,6 +476,11 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   Full recovery parses and bounds the complete artifact inventory, then authenticates only
   reports, attempts, blocks and certificates relevant to eligible current-generation capsules.
   Capsule age and an older producer commit cannot exclude otherwise eligible historical work.
+  Completed and already-reviewed inputs survive their own or another report owner's late
+  cancellation until seven-day expiry. Cleanup is a successful no-op for both branches; ordinary
+  report authentication suppresses redispatch, while cancelled owners reopen model-free recovery.
+  Only missing/terminally invalid inputs keep exact-ID cleanup. The pipeline document records
+  the additional retained storage and bounded owner reads per scheduled current-generation sweep.
 - `scripts/ci/visual_review_impact.py` is the narrow fail-closed cost and domain filter. PRs to
   `master` defer model work to their post-merge anchor; its `source-pr` scope protects direct
   release-branch PRs, where that automatic second stage is absent. `replicated-port` recognizes
