@@ -349,6 +349,14 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   scheduled runtime exists. A protected post-merge generation is complete only when its own diff
   is unproven or reaches the optional-mod coverage closure; releases and explicit complete-capture
   manual runs remain complete.
+  Within each secretless target invocation, complete row admission and manifest projection share
+  the same validated report/frame snapshot. Candidate curation still reopens the images and checks
+  their exact source and decoded-pixel identities; downstream capsule validation remains independent.
+  Two bounded CPU-only workers prepare ordered candidate PNG snapshots without writing output or
+  making API calls. The main thread owns reference processing, pixel/byte budgets and atomic
+  publication, and joins all workers on success, failure or cancellation. There are still only
+  three target runners and every wake retains the whole-producer completion boundary. Sanitized
+  stage wall/CPU times and logical API/archive counts are diagnostics, never admission evidence.
 - `scripts/ci/shared_compatibility.py` authenticates a clean complete schema-8 target review before
   optional-mod E2E. Each wave has its own target key, while source and target SHA both name current
   `master`. Its schema-2 plan is independently recomputed from the full matrix, scenario contract,

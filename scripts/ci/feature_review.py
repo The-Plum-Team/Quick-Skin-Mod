@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
+import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -22,14 +23,52 @@ import ci_reuse
 from bounded_zip import ExtractionLimits, extract_bounded_zip
 from check_visual_review import validate_input
 from selection import project_contract
-from visual_review import (DEFAULT_CATALOG, build_manifest, collect_evidence, curate_manifest,
-                           load_catalog, validate_expected_row)
+from visual_review import (DEFAULT_CATALOG, build_manifest_from_frames, collect_expected_row,
+                           curate_manifest, load_catalog)
 
 SELECTION_ARTIFACT = coverage.SELECTION_ARTIFACT_NAME
 MAX_SELECTION_ARCHIVE = 512 * 1024
 MAX_RAW_BYTES = 512 * 1024 * 1024
 MAX_RAW_ENTRIES = 768
 FEATURE_FIELDS = frozenset({"admission", "coverage"})
+
+
+class CurationProfile:
+    """Sanitized invocation-local work measurements, never admission or a reusable proof."""
+
+    def __init__(self) -> None:
+        self.stages: dict[str, dict[str, int | float]] = {}
+        self.counts = {"metadata_reads": 0, "archive_reads": 0, "archive_bytes": 0,
+                       "admitted_rows": 0, "admitted_frames": 0}
+
+    def measure(self, name: str, function: Any, *args: Any, **kwargs: Any) -> Any:
+        stage = self.stages.setdefault(name, {"calls": 0, "failures": 0, "wall_seconds": 0.0, "cpu_seconds": 0.0})
+        stage["calls"] += 1
+        wall, cpu = time.perf_counter(), time.process_time()
+        try:
+            return function(*args, **kwargs)
+        except BaseException:
+            stage["failures"] += 1
+            raise
+        finally:
+            stage["wall_seconds"] += time.perf_counter() - wall
+            stage["cpu_seconds"] += time.process_time() - cpu
+
+
+class ProfiledApi(publisher.Api):
+    def __init__(self, repository: str, profile: CurationProfile) -> None:
+        super().__init__(repository)
+        self.profile = profile
+
+    def json(self, endpoint: str) -> Any:
+        self.profile.counts["metadata_reads"] += 1
+        return super().json(endpoint)
+
+    def download(self, metadata: dict[str, Any], destination: Path, *,
+                 maximum: int = coverage.MAX_REPORT_ARCHIVE_BYTES) -> None:
+        self.profile.counts["archive_reads"] += 1
+        self.profile.measure("admission_archive_download", super().download, metadata, destination, maximum=maximum)
+        self.profile.counts["archive_bytes"] += metadata["size_in_bytes"]
 
 
 def _source_artifact(artifact: Any, *, name: str, source_sha: str, source_run_id: int,
@@ -90,22 +129,24 @@ def validate_selected_manifest(proof: dict[str, Any], manifest: Any, selected: A
 
 
 def _raw_artifact(api: publisher.Api, metadata: dict[str, Any], directory: Path, *,
-                  remaining_bytes: int, remaining_entries: int) -> tuple[Path, int, int]:
+                  remaining_bytes: int, remaining_entries: int,
+                  profile: CurationProfile) -> tuple[Path, int, int]:
     directory.mkdir()
-    raw = publisher._get(api.prefix + f"actions/artifacts/{metadata['id']}/zip",
-                         maximum=targets.MAX_ARTIFACT_BYTES)
+    profile.counts["archive_reads"] += 1
+    raw = profile.measure("runtime_download", publisher._get,
+        api.prefix + f"actions/artifacts/{metadata['id']}/zip", maximum=targets.MAX_ARTIFACT_BYTES)
     if len(raw) != metadata["size_in_bytes"] or "sha256:" + coverage.digest(raw) != metadata["digest"]:
         raise coverage.CoverageError("packaged selected evidence differs from its immutable artifact metadata")
     archive = directory / "runtime.zip"
     archive.write_bytes(raw)
+    profile.counts["archive_bytes"] += len(raw)
     extracted = directory / "contents"
-    result = extract_bounded_zip(archive, extracted, ExtractionLimits(archive_bytes=targets.MAX_ARTIFACT_BYTES,
+    result = profile.measure("runtime_extract", extract_bounded_zip, archive, extracted, ExtractionLimits(archive_bytes=targets.MAX_ARTIFACT_BYTES,
         entries=remaining_entries, total_bytes=remaining_bytes, file_bytes=targets.MAX_ARTIFACT_BYTES))
     return extracted, result["bytes"], result["entries"]
 
 
-def _reference_frames(root: Path, selected: Any, artifact_node: str) -> dict[str, dict[str, Any]]:
-    _lanes, frames, _comparisons = collect_evidence(root, load_catalog(DEFAULT_CATALOG, selection=selected))
+def _reference_frames(frames: list[dict[str, Any]], artifact_node: str) -> dict[str, dict[str, Any]]:
     references = {}
     for frame in frames:
         if frame["artifact_node"] != artifact_node or frame["capture_id"] in references:
@@ -201,9 +242,11 @@ def reference_record(artifact: dict[str, Any], *, node: str, source_sha: str,
 
 def curate(api: publisher.Api, *, repository: Path, source_sha: str, source_run_id: int,
            bundle_key: str, compatibility_impact: Any, output: Path, scratch: Path,
-           matrix_kind: str = "pr-anchors") -> dict[str, Any]:
+           matrix_kind: str = "pr-anchors", profile: CurationProfile | None = None) -> dict[str, Any]:
     """Download only the target and, for paired review, its same-run Fabric reference."""
-    source = authenticate_full(api, repository, source_sha=source_sha, source_run_id=source_run_id,
+    profile = profile if profile is not None else CurationProfile()
+    source = profile.measure("source_authentication", authenticate_full,
+                               api, repository, source_sha=source_sha, source_run_id=source_run_id,
                                matrix_kind=matrix_kind)
     inventory = source.artifacts
     admissions = [item for item in inventory if item["name"] == SELECTION_ARTIFACT]
@@ -214,7 +257,8 @@ def curate(api: publisher.Api, *, repository: Path, source_sha: str, source_run_
         paths = _selection_files(api, admissions[0], source_sha=source.execution["head_sha"],
             source_run_id=source.execution["id"], source_branch=source.execution["head_branch"],
             directory=scratch / "admission")
-        selected, authenticated = verify_selection(api, paths, source, repository=repository, directory=scratch / "baseline")
+        selected, authenticated = profile.measure("selection_authentication", verify_selection,
+            api, paths, source, repository=repository, directory=scratch / "baseline")
     coverage.validate_compatibility_impact(compatibility_impact)
     packaged = [item for item in inventory if item["name"].startswith("packaged-e2e-")]
     plan = plan_source(source, matrix_kind)
@@ -237,11 +281,12 @@ def curate(api: publisher.Api, *, repository: Path, source_sha: str, source_run_
     if (len(required) > targets.MAX_TARGET_ARTIFACTS
             or sum(item["size_in_bytes"] for item in required) > targets.MAX_TARGET_BYTES):
         raise coverage.CoverageError("selected target and reference exceed the aggregate artifact budget")
-    raw_roots = {}
+    admitted_frames = {}
+    profile_names = set()
     remaining_bytes, remaining_entries = MAX_RAW_BYTES, MAX_RAW_ENTRIES
     for item in required:
         root, size, entries = _raw_artifact(api, item, scratch / str(item["id"]),
-            remaining_bytes=remaining_bytes, remaining_entries=remaining_entries)
+            remaining_bytes=remaining_bytes, remaining_entries=remaining_entries, profile=profile)
         remaining_bytes -= size
         remaining_entries -= entries
         row = by_name[item["name"]]
@@ -254,26 +299,28 @@ def curate(api: publisher.Api, *, repository: Path, source_sha: str, source_run_
             row = {**row, "scenarios": ",".join(run.scenario for run in selected.runs)}
         elif any((root / name).exists() for name in ("selection.json", "coverage.json")):
             raise coverage.CoverageError("complete runtime lane carries partial feature coverage")
-        validate_expected_row(root, DEFAULT_CATALOG, row, selection=selected)
-        raw_roots[item["id"]] = root
-    combined = scratch / "target"
-    profiles = combined / "profiles"
-    profiles.mkdir(parents=True)
-    for item in target["artifact_inventory"]:
-        for profile in (raw_roots[item["id"]] / "profiles").iterdir():
-            if not profile.is_dir() or profile.is_symlink() or (profiles / profile.name).exists():
-                raise coverage.CoverageError("selected runtime profiles have duplicate or unsafe ownership")
-            shutil.move(str(profile), str(profiles / profile.name))
-    reference_frames = (_reference_frames(raw_roots[reference["id"]], selected, reference_node)
+        _summary, frames = profile.measure("row_validation", collect_expected_row,
+            root, DEFAULT_CATALOG, row, selection=selected)
+        profile.counts["admitted_rows"] += 1
+        profile.counts["admitted_frames"] += len(frames)
+        admitted_frames[item["id"]] = frames
+        if item in target["artifact_inventory"]:
+            for raw_profile in (root / "profiles").iterdir():
+                if not raw_profile.is_dir() or raw_profile.is_symlink() or raw_profile.name in profile_names:
+                    raise coverage.CoverageError("selected runtime profiles have duplicate or unsafe ownership")
+                profile_names.add(raw_profile.name)
+    reference_frames = (_reference_frames(admitted_frames[reference["id"]], reference_node)
                         if reference is not None else None)
-    manifest = build_manifest(combined, DEFAULT_CATALOG, include_all=True, combos=None,
-                              reference_frames=reference_frames, selection=selected)
+    frames = [frame for item in target["artifact_inventory"] for frame in admitted_frames[item["id"]]]
+    manifest = profile.measure("manifest_projection", build_manifest_from_frames,
+        frames, load_catalog(DEFAULT_CATALOG, selection=selected),
+        include_all=True, combos=None, reference_frames=reference_frames)
     review_root = output / "review-input"
     proof_path = output / "curation-proof.json"
     if review_root.exists() or proof_path.exists():
         raise coverage.CoverageError("selected curation output must be new")
-    manifest = curate_manifest(manifest, review_root)
-    validate_input(manifest, review_root, require_paired=paired)
+    manifest = profile.measure("canonical_image_curation", curate_manifest, manifest, review_root, workers=2)
+    profile.measure("capsule_validation", validate_input, manifest, review_root, require_paired=paired)
     images = list((review_root / "images").iterdir())
     image_bytes = sum(path.stat().st_size for path in images)
     manifest_path = review_root / "visual-review-manifest.json"
@@ -387,7 +434,8 @@ def main() -> int:
     elif args.output is None or args.compatibility_impact is None or args.manifest is not None:
         parser.error("selected curation requires an output root and protected compatibility impact")
     try:
-        api = publisher.Api(args.github_repository)
+        profile = CurationProfile()
+        api = ProfiledApi(args.github_repository, profile)
         if args.plan:
             source = authenticate_full(api, args.repository, source_sha=args.source_sha,
                 source_run_id=args.source_run_id, matrix_kind=args.matrix_kind)
@@ -414,8 +462,12 @@ def main() -> int:
                           "selection_sha256": selected.sha256 if selected is not None else ""}
             else:
                 impact, _digest = coverage._read(args.compatibility_impact)
-                proof = curate(api, compatibility_impact=impact, output=args.output,
-                                matrix_kind=args.matrix_kind, **arguments)
+                try:
+                    proof = curate(api, compatibility_impact=impact, output=args.output,
+                                    matrix_kind=args.matrix_kind, profile=profile, **arguments)
+                finally:
+                    print(json.dumps({"curation_profile": {"schema_version": 1,
+                        "stages": profile.stages, "counts": profile.counts}}, sort_keys=True), file=sys.stderr)
                 result = {"curated": True, "selected": proof["schema_version"] == 7,
                           "review_mode": proof["review_mode"], "generation_sha": proof["source_sha"],
                           "frame_count": proof["frame_count"]}

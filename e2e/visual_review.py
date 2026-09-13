@@ -18,6 +18,8 @@ import shutil
 import stat
 import sys
 import tempfile
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 
@@ -31,6 +33,7 @@ from evidence_target import DEFAULT_MATRIX, EvidenceTargetError, target_for_key 
 
 from visual_evidence import (
     DEFAULT_CATALOG,
+    Catalog,
     REPO,
     VisualEvidenceError,
     canonicalize_png_snapshot,
@@ -131,6 +134,29 @@ def build_manifest(
         raise VisualEvidenceError("selected review must include every admitted capture")
     catalog = load_catalog(catalog_path, **({"selection": selection} if selection is not None else {}))
     _, frames, _ = collect_evidence(e2e_root, catalog)
+    return build_manifest_from_frames(frames, catalog, include_all=include_all, combos=combos,
+                                      reference_frames=reference_frames)
+
+
+def build_manifest_from_frames(
+    frames: list[dict[str, object]],
+    catalog: Catalog,
+    *,
+    include_all: bool,
+    combos: set[tuple[str, str]] | None,
+    reference_frames: dict[str, dict[str, object]] | None = None,
+) -> list[dict[str, object]]:
+    """Project an invocation's already collected evidence; never load this snapshot from an artifact.
+
+    Row admission and manifest projection can consume the same complete report/image snapshot.
+    Curation still reopens every candidate and verifies its file/pixel identity, and downstream
+    admission independently authenticates the capsule. No snapshot survives this invocation.
+    """
+    if catalog.selection_sha256 is not None and not include_all:
+        raise VisualEvidenceError("selected review must include every admitted capture")
+    if len({frame["frame_id"] for frame in frames}) != len(frames):
+        raise VisualEvidenceError("visual manifest contains duplicate collected capture identities")
+    frames = sorted(frames, key=lambda item: (item["version"], item["loader"], item["capture_order"]))
     anchor_frames: dict[tuple[str, str], dict[str, object]] = {}
     for frame in frames:
         if (
@@ -623,6 +649,17 @@ def validate_expected_row(
 ) -> dict[str, object]:
     """Bind one artifact's complete evidence to one protected matrix row."""
 
+    return collect_expected_row(e2e_root, catalog_path, row, selection=selection)[0]
+
+
+def collect_expected_row(
+    e2e_root: Path,
+    catalog_path: Path,
+    row: object,
+    *, selection: SelectionPlan | None = None,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    """Validate one complete row and retain its admitted frames only in the calling invocation."""
+
     if not isinstance(row, dict):
         raise VisualEvidenceError("expected matrix row must be an object")
     row_id = row.get("id")
@@ -648,7 +685,7 @@ def validate_expected_row(
     catalog = load_catalog(catalog_path, **({"selection": selection} if selection is not None else {}))
     if selection is not None and scenarios != tuple(run.scenario for run in selection.runs):
         raise VisualEvidenceError("matrix row does not declare the exact admitted scenarios")
-    lanes, _frames, _comparisons = collect_evidence(e2e_root, catalog)
+    lanes, frames, _comparisons = collect_evidence(e2e_root, catalog)
     observed = {
         (
             lane["artifact_node"],
@@ -671,7 +708,7 @@ def validate_expected_row(
         raise VisualEvidenceError(
             f"artifact evidence uses multiple production JARs for matrix row {row_id}"
         )
-    return {
+    summary = {
         "schema_version": 2 if selection is not None else 1,
         "row_id": row_id,
         "artifact_node": artifact_node,
@@ -682,17 +719,45 @@ def validate_expected_row(
         "jar_sha256": next(iter(jar_digests)),
         **({"selection_sha256": selection.sha256} if selection is not None else {}),
     }
+    return summary, frames
+
+
+def _candidate_snapshots(manifest: list[dict[str, object]], executor: ThreadPoolExecutor | None):
+    """Keep at most two ordered CPU-only snapshots in flight; workers never publish files."""
+    def prepare(index):
+        source_value = manifest[index].get("path")
+        if not isinstance(source_value, str):
+            raise VisualEvidenceError(f"review frame {index} has no source path")
+        source = Path(source_value)
+        return source, canonicalize_png_snapshot(source)
+
+    if executor is None:
+        for index, item in enumerate(manifest):
+            source, snapshot = prepare(index)
+            yield index, item, source, snapshot
+        return
+    pending = deque(executor.submit(prepare, index) for index in range(min(2, len(manifest))))
+    for index, item in enumerate(manifest):
+        source, snapshot = pending.popleft().result()
+        yield index, item, source, snapshot
+        if index + 2 < len(manifest):
+            pending.append(executor.submit(prepare, index + 2))
 
 
 def curate_manifest(
-    manifest: list[dict[str, object]], output_root: Path
+    manifest: list[dict[str, object]], output_root: Path, *, workers: int = 1,
 ) -> list[dict[str, object]]:
     """Atomically retain only reviewed PNGs and rewrite paths for a fresh runner."""
 
+    if type(workers) is not int or workers not in {1, 2}:
+        raise VisualEvidenceError("image curation permits only one or two bounded CPU workers")
     if not manifest or len(manifest) > MAX_REVIEW_FRAMES:
         raise VisualEvidenceError(
             f"visual review frame count is outside 1..{MAX_REVIEW_FRAMES}"
         )
+    visits = sum(2 if item.get("reference_path") is not None else 1 for item in manifest)
+    if visits * REQUIRED_SCREENSHOT_SIZE[0] * REQUIRED_SCREENSHOT_SIZE[1] > MAX_REVIEW_IMAGE_PIXELS:
+        raise VisualEvidenceError("curated visual review exceeds its total pixel limit")
     destination = output_root.absolute()
     if not SAFE_DIRECTORY.fullmatch(destination.name):
         raise VisualEvidenceError("curated review output must have a portable directory name")
@@ -716,7 +781,9 @@ def curate_manifest(
     total_pixels = 0
     copied: dict[str, Path] = {}
     reference_snapshots: dict[str, tuple[tuple[int, int], str, bytes]] = {}
+    executor = None
     try:
+        executor = ThreadPoolExecutor(max_workers=workers) if workers > 1 else None
         images = staging / "images"
         images.mkdir(mode=0o700)
 
@@ -760,18 +827,14 @@ def curate_manifest(
                     "curated visual review exceeds its total pixel limit"
                 )
 
-        for index, item in enumerate(manifest):
-            source_value = item.get("path")
-            if not isinstance(source_value, str):
-                raise VisualEvidenceError(f"review frame {index} has no source path")
-            source = Path(source_value)
+        for index, item, source, snapshot in _candidate_snapshots(manifest, executor):
             (
                 dimensions,
                 source_digest,
                 pixel_digest,
                 digest,
                 payload,
-            ) = canonicalize_png_snapshot(source)
+            ) = snapshot
             expected_dimensions = (
                 item.get("_verified_width"),
                 item.get("_verified_height"),
@@ -864,11 +927,14 @@ def curate_manifest(
             os.fsync(handle.fileno())
         os.chmod(manifest_path, 0o644)
         os.replace(staging, destination)
-    except (OSError, VisualEvidenceError) as exc:
+    except BaseException as exc:
         shutil.rmtree(staging, ignore_errors=True)
-        if isinstance(exc, VisualEvidenceError):
-            raise
-        raise VisualEvidenceError(f"cannot curate visual review: {exc}") from exc
+        if isinstance(exc, OSError):
+            raise VisualEvidenceError(f"cannot curate visual review: {exc}") from exc
+        raise
+    finally:
+        if executor is not None:
+            executor.shutdown(wait=True, cancel_futures=True)
     return curated
 
 
