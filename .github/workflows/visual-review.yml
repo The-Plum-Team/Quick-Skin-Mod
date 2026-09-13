@@ -1270,7 +1270,7 @@ jobs:
           retention-days: 7
 
   request-drain:
-    name: Wake ${{ matrix.bundle_key }} visual review
+    name: Wake every available visual review
     needs:
       - authenticate
       - curate
@@ -1278,10 +1278,6 @@ jobs:
       always() &&
       needs.authenticate.outputs.eligible == 'true' &&
       (needs.curate.result == 'success' || needs.curate.result == 'failure')
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix: ${{ fromJSON(needs.authenticate.outputs.target_matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -1292,67 +1288,104 @@ jobs:
       - name: Request one protected queue drain
         shell: bash
         env:
-          BUNDLE_KEY: ${{ matrix.bundle_key }}
-          MINECRAFT_TARGET: ${{ matrix.minecraft_target }}
+          TARGET_MATRIX: ${{ needs.authenticate.outputs.target_matrix }}
           SOURCE_RUN_ID: ${{ needs.authenticate.outputs.source_run_id }}
           GENERATION_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Matrix job outputs are not a per-target inventory. Resolve this exact capsule from
-          # the current curator run, allowing completed siblings to wake when another target fails.
-          target_suffix=''
-          if [[ -n "$MINECRAFT_TARGET" ]]; then
-            target_suffix="--$BUNDLE_KEY"
-          fi
-          ARTIFACT_NAME="visual-review-input-$SOURCE_RUN_ID-$GENERATION_SHA$target_suffix"
+          [[ "$GITHUB_REF" == refs/heads/master ]] || exit 1
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 1
+          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ && "$GENERATION_SHA" == "$GITHUB_SHA" ]] || exit 1
+          targets="$(jq -ce '
+            select(type == "object" and (.include | type == "array" and length > 0 and length <= 64)) |
+            .include | select(all(.[]; type == "object" and
+              (.bundle_key | type == "string" and test("^[A-Za-z0-9._-]+$")) and
+              (.minecraft_target | type == "string" and
+                (. == "" or test("^[0-9]+([.][0-9]+)+$"))))) |
+            select(([.[].bundle_key] | unique | length) == length)
+          ' <<< "$TARGET_MATRIX")"
+          target_rows="$(jq -r '.[] | [.bundle_key, .minecraft_target] | @tsv' <<< "$targets")" || exit "$?"
+          # The matrix has settled. Read its shared immutable inventory once; an absent capsule
+          # from a failed sibling never prevents another target from receiving its exact wake.
           artifacts="$(gh api --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100")"
-          selected="$(jq -ce --arg name "$ARTIFACT_NAME" \
-            'select(type == "array" and length <= 10) |
-              [.[].artifacts[]] | select(length <= 1000) |
-              [.[] | select(.name == $name)]' <<< "$artifacts")"
-          if [[ "$(jq length <<< "$selected")" == 0 ]]; then
-            printf 'No capsule was produced for %s; its siblings remain independent.\n' "$BUNDLE_KEY"
-            exit 0
-          fi
-          ARTIFACT_ID="$(jq -er --arg sha "$GENERATION_SHA" --argjson run_id "$GITHUB_RUN_ID" \
-            'select(length == 1) | .[0] |
-              select(.expired == false and .workflow_run.id == $run_id and
-                .workflow_run.head_sha == $sha and .workflow_run.head_branch == "master" and
-                (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
-                (.size_in_bytes | type == "number" and . > 0 and . <= 536870912)) |
-              .id | select(type == "number" and . == floor and . > 0)' <<< "$selected")"
-          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA(--mc[0-9]+([.][0-9]+)+)?$ ]]
-          payload="$RUNNER_TEMP/visual-review-drain-request.json"
-          jq -n \
-            --arg artifact_id "$ARTIFACT_ID" \
-            --arg artifact_name "$ARTIFACT_NAME" \
-            --arg generation_sha "$GENERATION_SHA" \
-            '{event_type:"visual-review-drain-requested",
-              client_payload:{artifact_id:$artifact_id,artifact_name:$artifact_name,
-                generation_sha:$generation_sha}}' \
-            > "$payload"
-          dispatch_error="$RUNNER_TEMP/visual-review-drain-request.error"
-          for attempt in 1 2 3; do
-            : > "$dispatch_error"
-            if gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
-                --input "$payload" 2> "$dispatch_error"; then
-              exit 0
+          artifacts="$(jq -ce 'select(type == "array" and length > 0 and length <= 10) |
+            select(all(.[]; type == "object" and (.artifacts | type == "array" and length <= 100))) |
+            [.[].artifacts[]] | select(length <= 1000)' <<< "$artifacts")"
+          dispatched=0
+          missing=0
+          failed=0
+          deferred=0
+          dispatch_target() {
+            local BUNDLE_KEY="$1" MINECRAFT_TARGET="$2" target_suffix='' ARTIFACT_NAME
+            local selected ARTIFACT_ID payload dispatch_error attempt
+            if [[ -n "$MINECRAFT_TARGET" ]]; then
+              [[ "$BUNDLE_KEY" == "mc$MINECRAFT_TARGET" ]] || return 1
+              target_suffix="--$BUNDLE_KEY"
             fi
-            if grep -Fq 'API rate limit exceeded' "$dispatch_error"; then
-              # The source-bound capsule is already durable. The scheduled sweep will recover
-              # this wake after quota returns, so another primary request cannot improve safety.
-              echo "::warning::GitHub API quota exhausted; durable visual-review wake deferred"
-              exit 0
+            ARTIFACT_NAME="visual-review-input-$SOURCE_RUN_ID-$GENERATION_SHA$target_suffix"
+            selected="$(jq -ce --arg name "$ARTIFACT_NAME" \
+              '[.[] | select(.name == $name)]' <<< "$artifacts")" || return "$?"
+            if [[ "$(jq length <<< "$selected")" == 0 ]]; then
+              printf 'No capsule was produced for %s; its siblings remain independent.\n' "$BUNDLE_KEY"
+              missing=$((missing + 1))
+              return 0
             fi
-            if grep -Eq 'secondary rate limit|abuse detection|\(HTTP 429\)' \
-                "$dispatch_error" && (( attempt < 3 )); then
-              sleep $((attempt * 5))
+            ARTIFACT_ID="$(jq -er --arg sha "$GENERATION_SHA" --argjson run_id "$GITHUB_RUN_ID" \
+              'select(length == 1) | .[0] |
+                select(.expired == false and .workflow_run.id == $run_id and
+                  .workflow_run.head_sha == $sha and .workflow_run.head_branch == "master" and
+                  (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
+                  (.size_in_bytes | type == "number" and . > 0 and . <= 536870912)) |
+                .id | select(type == "number" and . == floor and . > 0)' <<< "$selected")" || return "$?"
+            [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || return 1
+            [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*-$GENERATION_SHA(--mc[0-9]+([.][0-9]+)+)?$ ]] || return 1
+            payload="$RUNNER_TEMP/visual-review-drain-request.json"
+            jq -n \
+              --arg artifact_id "$ARTIFACT_ID" \
+              --arg artifact_name "$ARTIFACT_NAME" \
+              --arg generation_sha "$GENERATION_SHA" \
+              '{event_type:"visual-review-drain-requested",
+                client_payload:{artifact_id:$artifact_id,artifact_name:$artifact_name,
+                  generation_sha:$generation_sha}}' \
+              > "$payload" || return "$?"
+            dispatch_error="$RUNNER_TEMP/visual-review-drain-request.error"
+            for attempt in 1 2 3; do
+              : > "$dispatch_error" || return "$?"
+              if gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+                  --input "$payload" 2> "$dispatch_error"; then
+                dispatched=$((dispatched + 1))
+                return 0
+              fi
+              if grep -Fq 'API rate limit exceeded' "$dispatch_error"; then
+                # The source-bound capsule is already durable. The scheduled sweep will recover
+                # this wake after quota returns, so another primary request cannot improve safety.
+                echo "::warning::GitHub API quota exhausted; durable visual-review wake deferred"
+                return 75
+              fi
+              if grep -Eq 'secondary rate limit|abuse detection|\(HTTP 429\)' \
+                  "$dispatch_error" && (( attempt < 3 )); then
+                sleep $((attempt * 5)) || return "$?"
+                continue
+              fi
+              printf '::error::GitHub visual-review dispatch failed; durable capsule retained.\n' >&2
+              return 1
+            done
+          }
+          while IFS=$'\t' read -r bundle_key minecraft_target; do
+            if dispatch_target "$bundle_key" "$minecraft_target"; then
               continue
+            else
+              status=$?
             fi
-            cat "$dispatch_error" >&2
-            exit 1
-          done
+            if [[ "$status" == 75 ]]; then
+              deferred=$(( $(jq length <<< "$targets") - dispatched - missing - failed ))
+              break
+            fi
+            printf '::error::Visual-review wake failed for %s; continuing with its siblings.\n' "$bundle_key"
+            failed=$((failed + 1))
+          done <<< "$target_rows"
+          printf 'Visual-review dispatch summary: inventory_queries=1 dispatched=%s missing=%s failed=%s deferred=%s\n' \
+            "$dispatched" "$missing" "$failed" "$deferred"
+          [[ "$failed" == 0 ]]
