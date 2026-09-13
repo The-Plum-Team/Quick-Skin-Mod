@@ -363,6 +363,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   admission and deployment. Selected components retain their separate baseline authentication,
   and historical direct-source bundles retain their collector gate. Private collected artifacts
   cannot substitute for successful final admission or become reusable public caches themselves.
+- Pages publication progress is advisory cost admission from exact current-head handoffs and one
+  successful atomic cache owner. Authenticate its complete exact-attempt job graph and each
+  artifact's upload window before suppressing fan-out. Admit initial ordinary, halfway and final
+  compatibility coverage, with a 45-minute partial eligibility deadline and a bounded hourly recovery
+  sweep. Final completeness adds no coalescing delay. Completed generations do not self-dispatch;
+  neither a cancelled owner nor stale/foreign evidence advances progress. Preserve the complete
+  collectors/runtime fan-in and actual successful-owner rotation. See
+  [Pages publication progress](../ci/PAGES-PUBLICATION-PROGRESS.md) for bounds and measured versus
+  simulated operation counts.
 - Published current state selects one durable Pages cache per matrix bundle key and exactly one
   lossless raw handoff for the matrix-derived Fabric 1.20.1 visual anchor. Select at most one durable
   mod-compatibility Pages cache for each key that has published evidence. Rotation retires duplicate
