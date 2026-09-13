@@ -151,6 +151,19 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 Use the smallest relevant check while iterating, then run the proportional aggregate gate before
 handoff. On Windows, use `gradlew.bat`; on Unix-like systems, use `./gradlew`.
 
+Before publishing an infrastructure repair or starting its expensive gate, use the
+[repair preflight](../ci/REPAIR-PREFLIGHT.md) to record the exact head/tree, reviewed scope,
+canonical impact, observed evidence identities, and any missing complete-recovery action. Its
+offline real-Git and archive-digest regressions do not replace the full required gates. Regenerate
+the plan after scope or head changes and retain which old proof is invalidated. An evidence
+observation still requires the canonical live verifier; routine non-impacting work must not add
+a full-validation marker merely because earlier optional evidence is unavailable.
+
+For long-running acceptance, use the [recoverable local observer](../ci/ACCEPTANCE-OBSERVER.md).
+One coordinator owns the bounded exact run/attempt/SHA inventory and persists its last successful
+snapshot; other observers read local status. Read errors and a stale heartbeat must remain visible,
+and restarting observation must not dispatch new work or grant merge/publication authority.
+
 Fast stable unit lane:
 
 ```powershell
@@ -220,8 +233,11 @@ explicitly partial build. A successful build report does not replace artifact st
 GitHub's reusable `build-matrix.yml` derives all target jobs from that same validated plan and
 allows eight isolated runners. `assemble_build.py` independently reverifies every target manifest,
 commit, matrix, production/harness hash and SBOM before constructing the complete bundle.
-Repository-policy tests run alongside compilation; both must pass the stable `Build and verify`
-gate. A PR's Packaged E2E waits for that exact source Build and downloads its immutable artifact
+Repository validation and the complete release-policy and CI-policy suites run alongside compilation.
+Each suite has its own hosted runner, checkout of the same tested SHA, temporary files, discovered
+test-count summary, and retained diagnostics. All three policy jobs and compilation must pass the
+stable `Build and verify` gate; only independently authenticated protected reuse permits their
+explicit skips. A PR's Packaged E2E waits for that exact source Build and downloads its immutable artifact
 by ID, then reverifies it against the tested merge commit. It never starts a second PR compilation.
 Standalone runs without an available bundle use the same complete isolated compiler. Runtime
 coverage uses up to sixteen isolated runners and retains every required target/loader job.
