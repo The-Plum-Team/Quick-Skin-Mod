@@ -69,7 +69,9 @@ SAFE_EXACT_PATHS = frozenset(
         "scripts/ci/version_port_failure_policy.py",
         "scripts/ci/visual_anchor_certification.py",
         "scripts/ci/visual_nonimpact_certification.py",
+        "scripts/ci/visual_review_completed.py",
         "scripts/ci/visual_review_impact.py",
+        "scripts/ci/visual_review_preparation.py",
         "scripts/ci/visual_review_queue.py",
     }
 )

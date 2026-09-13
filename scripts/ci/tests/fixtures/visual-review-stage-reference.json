@@ -1,0 +1,920 @@
+{
+  "schema_version": 1,
+  "source_generation": "ec802e0f0d022b16620460d87001dd9fcecb6267",
+  "timing_kind": "GitHub exact-attempt job and step metadata",
+  "counter_kind": "Protected numeric model-step log summaries; no provider payloads",
+  "rows": [
+    {
+      "bundle": "mc1.20.1",
+      "run_id": 34320767353,
+      "created_at": "2026-09-09T06:48:40Z",
+      "run_attempt": 1,
+      "job_id": 102366741882,
+      "started_at": "2026-09-09T07:06:37Z",
+      "completed_at": "2026-09-09T07:11:17Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:06:45Z",
+          "completed_at": "2026-09-09T07:07:02Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:07:02Z",
+          "completed_at": "2026-09-09T07:07:02Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:07:06Z",
+          "completed_at": "2026-09-09T07:11:07Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:11:07Z",
+          "completed_at": "2026-09-09T07:11:12Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:11:13Z",
+          "completed_at": "2026-09-09T07:11:14Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 0,
+        "identical": 0,
+        "cached": 0,
+        "represented": 0,
+        "triaged": 180,
+        "triage_chunks": 23,
+        "escalated": 10,
+        "verify_chunks": 3,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 1,
+        "total": 27,
+        "triage": 24,
+        "triage_chunks": 23,
+        "verify": 3,
+        "verify_chunks": 3
+      }
+    },
+    {
+      "bundle": "mc1.21.1",
+      "run_id": 34320767876,
+      "created_at": "2026-09-09T06:48:41Z",
+      "run_attempt": 1,
+      "job_id": 102366741047,
+      "started_at": "2026-09-09T07:00:56Z",
+      "completed_at": "2026-09-09T07:06:35Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:01:09Z",
+          "completed_at": "2026-09-09T07:01:37Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:01:37Z",
+          "completed_at": "2026-09-09T07:01:39Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:01:44Z",
+          "completed_at": "2026-09-09T07:06:20Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:06:20Z",
+          "completed_at": "2026-09-09T07:06:27Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:06:31Z",
+          "completed_at": "2026-09-09T07:06:32Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 2,
+        "represented": 29,
+        "triaged": 149,
+        "triage_chunks": 19,
+        "escalated": 3,
+        "verify_chunks": 1,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 20,
+        "triage": 19,
+        "triage_chunks": 19,
+        "verify": 1,
+        "verify_chunks": 1
+      }
+    },
+    {
+      "bundle": "mc1.21.10",
+      "run_id": 34320770565,
+      "created_at": "2026-09-09T06:48:43Z",
+      "run_attempt": 1,
+      "job_id": 102366760686,
+      "started_at": "2026-09-09T07:38:54Z",
+      "completed_at": "2026-09-09T07:43:35Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:39:09Z",
+          "completed_at": "2026-09-09T07:39:37Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:39:37Z",
+          "completed_at": "2026-09-09T07:39:39Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:39:46Z",
+          "completed_at": "2026-09-09T07:43:19Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:43:19Z",
+          "completed_at": "2026-09-09T07:43:28Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:43:30Z",
+          "completed_at": "2026-09-09T07:43:31Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 1,
+        "represented": 28,
+        "triaged": 151,
+        "triage_chunks": 19,
+        "escalated": 2,
+        "verify_chunks": 1,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 20,
+        "triage": 19,
+        "triage_chunks": 19,
+        "verify": 1,
+        "verify_chunks": 1
+      }
+    },
+    {
+      "bundle": "mc1.21.11",
+      "run_id": 34320770982,
+      "created_at": "2026-09-09T06:48:43Z",
+      "run_attempt": 1,
+      "job_id": 102366747335,
+      "started_at": "2026-09-09T07:23:14Z",
+      "completed_at": "2026-09-09T07:28:27Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:23:24Z",
+          "completed_at": "2026-09-09T07:23:49Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:23:49Z",
+          "completed_at": "2026-09-09T07:23:50Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:23:57Z",
+          "completed_at": "2026-09-09T07:28:15Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:28:15Z",
+          "completed_at": "2026-09-09T07:28:23Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:28:25Z",
+          "completed_at": "2026-09-09T07:28:26Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 0,
+        "represented": 26,
+        "triaged": 154,
+        "triage_chunks": 20,
+        "escalated": 2,
+        "verify_chunks": 1,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 21,
+        "triage": 20,
+        "triage_chunks": 20,
+        "verify": 1,
+        "verify_chunks": 1
+      }
+    },
+    {
+      "bundle": "mc1.21.2",
+      "run_id": 34320767831,
+      "created_at": "2026-09-09T06:48:41Z",
+      "run_attempt": 1,
+      "job_id": 102366728179,
+      "started_at": "2026-09-09T06:55:46Z",
+      "completed_at": "2026-09-09T07:00:53Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T06:55:54Z",
+          "completed_at": "2026-09-09T06:56:17Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T06:56:17Z",
+          "completed_at": "2026-09-09T06:56:18Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T06:56:21Z",
+          "completed_at": "2026-09-09T07:00:41Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:00:41Z",
+          "completed_at": "2026-09-09T07:00:48Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:00:50Z",
+          "completed_at": "2026-09-09T07:00:51Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 64,
+        "represented": 3,
+        "triaged": 113,
+        "triage_chunks": 15,
+        "escalated": 4,
+        "verify_chunks": 1,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 16,
+        "triage": 15,
+        "triage_chunks": 15,
+        "verify": 1,
+        "verify_chunks": 1
+      }
+    },
+    {
+      "bundle": "mc1.21.3",
+      "run_id": 34320768507,
+      "created_at": "2026-09-09T06:48:41Z",
+      "run_attempt": 1,
+      "job_id": 102366755447,
+      "started_at": "2026-09-09T07:33:14Z",
+      "completed_at": "2026-09-09T07:38:52Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:33:29Z",
+          "completed_at": "2026-09-09T07:34:01Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:34:01Z",
+          "completed_at": "2026-09-09T07:34:03Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:34:10Z",
+          "completed_at": "2026-09-09T07:38:34Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:38:34Z",
+          "completed_at": "2026-09-09T07:38:43Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:38:46Z",
+          "completed_at": "2026-09-09T07:38:48Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 58,
+        "represented": 9,
+        "triaged": 113,
+        "triage_chunks": 15,
+        "escalated": 7,
+        "verify_chunks": 2,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 17,
+        "triage": 15,
+        "triage_chunks": 15,
+        "verify": 2,
+        "verify_chunks": 2
+      }
+    },
+    {
+      "bundle": "mc1.21.4",
+      "run_id": 34320768413,
+      "created_at": "2026-09-09T06:48:41Z",
+      "run_attempt": 1,
+      "job_id": 102366773592,
+      "started_at": "2026-09-09T07:59:11Z",
+      "completed_at": "2026-09-09T08:04:14Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:59:22Z",
+          "completed_at": "2026-09-09T07:59:52Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:59:52Z",
+          "completed_at": "2026-09-09T07:59:54Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:59:58Z",
+          "completed_at": "2026-09-09T08:03:57Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T08:03:57Z",
+          "completed_at": "2026-09-09T08:04:07Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T08:04:09Z",
+          "completed_at": "2026-09-09T08:04:11Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 73,
+        "represented": 1,
+        "triaged": 106,
+        "triage_chunks": 14,
+        "escalated": 4,
+        "verify_chunks": 1,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 15,
+        "triage": 14,
+        "triage_chunks": 14,
+        "verify": 1,
+        "verify_chunks": 1
+      }
+    },
+    {
+      "bundle": "mc1.21.5",
+      "run_id": 34320769222,
+      "created_at": "2026-09-09T06:48:42Z",
+      "run_attempt": 1,
+      "job_id": 102366752345,
+      "started_at": "2026-09-09T07:28:29Z",
+      "completed_at": "2026-09-09T07:33:11Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:28:43Z",
+          "completed_at": "2026-09-09T07:29:12Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:29:12Z",
+          "completed_at": "2026-09-09T07:29:13Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:29:17Z",
+          "completed_at": "2026-09-09T07:32:56Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:32:56Z",
+          "completed_at": "2026-09-09T07:33:05Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:33:07Z",
+          "completed_at": "2026-09-09T07:33:08Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 22,
+        "represented": 22,
+        "triaged": 136,
+        "triage_chunks": 17,
+        "escalated": 1,
+        "verify_chunks": 1,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 18,
+        "triage": 17,
+        "triage_chunks": 17,
+        "verify": 1,
+        "verify_chunks": 1
+      }
+    },
+    {
+      "bundle": "mc1.21.6",
+      "run_id": 34320769843,
+      "created_at": "2026-09-09T06:48:42Z",
+      "run_attempt": 1,
+      "job_id": 102366775244,
+      "started_at": "2026-09-09T08:04:16Z",
+      "completed_at": "2026-09-09T08:07:34Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T08:04:26Z",
+          "completed_at": "2026-09-09T08:04:53Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T08:04:53Z",
+          "completed_at": "2026-09-09T08:04:55Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T08:04:59Z",
+          "completed_at": "2026-09-09T08:07:18Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T08:07:18Z",
+          "completed_at": "2026-09-09T08:07:25Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T08:07:27Z",
+          "completed_at": "2026-09-09T08:07:29Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 83,
+        "represented": 2,
+        "triaged": 95,
+        "triage_chunks": 12,
+        "escalated": 0,
+        "verify_chunks": 0,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 12,
+        "triage": 12,
+        "triage_chunks": 12,
+        "verify": 0,
+        "verify_chunks": 0
+      }
+    },
+    {
+      "bundle": "mc1.21.7",
+      "run_id": 34320769805,
+      "created_at": "2026-09-09T06:48:42Z",
+      "run_attempt": 1,
+      "job_id": 102366769211,
+      "started_at": "2026-09-09T07:43:37Z",
+      "completed_at": "2026-09-09T07:49:04Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:43:52Z",
+          "completed_at": "2026-09-09T07:44:18Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:44:18Z",
+          "completed_at": "2026-09-09T07:44:20Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:44:25Z",
+          "completed_at": "2026-09-09T07:48:49Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:48:49Z",
+          "completed_at": "2026-09-09T07:48:56Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:48:59Z",
+          "completed_at": "2026-09-09T07:49:00Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 30,
+        "represented": 20,
+        "triaged": 130,
+        "triage_chunks": 17,
+        "escalated": 4,
+        "verify_chunks": 1,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 18,
+        "triage": 17,
+        "triage_chunks": 17,
+        "verify": 1,
+        "verify_chunks": 1
+      }
+    },
+    {
+      "bundle": "mc1.21.8",
+      "run_id": 34320769736,
+      "created_at": "2026-09-09T06:48:42Z",
+      "run_attempt": 1,
+      "job_id": 102366771117,
+      "started_at": "2026-09-09T07:54:09Z",
+      "completed_at": "2026-09-09T07:59:08Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:54:19Z",
+          "completed_at": "2026-09-09T07:54:48Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:54:48Z",
+          "completed_at": "2026-09-09T07:54:49Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:54:53Z",
+          "completed_at": "2026-09-09T07:58:54Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:58:54Z",
+          "completed_at": "2026-09-09T07:59:04Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:59:06Z",
+          "completed_at": "2026-09-09T07:59:07Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 69,
+        "represented": 2,
+        "triaged": 109,
+        "triage_chunks": 14,
+        "escalated": 4,
+        "verify_chunks": 1,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 15,
+        "triage": 14,
+        "triage_chunks": 14,
+        "verify": 1,
+        "verify_chunks": 1
+      }
+    },
+    {
+      "bundle": "mc1.21.9",
+      "run_id": 34320769893,
+      "created_at": "2026-09-09T06:48:42Z",
+      "run_attempt": 1,
+      "job_id": 102366769860,
+      "started_at": "2026-09-09T07:49:06Z",
+      "completed_at": "2026-09-09T07:54:07Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:49:15Z",
+          "completed_at": "2026-09-09T07:49:43Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:49:43Z",
+          "completed_at": "2026-09-09T07:49:44Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:49:48Z",
+          "completed_at": "2026-09-09T07:53:52Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:53:52Z",
+          "completed_at": "2026-09-09T07:54:02Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:54:04Z",
+          "completed_at": "2026-09-09T07:54:05Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 70,
+        "represented": 1,
+        "triaged": 109,
+        "triage_chunks": 14,
+        "escalated": 4,
+        "verify_chunks": 1,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 15,
+        "triage": 14,
+        "triage_chunks": 14,
+        "verify": 1,
+        "verify_chunks": 1
+      }
+    },
+    {
+      "bundle": "mc26.1",
+      "run_id": 34320771430,
+      "created_at": "2026-09-09T06:48:43Z",
+      "run_attempt": 1,
+      "job_id": 102366743419,
+      "started_at": "2026-09-09T07:11:19Z",
+      "completed_at": "2026-09-09T07:18:05Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:11:28Z",
+          "completed_at": "2026-09-09T07:11:58Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:11:58Z",
+          "completed_at": "2026-09-09T07:11:58Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:12:02Z",
+          "completed_at": "2026-09-09T07:17:50Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:17:50Z",
+          "completed_at": "2026-09-09T07:18:00Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:18:02Z",
+          "completed_at": "2026-09-09T07:18:03Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 0,
+        "represented": 28,
+        "triaged": 152,
+        "triage_chunks": 19,
+        "escalated": 5,
+        "verify_chunks": 2,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 21,
+        "triage": 19,
+        "triage_chunks": 19,
+        "verify": 2,
+        "verify_chunks": 2
+      }
+    },
+    {
+      "bundle": "mc26.1.1",
+      "run_id": 34320617261,
+      "created_at": "2026-09-09T06:46:42Z",
+      "run_attempt": 1,
+      "job_id": 102366528469,
+      "started_at": "2026-09-09T06:48:11Z",
+      "completed_at": "2026-09-09T06:51:45Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T06:48:21Z",
+          "completed_at": "2026-09-09T06:48:50Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T06:48:50Z",
+          "completed_at": "2026-09-09T06:48:51Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T06:48:55Z",
+          "completed_at": "2026-09-09T06:51:30Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T06:51:30Z",
+          "completed_at": "2026-09-09T06:51:40Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T06:51:42Z",
+          "completed_at": "2026-09-09T06:51:43Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 67,
+        "represented": 1,
+        "triaged": 112,
+        "triage_chunks": 14,
+        "escalated": 0,
+        "verify_chunks": 0,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 14,
+        "triage": 14,
+        "triage_chunks": 14,
+        "verify": 0,
+        "verify_chunks": 0
+      }
+    },
+    {
+      "bundle": "mc26.1.2",
+      "run_id": 34320771473,
+      "created_at": "2026-09-09T06:48:43Z",
+      "run_attempt": 1,
+      "job_id": 102366747162,
+      "started_at": "2026-09-09T07:18:08Z",
+      "completed_at": "2026-09-09T07:23:12Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T07:18:20Z",
+          "completed_at": "2026-09-09T07:18:55Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T07:18:55Z",
+          "completed_at": "2026-09-09T07:18:56Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T07:19:01Z",
+          "completed_at": "2026-09-09T07:22:54Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T07:22:54Z",
+          "completed_at": "2026-09-09T07:23:04Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T07:23:07Z",
+          "completed_at": "2026-09-09T07:23:08Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 78,
+        "represented": 1,
+        "triaged": 101,
+        "triage_chunks": 13,
+        "escalated": 6,
+        "verify_chunks": 2,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 15,
+        "triage": 13,
+        "triage_chunks": 13,
+        "verify": 2,
+        "verify_chunks": 2
+      }
+    },
+    {
+      "bundle": "mc26.2",
+      "run_id": 34320671331,
+      "created_at": "2026-09-09T06:47:25Z",
+      "run_attempt": 1,
+      "job_id": 102366576748,
+      "started_at": "2026-09-09T06:51:47Z",
+      "completed_at": "2026-09-09T06:55:44Z",
+      "steps": [
+        {
+          "name": "Fetch and verify the exact curated capsule",
+          "started_at": "2026-09-09T06:51:58Z",
+          "completed_at": "2026-09-09T06:52:31Z"
+        },
+        {
+          "name": "Restore only the authenticated exact-policy verdict cache",
+          "started_at": "2026-09-09T06:52:31Z",
+          "completed_at": "2026-09-09T06:52:33Z"
+        },
+        {
+          "name": "Review bounded chunks with selective escalation",
+          "started_at": "2026-09-09T06:52:36Z",
+          "completed_at": "2026-09-09T06:55:25Z"
+        },
+        {
+          "name": "Independently validate the normalized result",
+          "started_at": "2026-09-09T06:55:25Z",
+          "completed_at": "2026-09-09T06:55:35Z"
+        },
+        {
+          "name": "Upload the source-bound normalized report",
+          "started_at": "2026-09-09T06:55:38Z",
+          "completed_at": "2026-09-09T06:55:39Z"
+        }
+      ],
+      "plan": {
+        "frames": 180,
+        "paired": 1,
+        "identical": 0,
+        "cached": 68,
+        "represented": 0,
+        "triaged": 112,
+        "triage_chunks": 14,
+        "escalated": 0,
+        "verify_chunks": 0,
+        "reviewed": 180,
+        "stopped_early": 0
+      },
+      "model_attempts": {
+        "retries": 0,
+        "total": 14,
+        "triage": 14,
+        "triage_chunks": 14,
+        "verify": 0,
+        "verify_chunks": 0
+      }
+    }
+  ]
+}

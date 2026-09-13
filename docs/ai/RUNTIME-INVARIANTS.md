@@ -454,9 +454,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   deletes only a completed or terminally invalid queue artifact. A transient failure retains the
   entry for cooldown and retry. Each exact artifact ID locks its complete protected drain, from
   exact selection through cleanup, so duplicate wakes cannot overlap. The model/cache job admits
-  one capsule per protected implementation at a time, retaining up to 100 pending jobs through
-  `queue: max` so the next target can reuse the latest verdicts. Its independent model chunks remain
-  concurrent. Exact wakes must authenticate through ID-scoped capsule lookup and exact-name
+  one ordinary capsule globally at a time, with at most 32 concurrent calls and up to 100 pending
+  jobs through `queue: max`, so the next target can reuse the latest verdicts. Two secretless
+  preparation slots overlap it, but only their exact same-run/attempt authenticated original ZIP
+  can enter the fresh model owner. Source freshness and immutable bytes are checked again there.
+  Complete normalized reports precede cache rotation; a cancelled publisher's successful exact
+  validation/upload steps and byte-identical capsule authorize model-free recovery, never a
+  partial, stale, foreign-policy or unfinished result. Valid old cancelled capsules do not block
+  a newer exact source attempt. Cache reuse follows the exact successful validation/build/upload
+  commit and immutable artifact window/metadata, so later cancellation or failure cannot discard
+  the committed union after predecessor retirement. Exact wakes must authenticate through ID-scoped capsule lookup and exact-name
   report, cooldown, and generation-block lookup rather than multiplying a full artifact-inventory
   scan across a parallel release wave; retryable GitHub API failures use bounded backoff and never
   become an image verdict. If the exact capsule returns authenticated metadata and then a download

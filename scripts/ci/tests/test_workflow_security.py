@@ -542,6 +542,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             "visual-review-drain.yml", "resume-capacity-queue"
         )
         review = job_block("visual-review-drain.yml", "review")
+        preparation = job_block("visual-review-drain.yml", "prepare")
         cleanup = job_block("visual-review-drain.yml", "cleanup")
         release_anchor = job_block("visual-review-drain.yml", "release-anchor")
         release_compatibility = job_block(
@@ -573,6 +574,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "capacity-check",
                 "capacity-probe",
                 "resume-capacity-queue",
+                "prepare",
                 "review",
                 "request-feature-coverage",
                 "cleanup",
@@ -590,8 +592,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", drain_header)
         self.assertIn("concurrency:", review)
         self.assertIn(
-            "quick-skin-visual-review-model-${{ "
-            "needs.select.outputs.implementation_sha }}",
+            "group: quick-skin-visual-review-model\n",
             review,
         )
         self.assertIn("cancel-in-progress: false", review)
@@ -769,11 +770,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("github_api_retry_to_file", review)
         self.assertIn("capsule_missing: ${{ steps.capsule.outputs.missing }}", review)
         self.assertIn("id: capsule", review)
-        self.assertIn("curated-review-download", review)
+        self.assertIn("curated-review-download", preparation)
         self.assertIn("printf 'missing=true\\n'", review)
         self.assertIn("no model session started", review)
         self.assertEqual(
-            review.count("steps.capsule.outputs.missing != 'true'"), 6
+            review.count("steps.capsule.outputs.missing != 'true'"), 7
         )
         self.assertIn(
             'source "$GITHUB_WORKSPACE/scripts/ci/github_api_retry.sh"', review
@@ -806,16 +807,16 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("actions/artifacts/$ARTIFACT_ID", review)
         self.assertIn("actions: write", review)
         self.assertIn("scripts/ci/bounded_zip.py", review)
-        self.assertIn("--max-entries 520", review)
+        self.assertIn("--max-entries 520", preparation)
         self.assertIn("visual-review-capsule", review)
         self.assertIn("ref: ${{ needs.select.outputs.implementation_sha }}", review)
         self.assertIn("fetch-depth: 0", review)
         self.assertIn("persist-credentials: false", review)
         self.assertNotIn("actions/download-artifact@", review)
-        self.assertIn("schema_version == 5", review)
+        self.assertIn("schema_version == 5", preparation)
         self.assertIn(".compatibility_impact", review)
         self.assertIn("cannot affect product/mod compatibility", review)
-        self.assertIn('evidence_kind == "raw-png"', review)
+        self.assertIn('evidence_kind == "raw-png"', preparation)
         self.assertIn("CLAUDE_CODE_OAUTH_TOKEN", review)
         self.assertIn("visual_review_runner.py", review)
         self.assertIn("--review-mode \"$review_mode\"", review)

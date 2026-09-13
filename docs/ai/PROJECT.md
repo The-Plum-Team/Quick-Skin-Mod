@@ -186,9 +186,12 @@ into those branches. Their source matrices and existing evidence remain intact d
   Only canonical content-addressed 1920x1080 RGB PNGs, authored checkpoint regions, a bounded
   manifest, and provenance enter the durable queue; curation never downsizes or normalizes a
   different resolution, and raw E2E ZIPs never share a runner with the credential. Protected drains are locked by
-  exact queue artifact, so duplicate wakes coalesce. Their model/cache job serializes capsules for
-  one protected implementation to reuse the latest verdicts, with `queue: max` retaining pending
-  work and concurrent model chunks inside each job. Generic recovery sweeps only redispatch an
+  exact queue artifact, so duplicate wakes coalesce. Two secretless preparation slots may overlap
+  the single global ordinary model/cache owner, which reauthenticates their exact same-run/attempt
+  immutable handoff and live source before restoring the latest verdicts. `queue: max` retains
+  pending work; at most 32 ordinary model calls run concurrently. Complete normalized reports are
+  retained before cache rotation, so authenticated publication cancellation can recover them
+  without another model call. Generic recovery sweeps only redispatch an
   authenticated pending identity; settled drains never wake their consumed capsule again. Before those independent
   drains fan out, one global serialized capacity section reuses only a fresh marker from the exact
   protected workflow. Its single tool-free Haiku probe either opens a short shared ready window or

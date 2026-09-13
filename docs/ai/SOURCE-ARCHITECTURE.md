@@ -395,8 +395,19 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   models, mode, and chunk policy. Paired artifact labels and loaders need not match when the entire
   reusable semantic identity does. Protected ancestor shards survive unrelated `master` merges only when their
   cache-producing workflow blob is byte-identical; the current codec and policy still validate
-  every entry before use. Parallel drains may briefly publish sibling shards;
-  a later protected successor combines and retires every authenticated shard it consumed.
+  every entry before use. A protected successor combines and retires every authenticated
+  historical sibling shard it consumed only after publishing the replacement union.
+  `scripts/ci/visual_review_preparation.py` authenticates the original curated ZIP inside an
+  exact same-run/attempt/id/digest secretless handoff. Two preparation slots overlap one global
+  ordinary model/cache owner; source freshness, model input and result validation remain in that
+  fresh owner, whose aggregate model-call bound is 32. `visual_review_completed.py` admits the
+  latest cache only after exact successful validation/build/upload steps commit its immutable
+  artifact, bound to that attempt's upload window and freshly matched inventory metadata. Later
+  cancellation or failure cannot invalidate that union after predecessor shards are retired.
+  It can also recover a complete report from a cancelled publisher after authenticating the
+  successful validation/upload interval and byte-identical capsule; recovery never calls a model.
+  Valid historical cancelled reports with another capsule are skipped, not reused or allowed
+  to block a newer authenticated runtime attempt sharing their report name.
 - `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
   an unpaired, loader-complete, completely clean 1.20.1 report and binds its source/proof/manifest/
   report digests to exact Git identities supplied by protected workflow checks. The version

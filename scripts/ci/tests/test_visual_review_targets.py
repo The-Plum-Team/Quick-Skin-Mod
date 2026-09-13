@@ -96,7 +96,7 @@ class VisualReviewTargetsTest(unittest.TestCase):
                     self.assertNotEqual(0, result.returncode)
 
     def test_actual_drainer_shell_binds_the_proof_to_its_queue_target(self) -> None:
-        script = step_script("visual-review-drain.yml", "review", "Fetch and verify the exact curated capsule")
+        script = step_script("visual-review-drain.yml", "prepare", "Fetch and verify the exact curated capsule")
         start = script.index('jq -e \\\n  --arg implementation_sha "$IMPLEMENTATION_SHA" \\\n  --arg manifest_sha256')
         excerpt = script[start:script.index("validation_arguments=(", start)]
         target = self.plan()["include"][0]
