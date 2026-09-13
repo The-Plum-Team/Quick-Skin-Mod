@@ -395,8 +395,33 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   models, mode, and chunk policy. Paired artifact labels and loaders need not match when the entire
   reusable semantic identity does. Protected ancestor shards survive unrelated `master` merges only when their
   cache-producing workflow blob is byte-identical; the current codec and policy still validate
-  every entry before use. Parallel drains may briefly publish sibling shards;
-  a later protected successor combines and retires every authenticated shard it consumed.
+  every entry before use. A protected successor combines and retires every authenticated
+  historical sibling shard it consumed only after publishing the replacement union.
+  `scripts/ci/visual_review_preparation.py` authenticates the original curated ZIP inside an
+  exact same-run/attempt/id/digest secretless handoff, bound to the executing workflow SHA
+  rather than conflated with the original curator's implementation SHA. Preparation begins
+  at immutable `github.sha`; before executing historical policy it validates bounded selector
+  identities, authenticates the exact capsule and protected curator, and requires the selected
+  implementation to be an already-fetched ancestor of that workflow SHA. A hook-free local
+  checkout cannot fetch an arbitrary selected revision. Historical protected ancestors remain
+  supported, while newer/unrelated revisions fail closed without deleting their capsule.
+  The model owner snapshots the current workflow's control helpers and dependencies from that
+  exact Git revision before its existing historical reviewer checkout. New preparation and
+  completed-result controls execute from that snapshot; original proof/model policy stays at
+  the selected implementation. Two preparation slots overlap one global
+  ordinary model/cache owner; source freshness, model input and result validation remain in that
+  fresh owner, whose aggregate model-call bound is 32. `visual_review_completed.py` admits the
+  latest cache only after exact successful validation/build/upload steps commit its immutable
+  artifact, bound to that attempt's upload window and freshly matched inventory metadata. Later
+  cancellation or failure cannot invalidate that union after predecessor shards are retired.
+  It can also recover a complete report from a cancelled publisher after authenticating the
+  successful validation/upload interval and byte-identical capsule; recovery never calls a model.
+  Valid historical cancelled reports with another capsule are skipped, not reused or allowed
+  to block a newer authenticated runtime attempt sharing their report name.
+  Cancelled-report recovery accepts only the exact selected implementation or current workflow
+  owner head, preserving current-workflow reviews of older capsules as well as legacy owners.
+  An arbitrary third revision remains ineligible; exact proof/manifest bytes and all successful
+  same-attempt upload checks remain mandatory.
 - `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
   an unpaired, loader-complete, completely clean 1.20.1 report and binds its source/proof/manifest/
   report digests to exact Git identities supplied by protected workflow checks. The version
@@ -465,6 +490,11 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   Full recovery parses and bounds the complete artifact inventory, then authenticates only
   reports, attempts, blocks and certificates relevant to eligible current-generation capsules.
   Capsule age and an older producer commit cannot exclude otherwise eligible historical work.
+  Completed and already-reviewed inputs survive their own or another report owner's late
+  cancellation until seven-day expiry. Cleanup is a successful no-op for both branches; ordinary
+  report authentication suppresses redispatch, while cancelled owners reopen model-free recovery.
+  Only missing/terminally invalid inputs keep exact-ID cleanup. The pipeline document records
+  the additional retained storage and bounded owner reads per scheduled current-generation sweep.
 - `scripts/ci/visual_review_impact.py` is the narrow fail-closed cost and domain filter. PRs to
   `master` defer model work to their post-merge anchor; its `source-pr` scope protects direct
   release-branch PRs, where that automatic second stage is absent. `replicated-port` recognizes

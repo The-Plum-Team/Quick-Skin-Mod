@@ -81,6 +81,8 @@ class ModCompatibilityImpactTest(unittest.TestCase):
             "scripts/ci/mod_compatibility_review_batch.py",
             "scripts/ci/mod_compatibility_impact.py",
             "scripts/ci/version_port_failure_policy.py",
+            "scripts/ci/visual_review_completed.py",
+            "scripts/ci/visual_review_preparation.py",
             "scripts/ci/tests/test_mod_compatibility_impact.py",
             "docs/ai/PROJECT.md",
         ]
@@ -100,6 +102,7 @@ class ModCompatibilityImpactTest(unittest.TestCase):
             "e2e/mod-compatibility-contract.json",
             "e2e/full-validation-baseline.json",
             "unknown/new-policy.txt",
+            "scripts/ci/visual_review_unknown.py",
         ):
             with self.subTest(path=path):
                 result = classify_paths([path])

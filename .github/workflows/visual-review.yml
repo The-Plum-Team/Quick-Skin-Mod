@@ -1265,8 +1265,8 @@ jobs:
             ${{ runner.temp }}/curation-proof.json
           if-no-files-found: error
           compression-level: 6
-          # This is a durable bounded queue entry. A successful drainer deletes it by exact ID;
-          # expiry is the recovery bound if the advisory provider remains unavailable.
+          # Keep this durable bounded entry through late drain cancellation, even after review.
+          # Authenticated reports suppress duplicates; expiry is the recovery/retirement bound.
           retention-days: 7
 
   request-drain:

@@ -48,11 +48,22 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   code must independently extract every result and enforce exact count, labels, bounds, and
   coherence before it emits the only normalized report eligible for upload. Durable queue state
   must not depend on a pending workflow run: a sanitized marker may cool a failed entry, raw
-  provider text must never be uploaded, and a final `actions: write` job may delete only a
-  completed handoff reauthenticated by exact id. A repository-wide capacity circuit may serialize
+  provider text must never be uploaded. The final `actions: write` cleanup job must retain fresh
+  and already-reviewed inputs through seven-day expiry, succeeding without deletion so a later
+  cancelled report owner can recover the original capsule. Only missing/terminally invalid inputs
+  enter exact-ID cleanup; authenticated reports suppress completed-input redispatch. A repository-wide capacity circuit may serialize
   its tool-free preflight and marker publication independently from the model/cache job. The latter
-  serializes capsules per protected implementation so subsequent targets reuse the latest verdicts;
-  its `queue: max` preserves pending jobs and its independent model chunks remain concurrent.
+  serializes ordinary capsules globally so subsequent targets reuse the latest verdicts, with
+  at most 32 concurrent calls across ordinary reviewers. Two secretless preparation slots may
+  overlap that owner, handing off only the original capsule ZIP by exact run/attempt/id/digest.
+  The model owner reauthenticates source freshness and independently validates the same bytes.
+  Its `queue: max` preserves pending jobs and its independent model chunks remain concurrent.
+  Publish the complete normalized report before cache rotation; after cancellation, authenticate
+  its exact successful validation/upload steps and unchanged capsule before republishing without
+  a model. Valid old cancelled capsules are skipped when the current authenticated capsule differs.
+  Exact successful validation/build/upload steps commit the immutable cache union independently
+  of later cancellation or failure; bind it to the attempt's upload window and fresh metadata
+  before reuse. Predecessor retirement must not make earlier completed keys unrecoverable.
   Capacity admission must fail closed on unknown/permanent probe failures and retain every
   capsule while an authenticated quota-pause marker is live. A successful tool-free call carrying
   `allowed` or `allowed_warning` is capacity-ready even when its optional coarse utilization field
