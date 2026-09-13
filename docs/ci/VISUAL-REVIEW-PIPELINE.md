@@ -147,6 +147,30 @@ avoids its previous cleanup metadata GET and DELETE, but that does not establish
 or storage savings. Retention itself adds no runner, dispatch or polling loop; the possible
 older-marker expiry retry above must not be counted as guaranteed zero added inference.
 
+## Observable model attempts and local retry waits
+
+The runner retains telemetry schema 1 and the existing six model-attempt counters.
+Separate sanitized stdout snapshots record cumulative launched CLI attempts and local
+retry-backoff events, with started/completed/cancelled counts, the existing fixed error
+categories and elapsed milliseconds measured by a monotonic clock. Concurrent worker
+wait durations are summed service time, not review-stage wall time or provider queue
+time. A CLI process attempt is not an individual API request or model turn. Logging
+does not change retry decisions, delays, model limits or payloads.
+
+Snapshots carry sequence and terminal/failure markers. Count the latest consistent
+snapshot, never add cumulative snapshots together. Handled success and failure emit
+terminal counters; an interrupted process may leave only observed lower bounds, and
+absence is unknown rather than zero. The independently schema-checked JSON summary
+also reaches stdout and the step summary, including model-free recovery. No provider
+response text, credentials or usage payloads belong in these logs.
+
+Provider-internal waiting is not exposed by the CLI and remains unmeasured. Historical
+evidence records one retry but no actual local wait duration; do not backfill it as zero
+or substitute the configured delay for a measurement. Updating runner instrumentation
+changes its exact cache-policy digest. The first new-policy wave therefore uses a new
+cache namespace: retain the old keys, do not migrate verdicts or weaken policy hashing,
+and report actual cold-namespace inference/cache counts separately from overlap savings.
+
 ## Offline replay, overhead and live acceptance
 
 `HistoricalStageReplayTest` checks every matrix target and all reference counters. Its

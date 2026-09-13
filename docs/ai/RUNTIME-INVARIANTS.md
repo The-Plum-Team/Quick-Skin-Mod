@@ -437,6 +437,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   1280x720 PNGs. After Haiku settles, only concerns or confidence below high are globally packed
   into selective concurrent Opus verification with a read-only tool surface; a clean
   high-confidence Haiku decision is final and perceptual similarity can neither route nor pass.
+  Sanitized attempt and local retry-backoff snapshots are cumulative observations, never
+  acceptance evidence or provider-internal wait measurements. Interrupted snapshots are
+  lower bounds; missing observations cannot imply zero calls or a complete review. Telemetry
+  changes retain exact runner-code cache hashing, without migrating old-policy verdicts.
   The runner captures each verdict from stdout,
   and validates exact labels and semantic coherence after every call. A first Opus-confirmed defect
   cancels outstanding work, emits only an explicit fail-closed partial report, publishes a sanitized

@@ -1626,7 +1626,7 @@ jobs:
                 "triage_chunks", "escalated", "verify_chunks", "reviewed", "stopped_early", "recovered")) and
               all(.[]; type == "number" and . >= 0 and . <= 100000 and floor == .)))' \
             "$telemetry" > /dev/null
-          jq -c '{state, model_attempts, review_plan}' "$telemetry" >> "$GITHUB_STEP_SUMMARY"
+          jq -c '{state, model_attempts, review_plan}' "$telemetry" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Independently validate the normalized result
         id: check

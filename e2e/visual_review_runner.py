@@ -601,21 +601,29 @@ class ClaudeProvider:
         self._processes: set[subprocess.Popen[bytes]] = set()
         self._attempts = {"triage": 0, "verify": 0}
         self._attempted_chunks = {"triage": set(), "verify": set()}
+        self._telemetry_sequence = 0
+        self._retry_waits = {"started": 0, "completed": 0, "cancelled": 0}
+        self._retry_wait_categories = dict.fromkeys(sorted(TRANSIENT_MODEL_CATEGORIES), 0)
+        self._retry_wait_ns = 0
         self._cancelled = threading.Event()
 
     def _record_attempt(self, stage: str, chunk_index: int) -> None:
         with self._telemetry_lock:
             self._attempts[stage] += 1
             self._attempted_chunks[stage].add(chunk_index)
+            self._emit_progress_locked()
 
     def telemetry(self) -> dict[str, int]:
         """Return sanitized model-process counts without provider-authored content."""
 
         with self._telemetry_lock:
-            triage = self._attempts["triage"]
-            verify = self._attempts["verify"]
-            triage_chunks = len(self._attempted_chunks["triage"])
-            verify_chunks = len(self._attempted_chunks["verify"])
+            return self._attempt_counts_locked()
+
+    def _attempt_counts_locked(self) -> dict[str, int]:
+        triage = self._attempts["triage"]
+        verify = self._attempts["verify"]
+        triage_chunks = len(self._attempted_chunks["triage"])
+        verify_chunks = len(self._attempted_chunks["verify"])
         total = triage + verify
         return {
             "retries": total - triage_chunks - verify_chunks,
@@ -625,6 +633,59 @@ class ClaudeProvider:
             "verify": verify,
             "verify_chunks": verify_chunks,
         }
+
+    def _emit_progress_locked(self, *, final: bool = False, failed: bool = False) -> None:
+        # Cumulative snapshots, not additive events. An interrupted log is only a lower
+        # bound: the process can die between Popen and this write, or during a wait.
+        self._telemetry_sequence += 1
+        marker = {
+            "sequence": self._telemetry_sequence,
+            "final": int(final),
+            "failed": int(failed),
+        }
+        attempts = {**marker, **self._attempt_counts_locked()}
+        waits = {
+            **marker,
+            **self._retry_waits,
+            "waited_ms": self._retry_wait_ns // 1_000_000,
+            **self._retry_wait_categories,
+        }
+        lines = "".join(
+            prefix + ", ".join(f"{key}={value}" for key, value in counts.items()) + "\n"
+            for prefix, counts in (
+                ("Sanitized model progress: ", attempts),
+                ("Sanitized local retry wait: ", waits),
+            )
+        )
+        try:
+            # One write under the same lock prevents concurrent snapshots interleaving.
+            sys.stdout.write(lines)
+            sys.stdout.flush()
+        except (OSError, ValueError):
+            # Observability must not change inference or retry behavior.
+            pass
+
+    def emit_terminal_telemetry(self, *, failed: bool) -> None:
+        with self._telemetry_lock:
+            self._emit_progress_locked(final=True, failed=failed)
+
+    def _retry_wait(self, category: str, seconds: float) -> None:
+        with self._telemetry_lock:
+            self._retry_waits["started"] += 1
+            self._retry_wait_categories[category] += 1
+            self._emit_progress_locked()
+        started = time.monotonic_ns()
+        cancelled = True
+        try:
+            cancelled = self._cancelled.wait(seconds)
+        finally:
+            elapsed = time.monotonic_ns() - started
+            with self._telemetry_lock:
+                self._retry_wait_ns += elapsed
+                self._retry_waits["cancelled" if cancelled else "completed"] += 1
+                self._emit_progress_locked()
+        if cancelled:
+            raise ReviewCancelled()
 
     def cancel(self) -> None:
         self._cancelled.set()
@@ -886,10 +947,10 @@ class ClaudeProvider:
                     )
             if not last_error.transient or attempt == self.attempts:
                 raise last_error
-            if self._cancelled.wait(
-                DEFAULT_RETRY_DELAYS[min(attempt - 1, len(DEFAULT_RETRY_DELAYS) - 1)]
-            ):
-                raise ReviewCancelled()
+            self._retry_wait(
+                last_error.category,
+                DEFAULT_RETRY_DELAYS[min(attempt - 1, len(DEFAULT_RETRY_DELAYS) - 1)],
+            )
         raise last_error
 
 
@@ -1032,8 +1093,11 @@ def main(argv: list[str] | None = None) -> int:
                 f"{key}={value}" for key, value in provider.telemetry().items()
             )
         )
+        provider.emit_terminal_telemetry(failed=False)
         return 0
     except RunnerError as exc:
+        if provider is not None:
+            provider.emit_terminal_telemetry(failed=True)
         try:
             _write_telemetry(telemetry_path, provider, None, state="failed")
         except OSError:
@@ -1043,6 +1107,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except (OSError, ReviewError, ValueError) as exc:
         error = RunnerError("protected_validation", "runner", transient=False)
+        if provider is not None:
+            provider.emit_terminal_telemetry(failed=True)
         try:
             _write_telemetry(telemetry_path, provider, None, state="failed")
         except OSError:

@@ -537,6 +537,64 @@ class CompletedReviewRecoveryTest(unittest.TestCase):
             validate_cache(malformed, POLICY)
 
 
+class BoundedTelemetryStepTest(unittest.TestCase):
+    def setUp(self):
+        self.telemetry = {
+            "schema_version": 1, "state": "complete",
+            "model_attempts": {"retries": 1, "total": 4, "triage": 3, "triage_chunks": 2,
+                               "verify": 1, "verify_chunks": 1},
+            "review_plan": {"frames": 16, "cached": 3, "represented": 1, "triaged": 12},
+        }
+
+    def record(self, telemetry):
+        script = step_script("visual-review-drain.yml", "review", "Record bounded model and cache telemetry")
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = Path(temporary)
+            capsule = runtime / "visual-review-capsule"
+            capsule.mkdir()
+            (capsule / "visual-review-telemetry.json").write_text(json.dumps(telemetry))
+            summary = runtime / "summary"
+            completed = subprocess.run(["bash", "-c", script], cwd=runtime,
+                env={"PATH": os.environ["PATH"], "RUNNER_TEMP": str(runtime), "GITHUB_STEP_SUMMARY": str(summary)},
+                capture_output=True, text=True, timeout=10)
+            return completed, summary.read_text() if summary.exists() else None
+
+    def test_valid_success_failure_and_recovered_counters_match_logs_and_summary(self):
+        recovered = {**self.telemetry,
+                     "model_attempts": {name: 0 for name in self.telemetry["model_attempts"]},
+                     "review_plan": {"frames": 16, "recovered": 16}}
+        for telemetry in (self.telemetry, {**self.telemetry, "state": "failed", "review_plan": None}, recovered):
+            with self.subTest(telemetry=telemetry):
+                completed, summary = self.record(telemetry)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual(completed.stdout, summary)
+                self.assertEqual(1, len(completed.stdout.splitlines()))
+                self.assertEqual({name: telemetry[name] for name in ("state", "model_attempts", "review_plan")},
+                                 json.loads(completed.stdout))
+                self.assertEqual("", completed.stderr)
+
+    def test_provider_text_and_non_numeric_counters_fail_before_any_output(self):
+        cases = [
+            {**self.telemetry, "provider_payload": "private-provider-text"},
+            {**self.telemetry, "state": "private-provider-text"},
+            {**self.telemetry, "model_attempts": {**self.telemetry["model_attempts"], "usage": 42}},
+            {**self.telemetry, "model_attempts": {**self.telemetry["model_attempts"], "total": "4"}},
+            {**self.telemetry, "review_plan": {"frames": 16, "provider_payload": "private-provider-text"}},
+            {**self.telemetry, "review_plan": {"cached": "private-provider-text"}},
+            {**self.telemetry, "review_plan": {"cached": True}},
+            {**self.telemetry, "review_plan": {"cached": -1}},
+            {**self.telemetry, "review_plan": {"cached": 100001}},
+            {**self.telemetry, "review_plan": {"cached": 0.5}},
+        ]
+        for telemetry in cases:
+            with self.subTest(telemetry=telemetry):
+                completed, summary = self.record(telemetry)
+                self.assertNotEqual(0, completed.returncode)
+                self.assertEqual("", completed.stdout)
+                self.assertIsNone(summary)
+                self.assertNotIn("private-provider-text", completed.stderr)
+
+
 class CompletedInputRetentionTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
