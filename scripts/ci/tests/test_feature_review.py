@@ -16,6 +16,8 @@ sys.path.insert(0, str(ROOT / "scripts/ci"))
 sys.path.insert(0, str(ROOT / "scripts/release/tests"))
 
 import feature_review as review
+import visual_evidence
+import visual_review
 import test_visual_evidence as image_fixtures
 from scenario_contract import load_contract
 
@@ -331,6 +333,67 @@ class FeatureReviewTest(unittest.TestCase):
         self.api.source_sha = "0" * 40
         with self.assertRaises(review.coverage.CoverageError): self.curate()
         self.assertFalse((self.root / "capsule-2/curation-proof.json").exists())
+
+    def test_each_complete_row_decodes_once_and_capsule_is_independently_validated(self):
+        self.complete_fixture()
+        with patch.object(visual_evidence, "validate_png_snapshot", wraps=visual_evidence.validate_png_snapshot) as decode, \
+                patch.object(review, "validate_input", wraps=review.validate_input) as capsule:
+            proof, output = self.curate(1)
+        self.assertEqual(3, decode.call_count)  # Two one-frame target lanes plus the same-run reference.
+        self.assertEqual(3, len(self.api.downloaded))
+        self.assertEqual(1, capsule.call_count)
+        self.assertEqual(2, proof["frame_count"])
+        self.assertTrue((output / "curation-proof.json").is_file())
+
+    def test_selected_rows_reuse_no_admission_or_decodes_across_invocations(self):
+        with patch.object(visual_evidence, "validate_png_snapshot", wraps=visual_evidence.validate_png_snapshot) as decode:
+            self.curate(1)
+            self.curate(1)
+        self.assertEqual(6, decode.call_count)
+        self.assertEqual(2, self.verifier.call_count)
+        self.assertEqual(8, len(self.api.downloaded))
+
+    def test_changed_image_after_row_snapshot_still_fails_canonical_curation(self):
+        collect = review.collect_expected_row
+        def substituted(*args, **kwargs):
+            summary, frames = collect(*args, **kwargs)
+            Image.new("RGB", (1920, 1080), (211, 17, 62)).save(frames[0]["source_path"], format="PNG")
+            return summary, frames
+        with patch.object(review, "collect_expected_row", side_effect=substituted):
+            with self.assertRaisesRegex(ValueError, "changed after evidence validation"):
+                self.curate()
+        self.assertFalse((self.root / "capsule-1/curation-proof.json").exists())
+
+    def test_cancelled_target_leaves_no_proof_and_fresh_invocation_can_recover(self):
+        with patch.object(review, "build_manifest_from_frames", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                self.curate(1)
+        self.assertFalse((self.root / "capsule-1/curation-proof.json").exists())
+        proof, output = self.curate(1)
+        self.assertEqual(2, proof["frame_count"])
+        self.assertTrue((output / "curation-proof.json").is_file())
+
+    def test_snapshot_projection_rejects_duplicate_frames_and_selected_key_only_view(self):
+        collected = review.collect_expected_row
+        def duplicated(*args, **kwargs):
+            summary, frames = collected(*args, **kwargs)
+            return summary, frames + frames
+        with patch.object(review, "collect_expected_row", side_effect=duplicated):
+            with self.assertRaisesRegex(ValueError, "duplicate collected capture"):
+                self.curate()
+        catalog = review.load_catalog(self.fixture.catalog_path, selection=self.selected)
+        with self.assertRaisesRegex(ValueError, "every admitted capture"):
+            visual_review.build_manifest_from_frames([], catalog, include_all=False, combos=None)
+
+    def test_profile_preserves_failure_and_reports_only_numeric_stage_work(self):
+        profile = review.CurationProfile()
+        with self.assertRaisesRegex(ValueError, "private failure payload"):
+            profile.measure("source_authentication", lambda: (_ for _ in ()).throw(ValueError("private failure payload")))
+        stage = profile.stages["source_authentication"]
+        self.assertEqual((1, 1), (stage["calls"], stage["failures"]))
+        self.assertGreaterEqual(stage["wall_seconds"], 0)
+        self.assertGreaterEqual(stage["cpu_seconds"], 0)
+        self.assertNotIn("private failure payload", json.dumps(profile.stages))
 
 
 if __name__ == "__main__":

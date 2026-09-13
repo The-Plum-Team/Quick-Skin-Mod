@@ -900,6 +900,65 @@ class VisualEvidenceTest(unittest.TestCase):
         self.assertFalse(output.exists())
         self.assertEqual([], list(self.root.glob(".over-budget-review.curating-*")))
 
+    def test_two_worker_curation_is_byte_identical_and_preserves_frame_order(self) -> None:
+        frames, _candidate, _similarity = self.paired_curator_fixture(4)
+        serial, parallel = self.root / "serial" / "review-input", self.root / "parallel" / "review-input"
+        serial.parent.mkdir(); parallel.parent.mkdir()
+        first = curate_manifest(frames, serial)
+        second = curate_manifest(frames, parallel, workers=2)
+        self.assertEqual(first, second)
+        self.assertEqual([item["label"] for item in frames], [item["label"] for item in second])
+        self.assertEqual(
+            {path.relative_to(serial).as_posix(): path.read_bytes() for path in serial.rglob("*") if path.is_file()},
+            {path.relative_to(parallel).as_posix(): path.read_bytes() for path in parallel.rglob("*") if path.is_file()},
+        )
+        self.assertEqual(4, validate_input(second, parallel, require_paired=True))
+
+    def test_two_worker_failure_and_cancellation_join_every_future_and_remove_staging(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        frames, _candidate, _similarity = self.paired_curator_fixture(4)
+        pools, futures = [], []
+        class ObservedPool(ThreadPoolExecutor):
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                pools.append(self)
+            def submit(self, *args, **kwargs):
+                result = super().submit(*args, **kwargs)
+                futures.append(result)
+                return result
+        for index, error in enumerate((VisualEvidenceError("failed image"), KeyboardInterrupt())):
+            destination = self.root / f"interrupted-{index}"
+            with mock.patch.object(visual_review, "ThreadPoolExecutor", ObservedPool), \
+                    mock.patch.object(visual_review, "canonicalize_png_snapshot", side_effect=error), \
+                    self.assertRaises(type(error)):
+                curate_manifest(frames, destination, workers=2)
+            self.assertFalse(destination.exists())
+            self.assertEqual([], list(self.root.glob(f".interrupted-{index}.curating-*")))
+            self.assertTrue(all(future.done() for future in futures))
+            self.assertTrue(all(not thread.is_alive() for pool in pools for thread in pool._threads))
+
+    def test_candidate_prefetch_and_worker_count_are_hard_bounded(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        frames, candidate, _similarity = self.paired_curator_fixture(5)
+        calls = []
+        class ObservedPool(ThreadPoolExecutor):
+            def submit(self, *args, **kwargs):
+                calls.append(args)
+                return super().submit(*args, **kwargs)
+        with ObservedPool(max_workers=2) as pool, \
+                mock.patch.object(visual_review, "canonicalize_png_snapshot", return_value=candidate):
+            snapshots = visual_review._candidate_snapshots(frames, pool)
+            self.assertEqual(0, len(calls))
+            next(snapshots)
+            self.assertEqual(2, len(calls))
+            next(snapshots)
+            self.assertEqual(3, len(calls))
+            snapshots.close()
+            self.assertEqual(3, len(calls))
+        for workers in (True, 0, 3, 16):
+            with self.assertRaisesRegex(VisualEvidenceError, "one or two"):
+                curate_manifest(frames, self.root / "invalid-workers", workers=workers)
+
     def test_curator_enforces_exact_dimensions_and_aggregate_pixels(self) -> None:
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
         result_path = self.write_result("phase0-smoke")
