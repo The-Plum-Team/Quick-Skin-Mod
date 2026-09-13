@@ -43,6 +43,10 @@ class TargetStatusPublishTest(unittest.TestCase):
         self.remote = self.root / "remote.git"
         self.remote.mkdir()
         git(self.remote, "init", "--bare", "--template=")
+        # These repositories live only for one test. Detached receive/fetch maintenance
+        # must not outlive its Git parent and race TemporaryDirectory.cleanup().
+        git(self.remote, "config", "gc.auto", "0")
+        git(self.remote, "config", "maintenance.auto", "false")
         tree = git(self.remote, "mktree", data=b"").strip().decode()
         self.master = git(self.remote, "commit-tree", tree, "-m", "protected source").strip().decode()
         git(self.remote, "update-ref", publisher.MASTER, self.master)
@@ -71,7 +75,10 @@ class TargetStatusPublishTest(unittest.TestCase):
 
     def client(self, cls=publisher.Git):
         self.counter += 1
-        return cls(self.root / f"writer-{self.counter}.git", str(self.remote))
+        client = cls(self.root / f"writer-{self.counter}.git", str(self.remote))
+        client.run("config", "gc.auto", "0")
+        client.run("config", "maintenance.auto", "false")
+        return client
 
     def publish(self, *, snapshot=None, client=None, directory=None):
         return publisher.publish(directory or self.site(snapshot), repository=REPOSITORY,
@@ -101,6 +108,13 @@ class TargetStatusPublishTest(unittest.TestCase):
         self.assertEqual(self.master, git(self.remote, "rev-parse", publisher.MASTER).strip().decode())
         self.assertEqual(hashlib.sha256(git(self.remote, "show", f"{head}:status.json")).hexdigest(),
                          result["snapshot_sha256"])
+
+    def test_temporary_git_owners_disable_detached_maintenance_locally(self):
+        client = self.client()
+        for directory in (self.remote, client.directory):
+            with self.subTest(directory=directory.name):
+                self.assertEqual(b"0\n", git(directory, "config", "--local", "gc.auto"))
+                self.assertEqual(b"false\n", git(directory, "config", "--local", "maintenance.auto"))
 
     def test_changed_status_is_fast_forward_but_timestamp_only_is_a_true_noop(self):
         first = self.publish(snapshot=self.snapshot(age=40))
