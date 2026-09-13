@@ -151,6 +151,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 Use the smallest relevant check while iterating, then run the proportional aggregate gate before
 handoff. On Windows, use `gradlew.bat`; on Unix-like systems, use `./gradlew`.
 
+Before publishing an infrastructure repair or starting its expensive gate, use the
+[repair preflight](../ci/REPAIR-PREFLIGHT.md) to record the exact head/tree, reviewed scope,
+canonical impact, observed evidence identities, and any missing complete-recovery action. Its
+offline real-Git and archive-digest regressions do not replace the full required gates. Regenerate
+the plan after scope or head changes and retain which old proof is invalidated. An evidence
+observation still requires the canonical live verifier; routine non-impacting work must not add
+a full-validation marker merely because earlier optional evidence is unavailable.
+
 Fast stable unit lane:
 
 ```powershell
