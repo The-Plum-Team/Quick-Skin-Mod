@@ -61,7 +61,11 @@
         "github_release.py publish",
         "--event-target",
         "--target \"$RELEASE_TARGET\"",
-        "release-target: ${{ needs.build.outputs.target }}"
+        "release-target: ${{ needs.build.outputs.target }}",
+        "queue: max",
+        "rehearse_publication.py",
+        "publication_state.py register",
+        "publication_state.py begin"
       ],
       ".github/workflows/sync-version-branches.yml": [
         "scripts/release/release_sources.py --kind mode",
@@ -72,6 +76,15 @@
         "scripts/release/recover_sbom_release.py prepare",
         "scripts/release/recover_sbom_release.py verify",
         "needs.prepare.outputs.source_sha"
+      ],
+      ".github/workflows/release-verify.yml": [
+        "environment: release",
+        "contents: read",
+        "actions: read",
+        "verify_pending_publications.py",
+        "--finalize",
+        "group: release-publish",
+        "queue: max"
       ]
     }
   },

@@ -136,14 +136,19 @@ class RepositoryGuidanceTest(unittest.TestCase):
         self.assertIn("fail-fast: false", workflow)
         self.assertIn("github_release.py stage", workflow)
         self.assertIn("github_release.py publish", workflow)
-        self.assertIn("reconcile_publication.py", workflow)
+        state = (ROOT / "scripts" / "release" / "publication_state.py").read_text(encoding="utf-8")
+        self.assertIn("publication_state.py begin", workflow)
+        self.assertIn("publication_state.py accept", workflow)
+        self.assertIn("publication_state.py check", workflow)
+        self.assertIn("from reconcile_publication import", state)
+        self.assertIn("rehearse_publication.py", workflow)
         self.assertIn("verify_reproducibility.py", workflow)
         self.assertIn("--rerun-tasks", workflow)
         self.assertIn("validate_changelog", release_identity)
         attest_pin = "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6"
         self.assertEqual(workflow.count(attest_pin), 2)
         self.assertIn("sbom-path: build/release/sbom/quick-skin.cdx.json", workflow)
-        combined = workflow + release_helper
+        combined = workflow + release_helper + state
         self.assertNotIn("gh release delete", combined)
         self.assertNotIn("git push --delete", combined)
         self.assertNotIn("gh release upload --clobber", combined)

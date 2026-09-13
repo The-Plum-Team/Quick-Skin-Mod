@@ -22,8 +22,9 @@ Before creating a release tag:
 2. let both required checks, `Build and verify` and `Packaged E2E gate`, pass on the exact release
    source branch (`master`) head;
 3. confirm the working tree is clean and the branch head has not moved;
-4. run the release workflow manually from `master` with an explicit `minecraft_target` if a
-   validation-only rehearsal is useful; a manual run of `release.yml` never publishes;
+4. run the release workflow manually from `master` for each intended `minecraft_target` and
+   require a successful validation-only rehearsal, including the offline publication/recovery
+   simulation against its staged bundle; a manual run of `release.yml` never publishes;
 5. derive and inspect the only accepted identity:
 
    ```bash
@@ -60,18 +61,32 @@ The workflow then performs this fixed sequence:
    `shadowBundle` lock, and the matching SHA-256 entries in Gradle verification metadata.
    The `serialNumber` required by the attestation action is derived from the document content, so
    identical inputs retain identical SBOM bytes;
-3. attest the production JARs twice with the same pinned GitHub action: once for build provenance
+3. rehearse the publication protocol offline with those exact staged bytes: validate the SBOM
+   attestation contract, recover an interrupted GitHub asset upload with normalized filenames,
+   fence an accepted but unindexed marketplace upload after a simulated restart, and finalize
+   only after every simulated file is approved and verified;
+4. attest the production JARs twice with the same pinned GitHub action: once for build provenance
    and once with the exact staged CycloneDX document as the SBOM predicate;
-4. run all release-profile scenarios for that target's matrix-declared runtimes against the staged bytes;
-5. create or reconcile an exact draft GitHub Release without overwriting assets;
-6. publish every artifact independently to Modrinth and CurseForge, reconciling the remote
+5. run all release-profile scenarios for that target's matrix-declared runtimes against the staged bytes;
+6. create or reconcile an exact draft GitHub Release without overwriting assets and persist its
+   publication ledger in a hidden comment at the end of the release notes;
+7. publish every artifact independently to Modrinth and CurseForge, reconciling the remote
    publication ID, filename, size, and bytes before and after each upload. Modrinth is reconciled
    by SHA-512 through its own API. CurseForge publishes no hash on any endpoint its author token
    can reach, so reconciliation locates the file through the unauthenticated first-party listing
    and then proves byte equality by downloading the published copy and hashing it locally against
-   the staged SHA-1 and SHA-256. A same-named file that is not yet approved fails closed rather
-   than racing an upload that is still settling;
-7. publish the GitHub Release only after every marketplace row is verified.
+   the staged SHA-1 and SHA-256. Persist upload intent before sending the file, then persist
+   acceptance before checking visibility once. An accepted or unapproved file remains pending
+   and never authorizes another upload;
+8. publish the GitHub Release only after every marketplace row is verified. Otherwise finish
+   the upload workflow with an explicit pending summary and leave the release as a draft.
+
+Preparation uses four matrix-derived build slots on isolated hosted runners, plus at most four
+Fabric and four Forge/NeoForge runtime jobs. Gradle remains serial inside each checkout.
+Different targets can prepare concurrently. Only the short jobs that stage assets, write the
+publication ledger, upload marketplace files or finalize GitHub share `release-publish`.
+Workflow and job queues use `queue: max` with cancellation disabled; GitHub retains up to 100
+pending entries per group. This is a bounded queue, not an unlimited capacity guarantee.
 
 The GitHub Release contains the production JARs, `artifacts.json`, `quick-skin.cdx.json`, and
 deterministic `SHA256SUMS`. The artifact manifest binds the SBOM's path, size, and SHA-256;
@@ -87,10 +102,45 @@ Names that collide after GitHub's normalization are rejected before creating or 
 ## Recovery and verification
 
 Publication is retryable, not rollback-based. If a marketplace or GitHub API fails, rerun the
-failed workflow from GitHub Actions. Exact existing uploads are accepted; missing uploads resume;
+failed jobs from GitHub Actions. Exact existing uploads are accepted; unstarted uploads resume;
 an identity or byte conflict fails closed. Never delete the tag or release, use an asset-clobber
 flag, or invent a second version ID to hide a partial release. A genuine byte conflict requires a
 new logical version and therefore a new immutable identity.
+
+`Verify pending releases` wakes after a release/recovery run and on a five-minute schedule
+(GitHub may delay scheduled runs). Its read-only probe checks each pending draft once using
+public marketplace APIs, without upload secrets or a publication lock. It authenticates the
+original producer, protected source history, immutable tag, successful preparation and release
+E2E jobs, archive ID/digest, manifest and every staged file. Old source metadata is read as inert
+data by the current protected implementation. A failed upload job does not invalidate already
+successful preparation; reused jobs from failed-jobs-only reruns retain their exact run identity.
+
+When every file is verified, final publication still requires the protected `release` environment's
+human approval. The final job repeats authentication and byte checks under `release-publish`.
+One active verifier avoids duplicate approval requests; a human approval can hold that verifier's
+queue, while pending moderation itself ends the probe without waiting. The original bundle must
+remain available within its 90-day retention window. An expired or conflicting bundle fails closed.
+
+The durable row states are `unstarted`, `uploading`, `pending`, and `verified`. A green upload
+workflow with pending rows means the upload phase finished, not that the release is public.
+Both that workflow and the verifier write the individual states to their job summaries. The
+final immutable release retains the ledger, including each verified marketplace file ID.
+
+If a runner loses the upload response, `uploading` deliberately remains fenced even if the
+public API lists no file. Check the provider's author dashboard and original upload logs before
+any operator recovery; absence from the public listing cannot prove rejection. Only after
+confirming that the provider never accepted the file may an operator restore that single row
+to `unstarted`, under the publication lock. Never erase the ledger or reset accepted rows.
+Ordinary pending approval needs no rerun or reset. A manual probe is available with:
+
+```bash
+gh workflow run release-verify.yml --ref master -f release_tag=mc26.1-v3.0.0
+```
+
+The offline rehearsal runs in the release-policy tests before tagging and on each actual staged
+target bundle before attestation. It checks our publication contracts and recovery behavior;
+it cannot predict live provider outages or moderation time. Re-run it locally on an existing
+verified bundle with `python3 scripts/release/rehearse_publication.py --stage build/release`.
 
 ### Recover an unpublished release with a missing SBOM serial number
 
@@ -117,7 +167,8 @@ The corrected bundle retains the original source SHA and receives a new SBOM att
 original production provenance and packaged E2E evidence remain authoritative for its unchanged
 JARs. Publication jobs independently reauthenticate the tag and protected implementation, require
 the exact prepared manifest hash, and reverify every staged artifact before the ordinary immutable
-GitHub/marketplace reconciliation. The workflow uses the same `release` concurrency group.
+GitHub/marketplace reconciliation. Recovery uses the same durable publication ledger and short
+`release-publish` write lock; pending approval is verified by `release-verify.yml`.
 
 The declared `release` environment permits protected `master` for this explicit recovery as well
 as canonical tag runs, with the same required human reviewer. Apply the reviewed governance change

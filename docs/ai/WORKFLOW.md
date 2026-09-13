@@ -240,6 +240,20 @@ Release automation always rebuilds `scripts/release/build_matrix.py` with `--rer
 requires every production and harness SHA-256 to equal the first build. When determinism is in
 scope locally, use `scripts/release/verify_reproducibility.py` against the first staged manifest.
 
+Release preparation is bounded to four isolated build runners and four runtime slots per loader
+family (Fabric or Forge/NeoForge); every checkout still runs Gradle serially. Preserve pending
+entries with `queue: max` and `cancel-in-progress: false`. Only remote publication writers share
+the short `release-publish` lock. Never hold it while polling marketplace moderation.
+
+Before tagging, require the manual target rehearsal on the exact protected source. The offline
+publication simulation also runs in policy tests and on the real staged bundle before attestation.
+Preserve the durable draft-body ledger: save `uploading` before the upload, `pending` after accepted
+submission, and `verified` only after identity/hash reconciliation. Missing public listings never
+reset upload intent. The secretless scheduled verifier reads original source inputs as inert data,
+authenticates the original release evidence, and requests protected-environment finalization only
+after every row is verified. An upload workflow can succeed with pending moderation; report that
+state explicitly and retain the original tag, version, bundle and publication identities.
+
 The separate SBOM recovery workflow may retain a canonical tag's already tested JARs only after
 authenticating its full release rehearsal and original tag-push provenance. Its bounded metadata
 repair preserves the original source SHA and requires the protected release environment's human

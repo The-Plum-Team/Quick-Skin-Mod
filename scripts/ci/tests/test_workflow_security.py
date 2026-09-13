@@ -3212,6 +3212,59 @@ class WorkflowSecurityTest(unittest.TestCase):
                     workflow.count("curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}"), 1
                 )
 
+    def test_release_queues_preserve_pending_work_and_only_writers_share_the_lock(self) -> None:
+        release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
+        for filename in ("release.yml", "release-recovery.yml", "release-verify.yml"):
+            text = (WORKFLOWS / filename).read_text(encoding="utf-8")
+            self.assertEqual(text.count("concurrency:"), text.count("queue: max"))
+            self.assertEqual(text.count("concurrency:"), text.count("cancel-in-progress: false"))
+        for job in ("build", "runtime-behavior"):
+            block = job_block("release.yml", job)
+            self.assertNotIn("group: release-publish", block)
+            self.assertIn("runs-on: ubuntu-24.04", block)
+        self.assertIn("release_schedule.py", release)
+        self.assertIn("release-build-${{ needs.admit.outputs.slot }}", release)
+        self.assertIn("release-runtime-${{ needs.build.outputs.preparation_slot }}", release)
+        for filename in ("release.yml", "release-recovery.yml"):
+            for job in ("stage-github-release", "publish-marketplace", "publish-github-release"):
+                block = job_block(filename, job)
+                self.assertIn("group: release-publish", block)
+                self.assertIn("environment: release", block)
+
+    def test_upload_intent_precedes_external_write_and_moderation_has_no_poll_loop(self) -> None:
+        for filename in ("release.yml", "release-recovery.yml"):
+            workflow = (WORKFLOWS / filename).read_text(encoding="utf-8")
+            block = job_block(filename, "publish-marketplace")
+            self.assertLess(block.index("publication_state.py begin"), block.index("uses: Kira-NT/mc-publish@"))
+            self.assertGreater(block.index("publication_state.py accept"), block.index("uses: Kira-NT/mc-publish@"))
+            self.assertNotIn("--attempts", block)
+            self.assertNotIn("--delay-seconds", block)
+            self.assertIn("publication_state.py register", job_block(filename, "stage-github-release"))
+            final = job_block(filename, "publish-github-release")
+            self.assertIn("publication_state.py check", final)
+            self.assertIn("if: ${{ steps.settled.outputs.ready == 'true' }}", final)
+            self.assertIn("Rehearse publication and interrupted recovery", workflow)
+            self.assertLess(workflow.index("rehearse_publication.py"), workflow.index("uses: actions/attest@"))
+
+    def test_pending_verification_is_secretless_and_finalization_remains_protected(self) -> None:
+        workflow = (WORKFLOWS / "release-verify.yml").read_text(encoding="utf-8")
+        probe = job_block("release-verify.yml", "verify")
+        final = job_block("release-verify.yml", "finalize")
+        self.assertIn("workflow_run:", workflow)
+        self.assertIn("schedule:", workflow)
+        self.assertNotIn("secrets.", workflow)
+        self.assertNotIn("mc-publish", workflow)
+        self.assertNotIn("contents: write", probe)
+        self.assertNotIn("environment:", probe)
+        self.assertNotIn("--finalize", probe)
+        self.assertIn("environment: release", final)
+        self.assertIn("group: release-publish", final)
+        self.assertIn("--finalize", final)
+        for block in (probe, final):
+            self.assertIn("ref: ${{ github.sha }}", block)
+            self.assertIn("persist-credentials: false", block)
+            self.assertIn("verify_pending_publications.py", block)
+
     def test_curseforge_upload_is_never_retried_inside_the_action(self) -> None:
         for filename in ("release.yml", "release-recovery.yml"):
             with self.subTest(workflow=filename):
