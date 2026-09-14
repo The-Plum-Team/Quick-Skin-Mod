@@ -687,7 +687,7 @@ interface ModCompatibilityFeature {
 
         /**
          * Fail before visual review when a modern child overlay carries its parent's pose locally.
-         * Minecraft 1.21.6 moved these parts below their matching body parts, so a copied parent
+         * Minecraft 1.21.2 moved these parts below their matching body parts, so a copied parent
          * pivot deterministically proves the same detached/splayed geometry that the screenshot
          * contract forbids.
          */
@@ -752,7 +752,7 @@ interface ModCompatibilityFeature {
                 return false;
             }
             try {
-                return Integer.parseInt(runtimeVersion.substring(prefix.length())) >= 6;
+                return Integer.parseInt(runtimeVersion.substring(prefix.length())) >= 2;
             } catch (NumberFormatException ignored) {
                 return false;
             }

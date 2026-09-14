@@ -1934,7 +1934,7 @@ public class PlayerModelRenderer {
                 || (now - lastAnimationUpdate) >= ANIMATION_UPDATE_INTERVAL_MS;
 
         if (!shouldUpdate) {
-//? if <1.21.6 {
+//? if <1.21.2 {
             // Keep previous pose, just update hat/sleeves to match
             model.hat.copyFrom(model.head);
             model.leftSleeve.copyFrom(model.leftArm);
@@ -1943,7 +1943,7 @@ public class PlayerModelRenderer {
             model.rightPants.copyFrom(model.rightLeg);
             model.jacket.copyFrom(model.body);
 //?} else {
-            // In MC 1.21.6+, outer layers are children of their corresponding body parts and
+            // In MC 1.21.2+, outer layers are children of their corresponding body parts and
             // inherit every transform. Keep their local pose at its baked value so a reused
             // preview model can never apply the parent's pivot or rotation twice.
             resetOuterLayerTransforms(model);
@@ -1985,16 +1985,16 @@ public class PlayerModelRenderer {
                 break;
         }
 
-//? if <1.21.6 {
+//? if <1.21.2 {
         // Hat layer (outer layer of head) follows head rotation
         model.hat.copyFrom(model.head);
 //?} else {
-        // In MC 1.21.6+, outer layers inherit their parent transforms.
+        // In MC 1.21.2+, outer layers inherit their parent transforms.
         resetOuterLayerTransforms(model);
     }
 //?}
 
-//? if <1.21.6 {
+//? if <1.21.2 {
         // Setup arm rendering
         model.leftSleeve.copyFrom(model.leftArm);
         model.rightSleeve.copyFrom(model.rightArm);
@@ -2004,7 +2004,7 @@ public class PlayerModelRenderer {
 //?} else {
     /**
      * Restore the baked local transforms of child outer layers.
-     * In MC 1.21.6+, hat, sleeves, pants, and jacket are children of their corresponding body
+     * In MC 1.21.2+, hat, sleeves, pants, and jacket are children of their corresponding body
      * parts. Copying a parent pose into one of these children applies its pivot and rotation twice.
      */
     private static void resetOuterLayerTransforms(PlayerModel model) {
