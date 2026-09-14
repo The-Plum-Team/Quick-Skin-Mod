@@ -1735,7 +1735,8 @@ public final class FullScenario implements Scenario {
                 return false;
             }
             case 1: // hold the editor with an empty chest, then grab the control frame
-                if (hold.incrementAndGet() < CAPE_PROBE_HOLD_TICKS) return false;
+                if (!settledPreviewHeld(mc, hold, failure)) return false;
+                if (failure.get() != null) return true;
                 if (!VanillaShim.screenshot(mc, emptyShot)) {
                     failure.set("could not grab the empty-chest frame " + emptyShot);
                     return true;
@@ -1758,7 +1759,8 @@ public final class FullScenario implements Scenario {
                 return false;
             }
             case 3: // hold with nothing changed, then grab the still frame
-                if (hold.incrementAndGet() < CAPE_PROBE_HOLD_TICKS) return false;
+                if (!settledPreviewHeld(mc, hold, failure)) return false;
+                if (failure.get() != null) return true;
                 if (!VanillaShim.screenshot(mc, stillShot)) {
                     failure.set("could not grab the still frame " + stillShot);
                     return true;
@@ -1772,7 +1774,8 @@ public final class FullScenario implements Scenario {
                 return false;
             case 5: // hold the elytra frame, re-asserting the slot, then grab it
                 equipElytra(mc); // creative inventory sync can clear it back out
-                if (hold.incrementAndGet() < CAPE_PROBE_HOLD_TICKS) return false;
+                if (!settledPreviewHeld(mc, hold, failure)) return false;
+                if (failure.get() != null) return true;
                 if (mc.player == null
                         || !mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)) {
                     failure.set("the elytra would not stay in the CHEST slot");
@@ -1805,6 +1808,27 @@ public final class FullScenario implements Scenario {
                 return true;
             }
         }
+    }
+
+    /**
+     * Counts one hold tick only once the editor's preview has stopped turning.
+     *
+     * <p>The preview eases toward its pose once per rendered frame, not per tick, so on a slow
+     * runner a tick-counted hold could end mid-turn: the region measured in the control frame then
+     * sat at the cape's edge and later grabs lost whole columns as it kept sliding. Returns true
+     * with a recorded failure if the preview is gone, so the step fails with a reason.
+     */
+    private boolean settledPreviewHeld(Minecraft mc, AtomicInteger hold, AtomicReference<String> failure) {
+        PlayerWidget widget = capeEditorPreviewWidget(mc);
+        if (widget == null) {
+            failure.set("the cape editor's 3D preview disappeared during the probe");
+            return true;
+        }
+        if (widget.getBodyYaw() != widget.getTargetYRotation()) {
+            hold.set(0);
+            return false;
+        }
+        return hold.incrementAndGet() >= CAPE_PROBE_HOLD_TICKS;
     }
 
     /** What the three frames say: the previewed cape has to survive the worn elytra. */
