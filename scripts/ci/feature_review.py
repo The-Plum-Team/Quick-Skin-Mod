@@ -476,6 +476,13 @@ def main() -> int:
             with args.github_output.open("a", encoding="utf-8") as stream:
                 for key, value in result.items():
                     stream.write(f"{key}={str(value).lower() if isinstance(value, bool) else value}\n")
+    except publisher.GitHubGetUnavailable:
+        # A failed GET cannot establish that this durable capsule is terminally invalid.
+        # Only protected proof verification may emit the retention signal; no log parsing.
+        if args.verify_proof is not None and args.github_output is not None:
+            with args.github_output.open("a", encoding="utf-8") as stream:
+                stream.write("proof_transport_unavailable=true\n")
+        parser.exit(2, "Selected review admission unavailable: bounded GitHub GET failed or timed out\n")
     except (OSError, ValueError, publisher.subprocess.SubprocessError) as exc:
         parser.exit(2, f"Selected review admission failed: {exc}\n")
     return 0

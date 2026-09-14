@@ -124,6 +124,16 @@ neither is proof that the recovery input can be deleted. Missing and terminally 
 inputs retain their existing exact-ID cleanup. Canonical certificate admission still
 rejects cancelled report owners; it has not been relaxed to compensate for lost inputs.
 
+If the bounded GitHub GET fails while `feature_review.py --verify-proof` reauthenticates
+the source, the verifier still fails before model admission but emits a typed protected
+retention signal. The failed capsule step maps only that signal to a sanitized
+`github_transport_unavailable` attempt marker. Its `transient: true` disposition retains
+the original capsule for the existing target-scoped cooldown and scheduled retry; it
+does not establish an HTTP status, quota cause, or successful proof. Response-size, JSON,
+digest, source, attempt and capsule validation failures remain nontransient. No error-text
+matching, new retry loop or extra dispatch is added. Historical implementation checkouts
+without this typed signal retain their original classification behavior.
+
 Both generic and exact queue selectors suppress retained inputs while their authenticated
 reports have successful, failed or in-progress owners, and reopen them after cancellation.
 Fresh reports start their own seven-day retention after their reviewed input's upload,
