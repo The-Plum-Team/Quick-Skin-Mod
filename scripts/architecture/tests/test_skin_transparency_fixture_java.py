@@ -27,10 +27,24 @@ import javax.imageio.ImageIO;
 
 public final class FixtureCanary {
     static final boolean[][] edited = new boolean[64][64];
+    static boolean checkRegisteredAlpha;
+    static int rejectedMutations;
     static void alpha(BufferedImage image, int x, int y, int expected) {
         int actual = image.getRGB(x, y) >>> 24;
         if (actual != expected) throw new AssertionError(x + "," + y + ": alpha " + actual + " != " + expected);
         edited[y][x] = true;
+        if (checkRegisteredAlpha) {
+            int before = image.getRGB(x, y);
+            int wrongAlpha = expected == 255 ? 128 : 255;
+            image.setRGB(x, y, (wrongAlpha << 24) | (before & 0xFFFFFF));
+            String mismatch = SkinTransparencyFixture.armAlphaMismatch(image);
+            if (mismatch == null || !mismatch.contains("(" + x + "," + y + ")")) {
+                throw new AssertionError("registered arm corruption not identified at " + x + "," + y);
+            }
+            if ((image.getRGB(x, y) >>> 24) != wrongAlpha) throw new AssertionError("validator repaired input");
+            image.setRGB(x, y, before);
+            rejectedMutations++;
+        }
     }
     static void arm(BufferedImage image, int u, int v, int overlayU, int overlayV) {
         // Classic geometry has four 4x12 side faces and two 4x4 caps. This skin's
@@ -56,8 +70,13 @@ public final class FixtureCanary {
         BufferedImage image = ImageIO.read(new File(args[0]));
         int[] before = image.getRGB(0, 0, 64, 64, null, 0, 64);
         SkinTransparencyFixture.apply(image);
+        if (SkinTransparencyFixture.armAlphaMismatch(image) != null) throw new AssertionError("valid arms rejected");
+        checkRegisteredAlpha = true;
         arm(image, 40, 16, 40, 32);
         arm(image, 32, 48, 48, 48);
+        checkRegisteredAlpha = false;
+        if (rejectedMutations != 960) throw new AssertionError("incomplete registered-UV mutation coverage");
+        if (SkinTransparencyFixture.armAlphaMismatch(image) != null) throw new AssertionError("restored arms rejected");
         for (int y = 23; y < 29; y++) for (int x = 34; x < 38; x++) alpha(image, x, y, 0);
         for (int y = 0; y < 64; y++) {
             for (int x = 0; x < 64; x++) {
@@ -71,6 +90,12 @@ public final class FixtureCanary {
             SkinTransparencyFixture.apply(new BufferedImage(64, 32, BufferedImage.TYPE_INT_ARGB));
             throw new AssertionError("legacy UVs accepted as classic");
         } catch (IllegalArgumentException expected) {}
+        if (SkinTransparencyFixture.armAlphaMismatch(new BufferedImage(64, 32, BufferedImage.TYPE_INT_ARGB)) == null) {
+            throw new AssertionError("registered legacy UVs accepted as classic");
+        }
+        if (SkinTransparencyFixture.armAlphaMismatch(new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB)) == null) {
+            throw new AssertionError("registered HD UVs accepted as classic");
+        }
         System.out.println("transparency fixture canaries passed");
     }
 }
@@ -86,6 +111,17 @@ public final class FixtureCanary {
             ], capture_output=True, text=True, timeout=30)
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             self.assertIn("transparency fixture canaries passed", result.stdout)
+
+    def test_runtime_checks_registered_bytes_before_reporting_opacity(self):
+        source = (HARNESS / "java/com/quickskin/mod/e2e/scenario/SkinFidelitySteps.java").read_text()
+        first_person = source.split('Step.of("base_layer_transparency_first_person")', 1)[1]
+        first_person = first_person.split('Step.of("transparency_disabled")', 1)[0]
+        self.assertIn("BufferedImage decoded = decodeFull(transparentSkinHash)", first_person)
+        self.assertIn("SkinTransparencyFixture.armAlphaMismatch(decoded)", first_person)
+        self.assertIn('Step.Result.fail("first-person arm " + armMismatch)', first_person)
+        self.assertNotIn("SkinTransparencyFixture.apply(", first_person)
+        self.assertNotIn("arm mixin renders", first_person)
+        self.assertIn("not framebuffer occlusion measurements", first_person)
 
 
 if __name__ == "__main__":

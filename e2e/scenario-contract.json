@@ -1993,7 +1993,7 @@
               "capture": {
                 "title": "Translucent first-person arm",
                 "review_tier": "all",
-                "expectation": "A normal first-person world view whose lower-right player arm is the half-transparent plaid sleeve: the world shows faintly through the sleeve while the brown hand stays solid.",
+                "expectation": "A normal first-person world view with the half-transparent plaid sleeve in the lower right; the world shows faintly through the sleeve away from the hand. The brown hand rim and checker-pattern end cap remain intact and opaque. In this pose the nearer sleeve overlays the back of that cap, so its brown checks can look dark through the sleeve. Shading may differ across versions, but the cap must not be missing or replaced by unobstructed world.",
                 "probes": []
               },
               "requires": [
