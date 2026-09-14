@@ -1302,6 +1302,13 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         graphics.pose().translate(-5, -8);
 //?}
 
+        // Immediate GUI blits (1.20.1, 1.21.1) use the current blend state, which is disabled by the
+        // time the grid draws, so a half-transparent cape face showed opaque only on those targets.
+        // Later GUI render types always blend it, as the worn cape does on every version.
+//? if <1.21.2 {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+//?}
 //? if <1.21 {
         GuiCompat.blit(graphics, texture,
                 0, 0, 10, 16, u, v, uWidth, vHeight, textureWidth, textureHeight);
@@ -1309,6 +1316,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         MinecraftCompat.INSTANCE.blit(graphics, texture, 0, 0, 10, 16, u, v, uWidth, vHeight, textureWidth, textureHeight);
 //?} else {
         GuiCompat.blit(graphics, texture, 0, 0, 10, 16, u, v, uWidth, vHeight, textureWidth, textureHeight);
+//?}
+//? if <1.21.2 {
+        RenderSystem.disableBlend();
 //?}
 
 //? if <1.21.6 {

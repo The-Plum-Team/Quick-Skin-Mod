@@ -1238,7 +1238,8 @@ jobs:
             python3 scripts/ci/feature_review.py \
               --github-repository "$GITHUB_REPOSITORY" --repository . \
               --source-run-id "$SOURCE_RUN_ID" --source-sha "$IMPLEMENTATION_SHA" \
-              --bundle-key "$BUNDLE_KEY" --verify-proof "$proof" --manifest "$manifest"
+              --bundle-key "$BUNDLE_KEY" --verify-proof "$proof" --manifest "$manifest" \
+              --github-output "$GITHUB_OUTPUT"
           elif [[ "$(jq -er .review_mode "$proof")" == reference-comparison ]]; then
             reference_branch="$(jq -er .visual_reference.branch "$proof")"
             reference_sha="$(jq -er .visual_reference.sha "$proof")"
@@ -2116,10 +2117,19 @@ jobs:
           mkdir -p "$capsule"
           failure="$capsule/visual-review-failure.json"
           if [[ ! -f "$failure" ]]; then
-            jq -n \
-              '{schema_version:1,category:"protected_validation",
-                stage:"drain",transient:false}' \
-              > "$failure"
+            if [[ "${{ steps.capsule.outcome }}" == failure &&
+                  "${{ steps.capsule.outputs.proof_transport_unavailable }}" == true ]]; then
+              # Retryable retention is not a claim about an HTTP status or provider quota.
+              jq -n \
+                '{schema_version:1,category:"github_transport_unavailable",
+                  stage:"proof_reauthentication",transient:true}' \
+                > "$failure"
+            else
+              jq -n \
+                '{schema_version:1,category:"protected_validation",
+                  stage:"drain",transient:false}' \
+                > "$failure"
+            fi
           fi
           category="$(jq -er \
             'select(.schema_version == 1 and

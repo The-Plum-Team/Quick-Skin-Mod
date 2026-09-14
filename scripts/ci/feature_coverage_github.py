@@ -36,6 +36,10 @@ class ArtifactInventoryLimit(coverage.CoverageError):
     """A valid inventory exceeds this reader's bounded first page."""
 
 
+class GitHubGetUnavailable(coverage.CoverageError):
+    """The bounded GET failed without admitting evidence or identifying its HTTP cause."""
+
+
 def _get(endpoint: str, *, maximum: int) -> bytes:
     process = subprocess.Popen(["gh", "api", "--method", "GET", endpoint],
                                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -49,8 +53,10 @@ def _get(endpoint: str, *, maximum: int) -> bytes:
             process.kill()
             raise coverage.CoverageError("GitHub response exceeds its byte limit")
         if process.wait(timeout=5) != 0:
-            raise coverage.CoverageError("bounded GitHub GET failed or timed out")
+            raise GitHubGetUnavailable("bounded GitHub GET failed or timed out")
         return raw
+    except subprocess.TimeoutExpired as exc:
+        raise GitHubGetUnavailable("bounded GitHub GET failed or timed out") from exc
     finally:
         timer.cancel()
         if process.poll() is None:
