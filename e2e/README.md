@@ -53,7 +53,7 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.2` | `26.2` | Fabric | `25` | `11` |
 | `neoforge-26.2` | `26.2` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `71507fad706a8959ebe9e03a316ad9d6f3565728de11586c495a3935986f5832`
+Scenario contract SHA-256: `abcd9ca1d82dda3067fc65b54cf1caf0642bf4315eea0a2e59f9f3fd64a8e217`
 Contract totals: `128` ordered steps, `97` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -353,7 +353,15 @@ an auto-detected slim layout, a converted 64x32 legacy skin with mirrored blue l
 HD skin whose one-pixel torso checker must survive rendering, and a base-layer transparent skin
 captured before and after the real Disable Skin Transparency checkbox flattens it. Its sleeves
 are half-transparent on every base face with opaque hands; cleared arm overlays let both the
-first-person and rear-view captures inspect the base layer. Catalog
+first-person and rear-view captures inspect the base layer. The first-person assertion checks
+every registered arm texel: all sleeve sides and shoulders stay alpha 128, the brown hand side
+rows and end caps stay alpha 255, and the complete arm overlays stay alpha 0. At that camera angle,
+the nearer translucent sleeve overlays the back of the opaque brown checker-pattern end cap.
+The cap's brown checks can therefore look darker than the directly visible opaque brown rim; two-sided
+lighting can also change that shading across Minecraft versions. This is not a claim of framebuffer
+depth or occlusion readback: visual review still requires an intact hand and rejects a missing cap
+or unobstructed world replacing it. Neither the review region nor the independent semantic and
+reference checks are narrowed. Catalog
 checkpoints rename, sort, protect, and delete entries through the real skin-menu paths and show
 the own-skin deletion toast and the stale-id fallback. Cape checkpoints import a translucent cape
 through the real drop workflow (vanilla elytra composited into its transparent elytra area), open

@@ -21,6 +21,36 @@ public final class SkinTransparencyFixture {
         setAlpha(image, 48, 48, 16, 16, 0);
     }
 
+    /** Checks every arm texel in the registered image, without repairing or reapplying the fixture. */
+    public static String armAlphaMismatch(BufferedImage image) {
+        if (image.getWidth() != 64 || image.getHeight() != 64) {
+            return "arm alpha evidence requires a 64x64 classic skin";
+        }
+        String mismatch = armAlphaMismatch(image, 40, 16, 40, 32);
+        return mismatch != null ? mismatch : armAlphaMismatch(image, 32, 48, 48, 48);
+    }
+
+    private static String armAlphaMismatch(BufferedImage image, int u, int v, int overlayU, int overlayV) {
+        String mismatch = alphaMismatch(image, u, v + 4, 16, 11, 128);
+        if (mismatch == null) mismatch = alphaMismatch(image, u, v + 15, 16, 1, 255);
+        if (mismatch == null) mismatch = alphaMismatch(image, u + 4, v, 4, 4, 128);
+        if (mismatch == null) mismatch = alphaMismatch(image, u + 8, v, 4, 4, 255);
+        if (mismatch == null) mismatch = alphaMismatch(image, overlayU, overlayV, 16, 16, 0);
+        return mismatch;
+    }
+
+    private static String alphaMismatch(BufferedImage image, int x, int y, int width, int height, int expected) {
+        for (int row = y; row < y + height; row++) {
+            for (int column = x; column < x + width; column++) {
+                int actual = image.getRGB(column, row) >>> 24;
+                if (actual != expected) {
+                    return "(" + column + "," + row + ") alpha " + actual + " expected " + expected;
+                }
+            }
+        }
+        return null;
+    }
+
     private static void setAlpha(BufferedImage image, int x, int y, int width, int height, int alpha) {
         for (int row = y; row < y + height; row++) {
             for (int column = x; column < x + width; column++) {

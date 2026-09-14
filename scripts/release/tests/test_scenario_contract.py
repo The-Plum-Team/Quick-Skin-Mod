@@ -682,6 +682,14 @@ class ScenarioContractTest(unittest.TestCase):
             self.contract.review_regions_for(cpm_delayed.capture_id),
         )
 
+    def test_translucent_first_person_hand_keeps_opaque_cap_and_full_review_region(self) -> None:
+        capture = self.contract.capture_by_id("full.client_a.base_layer_transparency_first_person")
+        self.assertIn("brown hand rim and checker-pattern end cap remain intact and opaque", capture.expectation)
+        self.assertIn("nearer sleeve overlays the back of that cap", capture.expectation)
+        self.assertIn("must not be missing or replaced by unobstructed world", capture.expectation)
+        self.assertEqual(((0.7, 0.42, 1.0, 0.98),), self.contract.review_regions_for(capture.capture_id))
+        self.assertEqual("all", capture.review_tier)
+
     def test_comparisons_preserve_thresholds_regions_and_order(self) -> None:
         def values(scenario: str, role: str) -> list[tuple[object, ...]]:
             return [
