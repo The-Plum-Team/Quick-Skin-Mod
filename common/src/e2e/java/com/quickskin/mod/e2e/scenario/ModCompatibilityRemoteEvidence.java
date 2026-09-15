@@ -33,6 +33,8 @@ final class ModCompatibilityRemoteEvidence {
     private volatile CompatibilityProbe.Result probe =
             new CompatibilityProbe.Result(false, "probe not executed");
     private volatile boolean remoteBaselineObserved;
+    private String lastWaitReason;
+    private int waitReasonLogs;
 
     private double targetX;
     private double targetY;
@@ -121,6 +123,51 @@ final class ModCompatibilityRemoteEvidence {
                     : checkRemoteCpmBaseline(subject);
         }
         return Step.Result.fail("unsupported remote compatibility mod " + modId);
+    }
+
+    /**
+     * Whether Bob can capture a remote checkpoint: at the rear vantage, seeing Alice's asserted
+     * state, with the terrain around her compiled by his renderer. Each changed waiting reason is
+     * logged, up to a bound, so a step timeout still records which condition never held.
+     */
+    boolean observerReady(String step, Minecraft minecraft, String modId, boolean applied) {
+        String reason = null;
+        if (!atVantage(minecraft)) {
+            reason = "not yet at the rear vantage with Alice in view";
+        } else {
+            Step.Result state = checkRemoteState(minecraft, modId, applied);
+            if (!state.pass()) {
+                reason = state.message();
+            } else {
+                Step.Result rendered = checkSubjectRendered(minecraft);
+                if (!rendered.pass()) reason = rendered.message();
+            }
+        }
+        if (reason != null && !reason.equals(lastWaitReason) && waitReasonLogs < 32) {
+            waitReasonLogs++;
+            E2ELog.info(step + " waiting: " + reason);
+        }
+        lastWaitReason = reason;
+        return reason == null;
+    }
+
+    /**
+     * Whether Bob's renderer has compiled the terrain holding Alice. Vanilla draws an entity only
+     * once its section is compiled, so an earlier frame shows sky and hotbar without Alice even
+     * when every appearance assertion already holds on Bob's client.
+     */
+    Step.Result checkSubjectRendered(Minecraft minecraft) {
+        AbstractClientPlayer subject = findOther(minecraft);
+        if (subject == null) return Step.Result.fail("Alice is not present on Bob's client");
+        var position = subject.blockPosition();
+        if (minecraft.level == null || minecraft.level.getBlockState(position.below()).isAir()) {
+            return Step.Result.fail("the terrain below Alice is not loaded on Bob's client");
+        }
+        if (!VanillaShim.isTerrainRenderReady(minecraft, position)
+                || !VanillaShim.isTerrainRenderReady(minecraft, position.below())) {
+            return Step.Result.fail("Bob's renderer has not compiled the terrain around Alice");
+        }
+        return Step.Result.pass("Bob's renderer compiled the terrain around Alice");
     }
 
     boolean observerAcknowledged(Minecraft minecraft) {
