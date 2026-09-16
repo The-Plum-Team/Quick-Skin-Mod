@@ -226,7 +226,11 @@ public final class GuiCompat {
         List<ClientTooltipComponent> components = List.of(
                 ClientTooltipComponent.create(text.getVisualOrderText())
         );
+            //? if <26.3 {
         graphics.tooltip(font, components, mouseX, mouseY, DefaultTooltipPositioner.INSTANCE, null);
+            //?} else {
+        graphics.tooltip(font, components, mouseX, mouseY, DefaultTooltipPositioner.INSTANCE, null, false);
+            //?}
         //?}
     //?}
     }
@@ -255,7 +259,11 @@ public final class GuiCompat {
         List<ClientTooltipComponent> components = lines.stream()
                 .map(line -> ClientTooltipComponent.create(line.getVisualOrderText()))
                 .collect(Collectors.toList());
+            //? if <26.3 {
         graphics.tooltip(font, components, mouseX, mouseY, DefaultTooltipPositioner.INSTANCE, null);
+            //?} else {
+        graphics.tooltip(font, components, mouseX, mouseY, DefaultTooltipPositioner.INSTANCE, null, false);
+            //?}
         //?}
     //?}
     }

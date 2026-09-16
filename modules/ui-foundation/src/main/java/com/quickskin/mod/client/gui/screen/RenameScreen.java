@@ -3,6 +3,7 @@ package com.quickskin.mod.client.gui.screen;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.effect.BlurHandler;
 import com.quickskin.mod.client.gui.util.ButtonFactory;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 //? if <26.1 {
@@ -15,7 +16,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.function.Consumer;
 
@@ -123,7 +123,7 @@ public class RenameScreen extends Screen {
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
         int keyCode = GuiCompat.keyCode(event);
     //?}
-        if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+        if (keyCode == InputConstants.KEY_RETURN || keyCode == InputConstants.KEY_NUMPADENTER) {
             if (this.confirmButton.active) {
                 //? if <1.21.9 {
                 this.confirmButton.onPress();

@@ -7,7 +7,11 @@ import dev.architectury.event.events.client.ClientScreenInputEvent;
 import dev.architectury.event.events.client.ClientTickEvent;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+//? if <26.3 {
 import org.lwjgl.glfw.GLFW;
+//?} else {
+import org.lwjgl.sdl.SDLMouse;
+//?}
 
 /** Registers the HUD preview's input, tick and render callbacks as one client feature. */
 @Environment(EnvType.CLIENT)
@@ -29,9 +33,14 @@ public final class HudPreviewIntegration {
                 //? if <1.21.9 {
                 boolean leftMouseDown = GLFW.glfwGetMouseButton(client.getWindow().getWindow(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
                 boolean rightMouseDown = GLFW.glfwGetMouseButton(client.getWindow().getWindow(), GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
-                //?} else {
+                //?} else if <26.3 {
                 boolean leftMouseDown = GLFW.glfwGetMouseButton(client.getWindow().handle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
                 boolean rightMouseDown = GLFW.glfwGetMouseButton(client.getWindow().handle(), GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
+                //?} else {
+                // SDL replaced GLFW, and MouseHandler records its pressed flags only without a screen.
+                int buttons = SDLMouse.SDL_GetMouseState(null, null);
+                boolean leftMouseDown = (buttons & SDLMouse.SDL_BUTTON_LMASK) != 0;
+                boolean rightMouseDown = (buttons & SDLMouse.SDL_BUTTON_RMASK) != 0;
                 //?}
                 double mouseX = client.mouseHandler.xpos() * (double)client.getWindow().getGuiScaledWidth() / (double)client.getWindow().getScreenWidth();
                 double mouseY = client.mouseHandler.ypos() * (double)client.getWindow().getGuiScaledHeight() / (double)client.getWindow().getScreenHeight();

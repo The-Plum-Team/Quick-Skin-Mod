@@ -519,8 +519,14 @@ public class CapeLayerMixin {
         capeModel.setupAnim(renderState);
 
         // Submit the cape model with our custom render type
+    //? if <26.3 {
         buffer.submitModel(capeModel, renderState, poseStack, renderType, packedLight,
                 OverlayTexture.NO_OVERLAY, renderState.outlineColor, null);
+    //?} else {
+        // 26.3 submits crumbling overlays separately, so models no longer take one.
+        buffer.submitModel(capeModel, renderState, poseStack, renderType, packedLight,
+                OverlayTexture.NO_OVERLAY, renderState.outlineColor);
+    //?}
 //?}
 
         ci.cancel();

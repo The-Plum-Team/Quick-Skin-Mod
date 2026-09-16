@@ -132,7 +132,11 @@ public class GuiSkinRendererMixin {
         poseStack.pushPose();
         cape.bodyModel().body.translateAndRotate(poseStack);
         poseStack.translate(0.0, 0.0, 0.125);
+//? if <26.3 {
         poseStack.mulPose(Axis.XP.rotationDegrees(6.0F));
+//?} else {
+        poseStack.rotate(Axis.XP.rotationDegrees(6.0F));
+//?}
 //? if <26.2 {
         cape.capeModel().body.getChild("cape").render(
                 poseStack, capeConsumer, 15728880, OverlayTexture.NO_OVERLAY);

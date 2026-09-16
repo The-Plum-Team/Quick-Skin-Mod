@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.quickskin.mod.platform.MinecraftCompat;
 import com.quickskin.mod.platform.MinecraftGifDecoder;
 
@@ -1447,7 +1448,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
 
         // Handle scrollbar dragging
-        if (button == 0 && this.maxScroll > 0) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && this.maxScroll > 0) {
             int scrollbarWidth = scaleValue(6);
             int scrollbarX = this.gridX + this.gridWidth + 3;
             int scrollbarTrackHeight = this.gridHeight;
@@ -1472,7 +1473,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         // Handle cape selection
-        if (button == 0 && isMouseOverGrid((int) mouseX, (int) mouseY)) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && isMouseOverGrid((int) mouseX, (int) mouseY)) {
             CapeEntry clickedCape = getCapeAt((int) mouseX, (int) mouseY);
             if (clickedCape != null) {
                 // Check for delete button click (only for local capes, not "None")
@@ -1624,7 +1625,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
         int button = GuiCompat.mouseButton(event);
 //?}
-        if (button == 0) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             this.isDraggingScrollbar = false;
         }
 //? if <1.21.9 {

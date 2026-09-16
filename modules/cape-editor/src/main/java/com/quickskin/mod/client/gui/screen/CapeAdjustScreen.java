@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.NativeImage;
 //? if <1.21.6 {
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -1666,7 +1667,7 @@ public class CapeAdjustScreen extends Screen {
         }
 
         // Start dragging if clicked inside the grid area
-        if (button == 0 && mouseX >= gridX && mouseX <= gridX + gridW
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && mouseX >= gridX && mouseX <= gridX + gridW
                 && mouseY >= gridY && mouseY <= gridY + gridH) {
             isDragging = true;
             dragStartX = mouseX;
@@ -1685,7 +1686,7 @@ public class CapeAdjustScreen extends Screen {
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
         int button = GuiCompat.mouseButton(event);
     //?}
-        if (button == 0 && isDragging) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && isDragging) {
             isDragging = false;
             previewDirty = true;
             return true;
@@ -1706,7 +1707,7 @@ public class CapeAdjustScreen extends Screen {
         double mouseY = GuiCompat.mouseY(event);
         int button = GuiCompat.mouseButton(event);
     //?}
-        if (isDragging && button == 0) {
+        if (isDragging && button == InputConstants.MOUSE_BUTTON_LEFT) {
             // Convert display-space drag to cape-space
             double deltaX = (mouseX - dragStartX) / displayScale;
             double deltaY = (mouseY - dragStartY) / displayScale;

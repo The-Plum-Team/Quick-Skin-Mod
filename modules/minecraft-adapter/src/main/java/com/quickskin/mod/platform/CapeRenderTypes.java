@@ -19,7 +19,8 @@ public final class CapeRenderTypes {
      * contain an opaque back and a translucent front; a double-sided material draws that opaque
      * back through the front and hides the player's skin. Minecraft removed the old entity
      * factory in 1.21.2; its remaining culled translucent material also supports Fabulous's
-     * item/entity target (and the GUI pipeline's explicit output target).
+     * item/entity target (and the GUI pipeline's explicit output target). Minecraft 26.3 replaced
+     * those output targets with order-independent transparency and kept only the culled material.
      */
     //? if <1.21.11 {
     public static RenderType translucent(ResourceLocation texture) {
@@ -32,8 +33,10 @@ public final class CapeRenderTypes {
         return RenderType.itemEntityTranslucentCull(texture);
         //?} else if <26.1 {
         return RenderTypes.itemEntityTranslucentCull(texture);
-        //?} else {
+        //?} else if <26.3 {
         return RenderTypes.entityTranslucentCullItemTarget(texture);
+        //?} else {
+        return RenderTypes.entityTranslucentCull(texture);
         //?}
     }
 }
