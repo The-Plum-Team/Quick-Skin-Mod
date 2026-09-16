@@ -45,6 +45,10 @@ MAX_ARTIFACTS = 10_000
 MAX_INPUT_BYTES = 536_870_912
 DEFAULT_COOLDOWN_MINUTES = 30
 MAX_NAMED_ARTIFACTS = 1_000
+# GitHub keeps an artifact's record in the listing long after its retention expires, so a busy
+# name accumulates records without bound. Live records stay bounded by MAX_NAMED_ARTIFACTS; this
+# separate page bound keeps the scan itself bounded and still fails closed.
+MAX_NAMED_PAGES = 200
 MAX_CAPACITY_FANOUT = 256
 REQUEST_ATTEMPTS = 4
 RATE_LIMIT_REQUEST_ATTEMPTS = 4
@@ -785,7 +789,7 @@ class GitHubApi:
         if not name or len(name) > 255:
             raise QueueError("artifact name is invalid")
         artifacts: list[Artifact] = []
-        for page in range(1, 12):
+        for page in range(1, MAX_NAMED_PAGES + 1):
             query = urllib.parse.urlencode(
                 {"name": name, "per_page": 100, "page": page}
             )
@@ -797,10 +801,18 @@ class GitHubApi:
             ):
                 raise QueueError("artifact inventory response is invalid")
             batch = payload["artifacts"]
+            # An expired record carries no downloadable evidence, and every consumer rejects one
+            # before authenticating it. Keeping expired records out of the returned window is what
+            # the callers already do; counting them toward the live bound only made a name that
+            # has been used often enough fail closed forever.
             artifacts.extend(
-                parse_artifact(item)
-                for item in batch
-                if isinstance(item, dict) and item.get("name") == name
+                parsed
+                for parsed in (
+                    parse_artifact(item)
+                    for item in batch
+                    if isinstance(item, dict) and item.get("name") == name
+                )
+                if not parsed.expired
             )
             if len(artifacts) > MAX_NAMED_ARTIFACTS:
                 raise QueueError(
@@ -808,7 +820,9 @@ class GitHubApi:
                 )
             if len(batch) < 100:
                 return artifacts
-        raise QueueError(f"visual review artifact name exceeds {MAX_NAMED_ARTIFACTS}")
+        raise QueueError(
+            f"visual review artifact name exceeds {MAX_NAMED_PAGES} listing pages"
+        )
 
     def get_artifact(self, artifact_id: int) -> Artifact | None:
         if artifact_id <= 0:

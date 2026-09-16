@@ -144,6 +144,14 @@ is no new scheduled cleanup dispatch, and suppression while a marker exists is n
 claim of zero future inference after marker expiry.
 Expiry, not a guaranteed later wake, is normal retirement for completed inputs.
 
+GitHub keeps an artifact's listing record after its retention expires, so a name that is
+used every generation accumulates records indefinitely: `mod-compatibility-plan` held 1,031
+records on 2026-09-16, of which only 155 were live. Named lookups therefore collect and bound
+live records only, which is what every consumer already admits, and a separate 200-page bound
+keeps the scan itself finite and fail-closed. Counting expired history against the live bound
+previously made scheduled compatibility recovery fail permanently once a name crossed 1,000
+records, and would have done the same to the shared capacity circuit.
+
 This durability has an explicit storage/API cost. Admission allows at most 512 MiB per
 input: one 16-target generation can retain up to 8 GiB for seven days (up to 56 GiB with
 one such generation daily), excluding reports, caches and one-day prepared wrappers.
