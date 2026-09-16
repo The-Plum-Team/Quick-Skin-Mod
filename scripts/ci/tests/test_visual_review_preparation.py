@@ -699,7 +699,8 @@ class HistoricalStageReplayTest(unittest.TestCase):
     def test_all_targets_and_actual_provider_counters_are_preserved(self):
         reference = json.loads((Path(__file__).parent / "fixtures/visual-review-stage-reference.json").read_text())
         rows = reference["rows"]
-        self.assertEqual({row["bundle_key"] for row in inventory()["include"]}, {row["bundle"] for row in rows})
+        # The saved generation predates later matrix targets; each of its targets is still current.
+        self.assertLessEqual({row["bundle"] for row in rows}, {row["bundle_key"] for row in inventory()["include"]})
         self.assertEqual(16, len(rows))
         self.assertEqual(16, len({row["job_id"] for row in rows}))
         self.assertEqual(2880, sum(row["plan"]["frames"] for row in rows))

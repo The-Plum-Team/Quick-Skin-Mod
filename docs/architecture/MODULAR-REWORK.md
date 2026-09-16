@@ -306,7 +306,8 @@ inside Minecraft modules. Existing source scanners, AI repair paths, release wor
 evidence consumers and version-port automation still need the complete modular contract migration;
 passing their current tests does not certify those stages.
 
-The active matrix now imports all sixteen targets through 26.2 from the pinned migration inputs.
+The active matrix now imports all sixteen targets through 26.2 from the pinned migration inputs,
+plus 26.3, which was added afterwards directly from the shared source.
 Every target has compiled its full mod and packaged harnesses in isolation. Integrated validation
 of the final tree and the publication/governance/Pages migration remain separate obligations;
 compilation is not runtime evidence. Keep target publication independent while migrating
