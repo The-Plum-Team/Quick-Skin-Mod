@@ -89,6 +89,11 @@ import java.util.function.Consumer;
  *       back to {@code MouseHandler}'s GLFW callbacks, whose shape GLFW fixes; modern drags also
  *       construct the runtime event record and invoke the public drag override, with the handler's
  *       accumulated-movement route retained as a compatibility fallback.</li>
+ *   <li><b>native window backend</b>: GLFW through 26.2, SDL from 26.3. The SDL-era
+ *       {@code MouseHandler}/{@code KeyboardHandler} callbacks take {@code MouseButtonInfo},
+ *       relative motion and {@code KeyEvent} values, and cursor warps plus window sizing resolve
+ *       whichever LWJGL binding the runtime ships. Button and key numbers come from
+ *       {@code InputConstants}, whose values follow the backend.</li>
  * </ul>
  *
  * <p>GL-touching calls (screenshot) must run on the render thread, after at least one full frame.</p>
@@ -169,7 +174,9 @@ public final class VanillaShim {
      * render section. Capturing in that interval produces a sky-and-hotbar frame even though the
      * player and block are both present. The section predicate rejects the initial placeholder;
      * the dispatcher predicate then waits until outstanding terrain work has drained. Both methods
-     * keep stable Fabric intermediary ids while their Mojang names changed in newer releases.</p>
+     * keep stable Fabric intermediary ids while their Mojang names changed in newer releases.
+     * Minecraft 26.3 passes the chunk fade duration into the section predicate, so that form uses
+     * the player's configured fade instead of treating a freshly uploaded section as visible.</p>
      *
      * @param blockPos a vanilla {@code BlockPos}; kept as {@link Object} so renamed vanilla types
      *                 never escape this compatibility adapter
@@ -183,22 +190,51 @@ public final class VanillaShim {
                     "isSectionCompiled", "isSectionCompiledAndVisible",
                     "method_40050", "m_202430_"
             );
+            Method fadingSectionReady = sectionReady != null ? null
+                    : findFadingSectionReady(renderer.getClass(), blockPos);
             Method dispatcherReady = findNoArg(
                     renderer.getClass(),
                     "hasRenderedAllChunks", "hasRenderedAllSections",
                     "method_3281", "m_109825_"
             );
-            if (sectionReady == null || dispatcherReady == null) {
+            if ((sectionReady == null && fadingSectionReady == null) || dispatcherReady == null) {
                 warnTerrainReadinessOnce("renderer readiness methods not found on "
                         + renderer.getClass().getName());
                 return false;
             }
-            return Boolean.TRUE.equals(sectionReady.invoke(renderer, blockPos))
+            Object sectionVisible = sectionReady != null
+                    ? sectionReady.invoke(renderer, blockPos)
+                    : fadingSectionReady.invoke(renderer, blockPos, chunkFadeMillis(mc));
+            return Boolean.TRUE.equals(sectionVisible)
                     && Boolean.TRUE.equals(dispatcherReady.invoke(renderer));
         } catch (Throwable t) {
             warnTerrainReadinessOnce("renderer readiness check failed: " + t);
             return false;
         }
+    }
+
+    /** The 26.3 {@code isSectionCompiledAndVisible(BlockPos, long fadeMillis)} predicate, or null. */
+    private static Method findFadingSectionReady(Class<?> renderer, Object blockPos) {
+        for (Method m : renderer.getMethods()) {
+            Class<?>[] parameters = m.getParameterTypes();
+            if (m.getName().equals("isSectionCompiledAndVisible")
+                    && parameters.length == 2
+                    && parameters[0].isInstance(blockPos)
+                    && parameters[1] == long.class
+                    && (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class)) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /** The chunk section fade-in option in milliseconds, matching {@code Util.toMillis}. */
+    private static long chunkFadeMillis(Minecraft mc) throws ReflectiveOperationException {
+        Method option = findNoArg(mc.options.getClass(), "chunkSectionFadeInTime");
+        Object instance = option == null ? null : option.invoke(mc.options);
+        Method get = instance == null ? null : findNoArg(instance.getClass(), "get");
+        Object seconds = get == null ? null : get.invoke(instance);
+        return seconds instanceof Number number ? (long) Math.floor(number.doubleValue() * 1000.0D) : 0L;
     }
 
     /** This player's profile name. {@code GameProfile.getName()} (class) vs {@code name()} (record, 26.x). */
@@ -1561,10 +1597,24 @@ public final class VanillaShim {
     private static String dispatchThroughMouseHandler(Minecraft mc, int button, int action) {
         Object handler = mc.mouseHandler;
         if (handler == null) return "mouseHandler is null";
+        Method onButton = sdlBackend() ? findEventCallback(handler, 3, "onButton") : null;
+        if (onButton != null) {
+            // SDL era (26.3+): onButton(window, MouseButtonInfo(button, modifiers), action).
+            try {
+                Constructor<?> buttonInfo = onButton.getParameterTypes()[1]
+                        .getDeclaredConstructor(int.class, int.class);
+                buttonInfo.setAccessible(true);
+                onButton.setAccessible(true);
+                onButton.invoke(handler, windowHandle(mc), buttonInfo.newInstance(button, 0), action);
+                return null;
+            } catch (Throwable t) {
+                return "MouseHandler." + onButton.getName() + " failed: " + t;
+            }
+        }
         Method onPress = findGlfwCallback(
                 handler, new Class<?>[]{long.class, int.class, int.class, int.class},
                 "onPress", "method_1611", "m_91530_");
-        if (onPress == null) return "MouseHandler has no (long,int,int,int) GLFW button callback";
+        if (onPress == null) return "MouseHandler has no GLFW or SDL button callback";
         try {
             onPress.setAccessible(true);
             onPress.invoke(handler, windowHandle(mc), button, action, 0);
@@ -1577,10 +1627,16 @@ public final class VanillaShim {
     private static String dispatchMove(Minecraft mc, double guiX, double guiY) {
         Object handler = mc.mouseHandler;
         if (handler == null) return "mouseHandler is null";
-        Method onMove = findGlfwCallback(
+        // Resolve the SDL-era relative-motion callback first: its GLFW-shaped (long,double,double)
+        // neighbour on 26.3 is the scroll callback, which a shape-only lookup would otherwise find.
+        Method sdlMove = sdlBackend() ? findGlfwCallback(
+                handler,
+                new Class<?>[]{long.class, double.class, double.class, double.class, double.class},
+                "onMove") : null;
+        Method onMove = sdlMove != null ? sdlMove : findGlfwCallback(
                 handler, new Class<?>[]{long.class, double.class, double.class},
                 "onMove", "method_1600", "m_91561_");
-        if (onMove == null) return "MouseHandler has no (long,double,double) GLFW move callback";
+        if (onMove == null) return "MouseHandler has no GLFW or SDL move callback";
         try {
             var window = mc.getWindow();
             int screenW = window.getScreenWidth();
@@ -1596,7 +1652,12 @@ public final class VanillaShim {
             double px = (targetX + 0.5) * screenW / guiW;
             double py = (targetY + 0.5) * screenH / guiH;
             onMove.setAccessible(true);
-            onMove.invoke(handler, windowHandle(mc), px, py);
+            if (onMove == sdlMove) {
+                onMove.invoke(handler, windowHandle(mc), px, py,
+                        px - mc.mouseHandler.xpos(), py - mc.mouseHandler.ypos());
+            } else {
+                onMove.invoke(handler, windowHandle(mc), px, py);
+            }
 
             // Since 1.21.9 onMove only accumulates a delta; the render loop normally drains it
             // later. The E2E gesture releases synchronously, so drain it now while activeButton is
@@ -1633,6 +1694,38 @@ public final class VanillaShim {
             for (Method method : type.getDeclaredMethods()) {
                 if (method.getReturnType() != void.class) continue;
                 if (!java.util.Arrays.equals(method.getParameterTypes(), params)) continue;
+                if (wanted.contains(method.getName())) return method;
+                if (shapeMatch == null) {
+                    shapeMatch = method;
+                } else {
+                    ambiguousShape = true;
+                }
+            }
+        }
+        return ambiguousShape ? null : shapeMatch;
+    }
+
+    /**
+     * Resolves an SDL-era input callback {@code (long window, <event record>, int)} by name,
+     * falling back to the only void method of that shape.
+     */
+    private static Method findEventCallback(Object owner, int eventIndex, String... names) {
+        Set<String> wanted = Set.of(names);
+        Method shapeMatch = null;
+        boolean ambiguousShape = false;
+        for (Class<?> type = owner.getClass(); type != null && type != Object.class;
+             type = type.getSuperclass()) {
+            for (Method method : type.getDeclaredMethods()) {
+                Class<?>[] parameters = method.getParameterTypes();
+                if (method.getReturnType() != void.class || parameters.length != 3
+                        || parameters[0] != long.class) {
+                    continue;
+                }
+                int actionIndex = eventIndex == 3 ? 2 : 1;
+                int recordIndex = eventIndex == 3 ? 1 : 2;
+                if (parameters[actionIndex] != int.class || !parameters[recordIndex].isRecord()) {
+                    continue;
+                }
                 if (wanted.contains(method.getName())) return method;
                 if (shapeMatch == null) {
                     shapeMatch = method;
@@ -1706,16 +1799,53 @@ public final class VanillaShim {
         }
     }
 
-    /** Best-effort {@code GLFW.glfwSetCursorPos}, resolved reflectively so the harness compiles without LWJGL. */
+    /**
+     * Best-effort native cursor warp: {@code GLFW.glfwSetCursorPos} through 26.2 and
+     * {@code SDL_WarpMouseInWindow} from 26.3, resolved reflectively so the harness compiles
+     * against either binding.
+     */
     private static String warpCursor(long windowHandle, double px, double py) {
         try {
-            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-            Method set = glfw.getMethod("glfwSetCursorPos", long.class, double.class, double.class);
-            set.invoke(null, windowHandle, px, py);
+            Class<?> glfw = nativeClass("org.lwjgl.glfw.GLFW");
+            if (glfw != null) {
+                Method set = glfw.getMethod("glfwSetCursorPos", long.class, double.class, double.class);
+                set.invoke(null, windowHandle, px, py);
+                return null;
+            }
+            Class<?> sdlMouse = nativeClass("org.lwjgl.sdl.SDLMouse");
+            if (sdlMouse == null) return "neither GLFW nor SDL is available";
+            Method warp = sdlMouse.getMethod(
+                    "SDL_WarpMouseInWindow", long.class, float.class, float.class);
+            warp.invoke(null, windowHandle, (float) px, (float) py);
             return null;
         } catch (Throwable t) {
             return t.toString();
         }
+    }
+
+    /** Warps the native cursor to a window-coordinate point without updating Minecraft's handler. */
+    public static String warpNativeCursor(long windowHandle, double windowX, double windowY) {
+        return warpCursor(windowHandle, windowX, windowY);
+    }
+
+    /** Whether this runtime replaced GLFW with SDL (Minecraft 26.3 and newer). */
+    private static boolean sdlBackend() {
+        return nativeClass("org.lwjgl.glfw.GLFW") == null
+                && nativeClass("org.lwjgl.sdl.SDLVideo") != null;
+    }
+
+    private static Class<?> nativeClass(String name) {
+        try {
+            return Class.forName(name);
+        } catch (ClassNotFoundException | LinkageError missing) {
+            return null;
+        }
+    }
+
+    private static java.nio.IntBuffer nativeInt() {
+        return java.nio.ByteBuffer.allocateDirect(Integer.BYTES)
+                .order(java.nio.ByteOrder.nativeOrder())
+                .asIntBuffer();
     }
 
     private static String forceMouseHandlerPosition(Minecraft mc, double px, double py) {
@@ -1749,12 +1879,24 @@ public final class VanillaShim {
 
     /** Actual rendered pixels, independent of the desktop's logical window size or DPI scale. */
     public static int[] framebufferSize(Minecraft mc) throws Exception {
+        Class<?> glfw = nativeClass("org.lwjgl.glfw.GLFW");
+        if (glfw == null) {
+            return sdlWindowSize(windowHandle(mc), "SDL_GetWindowSizeInPixels");
+        }
         int[] width = new int[1];
         int[] height = new int[1];
-        Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
         glfw.getMethod("glfwGetFramebufferSize", long.class, int[].class, int[].class)
                 .invoke(null, windowHandle(mc), width, height);
         return new int[] {width[0], height[0]};
+    }
+
+    private static int[] sdlWindowSize(long handle, String query) throws Exception {
+        java.nio.IntBuffer width = nativeInt();
+        java.nio.IntBuffer height = nativeInt();
+        Class.forName("org.lwjgl.sdl.SDLVideo")
+                .getMethod(query, long.class, java.nio.IntBuffer.class, java.nio.IntBuffer.class)
+                .invoke(null, handle, width, height);
+        return new int[] {width.get(0), height.get(0)};
     }
 
     /** Resize the game itself; evidence PNGs must never be resized to satisfy their contract. */
@@ -1762,24 +1904,36 @@ public final class VanillaShim {
             throws Exception {
         long handle = windowHandle(mc);
         int[] pixels = framebufferSize(mc);
-        int[] width = new int[1];
-        int[] height = new int[1];
-        Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-        glfw.getMethod("glfwGetWindowSize", long.class, int[].class, int[].class)
-                .invoke(null, handle, width, height);
-        if (pixels[0] < 1 || pixels[1] < 1 || width[0] < 1 || height[0] < 1) return;
-        int logicalWidth = Math.max(1, (int) Math.round((double) width[0] * targetWidth / pixels[0]));
-        int logicalHeight = Math.max(1, (int) Math.round((double) height[0] * targetHeight / pixels[1]));
-        glfw.getMethod("glfwSetWindowSize", long.class, int.class, int.class)
-                .invoke(null, handle, logicalWidth, logicalHeight);
+        Class<?> glfw = nativeClass("org.lwjgl.glfw.GLFW");
+        int[] logical;
+        if (glfw != null) {
+            int[] width = new int[1];
+            int[] height = new int[1];
+            glfw.getMethod("glfwGetWindowSize", long.class, int[].class, int[].class)
+                    .invoke(null, handle, width, height);
+            logical = new int[] {width[0], height[0]};
+        } else {
+            logical = sdlWindowSize(handle, "SDL_GetWindowSize");
+        }
+        if (pixels[0] < 1 || pixels[1] < 1 || logical[0] < 1 || logical[1] < 1) return;
+        int logicalWidth = Math.max(1, (int) Math.round((double) logical[0] * targetWidth / pixels[0]));
+        int logicalHeight = Math.max(1, (int) Math.round((double) logical[1] * targetHeight / pixels[1]));
+        if (glfw != null) {
+            glfw.getMethod("glfwSetWindowSize", long.class, int.class, int.class)
+                    .invoke(null, handle, logicalWidth, logicalHeight);
+        } else {
+            Class.forName("org.lwjgl.sdl.SDLVideo")
+                    .getMethod("SDL_SetWindowSize", long.class, int.class, int.class)
+                    .invoke(null, handle, logicalWidth, logicalHeight);
+        }
     }
 
-    /** The GLFW window handle; {@code Window.getWindow()} is remapped per era. */
+    /** The native GLFW/SDL window handle; {@code Window.getWindow()} is remapped per era. */
     private static long windowHandle(Minecraft mc) throws Exception {
         Object window = mc.getWindow();
         Method handle = findPublicNoArg(
                 window.getClass(), "getWindow", "handle", "method_4490", "m_85439_");
-        if (handle == null) throw new NoSuchMethodException("Window GLFW handle accessor not found");
+        if (handle == null) throw new NoSuchMethodException("Window native handle accessor not found");
         return ((Number) handle.invoke(window)).longValue();
     }
 
@@ -1824,7 +1978,10 @@ public final class VanillaShim {
     /**
      * Presses and releases a key over the current screen. {@code Screen.keyPressed} took
      * {@code (int,int,int)} before 1.21.11 and a {@code KeyEvent} afterwards, so the newer era is
-     * driven through {@code KeyboardHandler}'s GLFW callback, whose shape GLFW fixes.
+     * driven through {@code KeyboardHandler}'s GLFW callback, whose shape GLFW fixes. From 26.3
+     * that callback is SDL's {@code keyPress(window, action, KeyEvent)}: the event's key is the
+     * physical scancode (the {@code InputConstants.KEY_*} value callers pass) and its keycode is
+     * resolved through SDL's current layout.
      *
      * @return {@code null} when the screen consumed the key, or a message explaining why not
      */
@@ -1847,6 +2004,24 @@ public final class VanillaShim {
         }
         Object handler = mc.keyboardHandler;
         if (handler == null) return "keyboardHandler is null";
+        Method sdlKeyPress = sdlBackend() ? findEventCallback(handler, 2, "keyPress") : null;
+        if (sdlKeyPress != null) {
+            try {
+                Class<?> eventType = sdlKeyPress.getParameterTypes()[2];
+                Constructor<?> constructor =
+                        eventType.getDeclaredConstructor(int.class, int.class, int.class);
+                constructor.setAccessible(true);
+                Object event = constructor.newInstance(
+                        keyCode, sdlKeycode(keyCode, modifiers), modifiers);
+                sdlKeyPress.setAccessible(true);
+                long window = windowHandle(mc);
+                sdlKeyPress.invoke(handler, window, GLFW_PRESS, event);
+                sdlKeyPress.invoke(handler, window, GLFW_RELEASE, event);
+                return null;
+            } catch (Throwable t) {
+                return "KeyboardHandler." + sdlKeyPress.getName() + " failed: " + t;
+            }
+        }
         Method keyPress = findGlfwCallback(
                 handler,
                 new Class<?>[]{long.class, int.class, int.class, int.class, int.class},
@@ -1860,6 +2035,19 @@ public final class VanillaShim {
             return null;
         } catch (Throwable t) {
             return "KeyboardHandler." + keyPress.getName() + " failed: " + t;
+        }
+    }
+
+    /** SDL's layout keycode for a scancode, or 0 when the runtime has no SDL keyboard binding. */
+    private static int sdlKeycode(int scancode, int modifiers) {
+        try {
+            Class<?> keyboard = nativeClass("org.lwjgl.sdl.SDLKeyboard");
+            if (keyboard == null) return 0;
+            return ((Number) keyboard
+                    .getMethod("SDL_GetKeyFromScancode", int.class, short.class, boolean.class)
+                    .invoke(null, scancode, (short) modifiers, true)).intValue();
+        } catch (Throwable t) {
+            return 0;
         }
     }
 

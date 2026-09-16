@@ -1203,8 +1203,10 @@ interface ModCompatibilityFeature {
                     try {
                         Object value = window.getClass().getMethod(accessor).invoke(window);
                         if (value instanceof Number number) {
-                            org.lwjgl.glfw.GLFW.glfwSetCursorPos(
-                                    number.longValue(), 1.0, 1.0);
+                            String warp = VanillaShim.warpNativeCursor(number.longValue(), 1.0, 1.0);
+                            if (warp != null) {
+                                failure = "Essential cursor probe failed: " + warp;
+                            }
                             return;
                         }
                     } catch (NoSuchMethodException ignored) {
