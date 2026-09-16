@@ -1,19 +1,12 @@
 {
   "coverage_sha": "8991361527dfb726c3081c01ba674748a1840c87",
-  "observed_at": "2026-09-16T22:52:59Z",
+  "observed_at": "2026-09-16T22:53:17Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -22,27 +15,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 26.2"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -71,14 +49,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -87,27 +58,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 26.1.2"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -136,14 +92,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -152,27 +101,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 26.1.1"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -201,14 +135,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -217,27 +144,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 26.1"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -266,14 +178,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -282,27 +187,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.11"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -331,14 +221,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -347,27 +230,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.10"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -396,14 +264,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -412,27 +273,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.9"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -461,14 +307,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -477,27 +316,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.8"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -526,14 +350,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -542,27 +359,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.7"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -591,14 +393,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -607,27 +402,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.6"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -656,14 +436,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -672,27 +445,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.5"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -721,14 +479,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -737,27 +488,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.4"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -786,14 +522,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -802,27 +531,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.3"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -851,14 +565,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -867,27 +574,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.2"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -916,14 +608,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -932,27 +617,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.21.1"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
@@ -981,14 +651,7 @@
     },
     {
       "build": {
-        "execution": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
+        "execution": null,
         "expected_jobs": [
           "Resolve tested build reuse",
           "Validate CI policy",
@@ -997,27 +660,12 @@
           "compile / Plan every supported build target",
           "compile / Compile Minecraft 1.20.1"
         ],
-        "generation": {
-          "attempt": 1,
-          "conclusion": null,
-          "id": 35159746544,
-          "sha": "8991361527dfb726c3081c01ba674748a1840c87",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/attempts/1"
-        },
-        "jobs": [
-          {
-            "conclusion": null,
-            "id": 105007510750,
-            "name": "Resolve tested build reuse",
-            "status": "in_progress",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/35159746544/job/105007510750"
-          }
-        ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
+        "generation": null,
+        "jobs": [],
+        "reason": "GitHub evidence is unavailable, ambiguous or changed during observation.",
         "reused": false,
-        "state": "running",
-        "tested_sha": "8991361527dfb726c3081c01ba674748a1840c87"
+        "state": "unknown",
+        "tested_sha": null
       },
       "e2e": {
         "execution": null,
