@@ -598,6 +598,13 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             evidence,
         )
         self.assertIn('syncAppearance(observerId, "", "", "slim")', remote)
+        # Bob captures only after his renderer compiled Alice's terrain: vanilla skips entities
+        # in uncompiled sections, which once produced identical sky-only baseline/applied frames.
+        self.assertEqual(2, remote.count("evidence.observerReady("))
+        self.assertEqual(2, remote.count("evidence.checkSubjectRendered(minecraft)"))
+        self.assertIn("VanillaShim.isTerrainRenderReady(minecraft, position)", evidence)
+        self.assertIn("VanillaShim.isTerrainRenderReady(minecraft, position.below())", evidence)
+        self.assertIn('E2ELog.info(step + " waiting: " + reason)', evidence)
         self.assertIn("NetworkTextureCache.getInstance().hasTexture", evidence)
         self.assertIn('"quickskin:network/skin/" + hash', evidence)
         self.assertIn('getMethod("getGP_UUID", Object.class)', evidence)

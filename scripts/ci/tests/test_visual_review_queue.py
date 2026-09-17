@@ -19,8 +19,11 @@ from visual_review_queue import (  # noqa: E402
     DRAIN_WORKFLOW,
     GitHubApi,
     GitHubRateLimitError,
+    MAX_NAMED_ARTIFACTS,
+    MAX_NAMED_PAGES,
     PREPARE_WORKFLOW,
     Artifact,
+    QueueError,
     blocked_generations,
     input_review_key,
     input_target,
@@ -54,6 +57,18 @@ def artifact(
         head_branch="master",
         head_sha=SHA,
     )
+
+
+def raw_artifact(artifact_id: int, name: str, *, expired: bool) -> dict[str, Any]:
+    return {
+        "id": artifact_id,
+        "name": name,
+        "size_in_bytes": 1024,
+        "digest": "sha256:" + "b" * 64,
+        "expired": expired,
+        "created_at": (NOW - timedelta(minutes=artifact_id)).isoformat(),
+        "workflow_run": {"id": 10, "head_branch": "master", "head_sha": SHA},
+    }
 
 
 def owner(
@@ -287,6 +302,71 @@ class VisualReviewQueueTest(unittest.TestCase):
 
         self.assertEqual([], api.list_artifacts())
         self.assertEqual(100, api._request.call_count)
+
+    def test_named_listing_returns_live_records_and_ignores_expired_history(self) -> None:
+        # GitHub keeps expired records in the listing forever, so mod-compatibility-plan reached
+        # 1,031 records (842 expired) and every scheduled compatibility recovery failed closed.
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="test-token",
+            api_url="https://api.github.test",
+        )
+        pages = [
+            {"artifacts": [raw_artifact(index, "plan", expired=index > 2)
+                           for index in range(1, 101)]},
+            {"artifacts": [raw_artifact(101, "plan", expired=True),
+                           raw_artifact(102, "plan", expired=False),
+                           raw_artifact(103, "other", expired=False)]},
+        ]
+        api._request = MagicMock(side_effect=pages)  # type: ignore[method-assign]
+
+        named = api.list_artifacts_named("plan")
+
+        self.assertEqual([1, 2, 102], [item.artifact_id for item in named])
+        self.assertTrue(all(not item.expired for item in named))
+        self.assertEqual(2, api._request.call_count)
+
+    def test_named_listing_still_fails_closed_on_too_many_live_records(self) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="test-token",
+            api_url="https://api.github.test",
+        )
+        api._request = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "artifacts": [
+                    raw_artifact(index, "plan", expired=False)
+                    for index in range(1, 101)
+                ]
+            }
+        )
+
+        with self.assertRaises(QueueError) as caught:
+            api.list_artifacts_named("plan")
+
+        self.assertIn(str(MAX_NAMED_ARTIFACTS), str(caught.exception))
+        self.assertEqual(MAX_NAMED_ARTIFACTS // 100 + 1, api._request.call_count)
+
+    def test_named_listing_fails_closed_when_the_page_bound_is_exhausted(self) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="test-token",
+            api_url="https://api.github.test",
+        )
+        api._request = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "artifacts": [
+                    raw_artifact(index, "plan", expired=True)
+                    for index in range(1, 101)
+                ]
+            }
+        )
+
+        with self.assertRaises(QueueError) as caught:
+            api.list_artifacts_named("plan")
+
+        self.assertIn("listing pages", str(caught.exception))
+        self.assertEqual(MAX_NAMED_PAGES, api._request.call_count)
 
     def test_installation_rate_limit_is_classified_as_retryable(self) -> None:
         error = urllib.error.HTTPError(

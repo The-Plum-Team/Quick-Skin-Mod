@@ -107,8 +107,8 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                 .minTicks(5)
                 .ready(() -> {
                     evidence.stepTowardVantage(minecraft);
-                    return evidence.atVantage(minecraft)
-                            && evidence.checkRemoteState(minecraft, modId, false).pass();
+                    return evidence.observerReady(
+                            "observe_remote_baseline", minecraft, modId, false);
                 })
                 .settleTicks(20)
                 .timeoutTicks(20 * 90)
@@ -121,8 +121,8 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                 .minTicks(5)
                 .ready(() -> {
                     evidence.stepTowardVantage(minecraft);
-                    return evidence.atVantage(minecraft)
-                            && evidence.checkRemoteState(minecraft, modId, true).pass();
+                    return evidence.observerReady(
+                            "observe_remote_applied", minecraft, modId, true);
                 })
                 .settleTicks(20)
                 .timeoutTicks(20 * 90)
@@ -135,6 +135,8 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                     Step.Result state = evidence.checkRemoteState(
                             minecraft, modId, true);
                     if (!state.pass()) return state;
+                    Step.Result rendered = evidence.checkSubjectRendered(minecraft);
+                    if (!rendered.pass()) return rendered;
                     Step.Result rear = evidence.checkRearComposition(minecraft);
                     if (!rear.pass()) return rear;
                     return Step.Result.pass("remote optional-mod transition witnessed: "
@@ -147,6 +149,8 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
             Minecraft minecraft, UUID observerId, String modId) {
         Step.Result state = evidence.checkRemoteState(minecraft, modId, false);
         if (!state.pass()) return state;
+        Step.Result rendered = evidence.checkSubjectRendered(minecraft);
+        if (!rendered.pass()) return rendered;
         Step.Result rear = evidence.checkRearComposition(minecraft);
         if (!rear.pass()) return rear;
         try {
