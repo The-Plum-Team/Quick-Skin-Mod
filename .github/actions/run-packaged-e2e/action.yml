@@ -171,6 +171,10 @@ runs:
         QUICKSKIN_E2E_CPM_MODEL_PATH: ${{ inputs.cpm-model-path }}
         QUICKSKIN_E2E_RUNTIME_STORE: ${{ runner.temp }}/quick-skin-runtime-store
         QUICKSKIN_E2E_SERVER_STORE: ${{ runner.temp }}/quick-skin-server-store
+        # Minecraft 26.3 creates its window through SDL and requests an sRGB-capable OpenGL 3.3
+        # core framebuffer. Xvfb's software GLX exposes no such visual, so SDL must use Mesa's
+        # EGL instead. GLFW-based targets ignore this SDL variable.
+        SDL_VIDEO_FORCE_EGL: "1"
       run: |
         set -euo pipefail
         selection_arguments=()

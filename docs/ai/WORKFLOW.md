@@ -240,6 +240,8 @@ python -m unittest discover -s scripts/ci/tests -p "test_*.py" -v
 
 Packaged Minecraft runtime scenarios require a display and the matrix-declared Java toolchain. Use Xvfb on
 headless Linux and in CI; on a desktop session, macOS included, run the orchestrator directly.
+Minecraft 26.3's SDL window needs an sRGB OpenGL framebuffer that Xvfb's GLX lacks, so headless
+Linux runs export `SDL_VIDEO_FORCE_EGL=1`; the packaged E2E action sets it for every lane.
 Follow `e2e/README.md` for what is verified on which platform, and do not substitute Loom
 development runs for packaged-JAR E2E evidence. Gradle and Stonecutter must themselves start on
 JDK 21 or newer; shared CI installs JDK 17, JDK 21, and JDK 25 so each matrix target can select

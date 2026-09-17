@@ -175,11 +175,13 @@ python e2e/orchestrator.py --list --artifacts-manifest build/release/artifacts.j
 
 Run one packaged smoke. The runtime needs a display, not a specific operating system: on headless
 Linux (including CI) wrap the command in `xvfb-run`, and on a machine with a real display — macOS
-included — run it directly.
+included — run it directly. Minecraft 26.3 and newer open their window through SDL and need an
+sRGB-capable OpenGL framebuffer that Xvfb's software GLX cannot provide, so headless Linux runs also
+export `SDL_VIDEO_FORCE_EGL=1`, as the packaged E2E action does.
 
 ```bash
 # Headless Linux / CI
-xvfb-run -a python e2e/orchestrator.py \
+SDL_VIDEO_FORCE_EGL=1 xvfb-run -a python e2e/orchestrator.py \
   --packaged \
   --artifact-node fabric-1.20.1 \
   --runtime-version 1.20.1 \
