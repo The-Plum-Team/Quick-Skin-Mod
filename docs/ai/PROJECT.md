@@ -57,6 +57,11 @@ schema-2 snapshots retain their original branch/tag validation contract.
   diff, exact policy/contract/matrix, complete healthy source evidence, available full public
   archives, and unchanged transitive module fingerprints. Unknown or unavailable proof selects
   full profiles. PRs targeting `master` defer semantic AI review to the protected post-merge run.
+- A draft PR to `master` starts no Build or Packaged E2E work; its required gate jobs run under
+  distinct deferred names so no draft run can satisfy a required context. It lands only after it
+  is marked ready or through one `batch/*` PR from `scripts/ci/pr_batch.py`, which runs the
+  unchanged complete gate once for the squashed set
+  ([ADR 0009](../architecture/decisions/0009-validate-draft-pull-requests-in-batches.md)).
 - Both full and partial shared visual reviews use their own runtime generation's Fabric anchor.
   Secretless curation and model admission authenticate complete source jobs and immutable
   artifacts independently. Full proof schema 8 and selected proof schema 7 remain distinct;
@@ -234,8 +239,8 @@ into those branches. Their source matrices and existing evidence remain intact d
   conclusions never depend on model output. The semantic certificate gates only scheduling of the
   cross-version wave: provider failure or a semantic defect deliberately delays that wave instead
   of blessing an unverified baseline.
-- Ordinary PRs targeting `master` run Build and Packaged E2E as deterministic previews but never
-  enter the Claude queue. A merge necessarily creates the cumulative 1.20.1 synchronization
+- Ordinary ready PRs targeting `master` run Build and Packaged E2E as deterministic previews but
+  never enter the Claude queue; draft PRs defer even that preview. A merge necessarily creates the cumulative 1.20.1 synchronization
   anchor, which is the single semantic admission point for that generation. Direct PRs to release
   branches have no guaranteed post-merge anchor and retain a protected fail-closed `source-pr`
   scope. After a certified anchor releases the remaining ports, the protected

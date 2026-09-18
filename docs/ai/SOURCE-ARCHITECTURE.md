@@ -49,7 +49,8 @@ and its target manifests before staging one aggregate bundle. Build and Packaged
 bytes through `staged_build_bundle.py`; PR head identity selects the producer, while the manifest's
 distinct tested merge commit must equal the consumer checkout. Missing PR builds, failed gates,
 advanced PR parents and malformed bundles cannot authorize runtime. Standalone runs without an
-available bundle use the same compiler.
+available bundle use the same compiler. A draft PR's deferred Build run never supplies a bundle:
+when that draft is marked ready, the PR's E2E waits for the new Build of the same head.
 
 `scripts/ci/target_status.py` projects Build and Packaged E2E into an informational status for
 each target in the schema-3 release matrix. It collects one bounded snapshot per gate, authenticates
