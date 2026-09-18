@@ -134,7 +134,7 @@ to `unstarted`, under the publication lock. Never erase the ledger or reset acce
 Ordinary pending approval needs no rerun or reset. A manual probe is available with:
 
 ```bash
-gh workflow run release-verify.yml --ref master -f release_tag=mc26.1-v3.0.0
+gh workflow run release-verify.yml --ref master -f release_tag=mc<TARGET>-v<MOD_VERSION>
 ```
 
 The offline rehearsal runs in the release-policy tests before tagging and on each actual staged
@@ -170,21 +170,29 @@ the exact prepared manifest hash, and reverify every staged artifact before the 
 GitHub/marketplace reconciliation. Recovery uses the same durable publication ledger and short
 `release-publish` write lock; pending approval is verified by `release-verify.yml`.
 
-The declared `release` environment permits protected `master` for this explicit recovery as well
-as canonical tag runs, with the same required human reviewer. Apply the reviewed governance change
+The declared `release` environment permits protected `master` for this explicit recovery and for
+`release-verify.yml` finalization, as well as canonical tag runs, with the same required human
+reviewer. Apply the reviewed governance change
 before dispatching recovery. Ordinary `release.yml` dispatches remain validation-only. Recovery
 cannot move a tag, create another version identity, replace an existing conflicting asset, or
 claim that its current orchestration commit produced the original JARs. An advancing `master`,
 unavailable source archive, changed non-repair input or byte conflict stops recovery.
+
+This path recovered `mc26.1-v3.0.0` once, in run `34722137405`. Its admission requires a
+`generate_sbom.py` repair between the tag and protected `master` and no other change outside its
+allowlist, so it cannot admit a tag built with the deterministic generator, or any tag once
+`master` carries unrelated changes. It remains the audited record of that recovery; a new
+publication defect needs its own reviewed recovery or a new logical version.
 
 Actions storage follows the same recovery boundary. Ordinary build, diagnostics, packaged-E2E,
 review, publication-receipt, synchronization, and Pages handoff artifacts are transient and expire
 after one day. Source PNGs exist only in the `pages-e2e-*` handoff; protected Pages code validates
 and replaces them with WebP derivatives before fan-in. Each branch's single compact SHA-bound Pages
 cache is retained for 90 days, with successful rotation deleting the previous generation. The
-immutable `release-<release-id>` bundle is the other 90-day exception so the same verified bytes
-survive protected-environment approvals and can resume an interrupted GitHub Release or marketplace
-publication. Release, Packaged E2E, and every release-branch Build restore Gradle state read-only;
+immutable `release-<release-id>` bundle, or `release-recovery-<release-id>` for an SBOM recovery, is
+the other 90-day exception so the same verified bytes survive protected-environment approvals,
+resume an interrupted GitHub Release or marketplace publication, and let `Verify pending releases`
+finalize after moderation. Release, Packaged E2E, and every release-branch Build restore Gradle state read-only;
 only a trusted Build gate push or manual run on protected `master` may publish a Gradle cache.
 Existing branch-scoped release caches remain useful read-only fallbacks. A protected daily cleanup
 discovers live branches directly. It deletes absent-branch caches and superseded, unambiguously
@@ -224,8 +232,9 @@ The automatic cache-pruning boundary is deliberately mechanical:
 - The protected workflow applies at most 75 IDs and 10 GiB per invocation, serially, with one second
   between deletes. The script remains dry-run unless `--apply` is explicit.
 
-Downloaders can verify checksums with `SHA256SUMS`. Maintainers can additionally verify GitHub's
-provenance for a downloaded JAR:
+Downloaders can verify checksums with `SHA256SUMS` after restoring the original filenames of GitHub
+downloads (see above). Maintainers can additionally verify GitHub's provenance for a downloaded JAR
+under either filename:
 
 ```bash
 gh attestation verify "Quick Skin - Fabric - 1.20.1-3.0.0.jar" \
@@ -233,8 +242,8 @@ gh attestation verify "Quick Skin - Fabric - 1.20.1-3.0.0.jar" \
 ```
 
 Publication receipts and packaged-runtime diagnostics remain attached to the workflow run for one
-day. Durable audit comes from the immutable GitHub Release assets, checksums, attestations, and the
-marketplaces themselves; transient Actions output is not the system of record.
+day. Durable audit comes from the immutable GitHub Release assets and its release-notes publication
+ledger, checksums, attestations, and the marketplaces themselves; transient Actions output is not the system of record.
 
 ## Repository governance rollout
 
@@ -247,7 +256,8 @@ python scripts/release/github_governance.py readiness
 ```
 
 `readiness` pins the current default-branch commit, validates its complete schema-3 release matrix,
-and checks the shared build, runtime, release and retirement workflows at that same commit. It
+and checks the shared build, runtime, release, SBOM-recovery, pending-release verification and
+retirement workflows at that same commit. It
 requires no historical version branches. Once those changes are present on protected source, an
 administrator can converge the declared state explicitly:
 
@@ -258,12 +268,15 @@ python scripts/release/github_governance.py apply \
 
 The helper enables immutable releases, creates no-bypass branch and tag rulesets, requires PRs and
 strict stable checks, blocks deletion and force-pushes, and configures the human-reviewed `release`
-environment. Shared publication accepts canonical release tags only. The schema-2 governance
+environment. Shared publication deploys from canonical release tags; the declared `master` branch
+policy exists for the protected SBOM-recovery and pending-release finalization workflows, whose jobs
+wait for the same human reviewer. The schema-2 governance
 configuration explicitly retires the old `*-and-*-*` environment deployment policy; the helper
 shows that deletion in its plan and addresses only its independently read numeric policy ID.
 Unknown or ambiguous policies stop the apply operation. Historical release-branch rulesets are
-left untouched, and no branch or tag is removed. This migration has only been exercised with local
-API fixtures; no remote governance changes have been applied.
+left untouched, and no branch or tag is removed. The declared state, including the `master`
+recovery/finalization policy and the retired `*-and-*-*` policy, has been applied remotely; rerun
+`audit` before any further `apply`.
 
 ## GitHub Pages activation
 

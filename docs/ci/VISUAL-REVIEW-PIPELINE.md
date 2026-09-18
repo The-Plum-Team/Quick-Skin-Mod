@@ -146,8 +146,8 @@ Expiry, not a guaranteed later wake, is normal retirement for completed inputs.
 
 GitHub keeps an artifact's listing record after its retention expires, so a name that is
 used every generation accumulates records indefinitely: `mod-compatibility-plan` held 1,031
-records on 2026-09-16, of which only 155 were live. Named lookups therefore collect and bound
-live records only, which is what every consumer already admits, and a separate 200-page bound
+records on 2026-09-16, of which only 155 were live. The review queue's named lookups
+(`visual_review_queue.py`) therefore collect and bound live records only, which is what every consumer already admits, and a separate 200-page bound
 keeps the scan itself finite and fail-closed. Counting expired history against the live bound
 previously made scheduled compatibility recovery fail permanently once a name crossed 1,000
 records, and would have done the same to the shared capacity circuit.
@@ -254,9 +254,10 @@ solely to manufacture a benchmark. The model/provider interval remains the domin
 critical path; a regression beyond the measured overlap budget requires revisiting this
 split rather than increasing concurrent model/cache owners.
 
-For the first deployment, begin the new-policy live wave only after any already-running
-old-policy model job finishes. A previously started immutable workflow still uses its
-old implementation-scoped lock and cannot retroactively acquire the new global lock.
+The first deployment had to begin its new-policy live wave only after any already-running
+old-policy model job finished: a previously started immutable workflow keeps its old
+implementation-scoped lock and cannot retroactively acquire the new global lock. Drains under
+the global lock have run on `master` since 2026-09-14.
 
 Focused regressions cover same/different exact keys, malformed cache policy/key,
 foreign/stale preparation identities, bounded traversal rejection, unsuccessful

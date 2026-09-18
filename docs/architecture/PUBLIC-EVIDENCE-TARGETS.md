@@ -54,8 +54,10 @@ shared WebP caches cannot supply an AI baseline.
 
 Queue identities include the target. A clean report or retry cooldown settles only that target,
 while a confirmed defect can still stop its source generation. Exact wakes query the target's
-marker names and retain numeric-ID cleanup. Each successful curator sibling can publish its own
-wake after the matrix settles, including when another target failed to produce a capsule.
+marker names. Completed inputs stay until their seven-day expiry; only missing or terminally invalid
+inputs keep numeric-ID cleanup. After the curator matrix settles, one wake job reads that run's
+artifact inventory once and dispatches every target capsule it finds, including when another target
+failed to produce a capsule or its own dispatch failed.
 
 After a successful shared-source `master` push, Build gate requests one `workflow_dispatch`
 Packaged E2E generation. The scheduler checks the live source twice and suppresses a duplicate
@@ -85,8 +87,11 @@ screenshots never enter this job. It checks the live source again before publish
 complete job graph, target reports and module/policy fingerprints. The fixed artifact name is
 only a discovery key; source identity comes from the authenticated owner and payload.
 
-The collector supports completion events, an explicit protected reviewer wake and manual recovery
-of existing complete reports. It makes no model call. A local payload grants no workflow exemption.
+The collector starts only from a `feature-coverage-requested` dispatch sent by the coalescing
+request gate, `scripts/ci/feature_coverage_request.py` (see
+[baseline request coalescing](../ci/BASELINE-REQUESTS.md)), or from manual recovery that names an
+exact complete source run and attempt. It makes no model call. A local payload grants no workflow
+exemption.
 `feature_coverage_consumer.py` authenticates that publisher artifact and recomputes its complete
 matrix, capture, controller and dependency identities from Git objects. Its cumulative diff starts
 at the last complete healthy baseline; partial runs never advance that baseline. It separately

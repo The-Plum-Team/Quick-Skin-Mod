@@ -32,7 +32,9 @@ build. Every other layer below stays in force.
 - `scripts/release/generate_sbom.py` converts that exact per-lane embedded graph into one
   deterministic CycloneDX document. Every production JAR is represented by its staged hashes and
   depends only on coordinates present in its strict lock; every listed library carries the exact
-  upstream JAR SHA-256 from verification metadata. A missing lane, lock, component, JAR checksum,
+  upstream JAR SHA-256 from verification metadata. Its `serialNumber` is a UUIDv5 derived from the
+  SHA-256 of the canonical document without that field, so identical inputs keep identical bytes;
+  validation rejects a missing or stale serial. A missing lane, lock, component, JAR checksum,
   or manifest binding stops staging and all later publication jobs.
 
 ## Offline CycloneDX validation boundary
