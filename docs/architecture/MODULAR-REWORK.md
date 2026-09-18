@@ -740,7 +740,8 @@ public artifacts. The collector derives one complete source generation from all 
 archives; partial, mixed, failed, stale, and intermediate Pages wakes cannot certify coverage.
 Targeted validation passes 20 publisher tests, 12 executable workflow-routing tests, and 49
 workflow-security tests. This changes orchestration only; the verified production/harness bytes
-remain the same.
+remain the same. Since 2026-09-13 both producers run the coalescing request gate instead of waking
+the collector directly; see [baseline request coalescing](../ci/BASELINE-REQUESTS.md).
 
 ### Superseded runtime cancellation
 

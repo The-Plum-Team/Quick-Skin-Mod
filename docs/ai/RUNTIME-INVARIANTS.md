@@ -283,6 +283,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   texture bridge, or the CustomNPCs display-skin transition) must assert that integration state;
   coexistence lanes assert the unchanged plaid skin. The reviewer receives per-mod expectation
   overrides for that one capture id.
+- A live `mod-compatibility-remote` observer capture requires, besides the asserted remote state
+  and rear vantage, that the observer's renderer has compiled the terrain at and below the
+  subject. Vanilla skips entities in uncompiled sections, so appearance state alone can pass on
+  a sky-only frame.
 - Every orchestrator invocation writes into a fresh owned workspace and promotes only its bounded
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's
@@ -348,13 +352,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   never appear to have tested a head it did not. The field stays optional until every release
   branch has republished, and the AI oracle never consumes a continued bundle.
 - Pages repository wakes and deploys use one shared publication concurrency group so a branch wave
-  cannot fan out multiple collectors. Discovery may defer on active release attestations, but must
-  not preselect every artifact and repeat selection in the collector. The collector owns exact
-  current-head selection; retryable GitHub API and installation-rate-limit failures use bounded
+  cannot fan out multiple collectors. Discovery may defer on active release attestations. Its
+  advisory progress controller may nominate exact current-head handoff IDs from bounded metadata,
+  but never downloads or validates a bundle; each collector reauthenticates its nomination, fails
+  closed if it changed or disappeared, and otherwise owns exact current-head selection; retryable GitHub API and installation-rate-limit failures use bounded
   jittered backoff and remain distinguishable from authenticated evidence absence.
-  Reuse of an authenticated runtime reference or terminal review owner lasts only for one
-  admission. Each capsule and artifact retains its own identity and integrity checks; a failed
-  authentication never enters that invocation's reuse map. Quota telemetry is advisory and emits
+  Reuse of an authenticated runtime reference, terminal review owner, or successful public Pages
+  owner lasts only for one admission. Each capsule and artifact retains its own identity and
+  integrity checks, including each public archive's own retention job; a failed authentication never
+  enters that invocation's reuse map. Quota telemetry is advisory and emits
   only numeric counters from the affected token.
 - Shared Pages collectors authenticate artifact owners and complete bounded bundles. Before
   rendering or uploading the site, Build reauthenticates each distinct runtime generation once
@@ -365,9 +371,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   cannot substitute for successful final admission or become reusable public caches themselves.
 - Pages publication progress is advisory cost admission from exact current-head handoffs and one
   successful atomic cache owner. Authenticate its complete exact-attempt job graph and each
-  artifact's upload window before suppressing fan-out. Admit initial ordinary, halfway and final
-  compatibility coverage, with a 45-minute partial eligibility deadline and a bounded hourly recovery
-  sweep. Final completeness adds no coalescing delay. Completed generations do not self-dispatch;
+  artifact's upload window before suppressing fan-out. Admit the initial ordinary publication, a
+  later complete same-head ordinary attempt, and halfway and final compatibility coverage, with a
+  45-minute partial eligibility deadline and a bounded hourly recovery sweep. Final completeness
+  adds no coalescing delay. Three failed or cancelled publications without newer readiness stop
+  automatic fan-out; `operation=manual` remains the operator recovery. Completed generations do not self-dispatch;
   neither a cancelled owner nor stale/foreign evidence advances progress. Preserve the complete
   collectors/runtime fan-in and actual successful-owner rotation. See
   [Pages publication progress](../ci/PAGES-PUBLICATION-PROGRESS.md) for bounds and measured versus
@@ -417,7 +425,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   size-limit violations. Protected rendering must decode and recompute screenshot/comparison pixel
   metrics before publishing. Presentation code must use escaped/text DOM APIs and local assets.
 - Secret-bearing visual review has the fixed boundary `authenticate -> curate without secrets ->
-  durable queue -> artifact-scoped review in a fresh capsule -> retention-safe cleanup`. Curating
+  durable queue -> secretless preparation handoff -> artifact-scoped review in a fresh capsule ->
+  retention-safe cleanup`. Curating
   must authenticate every source artifact by numeric id, size, digest, run, protected matrix row,
   complete scenario product, and one JAR;
   it must import the authenticated source commit only as inert Git objects and never check out or
@@ -468,7 +477,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   cleanup job must succeed without deletion for both branches: its own or another in-progress
   report owner can still cancel during later tails, requiring the original input for recovery.
   Only missing/terminally invalid inputs enter exact-ID cleanup. A transient failure retains the
-  entry for cooldown and retry. Each exact artifact ID locks its complete protected drain, from
+  entry for cooldown and retry; a bounded GitHub GET that fails in transport while the drain
+  reauthenticates the source proof is transient (`github_transport_unavailable`), while size, JSON,
+  digest and identity failures stay terminal. Each exact artifact ID locks its complete protected drain, from
   exact selection through cleanup, so duplicate wakes cannot overlap. The model/cache job admits
   one ordinary capsule globally at a time, with at most 32 concurrent calls and up to 100 pending
   jobs through `queue: max`, so the next target can reuse the latest verdicts. Two secretless
@@ -484,11 +495,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   scan across a parallel release wave; retryable GitHub API failures use bounded backoff and never
   become an image verdict. If the exact capsule returns authenticated metadata and then a download
   404, only that post-guard disappearance is a coalesced settled wake: no model starts, while every
-  other download or validation failure remains visible. Once a normalized report or durable block
-  makes a source ineligible, an explicit
-  GitHub installation-rate-limit response may defer input cleanup without turning the completed
-  review red. A newly normalized report or block must outlive the input it reviewed so deferred
-  cleanup cannot make that work eligible again. A later recuration skipped for another owner's
+  other download or validation failure remains visible. Completed and already-reviewed inputs make
+  no cleanup request; an explicit GitHub installation-rate-limit response may defer only the exact-ID
+  cleanup of a terminally invalid input, without turning its drain red. A newly normalized report or
+  block must outlive the input it reviewed so that retained input cannot become eligible again. A
+  later recuration skipped for another owner's
   older report can outlive that marker and become eligible again within its remaining bounded
   input lifetime; never treat marker expiry as proof of completed review. Artifact retention
   owns completed-input retirement and scheduled sweeps own recovery, while every other API error remains visible. A separately locked

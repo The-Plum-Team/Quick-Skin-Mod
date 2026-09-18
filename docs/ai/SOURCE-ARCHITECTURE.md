@@ -358,6 +358,7 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   publication, and joins all workers on success, failure or cancellation. There are still only
   three target runners and every wake retains the whole-producer completion boundary. Sanitized
   stage wall/CPU times and logical API/archive counts are diagnostics, never admission evidence.
+  See [curation throughput](../ci/CURATION-THROUGHPUT.md) for bounds and measurements.
 - `scripts/ci/feature_coverage_request.py` coalesces advisory review/Pages requests under one
   short request lock, checking complete immutable readiness and terminal producer ownership
   before starting the separately locked canonical collector. An existing certificate suppresses
@@ -466,6 +467,15 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   the Actions cache. `scripts/pages/evidence.py carry-forward` then records the
   reached head in the optional `provenance.coverage_sha` while the packaged provenance keeps naming
   the run and commit that produced the pixels.
+- `scripts/pages/publication_progress.py` is the advisory cost-admission controller in Pages
+  discovery. From bounded metadata only, it authenticates the newest successful atomic Pages
+  owner's exact-attempt jobs and cache upload windows plus current-head E2E and compatibility
+  handoffs, then admits the initial ordinary publication, a later complete same-head ordinary
+  attempt, the compatibility halfway and final milestones, or a 45-minute partial deadline. It
+  nominates exact handoff IDs; `select_artifact.py` and `select_compatibility_artifact.py`
+  reauthenticate a nominated `--preferred-artifact-id` and fail closed instead of falling back
+  to an older cache. It never downloads, validates pixels, deploys, rotates or dispatches. See
+  [Pages publication progress](../ci/PAGES-PUBLICATION-PROGRESS.md).
 - `scripts/pages/rotate_artifacts.py` owns post-deployment retention. It may delete only exact
   Actions artifact IDs whose protected run provenance, branch, SHA, age, and successful replacement
   have all been revalidated, including Pages-run intermediates; it never implements screenshot or
@@ -490,7 +500,8 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   receive bounded backoff before the durable wake is allowed to fail visibly. Queue state
   lives in Actions artifacts rather than pending workflow runs, so GitHub concurrency coalescing
   cannot lose a review. Exact artifact IDs define drain concurrency groups: duplicate wakes cannot
-  overlap, while distinct capsules run in parallel. Scheduled/manual recovery sweeps share a
+  overlap, while distinct capsules run in parallel until two secretless preparation slots and the
+  single global model/cache owner serialize their later stages. Scheduled/manual recovery sweeps share a
   separate lock and only redispatch the selected exact identity, so they never review a capsule
   concurrently with its direct wake. Queue selection also authenticates generation-block artifacts
   from failed/in-progress protected drains and skips only inputs carrying the exact blocked master
@@ -501,8 +512,9 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   Completed and already-reviewed inputs survive their own or another report owner's late
   cancellation until seven-day expiry. Cleanup is a successful no-op for both branches; ordinary
   report authentication suppresses redispatch, while cancelled owners reopen model-free recovery.
-  Only missing/terminally invalid inputs keep exact-ID cleanup. The pipeline document records
-  the additional retained storage and bounded owner reads per scheduled current-generation sweep.
+  Only missing/terminally invalid inputs keep exact-ID cleanup. The
+  [visual-review pipeline](../ci/VISUAL-REVIEW-PIPELINE.md) records the additional retained storage
+  and bounded owner reads per scheduled current-generation sweep.
 - `scripts/ci/visual_review_impact.py` is the narrow fail-closed cost and domain filter. PRs to
   `master` defer model work to their post-merge anchor; its `source-pr` scope protects direct
   release-branch PRs, where that automatic second stage is absent. `replicated-port` recognizes

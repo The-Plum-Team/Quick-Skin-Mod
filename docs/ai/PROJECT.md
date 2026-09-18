@@ -14,6 +14,9 @@ repository root.
 - `RELEASING.md` owns immutable identity, publication, recovery, provenance, and GitHub governance.
 - `e2e/README.md`, `e2e/scenario-contract.json`, and `scripts/pages/` own packaged-scenario and
   public visual-evidence identity, validation, rendering, and GitHub Pages publication.
+- `docs/ci/` holds bounded operational guides (repair preflight, acceptance observation, and the
+  measured review, curation, baseline and Pages pipelines); `docs/ai` links to them rather than
+  restating their procedures.
 - [`docs/architecture/decisions/`](../architecture/decisions/README.md)
   records evidence-backed architectural decisions that must survive individual worktrees.
 
@@ -40,8 +43,8 @@ loader change starts in the release matrix and must pass its validation and muta
 The matrix names `master` as the shared source branch. `scripts/release/release_identity.py`
 derives a non-publishable `build-v<mod_version>` identity for the complete schema-3 bundle;
 `--target <minecraft>` derives that target's independent `mc<minecraft>-v<mod_version>` identity.
-A publishing run must still bind the exact source head. Release workflow, governance and public
-evidence migration must finish before this new target identity is used for publication. Historical
+A publishing run must still bind the exact source head, pass its manual target rehearsal and
+receive protected `release` environment approval; see `RELEASING.md`. Historical
 schema-2 snapshots retain their original branch/tag validation contract.
 
 ## Shared validation and feature evidence
@@ -304,24 +307,26 @@ into those branches. Their source matrices and existing evidence remain intact d
 - Pages wake and deploy events share one coalescing lock. A parallel release-attestation burst
   retains only the running publication member and the newest pending survivor; the survivor
   rediscovers every exact current release head. Discovery defers while a release attestation is
-  active and never duplicates per-branch artifact selection: the bounded collector owns the single
-  authoritative selection/provenance pass. Its GitHub API client applies bounded jittered backoff
+  active; the shared-source progress controller may only nominate exact handoff IDs, which the
+  bounded collector reauthenticates in its single authoritative selection/provenance pass. Its GitHub API client applies bounded jittered backoff
   to installation-rate-limit and transient transport/server responses; those responses are never
   reclassified as missing evidence.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
   named seven-day exceptions are automatic-sync packaged evidence/input bundles needed by delayed
   compatibility review, compatibility plans/evidence/capsules/reports/block markers, queued visual
-  review capsules, compatibility Pages handoffs, and rolling exact-policy visual verdict caches.
+  review capsules with their normalized reports and generation-block markers, compatibility Pages
+  handoffs, and rolling exact-policy visual verdict caches.
   Named 90-day artifact classes include the semantic certificate, the
   SHA-bound Pages cache, the matrix-derived lossless
-  Fabric 1.20.1 anchor handoff, the per-covered-branch mod-compatibility Pages cache, and the
-  immutable `release-<release-id>` bundle. Shared-source feature coverage additionally retains its
+  Fabric 1.20.1 anchor handoff, the per-covered-branch mod-compatibility Pages cache, the
+  immutable `release-<release-id>` bundle, and its SBOM-recovery counterpart
+  `release-recovery-<release-id>`. Shared-source feature coverage additionally retains its
   complete healthy certificate and exact target/source/run compact Pages baselines for at most
   90 days. Only a successfully deployed complete generation may create those public baselines;
   partial generations reuse them without extending their lifetime. Missing or expired baseline
   artifacts restore complete runtime coverage. The release bundle
-  spans protected environment
-  approvals and provides bounded recovery for an interrupted publication. After a successful Pages
+  spans protected environment approvals, provides bounded recovery for an interrupted publication,
+  and is the only source from which the pending-release verifier finalizes. After a successful Pages
   replacement, protected rotation deletes by exact artifact ID the superseded cache, ordinary
   consumed `pages-e2e-<branch>` and compatibility handoffs, older lossless anchor generations,
   Pages fan-in artifacts, and the deploy artifact while preserving the current lossless anchor.
@@ -331,8 +336,9 @@ into those branches. Their source matrices and existing evidence remain intact d
   Completed and already-reviewed AI queue entries retain seven days so late publication-tail
   cancellation can recover them; authenticated reports suppress duplicate review while available.
   Terminally invalid entries retain exact-ID cleanup, while transient failures remain for retry.
-  Retention is bounded per input, not by an aggregate storage cap; the pipeline document quantifies
-  its storage and scheduled owner-read tradeoff. A
+  Retention is bounded per input, not by an aggregate storage cap; the
+  [visual-review pipeline](../ci/VISUAL-REVIEW-PIPELINE.md) document quantifies its storage and
+  scheduled owner-read tradeoff. A
   protected schedule also deletes by exact cache ID Actions caches scoped to branch
   refs that no longer exist. On live branches it recognizes only SHA-bearing `setup-gradle` home
   keys, preserves the newest restorable generation per OS/job/cache-version family that has a
