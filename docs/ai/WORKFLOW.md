@@ -258,8 +258,9 @@ combine every Minecraft target's remapping tasks in one JVM. Use `--target <mine
 explicitly partial build. A successful build report does not replace artifact staging or E2E.
 
 GitHub's reusable `build-matrix.yml` derives all target jobs from that same validated plan and
-allows eight isolated runners. `assemble_build.py` independently reverifies every target manifest,
-commit, matrix, production/harness hash and SBOM before constructing the complete bundle.
+gives every matrix version its own isolated runner, so the complete matrix compiles in one wave.
+`assemble_build.py` independently reverifies every target manifest, commit, matrix,
+production/harness hash and SBOM before constructing the complete bundle.
 Repository validation and the complete release-policy and CI-policy suites run alongside compilation.
 Each suite has its own hosted runner, checkout of the same tested SHA, temporary files, discovered
 test-count summary, and retained diagnostics. All three policy jobs and compilation must pass the
@@ -267,7 +268,9 @@ stable `Build and verify` gate; only independently authenticated protected reuse
 explicit skips. A PR's Packaged E2E waits for that exact source Build and downloads its immutable artifact
 by ID, then reverifies it against the tested merge commit. It never starts a second PR compilation.
 Standalone runs without an available bundle use the same complete isolated compiler. Runtime
-coverage uses up to sixteen isolated runners and retains every required target/loader job.
+coverage gives every version/loader lane its own isolated runner, so the complete matrix runs in
+one wave, and retains every required target/loader job. Neither matrix sets a `max-parallel`
+bound: the validated plan alone decides its width, so a support change needs no workflow edit.
 
 After an identical-tree PR merge, Build and Packaged E2E independently authenticate the original
 PR records and skip their compilation and Minecraft workers. The post-merge generation contains
