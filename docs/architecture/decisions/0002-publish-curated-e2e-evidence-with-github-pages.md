@@ -3,6 +3,9 @@
 - Status: Accepted — active
 - Date: 2026-08-02
 - Amended by: ADR 0004 on 2026-08-10 for the single lossless AI anchor
+- Amended on 2026-09-13 by [Pages publication progress](../../ci/PAGES-PUBLICATION-PROGRESS.md):
+  an hourly recovery sweep replaced decision 6's monthly refresh, and an unchanged complete
+  generation is not re-collected
 - Scope: project landing page and cross-version packaged-E2E evidence
 
 ## Context

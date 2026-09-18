@@ -3,7 +3,7 @@
 Shared development lives on `master`. A target selects an API family and loader inputs from the
 same source tree and produces one installable JAR per loader. It does not need a permanent version
 branch or a second copy of a feature. The ongoing migration status is in
-[`MODULAR-REWORK.md`](MODULAR-REWORK.md); release/governance migration is still unfinished.
+[`MODULAR-REWORK.md`](MODULAR-REWORK.md); target publication follows [`RELEASING.md`](../../RELEASING.md).
 
 Start with the complete [`release-matrix.json`](../../release/release-matrix.json). Add the target's
 artifact rows, exact runtime/dependency pins and installers, then update its checked Gradle

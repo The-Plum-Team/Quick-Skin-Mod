@@ -465,8 +465,8 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      # Every Minecraft process stays isolated; independent versions need not wait eight waves.
-      max-parallel: 16
+      # Every Minecraft process stays isolated. No parallelism bound: every lane runs in one wave,
+      # limited only by the account's job allowance.
       matrix: ${{ fromJSON(needs.build.outputs.anchors) }}
 
     steps:

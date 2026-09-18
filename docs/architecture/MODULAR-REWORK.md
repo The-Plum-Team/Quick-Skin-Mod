@@ -740,7 +740,8 @@ public artifacts. The collector derives one complete source generation from all 
 archives; partial, mixed, failed, stale, and intermediate Pages wakes cannot certify coverage.
 Targeted validation passes 20 publisher tests, 12 executable workflow-routing tests, and 49
 workflow-security tests. This changes orchestration only; the verified production/harness bytes
-remain the same.
+remain the same. Since 2026-09-13 both producers run the coalescing request gate instead of waking
+the collector directly; see [baseline request coalescing](../ci/BASELINE-REQUESTS.md).
 
 ### Superseded runtime cancellation
 
@@ -768,14 +769,14 @@ The first successful final-source GitHub Build (`34014354343`, PR head `d00fdbe6
 limited to four runners. The unified source had exposed serial work and duplicated PR compilation;
 fewer feature screenshots alone could not remove those costs.
 
-The compiler now derives every target from the existing validated local plan and builds on up to
-eight isolated hosted runners. Local Gradle remains serial. Complete assembly reverifies every
+The compiler now derives every target from the existing validated local plan and builds every
+matrix version on its own isolated hosted runner in a single wave. Local Gradle remains serial. Complete assembly reverifies every
 target's commit, matrix, JARs, harnesses and SBOM before it creates an aggregate bundle; a missing,
 foreign, overlapping or altered target cannot pass. Repository-policy suites run alongside the
 compiler and remain required by the stable Build gate. PR E2E waits for that exact successful Build
 and consumes its immutable artifact, checking the manifest against the distinct tested merge SHA.
-Standalone runs without an available bundle use the same compiler. Sixteen isolated runtime
-runners retain the full required lane inventory while reducing scheduling waves. GitHub timing
+Standalone runs without an available bundle use the same compiler. Every runtime lane has its own
+isolated runner in a single wave and the full required lane inventory is retained. GitHub timing
 and complete runtime acceptance for this revised orchestration are still pending.
 
 Local validation passes all 408 CI tests and 532 release/Pages tests, the generated profile checks,

@@ -102,7 +102,8 @@ interval that permits realistic API latency for the inventory's size. Healthy te
 observed by the next two polling intervals; declared rate-limit waits and continued failed reads
 are explicit exceptions, not evidence that remote execution continues.
 
-Primary reset and `Retry-After` deadlines pause the entire inventory and survive restart. A rate
+Primary reset and rate-limit `Retry-After` deadlines pause the entire inventory and survive
+restart; a `Retry-After` on another failed read delays only that attempt. A rate
 limit without a usable deadline waits at least one minute; repeated rate limits double this delay
 up to one hour. A declared later deadline is never shortened to fit that cap. Heartbeats continue
 during the pause. Rate limits are handled according to GitHub's
