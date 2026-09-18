@@ -3073,7 +3073,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         target = job_block("build-matrix.yml", "target")
         assemble = job_block("build-matrix.yml", "assemble")
         gate = job_block("build-gate.yml", "build")
-        self.assertIn("max-parallel: 8", target)
+        # The validated plan alone decides the width, so a support change needs no workflow edit.
+        self.assertNotIn("max-parallel:", target)
         self.assertIn('python scripts/release/build_matrix.py --clean "${target_args[@]}"', target)
         self.assertIn('python scripts/release/verify_release.py "${target_args[@]}"', target)
         self.assertIn("needs: target", assemble)
@@ -3082,7 +3083,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('[[ "$REUSED" == false ]]', gate)
         self.assertIn('"$COMPILE_RESULT" "$POLICY_RESULT" "$RELEASE_POLICY_RESULT" "$CI_POLICY_RESULT"', gate)
         self.assertIn("--verify-staged", gate)
-        self.assertIn("max-parallel: 16", job_block("on-demand-e2e.yml", "e2e"))
+        self.assertNotIn("max-parallel:", job_block("on-demand-e2e.yml", "e2e"))
 
     def test_version_port_merge_bridges_verified_runs_to_required_statuses(self) -> None:
         merge = job_block("handle-version-port-result.yml", "merge")
