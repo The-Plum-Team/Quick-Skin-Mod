@@ -85,9 +85,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   direct request whose source SHA differs from the protected current implementation, and recheck
   live `master` independently at both the secretless batch boundary and credential-bearing model
   boundary before capsule download or model admission.
-- Keep deterministic E2E applicability and model applicability separate. A PR to `master` runs
-  Build and Packaged E2E and defers semantic model work to the cumulative protected post-merge
-  generation. Shared source builds every matrix target; the baseline consumer may reduce only
+- Keep deterministic E2E applicability and model applicability separate. A ready PR to `master`
+  runs Build and Packaged E2E and defers semantic model work to the cumulative protected post-merge
+  generation. A draft PR to `master` runs neither gate: its required jobs report distinct deferred
+  names, and it never seals a tested-source record or publishes a staged bundle. Never let a draft,
+  skipped or deferred job report a required context name. Shared source builds every matrix target; the baseline consumer may reduce only
   the authored execution/capture scope after authenticating exact Git ancestry, unchanged module
   fingerprints, complete runtime/review evidence, and available full public baseline artifacts.
   Missing or expired baseline evidence, changed policy/graph, or unknown ownership selects full
@@ -165,6 +167,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - New pull requests target `master`, including version-only fixes; only historical schema-2
   recovery uses an old release branch. Its title follows the same conventional format, and its body records scope, validation,
   risks, generated-output status, and material AI assistance.
+- Several changes can be validated together: open them as drafts, which start no Build or
+  Minecraft work, then land them through one batch PR created by `scripts/ci/pr_batch.py` and
+  close them with its `settle` command. A batch squashes one commit per PR onto current `master`
+  and accepts only same-repository PRs; never place fork code on a same-repository branch. See
+  [PR batches](../ci/PR-BATCHES.md).
 
 ## Verification
 

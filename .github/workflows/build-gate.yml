@@ -3,8 +3,11 @@ name: Build gate
 # Compile each matrix target on an isolated runner while repository-policy checks run alongside.
 # The stable required gate reverifies the complete bundle, which Packaged E2E consumes unchanged.
 # Historical automation branches may still dispatch both gates independently.
+# A draft PR to master defers all of this to its ready head or to a batch PR (ADR 0009).
 on:
   pull_request:
+    # Converting a PR to draft starts a deferred run that cancels its in-progress gate.
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   push:
     branches:
       - master
@@ -43,7 +46,9 @@ env:
 jobs:
   source:
     name: Resolve tested build reuse
-    if: github.event_name != 'workflow_dispatch' || inputs.attest_run_id == ''
+    if: >-
+      (github.event_name != 'workflow_dispatch' || inputs.attest_run_id == '') &&
+      !(github.event.pull_request.draft && github.event.pull_request.base.ref == 'master')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -268,13 +273,17 @@ jobs:
           retention-days: 1
 
   build:
-    name: Build and verify
+    # A draft must never report the required context: a skipped or deferred "Build and verify"
+    # would still satisfy the ruleset after the same head is marked ready, before it builds.
+    name: ${{ github.event.pull_request.draft && github.event.pull_request.base.ref == 'master' && 'Build deferred for draft' || 'Build and verify' }}
     needs: [source, compile, policy, policy-release, policy-ci]
     if: >-
       always() &&
       (github.event_name != 'workflow_dispatch' || inputs.attest_run_id == '')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      DRAFT_DEFERRED: ${{ github.event.pull_request.draft && github.event.pull_request.base.ref == 'master' }}
     steps:
       - name: Require the complete compilation and policy jobs
         shell: bash
@@ -287,6 +296,12 @@ jobs:
           REUSED: ${{ needs.source.outputs.reused }}
         run: |
           set -euo pipefail
+          if [[ "${DRAFT_DEFERRED:-false}" == true ]]; then
+            [[ "$SOURCE_RESULT" == skipped ]] || exit 1
+            printf 'Draft PR: Build is deferred until the PR is ready or included in a batch PR.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           [[ "$SOURCE_RESULT" == success ]] || exit 1
           if [[ "$REUSED" == true ]]; then
             expected=skipped
@@ -298,12 +313,14 @@ jobs:
             [[ "$result" == "$expected" ]] || exit 1
           done
       - name: Check out source
+        if: env.DRAFT_DEFERRED != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Install Python
+        if: env.DRAFT_DEFERRED != 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
@@ -340,11 +357,12 @@ jobs:
           compression-level: 0
           retention-days: 7
 
+      # A deferred draft built nothing, so it must never seal a record that reuse could admit.
       - name: Record the actual PR commit that passed Build
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && env.DRAFT_DEFERRED != 'true'
         run: python scripts/ci/ci_reuse.py seal --kind build --output tested-source/tested-source.json
       - name: Retain the immutable tested-build record
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && env.DRAFT_DEFERRED != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tested-source-build
@@ -353,6 +371,7 @@ jobs:
           retention-days: 90
 
       - name: Assert the build did not mutate tracked sources
+        if: env.DRAFT_DEFERRED != 'true'
         shell: bash
         run: |
           set -euo pipefail

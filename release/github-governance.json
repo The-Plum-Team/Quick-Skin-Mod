@@ -41,11 +41,13 @@
     "all_protected_branches": {
       ".github/workflows/build-gate.yml": [
         "pull_request:",
-        "name: Build and verify"
+        "ready_for_review",
+        "|| 'Build and verify' }}"
       ],
       ".github/workflows/on-demand-e2e.yml": [
         "pull_request:",
-        "name: Packaged E2E gate"
+        "ready_for_review",
+        "|| 'Packaged E2E gate' }}"
       ]
     },
     "default_branch": {
