@@ -34,6 +34,14 @@ def job_display_name(workflow: str, job: str) -> str:
     return match.group(1)
 
 
+def ready_display_name(name: str) -> str:
+    """A gate named for draft deferral reports its fallback context in every non-draft run."""
+    match = re.fullmatch(
+        r"\$\{\{ github\.event\.pull_request\.draft && github\.event\.pull_request\.base\.ref == "
+        r"'master' && '[^']+' \|\| '([^']+)' \}\}", name)
+    return match.group(1) if match else name
+
+
 class E2EJobNamesTest(unittest.TestCase):
     """The E2E job display names are pinned as literals by the protected evaluator and by the
     workflows that authenticate Packaged E2E runs from the jobs API. A one-sided rename would
@@ -46,7 +54,8 @@ class E2EJobNamesTest(unittest.TestCase):
         )
         self.assertEqual(graph.BUILD_JOB, job_display_name("on-demand-e2e.yml", "build"))
         self.assertEqual(
-            graph.GATE_JOB, job_display_name("on-demand-e2e.yml", "required-gate")
+            graph.GATE_JOB,
+            ready_display_name(job_display_name("on-demand-e2e.yml", "required-gate")),
         )
         self.assertEqual(
             "${{ matrix.id }}" + graph.SCENARIO_SUFFIX,

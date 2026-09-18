@@ -72,6 +72,36 @@ class StagedBuildBundleTest(unittest.TestCase):
         self.assertEqual(20, result["artifact_id"])
         self.assertEqual(30, seconds[0])
 
+    def test_ready_pr_waits_past_the_deferred_draft_build_of_its_head(self):
+        # Marking a draft ready starts a new Build. Until GitHub lists it, the head's deferred
+        # draft run is the latest one and must be waited out rather than read as a missing gate.
+        deferred = {"name": bundle.DRAFT_JOB, "status": "completed", "conclusion": "success"}
+        self.api.jobs = lambda run: [{"jobs": [deferred if run["id"] == 10 else self.api.job]}]
+        seconds = [0]
+        def sleep(amount):
+            seconds[0] += amount
+            self.api.runs = [self.api.run, {**self.api.run, "id": 11}]
+        result = bundle.find_bundle(self.api, self.source, wait_seconds=60,
+                                    sleep=sleep, now=lambda: seconds[0])
+        self.assertEqual(11, result["run_id"])
+        self.assertEqual(30, seconds[0])
+
+    def test_job_names_match_the_build_gate_workflow(self):
+        workflow = (Path(__file__).resolve().parents[3] / bundle.WORKFLOW).read_text(encoding="utf-8")
+        self.assertIn(f"&& '{bundle.DRAFT_JOB}' || '{bundle.GATE_JOB}' }}}}", workflow)
+
+    def test_a_deferred_draft_build_never_supplies_a_bundle(self):
+        deferred = {"name": bundle.DRAFT_JOB, "status": "completed", "conclusion": "success"}
+        self.api.jobs = lambda run: [{"jobs": [deferred]}]
+        with self.assertRaisesRegex(ValueError, "timed out"):
+            self.find()
+        # Only a PR can be a draft; any other source without the gate job has no bundle.
+        source = bundle.Source("owner/repo", "push", "a" * 40, "master", "owner/repo", "a" * 40)
+        api = Api(source)
+        api.jobs = lambda run: [{"jobs": [deferred]}]
+        with self.assertRaisesRegex(ValueError, "required gate"):
+            self.find(api, source)
+
     def test_missing_or_stalled_pr_build_fails_instead_of_silently_rebuilding(self):
         for runs in ([], [{**self.api.run, "status": "queued", "conclusion": None}]):
             with self.subTest(runs=runs):
