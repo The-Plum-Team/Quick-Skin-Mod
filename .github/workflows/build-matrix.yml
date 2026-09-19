@@ -46,8 +46,8 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      # Each hosted VM owns one checkout and one serial Gradle invocation.
-      max-parallel: 8
+      # Each hosted VM owns one checkout and one serial Gradle invocation. No parallelism bound:
+      # every planned target compiles in one wave, limited only by the account's job allowance.
       matrix: ${{ fromJSON(needs.inventory.outputs.targets) }}
     steps:
       - name: Check out source

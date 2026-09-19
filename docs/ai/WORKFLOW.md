@@ -85,9 +85,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   direct request whose source SHA differs from the protected current implementation, and recheck
   live `master` independently at both the secretless batch boundary and credential-bearing model
   boundary before capsule download or model admission.
-- Keep deterministic E2E applicability and model applicability separate. A PR to `master` runs
-  Build and Packaged E2E and defers semantic model work to the cumulative protected post-merge
-  generation. Shared source builds every matrix target; the baseline consumer may reduce only
+- Keep deterministic E2E applicability and model applicability separate. A ready PR to `master`
+  runs Build and Packaged E2E and defers semantic model work to the cumulative protected post-merge
+  generation. A draft PR to `master` runs neither gate: its required jobs report distinct deferred
+  names, and it never seals a tested-source record or publishes a staged bundle. Never let a draft,
+  skipped or deferred job report a required context name. Shared source builds every matrix target; the baseline consumer may reduce only
   the authored execution/capture scope after authenticating exact Git ancestry, unchanged module
   fingerprints, complete runtime/review evidence, and available full public baseline artifacts.
   Missing or expired baseline evidence, changed policy/graph, or unknown ownership selects full
@@ -165,6 +167,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - New pull requests target `master`, including version-only fixes; only historical schema-2
   recovery uses an old release branch. Its title follows the same conventional format, and its body records scope, validation,
   risks, generated-output status, and material AI assistance.
+- Several changes can be validated together: open them as drafts, which start no Build or
+  Minecraft work, then land them through one batch PR created by `scripts/ci/pr_batch.py` and
+  close them with its `settle` command. A batch squashes one commit per PR onto current `master`
+  and accepts only same-repository PRs; never place fork code on a same-repository branch. See
+  [PR batches](../ci/PR-BATCHES.md).
 
 ## Verification
 
@@ -253,8 +260,9 @@ combine every Minecraft target's remapping tasks in one JVM. Use `--target <mine
 explicitly partial build. A successful build report does not replace artifact staging or E2E.
 
 GitHub's reusable `build-matrix.yml` derives all target jobs from that same validated plan and
-allows eight isolated runners. `assemble_build.py` independently reverifies every target manifest,
-commit, matrix, production/harness hash and SBOM before constructing the complete bundle.
+gives every matrix version its own isolated runner, so the complete matrix compiles in one wave.
+`assemble_build.py` independently reverifies every target manifest, commit, matrix,
+production/harness hash and SBOM before constructing the complete bundle.
 Repository validation and the complete release-policy and CI-policy suites run alongside compilation.
 Each suite has its own hosted runner, checkout of the same tested SHA, temporary files, discovered
 test-count summary, and retained diagnostics. All three policy jobs and compilation must pass the
@@ -262,7 +270,9 @@ stable `Build and verify` gate; only independently authenticated protected reuse
 explicit skips. A PR's Packaged E2E waits for that exact source Build and downloads its immutable artifact
 by ID, then reverifies it against the tested merge commit. It never starts a second PR compilation.
 Standalone runs without an available bundle use the same complete isolated compiler. Runtime
-coverage uses up to sixteen isolated runners and retains every required target/loader job.
+coverage gives every version/loader lane its own isolated runner, so the complete matrix runs in
+one wave, and retains every required target/loader job. Neither matrix sets a `max-parallel`
+bound: the validated plan alone decides its width, so a support change needs no workflow edit.
 
 After an identical-tree PR merge, Build and Packaged E2E independently authenticate the original
 PR records and skip their compilation and Minecraft workers. The post-merge generation contains
@@ -334,8 +344,8 @@ Public frames keep their original tested commit/run/JAR when unaffected dependen
   runtime or publication evidence.
 - Keep the newcomer and AI-assisted contribution path in `CONTRIBUTING.md`, and keep
   `.github/pull_request_template.md` aligned with it.
-- Keep root `AGENTS.md` limited to one `@path.md` import per line and keep root `CLAUDE.md`
-  byte-for-byte equivalent to `@AGENTS.md` followed by one newline.
+- Keep root `AGENTS.md` limited to one `@path.md` import per line. Do not add a `CLAUDE.md`,
+  `.claude/CLAUDE.md` or `CLAUDE.local.md`: Claude Code reads `AGENTS.md` only while none exists.
 - Update the appropriate imported file whenever source-set routing, overlay ownership, lifecycle
   composition roots, security boundaries, or mandatory verification commands change.
 - When a packaged scenario adds, renames, or removes a step, edit the scenario contract and its Java

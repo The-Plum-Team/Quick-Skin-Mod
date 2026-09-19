@@ -49,7 +49,8 @@ and its target manifests before staging one aggregate bundle. Build and Packaged
 bytes through `staged_build_bundle.py`; PR head identity selects the producer, while the manifest's
 distinct tested merge commit must equal the consumer checkout. Missing PR builds, failed gates,
 advanced PR parents and malformed bundles cannot authorize runtime. Standalone runs without an
-available bundle use the same compiler.
+available bundle use the same compiler. A draft PR's deferred Build run never supplies a bundle:
+when that draft is marked ready, the PR's E2E waits for the new Build of the same head.
 
 `scripts/ci/target_status.py` projects Build and Packaged E2E into an informational status for
 each target in the schema-3 release matrix. It collects one bounded snapshot per gate, authenticates
@@ -219,30 +220,10 @@ The shared-source schema-3 matrix retires automatic version ports. `release_sour
 the complete matrix before resolving `master` as the only source branch and an empty port list.
 The sync workflow exits before Git/GitHub work; delayed port results must pass a protected layout
 job before candidate inspection or repair. Existing historical refs remain untouched and do not
-declare active support. README status uses `status_table.py --matrix` directly. The following
-controllers remain for historical schema-2 evidence and explicit recovery, not shared-source work.
-
-- `scripts/ci/version_port_merge.py` is the sole protected owner of version-port Git merge
-  semantics. Given exact clean target/source commits, it runs a hook-free no-commit merge,
-  authenticates `MERGE_HEAD`, snapshots the complete original index, applies the classifier's
-  mechanical policies, and emits stable evidence. For an AI resolution it accepts an external
-  candidate index only with its exact tree id and copies only the recomputed `ai_paths`; it never
-  imports another candidate entry.
-- `scripts/ci/version_port_conflicts.py` is the pure, fail-closed classifier for the original Git
-  conflict set. It may assign a protected path only to an exact reviewed mechanical policy. Shared
-  guidance and runtime documents use a source-preferred three-way merge, the release matrix uses
-  the target version, a build script may be deleted only when its loader is inactive in that
-  target matrix, and a path below a legacy overlay may be deleted only when that exact overlay root
-  is absent from the target matrix. The one reviewed datapack-layout migration moves the protected
-  `functions` files and tags to 1.21+'s singular `function` paths, rewrites the three renamed game
-  rules from the target matrix's single runtime version, and removes every obsolete plural path.
-  Unknown protected paths, active-loader build conflicts, and
-  active-overlay conflicts abort the port; only unprotected residual conflicts may reach AI.
-- `scripts/release/branch_readme.py`, `scripts/release/e2e_readme.py`, and
-  `scripts/release/workflow_guidance.py` are the protected renderers for matrix-owned branch
-  profiles. The synchronizer runs them after conflict resolution, stages their exact outputs, and
-  reruns them in both the credentialless validator and the narrow writer. Do not hand-maintain
-  their marked blocks or version-specific test-task anchors.
+declare active support. README status uses `status_table.py --matrix` directly. The version-port
+merge controller, conflict classifier, protected profile renderers and anchor-certification
+codecs remain for historical schema-2 evidence and explicit recovery; their contracts live in
+[VERSION-BRANCHES.md](../../VERSION-BRANCHES.md#historical-automation-invariants).
 
 ## Visual evidence and static-site sources
 
@@ -357,6 +338,7 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   publication, and joins all workers on success, failure or cancellation. There are still only
   three target runners and every wake retains the whole-producer completion boundary. Sanitized
   stage wall/CPU times and logical API/archive counts are diagnostics, never admission evidence.
+  See [curation throughput](../ci/CURATION-THROUGHPUT.md) for bounds and measurements.
 - `scripts/ci/feature_coverage_request.py` coalesces advisory review/Pages requests under one
   short request lock, checking complete immutable readiness and terminal producer ownership
   before starting the separately locked canonical collector. An existing certificate suppresses
@@ -429,21 +411,6 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   owner head, preserving current-workflow reviews of older capsules as well as legacy owners.
   An arbitrary third revision remains ineligible; exact proof/manifest bytes and all successful
   same-attempt upload checks remain mandatory.
-- `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
-  an unpaired, loader-complete, completely clean 1.20.1 report and binds its source/proof/manifest/
-  report digests to exact Git identities supplied by protected workflow checks. The version
-  synchronizer accepts the resulting artifact only from a successful protected drain run, for the
-  exact current `master` SHA and exact current merged anchor head.
-- `scripts/ci/visual_nonimpact_certification.py` is the distinct model-free continuation codec.
-  The protected port merge controller may create it only after exact Build and full anchor E2E
-  pass and `scripts/ci/visual_review_impact.py` classifies the complete first-parent-to-port-head
-  diff as nonvisual. The consuming synchronizer authenticates the handler artifact and owner,
-  independently recomputes that exact diff with current protected policy, verifies both gate runs,
-  the current `master` second parent, current anchor head, and equal merged trees, then releases the
-  remaining ports without minting a semantic certificate or starting optional-mod compatibility.
-  `scripts/ci/visual_review_queue.py` also authenticates that protected artifact name and owner
-  before suppressing a duplicate scheduled or automatic review of the exact generation; it never
-  applies this shortcut to an ordinary feature-PR semantic review.
 - `scripts/pages/evidence.py` creates and validates a small branch-scoped raw handoff, then
   atomically compacts a validated bundle to protected WebP derivatives. It may copy only contracted
   screenshots, structured provenance, and each capture's bounded printable passed-assertion
@@ -465,6 +432,15 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   the Actions cache. `scripts/pages/evidence.py carry-forward` then records the
   reached head in the optional `provenance.coverage_sha` while the packaged provenance keeps naming
   the run and commit that produced the pixels.
+- `scripts/pages/publication_progress.py` is the advisory cost-admission controller in Pages
+  discovery. From bounded metadata only, it authenticates the newest successful atomic Pages
+  owner's exact-attempt jobs and cache upload windows plus current-head E2E and compatibility
+  handoffs, then admits the initial ordinary publication, a later complete same-head ordinary
+  attempt, the compatibility halfway and final milestones, or a 45-minute partial deadline. It
+  nominates exact handoff IDs; `select_artifact.py` and `select_compatibility_artifact.py`
+  reauthenticate a nominated `--preferred-artifact-id` and fail closed instead of falling back
+  to an older cache. It never downloads, validates pixels, deploys, rotates or dispatches. See
+  [Pages publication progress](../ci/PAGES-PUBLICATION-PROGRESS.md).
 - `scripts/pages/rotate_artifacts.py` owns post-deployment retention. It may delete only exact
   Actions artifact IDs whose protected run provenance, branch, SHA, age, and successful replacement
   have all been revalidated, including Pages-run intermediates; it never implements screenshot or
@@ -489,7 +465,8 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   receive bounded backoff before the durable wake is allowed to fail visibly. Queue state
   lives in Actions artifacts rather than pending workflow runs, so GitHub concurrency coalescing
   cannot lose a review. Exact artifact IDs define drain concurrency groups: duplicate wakes cannot
-  overlap, while distinct capsules run in parallel. Scheduled/manual recovery sweeps share a
+  overlap, while distinct capsules run in parallel until two secretless preparation slots and the
+  single global model/cache owner serialize their later stages. Scheduled/manual recovery sweeps share a
   separate lock and only redispatch the selected exact identity, so they never review a capsule
   concurrently with its direct wake. Queue selection also authenticates generation-block artifacts
   from failed/in-progress protected drains and skips only inputs carrying the exact blocked master
@@ -500,8 +477,9 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   Completed and already-reviewed inputs survive their own or another report owner's late
   cancellation until seven-day expiry. Cleanup is a successful no-op for both branches; ordinary
   report authentication suppresses redispatch, while cancelled owners reopen model-free recovery.
-  Only missing/terminally invalid inputs keep exact-ID cleanup. The pipeline document records
-  the additional retained storage and bounded owner reads per scheduled current-generation sweep.
+  Only missing/terminally invalid inputs keep exact-ID cleanup. The
+  [visual-review pipeline](../ci/VISUAL-REVIEW-PIPELINE.md) records the additional retained storage
+  and bounded owner reads per scheduled current-generation sweep.
 - `scripts/ci/visual_review_impact.py` is the narrow fail-closed cost and domain filter. PRs to
   `master` defer model work to their post-merge anchor; its `source-pr` scope protects direct
   release-branch PRs, where that automatic second stage is absent. `replicated-port` recognizes

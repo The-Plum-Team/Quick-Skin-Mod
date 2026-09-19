@@ -2277,13 +2277,49 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_packaged_e2e_exposes_one_stable_required_context(self) -> None:
         required = job_block("on-demand-e2e.yml", "required-gate")
-        self.assertIn("name: Packaged E2E gate", required)
+        self.assertIn("&& 'Packaged E2E deferred for draft' || 'Packaged E2E gate' }}", required)
         self.assertIn("always()", required)
         self.assertIn("needs.runtime-policy.result", required)
         self.assertIn("needs.runtime-policy.outputs.effective", required)
         self.assertIn("needs.build.result", required)
         self.assertIn("needs.e2e.result", required)
         self.assertIn("inputs.attest_run_id == ''", required)
+
+    def test_draft_pull_requests_defer_both_gates_without_reporting_a_required_context(self) -> None:
+        draft = "github.event.pull_request.draft && github.event.pull_request.base.ref == 'master'"
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        for workflow, root, gate, step, context, deferred in (
+            ("build-gate.yml", "source", "build", "Require the complete compilation and policy jobs",
+             "Build and verify", "Build deferred for draft"),
+            ("on-demand-e2e.yml", "runtime-policy", "required-gate", "Require build and packaged behavior",
+             "Packaged E2E gate", "Packaged E2E deferred for draft"),
+        ):
+            with self.subTest(workflow=workflow):
+                text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+                self.assertIn("  pull_request:\n    # Converting a PR to draft starts a deferred run "
+                              "that cancels its in-progress gate.\n    types: [opened, synchronize, "
+                              "reopened, ready_for_review, converted_to_draft]\n", text)
+                self.assertIn(f"!({draft})", job_block(workflow, root))
+                block = job_block(workflow, gate)
+                # A skipped job still reports its name, and GitHub leaves a skipped job's name
+                # expression unevaluated; the running draft job therefore uses another context.
+                self.assertIn(f"    name: ${{{{ {draft} && '{deferred}' || '{context}' }}}}\n", block)
+                self.assertIn(f"      DRAFT_DEFERRED: ${{{{ {draft} }}}}\n", block)
+                self.assertNotIn("if: github.event_name == 'pull_request'\n", block)
+                self.assertEqual(2, block.count(
+                    "if: github.event_name == 'pull_request' && env.DRAFT_DEFERRED != 'true'\n"))
+                script = step_script(workflow, gate, step)
+                root_result = "SOURCE_RESULT" if workflow == "build-gate.yml" else "POLICY_RESULT"
+                summary = Path(temporary.name) / f"{gate}-summary.md"
+                environment = {**os.environ, "DRAFT_DEFERRED": "true", root_result: "skipped",
+                               "GITHUB_STEP_SUMMARY": str(summary)}
+                self.assertEqual(0, subprocess.run(["bash", "-c", script], env=environment,
+                                                   capture_output=True).returncode)
+                self.assertIn("Draft PR:", summary.read_text(encoding="utf-8"))
+                for result in ("success", "failure", ""):
+                    self.assertNotEqual(0, subprocess.run(["bash", "-c", script],
+                        env={**environment, root_result: result}, capture_output=True).returncode)
 
     def test_rate_limited_gate_notifications_use_protected_bounded_retry(self) -> None:
         e2e_notify = job_block("on-demand-e2e.yml", "notify-version-port")
@@ -3037,7 +3073,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         target = job_block("build-matrix.yml", "target")
         assemble = job_block("build-matrix.yml", "assemble")
         gate = job_block("build-gate.yml", "build")
-        self.assertIn("max-parallel: 8", target)
+        # The validated plan alone decides the width, so a support change needs no workflow edit.
+        self.assertNotIn("max-parallel:", target)
         self.assertIn('python scripts/release/build_matrix.py --clean "${target_args[@]}"', target)
         self.assertIn('python scripts/release/verify_release.py "${target_args[@]}"', target)
         self.assertIn("needs: target", assemble)
@@ -3046,7 +3083,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('[[ "$REUSED" == false ]]', gate)
         self.assertIn('"$COMPILE_RESULT" "$POLICY_RESULT" "$RELEASE_POLICY_RESULT" "$CI_POLICY_RESULT"', gate)
         self.assertIn("--verify-staged", gate)
-        self.assertIn("max-parallel: 16", job_block("on-demand-e2e.yml", "e2e"))
+        self.assertNotIn("max-parallel:", job_block("on-demand-e2e.yml", "e2e"))
 
     def test_version_port_merge_bridges_verified_runs_to_required_statuses(self) -> None:
         merge = job_block("handle-version-port-result.yml", "merge")

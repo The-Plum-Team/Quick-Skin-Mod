@@ -25,7 +25,8 @@ For the complete matrix, use the serial coordinator:
 python3 scripts/release/build_matrix.py
 ```
 
-A PR runs the required Build and Packaged E2E gates. After merge, the protected scheduler tests the
+A ready PR runs the required Build and Packaged E2E gates; a draft PR defers both until it is
+marked ready or lands through a batch PR ([PR batches](docs/ci/PR-BATCHES.md)). After merge, the protected scheduler tests the
 current shared generation and explicitly requests its per-target visual reviews. An authenticated
 complete healthy baseline permits cumulative feature selections; unknown impact or unavailable
 baseline evidence falls back to full coverage. Optional-mod integration profiles stay complete,
@@ -219,3 +220,332 @@ rmdir "$qsm_worktree_root"
 
 Stop if the status command prints anything or removal refuses. Never force-remove a dirty,
 unfamiliar, or user-owned worktree, and never develop directly on `automation/sync/*`.
+
+## Historical automation invariants
+
+These are the coding-agent rules for the retired schema-2 automation. They were moved here from
+the imported instruction set so that shared-source sessions do not load them. They remain binding
+for any edit to that automation and for any historical recovery.
+
+### Release-branch delivery
+
+The following describes delivery to existing schema-2 remote release branches. It is historical
+context for the shared-source rework, not a requirement to propagate unfinished schema-3 changes
+into those branches. Their source matrices and existing evidence remain intact during migration.
+
+- `master` is the shared integration branch. Release branches use the naming form
+  `<loader>-and-<loader>-<minecraft>`, for example `forge-and-fabric-1.20.1`.
+- A release branch is a normal descendant of `master`, not an orphan patch branch. Unchanged Git
+  blobs are shared; the branch-specific commits contain only its matrix, loader/API adapters,
+  overlays, metadata, and documentation differences.
+- `.github/workflows/sync-version-branches.yml` discovers release branches from their names. It must
+  not contain a Minecraft-version list. The matrix checked into each target remains authoritative.
+- A trusted push to `master` creates a target-specific synchronization branch and PR. Clean merges
+  are mechanical. For a conflicted merge, protected code partitions the original conflict set
+  before any model runs: exact shared guidance/runtime documents use a source-preferred three-way
+  merge, the target matrix remains authoritative, an inactive loader build file remains absent,
+  files below an overlay root not activated by that target matrix remain absent, and the exact
+  protected 1.20 `functions` datapack layout is migrated to the 1.21+ singular `function` layout
+  with game-rule identifiers selected from the target runtime. Unknown
+  protected conflicts fail closed; Claude receives only the remaining unprotected paths and may
+  make one bounded repair after a failed gate. AI jobs have read-only GitHub
+  permissions, check out without persisted credentials, and emit only bounded patch artifacts. A
+  protected merge controller owns Git's no-commit merge, the original index classification, exact
+  mechanical resolutions, and stable evidence. Both the credentialless validator and the fresh
+  writer rebuild that merge from the authenticated parents. They apply the complete proposal only
+  to an alternate index, authenticate its full tree, import only classifier-approved AI paths, run
+  protected profile renderers, and require the reconstructed tree to equal the proposal exactly.
+  Candidate scripts never run in the writer.
+- GITHUB_TOKEN-created PRs and child runs do not recursively start ordinary PR or completion
+  workflows, so synchronization explicitly dispatches `build-gate.yml` and `on-demand-e2e.yml`.
+  Each gate reports completion through a trusted `repository_dispatch`; the result handler merges
+  only when the latest exact-head run of both gates succeeds. After revalidating the PR identity,
+  base, head, ancestry, and both run records, the handler binds those results to the exact head with
+  the two stable commit-status contexts required by the release ruleset. These statuses are a
+  ruleset bridge, never substitute test executions. An open synchronization PR is updated in place
+  when newer shared commits arrive.
+- After merging, the controller publishes lightweight Build and Packaged E2E attestations on the
+  final release branch. They must verify the original trusted run IDs, exact tested commit, ancestry,
+  and identical Git trees; never rerun Minecraft merely to populate a badge or attest a changed tree.
+- A port may report packaged Minecraft as not applicable only when protected automation computes
+  an exact documentation/site/administration-only diff. Production, loader, overlay, harness,
+  contract, visual oracle, matrix, Gradle, workflow, classifier, mixed, malformed, or unknown
+  changes always execute the complete contract-selected suite. The dispatched workflow and result
+  handler independently revalidate that decision before publishing the stable status context. The
+  automatic 1.20.1 anchor port is always `full`, even when its immediate diff would otherwise be
+  eligible for N/A, because it certifies the cumulative current `master` generation.
+- The marked README release-status table is generated from discovered release branches and each
+  branch's matrix. Its workflow updates one idempotent automation PR and never pushes directly to
+  `master`. Do not edit its rows manually or add a branch/version list to its workflow.
+- Each successful release-branch E2E tree may produce one transient curated
+  `pages-e2e-<branch>` handoff. The Pages workflow must discover the same release branches, require
+  evidence for every exact current head, validate each source PNG, convert it to a protected WebP
+  derivative before fan-in, render with protected `master` code, and deploy the whole site
+  atomically. The producer sends an authenticated explicit wake-up because token-created runs do
+  not reliably create a recursive completion event. `collected-pages-*` and `pages-cache-*`
+  contain only compact derivatives plus the
+  source and derivative proof records, never original PNG bytes. A release branch that advanced
+  only through a certified non-visual port keeps publishing its existing validated evidence,
+  carried forward to the current head by the collector's own ancestry and impact recomputation. Only after that Pages run reaches
+  `completed/success` may protected automation replace the branch's single rolling cache and
+  retire older caches plus the consumed handoff.
+  Never delete the fallback before its replacement succeeds, introduce a second version list,
+  publish logs/crash reports, or make Pages a protected release check.
+- A completely clean optional-mod wave may separately produce one
+  `pages-mod-compatibility-<branch>` handoff. Its protected publisher reauthenticates the complete
+  runtime plan and all normalized AI reports, then exposes the two local compatibility-specific
+  clean/modded image pairs plus, where the mod contract opts in, two CPM first-person-hand pairs,
+  two live remote-observer pairs, and one late-join observer pair per applicable mod/loader lane as
+  1280x720 WebPs. Pages discovers this evidence opportunistically: a missing compatibility bundle
+  must not block ordinary evidence,
+  and a bundle bound to a superseded scenario or compatibility contract is treated as unavailable.
+  A bundle for the current contracts is strict, current-state evidence and may cross only a
+  protected compatibility-nonimpacting release-branch diff. Any other validation failure remains
+  fatal. Schema v5 records the mod-selective two-, five-, or seven-frame review count while schemas
+  v1 through v4 remain readable for rolling caches created by the former complete-scenario,
+  local-only, four-frame multiplayer, and five-frame multiplayer reviews. Manual recovery
+  republishes an already-clean wave without another model call.
+- Every automatic push to `master` propagates in two waves. The synchronizer first targets only
+  the matrix-derived Minecraft 1.20.1 release branch and always requires its exact Build plus full
+  Fabric/Forge packaged E2E. A protected classifier evaluates the complete anchor-port diff, not
+  merely the latest `master` push. If every path belongs to the narrow nonvisual orchestration,
+  test, or documentation allowlist, the merge controller emits an exact nonvisual continuation
+  certificate; the synchronizer reauthenticates its owner run, both gate runs, Git parents, equal
+  source/target trees, current branch heads, policy digest, and independently recomputed diff
+  before releasing the remaining ports without Claude or a compatibility wave. Any ambiguity or
+  visual/runtime path follows the semantic route. On that route, Fabric and Forge screenshots are curated
+  without any reference image and reviewed independently against every contract expectation, so a
+  defect shared by both loaders cannot certify itself. The protected report records semantic
+  validity separately from reference similarity. Only a completely clean, loader-complete report
+  for the exact bot-owned synchronization commit may produce a 90-day semantic certificate,
+  and only after its exact-tree merge is the current 1.20.1 branch head. The certificate binds the
+  `master` source SHA, tested and merged anchor SHAs, source run, protected implementation,
+  scenario contract, manifest, and normalized report. A protected `repository_dispatch`
+  reauthenticates that artifact and releases every other discovered version branch. A stale,
+  malformed, incomplete, defective, unavailable, or superseded certificate releases nothing.
+  Queue admission also treats that exact authenticated certificate as terminal for the same
+  automatic or scheduled anchor generation, and discards every capsule whose authenticated
+  `master` generation is no longer current plus closed pull-request evidence before any model
+  call. That identity-level deduplication is distinct from the exact-policy semantic cache used by
+  a later generation whose same-lane anchor frame is byte-for-byte and semantically identical.
+  No immediate-tip exception may fan out directly: a documentation-only tip can contain an older
+  runtime change whose certification is still pending or failed. Only the exact anchor merge diff,
+  whose newest synchronization commit has current `master` as its second parent and whose bounded
+  first-parent synchronization chain terminates at the authenticated release base, can prove the
+  whole pending wave nonvisual. An explicit manual exact target remains an operator recovery path.
+- Credential-bearing AI visual judgment pins the exact workflow `github.sha`, authenticates the
+  complete protected job graph, and curates raw artifacts on a secretless runner. After the anchor
+  is certified, every later-version candidate is paired by semantic `capture_id` with authenticated
+  current-head lossless Fabric 1.20.1 Pages evidence; the compact WebP cache is never an AI oracle.
+  Only canonical content-addressed 1920x1080 RGB PNGs, authored checkpoint regions, a bounded
+  manifest, and provenance enter the durable queue; curation never downsizes or normalizes a
+  different resolution, and raw E2E ZIPs never share a runner with the credential. Protected drains are locked by
+  exact queue artifact, so duplicate wakes coalesce. Two secretless preparation slots may overlap
+  the single global ordinary model/cache owner, which reauthenticates their exact same-run/attempt
+  immutable handoff and live source before restoring the latest verdicts. `queue: max` retains
+  pending work; at most 32 ordinary model calls run concurrently. Complete normalized reports are
+  retained before cache rotation, so authenticated publication cancellation can recover them
+  without another model call. Generic recovery sweeps only redispatch an
+  authenticated pending identity; settled drains never wake their consumed capsule again. Before those independent
+  drains fan out, one global serialized capacity section reuses only a fresh marker from the exact
+  protected workflow. Its single tool-free Haiku probe either opens a short shared ready window or
+  records a sanitized hard-rejection/provider-failure pause. A successful `allowed` or
+  `allowed_warning` call remains ready regardless of its optional coarse utilization field because
+  that field may disagree with the subscription usage panel; a later rejected review still fails
+  closed and keeps its capsule durable. Paused capsules remain durable and the scheduled sweep
+  probes again later. A fresh ready probe enumerates and redispatches every authenticated
+  pending artifact independently, so coalescing probe contenders cannot lose model/cache admission.
+  It consumes the bounded headless rate-limit status and optional utilization when
+  present, without pretending Claude provides a reliable Pro/Max percentage to headless CI. A
+  certifiable anchor is prioritized before the cross-version wave. An unpaired anchor frame reaches
+  Haiku unless an authenticated ancestor cache carries the exact same canonical PNG, lane label,
+  authored region fingerprint, scope, capture, expectation, and runtime evidence under the exact
+  current semantic policy. For paired evidence, decoded RGB pixels from the authored regions can prove an exact
+  candidate/reference match without a model call; exact-equivalent versions share one AI-reviewed
+  representative. Each drain triages the remaining loader-grouped chunks concurrently with Haiku
+  from deterministic 1280x720 copies, then globally packs only concerns or confidence below high
+  into concurrent bounded Opus verification. A clean high-confidence Haiku decision is final.
+  Perceptual similarity is model context only and can never synthesize a pass or force escalation.
+  The first Opus-confirmed defect publishes a protected generation-bound marker,
+  cancels sibling drains and keeps later queue selection from spending more model calls on that
+  automatic wave. Each drain also cancels its own outstanding calls on confirmation and reuses a
+  verdict only under exact semantic candidate/reference fingerprints, authored review scope,
+  capture, expectation, runtime evidence, contract, matrix, reviewer, prompt, model, and
+  chunk-policy identity. Artifact labels and loaders may differ for paired comparisons when all
+  reusable semantic identity is exact; an anchor hit additionally binds the exact label so Fabric
+  and Forge remain independently judged. A cache shard from an earlier protected `master` SHA is eligible only when that SHA
+  remains an ancestor and its cache-producing workflow blob is byte-identical to the current one;
+  the current codec then revalidates every exact key. The capacity marker retains only normalized
+  status, known limit type, and utilization
+  band rather than provider text or exact account usage. Unpaired anchor cache entries also bind
+  the full content-addressed canonical PNG and never cross a lane label. It keeps provider output private and uploads only the
+  protected normalized report or a sanitized retry marker. Completed and already-reviewed inputs
+  retain their seven-day recovery window across late owner cancellation; only missing or terminally
+  invalid inputs enter exact-ID cleanup. If an authenticated capsule disappears between the final guard and its
+  download, that exact wake settles without starting a model; every other download or validation
+  failure remains visible. Build and
+  Packaged E2E remain the required exact-head checks for every individual port, and their
+  conclusions never depend on model output. The semantic certificate gates only scheduling of the
+  cross-version wave: provider failure or a semantic defect deliberately delays that wave instead
+  of blessing an unverified baseline.
+- Ordinary ready PRs targeting `master` run Build and Packaged E2E as deterministic previews but
+  never enter the Claude queue; draft PRs defer even that preview. A merge necessarily creates the cumulative 1.20.1 synchronization
+  anchor, which is the single semantic admission point for that generation. Direct PRs to release
+  branches have no guaranteed post-merge anchor and retain a protected fail-closed `source-pr`
+  scope. After a certified anchor releases the remaining ports, the protected
+  `post-anchor-port` scope treats visual-review prompts/runners/orchestration as already exercised
+  by that anchor; product, scenario, packaged-E2E, malformed, and unknown paths remain reviewable.
+  That broader scope requires the exact certificate-driven synchronization `repository_dispatch`
+  and never applies to a manual recovery target.
+- A clean semantic review of an exact synchronized release tree starts a separate optional-mod
+  compatibility wave only when its protected curation proof carries a complete fail-closed
+  product/integration impact manifest. Visual-review workflows, prompts, documentation, and their
+  policy tests cannot request that wave. A change made only of module-owned sources requests it
+  exactly when the module graph proves that its reverse dependency closure reaches a step of a
+  compatibility scenario or one of the clean reference captures those lanes are paired against;
+  a module change proven outside that closure keeps the already published compatibility evidence.
+  Build, loader, assembly, runtime-harness, compatibility-policy, malformed, renamed-from-unknown,
+  and unknown paths always request the wave. The same closure keeps the packaged E2E selection on
+  the complete profile, so the wave always finds the complete clean runtime it pairs against
+  instead of leaving that evidence missing. Protected planning derives every
+  `version x loader x mod` lane from the
+  release matrix and `e2e/mod-compatibility-contract.json`, including explicit N/A rows. Applicable
+  lanes run concurrently, prove that the selected integration activated, and execute both the
+  local compatibility scenario, any mod-contracted remote-observer scenarios, and the complete base
+  suite with only immutable size/SHA-256/SHA-512 verified external JARs. Secretless curation
+  authenticates that complete runtime result, then pairs exactly the selected compatibility-profile
+  captures with the clean same-version/loader result. Exact
+  authored-region matches need no model call, exact-equivalent pairs share one representative,
+  Haiku reviews the remaining pairs, and Opus verifies only a concern or confidence below high.
+  The first confirmed defect records a durable wave block and cancels outstanding model calls.
+  Each successful runtime lane curates its own capsule before
+  the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing
+  successful lanes or preventing their later source-wide AI review. The settled compatibility
+  producer explicitly dispatches the protected reviewer and that reviewer polls until the exact
+  source run is complete; relying on a recursive `workflow_run` would silently lose token-created
+  waves. The reviewer shares the repository-wide Claude capacity circuit, records clean lanes
+  independently,
+  and keeps the authenticated source plan pending across quota pauses. Every compatibility source
+  requires its own fresh serialized tool-free probe; a ready marker from the preceding source is
+  not treated as capacity reserved for another wave. All deterministic mod lanes still start
+  concurrently. After the fresh probe, a secretless protected batcher authenticates every
+  unfinished curated capsule, deduplicates content-addressed images, and combines their manifests
+  so exact-equivalent pairs can share representatives across loaders and chunks can fill to their
+  global bound. One credential-bearing runner applies the protected per-wave parallel-call budget
+  and bounded call spacing, then secretless matrix jobs split a complete clean result back into
+  independently authenticated lane reports and completion markers. It publishes only sanitized
+  per-stage call, chunk, and retry counts, never provider text, token counts, or account usage.
+  Scheduled recovery reruns only unfinished lanes and publishes a source completion marker after
+  the full set is clean. A producer that settles after `master` advances suppresses its wake;
+  direct review admission binds
+  the source SHA to the protected current implementation, and both the secretless batcher and
+  credential-bearing runner recheck live `master` before capsules or a model are admitted.
+  Authored loader/version exclusions
+  remain explicit N/A records and survive lock refreshes. This post-validation signal does not
+  replace or weaken Build,
+  Packaged E2E, or the independent 1.20.1 semantic certification gate.
+- Pages wake and deploy events share one coalescing lock. A parallel release-attestation burst
+  retains only the running publication member and the newest pending survivor; the survivor
+  rediscovers every exact current release head. Discovery defers while a release attestation is
+  active; the shared-source progress controller may only nominate exact handoff IDs, which the
+  bounded collector reauthenticates in its single authoritative selection/provenance pass. Its GitHub API client applies bounded jittered backoff
+  to installation-rate-limit and transient transport/server responses; those responses are never
+  reclassified as missing evidence.
+- Shared behavior changes start on `master`. A version-only fix starts on its release branch and
+  must be reflected in canonical `master` sources when the same behavior applies elsewhere.
+- A shared change is not repository-wide delivery merely because it reached `master`. The
+  synchronizer must create one port PR for every discovered release branch; each PR must pass its
+  exact-head Build and Packaged E2E gates, merge into its target, and receive successful final
+  exact-tree attestations. Until that is true for every target, report the outstanding ports rather
+  than calling the change delivered everywhere. Name every intentional branch exclusion in the
+  issue or source pull request; never let an omitted port become an implicit support policy.
+
+### Version-port controllers
+
+- `scripts/ci/version_port_merge.py` is the sole protected owner of version-port Git merge
+  semantics. Given exact clean target/source commits, it runs a hook-free no-commit merge,
+  authenticates `MERGE_HEAD`, snapshots the complete original index, applies the classifier's
+  mechanical policies, and emits stable evidence. For an AI resolution it accepts an external
+  candidate index only with its exact tree id and copies only the recomputed `ai_paths`; it never
+  imports another candidate entry.
+- `scripts/ci/version_port_conflicts.py` is the pure, fail-closed classifier for the original Git
+  conflict set. It may assign a protected path only to an exact reviewed mechanical policy. Shared
+  guidance and runtime documents use a source-preferred three-way merge, the release matrix uses
+  the target version, a build script may be deleted only when its loader is inactive in that
+  target matrix, and a path below a legacy overlay may be deleted only when that exact overlay root
+  is absent from the target matrix. The one reviewed datapack-layout migration moves the protected
+  `functions` files and tags to 1.21+'s singular `function` paths, rewrites the three renamed game
+  rules from the target matrix's single runtime version, and removes every obsolete plural path.
+  Unknown protected paths, active-loader build conflicts, and
+  active-overlay conflicts abort the port; only unprotected residual conflicts may reach AI.
+- `scripts/release/branch_readme.py`, `scripts/release/e2e_readme.py`, and
+  `scripts/release/workflow_guidance.py` are the protected renderers for matrix-owned branch
+  profiles. The synchronizer runs them after conflict resolution, stages their exact outputs, and
+  reruns them in both the credentialless validator and the narrow writer. Do not hand-maintain
+  their marked blocks or version-specific test-task anchors.
+- `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
+  an unpaired, loader-complete, completely clean 1.20.1 report and binds its source/proof/manifest/
+  report digests to exact Git identities supplied by protected workflow checks. The version
+  synchronizer accepts the resulting artifact only from a successful protected drain run, for the
+  exact current `master` SHA and exact current merged anchor head.
+- `scripts/ci/visual_nonimpact_certification.py` is the distinct model-free continuation codec.
+  The protected port merge controller may create it only after exact Build and full anchor E2E
+  pass and `scripts/ci/visual_review_impact.py` classifies the complete first-parent-to-port-head
+  diff as nonvisual. The consuming synchronizer authenticates the handler artifact and owner,
+  independently recomputes that exact diff with current protected policy, verifies both gate runs,
+  the current `master` second parent, current anchor head, and equal merged trees, then releases the
+  remaining ports without minting a semantic certificate or starting optional-mod compatibility.
+  `scripts/ci/visual_review_queue.py` also authenticates that protected artifact name and owner
+  before suppressing a duplicate scheduled or automatic review of the exact generation; it never
+  applies this shortcut to an ordinary feature-PR semantic review.
+
+### Version-port and anchor invariants
+
+- Every automatic `master` synchronization releases non-anchor version branches through exactly
+  one of two authenticated routes. The ordinary route requires the protected drainer to produce a
+  semantic 1.20.1 certificate. The certificate must cover identical
+  non-empty Fabric and Forge capture sets, contain no reference, report every frame semantically
+  valid with no defect, belong to the exact synchronization merge parent, and bind the current
+  exact-tree anchor merge head. The consuming synchronizer must reauthenticate the artifact id,
+  digest, size, successful protected owner run, source E2E run, contract hash, Git parents, equal
+  source/target trees, current `master`, and current anchor head. Stale or invalid dispatches are
+  no-ops. The model-free route requires a bounded nonvisual continuation artifact from the current
+  protected merge handler after the anchor's exact Build and full Packaged E2E succeed. The
+  synchronizer must reauthenticate that artifact and owner, both gate runs, the current `master`
+  second parent on the newest synchronization commit, the bounded two-parent synchronization chain
+  terminating at the exact release base, equal source/target trees, current anchor head, policy
+  digest, and an independently recomputed complete anchor diff whose every path is allowlisted. It
+  must not launch optional-mod compatibility because no runtime generation changed.
+  Immediate-tip classification must never bypass the anchor: a non-runtime tip can include an older
+  uncertified runtime change. The anchor's Packaged E2E policy is therefore always `full`.
+  This scheduling gate must never replace or weaken either individual port's required Build or
+  Packaged E2E checks.
+- A version port must classify the complete original unmerged path set before AI runs. Exact
+  protected paths may use only their reviewed mechanical resolution: source-preferred three-way
+  merge for shared guidance/runtime documents, target retention for the release matrix, deletion
+  of a build script whose loader is absent from that target matrix, or deletion below a legacy
+  overlay root absent from that target matrix. The exact 1.20-to-1.21 datapack directory rename is
+  the only protected path migration: it must move both functions and tags to the singular layout,
+  select legacy or namespaced game-rule identifiers from one authenticated target runtime, and
+  leave no plural path. Any unknown protected conflict, active-loader build
+  conflict, or active-overlay conflict fails closed. Recompute the partition from the original
+  paths and target matrix in every downstream trust boundary; never let AI receive a protected path.
+- Treat a proposed version-port patch as untrusted even after policy validation. Apply it first to
+  an isolated alternate index and authenticate its complete tree id. The credentialless validator
+  and credentialed writer must each rerun the protected merge controller from the exact original
+  parents, compare its stable evidence byte-for-byte, import only the recomputed AI-conflict paths
+  from that index, rerun protected generators, and require the final real index tree to equal both
+  the isolated candidate tree and the plan tree. Never apply the full patch to the real index.
+- After a version-port validation matrix settles, one protected authorization job must read its
+  complete latest job inventory once and bind the exact successful target set to the workflow run,
+  protected source SHA, attempt, and discovered inventory. A writer may reconstruct only when its
+  own target is present in that authenticated same-run output. Never poll the inventory per target:
+  fan-out polling amplifies installation-API load across a parallel release wave without adding a
+  stronger trust binding; the proposal artifact is already immutable within that run.
+- A successful automated version port may publish the stable Packaged E2E status only after the
+  protected evaluator sees exactly one successful control job, the exact target-branch PR-anchor
+  lane set, and byte-identical protected workflow, attestation workflow, composite action, contract,
+  Python controller, common Java E2E harness, Gradle bootstrap/wrapper, and contract-generation
+  paths. Each active loader's entire `src/e2e` bootstrap and full loader build script must also
+  match the exact protected digest selected for that release branch. A green subset or a final
+  convention-apply line attached to an otherwise unknown build script is never sufficient.

@@ -18,9 +18,12 @@ contributing; submitting a pull request accepts its contribution terms.
 - [DEPENDENCY-SECURITY.md](DEPENDENCY-SECURITY.md) explains repository routing, checksums, and locks.
 - [e2e/README.md](e2e/README.md) describes the packaged Minecraft tests used by CI.
 
-`CLAUDE.md` deliberately contains only `@AGENTS.md`, which in turn imports the focused files under
-`docs/ai/`. This gives Claude the same modular rules as other agents without maintaining duplicate
-copies. Do not put rules directly in either manifest.
+The repository deliberately has no `CLAUDE.md`. Claude Code 2.1.277 or later reads `AGENTS.md`
+directly, including its imports of the focused files under `docs/ai/`, so Claude gets the same
+modular rules as other agents without a duplicate copy. Adding a `CLAUDE.md`, `.claude/CLAUDE.md` or
+`CLAUDE.local.md` would stop Claude from reading `AGENTS.md`. Where Claude cannot read `AGENTS.md`
+directly (for example on Amazon Bedrock or with telemetry disabled), import it from a personal
+`~/.claude/CLAUDE.md` instead. Do not put rules directly in `AGENTS.md`.
 
 ## 1. Choose the correct base branch
 
@@ -226,8 +229,9 @@ exact compilation; changes within one feature can then reduce its authenticated 
 
 You normally do not need to launch packaged Minecraft E2E locally. Use the `capture_coverage=full`
 manual recovery option when complete coverage is needed; optional-mod profiles remain complete
-integration checks. The pull-request workflow
-builds immutable jars and runs the declared scenarios on GitHub. Fork pull requests do not receive
+integration checks. Once a pull request is ready for review, its workflow
+builds immutable jars and runs the declared scenarios on GitHub. A draft pull request to `master`
+runs neither, so it gives no build or runtime feedback until it is marked ready. Fork pull requests do not receive
 repository secrets, so secret-dependent AI review may be skipped while programmatic checks still
 run.
 
@@ -315,8 +319,11 @@ Use the pull-request template. A reviewer should be able to determine:
 - whether the release matrix or generated output changed.
 
 Use a conventional PR title such as `fix: reject an oversized texture before allocation`.
-Draft PRs are welcome when you want early help. Include concise logs as text or an attachment rather
-than committing runtime directories.
+Draft PRs are welcome when you want early help. A draft to `master` starts no Build or packaged
+E2E work, and it cannot be merged; mark it ready for review to run the complete gate. Maintainers
+can instead validate several drafts together through one batch PR, as described in
+[PR batches](docs/ci/PR-BATCHES.md). Include concise logs as text or an attachment rather than
+committing runtime directories.
 
 CI is part of the review. A green compile alone is not enough for runtime-sensitive changes: wait
 for the packaged E2E result. Do not work around a failure by weakening a gate. Explain the failure,

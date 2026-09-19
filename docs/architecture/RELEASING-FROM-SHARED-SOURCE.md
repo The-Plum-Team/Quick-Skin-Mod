@@ -42,8 +42,8 @@ publication writer jobs share `release-publish`; every queue preserves pending r
 `publication_state.py` binds upload intent to the tag, original source, producer run, immutable
 archive ID/digest and manifest digest. Its versioned hidden draft-body comment contains the exact
 matrix-derived row inventory. Writers reread the body under the shared lock before patching it and
-confirm the saved state before authorizing an upload. This preserves the five-asset GitHub release
-contract and survives runner loss without a second mutable branch or expiring queue artifact.
+confirm the saved state before authorizing an upload. This preserves the exact GitHub release asset
+contract (JARs, `artifacts.json`, SBOM and `SHA256SUMS`) and survives runner loss without a second mutable branch or expiring queue artifact.
 
 `verify_pending_publications.py` is a read-only observer until protected finalization is approved.
 It runs current protected code, authenticates original build/E2E evidence and tag ancestry, downloads
@@ -55,5 +55,5 @@ ambiguous-response recovery and the distinction between upload completion and pu
 
 During the modular migration, routine image E2E is deferred to GitHub by maintainer direction.
 Compilation, local stage verification and workflow dry runs do not certify those images. The
-protected selective-review/baseline pipeline and release governance/status/Pages migration are
-still separate unfinished parts of `MODULAR-REWORK.md`.
+protected selective-review/baseline pipeline and the status/Pages migration are complete; the
+remaining migration work is listed in [`MODULAR-REWORK.md`](MODULAR-REWORK.md#remaining-work).

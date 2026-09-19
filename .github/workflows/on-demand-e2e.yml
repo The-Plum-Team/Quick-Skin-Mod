@@ -3,8 +3,11 @@ name: Packaged E2E
 # Packaged Minecraft consumes the exact successful Build bundle, then runs contract-selected
 # scenarios on every matrix lane. A standalone run without an available bundle uses the same
 # isolated target compiler. Semantic visual review remains a separate protected workflow.
+# A draft PR to master defers all of this to its ready head or to a batch PR (ADR 0009).
 on:
   pull_request:
+    # Converting a PR to draft starts a deferred run that cancels its in-progress gate.
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   workflow_dispatch:
     inputs:
       attest_run_id:
@@ -55,8 +58,8 @@ jobs:
   runtime-policy:
     name: Classify packaged runtime impact
     if: >-
-      github.event_name != 'workflow_dispatch' ||
-      inputs.attest_run_id == ''
+      (github.event_name != 'workflow_dispatch' || inputs.attest_run_id == '') &&
+      !(github.event.pull_request.draft && github.event.pull_request.base.ref == 'master')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -462,8 +465,8 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      # Every Minecraft process stays isolated; independent versions need not wait eight waves.
-      max-parallel: 16
+      # Every Minecraft process stays isolated. No parallelism bound: every lane runs in one wave,
+      # limited only by the account's job allowance.
       matrix: ${{ fromJSON(needs.build.outputs.anchors) }}
 
     steps:
@@ -488,7 +491,9 @@ jobs:
           evidence-retention-days: '7'
 
   required-gate:
-    name: Packaged E2E gate
+    # A draft must never report the required context: a skipped or deferred "Packaged E2E gate"
+    # would still satisfy the ruleset after the same head is marked ready, before Minecraft runs.
+    name: ${{ github.event.pull_request.draft && github.event.pull_request.base.ref == 'master' && 'Packaged E2E deferred for draft' || 'Packaged E2E gate' }}
     needs:
       - runtime-policy
       - build
@@ -498,6 +503,8 @@ jobs:
       (github.event_name != 'workflow_dispatch' || inputs.attest_run_id == '')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    env:
+      DRAFT_DEFERRED: ${{ github.event.pull_request.draft && github.event.pull_request.base.ref == 'master' }}
 
     steps:
       - name: Require build and packaged behavior
@@ -510,6 +517,12 @@ jobs:
           REUSED: ${{ needs.runtime-policy.outputs.reused }}
         run: |
           set -euo pipefail
+          if [[ "${DRAFT_DEFERRED:-false}" == true ]]; then
+            [[ "$POLICY_RESULT" == skipped ]] || exit 1
+            printf 'Draft PR: packaged Minecraft is deferred until the PR is ready or included in a batch PR.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           [[ "$POLICY_RESULT" == success ]] || exit 1
           if [[ "$REUSED" == true ]]; then
             [[ "$RUNTIME_POLICY" == full && "$BUILD_RESULT" == skipped && "$E2E_RESULT" == skipped ]] || exit 1
@@ -536,7 +549,9 @@ jobs:
           esac
 
       - name: Check out the actual tested source record policy
-        if: github.event_name == 'pull_request' || needs.runtime-policy.outputs.reused == 'true'
+        if: >-
+          (github.event_name == 'pull_request' && env.DRAFT_DEFERRED != 'true') ||
+          needs.runtime-policy.outputs.reused == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -552,11 +567,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/ci/ci_reuse.py verify --kind e2e --reference reuse/reused-source.json
+      # A deferred draft ran nothing, so it must never seal a record that reuse could admit.
       - name: Record the actual PR commit that passed packaged Minecraft
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && env.DRAFT_DEFERRED != 'true'
         run: python3 scripts/ci/ci_reuse.py seal --kind e2e --output tested-source/tested-source.json
       - name: Retain the immutable tested-runtime record
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && env.DRAFT_DEFERRED != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tested-source-e2e

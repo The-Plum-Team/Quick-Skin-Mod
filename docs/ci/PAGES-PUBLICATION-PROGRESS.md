@@ -35,7 +35,7 @@ there is no successful current publication, one exact successful E2E owner must 
 ordinary handoff from its current attempt before the initial full fan-out is admitted.
 
 Full collectors still select and validate their own current artifacts, including arriving
-evidence newer than the controller snapshot. Build still authenticates the complete 16-target
+evidence newer than the controller snapshot. Build still authenticates the complete matrix-derived
 runtime fan-in before rendering; raw anchors and original runtime identities are unchanged.
 The controller supplies immutable ordinary/compatibility handoff-ID nominations by target so a later-timestamp stale
 cache cannot hide a producer that the preceding collector missed. The collector independently

@@ -482,9 +482,13 @@ The curator applies the protected review checker before upload and reserves 32 M
 envelope for the bounded manifest, proof, archive metadata, and structure. A source/run/
 implementation proof and bounded manifest become a seven-day durable queue entry. A protected
 exact wake may authenticate only its requested artifact and locks the complete drain by that ID;
-duplicate wakes coalesce. The model/cache job runs one capsule at a time per protected implementation
-so the next target can reuse the preceding verdicts. Its `queue: max` retains up to 100 pending jobs
-instead of replacing all but one. Independent model chunks inside that job remain concurrent.
+duplicate wakes coalesce. Two secretless preparation slots, chosen by capsule-ID parity, fetch,
+bound and validate queued capsules and hand over only the original capsule ZIP. One global
+model/cache job then runs one ordinary capsule at a time, whatever its protected implementation,
+so the next target can reuse the preceding verdicts; it reauthenticates that handoff by exact run,
+attempt, artifact ID and digest and rechecks the live source first. Its `queue: max` retains up to
+100 pending jobs instead of replacing all but one. Independent model chunks inside that job remain
+concurrent, with at most 32 calls at once.
 Scheduled/manual recovery sweeps share a separate lock and redispatch an authenticated pending
 identity. Completed drains do not wake their consumed capsule again; curator wakes, capacity
 recovery and scheduled sweeps admit remaining work. The durable artifact remains the source of
@@ -534,11 +538,13 @@ independent final fields: `semantic_valid` and nullable `matches_reference`. A r
 never hide a semantic failure. It uploads only a schema-normalized report; raw provider output stays
 private. Transient provider failures create only a sanitized one-day cooldown marker, leaving the
 queue entry for retry while other entries progress. Terminal validation/configuration failures are
-marked and retired. An independent cleanup job deletes a settled entry by exact artifact id. The
-final small report remains for seven days so it can release the delayed compatibility wave.
-Exact-policy verdict cache shards remain for seven days;
-parallel drains may briefly publish siblings, and a later protected successor combines and retires
-every authenticated shard it consumed without dropping concurrent verdicts. A shard owned by an
+marked and retired by exact artifact id. A freshly completed or already-reviewed entry instead stays
+until its seven-day expiry, so a report owner cancelled during a later publication tail can recover
+its complete result from the original capsule without another model call; authenticated reports
+suppress a second review meanwhile. The final small report remains for seven days so it can release
+the delayed compatibility wave. Exact-policy verdict cache shards remain for seven days; the single
+model/cache owner publishes its replacement union before retiring every authenticated shard it
+consumed, so a later cancellation cannot drop earlier verdicts. A shard owned by an
 earlier protected `master` commit may be reused across an unrelated merge only when that commit is
 still an ancestor and its cache-producing workflow blob is byte-identical; the current codec still
 revalidates the complete policy and every content-addressed verdict key.
@@ -655,7 +661,11 @@ acknowledges that exact checkpoint through the normal Quick Skin relay. Alice th
 while both clients remain connected. Bob's second capture requires the remote Quick Skin texture
 cache and renderer location to agree; Ears also requires TALL/BACK features in its cache, public
 storage, and renderer lookup, while CPM requires a healthy remote model definition before the
-change and an inactive definition after its server reset. In the sequential late-join scenario,
+change and an inactive definition after its server reset. Before both live captures, and again in
+both assertions, Bob's renderer must have compiled the terrain at and below Alice; vanilla skips
+entities in uncompiled sections, so passing appearance checks alone once produced identical
+sky-only frames. Each changed waiting reason is logged, up to a bound, so a timeout names the
+condition that never held. In the sequential late-join scenario,
 Bob launches only after Alice has completed a genuine CPM horn model or an Ears-authored TALL/BACK
 skin, respectively, and must recover that already-active renderer state. Reflection failures never
 count as a successful CPM observation or reset.
@@ -776,7 +786,13 @@ token-triggered workflow behavior.
 
 The `Project site` controller executes only the protected generator from `master`. It authenticates
 each wake-up, coalesces concurrent events, derives targets from the shared matrix, and accepts
-evidence only for the authenticated current source generation. It authenticates both recorded
+evidence only for the authenticated current source generation. Before collection fan-out,
+`scripts/pages/publication_progress.py` admits only an authenticated coverage milestone: the
+initial complete ordinary publication, a later complete same-head ordinary attempt, the
+compatibility halfway (after ten minutes of coalescing) and final milestones, or a partial set whose
+oldest unpublished handoff has waited 45 minutes. Each collector reauthenticates the exact handoff
+ID that discovery nominates and fails closed rather than falling back to an older cache; see
+[Pages publication progress](../docs/ci/PAGES-PUBLICATION-PROGRESS.md). It authenticates both recorded
 Actions runs, validates the exact curated tree and every path/hash/dimension/contract identity,
 rechecks all heads, converts each raw bundle to an exact-schema WebP derivative bundle before the
 `collected-pages-*` fan-in, and publishes the complete site as one atomic GitHub Pages artifact. A
@@ -796,8 +812,10 @@ retaining one validated compact `pages-cache-*` bundle for each exact release he
 generation-safe rotation admits the replacement before deleting superseded exact IDs, and a delayed
 rotation cannot delete a newer cache. For the matrix-derived 1.20.1 anchor it also retains the exact
 current raw handoff, revalidates it before every deletion, and deletes only older raw generations.
-Original PNG bytes never enter the durable compact cache. Monthly validation can refresh compact
-caches without relaunching Minecraft. The same rotation retains one validated compatibility cache
+Original PNG bytes never enter the durable compact cache. Pages never relaunches Minecraft: its
+hourly schedule only recovers a lost wake or a stalled partial publication, and a generation whose
+caches are already complete exits in discovery without collecting or refreshing them. The same
+rotation retains one validated compatibility cache
 per covered matrix target and retires older compatibility caches and consumed handoffs only after
 the replacement deploys successfully. Pages and advisory AI reports do not replace the required
 Build or Packaged E2E gates. Full baseline archives have their own bounded retention and must still

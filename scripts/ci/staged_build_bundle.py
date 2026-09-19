@@ -16,6 +16,8 @@ from feature_coverage_github import Api
 
 
 WORKFLOW = ".github/workflows/build-gate.yml"
+GATE_JOB = "Build and verify"
+DRAFT_JOB = "Build deferred for draft"
 ARTIFACT = "staged-release-bundle"
 SHA = re.compile(r"[0-9a-f]{40}")
 REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
@@ -67,6 +69,28 @@ def current_pull_request(api: Api, source: Source) -> None:
             "PR source or base advanced while waiting for its Build")
 
 
+def staged_bundle(api: Api, source: Source, run: dict, jobs: list[dict]) -> dict | None:
+    gates = [job for job in jobs if job.get("name") == GATE_JOB]
+    require(len(gates) == 1 and gates[0].get("status") == "completed"
+            and gates[0].get("conclusion") == "success", "Build has no successful complete required gate")
+    artifacts = [item for item in api.artifacts(run_id=run["id"]) if item["name"] == ARTIFACT]
+    if not artifacts or (len(artifacts) == 1 and artifacts[0].get("expired") is True):
+        require(source.pull_request is None, "successful PR Build has no available staged bundle")
+        return None
+    require(len(artifacts) == 1, "Build published multiple staged bundles")
+    artifact = artifacts[0]
+    require(type(artifact.get("id")) is int and artifact["id"] > 0
+            and artifact.get("expired") is False
+            and type(artifact.get("size_in_bytes")) is int
+            and 0 < artifact["size_in_bytes"] <= MAX_BUNDLE_BYTES
+            and isinstance(artifact.get("digest"), str)
+            and re.fullmatch(r"sha256:[0-9a-f]{64}", artifact["digest"]) is not None,
+            "Build bundle metadata is malformed or too large")
+    current_pull_request(api, source)
+    return {"run_id": run["id"], "artifact_id": artifact["id"],
+            "tested_commit": source.tested_commit, "digest": artifact["digest"]}
+
+
 def find_bundle(api: Api, source: Source, *, wait_seconds: int,
                 sleep=time.sleep, now=time.monotonic) -> dict | None:
     require(type(wait_seconds) is int and 0 <= wait_seconds <= 5400, "invalid Build wait limit")
@@ -88,28 +112,17 @@ def find_bundle(api: Api, source: Source, *, wait_seconds: int,
         runs = [run for run in runs if run.get("head_branch") == source.branch
                 and run.get("head_repository", {}).get("full_name") == source.head_repository]
         run = max(runs, key=lambda item: item["id"]) if runs else None
+        pending = run is None or run.get("status") in ACTIVE
         if run is not None and run.get("status") == "completed":
             require(run.get("conclusion") == "success", "the latest exact-source Build did not succeed")
-            jobs = [job for page in api.jobs(run) for job in page["jobs"] if job.get("name") == "Build and verify"]
-            require(len(jobs) == 1 and jobs[0].get("status") == "completed"
-                    and jobs[0].get("conclusion") == "success", "Build has no successful complete required gate")
-            artifacts = [item for item in api.artifacts(run_id=run["id"]) if item["name"] == ARTIFACT]
-            if not artifacts or (len(artifacts) == 1 and artifacts[0].get("expired") is True):
-                require(source.pull_request is None, "successful PR Build has no available staged bundle")
-                return None
-            require(len(artifacts) == 1, "Build published multiple staged bundles")
-            artifact = artifacts[0]
-            require(type(artifact.get("id")) is int and artifact["id"] > 0
-                    and artifact.get("expired") is False
-                    and type(artifact.get("size_in_bytes")) is int
-                    and 0 < artifact["size_in_bytes"] <= MAX_BUNDLE_BYTES
-                    and isinstance(artifact.get("digest"), str)
-                    and re.fullmatch(r"sha256:[0-9a-f]{64}", artifact["digest"]) is not None,
-                    "Build bundle metadata is malformed or too large")
-            current_pull_request(api, source)
-            return {"run_id": run["id"], "artifact_id": artifact["id"],
-                    "tested_commit": source.tested_commit, "digest": artifact["digest"]}
-        require(run is None or run.get("status") in ACTIVE, "unknown Build state")
+            jobs = [job for page in api.jobs(run) for job in page["jobs"]]
+            names = [job.get("name") for job in jobs]
+            if source.pull_request is not None and GATE_JOB not in names and names.count(DRAFT_JOB) == 1:
+                # The head's deferred draft run can precede the Build started when it became ready.
+                pending = True
+            else:
+                return staged_bundle(api, source, run, jobs)
+        require(pending, "unknown Build state")
         if source.pull_request is None and run is None:
             return None
         if now() >= deadline:
