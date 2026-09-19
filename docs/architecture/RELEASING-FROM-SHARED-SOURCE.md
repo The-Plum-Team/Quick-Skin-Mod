@@ -55,5 +55,5 @@ ambiguous-response recovery and the distinction between upload completion and pu
 
 During the modular migration, routine image E2E is deferred to GitHub by maintainer direction.
 Compilation, local stage verification and workflow dry runs do not certify those images. The
-protected selective-review/baseline pipeline and status/Pages migration are
-still separate unfinished parts of `MODULAR-REWORK.md`.
+protected selective-review/baseline pipeline and the status/Pages migration are complete; the
+remaining migration work is listed in [`MODULAR-REWORK.md`](MODULAR-REWORK.md#remaining-work).
