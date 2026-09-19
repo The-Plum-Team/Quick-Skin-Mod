@@ -71,7 +71,7 @@ class TargetStatusTest(unittest.TestCase):
     def test_all_targets_share_one_job_inventory_per_gate(self):
         result = self.transport.collect()
         validate_snapshot(result)
-        self.assertEqual(16, len(result["targets"]))
+        self.assertEqual(len(self.transport.targets), len(result["targets"]))
         self.assertEqual({"success"}, set(self.states(result, "build").values()))
         self.assertEqual({"success"}, set(self.states(result, "e2e").values()))
         for kind in ("build", "e2e"):

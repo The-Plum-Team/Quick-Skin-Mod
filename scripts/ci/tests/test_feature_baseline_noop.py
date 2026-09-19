@@ -54,7 +54,8 @@ class FeatureBaselineNoopTest(unittest.TestCase):
         value = self.prepare()
         self.assertEqual(2, value['source_run_attempt'])
         self.assertEqual(9100, value['issuer']['run_id'])
-        self.assertEqual(17, len(self.api.downloaded))
+        targets = publisher.coverage.inventory(publisher.coverage.DEFAULT_MATRIX)["include"]
+        self.assertEqual(len(targets) + 1, len(self.api.downloaded))
 
     def test_malformed_candidate_ids_never_reach_sort_or_owner_transport(self):
         candidates = [self.fixture.artifact]

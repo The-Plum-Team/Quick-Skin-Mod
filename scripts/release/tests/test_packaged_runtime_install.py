@@ -175,6 +175,40 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
         sleep.assert_called_once_with(5)
         self.assertEqual(1, self.store.metrics.misses)
 
+    def test_every_loader_retries_a_transient_client_install_failure(self) -> None:
+        for loader in ("fabric", "forge", "neoforge"):
+            with self.subTest(loader=loader):
+                self.row["loader"] = loader
+                version_id = packaged_runtime.installed_version_id(self.row)
+                calls: list[Path] = []
+
+                def reset_first_attempt(
+                    _command: list[str], cwd: Path, _log: Path, _env: dict[str, str],
+                    **_kwargs: object,
+                ) -> None:
+                    calls.append(cwd)
+                    self.write_loader_profile(cwd, version_id)
+                    if len(calls) == 1:
+                        raise packaged_runtime.RuntimeFailure("Connection reset by peer")
+
+                def install_vanilla(version: str, target: str) -> None:
+                    # Fabric's profile normalization requires the inherited vanilla jar.
+                    jar = Path(target) / "versions" / version / f"{version}.jar"
+                    jar.parent.mkdir(parents=True, exist_ok=True)
+                    jar.write_bytes(b"vanilla")
+
+                with self.patched_launcher(install_vanilla), mock.patch.object(
+                    packaged_runtime, "run_checked", side_effect=reset_first_attempt
+                ), mock.patch.object(packaged_runtime.time, "sleep") as sleep:
+                    directory, actual_version_id = packaged_runtime.prepare_client_install(
+                        self.matrix, self.row, self.session, "/fake/java"
+                    )
+
+                self.assertEqual(version_id, actual_version_id)
+                self.assertEqual(2, len(calls))
+                self.assertTrue((directory / "versions" / version_id).is_dir())
+                sleep.assert_called_once_with(5)
+
     def test_all_attempts_fail_without_a_recipe_or_materialized_partial_tree(self) -> None:
         version_id = packaged_runtime.installed_version_id(self.row)
         attempts: list[Path] = []

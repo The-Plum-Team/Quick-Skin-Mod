@@ -336,6 +336,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   `MouseHandler`'s GLFW button and move callbacks, whose `(long,int,int,int)` and
   `(long,double,double)` shapes GLFW itself fixes. Resolve those callbacks by
   named/intermediary/SRG name first and fall back to the unique matching shape.
+  Minecraft 26.3 replaced GLFW with SDL: only when the runtime ships no GLFW binding does the
+  shim call `onButton(long,MouseButtonInfo,int)`, the relative `onMove(long,double,double,double,
+  double)` and `keyPress(long,int,KeyEvent)`, and warp or size the window through SDL. Mouse
+  buttons and keys are backend numbers (SDL's left button is 1 and its keys are scancodes), so
+  product code and harness steps compare and send `InputConstants` constants, which are inlined
+  per compiled target, never literal GLFW values.
 - The shared Java harness must reference a drifting Minecraft type as a class literal so the
   harness jar's remapper rewrites it. Resolving a Minecraft name from a string resolves only on
   Mojang-mapped loaders and fails on Fabric's intermediary runtime, so a string lookup additionally

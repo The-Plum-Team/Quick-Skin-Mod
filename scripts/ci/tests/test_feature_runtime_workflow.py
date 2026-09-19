@@ -83,6 +83,14 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.assertNotIn("--selection-admission", arguments)
         self.assertNotIn("", arguments)
 
+    def test_packaged_minecraft_launch_uses_sdl_egl_under_xvfb(self):
+        # Minecraft 26.3's SDL window needs an sRGB OpenGL framebuffer that Xvfb's GLX lacks.
+        text = (COMPOSITE_ACTIONS / "run-packaged-e2e/action.yml").read_text()
+        step = text.split("    - name: Run contract-declared packaged scenarios\n", 1)[1].split("\n    - name:", 1)[0]
+        environment = step.split("      env:\n", 1)[1].split("      run: |\n", 1)[0]
+        self.assertIn('        SDL_VIDEO_FORCE_EGL: "1"\n', environment)
+        self.assertIn("xvfb-run --auto-servernum", action_script("Run contract-declared packaged scenarios"))
+
     def test_tampered_incomplete_empty_or_compatibility_selection_never_launches_minecraft(self):
         for changes in ({"E2E_SELECTION_SHA256": "0" * 64}, {"E2E_SELECTION_BASE": ""},
                         {"E2E_SELECTION_POLICY": "b" * 40 + "\ninjected=true"},

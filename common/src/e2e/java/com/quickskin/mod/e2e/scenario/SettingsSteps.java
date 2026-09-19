@@ -50,8 +50,11 @@ final class SettingsSteps {
     /** Rendered ticks a settled tab must hold before its screenshot, so the frame really shows it. */
     private static final int TAB_HOLD_TICKS = 15;
 
-    /** GLFW_KEY_ESCAPE, the value {@code SettingsScreen.keyPressed} compares against. */
-    private static final int KEY_ESCAPE = 256;
+    /**
+     * Escape as {@code SettingsScreen.keyPressed} compares it: GLFW's key code through 26.2 and
+     * SDL's scancode from 26.3. The compile-time constant is inlined per harness target.
+     */
+    private static final int KEY_ESCAPE = InputConstants.KEY_ESCAPE;
 
     /** What the Client tab's keybind button reads while it waits for a key (yellow "???" inside). */
     private static final String CAPTURE_LABEL = "> ??? <";

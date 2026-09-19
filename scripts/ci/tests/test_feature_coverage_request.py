@@ -212,13 +212,14 @@ class RequestTests(unittest.TestCase):
         for owner in self.api.owners.values():
             owner.update(status="in_progress", conclusion=None)
         self.api.owners[50].update(status="completed", conclusion="success")
+        producers = range(100, 100 + len(scheduler.coverage.inventory(scheduler.coverage.DEFAULT_MATRIX)["include"]))
         results = []
-        for producer in range(100, 116):
+        for producer in producers:
             result = scheduler.request(self.api, repository=ROOT, source_sha=self.api.sha, source_id=10,
                 producer_id=producer, directory=Path(self.directory.name), sleep=lambda _: None)
             results.append(result)
             self.api.owners[producer].update(status="completed", conclusion="success")
-        self.assertEqual(results, ["evidence-incomplete"] * 15 + ["collector-dispatched"])
+        self.assertEqual(results, ["evidence-incomplete"] * (len(producers) - 1) + ["collector-dispatched"])
         self.assertEqual(len(self.api.payloads), 1)
 
     def test_recovery_requires_even_the_last_owner_terminal(self):
@@ -231,6 +232,16 @@ class RequestTests(unittest.TestCase):
     def test_saved_twenty_four_staggered_requests_start_one_collector(self):
         import json
         fixture = json.loads((ROOT / "scripts/ci/tests/fixtures/baseline-readiness-2026-09-09.json").read_text())
+        # Replay the recorded generation against the targets it actually had; a later matrix
+        # target has no saved producer event and must not turn the replay incomplete.
+        recorded = {event["target"] for event in fixture["events"] if event["kind"] == "review"}
+        inventory = scheduler.coverage.inventory
+
+        def recorded_inventory(matrix):
+            value = inventory(matrix)
+            return {**value, "include": [row for row in value["include"] if row["bundle_key"] in recorded]}
+
+        patch.object(scheduler.coverage, "inventory", side_effect=recorded_inventory).start()
         records = self.api.records
         self.api.records = {}
         outcomes = []
@@ -365,8 +376,10 @@ class CanonicalRequestTests(unittest.TestCase):
             source_sha=self.fixture.base, source_run_id=int(payload["source_run_id"]),
             expected_source_attempt=int(payload["source_run_attempt"]), issuer_run_id=9000,
             directory=directory)
-        self.assertEqual(16, len(result["targets"]))
-        self.assertEqual(2880, sum(target["frame_count"] for target in result["targets"]))
+        targets = scheduler.coverage.inventory(scheduler.coverage.DEFAULT_MATRIX)["include"]
+        self.assertEqual(len(targets), len(result["targets"]))
+        # Every target publishes the same contracted 180 frames (the 16-target baseline had 2,880).
+        self.assertEqual(180 * len(targets), sum(target["frame_count"] for target in result["targets"]))
         key = name.split("--", 1)[1]
         self.assertEqual(replacement["id"], result["review_artifacts"][key]["id"])
         self.assertNotIn(original["id"], inner.downloaded)
@@ -397,8 +410,10 @@ class CanonicalRequestTests(unittest.TestCase):
             source_sha=self.fixture.base, source_run_id=int(payload["source_run_id"]),
             expected_source_attempt=int(payload["source_run_attempt"]), issuer_run_id=9000,
             directory=directory)
-        self.assertEqual(16, len(result["targets"]))
-        self.assertEqual(2880, sum(target["frame_count"] for target in result["targets"]))
+        targets = scheduler.coverage.inventory(scheduler.coverage.DEFAULT_MATRIX)["include"]
+        self.assertEqual(len(targets), len(result["targets"]))
+        # Every target publishes the same contracted 180 frames (the 16-target baseline had 2,880).
+        self.assertEqual(180 * len(targets), sum(target["frame_count"] for target in result["targets"]))
         self.assertEqual({8000}, {record["owner_run_id"] for record in result["public_artifacts"].values()})
 
 

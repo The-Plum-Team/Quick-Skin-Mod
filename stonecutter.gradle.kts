@@ -4,7 +4,7 @@ plugins {
     id("dev.kikugie.stonecutter")
     id("dev.architectury.loom") version "1.17.480" apply false
     id("dev.architectury.loom-no-remap") version "1.17.480" apply false
-    id("architectury-plugin") version "3.5.167" apply false
+    id("architectury-plugin") version "3.5.170" apply false
     id("com.gradleup.shadow") version "8.3.11" apply false
 }
 

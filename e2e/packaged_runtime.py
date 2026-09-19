@@ -171,8 +171,10 @@ class RuntimeFailure(RuntimeError):
     pass
 
 
-NEOFORGE_CLIENT_INSTALL_ATTEMPTS = 3
-NEOFORGE_CLIENT_INSTALL_BACKOFF_SECONDS = (5, 15)
+# Every loader's client install downloads vanilla libraries and assets, and every matrix lane
+# starts in one wave, so a transient connection reset must not fail a lane on its first attempt.
+CLIENT_INSTALL_ATTEMPTS = 3
+CLIENT_INSTALL_BACKOFF_SECONDS = (5, 15)
 LOADER_SERVER_INSTALL_ATTEMPTS = 3
 LOADER_SERVER_INSTALL_BACKOFF_SECONDS = (5, 15)
 LAUNCHER_LIBRARY_VERSION = "8.0"
@@ -907,9 +909,7 @@ def prepare_client_install(
     with leased_installer(matrix, row, session.store) as installer:
 
         def build(staging: Path) -> None:
-            attempts = (
-                NEOFORGE_CLIENT_INSTALL_ATTEMPTS if row["loader"] == "neoforge" else 1
-            )
+            attempts = CLIENT_INSTALL_ATTEMPTS
             last_error: Exception | None = None
             install_log.parent.mkdir(parents=True, exist_ok=True)
             install_log.write_text("", encoding="utf-8")
@@ -995,7 +995,7 @@ def prepare_client_install(
                         remove_install_path(partial)
                     if attempt_number < attempts:
                         time.sleep(
-                            NEOFORGE_CLIENT_INSTALL_BACKOFF_SECONDS[attempt_number - 1]
+                            CLIENT_INSTALL_BACKOFF_SECONDS[attempt_number - 1]
                         )
             if last_error is None:
                 raise RuntimeFailure(f"client installation made no attempts for {key}")

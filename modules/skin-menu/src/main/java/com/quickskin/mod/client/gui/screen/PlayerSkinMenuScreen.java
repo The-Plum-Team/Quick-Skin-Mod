@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 //? if <26.1 {
 //?} else {
 import com.quickskin.mod.client.gui.GuiCompat;
@@ -398,14 +399,22 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                     // HD Skin Website
                     if (this.minecraft != null) {
                         this.minecraft.options.chatLinksPrompt().set(false);
+                        //? if <26.3 {
                         Util.getPlatform().openUri("https://mcskins.top/128x128/");
+                        //?} else {
+                        com.mojang.blaze3d.Blaze3D.openUri(java.net.URI.create("https://mcskins.top/128x128/"));
+                        //?}
                     }
                 },
                 () -> {
                     // Skin Website
                     if (this.minecraft != null) {
                         this.minecraft.options.chatLinksPrompt().set(false);
+                        //? if <26.3 {
                         Util.getPlatform().openUri("https://laby.net/skins?order=trending_30d");
+                        //?} else {
+                        com.mojang.blaze3d.Blaze3D.openUri(java.net.URI.create("https://laby.net/skins?order=trending_30d"));
+                        //?}
                     }
                 },
                 () -> {
@@ -871,11 +880,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
         int keyCode = GuiCompat.keyCode(event);
-        int scanCode = event.scancode();
-        int modifiers = event.modifiers();
 //?}
         // Allow ESC to close
-        if (keyCode == 256) { // ESC key
+        if (keyCode == InputConstants.KEY_ESCAPE) {
             this.onClose();
             return true;
         }
@@ -896,7 +903,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
             if (widget != null && widget.mouseClicked(mouseX, mouseY, button)) {
                 this.setFocused(widget);
-                if (button == 0) {
+                if (button == InputConstants.MOUSE_BUTTON_LEFT) {
                     this.setDragging(true);
                 }
                 return true;
@@ -913,7 +920,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
             if (widget != null && widget.mouseClicked(event, focused)) {
                 this.setFocused(widget);
-                if (button == 0) {
+                if (button == InputConstants.MOUSE_BUTTON_LEFT) {
                     this.setDragging(true);
                 }
                 return true;
@@ -930,7 +937,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
             if (widget != null && widget.mouseClicked(event, focused)) {
                 this.setFocused(widget);
-                if (button == 0) {
+                if (button == InputConstants.MOUSE_BUTTON_LEFT) {
                     this.setDragging(true);
                 }
                 return true;

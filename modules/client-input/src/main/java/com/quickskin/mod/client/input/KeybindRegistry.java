@@ -13,7 +13,6 @@ import net.minecraft.resources.ResourceLocation;
 //?} else if >=1.21.11 {
 import net.minecraft.resources.Identifier;
 //?}
-import org.lwjgl.glfw.GLFW;
 
 /**
  * Keybind registration and handling for QuickSkin
@@ -45,7 +44,11 @@ public class KeybindRegistry {
         // Create keybind for opening skin menu (default: none)
         OPEN_SKIN_MENU = new KeyMapping(
             "key." + QuickSkinInfo.MOD_ID + ".open_menu",
+            //? if <26.3 {
             InputConstants.Type.KEYSYM,
+            //?} else {
+            InputConstants.Type.KEYBOARD,
+            //?}
             InputConstants.UNKNOWN.getValue(),
             CATEGORY
         );

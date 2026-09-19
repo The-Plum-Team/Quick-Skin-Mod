@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.widget;
 
+import com.mojang.blaze3d.platform.InputConstants;
 //? if <26.1 {
 //?} else {
 import com.quickskin.mod.client.gui.GuiCompat;
@@ -849,7 +850,7 @@ public class PlayerWidget extends AbstractWidget {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Check if customization feature is enabled and left click
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-        if (!config.enablePlayerPreviewCustomization || button != 0) {
+        if (!config.enablePlayerPreviewCustomization || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
 //?} else if <26.1 {
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean focused) {
@@ -858,7 +859,7 @@ public class PlayerWidget extends AbstractWidget {
         int button = event.buttonInfo().button();
         // Check if customization feature is enabled and left click
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-        if (!config.enablePlayerPreviewCustomization || button != 0) {
+        if (!config.enablePlayerPreviewCustomization || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
 //?} else {
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean focused) {
@@ -867,7 +868,7 @@ public class PlayerWidget extends AbstractWidget {
         int button = GuiCompat.mouseButton(event);
         // Check if customization feature is enabled and left click
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-        if (!config.enablePlayerPreviewCustomization || button != 0) {
+        if (!config.enablePlayerPreviewCustomization || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
 //?}
         }
@@ -890,7 +891,7 @@ public class PlayerWidget extends AbstractWidget {
 
 //? if <1.21 {
         // Left-click: Position dragging (only in customization mode) OR rotation (always)
-        if (button == 0) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             // In customization mode: left-click drags position
             if (config.enablePlayerPreviewCustomization) {
                 isDragging = true;
@@ -912,7 +913,7 @@ public class PlayerWidget extends AbstractWidget {
             }
         }
         // Right-click: Always rotation dragging (works in both modes)
-        else if (button == 1) {
+        else if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
             isRotating = true;
             rotationDragStartX = (int)mouseX;
             rotationDragStartYaw = targetYRotation;
@@ -933,7 +934,7 @@ public class PlayerWidget extends AbstractWidget {
         boolean handled = false;
 
         // Handle position dragging release (left-click only)
-        if (isDragging && button == 0) {
+        if (isDragging && button == InputConstants.MOUSE_BUTTON_LEFT) {
             isDragging = false;
             if (activeInteractionWidget == this) {
                 activeInteractionWidget = null; // Clear active widget
@@ -941,24 +942,24 @@ public class PlayerWidget extends AbstractWidget {
             handled = true;
 //?} else if <1.21.9 {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (!isDragging || button != 0) {
+        if (!isDragging || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
 //?} else if <26.1 {
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
         int button = event.buttonInfo().button();
-        if (!isDragging || button != 0) {
+        if (!isDragging || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
 //?} else {
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
         int button = GuiCompat.mouseButton(event);
-        if (!isDragging || button != 0) {
+        if (!isDragging || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
 //?}
         }
 
 //? if <1.21 {
         // Handle rotation dragging release (left-click in normal mode, or right-click in any mode)
-        if (isRotating && (button == 0 || button == 1)) {
+        if (isRotating && (button == InputConstants.MOUSE_BUTTON_LEFT || button == InputConstants.MOUSE_BUTTON_RIGHT)) {
             isRotating = false;
             shouldReturnToOriginal = true; // Start smooth return to original rotation
             if (activeInteractionWidget == this) {
@@ -979,7 +980,7 @@ public class PlayerWidget extends AbstractWidget {
 //? if <1.21 {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         // Handle position dragging (left-click in customization mode)
-        if (isDragging && button == 0) {
+        if (isDragging && button == InputConstants.MOUSE_BUTTON_LEFT) {
             // Calculate new offsets based on drag distance
             int deltaX = (int)mouseX - dragStartX;
             int deltaY = (int)mouseY - dragStartY;
@@ -992,28 +993,28 @@ public class PlayerWidget extends AbstractWidget {
             return true;
 //?} else if <1.21.9 {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (!isDragging || button != 0) {
+        if (!isDragging || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
 //?} else if <26.1 {
     public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dragX, double dragY) {
         double mouseX = event.x();
         double mouseY = event.y();
         int button = event.buttonInfo().button();
-        if (!isDragging || button != 0) {
+        if (!isDragging || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
 //?} else {
     public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dragX, double dragY) {
         double mouseX = GuiCompat.mouseX(event);
         double mouseY = GuiCompat.mouseY(event);
         int button = GuiCompat.mouseButton(event);
-        if (!isDragging || button != 0) {
+        if (!isDragging || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
 //?}
         }
 
 //? if <1.21 {
         // Handle rotation dragging (left-click in normal mode, or right-click in any mode)
-        if (isRotating && (button == 0 || button == 1)) {
+        if (isRotating && (button == InputConstants.MOUSE_BUTTON_LEFT || button == InputConstants.MOUSE_BUTTON_RIGHT)) {
             // Calculate rotation based on horizontal mouse movement
             int deltaX = (int)mouseX - rotationDragStartX;
             float rotationDelta = deltaX * ROTATION_SENSITIVITY;
