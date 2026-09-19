@@ -220,30 +220,10 @@ The shared-source schema-3 matrix retires automatic version ports. `release_sour
 the complete matrix before resolving `master` as the only source branch and an empty port list.
 The sync workflow exits before Git/GitHub work; delayed port results must pass a protected layout
 job before candidate inspection or repair. Existing historical refs remain untouched and do not
-declare active support. README status uses `status_table.py --matrix` directly. The following
-controllers remain for historical schema-2 evidence and explicit recovery, not shared-source work.
-
-- `scripts/ci/version_port_merge.py` is the sole protected owner of version-port Git merge
-  semantics. Given exact clean target/source commits, it runs a hook-free no-commit merge,
-  authenticates `MERGE_HEAD`, snapshots the complete original index, applies the classifier's
-  mechanical policies, and emits stable evidence. For an AI resolution it accepts an external
-  candidate index only with its exact tree id and copies only the recomputed `ai_paths`; it never
-  imports another candidate entry.
-- `scripts/ci/version_port_conflicts.py` is the pure, fail-closed classifier for the original Git
-  conflict set. It may assign a protected path only to an exact reviewed mechanical policy. Shared
-  guidance and runtime documents use a source-preferred three-way merge, the release matrix uses
-  the target version, a build script may be deleted only when its loader is inactive in that
-  target matrix, and a path below a legacy overlay may be deleted only when that exact overlay root
-  is absent from the target matrix. The one reviewed datapack-layout migration moves the protected
-  `functions` files and tags to 1.21+'s singular `function` paths, rewrites the three renamed game
-  rules from the target matrix's single runtime version, and removes every obsolete plural path.
-  Unknown protected paths, active-loader build conflicts, and
-  active-overlay conflicts abort the port; only unprotected residual conflicts may reach AI.
-- `scripts/release/branch_readme.py`, `scripts/release/e2e_readme.py`, and
-  `scripts/release/workflow_guidance.py` are the protected renderers for matrix-owned branch
-  profiles. The synchronizer runs them after conflict resolution, stages their exact outputs, and
-  reruns them in both the credentialless validator and the narrow writer. Do not hand-maintain
-  their marked blocks or version-specific test-task anchors.
+declare active support. README status uses `status_table.py --matrix` directly. The version-port
+merge controller, conflict classifier, protected profile renderers and anchor-certification
+codecs remain for historical schema-2 evidence and explicit recovery; their contracts live in
+[VERSION-BRANCHES.md](../../VERSION-BRANCHES.md#historical-automation-invariants).
 
 ## Visual evidence and static-site sources
 
@@ -431,21 +411,6 @@ controllers remain for historical schema-2 evidence and explicit recovery, not s
   owner head, preserving current-workflow reviews of older capsules as well as legacy owners.
   An arbitrary third revision remains ineligible; exact proof/manifest bytes and all successful
   same-attempt upload checks remain mandatory.
-- `scripts/ci/visual_anchor_certification.py` is the fail-closed certificate codec. It accepts only
-  an unpaired, loader-complete, completely clean 1.20.1 report and binds its source/proof/manifest/
-  report digests to exact Git identities supplied by protected workflow checks. The version
-  synchronizer accepts the resulting artifact only from a successful protected drain run, for the
-  exact current `master` SHA and exact current merged anchor head.
-- `scripts/ci/visual_nonimpact_certification.py` is the distinct model-free continuation codec.
-  The protected port merge controller may create it only after exact Build and full anchor E2E
-  pass and `scripts/ci/visual_review_impact.py` classifies the complete first-parent-to-port-head
-  diff as nonvisual. The consuming synchronizer authenticates the handler artifact and owner,
-  independently recomputes that exact diff with current protected policy, verifies both gate runs,
-  the current `master` second parent, current anchor head, and equal merged trees, then releases the
-  remaining ports without minting a semantic certificate or starting optional-mod compatibility.
-  `scripts/ci/visual_review_queue.py` also authenticates that protected artifact name and owner
-  before suppressing a duplicate scheduled or automatic review of the exact generation; it never
-  applies this shortcut to an ordinary feature-PR semantic review.
 - `scripts/pages/evidence.py` creates and validates a small branch-scoped raw handoff, then
   atomically compacts a validated bundle to protected WebP derivatives. It may copy only contracted
   screenshots, structured provenance, and each capture's bounded printable passed-assertion
