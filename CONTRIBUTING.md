@@ -18,9 +18,12 @@ contributing; submitting a pull request accepts its contribution terms.
 - [DEPENDENCY-SECURITY.md](DEPENDENCY-SECURITY.md) explains repository routing, checksums, and locks.
 - [e2e/README.md](e2e/README.md) describes the packaged Minecraft tests used by CI.
 
-`CLAUDE.md` deliberately contains only `@AGENTS.md`, which in turn imports the focused files under
-`docs/ai/`. This gives Claude the same modular rules as other agents without maintaining duplicate
-copies. Do not put rules directly in either manifest.
+The repository deliberately has no `CLAUDE.md`. Claude Code 2.1.277 or later reads `AGENTS.md`
+directly, including its imports of the focused files under `docs/ai/`, so Claude gets the same
+modular rules as other agents without a duplicate copy. Adding a `CLAUDE.md`, `.claude/CLAUDE.md` or
+`CLAUDE.local.md` would stop Claude from reading `AGENTS.md`. Where Claude cannot read `AGENTS.md`
+directly (for example on Amazon Bedrock or with telemetry disabled), import it from a personal
+`~/.claude/CLAUDE.md` instead. Do not put rules directly in `AGENTS.md`.
 
 ## 1. Choose the correct base branch
 

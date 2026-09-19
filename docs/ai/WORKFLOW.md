@@ -342,8 +342,8 @@ Public frames keep their original tested commit/run/JAR when unaffected dependen
   runtime or publication evidence.
 - Keep the newcomer and AI-assisted contribution path in `CONTRIBUTING.md`, and keep
   `.github/pull_request_template.md` aligned with it.
-- Keep root `AGENTS.md` limited to one `@path.md` import per line and keep root `CLAUDE.md`
-  byte-for-byte equivalent to `@AGENTS.md` followed by one newline.
+- Keep root `AGENTS.md` limited to one `@path.md` import per line. Do not add a `CLAUDE.md`,
+  `.claude/CLAUDE.md` or `CLAUDE.local.md`: Claude Code reads `AGENTS.md` only while none exists.
 - Update the appropriate imported file whenever source-set routing, overlay ownership, lifecycle
   composition roots, security boundaries, or mandatory verification commands change.
 - When a packaged scenario adds, renames, or removes a step, edit the scenario contract and its Java
