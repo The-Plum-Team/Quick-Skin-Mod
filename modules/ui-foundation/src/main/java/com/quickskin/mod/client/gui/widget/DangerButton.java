@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.widget;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 //? if <26.1 {
@@ -85,9 +86,9 @@ public class DangerButton extends Button {
     //?}
         // Only allow left-click
         //? if <1.21.9 {
-        return button == 0;
+        return button == InputConstants.MOUSE_BUTTON_LEFT;
         //?} else {
-        return buttonInfo.button() == 0;
+        return buttonInfo.button() == InputConstants.MOUSE_BUTTON_LEFT;
         //?}
     }
 }

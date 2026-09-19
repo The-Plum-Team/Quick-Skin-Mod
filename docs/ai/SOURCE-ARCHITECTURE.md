@@ -156,7 +156,7 @@ common assembly until their resource ownership and loader contracts are migrated
 The shared NeoForge `legacy26_1` overlay contains the Architectury BreakEvent bridge and Screen
 access transformer for exactly the matrix-routed 26.1 and 26.1.1 targets. Its `test/java` directory
 runs only on that overlay and verifies the pinned upstream class shape and Screen hook calls.
-The 26.1.2 and 26.2 artifacts must contain neither the bridge configuration nor its classes.
+The 26.1.2, 26.2 and 26.3 artifacts must contain neither the bridge configuration nor its classes.
 
 `gradle/e2e-harness-conventions.gradle.kts` owns the exact E2E source roots, classpaths, generated
 contract source, and harness archive tasks for every active loader node. Loader build scripts may

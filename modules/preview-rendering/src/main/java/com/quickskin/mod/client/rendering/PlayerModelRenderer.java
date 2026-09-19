@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.rendering;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Lighting;
 //? if <1.21.6 {
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -694,8 +695,13 @@ public class PlayerModelRenderer {
 //?} else {
                 poseStack.mulPose(scaleMatrix);
 //?}
+//? if <26.3 {
                 poseStack.mulPose(quaternionXZ);
                 poseStack.mulPose(Axis.YP.rotationDegrees(-targetRotation));
+//?} else {
+                poseStack.rotate(quaternionXZ);
+                poseStack.rotate(Axis.YP.rotationDegrees(-targetRotation));
+//?}
                 poseStack.scale(-1.0F, -1.0F, 1.0F);
                 poseStack.translate(0.0F, -1.501F, 0.0F);
 
@@ -2234,7 +2240,11 @@ public class PlayerModelRenderer {
         poseStack.translate(offsetX, offsetY, offsetZ);
 
         // Rotate 180 degrees around X-axis to flip it right-side up
+//? if <26.3 {
         poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(180.0f));
+//?} else {
+        poseStack.rotate(com.mojang.math.Axis.XP.rotationDegrees(180.0f));
+//?}
 
         // Scale the block
         poseStack.scale((float)scale, (float)scale, (float)scale);
@@ -2939,7 +2949,7 @@ public class PlayerModelRenderer {
      * Call this from your screen's mouseClicked method
      */
     public static boolean handleDebugMousePressed(int mouseX, int mouseY, int button) {
-        if (!debugPositioningMode || button != 0) {
+        if (!debugPositioningMode || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
         }
 
@@ -2957,7 +2967,7 @@ public class PlayerModelRenderer {
      * Call this from your screen's mouseDragged method
      */
     public static boolean handleDebugMouseDragged(int mouseX, int mouseY, int button) {
-        if (!debugPositioningMode || !isDraggingModel || button != 0) {
+        if (!debugPositioningMode || !isDraggingModel || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
         }
 
@@ -2976,7 +2986,7 @@ public class PlayerModelRenderer {
      * Call this from your screen's mouseReleased method
      */
     public static boolean handleDebugMouseReleased(int mouseX, int mouseY, int button) {
-        if (!debugPositioningMode || !isDraggingModel || button != 0) {
+        if (!debugPositioningMode || !isDraggingModel || button != InputConstants.MOUSE_BUTTON_LEFT) {
             return false;
         }
 

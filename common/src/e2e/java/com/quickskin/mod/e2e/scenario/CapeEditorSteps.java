@@ -1,5 +1,6 @@
 package com.quickskin.mod.e2e.scenario;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.quickskin.mod.client.gui.screen.CapeAdjustScreen;
 import com.quickskin.mod.client.gui.screen.CapeEntry;
 import com.quickskin.mod.client.gui.screen.PlayerCapeMenuScreen;
@@ -351,18 +352,18 @@ final class CapeEditorSteps {
                         + FullScenario.adjustScreenInt(s, "gridH") / 2.0;
                 double mx = cx + DRAG_CAPE_DX * displayScale;
                 double my = cy + DRAG_CAPE_DY * displayScale;
-                String pressed = VanillaShim.mousePress(mc, cx, cy, 0);
+                String pressed = VanillaShim.mousePress(mc, cx, cy, InputConstants.MOUSE_BUTTON_LEFT);
                 if (pressed != null || !adjustBoolean(s, "isDragging")) {
                     failure.set("a click at the grid centre did not start a drag"
                             + (pressed == null ? "" : ": " + pressed));
                     return true;
                 }
-                String dragged = VanillaShim.mouseDragTo(mc, mx, my, 0, cx, cy);
+                String dragged = VanillaShim.mouseDragTo(mc, mx, my, InputConstants.MOUSE_BUTTON_LEFT, cx, cy);
                 if (dragged != null) {
                     failure.set("the editor ignored the drag: " + dragged);
                     return true;
                 }
-                String released = VanillaShim.mouseRelease(mc, mx, my, 0);
+                String released = VanillaShim.mouseRelease(mc, mx, my, InputConstants.MOUSE_BUTTON_LEFT);
                 if (released != null || adjustBoolean(s, "isDragging")) {
                     failure.set("the release did not end the drag"
                             + (released == null ? "" : ": " + released));

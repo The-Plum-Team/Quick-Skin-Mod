@@ -127,8 +127,9 @@ the same lanes.
   One `MinecraftTextureUploads` adapter serves the catalog, network and animation caches, the star
   background and the cape editor. The NeoForge `legacy26_1`
   overlay reaches only 26.1 and 26.1.1.
-- **Matrix and build.** Release-matrix schema 3 builds all 16 targets through 26.2 (32 production
-  JARs and 32 harnesses) from one source. `scripts/release/build_matrix.py` runs one serial Gradle
+- **Matrix and build.** Release-matrix schema 3 builds all 16 imported targets through 26.2 (32
+  production JARs and 32 harnesses) from one source; 26.3 was added afterwards directly from the
+  shared source. `scripts/release/build_matrix.py` runs one serial Gradle
   process per target, because a single-JVM aggregate exhausted its heap during remapping, and
   `-PquickskinTarget` scopes a build to one target. A forced rebuild reproduced all 64 JARs
   byte-for-byte.

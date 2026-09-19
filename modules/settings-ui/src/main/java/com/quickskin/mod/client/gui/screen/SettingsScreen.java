@@ -747,8 +747,6 @@ public class SettingsScreen extends Screen {
     //?} else {
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
         int keyCode = GuiCompat.keyCode(event);
-        int scanCode = event.scancode();
-        int modifiers = event.modifiers();
     //?}
         // Handle setting a keybind with a keyboard press
         if (this.selectedKey != null) {
@@ -767,7 +765,7 @@ public class SettingsScreen extends Screen {
         }
 
         // ESC key closes dialog
-        if (keyCode == 256) { // ESC
+        if (keyCode == InputConstants.KEY_ESCAPE) {
             this.onClose();
             return true;
         }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sys
 import unittest
 import urllib.parse
@@ -25,13 +26,14 @@ def utc(value):
 
 class GitHubFixture:
     """Count actual controller GET calls, without credentials, ZIPs or remote execution."""
-    def __init__(self, published=(), ready=(), ordinary_at=None):
+    def __init__(self, published=(), ready=(), ordinary_at=None, keys=None):
+        keys = KEYS if keys is None else keys
         self.runs, self.jobs, self.artifacts = {}, {}, {}
         self.calls = []
         self.heads = [SHA, SHA]
         if published is not None:
             owner = self.owner(1000, progress.PAGES, 2000)
-            for key in sorted(KEYS):
+            for key in sorted(keys):
                 self.job(owner, f"Collect {key}", "Select the target artifact for the exact source commit", 1900)
                 self.job(owner, f"Collect compatibility {key}",
                          "Select the newest authenticated compatibility generation", 1900)
@@ -47,7 +49,7 @@ class GitHubFixture:
         if published is None or ordinary_at is not None:
             at = ordinary_at if ordinary_at is not None else 1000
             owner = self.owner(900, progress.E2E, at)
-            for key in sorted(KEYS):
+            for key in sorted(keys):
                 job = self.job(owner, "Prepare public evidence for " + key + " (advisory)",
                                "Upload stable public evidence for this Minecraft target", at)
                 self.artifact(owner, f"pages-e2e-{key}", job, at)
@@ -151,7 +153,7 @@ class PublicationPolicyTest(unittest.TestCase):
     def test_initial_half_and_immediate_final_are_separate_milestones(self):
         first = self.decision(published_at=None)
         self.assertEqual("initial-ordinary", first.reason)
-        half = set(sorted(KEYS)[:len(KEYS) // 2])
+        half = set(sorted(KEYS)[:math.ceil(len(KEYS) / 2)])
         self.assertEqual("coalescing", self.decision(ready=half, at=3599).reason)
         self.assertEqual("half-coverage", self.decision(ready=half, at=3600).reason)
         self.assertEqual("final-complete", self.decision(published=half, ready=KEYS, at=3000).reason)
@@ -187,11 +189,24 @@ class PublicationPolicyTest(unittest.TestCase):
     def test_reference_readiness_replay_has_three_builds_and_separate_fanout_counts(self):
         data = json.loads((Path(__file__).parent / "fixtures/pages-progress-reference.json").read_text())
         self.assertEqual(34, len(data["wakes"]))
-        self.assertEqual(len(KEYS), len(data["readiness"]))
+        self.assertEqual(16, len(data["readiness"]))
+        # Slots are anonymous and the policy depends on cardinality, so replay the saved sixteen
+        # against sixteen current targets rather than every target added to the matrix since.
+        keys = set(sorted(KEYS)[:len(data["readiness"])])
+        inventory = progress.inventory
+
+        def recorded_inventory(*args, **kwargs):
+            value = inventory(*args, **kwargs)
+            return {**value, "include": [row for row in value["include"] if row["bundle_key"] in keys]}
+
+        for module in (progress, sys.modules["evidence_target"]):
+            patcher = mock.patch.object(module, "inventory", side_effect=recorded_inventory)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         initial = progress.timestamp(data["wakes"][1]["created_at"])
         events = [(initial, "ordinary", None)]
         events.extend((progress.timestamp(row["ready_at"]), "ready", key)
-                      for row, key in zip(data["readiness"], sorted(KEYS)))
+                      for row, key in zip(data["readiness"], sorted(keys)))
         events.extend((progress.timestamp(row["created_at"]), "wake", None) for row in data["wakes"])
         final_at = max(time for time, _, _ in events)
         first_recovery = int(initial) // 3600 * 3600 + 43 * 60
@@ -212,9 +227,10 @@ class PublicationPolicyTest(unittest.TestCase):
             if at < initial or active is not None:
                 continue
             checks += 1
-            decision = progress.decide(expected=KEYS, published=published, ready=ready,
+            decision = progress.decide(expected=keys, published=published, ready=ready,
                 ordinary_ready=True, published_at=published_at, now=at)
-            fixture = GitHubFixture(published=published if published_at is not None else None, ready=ready)
+            fixture = GitHubFixture(published=published if published_at is not None else None, ready=ready,
+                                    keys=keys)
             fixture.place_on_replay_clock(ready=ready, initial=initial,
                                          published_at=published_at, selected_at=selected_at)
             authenticated = fixture.plan(now=at)
@@ -223,7 +239,7 @@ class PublicationPolicyTest(unittest.TestCase):
             scheduler_gets += len(fixture.calls)
             if decision.eligible:
                 builds.append({"at": at, "reason": decision.reason, "compatibility": len(ready)})
-                if len(ready) == len(KEYS):
+                if len(ready) == len(keys):
                     final_enqueued = at
                 # Conservatively use the observed initial publication's complete elapsed time
                 # (17m45s), not just its Build-job duration, for every replay publication.
@@ -243,15 +259,15 @@ class PublicationPolicyTest(unittest.TestCase):
                 events.sort()
         self.assertEqual(["initial-ordinary", "half-coverage", "final-complete"], [row["reason"] for row in builds])
         self.assertLessEqual(len(builds), 5)
-        self.assertEqual(3 * len(KEYS) * 4, 192)
+        self.assertEqual(3 * len(keys) * 4, 192)
         self.assertEqual(544, data["observed_executed_collect_refresh_jobs"])
-        self.assertEqual(8 * len(KEYS) * 4 + len(KEYS) * 2,
+        self.assertEqual(8 * len(keys) * 4 + len(keys) * 2,
                          data["observed_executed_collect_refresh_jobs"])
         self.assertEqual(progress.timestamp(data["readiness"][-1]["ready_at"]), final_enqueued)
         self.assertGreater(checks, len(builds))
         print(json.dumps({"pages_reference_replay": {"recorded_wakes": len(data["wakes"]),
             "controller_snapshots": checks, "full_builds": len(builds),
-            "collect_refresh_jobs": len(builds) * len(KEYS) * 4,
+            "collect_refresh_jobs": len(builds) * len(keys) * 4,
             "scheduler_fixture_GETs": scheduler_gets,
             "preferred_collector_fixture_GETs": preferred_collector_gets,
             "original_collector_runtime_GETs": "not reconstructed", "live_generation": False}}, sort_keys=True))
@@ -259,16 +275,19 @@ class PublicationPolicyTest(unittest.TestCase):
 
 class PublicationAuthenticationTest(unittest.TestCase):
     def test_actual_bounded_api_operations_are_counted_separately_from_build_jobs(self):
-        half = set(sorted(KEYS)[:len(KEYS) // 2])
+        half = set(sorted(KEYS)[:math.ceil(len(KEYS) / 2)])
         fixture = GitHubFixture(ready=half)
         result = fixture.plan()
         self.assertTrue(result["eligible"])
         counts = result["api_operations"]
-        self.assertEqual({"current-head": 2, "artifact-inventory": 18, "owner-run": 9,
-                          "exact-attempt-jobs": 9, "exact-artifact": 8, "workflow-runs": 3}, counts)
-        self.assertEqual(49, len(fixture.calls))
+        # One inventory read per target plus the Pages and ordinary owners; one owner and job read
+        # per ready compatibility handoff plus the ordinary owner (16 targets: 18/9/9/8, 49 calls).
+        self.assertEqual({"current-head": 2, "artifact-inventory": len(KEYS) + 2, "owner-run": len(half) + 1,
+                          "exact-attempt-jobs": len(half) + 1, "exact-artifact": len(half),
+                          "workflow-runs": 3}, counts)
+        self.assertEqual(len(KEYS) + 3 * len(half) + 9, len(fixture.calls))
         self.assertEqual(len(fixture.calls), sum(counts.values()))
-        self.assertEqual(8, len({row["artifact_id"] for row in result["handoffs"]}))
+        self.assertEqual(len(half), len({row["artifact_id"] for row in result["handoffs"]}))
 
     def test_complete_successful_owner_ends_recovery_before_compatibility_inventory(self):
         fixture = GitHubFixture(published=KEYS)

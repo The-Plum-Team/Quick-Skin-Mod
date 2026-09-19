@@ -284,14 +284,15 @@ class CiReuseTest(unittest.TestCase):
         original["seal_artifact"]["digest"] = "sha256:" + "f" * 64
         with self.assertRaises(ValueError): reuse.verify_reference(self.api, original, "e2e")
 
-    def test_wrapper_keeps_original_artifacts_commit_and_all_32_executed_jobs(self):
+    def test_wrapper_keeps_original_artifacts_commit_and_every_executed_job(self):
         reference, _ = self.find()
         self.api.wrapper(reference)
         source = reuse.runtime_source(self.api, 30, self.api.covered)
         self.assertEqual(20, source.execution["id"])
         self.assertEqual(30, source.generation["id"])
         self.assertEqual(self.api.tested, source.tested_sha)
-        self.assertEqual(32, len(source.graph["observed_scenario_jobs"]))
+        self.assertEqual(len(load_matrix(reuse.DEFAULT_MATRIX)["artifacts"]),
+                         len(source.graph["observed_scenario_jobs"]))
         self.assertTrue(all(item["workflow_run"]["id"] == 20 for item in source.artifacts))
         self.assertEqual(reference, source.reference)
         self.assertEqual({120, 300}, set(self.api.downloaded))

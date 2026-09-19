@@ -5,23 +5,46 @@ import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
+//? if <26.3 {
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
+//?} else {
+import org.lwjgl.sdl.SDLDialog;
+import org.lwjgl.sdl.SDLError;
+import org.lwjgl.sdl.SDLProperties;
+import org.lwjgl.sdl.SDL_DialogFileCallback;
+import org.lwjgl.sdl.SDL_DialogFileFilter;
+import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.system.Pointer;
+//?}
 
 import java.nio.file.Path;
+//? if >=26.3 {
+import java.nio.ByteBuffer;
+import java.nio.file.InvalidPathException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+//?}
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+//? if <26.3 {
 import static org.lwjgl.system.MemoryStack.stackPush;
+//?}
 
 /**
- * Helper class for opening native file dialogs
- * Uses TinyFileDialogs for cross-platform file selection
+ * Helper class for opening native file dialogs.
+ * Uses TinyFileDialogs before Minecraft 26.3 and SDL's asynchronous dialogs afterwards.
  */
 @Environment(EnvType.CLIENT)
 public class FileDialogHelper {
     private static final AtomicBoolean DIALOG_OPEN = new AtomicBoolean();
+    private static final int MAX_SELECTED_FILES = 256;
+    //? if >=26.3 {
+    private static final AtomicReference<SdlDialogRequest> PENDING_SDL_DIALOG = new AtomicReference<>();
+    //?}
 
     /**
      * Opens a file dialog to select a PNG image or CPM model
@@ -30,6 +53,10 @@ public class FileDialogHelper {
      */
     public static void openSkinFileDialog(String title, Consumer<Path> onFileSelected) {
         if (!DIALOG_OPEN.compareAndSet(false, true)) return;
+        //? if >=26.3 {
+        openSdlDialog(title, "Skin Files (PNG, CPM Model)", "png;cpmmodel", false,
+                paths -> onFileSelected.accept(paths.get(0)));
+        //?} else {
         ClientIoExecutor.runAsync(() -> {
             try (MemoryStack stack = stackPush()) {
                 PointerBuffer filters = stack.mallocPointer(2);
@@ -54,6 +81,7 @@ public class FileDialogHelper {
                 DIALOG_OPEN.set(false);
             }
         }).whenComplete((ignored, error) -> resetAfterSubmissionFailure(error));
+        //?}
     }
 
     /**
@@ -63,6 +91,10 @@ public class FileDialogHelper {
      */
     public static void openCapeFileDialog(String title, Consumer<Path> onFileSelected) {
         if (!DIALOG_OPEN.compareAndSet(false, true)) return;
+        //? if >=26.3 {
+        openSdlDialog(title, "PNG/GIF Images", "png;gif", false,
+                paths -> onFileSelected.accept(paths.get(0)));
+        //?} else {
         ClientIoExecutor.runAsync(() -> {
             try (MemoryStack stack = stackPush()) {
                 PointerBuffer filters = stack.mallocPointer(2);
@@ -87,6 +119,7 @@ public class FileDialogHelper {
                 DIALOG_OPEN.set(false);
             }
         }).whenComplete((ignored, error) -> resetAfterSubmissionFailure(error));
+        //?}
     }
 
     /**
@@ -97,6 +130,10 @@ public class FileDialogHelper {
     @SuppressWarnings("unused")
     public static void openMultipleFileDialog(String title, Consumer<Path[]> onFilesSelected) {
         if (!DIALOG_OPEN.compareAndSet(false, true)) return;
+        //? if >=26.3 {
+        openSdlDialog(title, "PNG Images", "png", true,
+                paths -> onFilesSelected.accept(paths.toArray(Path[]::new)));
+        //?} else {
         ClientIoExecutor.runAsync(() -> {
             try (MemoryStack stack = stackPush()) {
                 PointerBuffer filters = stack.mallocPointer(1);
@@ -112,8 +149,8 @@ public class FileDialogHelper {
 
                 if (files != null && !files.isEmpty()) {
                     // TinyFileDialogs returns multiple files separated by |
-                    String[] filePaths = files.split("\\|", 257);
-                    if (filePaths.length > 256) {
+                    String[] filePaths = files.split("\\|", MAX_SELECTED_FILES + 1);
+                    if (filePaths.length > MAX_SELECTED_FILES) {
                         QuickSkinInfo.LOGGER.warn("Ignoring a file dialog result with more than 256 files");
                         return;
                     }
@@ -129,7 +166,132 @@ public class FileDialogHelper {
                 DIALOG_OPEN.set(false);
             }
         }).whenComplete((ignored, error) -> resetAfterSubmissionFailure(error));
+        //?}
     }
+
+    //? if >=26.3 {
+    /**
+     * SDL dialogs are asynchronous and must start on the main thread. The native filter strings
+     * stay allocated until the result arrives; the callback itself may run on another thread.
+     */
+    private static void openSdlDialog(
+            String title,
+            String filterName,
+            String pattern,
+            boolean allowMany,
+            Consumer<List<Path>> onSelected
+    ) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null) {
+            DIALOG_OPEN.set(false);
+            return;
+        }
+        minecraft.execute(() -> {
+            SdlDialogRequest request = null;
+            try {
+                request = SdlDialogRequest.allocate(filterName, pattern, onSelected);
+                int properties = request.properties();
+                SDLProperties.SDL_SetStringProperty(properties, SDLDialog.SDL_PROP_FILE_DIALOG_TITLE_STRING, title);
+                SDLProperties.SDL_SetPointerProperty(
+                        properties, SDLDialog.SDL_PROP_FILE_DIALOG_FILTERS_POINTER, request.filters().address());
+                SDLProperties.SDL_SetNumberProperty(properties, SDLDialog.SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, 1);
+                SDLProperties.SDL_SetPointerProperty(
+                        properties, SDLDialog.SDL_PROP_FILE_DIALOG_WINDOW_POINTER, minecraft.getWindow().handle());
+                SDLProperties.SDL_SetBooleanProperty(properties, SDLDialog.SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, allowMany);
+                if (!PENDING_SDL_DIALOG.compareAndSet(null, request)) {
+                    throw new IllegalStateException("another SDL file dialog is still pending");
+                }
+                SDLDialog.SDL_ShowFileDialogWithProperties(
+                        SDLDialog.SDL_FILEDIALOG_OPENFILE, SdlDialogCallback.INSTANCE, 0L, properties);
+            } catch (Throwable e) {
+                QuickSkinInfo.LOGGER.warn("Unable to open the file dialog", e);
+                if (request != null) {
+                    PENDING_SDL_DIALOG.compareAndSet(request, null);
+                    request.free();
+                }
+                DIALOG_OPEN.set(false);
+            }
+        });
+    }
+
+    private static void onSdlDialogResult(long userdata, long fileList, int filter) {
+        SdlDialogRequest request = PENDING_SDL_DIALOG.getAndSet(null);
+        if (request == null) {
+            return;
+        }
+        List<Path> paths = new ArrayList<>();
+        if (fileList == 0L) {
+            QuickSkinInfo.LOGGER.warn("Unable to open the file dialog: {}", SDLError.SDL_GetError());
+        } else {
+            for (int index = 0; ; index++) {
+                long entry = MemoryUtil.memGetAddress(fileList + (long) index * Pointer.POINTER_SIZE);
+                if (entry == 0L) {
+                    break;
+                }
+                if (index == MAX_SELECTED_FILES) {
+                    QuickSkinInfo.LOGGER.warn("Ignoring a file dialog result with more than {} files", MAX_SELECTED_FILES);
+                    paths.clear();
+                    break;
+                }
+                try {
+                    paths.add(Path.of(MemoryUtil.memUTF8(entry)));
+                } catch (InvalidPathException e) {
+                    QuickSkinInfo.LOGGER.warn("Ignoring an invalid file dialog path", e);
+                }
+            }
+        }
+        Runnable finish = () -> {
+            request.free();
+            DIALOG_OPEN.set(false);
+            if (!paths.isEmpty()) {
+                request.onSelected().accept(List.copyOf(paths));
+            }
+        };
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft != null) {
+            minecraft.execute(finish);
+        } else {
+            finish.run();
+        }
+    }
+
+    private record SdlDialogRequest(
+            Consumer<List<Path>> onSelected,
+            ByteBuffer name,
+            ByteBuffer pattern,
+            SDL_DialogFileFilter.Buffer filters,
+            int properties
+    ) {
+        static SdlDialogRequest allocate(String filterName, String pattern, Consumer<List<Path>> onSelected) {
+            ByteBuffer nameBytes = MemoryUtil.memUTF8(filterName);
+            ByteBuffer patternBytes = MemoryUtil.memUTF8(pattern);
+            SDL_DialogFileFilter.Buffer filters = SDL_DialogFileFilter.calloc(1);
+            filters.get(0).name(nameBytes).pattern(patternBytes);
+            int properties = SDLProperties.SDL_CreateProperties();
+            SdlDialogRequest request = new SdlDialogRequest(onSelected, nameBytes, patternBytes, filters, properties);
+            if (properties == 0) {
+                request.free();
+                throw new IllegalStateException("SDL_CreateProperties failed: " + SDLError.SDL_GetError());
+            }
+            return request;
+        }
+
+        void free() {
+            if (properties != 0) {
+                SDLProperties.SDL_DestroyProperties(properties);
+            }
+            filters.free();
+            MemoryUtil.memFree(name);
+            MemoryUtil.memFree(pattern);
+        }
+    }
+
+    /** One process-lifetime upcall stub; per-dialog state lives in {@link #PENDING_SDL_DIALOG}. */
+    private static final class SdlDialogCallback {
+        private static final SDL_DialogFileCallback INSTANCE =
+                SDL_DialogFileCallback.create(FileDialogHelper::onSdlDialogResult);
+    }
+    //?}
 
     private static <T> void dispatch(Consumer<T> consumer, T value) {
         Minecraft minecraft = Minecraft.getInstance();

@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.widget;
 
+import com.mojang.blaze3d.platform.InputConstants;
 //? if <1.21.6 {
 import com.mojang.blaze3d.systems.RenderSystem;
 //?}
@@ -92,7 +93,11 @@ public class LinkButton extends Button {
 
     private static void openLink(String url) {
         // Open the link in the default browser
+        //? if <26.3 {
         Util.getPlatform().openUri(url);
+        //?} else {
+        com.mojang.blaze3d.Blaze3D.openUri(java.net.URI.create(url));
+        //?}
     }
 
     @Override
@@ -103,9 +108,9 @@ public class LinkButton extends Button {
     //?}
         // Only allow left-click
         //? if <1.21.9 {
-        return button == 0;
+        return button == InputConstants.MOUSE_BUTTON_LEFT;
         //?} else {
-        return buttonInfo.button() == 0;
+        return buttonInfo.button() == InputConstants.MOUSE_BUTTON_LEFT;
         //?}
     }
 }

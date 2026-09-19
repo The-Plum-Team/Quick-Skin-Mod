@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "lane_count": 32,
+  "lane_count": 34,
   "unit_test_version": "1.20.1",
   "project": {
     "name": "Quick Skin",
@@ -104,6 +104,10 @@
     "neoforge-26.2.0.10-beta": {
       "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/26.2.0.10-beta/neoforge-26.2.0.10-beta-installer.jar",
       "sha256": "79cc630b86261922cfe7a3ff2df8f6e004baee57b233bb2702eac21cf89b7529"
+    },
+    "neoforge-26.3.0.3-beta": {
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.3-beta/neoforge-26.3.0.3-beta-installer.jar",
+      "sha256": "1bad40deae960e81d13d533970aeccdc7cfced8adf89726fa730807654d28ed9"
     }
   },
   "artifacts": [
@@ -794,6 +798,49 @@
         "pack_format": 88,
         "server_data_pack_format": 107
       }
+    },
+    {
+      "artifact_node": "fabric-26.3",
+      "artifact_version": "26.3",
+      "loader": "fabric",
+      "java": 25,
+      "no_remap": true,
+      "metadata_range": "=26.3",
+      "gradle_task": ":fabric:26.3:shadowJar",
+      "harness_task": ":fabric:26.3:e2eHarnessJar",
+      "jar": "fabric/versions/26.3/build/libs/Quick Skin - Fabric - 26.3-{mod_version}.jar",
+      "harness_jar": "fabric/versions/26.3/build/libs/Quick Skin E2E - Fabric - 26.3-0.0.0.jar",
+      "game_versions": [
+        "26.3"
+      ],
+      "metadata": {
+        "file": "fabric.mod.json",
+        "loader": ">=0.19.5",
+        "architectury": ">=22.0.1"
+      }
+    },
+    {
+      "artifact_node": "neoforge-26.3",
+      "artifact_version": "26.3",
+      "loader": "neoforge",
+      "java": 25,
+      "no_remap": true,
+      "metadata_range": "[26.3,26.3.1)",
+      "gradle_task": ":neoforge:26.3:shadowJar",
+      "harness_task": ":neoforge:26.3:e2eHarnessJar",
+      "jar": "neoforge/versions/26.3/build/libs/Quick Skin - NeoForge - 26.3-{mod_version}.jar",
+      "harness_jar": "neoforge/versions/26.3/build/libs/Quick Skin E2E - NeoForge - 26.3-0.0.0.jar",
+      "game_versions": [
+        "26.3"
+      ],
+      "metadata": {
+        "file": "META-INF/neoforge.mods.toml",
+        "loader_api": "[1,)",
+        "loader": "[26.3,)",
+        "architectury": "[22.0.1,)",
+        "pack_format": 97,
+        "server_data_pack_format": 121
+      }
     }
   ],
   "runtimes": [
@@ -1323,6 +1370,39 @@
       "architectury": {
         "kind": "maven",
         "version": "21.0.2"
+      },
+      "scheduled_anchor": true,
+      "pr_anchor": true
+    },
+    {
+      "artifact_node": "fabric-26.3",
+      "runtime_version": "26.3",
+      "loader": "fabric",
+      "jar_sha256": "from:artifact-manifest",
+      "port": 0,
+      "java": 25,
+      "loader_version": "0.19.5",
+      "installer": "fabric-1.1.0",
+      "fabric_api": "0.160.6+26.3",
+      "architectury": {
+        "kind": "maven",
+        "version": "22.0.1"
+      },
+      "scheduled_anchor": true,
+      "pr_anchor": true
+    },
+    {
+      "artifact_node": "neoforge-26.3",
+      "runtime_version": "26.3",
+      "loader": "neoforge",
+      "jar_sha256": "from:artifact-manifest",
+      "port": 0,
+      "java": 25,
+      "loader_version": "26.3.0.3-beta",
+      "installer": "neoforge-26.3.0.3-beta",
+      "architectury": {
+        "kind": "maven",
+        "version": "22.0.1"
       },
       "scheduled_anchor": true,
       "pr_anchor": true

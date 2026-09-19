@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.widget;
 
+import com.mojang.blaze3d.platform.InputConstants;
 //? if <1.21.6 {
 import com.mojang.blaze3d.systems.RenderSystem;
 //?} else {
@@ -295,7 +296,7 @@ public class SkinEntry extends ContainerObjectSelectionList.Entry<SkinEntry> {
         double mouseY = GuiCompat.mouseY(event);
         int button = GuiCompat.mouseButton(event);
     //?}
-        if (button == 0) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             if (this.isDeleteHovered) {
                 // Request deletion confirmation from parent
                 parentList.requestDeletion(this);

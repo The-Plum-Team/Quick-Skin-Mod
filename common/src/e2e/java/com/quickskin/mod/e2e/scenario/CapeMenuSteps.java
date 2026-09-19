@@ -1,5 +1,6 @@
 package com.quickskin.mod.e2e.scenario;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.gui.screen.CapeEntry;
 import com.quickskin.mod.client.gui.screen.DeletionConfirmScreen;
@@ -159,7 +160,7 @@ final class CapeMenuSteps {
                             return true;
                         }
                         gifTile.set(centre);
-                        String clicked = VanillaShim.clickAt(mc, centre[0], centre[1], 0);
+                        String clicked = VanillaShim.clickAt(mc, centre[0], centre[1], InputConstants.MOUSE_BUTTON_LEFT);
                         if (clicked != null) {
                             gifClickFailure.compareAndSet(null, "GIF cape tile click at "
                                     + centre[0] + "," + centre[1] + ": " + clicked);
@@ -500,7 +501,7 @@ final class CapeMenuSteps {
                     }
                     deletedPath.set(contrast.getPath());
                     deleteButton.set(new int[] {clickX, clickY});
-                    String clickedDelete = VanillaShim.clickAt(mc, clickX, clickY, 0);
+                    String clickedDelete = VanillaShim.clickAt(mc, clickX, clickY, InputConstants.MOUSE_BUTTON_LEFT);
                     if (clickedDelete != null) {
                         deleteFailure.set("delete-button click: " + clickedDelete);
                         return;
@@ -624,7 +625,7 @@ final class CapeMenuSteps {
                         return;
                     }
                     noneTile.set(centre);
-                    String clickedNone = VanillaShim.clickAt(mc, centre[0], centre[1], 0);
+                    String clickedNone = VanillaShim.clickAt(mc, centre[0], centre[1], InputConstants.MOUSE_BUTTON_LEFT);
                     if (clickedNone != null) {
                         noneFailure.set("None tile click: " + clickedNone);
                     }
@@ -1017,7 +1018,7 @@ final class CapeMenuSteps {
         // AbstractSliderButton.setValueFromMouse: (mouseX - (x + 4)) / (width - 8)
         double mouseX = slider.getX() + 4 + value * (slider.getWidth() - 8);
         double mouseY = slider.getY() + slider.getHeight() / 2.0;
-        return VanillaShim.clickAt(mc, mouseX, mouseY, 0);
+        return VanillaShim.clickAt(mc, mouseX, mouseY, InputConstants.MOUSE_BUTTON_LEFT);
     }
 
     /**

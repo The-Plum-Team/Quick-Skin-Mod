@@ -87,8 +87,9 @@ class PagesRuntimeFaninTest(unittest.TestCase):
     def verify(self):
         return pages.verify_runtime_tree(self.api, evidence_root=self.evidence, source_sha=self.api.covered)
 
-    def test_complete_sixteen_target_gate_authenticates_original_runtime_once_with_live_head_guards(self):
-        self.assertEqual({'targets': 16, 'runtime_manifests': 16, 'runtime_sources': 1}, self.verify())
+    def test_complete_target_gate_authenticates_original_runtime_once_with_live_head_guards(self):
+        targets = len(self.keys)
+        self.assertEqual({'targets': targets, 'runtime_manifests': targets, 'runtime_sources': 1}, self.verify())
         self.assertEqual(Counter(head=2, run=2, jobs=2, artifacts=2, artifact=1, download=2, json=3), self.api.calls)
         self.assertEqual(14, sum(self.api.calls.values()))
 
@@ -112,7 +113,8 @@ class PagesRuntimeFaninTest(unittest.TestCase):
         del manifest['runtime_source']
         manifest['provenance']['coverage_sha'] = self.api.covered
         self.write(self.keys[-1], manifest)
-        self.assertEqual({'targets': 16, 'runtime_manifests': 15, 'runtime_sources': 1}, self.verify())
+        targets = len(self.keys)
+        self.assertEqual({'targets': targets, 'runtime_manifests': targets - 1, 'runtime_sources': 1}, self.verify())
 
     def test_failed_original_lane_blocks_the_entire_fanin(self):
         self.api.job_lists[20][0]['jobs'][-1]['conclusion'] = 'failure'

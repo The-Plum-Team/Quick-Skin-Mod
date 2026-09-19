@@ -483,8 +483,14 @@ public class CapeLayerMixin {
         capeModel.renderToBuffer(poseStack, vertexconsumer, packedLight, OverlayTexture.NO_OVERLAY);
 //?} else {
         // Submit the cape model with our custom render type
+    //? if <26.3 {
         buffer.submitModel(capeModel, renderState, poseStack, renderType, packedLight,
                 OverlayTexture.NO_OVERLAY, renderState.outlineColor, null);
+    //?} else {
+        // 26.3 submits crumbling overlays separately, so models no longer take one.
+        buffer.submitModel(capeModel, renderState, poseStack, renderType, packedLight,
+                OverlayTexture.NO_OVERLAY, renderState.outlineColor);
+    //?}
 //?}
 
         // Cancel the original vanilla method to prevent it from rendering a second time
