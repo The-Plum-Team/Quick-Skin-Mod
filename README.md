@@ -1,13 +1,14 @@
 # CI status snapshots
 
 Repository: [The-Plum-Team/Quick-Skin-Mod](https://github.com/The-Plum-Team/Quick-Skin-Mod).
-Covered commit: `5a459503ac8acdf8c3b8b59cb85b5b32b51fcea3`.
-Observed: 2026-09-19T08:26:47Z (UTC).
+Covered commit: `157d3cac6852b993472467655c4ef5c91ca79043`.
+Observed: 2026-09-19T09:08:19Z (UTC).
 
 Each row summarizes target jobs and shared prerequisites. Open a target for the separate overall workflow result and original execution provenance. Snapshots update on CI transitions; caching may delay displayed badges. A badge is a status summary, not an acceptance certificate.
 
 | Minecraft | Build | E2E |
 |---|---|---|
+| [26.3](targets/26.3.md) | [![Build](badges/26.3/build.svg)](targets/26.3.md#build) | [![E2E](badges/26.3/e2e.svg)](targets/26.3.md#e2e) |
 | [26.2](targets/26.2.md) | [![Build](badges/26.2/build.svg)](targets/26.2.md#build) | [![E2E](badges/26.2/e2e.svg)](targets/26.2.md#e2e) |
 | [26.1.2](targets/26.1.2.md) | [![Build](badges/26.1.2/build.svg)](targets/26.1.2.md#build) | [![E2E](badges/26.1.2/e2e.svg)](targets/26.1.2.md#e2e) |
 | [26.1.1](targets/26.1.1.md) | [![Build](badges/26.1.1/build.svg)](targets/26.1.1.md#build) | [![E2E](badges/26.1.1/e2e.svg)](targets/26.1.1.md#e2e) |
