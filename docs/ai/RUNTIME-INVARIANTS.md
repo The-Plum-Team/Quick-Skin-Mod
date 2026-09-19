@@ -557,25 +557,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   receives only the bounded, metadata-free source batch and its source/target/artifact proofs. A
   clean aggregate is split back into complete lane reports without another model call, so completed
   lanes remain independently recoverable.
-- Every automatic `master` synchronization releases non-anchor version branches through exactly
-  one of two authenticated routes. The ordinary route requires the protected drainer to produce a
-  semantic 1.20.1 certificate. The certificate must cover identical
-  non-empty Fabric and Forge capture sets, contain no reference, report every frame semantically
-  valid with no defect, belong to the exact synchronization merge parent, and bind the current
-  exact-tree anchor merge head. The consuming synchronizer must reauthenticate the artifact id,
-  digest, size, successful protected owner run, source E2E run, contract hash, Git parents, equal
-  source/target trees, current `master`, and current anchor head. Stale or invalid dispatches are
-  no-ops. The model-free route requires a bounded nonvisual continuation artifact from the current
-  protected merge handler after the anchor's exact Build and full Packaged E2E succeed. The
-  synchronizer must reauthenticate that artifact and owner, both gate runs, the current `master`
-  second parent on the newest synchronization commit, the bounded two-parent synchronization chain
-  terminating at the exact release base, equal source/target trees, current anchor head, policy
-  digest, and an independently recomputed complete anchor diff whose every path is allowlisted. It
-  must not launch optional-mod compatibility because no runtime generation changed.
-  Immediate-tip classification must never bypass the anchor: a non-runtime tip can include an older
-  uncertified runtime change. The anchor's Packaged E2E policy is therefore always `full`.
-  This scheduling gate must never replace or weaken either individual port's required Build or
-  Packaged E2E checks.
+- Schema-2 version-port and anchor fan-out invariants apply only to historical recovery; they
+  live in [VERSION-BRANCHES.md](../../VERSION-BRANCHES.md#historical-automation-invariants).
 - Optimized gallery images are derivatives, not the source proof. Publish separate source and
   derivative hashes/dimensions, and content-address each public image URL with the bytes actually
   served. Original PNGs may exist only in `pages-e2e-*` handoffs; all are one-day transients except
@@ -586,32 +569,3 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   comparisons. AI comparison must never use the lossy derivative as its baseline.
 - Pages is an advisory, atomic publication surface. Failure must preserve the previous site and
   must not weaken or replace the required Build and Packaged E2E gates.
-- A version port must classify the complete original unmerged path set before AI runs. Exact
-  protected paths may use only their reviewed mechanical resolution: source-preferred three-way
-  merge for shared guidance/runtime documents, target retention for the release matrix, deletion
-  of a build script whose loader is absent from that target matrix, or deletion below a legacy
-  overlay root absent from that target matrix. The exact 1.20-to-1.21 datapack directory rename is
-  the only protected path migration: it must move both functions and tags to the singular layout,
-  select legacy or namespaced game-rule identifiers from one authenticated target runtime, and
-  leave no plural path. Any unknown protected conflict, active-loader build
-  conflict, or active-overlay conflict fails closed. Recompute the partition from the original
-  paths and target matrix in every downstream trust boundary; never let AI receive a protected path.
-- Treat a proposed version-port patch as untrusted even after policy validation. Apply it first to
-  an isolated alternate index and authenticate its complete tree id. The credentialless validator
-  and credentialed writer must each rerun the protected merge controller from the exact original
-  parents, compare its stable evidence byte-for-byte, import only the recomputed AI-conflict paths
-  from that index, rerun protected generators, and require the final real index tree to equal both
-  the isolated candidate tree and the plan tree. Never apply the full patch to the real index.
-- After a version-port validation matrix settles, one protected authorization job must read its
-  complete latest job inventory once and bind the exact successful target set to the workflow run,
-  protected source SHA, attempt, and discovered inventory. A writer may reconstruct only when its
-  own target is present in that authenticated same-run output. Never poll the inventory per target:
-  fan-out polling amplifies installation-API load across a parallel release wave without adding a
-  stronger trust binding; the proposal artifact is already immutable within that run.
-- A successful automated version port may publish the stable Packaged E2E status only after the
-  protected evaluator sees exactly one successful control job, the exact target-branch PR-anchor
-  lane set, and byte-identical protected workflow, attestation workflow, composite action, contract,
-  Python controller, common Java E2E harness, Gradle bootstrap/wrapper, and contract-generation
-  paths. Each active loader's entire `src/e2e` bootstrap and full loader build script must also
-  match the exact protected digest selected for that release branch. A green subset or a final
-  convention-apply line attached to an otherwise unknown build script is never sufficient.
