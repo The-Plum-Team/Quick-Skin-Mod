@@ -16,11 +16,11 @@ AGENT_IMPORTS = (
 
 
 class RepositoryGuidanceTest(unittest.TestCase):
-    def test_claude_is_only_the_agents_redirect(self) -> None:
-        self.assertEqual(
-            (ROOT / "CLAUDE.md").read_text(encoding="utf-8"),
-            "@AGENTS.md\n",
-        )
+    def test_no_claude_file_shadows_the_agents_manifest(self) -> None:
+        # Claude Code reads AGENTS.md itself only while none of these files exists.
+        for name in ("CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"):
+            with self.subTest(name=name):
+                self.assertFalse((ROOT / name).exists())
 
     def test_agents_is_only_a_complete_import_manifest(self) -> None:
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")

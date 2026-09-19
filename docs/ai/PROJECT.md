@@ -7,7 +7,9 @@ repository root.
 ## Documentation map
 
 - `AGENTS.md` is the import-only manifest for the complete coding-agent instruction set.
-- `CLAUDE.md` is only a compatibility redirect to that manifest.
+- There is deliberately no `CLAUDE.md`. Claude Code 2.1.277 or later reads `AGENTS.md` and expands
+  its imports only while no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in the
+  working directory or above it.
 - `CONTRIBUTING.md` is the human-facing path from an unfamiliar checkout to a reviewed pull
   request, including an AI-assisted workflow.
 - `README.md` is for users and builders; focused architecture documents own their subjects.
@@ -20,8 +22,8 @@ repository root.
 - [`docs/architecture/decisions/`](../architecture/decisions/README.md)
   records evidence-backed architectural decisions that must survive individual worktrees.
 
-Do not put operational rules directly in `AGENTS.md` or `CLAUDE.md`, and do not create another root
-instruction file that restates this contract. Add a nested `AGENTS.md` only when a directory
+Do not put operational rules directly in `AGENTS.md`, do not add any of those `CLAUDE.md` files, and
+do not create another root instruction file that restates this contract. Add a nested `AGENTS.md` only when a directory
 genuinely needs narrower rules, and keep it limited to imports for those local deltas.
 
 Quick Skin is a client-and-server Minecraft mod built from one Stonecutter-managed source tree. The
