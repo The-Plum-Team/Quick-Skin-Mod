@@ -1057,8 +1057,8 @@ jobs:
               "$GITHUB_WORKSPACE/e2e/mod_compatibility_review_prompt.md" \
             --verify-prompt \
               "$GITHUB_WORKSPACE/e2e/mod_compatibility_review_verify_prompt.md" \
-            --triage-model claude-haiku-4-5 \
-            --verify-model claude-opus-5 \
+            --triage-model claude-opus-5-5 \
+            --verify-model claude-opus-5-5 \
             --review-mode reference-comparison \
             --triage-chunk-size 8 \
             --verify-chunk-size 4)"
@@ -1244,8 +1244,8 @@ jobs:
             --claude "$RUNNER_TEMP/claude-cli/node_modules/.bin/claude" \
             --triage-prompt "$GITHUB_WORKSPACE/e2e/mod_compatibility_review_prompt.md" \
             --verify-prompt "$GITHUB_WORKSPACE/e2e/mod_compatibility_review_verify_prompt.md" \
-            --triage-model claude-haiku-4-5 \
-            --verify-model claude-opus-5 \
+            --triage-model claude-opus-5-5 \
+            --verify-model claude-opus-5-5 \
             --triage-chunk-size 8 \
             --verify-chunk-size 4 \
             --max-parallel-calls "${{ needs.enumerate.outputs.model_parallelism }}" \

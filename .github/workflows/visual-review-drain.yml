@@ -1299,8 +1299,8 @@ jobs:
             --provider-lock "$GITHUB_WORKSPACE/.github/claude/package-lock.json" \
             --triage-prompt "$triage_prompt" \
             --verify-prompt "$verify_prompt" \
-            --triage-model claude-haiku-4-5 \
-            --verify-model claude-opus-5 \
+            --triage-model claude-opus-5-5 \
+            --verify-model claude-opus-5-5 \
             --review-mode "$review_mode" \
             --triage-chunk-size 8 \
             --verify-chunk-size 4)"
@@ -1594,8 +1594,8 @@ jobs:
             --claude "$RUNNER_TEMP/claude-cli/node_modules/.bin/claude" \
             --triage-prompt "$triage_prompt" \
             --verify-prompt "$verify_prompt" \
-            --triage-model claude-haiku-4-5 \
-            --verify-model claude-opus-5 \
+            --triage-model claude-opus-5-5 \
+            --verify-model claude-opus-5-5 \
             --triage-chunk-size 8 \
             --verify-chunk-size 4 \
             --max-parallel-calls 32 \

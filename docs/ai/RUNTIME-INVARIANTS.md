@@ -452,15 +452,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   generation identity, while a later generation may reuse an exact-policy same-lane anchor verdict
   only when its canonical full PNG, semantic region fingerprint, label, scope, expectation, and
   runtime evidence all match. The review runner accepts only that immutable handoff and sends every
-  remaining unpaired anchor frame to Haiku. In paired mode, exact decoded RGB
+  remaining unpaired anchor frame to triage. In paired mode, exact decoded RGB
   fingerprints over the contract-authored regions may inherit the certified reference without a
   model, and exact-equivalent non-matching pairs may share one AI-reviewed representative. It
   exposes only bounded manifests/images plus authored regions and each passed capture assertion's
-  bounded printable runtime evidence to concurrent loader-grouped Haiku triage. Authenticated
+  bounded printable runtime evidence to concurrent loader-grouped triage. Authenticated
   evidence and exact identities stay at 1920x1080; model-visible copies are deterministic
-  1280x720 PNGs. After Haiku settles, only concerns or confidence below high are globally packed
-  into selective concurrent Opus verification with a read-only tool surface; a clean
-  high-confidence Haiku decision is final and perceptual similarity can neither route nor pass.
+  1280x720 PNGs. After triage settles, only concerns or confidence below high are globally packed
+  into selective concurrent verification with a read-only tool surface; a clean
+  high-confidence triage decision is final and perceptual similarity can neither route nor pass.
   Sanitized attempt and local retry-backoff snapshots are cumulative observations, never
   acceptance evidence or provider-internal wait measurements. Interrupted snapshots are
   lower bounds; missing observations cannot imply zero calls or a complete review. Telemetry
@@ -556,7 +556,7 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   captures must not enter the model capsule.
   Exact authored-region matches inherit the clean paired result, exact-equivalent pairs share one
   representative across every unfinished lane, and globally packed chunks send every remaining
-  group to Haiku. Only a concern or confidence below high reaches Opus. The first Opus-confirmed
+  group to triage. Only a concern or confidence below high reaches verification. The first Opus-confirmed
   defect publishes a durable source-wave marker and cancels outstanding model calls. Raw packaged
   artifacts are authenticated and re-encoded by per-lane secretless curators; another secretless
   boundary authenticates and deduplicates those capsules before the credential-bearing reviewer

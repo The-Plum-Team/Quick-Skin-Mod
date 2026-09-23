@@ -607,7 +607,7 @@ jobs:
             Do not run git add, git commit, git push or gh; do not edit any path that was not already \
             conflicted. Do not alter workflows, tests, matrices, guardrails or build configuration. \
             Leave the resolved tracked files in the worktree for the deterministic patch packager." \
-            --model claude-opus-5 \
+            --model claude-opus-5-5 \
             --safe-mode \
             --no-session-persistence \
             --tools "Read,Edit,Write" \

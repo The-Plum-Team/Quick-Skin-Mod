@@ -509,7 +509,7 @@ primarily an availability circuit rather than an invented quota estimate. The ma
 the normalized provider status, known limit type, and utilization band; neither provider text nor
 exact account-usage details are uploaded.
 
-The runner sends every unpaired 1.20.1 frame to Haiku and gives certifiable anchor entries priority
+The runner sends every unpaired 1.20.1 frame to triage and gives certifiable anchor entries priority
 over advisory queue work. Curation fingerprints decoded RGB pixels inside every contract-authored
 review region. In later paired reviews an exact candidate/reference region match inherits the
 certified result without a model call, while exact-equivalent non-matching pairs across versions or
@@ -518,10 +518,10 @@ semantic fingerprints, review scope, expectation, passed runtime evidence, captu
 scenario contract, release matrix, prompts, reviewer/checker/cache/similarity code, models, mode,
 and chunk policy match exactly; artifact labels and loaders may differ because they are not visual
 identity. Unpaired anchor cache hits additionally bind the exact loader label and full canonical PNG,
-so one loader cannot certify another. Haiku triages the remaining representative
+so one loader cannot certify another. Opus 5.5 triages the remaining representative
 frames in chunks of at most eight. All independent chunks run concurrently. After the complete
-Haiku stage settles, every concern or confidence below high is packed source-wide and rechecked by
-Opus in concurrent chunks of at most four; a clean high-confidence Haiku verdict is final.
+triage stage settles, every concern or confidence below high is packed source-wide and rechecked by
+a second Opus 5.5 pass in concurrent chunks of at most four; a clean high-confidence triage verdict is final.
 Perceptual similarity is model context only and can never produce a pass or force an escalation.
 The authenticated evidence remains 1920x1080 for exact comparison and caching, while the runner
 creates deterministic 1280x720 copies only for chunks that actually reach a model. Provider
@@ -718,8 +718,8 @@ Quick Skin injector check. The credential-bearing review workflow receives only 
 curated capsules, never raw packaged artifacts. A secretless step authenticates and combines the
 unfinished capsules, deduplicates content-addressed images, and exposes exact equivalence across
 loaders to one source-wide review plan. Exact authored-region matches need no AI call,
-exact-equivalent pairs share one representative, Haiku reviews globally packed groups from
-deterministic 1280x720 copies, and Opus confirms only a Haiku concern or confidence below high.
+exact-equivalent pairs share one representative, Opus 5.5 triage reviews globally packed groups from
+deterministic 1280x720 copies, and Opus 5.5 verification confirms only a triage concern or confidence below high.
 The workflow records sanitized attempt/chunk/retry counts without provider text or usage details,
 then secretless jobs split a clean result into independently recoverable lane artifacts. Clean
 paired verdicts also enter the protected source-wide exact-policy cache, so a
