@@ -526,7 +526,7 @@ jobs:
             source or active-overlay implementation files. Never edit workflows, tests, matrices, \
             scripts, limits, build configuration, generated output or agent instructions. Do not \
             run git add, commit, push or gh. Leave only the proposed tracked edits in the worktree." \
-            --model claude-opus-5 \
+            --model claude-opus-5-5 \
             --safe-mode \
             --no-session-persistence \
             --add-dir "$RUNNER_TEMP/ai-port-evidence" \

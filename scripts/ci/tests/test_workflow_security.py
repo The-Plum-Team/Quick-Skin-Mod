@@ -828,8 +828,8 @@ class WorkflowSecurityTest(unittest.TestCase):
             "a backslash inside a multiline single-quoted jq filter is literal",
         )
         self.assertIn("--model claude-haiku-4-5", capacity_probe)
-        self.assertIn("--triage-model claude-haiku-4-5", review)
-        self.assertIn("--verify-model claude-opus-5", review)
+        self.assertIn("--triage-model claude-opus-5-5", review)
+        self.assertIn("--verify-model claude-opus-5-5", review)
         self.assertNotIn("claude-sonnet-5", review)
         self.assertIn("--triage-chunk-size 8", review)
         self.assertIn("--verify-chunk-size 4", review)
@@ -1317,8 +1317,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn('--compatibility-mod "$mod"', prepare_review)
         self.assertIn("--model claude-haiku-4-5", capacity_probe)
-        self.assertIn("--triage-model claude-haiku-4-5", review)
-        self.assertIn("--verify-model claude-opus-5", review)
+        self.assertIn("--triage-model claude-opus-5-5", review)
+        self.assertIn("--verify-model claude-opus-5-5", review)
         self.assertNotIn("claude-sonnet-5", review)
         self.assertIn("Install hash-locked image decoder", prepare_review)
         self.assertIn("Install hash-locked image decoder", review)
@@ -3200,9 +3200,9 @@ class WorkflowSecurityTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(package["dependencies"]["@anthropic-ai/claude-code"], "2.1.220")
+        self.assertEqual(package["dependencies"]["@anthropic-ai/claude-code"], "2.1.280")
         locked = lock["packages"]["node_modules/@anthropic-ai/claude-code"]
-        self.assertEqual(locked["version"], "2.1.220")
+        self.assertEqual(locked["version"], "2.1.280")
         self.assertTrue(locked["integrity"].startswith("sha512-"))
         for workflow in WORKFLOWS.glob("*.yml"):
             self.assertNotIn("npm install -g @anthropic-ai/claude-code", workflow.read_text())

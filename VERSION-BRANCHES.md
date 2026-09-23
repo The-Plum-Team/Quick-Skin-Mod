@@ -358,13 +358,13 @@ into those branches. Their source matrices and existing evidence remain intact d
   It consumes the bounded headless rate-limit status and optional utilization when
   present, without pretending Claude provides a reliable Pro/Max percentage to headless CI. A
   certifiable anchor is prioritized before the cross-version wave. An unpaired anchor frame reaches
-  Haiku unless an authenticated ancestor cache carries the exact same canonical PNG, lane label,
+  triage unless an authenticated ancestor cache carries the exact same canonical PNG, lane label,
   authored region fingerprint, scope, capture, expectation, and runtime evidence under the exact
   current semantic policy. For paired evidence, decoded RGB pixels from the authored regions can prove an exact
   candidate/reference match without a model call; exact-equivalent versions share one AI-reviewed
-  representative. Each drain triages the remaining loader-grouped chunks concurrently with Haiku
+  representative. Each drain triages the remaining loader-grouped chunks concurrently with Opus 5.5
   from deterministic 1280x720 copies, then globally packs only concerns or confidence below high
-  into concurrent bounded Opus verification. A clean high-confidence Haiku decision is final.
+  into concurrent bounded Opus 5.5 verification. A clean high-confidence triage decision is final.
   Perceptual similarity is model context only and can never synthesize a pass or force escalation.
   The first Opus-confirmed defect publishes a protected generation-bound marker,
   cancels sibling drains and keeps later queue selection from spending more model calls on that
@@ -416,7 +416,7 @@ into those branches. Their source matrices and existing evidence remain intact d
   authenticates that complete runtime result, then pairs exactly the selected compatibility-profile
   captures with the clean same-version/loader result. Exact
   authored-region matches need no model call, exact-equivalent pairs share one representative,
-  Haiku reviews the remaining pairs, and Opus verifies only a concern or confidence below high.
+  Opus 5.5 triages the remaining pairs, and a second Opus 5.5 pass verifies only a concern or confidence below high.
   The first confirmed defect records a durable wave block and cancels outstanding model calls.
   Each successful runtime lane curates its own capsule before
   the matrix settles, so a failed sibling keeps the deterministic runtime gate red without erasing

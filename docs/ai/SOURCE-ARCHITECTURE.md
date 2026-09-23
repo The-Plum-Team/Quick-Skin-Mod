@@ -265,8 +265,8 @@ codecs remain for historical schema-2 evidence and explicit recovery; their cont
   sibling never suppresses capsules already produced by successful lanes.
   `.github/workflows/mod-compatibility-review.yml` is the separate credential-bearing consumer; it
   downloads only curated capsules, inherits exact authored-region matches, groups exact-equivalent
-  pairs behind one representative, sends every remaining group to Haiku, escalates only a concern
-  or confidence below high to Opus, and publishes a durable source-wave block before
+  pairs behind one representative, sends every remaining group to triage, escalates only a concern
+  or confidence below high to verification, and publishes a durable source-wave block before
   cancelling siblings after a confirmed defect. Its authenticated source queue shares the global
   Claude capacity circuit, requires a fresh probe for each source, preserves one completion marker
   per clean lane, and reschedules only unfinished lanes after a provider pause. Clean lane markers
@@ -366,13 +366,13 @@ codecs remain for historical schema-2 evidence and explicit recovery; their cont
   all-single or all-paired bounded capsule,
   including each capture's exact passed assertion as `runtime_evidence`, keeps `semantic_valid`
   independent from nullable `matches_reference`, and normalizes bounded model output.
-  `e2e/visual_review_runner.py` sends every uncached unpaired anchor frame through semantic Haiku
+  `e2e/visual_review_runner.py` sends every uncached unpaired anchor frame through semantic
   triage, inherits exact paired region matches, shares one model verdict across exact-equivalent
   paired versions, runs independent loader-grouped chunks concurrently, creates deterministic
   1280x720 model-only copies without altering the authenticated 1920x1080 evidence, and globally
-  packs only concerns or confidence below high into concurrent bounded Opus verification after
-  Haiku settles. A clean
-  high-confidence Haiku result is final; perceptual metrics never create or route a verdict. The
+  packs only concerns or confidence below high into concurrent bounded verification after
+  triage settles. A clean
+  high-confidence triage result is final; perceptual metrics never create or route a verdict. The
   runner cancels outstanding calls after the first
   confirmed defect, publishes a protected exact-generation block, cancels sibling drains, and keeps
   raw provider output private.
