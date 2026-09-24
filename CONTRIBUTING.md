@@ -222,6 +222,10 @@ python -m unittest discover -s scripts/release/tests -p "test_*.py" -v
 python -m unittest discover -s scripts/ci/tests -p "test_*.py" -v
 ```
 
+The build gate runs those two suites through `scripts/ci/parallel_unittest.py`, which takes the
+same `-s`/`-p` arguments, spreads one discovery across every core, and fails if any discovered
+test is lost, fails, errors or unexpectedly succeeds. Use it locally for a faster equivalent run.
+
 Do not run multiple Gradle commands at the same time on one machine. Architectury's transforms share
 JVM-global state, so local aggregate builds remain serial. GitHub compiles separate targets on
 isolated runners, then verifies the complete set before passing Build. Packaged E2E reuses that

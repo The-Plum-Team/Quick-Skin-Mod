@@ -47,9 +47,10 @@ class RepositoryGuidanceTest(unittest.TestCase):
         self.assertIn("CONTRIBUTING.md", pull_request_template)
         self.assertIn("AGENTS.md", pull_request_template)
         self.assertIn(
-            "python -m unittest discover -s scripts/release/tests",
+            "python scripts/ci/parallel_unittest.py -s scripts/release/tests",
             build_gate,
         )
+        self.assertIn("scripts/ci/parallel_unittest.py", contributing)
 
     def test_release_badges_are_backed_by_exact_tree_attestations(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
