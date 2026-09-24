@@ -245,6 +245,9 @@ python -m unittest discover -s scripts/release/tests -p "test_*.py" -v
 python -m unittest discover -s scripts/ci/tests -p "test_*.py" -v
 ```
 
+`scripts/ci/parallel_unittest.py` accepts the same `-s`/`-p` arguments and is the faster
+equivalent of those last two commands; the build gate runs both suites through it.
+
 Packaged Minecraft runtime scenarios require a display and the matrix-declared Java toolchain. Use Xvfb on
 headless Linux and in CI; on a desktop session, macOS included, run the orchestrator directly.
 Minecraft 26.3's SDL window needs an sRGB OpenGL framebuffer that Xvfb's GLX lacks, so headless
@@ -265,7 +268,11 @@ gives every matrix version its own isolated runner, so the complete matrix compi
 production/harness hash and SBOM before constructing the complete bundle.
 Repository validation and the complete release-policy and CI-policy suites run alongside compilation.
 Each suite has its own hosted runner, checkout of the same tested SHA, temporary files, discovered
-test-count summary, and retained diagnostics. All three policy jobs and compilation must pass the
+test-count summary, and retained diagnostics. `parallel_unittest.py` discovers the suite once, as
+`unittest discover -s` would, and runs it across the runner's cores: a class with class-level
+fixtures stays whole in one worker, and each worker has its own pre-created temporary directory.
+It fails closed on a discovery error, failure, error, unexpected success, dead worker, zero tests,
+or any unit that does not run exactly its discovered number of tests. All three policy jobs and compilation must pass the
 stable `Build and verify` gate; only independently authenticated protected reuse permits their
 explicit skips. A PR's Packaged E2E waits for that exact source Build and downloads its immutable artifact
 by ID, then reverifies it against the tested merge commit. It never starts a second PR compilation.

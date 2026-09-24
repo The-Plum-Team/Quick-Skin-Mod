@@ -64,9 +64,18 @@ class PolicyIsolationTest(unittest.TestCase):
         for suite, job in PARTITIONS.items():
             with self.subTest(suite=suite):
                 block = job_block(WORKFLOW, job)
-                command = f"python -m unittest discover -s scripts/{suite}/tests -p 'test_*.py' -v"
+                command = (f"python scripts/ci/parallel_unittest.py -s scripts/{suite}/tests "
+                           "-p 'test_*.py' -v")
                 self.assertEqual(1, workflow.count(command))
                 self.assertIn(command, block)
+                # The fail-closed runner is the only executor of the suite, and it runs exactly
+                # the start directory and pattern whose inventory the job records.
+                self.assertNotIn("-m unittest", block)
+                self.assertIn(f"loader.discover('scripts/{suite}/tests', pattern='test_*.py')", block)
+                name = "release" if suite == "release" else "CI"
+                script = step_script(WORKFLOW, job, f"Run the complete {name} policy suite")
+                self.assertTrue(script.startswith("set -euo pipefail\n"), script)
+                self.assertIn(f"{command} 2>&1 | tee \"$RUNNER_TEMP/{suite}-policy-tests.log\"", script)
                 self.assertIn("needs: source\n", block)
                 self.assertIn("needs.source.outputs.reused == 'false'", block)
                 self.assertIn("runs-on: ubuntu-24.04", block)
