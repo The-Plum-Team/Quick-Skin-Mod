@@ -145,8 +145,10 @@ def save(api: Api, release: dict[str, Any], state: dict[str, Any]) -> None:
     require(fresh["id"] == release["id"] and fresh["draft"] is True
             and (fresh.get("body") or "") == body, "release body changed; retry under the publication lock")
     # The lock is the serialization authority, not an undocumented HTTP compare-and-swap.
+    # A draft edit that omits tag_name detaches the draft from its tag, so always restate it.
+    payload = {"body": updated, "tag_name": state["tag"]}
     subprocess.run(["gh", "api", "--method", "PATCH", api.prefix + f"releases/{release['id']}",
-                    "--input", "-"], input=json.dumps({"body": updated}), text=True, check=True,
+                    "--input", "-"], input=json.dumps(payload), text=True, check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
     require((read_release(api, state["tag"]).get("body") or "") == updated,
             "publication state write was not confirmed")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import os
 import sys
 import tempfile
@@ -140,6 +141,22 @@ class PublicationStateTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "write was not confirmed"):
                 ledger.save(api, release, self.state)
             mutation.assert_called_once()
+
+    def test_ledger_write_keeps_the_draft_attached_to_its_tag(self):
+        contract = load_contract(self.path, self.stage, self.state["tag"], self.state["source_sha"])
+        service = SimulatedGitHub(contract)
+        service.release = {"id": 1, "tag_name": self.state["tag"], "draft": True, "body": "Notes"}
+        with patch.object(ledger.subprocess, "run", side_effect=service.command) as mutation:
+            ledger.save(service, ledger.read_release(service, self.state["tag"]), self.state)
+        payload = json.loads(mutation.call_args.kwargs["input"])
+        self.assertEqual(payload["tag_name"], self.state["tag"])
+        self.assertEqual(service.release["tag_name"], self.state["tag"])
+        self.assertEqual(ledger.decode(service.release["body"]), self.state)
+        # The simulated GitHub detaches a draft edited without its tag, as the real API does.
+        service.command(["gh", "api", "--method", "PATCH", service.prefix + "releases/1", "--input", "-"],
+                        input=json.dumps({"body": service.release["body"]}))
+        with self.assertRaisesRegex(ValueError, "no single"):
+            ledger.read_release(service, self.state["tag"])
 
     def test_accepted_upload_is_durable_even_when_the_visibility_api_fails(self):
         self.state["rows"][self.row_id] = {"state": "uploading", "remote_id": None}
