@@ -1937,7 +1937,12 @@ jobs:
     timeout-minutes: 90
     permissions:
       actions: read
-      contents: write
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.handoff.outputs.artifact-id }}
+      artifact_digest: ${{ steps.handoff.outputs.artifact-digest }}
+      bundle_key: ${{ steps.collect.outputs.bundle_key }}
+      coverage_sha: ${{ steps.coverage.outputs.coverage_sha }}
 
     steps:
       - name: Check out the protected compatibility publisher
@@ -1985,58 +1990,64 @@ jobs:
             --output public-compatibility \
             --github-output "$GITHUB_OUTPUT"
 
-      - name: Upload the compact public compatibility handoff
-        id: artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ steps.collect.outputs.artifact_name }}
-          path: public-compatibility/
-          if-no-files-found: error
-          compression-level: 6
-          retention-days: 7
-
-      - name: Wake the protected Pages publisher
+      # mod-base binds a family generation to exactly the producer checkout: the native bundle
+      # must cover this protected head, which collection has just rechecked as the live master.
+      - name: Bind the collected coverage to this protected head
+        id: coverage
         shell: bash
         env:
-          ARTIFACT_DIGEST: ${{ steps.artifact.outputs.artifact-digest }}
-          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
-          ARTIFACT_NAME: ${{ steps.collect.outputs.artifact_name }}
-          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
-          BRANCH: ${{ steps.collect.outputs.branch }}
           BUNDLE_KEY: ${{ steps.collect.outputs.bundle_key }}
-          COMPATIBILITY_RUN_ID: ${{ steps.collect.outputs.compatibility_run_id }}
           COVERAGE_SHA: ${{ steps.collect.outputs.coverage_sha }}
-          GH_TOKEN: ${{ github.token }}
-          TARGET_SHA: ${{ steps.collect.outputs.target_sha }}
         run: |
           set -euo pipefail
-          source scripts/ci/github_api_retry.sh
-          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
-          [[ "$ARTIFACT_NAME" == "pages-mod-compatibility-$BUNDLE_KEY" ]]
-          [[ "$ARTIFACT_URL" == \
-             "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts/$ARTIFACT_ID" ]]
-          # GitHub accepts at most ten client_payload properties. The artifact name is
-          # derived from the bundle key on both sides, so it is not transmitted.
-          payload="$RUNNER_TEMP/pages-compatibility-evidence-ready.json"
-          jq -n \
-            --arg artifact_digest "sha256:$ARTIFACT_DIGEST" \
-            --arg branch "$BRANCH" \
-            --arg bundle_key "$BUNDLE_KEY" \
-            --arg coverage_sha "$COVERAGE_SHA" \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg target_sha "$TARGET_SHA" \
-            --argjson artifact_id "$ARTIFACT_ID" \
-            --argjson compatibility_run_id "$COMPATIBILITY_RUN_ID" \
-            --argjson publication_run_id "$GITHUB_RUN_ID" \
-            '{event_type:"pages-compatibility-evidence-ready",client_payload:{
-              repository:$repository,publication_run_id:$publication_run_id,
-              publication_sha:env.GITHUB_SHA,artifact_id:$artifact_id,
-              artifact_digest:$artifact_digest,
-              compatibility_run_id:$compatibility_run_id,branch:$branch,bundle_key:$bundle_key,
-              target_sha:$target_sha,coverage_sha:$coverage_sha}}' > "$payload"
-          github_api_retry --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
-            --input "$payload" > /dev/null
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$COVERAGE_SHA" != "$GITHUB_SHA" ]]; then
+            printf 'Compatibility coverage %s is not the protected head %s.\n' \
+              "$COVERAGE_SHA" "$GITHUB_SHA" >&2
+            exit 1
+          fi
+          [[ "$BUNDLE_KEY" =~ ^[a-z0-9][a-z0-9._-]{0,62}[a-z0-9]$ && "$BUNDLE_KEY" != *--* ]]
+          [[ -d "public-compatibility/$BUNDLE_KEY" && ! -L "public-compatibility/$BUNDLE_KEY" &&
+             -f "public-compatibility/$BUNDLE_KEY/manifest.json" &&
+             ! -L "public-compatibility/$BUNDLE_KEY/manifest.json" ]]
+          printf 'coverage_sha=%s\n' "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+      # The pinned composite wraps the native bundle in its mod-base envelope, validates it in a
+      # fresh process and uploads the single mb-family-handoff. The step name is the family's
+      # upload-window contract (site/mod-base.json families[].producer.step).
+      - name: Upload the mod-base family handoff
+        id: handoff
+        uses: The-Plum-Team/mod-base/actions/publish-family@1401a34dd19be17b2c42b4f494c0b43380919eac # v1.0.2
+        with:
+          family: mod-compatibility
+          key: ${{ steps.collect.outputs.bundle_key }}
+          bundle: public-compatibility/${{ steps.collect.outputs.bundle_key }}
+          coverage-sha: ${{ github.sha }}
+          subject-branch: master
+          subject-commit: ${{ github.sha }}
+
+  notify-family:
+    name: Wake the protected project site for compatibility evidence
+    needs: publish-evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: write
+
+    # A pure-bash composite without checkout: the woken Pages run re-authenticates the exact
+    # family handoff by id and digest before any validation.
+    steps:
+      - name: Dispatch the exact family handoff to the protected Pages publisher
+        uses: The-Plum-Team/mod-base/actions/notify-pages@1401a34dd19be17b2c42b4f494c0b43380919eac # v1.0.2
+        with:
+          operation: family
+          run-id: ${{ github.run_id }}
+          sha: ${{ github.sha }}
+          family: mod-compatibility
+          bundle-key: ${{ needs.publish-evidence.outputs.bundle_key }}
+          artifact-id: ${{ needs.publish-evidence.outputs.artifact_id }}
+          artifact-digest: ${{ needs.publish-evidence.outputs.artifact_digest }}
+          coverage-sha: ${{ needs.publish-evidence.outputs.coverage_sha }}
 
   # Exact producer wakes already cover fresh sources. Only a scheduled/manual recovery
   # chain needs another full queue sweep to drain older eligible sources after settling.

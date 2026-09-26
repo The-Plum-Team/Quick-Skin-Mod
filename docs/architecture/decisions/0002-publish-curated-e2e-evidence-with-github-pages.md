@@ -1,12 +1,21 @@
 # ADR 0002: Publish curated E2E evidence with GitHub Pages
 
-- Status: Accepted — active
+- Status: Accepted — partially superseded by
+  [ADR 0010](0010-delegate-public-evidence-to-mod-base.md) on 2026-09-25
 - Date: 2026-08-02
 - Amended by: ADR 0004 on 2026-08-10 for the single lossless AI anchor
 - Amended on 2026-09-13 by [Pages publication progress](../../ci/PAGES-PUBLICATION-PROGRESS.md):
   an hourly recovery sweep replaced decision 6's monthly refresh, and an unchanged complete
   generation is not re-collected
 - Scope: project landing page and cross-version packaged-E2E evidence
+
+ADR 0010 moves this record's evidence handling, publication, retention and rendering mechanics
+(decisions 1, 3, 4, 6 and 7, and the `pages-e2e-*`, `collected-pages-*` and `pages-cache-*`
+artifacts) to the pinned mod-base kit and replaces its implementation-identity consequence: only
+the adapter at the protected `github.sha` plus the mod-base commit that `github.sha` pins, reachable
+from mod-base `main`, may validate or render public evidence. The advisory static site, the
+`github-pages` environment restricted to `master`, the deploy-only Pages credentials and the
+landing page and gallery remain decided here.
 
 ## Context
 

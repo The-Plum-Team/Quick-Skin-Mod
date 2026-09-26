@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Collect one authenticated clean compatibility wave into a public Pages handoff."""
+"""Collect one authenticated clean compatibility wave into its public native bundle.
+
+The bundle (``compatibility_evidence`` shared schema 6) is the native bundle of mod-base's
+``mod-compatibility`` family: the publishing workflow wraps it in its envelope and uploads the
+family handoff through the pinned ``publish-family`` composite. For shared-source evidence the
+bundle also records the publication run's own API facts (``provenance.publication_run``), which the
+adapter's ``family_validate`` needs to project the producer ``RunRecord`` without API access."""
 
 from __future__ import annotations
 
@@ -34,6 +40,7 @@ from compatibility_evidence import (  # noqa: E402
     carry_forward,
     read_json,
     validate_plan,
+    validate_publication_run,
 )
 from mod_compatibility import (  # noqa: E402
     CompatibilityContractError,
@@ -390,6 +397,45 @@ def _validate_run(
     ):
         raise CollectionError(f"workflow run {run.get('id')!r} failed provenance validation")
     return run_sha
+
+
+def _publication_run(
+    api: GitHubClient,
+    *,
+    repository: str,
+    publication_run_id: int,
+    implementation_sha: str,
+) -> dict[str, Any]:
+    """The executing publication run's API facts (``event``, ``created_at``, ``display_title``).
+
+    A shared-source bundle records them so mod-base's ``family_validate`` hook, which has no API
+    access, can project the producer ``RunRecord`` that the Pages build then authenticates. The
+    run must be this protected producer: an in-progress ``master`` run of the review workflow at
+    the exact implementation commit, owned by this repository.
+    """
+
+    run = api.get_run(publication_run_id)
+    head_repository = run.get("head_repository")
+    if (
+        run.get("id") != publication_run_id
+        or run.get("status") != "in_progress"
+        or run.get("path") != REVIEW_WORKFLOW
+        or run.get("event") not in REVIEW_EVENTS
+        or run.get("head_branch") != "master"
+        or run.get("head_sha") != implementation_sha
+        or not isinstance(head_repository, dict)
+        or head_repository.get("full_name") != repository
+    ):
+        raise CollectionError(
+            f"workflow run {publication_run_id!r} is not this protected publication run"
+        )
+    record = {"event": run["event"], "created_at": run.get("created_at")}
+    if run.get("display_title") is not None:
+        record["display_title"] = run["display_title"]
+    try:
+        return validate_publication_run(record, "publication run")
+    except CompatibilityEvidenceError as exc:
+        raise CollectionError(str(exc)) from exc
 
 
 def _git(repository: Path, *arguments: str) -> str:
@@ -816,6 +862,16 @@ def collect(
                 {"review_run_id": lane_completion_artifact.run_id},
             )
 
+        publication_run = (
+            _publication_run(
+                api,
+                repository=repository,
+                publication_run_id=publication_run_id,
+                implementation_sha=current_implementation_sha,
+            )
+            if "matrix_sha256" in identity
+            else None
+        )
         built_root = temporary_root / "built"
         bundle = build_bundle(
             plan_path=plan_path,
@@ -827,6 +883,7 @@ def collect(
             publication_run_id=publication_run_id,
             scenario_contract_path=REPO / "e2e/scenario-contract.json",
             compatibility_contract_path=REPO / "e2e/mod-compatibility-contract.json",
+            publication_run=publication_run,
         )
         final_root = temporary_root / "final"
         if current_target_sha == identity["target_sha"]:
@@ -858,7 +915,6 @@ def collect(
             "target_sha": identity["target_sha"],
             "coverage_sha": current_target_sha,
             "compatibility_run_id": source_run_id,
-            "artifact_name": f"pages-mod-compatibility-{identity['bundle_key']}",
             "lane_count": len(plan_rows),
             "publication_run_id": publication_run_id,
         }
@@ -912,7 +968,6 @@ def main(argv: list[str] | None = None) -> int:
                     "target_sha",
                     "coverage_sha",
                     "compatibility_run_id",
-                    "artifact_name",
                     "lane_count",
                 ):
                     output.write(f"{key}={summary[key]}\n")

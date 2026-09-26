@@ -7,12 +7,54 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 LOCAL_LINK = re.compile(r"\[[^\]]+\]\((?!https?://)([^)#]+)(?:#[^)]+)?\)")
-AGENT_IMPORTS = (
+# The mod-base kit manages the two shared documents and requires them first (mod-base SPEC 8.3);
+# the remaining imports are site/mod-base.json template.agents_local, in order.
+SHARED_AGENT_IMPORTS = (
+    "docs/ai/shared/REPOSITORY.md",
+    "docs/ai/shared/PUBLIC-EVIDENCE.md",
+)
+LOCAL_AGENT_IMPORTS = (
     "docs/ai/PROJECT.md",
     "docs/ai/SOURCE-ARCHITECTURE.md",
     "docs/ai/RUNTIME-INVARIANTS.md",
     "docs/ai/WORKFLOW.md",
 )
+AGENT_IMPORTS = (*SHARED_AGENT_IMPORTS, *LOCAL_AGENT_IMPORTS)
+MOD_BASE_DEPENDENCY = "The-Plum-Team/mod-base*"
+CODE_OWNER = "@AkaNebur"
+CODE_OWNED_PATHS = (
+    "/.github/",
+    "/site/",
+    "/scripts/pages/",
+    "/scripts/ci/",
+    "/AGENTS.md",
+    "/docs/ai/",
+)
+# Generic Pages code that mod-base replaced (ADR 0010); local guidance must not describe it. The
+# module names are matched without their directory so a shortened reference is caught too.
+RETIRED_PAGES_REFERENCES = (
+    "build_site.py",
+    "scripts/pages/evidence.py",
+    "select_artifact.py",
+    "select_compatibility_artifact.py",
+    "rotate_artifacts.py",
+    "publication_progress.py",
+    "site/assets/",
+    "--allow-continuation",
+)
+# The Build `policy` job runs these; both verification guides must keep them runnable.
+MOD_BASE_VERIFICATION_COMMANDS = (
+    "python scripts/ci/mod_base_kit.py verify --network",
+    "python scripts/ci/mod_base_kit.py run template check --repo .",
+)
+MOD_BASE_BUMP = "scripts/ci/mod_base_kit.py bump --to vX.Y.Z"
+FENCED_BLOCK = re.compile(r"^```[^\n]*\n(.*?)^```", re.MULTILINE | re.DOTALL)
+
+
+def instruction_set() -> str:
+    return "".join(
+        (ROOT / path).read_text(encoding="utf-8") for path in AGENT_IMPORTS
+    )
 
 
 class RepositoryGuidanceTest(unittest.TestCase):
@@ -103,11 +145,15 @@ class RepositoryGuidanceTest(unittest.TestCase):
         )
         contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
 
+        instructions = instruction_set()
+
         self.assertIn("New work targets `master`", project)
         self.assertIn("architecture/modules.json", project)
         self.assertIn("complete required target/loader gate", project)
-        self.assertIn("separate ephemeral Git worktree", workflow)
-        self.assertIn("never use `--force`", workflow)
+        # The worktree rules are generic and live in the managed shared contract.
+        self.assertIn("separate ephemeral Git worktree", instructions)
+        self.assertIn("never use `--force`", instructions)
+        self.assertIn("shared/REPOSITORY.md", workflow)
         self.assertIn("scripts/release/branch_readme.py", workflow)
         for command in (
             "mktemp -d",
@@ -181,22 +227,118 @@ class RepositoryGuidanceTest(unittest.TestCase):
         self.assertIn("directory: /.github/claude", dependabot)
         self.assertIn("interval: monthly", dependabot)
 
-    def test_new_guidance_has_no_broken_local_links(self) -> None:
-        decision_documents = tuple(
-            sorted((ROOT / "docs" / "architecture" / "decisions").glob("*.md"))
+    def test_dependabot_leaves_the_mod_base_pin_to_the_kit_bump(self) -> None:
+        # The kit is pinned by SHA and moved only by `mod_base_kit.py bump`, which also
+        # resynchronizes the managed files; mod-base `template check` requires this ignore.
+        dependabot = (ROOT / ".github" / "dependabot.yml").read_text(
+            encoding="utf-8"
         )
+        updates = dependabot.split("\n  - package-ecosystem: ")[1:]
+        actions = [update for update in updates if update.startswith("github-actions\n")]
+        self.assertEqual(len(actions), 1)
+        # Every other action pinned inside the managed region of pages.yml is kit-owned too: a
+        # Dependabot bump of it would be byte drift that `template check` rejects.
+        caller = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
+        managed = caller.split("# <<< mod-base managed\n", 1)[0]
+        managed_actions = sorted(
+            set(re.findall(r"^\s*(?:-\s+)?uses:\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/[^@\s]*)?@",
+                           managed, re.MULTILINE))
+            - {"The-Plum-Team/mod-base"}
+        )
+        self.assertIn("actions/deploy-pages", managed_actions)
+        self.assertIn(
+            "\n    ignore:\n"
+            f'      - dependency-name: "{MOD_BASE_DEPENDENCY}"\n'
+            + "".join(f'      - dependency-name: "{name}"\n' for name in managed_actions)
+            + "    groups:\n",
+            actions[0],
+        )
+        self.assertEqual(dependabot.count(MOD_BASE_DEPENDENCY), 1)
+
+    def test_protected_paths_keep_a_code_owner(self) -> None:
+        rules: dict[str, list[str]] = {}
+        codeowners = (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
+        for line in codeowners.splitlines():
+            tokens = line.split("#", 1)[0].split()
+            if not tokens:
+                continue
+            with self.subTest(rule=tokens[0]):
+                # An owner-less rule silently removes ownership from every path it matches.
+                self.assertGreater(len(tokens), 1)
+                self.assertNotIn(tokens[0], rules)
+            rules[tokens[0]] = tokens[1:]
+        for pattern in CODE_OWNED_PATHS:
+            with self.subTest(pattern=pattern):
+                self.assertEqual(rules.get(pattern), [CODE_OWNER])
+
+    def test_verification_guides_keep_the_mod_base_checks_and_bump_route(self) -> None:
+        for guide in (ROOT / "docs" / "ai" / "WORKFLOW.md", ROOT / "CONTRIBUTING.md"):
+            text = guide.read_text(encoding="utf-8")
+            commands = {
+                line.strip()
+                for block in FENCED_BLOCK.findall(text)
+                for line in block.splitlines()
+            }
+            for command in MOD_BASE_VERIFICATION_COMMANDS:
+                with self.subTest(guide=str(guide.relative_to(ROOT)), command=command):
+                    self.assertIn(command, commands)
+            with self.subTest(guide=str(guide.relative_to(ROOT)), route="bump"):
+                self.assertIn(MOD_BASE_BUMP, text)
+
+    def test_local_guidance_names_no_retired_pages_code(self) -> None:
+        # Decision records keep their history, and the kit owns docs/ai/shared/*; every other
+        # document under docs/ is Quick Skin's current guidance.
+        records = ROOT / "docs" / "architecture" / "decisions"
+        managed = ROOT / "docs" / "ai" / "shared"
         documents = (
             ROOT / "README.md",
             ROOT / "CONTRIBUTING.md",
-            ROOT / "VERSION-BRANCHES.md",
-            ROOT / ".github" / "pull_request_template.md",
-            *(ROOT / path for path in AGENT_IMPORTS),
-            *decision_documents,
+            ROOT / "e2e" / "README.md",
+            *(
+                document
+                for document in sorted((ROOT / "docs").rglob("*.md"))
+                if records not in document.parents and managed not in document.parents
+            ),
+        )
+        for path in LOCAL_AGENT_IMPORTS:
+            self.assertIn(ROOT / path, documents)
+        self.assertIn(ROOT / "docs" / "architecture" / "PUBLIC-EVIDENCE-TARGETS.md", documents)
+        self.assertIn(ROOT / "docs" / "ci" / "PAGES-PUBLICATION-PROGRESS.md", documents)
+        for document in documents:
+            text = document.read_text(encoding="utf-8")
+            for retired in RETIRED_PAGES_REFERENCES:
+                with self.subTest(
+                    document=str(document.relative_to(ROOT)), retired=retired
+                ):
+                    self.assertNotIn(retired, text)
+
+    def test_new_guidance_has_no_broken_local_links(self) -> None:
+        # Every document under docs/ is scanned, including the managed docs/ai/shared/*.md and
+        # the docs/ci pointers that older records still link to.
+        documents = tuple(
+            dict.fromkeys(
+                (
+                    ROOT / "README.md",
+                    ROOT / "CONTRIBUTING.md",
+                    ROOT / "VERSION-BRANCHES.md",
+                    ROOT / ".github" / "pull_request_template.md",
+                    ROOT / "e2e" / "README.md",
+                    *(ROOT / path for path in AGENT_IMPORTS),
+                    *sorted((ROOT / "docs" / "ai" / "shared").glob("*.md")),
+                    *sorted((ROOT / "docs").rglob("*.md")),
+                )
+            )
+        )
+        self.assertGreaterEqual(
+            len(tuple((ROOT / "docs" / "ai" / "shared").glob("*.md"))),
+            len(SHARED_AGENT_IMPORTS),
         )
         for document in documents:
             text = document.read_text(encoding="utf-8")
             for target in LOCAL_LINK.findall(text):
-                with self.subTest(document=document.name, target=target):
+                with self.subTest(
+                    document=str(document.relative_to(ROOT)), target=target
+                ):
                     self.assertTrue((document.parent / target).resolve().is_file())
 
 

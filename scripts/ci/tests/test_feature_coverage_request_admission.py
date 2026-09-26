@@ -20,6 +20,8 @@ from scripts.ci.tests.test_workflow_security import job_block, step_script
 
 SHA = "a" * 40
 REPOSITORY = "The-Plum-Team/Quick-Skin-Mod"
+# The producer tail of each workflow: pages.yml keeps it in mod-base's mod-local extension region.
+PRODUCER_JOBS = {"visual-review-drain.yml": "request-feature-coverage", "pages.yml": "ext-feature-coverage"}
 
 
 class RequestInventoryAdmissionTest(unittest.TestCase):
@@ -140,7 +142,7 @@ gh() { return 94; }
         self.calls.unlink(missing_ok=True)
         name = ("Reconcile durable readiness without running a model or assembling reports" if recovery
                 else "Request a collector only for complete unscheduled readiness")
-        script = step_script(workflow, "request" if recovery else "request-feature-coverage", name)
+        script = step_script(workflow, "request" if recovery else PRODUCER_JOBS[workflow], name)
         result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", self.boundary + script],
             cwd=self.folder, env={**self.environment, **(overrides or {})}, text=True,
             capture_output=True, timeout=10)
@@ -155,7 +157,7 @@ gh() { return 94; }
                 result, arguments = self.shell(workflow)
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual(expected, arguments)
-                block = job_block(workflow, "request-feature-coverage")
+                block = job_block(workflow, PRODUCER_JOBS[workflow])
                 self.assertIn("quick-skin-feature-baseline-request-${{ github.sha }}", block)
                 self.assertIn("queue: max", block)
                 self.assertIn("actions: read", block)
@@ -330,7 +332,7 @@ class TerminalProducerRecoveryTest(unittest.TestCase):
                 self.api = self.Api()
                 self.api.owners[999] = {**self.api.owners[50], "id": 999, "conclusion": conclusion}
                 for name, records in self.api.records.items():
-                    if name.startswith("pages-"):
+                    if name.startswith(scheduler.publisher.PUBLIC_BASELINE_PREFIX):
                         old = copy.deepcopy(records[0])
                         old["id"] -= 500
                         old["workflow_run"]["id"] = 999
@@ -344,7 +346,7 @@ class TerminalProducerRecoveryTest(unittest.TestCase):
                 self.api = self.Api()
                 self.api.owners[999] = {**self.api.owners[50], "id": 999, "conclusion": conclusion}
                 for name, records in self.api.records.items():
-                    if name.startswith("pages-"):
+                    if name.startswith(scheduler.publisher.PUBLIC_BASELINE_PREFIX):
                         newer = copy.deepcopy(records[0])
                         newer["id"] += 9000
                         newer["workflow_run"]["id"] = 999
@@ -353,7 +355,7 @@ class TerminalProducerRecoveryTest(unittest.TestCase):
                 self.assertEqual([], self.api.payloads)
 
     def test_public_candidate_window_counts_expired_newer_records_before_filtering(self):
-        name = next(name for name in self.api.records if name.startswith("pages-"))
+        name = next(name for name in self.api.records if name.startswith(scheduler.publisher.PUBLIC_BASELINE_PREFIX))
         original = self.api.records[name][0]
         self.api.records[name].extend({**original, "id": original["id"] + 10000 + index,
                                       "expired": True} for index in range(8))
@@ -365,7 +367,7 @@ class TerminalProducerRecoveryTest(unittest.TestCase):
         self.api.owners[999] = {**self.api.owners[50], "id": 999,
                               "status": "completed", "conclusion": "failure"}
         for name, records in self.api.records.items():
-            if name.startswith("pages-"):
+            if name.startswith(scheduler.publisher.PUBLIC_BASELINE_PREFIX):
                 older = copy.deepcopy(records[0])
                 older["id"] -= 500
                 older["workflow_run"]["id"] = 999
@@ -392,7 +394,8 @@ class TerminalProducerRecoveryTest(unittest.TestCase):
         self.assertEqual([], self.api.payloads)
 
     def test_cli_reuses_only_its_existing_invocation_local_owner_read(self):
-        self.api.records.pop(next(name for name in self.api.records if name.startswith("pages-")))
+        prefix = scheduler.publisher.PUBLIC_BASELINE_PREFIX
+        self.api.records.pop(next(name for name in self.api.records if name.startswith(prefix)))
         arguments = ["feature_coverage_request.py", "--producer-run-id", "100",
                      "--github-repository", REPOSITORY, "--source-sha", SHA]
         with patch.object(sys, "argv", arguments), patch.object(scheduler, "Api", return_value=self.api), \

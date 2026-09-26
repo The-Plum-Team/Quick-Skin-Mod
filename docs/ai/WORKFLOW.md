@@ -4,36 +4,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 ## Editing workflow
 
-- Read `CONTRIBUTING.md` when preparing a human-facing branch, commit, or pull request.
+The generic editing, worktree, commit, pull-request, workflow-security and AI-credential rules live
+in the managed [shared repository contract](shared/REPOSITORY.md); this section adds Quick Skin's
+deltas.
+
 - Read `release/release-matrix.json` and the relevant module `build.gradle.kts` before changing
   versions, loaders, source roots, resources, artifact tasks, or E2E coverage.
 - Search canonical sources and all active overlays before changing a cross-version class or method.
-- Preserve unrelated working-tree changes. Do not rewrite or delete user work to simplify a patch.
-- Never switch or repurpose a user's existing checkout merely to inspect or edit a different branch.
-  Fetch that remote branch and create a separate ephemeral Git worktree; inside it, reread
-  `AGENTS.md`, every imported instruction, and that branch's release matrix before acting.
-- Remove an ephemeral worktree only after `git status --short` is empty and every valuable change
-  belongs to a named branch and is committed, pushed, or otherwise exported. A detached-HEAD commit
-  alone is not preserved. Let `git worktree remove` refuse dirty trees; never use `--force` to erase
-  a dirty or user-owned worktree. Discard work only with the user's explicit authorization.
-- Do not commit generated JARs, staged release files, Minecraft runtime directories, screenshots,
-  caches, or IDE output.
-- Keep production and E2E JARs physically separate. The E2E harness may compile against main output
-  but must never package Quick Skin production classes.
-- Do not run multiple Gradle invocations concurrently on one machine or checkout. Architectury uses
-  JVM-global transform state, and aggregate local builds remain serial. GitHub may compile separate
-  targets concurrently only on isolated hosted runners, each with its own checkout and serial JVM.
-- A workflow step that receives an AI credential must run the pinned CLI with safe mode, no session
-  persistence or prompt history, `dontAsk`, an explicit shell-free `--tools` set, and scoped
-  `Read`/`Edit`/`Write` permission rules. Install that CLI only from package and lock files
-  materialized from the protected workflow SHA, with lifecycle scripts disabled and only the
-  reviewed pinned installer invoked explicitly; never load project hooks, MCP, agent configuration,
-  or package metadata from the release/topic checkout that supplies logs or source for analysis.
-- Treat AI failure evidence as an adversarial payload. Authenticate the source run, cap its log,
-  select only named artifacts by immutable numeric id, bound their count and compressed size, and
-  extract them with the protected traversal/link/entry/expanded-byte validator. Grant the model
-  read-only access to that evidence path; repair writes are positively limited to production
-  `src/main` paths and cannot persist agent configuration.
+- AI repair writes are positively limited to the `common`, `fabric`, `forge` and `neoforge`
+  production `src/main` paths; `scripts/ci/ai_patch_policy.py` is that boundary.
 - Never place raw visual artifacts in a credential-bearing job. Authenticate them, validate the
   protected lane graph, extract them with aggregate budgets, enforce exact matrix-row/scenario/JAR
   coverage, and canonicalize selected images in a prior secretless job. The fresh review capsule
@@ -135,7 +114,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   baseline consumers still require their own availability checks. Observe the affected Actions
   token's recorded quota counters rather than
   inferring its budget or reset from a developer token.
-  Review and Pages tail jobs share the separate short baseline-request lock. They may dispatch
+  Review tails and the Pages caller's `ext-feature-coverage` extension job share the separate
+  short baseline-request lock. They may dispatch
   only after exact complete readiness and terminal sibling owners, retaining the lock until
   the new source/attempt collector is observable. The collector still authenticates every
   runtime, report and public artifact; cancelled-owner report recovery must not be blocked by
@@ -155,23 +135,21 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   repeats the reconstruction and exact-tree comparison using only protected policy, creates commits
   with explicit bot identity through `git commit-tree` (never hooks), rechecks ancestry/remote
   identity, and only then configures GitHub authentication. It must never execute candidate scripts.
-- Keep each commit to one reviewable concern. Use an imperative conventional subject consistent
-  with repository history: `feat:`, `fix:`, `refactor:`, `test:`, `build:`, `docs:`, `ci:`, or
-  `chore:`.
-- Before committing, inspect the staged diff, run `git diff --check` and
-  `git diff --cached --check`, and confirm that no generated or unrelated files are staged. Commit,
-  amend, rebase, push, force-push, open a PR, or merge only when explicitly requested.
-- Never rewrite commits that may belong to the user or another contributor. Updating an unshared
-  topic branch may use rebase when requested; updating a shared branch must use a non-destructive
-  merge or a fresh topic branch.
 - New pull requests target `master`, including version-only fixes; only historical schema-2
-  recovery uses an old release branch. Its title follows the same conventional format, and its body records scope, validation,
-  risks, generated-output status, and material AI assistance.
+  recovery uses an old release branch.
 - Several changes can be validated together: open them as drafts, which start no Build or
   Minecraft work, then land them through one batch PR created by `scripts/ci/pr_batch.py` and
   close them with its `settle` command. A batch squashes one commit per PR onto current `master`
   and accepts only same-repository PRs; never place fork code on a same-repository branch. See
   [PR batches](../ci/PR-BATCHES.md).
+- A mod-base kit bump is Quick Skin's control-plane route for managed files: on a fresh
+  `chore/mod-base-vX.Y.Z` branch run `python scripts/ci/mod_base_kit.py bump --to vX.Y.Z`,
+  review the complete diff, open it as a draft and land it through a batch PR. It edits
+  `.github/workflows/*`, so it runs the complete Build, every Packaged E2E lane and the optional-mod
+  wave its impact classifiers select; there is no selection-policy exception
+  ([ADR 0010](../architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)). Never edit
+  a managed file by hand, and close any Dependabot pull request that touches a kit reference or
+  the managed part of `pages.yml` (Dependabot ignores the kit and `actions/deploy-pages`).
 
 ## Verification
 
@@ -241,12 +219,28 @@ python scripts/release/workflow_guidance.py `
   --guidance docs/ai/WORKFLOW.md `
   --profile-branch master `
   --check
+python scripts/ci/mod_base_kit.py verify --network
+python scripts/ci/mod_base_kit.py run template check --repo .
 python -m unittest discover -s scripts/release/tests -p "test_*.py" -v
 python -m unittest discover -s scripts/ci/tests -p "test_*.py" -v
 ```
 
 `scripts/ci/parallel_unittest.py` accepts the same `-s`/`-p` arguments and is the faster
 equivalent of those last two commands; the build gate runs both suites through it.
+
+`verify --network` proves that the single mod-base pin is a released tag reachable from mod-base
+`main`; `template check` proves that the managed files are byte-identical to that pin and that the
+fragment files, `AGENTS.md` and `.github/CODEOWNERS` keep their required shape. The build gate's
+`policy` job runs both. The suites that exercise the adapter and the managed files find the kit
+only through `scripts/ci/mod_base_kit.py` and fail, never skip, when it is unavailable; the first
+local run fetches the pinned kit into the user cache (see "Kit availability" in the
+[shared repository contract](shared/REPOSITORY.md)). After changing the adapter,
+`site/mod-base.json` or a scenario, also run the kit's conformance check against the real matrix
+and contract:
+
+```powershell
+python scripts/ci/mod_base_kit.py run conformance --repo . --keys mc1.20.1,mc26.3 --families
+```
 
 Packaged Minecraft runtime scenarios require a display and the matrix-declared Java toolchain. Use Xvfb on
 headless Linux and in CI; on a desktop session, macOS included, run the orchestrator directly.
@@ -287,9 +281,11 @@ small `reused-source-build` / `reused-source-e2e` references rather than copied 
 The original passing PR gates emit `tested-source-build` / `tested-source-e2e`. These JSON records
 are retained for 90 days; source Build/E2E bundles and raw runtime evidence are retained for seven
 days. Review and Pages reauthenticate the source reference before consuming its original bytes.
-Shared proof/public schemas keep an optional `runtime_source` binding; selected admissions retain
-their original PR merge and policy base. These references never chain. Explicit full recovery
-requests bypass runtime reuse and may rebuild if no current source bundle is available.
+Shared proof schemas keep an optional `runtime_source` binding; public mod-base evidence records
+it as the `quick-skin.runtime_source` extension with delegated reuse, which the adapter's
+`authenticate_extensions` hook verifies. Selected admissions retain their original PR merge and
+policy base. These references never chain. Explicit full recovery requests bypass runtime reuse
+and may rebuild if no current source bundle is available.
 
 Release automation always rebuilds `scripts/release/build_matrix.py` with `--rerun-tasks` and
 requires every production and harness SHA-256 to equal the first build. When determinism is in
@@ -323,13 +319,17 @@ Public frames keep their original tested commit/run/JAR when unaffected dependen
 
 ## Documentation maintenance
 
+The shared repository contract owns the generic documentation rules; Quick Skin's documents and
+generators are:
+
 - Keep the active support table and user build instructions in `README.md` synchronized with the
   release matrix.
 - Keep oracle preservation and post-retirement resource routing in `ORACLE-RETIREMENT.md`.
 - Keep packaged-runtime behavior in `e2e/README.md`.
-- Keep scenario execution and screenshot semantics in `e2e/scenario-contract.json` and public-site
-  behavior under `scripts/pages/` plus `site/`; never hand-maintain scenario or version lists in
-  consumers.
+- Keep scenario execution and screenshot semantics in `e2e/scenario-contract.json`. Public-site
+  behavior belongs to the pinned mod-base kit; Quick Skin owns only its configuration
+  `site/mod-base.json` and its adapter `scripts/pages/mod_base_adapter.py`. Never hand-maintain
+  scenario or version lists in consumers.
 - Keep shared-source development and historical branch recovery in `VERSION-BRANCHES.md`.
 - Keep immutable release identity, retry semantics, provenance, and protected-environment operation
   in `RELEASING.md`.
@@ -349,16 +349,12 @@ Public frames keep their original tested commit/run/JAR when unaffected dependen
   the non-generated README text for the shared source. Verify the complete required target/loader
   gate and every affected feature interaction; document intentional exclusions and outstanding
   runtime or publication evidence.
-- Keep the newcomer and AI-assisted contribution path in `CONTRIBUTING.md`, and keep
-  `.github/pull_request_template.md` aligned with it.
-- Keep root `AGENTS.md` limited to one `@path.md` import per line. Do not add a `CLAUDE.md`,
-  `.claude/CLAUDE.md` or `CLAUDE.local.md`: Claude Code reads `AGENTS.md` only while none exists.
-- Update the appropriate imported file whenever source-set routing, overlay ownership, lifecycle
-  composition roots, security boundaries, or mandatory verification commands change.
-- When a packaged scenario adds, renames, or removes a step, edit the scenario contract and its Java
-  executable action together, update independent probe canaries where intentional, and let derived
-  gallery/reviewer/README consumers follow the contract. Verify every affected matrix target from
-  that shared source revision.
+- Keep `AGENTS.md` as the two managed shared imports followed by `site/mod-base.json`
+  `template.agents_local` (`PROJECT`, `SOURCE-ARCHITECTURE`, `RUNTIME-INVARIANTS`, `WORKFLOW`, in
+  that order). Change `docs/ai/shared/*` only through a kit bump; put Quick Skin rules in the four
+  local documents.
+- When a packaged scenario adds, renames, or removes a step, its executable action is the Java
+  harness step; verify every affected matrix target from that shared source revision.
 
 When matrix-owned profile facts change, regenerate the marked README block instead of editing it:
 

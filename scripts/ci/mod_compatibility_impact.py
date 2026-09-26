@@ -73,6 +73,7 @@ SAFE_EXACT_PATHS = frozenset(
         "scripts/ci/visual_review_impact.py",
         "scripts/ci/visual_review_preparation.py",
         "scripts/ci/visual_review_queue.py",
+        "site/mod-base.json",
     }
 )
 SAFE_PREFIXES = (

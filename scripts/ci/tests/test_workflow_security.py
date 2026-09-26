@@ -311,16 +311,6 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "${{ steps.baseline.outputs.artifact_name }}",
             ): "90",
             (
-                "pages.yml",
-                "Roll the protected evidence cache forward",
-                "${{ steps.cache.outputs.name }}",
-            ): "90",
-            (
-                "pages.yml",
-                "Retain the complete compact generation for feature evidence reuse",
-                "${{ steps.cache.outputs.complete_name }}",
-            ): "90",
-            (
                 "release.yml",
                 "Upload immutable release bundle",
                 "release-${{ steps.release.outputs.release_id }}",
@@ -330,11 +320,6 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "Upload the exact recovered release bundle",
                 "release-recovery-${{ steps.recovery.outputs.release_id }}",
             ): "90",
-            (
-                "on-demand-e2e.yml",
-                "Upload stable public evidence for this Minecraft target",
-                "pages-e2e-${{ matrix.bundle_key }}",
-            ): "${{ matrix.raw_retention_days }}",
             (
                 "visual-review.yml",
                 "Upload only the curated review input",
@@ -421,16 +406,6 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "Upload the durable source attempt settlement marker",
                 "mod-compatibility-review-settled-${{ needs.enumerate.outputs.source_run_id }}-${{ needs.enumerate.outputs.source_run_attempt }}",
             ): "7",
-            (
-                "mod-compatibility-review.yml",
-                "Upload the compact public compatibility handoff",
-                "${{ steps.collect.outputs.artifact_name }}",
-            ): "7",
-            (
-                "pages.yml",
-                "Roll the protected compatibility cache forward",
-                "${{ steps.cache.outputs.name }}",
-            ): "90",
             (
                 "handle-version-port-result.yml",
                 "Upload the authenticated nonvisual anchor continuation",
@@ -755,18 +730,21 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('git show "$SOURCE_SHA:e2e/scenario-contract.json"', curate)
         self.assertIn('git show "$SOURCE_SHA:release/release-matrix.json"', curate)
         self.assertIn("--reference-identity", curate)
-        self.assertIn("scripts/pages/select_artifact.py", curate)
-        self.assertIn("--require-raw", curate)
-        self.assertIn("for attempt in {1..90}", curate)
-        self.assertIn(
-            'git show "${candidate_reference_sha}:e2e/scenario-contract.json"',
-            curate,
+        # Historical schema-2 reference comparison consumed the retired pages-e2e raw handoffs.
+        # It fails closed before any raw artifact is fetched; shared curation exits earlier.
+        retired = (
+            "Historical schema-2 reference comparison is retired (ADR 0010); "
+            "recover from tag pre-mod-base-gallery."
         )
-        self.assertIn(
-            'reference_contract_sha256" == "$master_contract_sha256', curate
-        )
-        self.assertIn("visual reference did not reach protected", curate)
-        self.assertIn("sleep 5", curate)
+        self.assertIn(retired, curate)
+        self.assertLess(curate.index(retired), curate.index('raw_root="$RUNNER_TEMP/raw-review-evidence"'))
+        self.assertLess(curate.index("feature_review.py"), curate.index(retired))
+        self.assertIn(retired, preparation)
+        self.assertNotIn("scripts/pages/select_artifact.py", curate)
+        self.assertNotIn("scripts/pages/evidence.py", curate)
+        self.assertNotIn("--require-raw", curate)
+        self.assertNotIn('"pages-e2e-$', curate)
+        self.assertNotIn('"pages-e2e-$', preparation)
         self.assertIn("github_api_retry_to_file", review)
         self.assertIn("capsule_missing: ${{ steps.capsule.outputs.missing }}", review)
         self.assertIn("id: capsule", review)
@@ -779,9 +757,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn(
             'source "$GITHUB_WORKSPACE/scripts/ci/github_api_retry.sh"', review
         )
-        self.assertIn("--kind raw", curate)
-        self.assertNotIn("scripts/pages/evidence.py compact", curate)
-        self.assertIn("--reference-evidence-root \"$reference_selected\"", curate)
+        self.assertNotIn("--kind raw", curate)
         self.assertIn("--semantic-anchor", curate)
         self.assertIn("review_mode=anchor-semantic", curate)
         self.assertIn("visual_reference=null", curate)
@@ -816,7 +792,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("schema_version == 5", preparation)
         self.assertIn(".compatibility_impact", review)
         self.assertIn("cannot affect product/mod compatibility", review)
-        self.assertIn('evidence_kind == "raw-png"', preparation)
+        # The historical raw-png reference is no longer revalidated: that path fails closed.
+        self.assertNotIn('evidence_kind == "raw-png"', preparation)
         self.assertIn("CLAUDE_CODE_OAUTH_TOKEN", review)
         self.assertIn("visual_review_runner.py", review)
         self.assertIn("--review-mode \"$review_mode\"", review)
@@ -1653,404 +1630,137 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotEqual(duplicate.returncode, 0, duplicate.stderr)
 
     def test_pages_fan_in_uses_protected_code_and_exact_release_heads(self) -> None:
-        workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
-        wake = job_block("pages.yml", "wake")
-        discover = job_block("pages.yml", "discover")
-        collect = job_block("pages.yml", "collect")
-        build = job_block("pages.yml", "build")
-        deploy = job_block("pages.yml", "deploy")
-        refresh = job_block("pages.yml", "refresh-cache")
-        selector = (ROOT / "scripts" / "pages" / "select_artifact.py").read_text(
-            encoding="utf-8"
-        )
+        # Admission, collection and rendering are mod-base code at the pinned commit. The caller
+        # binds that commit from GitHub's own run record and executes it only from the protected
+        # default-branch head; every producer merely wakes it.
+        import test_mod_base_caller as caller
 
-        self.assertNotIn("pull_request_target", workflow)
+        workflow = caller.caller_text()
+        managed, _begin, _body = caller.caller_regions()
+        verify = caller.caller_job("verify-kit")
+        publish = caller.caller_job("publish")
+        sha, version, _references = caller.pin()
+
+        self.assertEqual(caller.rendered_managed_region(), managed)
         self.assertIn("permissions: {}", workflow)
-        self.assertIn("pages-evidence-ready", workflow)
-        self.assertNotIn("quick-skin-pages-wake", workflow)
-        self.assertIn("quick-skin-github-pages", workflow)
-        self.assertIn("cancel-in-progress: false", workflow)
-        self.assertIn("actions: write", wake)
-        self.assertIn("contents: read", wake)
-        self.assertIn("protected_gh_api_retry", wake)
-        self.assertIn("on-demand-e2e.yml", wake)
-        self.assertIn("--validate-handoffs", wake)
-        self.assertIn("--validate-handoffs", discover)
-        self.assertIn("evidence_target.py --kind keys", discover)
-        self.assertNotIn("branches?per_page=100", discover)
-        self.assertIn("ref: ${{ github.sha }}", wake)
-        self.assertIn("persist-credentials: false", wake)
-        self.assertIn("gh workflow run pages.yml --ref master", wake)
-        self.assertIn("ref: ${{ github.sha }}", discover)
-        self.assertNotIn("implementation_sha", workflow)
-        self.assertIn("git rev-parse HEAD", discover)
-        for block in (collect, build):
-            self.assertIn("ref: ${{ github.sha }}", block)
-        for block in (discover, collect, build):
-            self.assertIn("persist-credentials: false", block)
-            self.assertNotIn("id-token: write", block)
-            self.assertNotIn("pages: write", block)
-        self.assertIn("artifact.head_sha == current_sha", selector)
-        self.assertIn('artifact.head_branch == "master"', selector)
-        self.assertNotIn("workflows:\n      - Packaged E2E", workflow)
-        self.assertNotIn("github.event.workflow_run", workflow)
-        self.assertNotIn("TRIGGER_RUN_ID", discover)
-        self.assertNotIn("TRIGGER_SHA", discover)
-        self.assertIn("pages-evidence-ready", workflow)
-        self.assertIn('.event == "workflow_dispatch"', discover)
-        self.assertIn('.path == ".github/workflows/on-demand-e2e.yml"', discover)
-        self.assertIn("DISPATCH_OPERATION", discover)
-        self.assertIn("pages-cache-$bundle_key--$source_sha", discover)
-        self.assertIn('"$current_sha" != "$source_sha"', discover)
-        self.assertIn("Every Minecraft target already belongs", discover)
-        self.assertIn("Deferring publication while", discover)
-        self.assertNotIn("--probe", discover)
-        self.assertIn(
-            "for active_status in requested queued pending waiting in_progress",
-            discover,
-        )
-        self.assertIn("status=$active_status&per_page=100", discover)
-        self.assertIn(".total_count as $total_count", discover)
-        self.assertIn("$total_count <= 100", discover)
-        self.assertIn("length == $total_count", discover)
-        self.assertNotIn("length == .total_count", discover)
-        self.assertIn("source scripts/ci/github_api_retry.sh", discover)
-        self.assertIn("github_api_retry", collect)
-        self.assertIn("github_api_retry", build)
-        self.assertIn("github.ref == 'refs/heads/master'", discover)
-        self.assertIn("scripts/pages/evidence.py validate", collect)
-        self.assertIn("--only-branch", collect)
-        self.assertIn("steps.artifact.outputs.coverage_sha", collect)
-        self.assertNotIn("steps.artifact.outputs.sha", collect)
-        self.assertIn(
-            'target_sha="$(jq -er .provenance.target.sha "$manifest")"', collect
-        )
-        self.assertIn('--target-sha "$target_sha"', collect)
-        self.assertIn('--coverage-sha "$COVERAGE_SHA"', collect)
-        self.assertIn('--arg sha "$target_sha"', collect)
-        self.assertIn("source_run_id", collect)
-        self.assertIn("target_run_id", collect)
-        self.assertIn("digest-mismatch: error", collect)
-        self.assertIn("needs:\n      - discover\n      - collect", build)
-        self.assertIn("needs.discover.outputs.bundle_keys", build)
-        self.assertIn("--expected-bundles-json", build)
-        self.assertIn("Recheck shared source immediately before rendering", build)
-        self.assertIn(".provenance.coverage_sha // .provenance.target.sha", build)
-        self.assertIn('--target-sha "$target_sha"', build)
-        self.assertIn('--coverage-sha "$coverage_sha"', build)
-        self.assertIn('"$current_sha" != "$coverage_sha"', build)
-        self.assertIn('"$target_sha" != "$SOURCE_SHA"', build)
-        self.assertIn("name: github-pages", deploy)
-        self.assertIn("pages: write", deploy)
-        self.assertIn("id-token: write", deploy)
-        self.assertNotIn("actions/checkout@", deploy)
-        self.assertIn("Recheck the shared source immediately before deployment", deploy)
-        self.assertIn('"$current_sha" != "$SOURCE_SHA"', deploy)
-        self.assertIn('cron: "43 * * * *"', workflow)
-        self.assertIn("steps.progress.outputs.eligible", discover)
-        self.assertIn("scripts/pages/publication_progress.py", discover)
-        self.assertIn("- deploy", refresh)
-        self.assertIn("scripts/pages/select_artifact.py", collect)
-        self.assertIn('cache_name = f"pages-cache-{key}--{current_sha}"', selector)
-        self.assertIn('key = bundle_key if bundle_key is not None else branch', selector)
-        self.assertIn('legacy_name = f"pages-cache-{branch}"', selector)
-        self.assertIn("sorted([*handoffs, *caches], key=lambda item: item.order, reverse=True)", selector)
-        self.assertIn("if selected is not None:", selector)
-        self.assertIn("^[0-9a-f]{40}$", refresh)
-        self.assertIn("name=pages-cache-%s--%s", refresh)
-        # The rolling cache is keyed by the covered head so a continued branch can still be
-        # asked for by name on the next run.
-        self.assertIn(".provenance.coverage_sha // .provenance.target.sha", refresh)
-        self.assertIn('--coverage-sha "$coverage_sha"', refresh)
-        self.assertIn('"$coverage_sha" ]]', refresh)
-        self.assertIn("name: ${{ steps.cache.outputs.name }}", refresh)
-        self.assertIn("actions/checkout@", refresh)
-        self.assertIn("ref: ${{ github.sha }}", refresh)
-        self.assertIn("persist-credentials: false", refresh)
-        self.assertIn("scripts/pages/evidence.py validate", refresh)
-        self.assertIn("--kind compact", refresh)
-        self.assertNotIn("id-token: write", refresh)
-        self.assertNotIn("pages: write", refresh)
-        self.assertIn("api.list_artifacts(handoff_name)", selector)
-        self.assertIn("api.list_artifacts(cache_name)", selector)
-        self.assertIn("coverage_sha={evidence.coverage_sha}", selector)
-        self.assertIn("--require-hashes", build)
-        self.assertIn("scripts/pages/requirements.txt", build)
-
-        # Historical selectors retain branch continuation for archive tooling. The shared
-        # workflow requires exact source coverage until a healthy-baseline proof is admitted.
-        self.assertNotIn("--allow-continuation", collect)
-        self.assertIn('--branch "$SOURCE_BRANCH"', collect)
-        self.assertIn('--bundle-key "$BUNDLE_KEY"', collect)
-        self.assertIn('--expected-source-sha', collect)
-        self.assertIn("MAX_CONTINUATION_COMMITS = 20", selector)
-        self.assertIn("api.list_branch_commits(branch, MAX_CONTINUATION_COMMITS)", selector)
-        self.assertIn("if require_raw or not allow_continuation:", selector)
-        self.assertIn("if not commits or commits[0] != current_sha:", selector)
-        self.assertIn('[[ "$current_sha" == "$HEAD_SHA" ]]', collect)
-        # The privileged collector proves ancestry from the comparison API. Fetching the
-        # release branch would put untrusted history in a workspace that can write the
-        # Actions cache, which is exactly the cache-poisoning shape CodeQL rejects.
-        self.assertNotIn("git fetch", collect)
-        self.assertIn("fetch-depth: 0", collect)
-        self.assertIn("scripts/ci/feature_pages.py", collect)
-        self.assertNotIn("feature_pages.py --verify-runtime ", collect)
-        self.assertIn('"$schema" == 5 || "$schema" == 7', collect)
-        self.assertIn("feature_pages.py --verify-runtime-tree", build)
-        self.assertLess(build.index("--verify-runtime-tree"), build.index("Render the landing page"))
-        self.assertLess(build.index("--verify-runtime-tree"), build.index("Upload the complete Pages artifact"))
-        self.assertNotIn('/compare/$COVERAGE_SHA...$HEAD_SHA', collect)
-        self.assertNotIn('/compare/$EXPECTED_SHA...$HEAD_SHA', collect)
-        self.assertNotIn("scripts/pages/evidence.py carry-forward", collect)
-        self.assertIn("Shared-source coverage requires an authenticated baseline proof", collect)
+        for forbidden in (*caller.FORBIDDEN_CALLER_TEXT, "pages-evidence-ready",
+                          "pages-compatibility-evidence-ready", "workflows:\n      - Packaged E2E"):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, workflow)
+        self.assertNotIn("scripts/pages/", workflow)
+        self.assertEqual({"actions": "read", "contents": "read"}, caller.job_permissions(verify))
+        self.assertNotIn("actions/checkout@", verify)
+        self.assertIn('[[ "$GITHUB_REF" == "refs/heads/$default_branch" ]]', verify)
+        self.assertIn('.path == ".github/workflows/pages.yml" and .head_sha == $sha', verify)
+        self.assertIn('startswith("the-plum-team/mod-base/.github/workflows/")', verify)
+        self.assertIn('[[ "$declared" == "$kit_sha" ]]', verify)
+        self.assertIn("repos/The-Plum-Team/mod-base/compare/$kit_sha...main", verify)
+        self.assertIn("needs: verify-kit", publish)
+        self.assertIn(f"uses: The-Plum-Team/mod-base/.github/workflows/publish.yml@{sha} # {version}", publish)
+        self.assertIn("kit-sha: ${{ needs.verify-kit.outputs.kit_sha }}", publish)
+        self.assertIn("operation: ${{ github.event_name == 'schedule' && 'recovery' || inputs.operation }}",
+                      publish)
+        self.assertIn("if: inputs.operation != 'rotate'", publish)
+        self.assertNotIn("secrets:", workflow)
 
     def test_pages_render_recheck_requires_the_exact_shared_source_commit(self) -> None:
+        # The kit build rechecks every source head before and after rendering; the caller-owned
+        # deploy repeats that recheck immediately before minting its Pages token.
         script = step_script(
-            "pages.yml", "build", "Recheck shared source immediately before rendering"
+            "pages.yml", "deploy", "Recheck every published source head immediately before deployment"
         )
-        target_sha = "b" * 40
-        coverage_sha = "b" * 40
-
+        head = "b" * 40
         with tempfile.TemporaryDirectory() as temporary:
             temp = Path(temporary)
-            branch = "mc26.2"
-            manifest = temp / "public-evidence" / branch / "manifest.json"
-            manifest.parent.mkdir(parents=True)
-            manifest.write_text(
-                json.dumps(
-                    {
-                        "provenance": {
-                            "target": {"sha": target_sha},
-                            "coverage_sha": coverage_sha,
-                        }
-                    }
-                ),
-                encoding="utf-8",
-            )
-            retry_helper = temp / "scripts" / "ci" / "github_api_retry.sh"
-            retry_helper.parent.mkdir(parents=True)
-            retry_helper.write_text(
-                "github_api_retry() { printf '%s\\n' \"$CURRENT_SHA\"; }\n",
-                encoding="utf-8",
-            )
-            arguments = temp / "validate-arguments"
-            runtime_arguments = temp / "runtime-arguments"
-            fake_python = temp / "python3"
-            fake_python.write_text(
-                "#!/usr/bin/env bash\n"
-                "if [[ \"$1\" == scripts/pages/evidence.py ]]; then\n"
-                "  printf '%s\\n' \"$@\" > \"$VALIDATE_ARGUMENTS\"\n"
-                "elif [[ \"$1\" == scripts/ci/feature_pages.py ]]; then\n"
-                "  printf '%s\\n' \"$@\" > \"$RUNTIME_ARGUMENTS\"\n"
-                "else\n  exit 2\nfi\n",
-                encoding="utf-8",
-            )
-            fake_python.chmod(0o755)
-            environment = os.environ.copy()
-            environment.pop("BASH_ENV", None)
-            environment.pop("ENV", None)
-            environment.update(
-                {
-                    "CURRENT_SHA": coverage_sha,
-                    "SOURCE_SHA": coverage_sha,
-                    "SOURCE_BRANCH": "master",
-                    "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
-                    "PATH": f"{temp}{os.pathsep}{environment.get('PATH', '')}",
-                    "VALIDATE_ARGUMENTS": str(arguments),
-                    "RUNTIME_ARGUMENTS": str(runtime_arguments),
-                }
-            )
-
-            accepted = subprocess.run(
-                ["bash", "-c", script],
-                cwd=temp,
-                env=environment,
-                capture_output=True,
-                check=False,
-                text=True,
-            )
-            self.assertEqual(accepted.returncode, 0, accepted.stderr)
-            validate_arguments = arguments.read_text(encoding="utf-8").splitlines()
-            target_index = validate_arguments.index("--target-sha")
-            coverage_index = validate_arguments.index("--coverage-sha")
-            self.assertEqual(validate_arguments[target_index + 1], target_sha)
-            self.assertEqual(validate_arguments[coverage_index + 1], coverage_sha)
-            runtime_flags = runtime_arguments.read_text(encoding="utf-8").splitlines()
-            self.assertIn("--verify-runtime-tree", runtime_flags)
-            self.assertEqual(runtime_flags[runtime_flags.index("--source-sha") + 1], coverage_sha)
-            self.assertNotIn("--bundle-key", runtime_flags)
-
-            environment["CURRENT_SHA"] = "a" * 40
-            stale = subprocess.run(
-                ["bash", "-c", script],
-                cwd=temp,
-                env=environment,
-                capture_output=True,
-                check=False,
-                text=True,
-            )
-            self.assertNotEqual(stale.returncode, 0)
-            self.assertIn("moved from covered SHA", stale.stderr)
-
-    def test_pages_collector_rejects_unproved_shared_coverage(self) -> None:
-        script = step_script(
-            "pages.yml", "collect", "Validate the target bundle and recheck its source commit"
-        )
-        # GitHub's runner uses Bash 5. macOS Bash 3.2 applies nounset to an empty array
-        # expansion differently, so keep this test focused on the identity contract.
-        script = script.replace("set -euo pipefail", "set -eo pipefail", 1)
-        branch = "mc26.2"
-        source_branch = "master"
-        source_sha = "a" * 40
-        target_sha = "a" * 40
-        coverage_sha = "b" * 40
-        head_sha = "c" * 40
-        source_created_at = "2026-08-01T10:00:00Z"
-        target_created_at = "2026-08-01T11:00:00Z"
-        source_run_id = 101
-        target_run_id = 202
-        source_run = json.dumps(
-            {
-                "id": source_run_id,
-                "status": "completed",
-                "conclusion": "success",
-                "event": "workflow_dispatch",
-                "head_branch": source_branch,
-                "head_sha": source_sha,
-                "created_at": source_created_at,
-                "path": ".github/workflows/on-demand-e2e.yml",
-                "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"},
-            },
-            separators=(",", ":"),
-        )
-        target_run = json.dumps(
-            {
-                "id": target_run_id,
-                "status": "completed",
-                "conclusion": "success",
-                "event": "workflow_dispatch",
-                "head_branch": source_branch,
-                "head_sha": target_sha,
-                "created_at": target_created_at,
-                "path": ".github/workflows/on-demand-e2e.yml",
-                "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"},
-            },
-            separators=(",", ":"),
-        )
-        with tempfile.TemporaryDirectory() as temporary:
-            temp = Path(temporary)
-            manifest = temp / "selected-evidence" / branch / "manifest.json"
-            manifest.parent.mkdir(parents=True)
-            manifest.write_text(
-                json.dumps(
-                    {
-                        "provenance": {
-                            "source": {
-                                "run_id": source_run_id,
-                                "branch": source_branch,
-                                "sha": source_sha,
-                                "created_at": source_created_at,
-                            },
-                            "target": {
-                                "run_id": target_run_id,
-                                "branch": source_branch,
-                                "sha": target_sha,
-                                "created_at": target_created_at,
-                            },
-                            "coverage_sha": coverage_sha,
-                        }
-                    }
-                ),
-                encoding="utf-8",
-            )
-            api_calls = temp / "api-calls"
-            retry_helper = temp / "scripts" / "ci" / "github_api_retry.sh"
-            retry_helper.parent.mkdir(parents=True)
-            retry_helper.write_text(
-                textwrap.dedent(
-                    f"""
-                    github_api_retry() {{
-                      printf '%s\\n' "$1" >> "$API_CALLS"
-                      case "$1" in
-                        */actions/runs/{source_run_id}) printf '%s\\n' '{source_run}' ;;
-                        */actions/runs/{target_run_id}) printf '%s\\n' '{target_run}' ;;
-                        */branches/{source_branch}) printf '%s\\n' '{head_sha}' ;;
-                        *) printf 'unexpected API call: %s\\n' "$1" >&2; return 90 ;;
-                      esac
-                    }}
-                    """
-                ).lstrip(),
-                encoding="utf-8",
-            )
-            validate_arguments = temp / "validate-arguments"
-            fake_python = temp / "python3"
-            fake_python.write_text(
+            fake_gh = temp / "gh"
+            fake_gh.write_text(
                 textwrap.dedent(
                     """
                     #!/usr/bin/env bash
                     set -euo pipefail
-                    if [[ "$1" == scripts/pages/evidence.py ]]; then
-                      printf '%s\n' "$@" > "$VALIDATE_ARGUMENTS"
-                    elif [[ "$1" == scripts/ci/visual_review_impact.py ]]; then
-                      printf 'skip\n'
-                    else
-                      printf 'unexpected Python call: %s\n' "$1" >&2
-                      exit 91
-                    fi
+                    printf '%s\n' "$*" >> "$API_CALLS"
+                    case "$2" in
+                      repos/The-Plum-Team/Quick-Skin-Mod) printf 'master\n' ;;
+                      repos/The-Plum-Team/Quick-Skin-Mod/branches/master) printf '%s\n' "$CURRENT_SHA" ;;
+                      *) printf 'unexpected API call: %s\n' "$2" >&2; exit 90 ;;
+                    esac
                     """
                 ).lstrip(),
                 encoding="utf-8",
             )
-            fake_python.chmod(0o755)
+            fake_gh.chmod(0o755)
             environment = os.environ.copy()
             environment.pop("BASH_ENV", None)
             environment.pop("ENV", None)
             environment.update(
                 {
-                    "API_CALLS": str(api_calls),
-                    "ARTIFACT_NAME": f"pages-cache-{branch}--{coverage_sha}",
-                    "BUNDLE_KEY": branch,
-                    "SOURCE_BRANCH": source_branch,
-                    "COVERAGE_SHA": coverage_sha,
+                    "API_CALLS": str(temp / "api-calls"),
+                    "CURRENT_SHA": head,
+                    "GITHUB_REF": "refs/heads/master",
                     "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
-                    "HEAD_SHA": head_sha,
-                    "OWNER_RUN_ID": "303",
+                    "GITHUB_SHA": head,
+                    "HEADS": json.dumps({"master": head}),
                     "PATH": f"{temp}{os.pathsep}{environment.get('PATH', '')}",
-                    "VALIDATE_ARGUMENTS": str(validate_arguments),
                 }
             )
 
-            completed = subprocess.run(
-                ["bash", "-c", script],
-                cwd=temp,
-                env=environment,
-                capture_output=True,
-                check=False,
-                text=True,
-            )
+            def run(**overrides: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    ["bash", "-c", script],
+                    cwd=temp,
+                    env={**environment, **overrides},
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                )
 
-            self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("authenticated baseline proof", completed.stderr)
-            arguments = validate_arguments.read_text(encoding="utf-8").splitlines()
-            self.assertEqual(arguments[arguments.index("--target-sha") + 1], target_sha)
-            self.assertEqual(
-                arguments[arguments.index("--coverage-sha") + 1], coverage_sha
-            )
-            calls = api_calls.read_text(encoding="utf-8").splitlines()
-            self.assertIn("repos/The-Plum-Team/Quick-Skin-Mod/branches/master", calls)
-            self.assertFalse(any("/compare/" in call for call in calls))
+            accepted = run()
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            calls = (temp / "api-calls").read_text(encoding="utf-8").splitlines()
+            self.assertIn("api repos/The-Plum-Team/Quick-Skin-Mod/branches/master --jq .commit.sha", calls)
+
+            moved = run(CURRENT_SHA="a" * 40)
+            self.assertNotEqual(moved.returncode, 0)
+            self.assertIn("advanced before deployment; retaining the deployed site", moved.stderr)
+            for overrides in (
+                {"HEADS": json.dumps({"master": "a" * 40})},
+                {"HEADS": json.dumps({"../master": head, "master": head})},
+                {"HEADS": "{}"},
+                {"GITHUB_REF": "refs/heads/automation/sync/mc1.20.1"},
+            ):
+                with self.subTest(overrides=overrides):
+                    self.assertNotEqual(run(**overrides).returncode, 0)
+
+    def test_pages_collector_rejects_unproved_shared_coverage(self) -> None:
+        # Selected feature evidence reaches the site only through the kit's composition, which
+        # calls Quick Skin's adapter; the caller forwards regex-validated identifiers and never a
+        # coverage decision, and a family's coverage can only be its producer's exact head.
+        import test_mod_base_caller as caller
+
+        workflow = caller.caller_text()
+        publish = caller.caller_job("publish")
+        for identifier in ("run_id", "sha", "family", "bundle_key", "artifact_id", "artifact_digest",
+                           "coverage_sha"):
+            with self.subTest(identifier=identifier):
+                self.assertIn(f"${{{{ inputs.{identifier} }}}}", publish)
+                self.assertIn(f"      {identifier}: {{description: Internal", workflow)
+        self.assertNotIn("--allow-continuation", workflow)
+        self.assertNotIn("carry-forward", workflow)
+        adapter = (ROOT / "scripts" / "pages" / "mod_base_adapter.py").read_text(encoding="utf-8")
+        for hook in ("compose", "authenticate_extensions", "family_validate"):
+            with self.subTest(hook=hook):
+                self.assertRegex(adapter, rf"(?m)^def {hook}\(")
+        family = job_block("mod-compatibility-review.yml", "publish-evidence")
+        self.assertIn("coverage-sha: ${{ github.sha }}", family)
+        self.assertIn('if [[ "$COVERAGE_SHA" != "$GITHUB_SHA" ]]; then', family)
 
     def test_mod_compatibility_pages_publication_reuses_only_complete_clean_reports(self) -> None:
         review_workflow = (
             WORKFLOWS / "mod-compatibility-review.yml"
         ).read_text(encoding="utf-8")
-        pages_workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
         request = job_block("mod-compatibility-review.yml", "request-publication")
         publish = job_block("mod-compatibility-review.yml", "publish-evidence")
-        wake = job_block("pages.yml", "wake-compatibility")
-        collect = job_block("pages.yml", "collect-compatibility")
-        build = job_block("pages.yml", "build")
-        refresh = job_block("pages.yml", "refresh-compatibility-cache")
+        notify = job_block("mod-compatibility-review.yml", "notify-family")
 
         self.assertIn("operation:", review_workflow)
         self.assertIn("- publish", review_workflow)
@@ -2068,8 +1778,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("inputs.source_run_id", publish)
         self.assertIn("github.event.client_payload.source_run_id", publish)
         self.assertIn("github.event.action == 'mod-compatibility-publication-requested'", publish)
-        self.assertIn("actions: read", publish)
-        self.assertIn("contents: write", publish)
+        self.assertIn(
+            "    permissions:\n      actions: read\n      contents: read\n", publish
+        )
+        self.assertNotIn("contents: write", publish)
+        self.assertNotIn("actions: write", publish)
         self.assertIn("ref: ${{ github.sha }}", publish)
         self.assertIn("fetch-depth: 0", publish)
         self.assertIn("persist-credentials: false", publish)
@@ -2078,38 +1791,22 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--publication-run-id", publish)
         self.assertNotIn("visual_review_runner.py", publish)
         self.assertNotIn("ANTHROPIC", publish)
-        self.assertIn("pages-mod-compatibility-$BUNDLE_KEY", publish)
-        self.assertIn("bundle_key:$bundle_key", publish)
-        self.assertIn("pages-compatibility-evidence-ready", publish)
-        self.assertIn('^[0-9a-f]{64}$', publish)
-        self.assertIn('"sha256:$ARTIFACT_DIGEST"', publish)
-
-        self.assertIn("pages-compatibility-evidence-ready", pages_workflow)
-        authenticate = wake.index("Authenticate the exact compatibility handoff")
-        checkout = wake.index("Check out the exact protected dispatcher")
-        self.assertLess(authenticate, checkout)
-        self.assertIn("protected_gh_api_retry", wake)
-        self.assertIn("mod-compatibility-review.yml", wake)
-        self.assertIn(".digest == $digest", wake)
-        self.assertIn(".workflow_run.id == $run_id", wake)
-        self.assertIn("gh workflow run pages.yml --ref master", wake)
-
-        self.assertIn("scripts/pages/select_compatibility_artifact.py", collect)
-        self.assertIn("digest-mismatch: error", collect)
-        self.assertIn("scripts/pages/compatibility_evidence.py validate", collect)
-        self.assertIn("validation_status=0", collect)
-        self.assertIn('[[ "$validation_status" -eq 3 ]]', collect)
-        self.assertIn('exit "$validation_status"', collect)
-        self.assertIn("git merge-base --is-ancestor", collect)
-        self.assertIn("scripts/ci/mod_compatibility_impact.py", collect)
-        self.assertIn("scripts/pages/compatibility_evidence.py carry-forward", collect)
-        self.assertIn("collected-compatibility-${{ matrix.bundle_key }}", collect)
-        self.assertIn("--compatibility-root public-compatibility", build)
-        self.assertIn("pattern: collected-compatibility-*", build)
-        self.assertIn("pattern: collected-compatibility-${{ matrix.bundle_key }}", refresh)
-        self.assertIn("pages-mod-compatibility-cache-%s", refresh)
-        self.assertIn("retention-days: 90", refresh)
-
+        # The pinned composite wraps, validates and uploads the family handoff; a separate
+        # job holding only actions: write wakes the protected publisher with its exact identity.
+        self.assertRegex(
+            publish, r"uses: The-Plum-Team/mod-base/actions/publish-family@[0-9a-f]{40} # v\d+\.\d+\.\d+"
+        )
+        self.assertIn("bundle: public-compatibility/${{ steps.collect.outputs.bundle_key }}", publish)
+        self.assertNotIn("actions/upload-artifact@", publish)
+        self.assertNotIn("pages-compatibility-evidence-ready", publish)
+        self.assertIn("needs: publish-evidence", notify)
+        self.assertIn("    permissions:\n      actions: write\n", notify)
+        self.assertNotIn("actions/checkout@", notify)
+        self.assertRegex(
+            notify, r"uses: The-Plum-Team/mod-base/actions/notify-pages@[0-9a-f]{40} # v\d+\.\d+\.\d+"
+        )
+        self.assertIn("operation: family", notify)
+        self.assertIn("artifact-digest: ${{ needs.publish-evidence.outputs.artifact_digest }}", notify)
 
     def test_every_repository_dispatch_payload_fits_the_ten_property_github_limit(self):
         """GitHub rejects a repository_dispatch whose client_payload has more than ten keys."""
@@ -2122,106 +1819,57 @@ class WorkflowSecurityTest(unittest.TestCase):
                 with self.subTest(workflow=path.name, keys=keys):
                     self.assertTrue(1 <= len(keys) <= 10)
                     self.assertEqual(len(keys), len(set(keys)))
+            with self.subTest(workflow=path.name):
+                # Pages wakes are workflow_dispatch inputs of the pinned notify-pages composite.
+                self.assertNotIn("pages-evidence-ready", text)
+                self.assertNotIn("pages-compatibility-evidence-ready", text)
         self.assertGreaterEqual(seen, 15)
-        publish = job_block("mod-compatibility-review.yml", "publish-evidence")
-        wake = re.search(r"client_payload:\s*\{(.*?)\}\s*\}", publish, re.S).group(1)
-        keys = re.findall(r"(?:^|[,{\s])([a-z_]+):", wake)
-        self.assertEqual(10, len(keys))
-        self.assertNotIn("artifact_name", keys)
-        self.assertIn("bundle_key", keys)
-        self.assertIn('[[ "$ARTIFACT_NAME" == "pages-mod-compatibility-$BUNDLE_KEY" ]]', publish)
-        pages_wake = job_block("pages.yml", "wake-compatibility")
-        self.assertIn("ARTIFACT_NAME: pages-mod-compatibility-"
-                      "${{ github.event.client_payload.bundle_key }}", pages_wake)
-        self.assertNotIn("client_payload.artifact_name", pages_wake)
+        notify = job_block("mod-compatibility-review.yml", "notify-family")
+        inputs = re.findall(r"(?m)^          ([a-z0-9-]+): ", notify.split("        with:\n", 1)[1])
+        self.assertEqual(8, len(inputs))
+        self.assertEqual(len(inputs), len(set(inputs)))
+        self.assertNotIn("artifact-name", inputs)
+        self.assertIn("bundle-key", inputs)
 
     def test_pages_evidence_rotation_is_post_success_bounded_and_exact(self) -> None:
-        workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
-        request = job_block("pages.yml", "request-rotation")
-        rotate = job_block("pages.yml", "rotate")
+        # Exact-ID rotation is kit code; the caller only requests it after a successful finalize
+        # and runs it under its own lock, authenticated by the callee after completed/success.
+        import test_mod_base_caller as caller
+
+        workflow = caller.caller_text()
+        request = caller.caller_job("request-rotation")
+        rotate = caller.caller_job("rotate")
         handoff = job_block("on-demand-e2e.yml", "prepare-pages-evidence")
-        rotator = (ROOT / "scripts" / "pages" / "rotate_artifacts.py").read_text(
-            encoding="utf-8"
-        )
+        sha, version, _references = caller.pin()
 
         self.assertFalse((WORKFLOWS / "rotate-pages-evidence.yml").exists())
+        self.assertFalse((ROOT / "scripts" / "pages" / "rotate_artifacts.py").exists())
         self.assertIn("permissions: {}", workflow)
-        self.assertIn("quick-skin-pages-evidence-rotation", workflow)
+        self.assertIn(caller.ROTATION_LOCK, workflow)
         self.assertIn("cancel-in-progress: false", workflow)
         self.assertNotIn("continue-on-error", request)
-        self.assertIn("actions: write", request)
-        self.assertIn("gh workflow run pages.yml --ref master", request)
-        self.assertIn("-f operation=rotate", request)
-        self.assertIn('pages_run_id="$GITHUB_RUN_ID"', request)
-        self.assertIn('pages_run_sha="$GITHUB_SHA"', request)
+        self.assertEqual({"actions": "write"}, caller.job_permissions(request))
+        self.assertNotIn("actions/checkout@", request)
+        self.assertIn("needs.finalize.result == 'success'", request)
+        self.assertIn("repos/$GH_REPO/actions/workflows/pages.yml/dispatches", request)
+        self.assertIn('inputs: {operation: "rotate", run_id: $run_id, sha: $sha}', request)
+        self.assertIn('--arg run_id "$GITHUB_RUN_ID" --arg sha "$GITHUB_SHA"', request)
 
-        self.assertIn("github.event_name == 'workflow_dispatch'", rotate)
-        self.assertIn("github.ref == 'refs/heads/master'", rotate)
-        self.assertIn("inputs.operation == 'rotate'", rotate)
-        self.assertIn("timeout-minutes: 20", rotate)
-        self.assertIn("actions: write", rotate)
-        self.assertIn("contents: read", rotate)
-        self.assertIn("protected_gh_api_retry", rotate)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.operation == 'rotate'", rotate)
+        self.assertEqual({"actions": "write", "contents": "read"}, caller.job_permissions(rotate))
+        self.assertIn(f"uses: The-Plum-Team/mod-base/.github/workflows/rotate.yml@{sha} # {version}", rotate)
+        self.assertIn("pages-run-id: ${{ inputs.run_id }}", rotate)
+        self.assertIn("pages-run-sha: ${{ inputs.sha }}", rotate)
         self.assertNotIn("pages: write", rotate)
         self.assertNotIn("id-token: write", rotate)
         self.assertNotIn("continue-on-error", rotate)
-        authenticate = rotate.index("Authenticate the successful cache-owning Pages run")
-        checkout = rotate.index("Check out the exact protected rotation implementation")
-        self.assertLess(authenticate, checkout)
-        self.assertIn('.status == "completed" and .conclusion == "success"', rotate)
-        self.assertIn('.path == ".github/workflows/pages.yml"', rotate)
-        self.assertIn('.head_branch == "master"', rotate)
-        self.assertIn(".head_repository.full_name == $repository", rotate)
-        self.assertIn(".workflow_id == $workflow_id", rotate)
         self.assertNotIn("implementation_sha", rotate)
-        self.assertIn("ref: ${{ github.sha }}", rotate)
-        self.assertIn("persist-credentials: false", rotate)
-        self.assertIn("pattern: pages-cache-*", rotate)
-        self.assertIn("pattern: pages-mod-compatibility-cache-*", rotate)
-        self.assertIn("run-id: ${{ steps.owner.outputs.pages_run_id }}", rotate)
-        self.assertIn("digest-mismatch: error", rotate)
-        self.assertIn("scripts/pages/rotate_artifacts.py", rotate)
-        self.assertIn("--pages-run-id", rotate)
-        self.assertIn("--pages-run-sha", rotate)
-        self.assertIn("--compatibility-evidence-root", rotate)
-        self.assertIn("steps.owner.outputs.pages_run_sha", rotate)
-        self.assertNotIn("list_artifacts_with_prefix", rotator)
-        self.assertIn(
-            "_list_replaced_caches(api, legacy_name=cache_name, keep=generation.keep)",
-            rotator,
-        )
-        self.assertIn("api.list_artifacts(name)", rotator)
-        self.assertIn("MAX_ROTATION_DELETIONS", rotator)
-        self.assertIn("deletion_budget=deletion_budget", rotator)
-        self.assertIn("MAX_TRANSIENT_KEEP_VALIDATIONS", rotator)
 
         self.assertIn("actions: read", handoff)
         self.assertNotIn("actions: write", handoff)
-        self.assertIn("pages-e2e-${{ matrix.bundle_key }}", handoff)
-        self.assertIn(
-            "retention-days: ${{ matrix.raw_retention_days }}",
-            handoff,
-        )
+        self.assertNotIn("pages-e2e-", handoff)
+        self.assertNotIn("retention-days", handoff)
         self.assertIn("fromJSON(needs.pages-inventory.outputs.targets)", handoff)
-        self.assertIn("--preserve-raw-key", rotate)
-        self.assertIn('expected_names = {"github-pages"}', rotator)
-        self.assertIn(
-            'f"collected-pages-{generation.key}" for generation in generations',
-            rotator,
-        )
-        retirement = rotator.split("def _rotate_candidate_groups(", 1)[1].split(
-            "\ndef rotate_branch(", 1
-        )[0]
-        self.assertLess(retirement.index("_validate_run("), retirement.index("validate_keep()"))
-        self.assertLess(retirement.index("validate_keep()"), retirement.index("_delete_exact_artifact("))
-        self.assertIn("for artifact in candidates:", rotator)
-        self.assertIn("select_old_handoffs(", rotator)
-        self.assertIn("lossless visual reference changed", rotator)
-        self.assertIn("retire_pages_run_transients(", rotator)
-        self.assertIn("rotate_compatibility_generations(", rotator)
-        self.assertIn("pages-mod-compatibility-cache-", rotator)
-        self.assertIn("api.get_artifact(artifact.artifact_id)", rotator)
-        self.assertIn("api.delete_artifact(artifact.artifact_id)", rotator)
 
     def test_bounded_actions_caches_are_pruned_by_exact_id_from_protected_code(
         self,
@@ -2265,15 +1913,17 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn('f"/actions/caches/{cache_id}"', implementation)
 
     def test_pages_actions_use_reviewed_immutable_versions(self) -> None:
-        workflow = (WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
-        self.assertIn(
-            "actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9",
-            workflow,
-        )
-        self.assertIn(
-            "actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128",
-            workflow,
-        )
+        # The site artifact is uploaded by the pinned kit callee; only the caller deploys it.
+        import test_mod_base_caller as caller
+
+        workflow = caller.caller_text()
+        self.assertIn(caller.DEPLOY_PAGES, caller.caller_job("deploy"))
+        self.assertNotIn("actions/upload-pages-artifact@", workflow)
+        for line in workflow.splitlines():
+            match = re.match(r"\s*(?:-\s+)?uses:\s+(\S+)", line)
+            if match is not None:
+                with self.subTest(uses=match.group(1)):
+                    self.assertRegex(match.group(1), r"^[^@]+@[0-9a-f]{40}$")
 
     def test_packaged_e2e_exposes_one_stable_required_context(self) -> None:
         required = job_block("on-demand-e2e.yml", "required-gate")
@@ -2327,7 +1977,17 @@ class WorkflowSecurityTest(unittest.TestCase):
         build_notify = job_block("build-gate.yml", "notify-version-port")
         sync_discover = job_block("sync-version-branches.yml", "discover")
 
-        for block in (e2e_notify, pages_notify, build_notify):
+        # The Pages wake is the pinned pure-bash composite: it retries with the kit's bounded
+        # helper (10 attempts, 60 s cap) and needs neither a checkout nor contents: write.
+        self.assertRegex(
+            pages_notify,
+            r"uses: The-Plum-Team/mod-base/actions/notify-pages@[0-9a-f]{40} # v\d+\.\d+\.\d+",
+        )
+        self.assertIn("    permissions:\n      actions: write\n\n", pages_notify)
+        self.assertNotIn("contents:", pages_notify)
+        self.assertNotIn("actions/checkout@", pages_notify)
+
+        for block in (e2e_notify, build_notify):
             with self.subTest(name=block.splitlines()[0]):
                 self.assertIn("ref: master", block)
                 self.assertIn("persist-credentials: false", block)
@@ -2526,10 +2186,30 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("scripts/release/version_branches.py", workflow)
         self.assertNotIn("/branches?per_page=", workflow)
 
+    def test_release_status_refresh_runs_the_policy_suites_without_write_credentials(self) -> None:
+        # The complete suites include the mod-base kit tests, which fetch the pinned kit; they run
+        # read-only and uncredentialed, and only their exact validated commit may be refreshed.
+        workflow = (WORKFLOWS / "refresh-release-status.yml").read_text(encoding="utf-8")
+        self.assertIn("\npermissions: {}\n", workflow)
+        validate = job_block("refresh-release-status.yml", "validate")
+        refresh = job_block("refresh-release-status.yml", "refresh")
+        self.assertIn("    permissions:\n      contents: read\n    outputs:\n", validate)
+        self.assertIn("persist-credentials: false", validate)
+        self.assertNotIn("persist-credentials: true", validate)
+        self.assertNotIn("GH_TOKEN", validate)
+        self.assertIn('PYTHONDONTWRITEBYTECODE: "1"', validate)
+        for suite in ("ci", "release"):
+            self.assertIn(f"python3 scripts/ci/parallel_unittest.py -s scripts/{suite}/tests -p 'test_*.py' -v",
+                          validate)
+            self.assertNotIn(f"scripts/{suite}/tests", refresh)
+        self.assertIn("    needs: validate\n", refresh)
+        self.assertIn("ref: ${{ needs.validate.outputs.sha }}", refresh)
+        self.assertIn("      actions: write\n      contents: write\n      pull-requests: write\n", refresh)
+
     def test_release_test_jobs_install_locked_pages_dependency(self) -> None:
         for workflow, job in (
             ("build-gate.yml", "policy-release"),
-            ("refresh-release-status.yml", "refresh"),
+            ("refresh-release-status.yml", "validate"),
             ("sync-version-branches.yml", "validate"),
             ("handle-version-port-result.yml", "validate-repair"),
         ):
@@ -2554,7 +2234,7 @@ class WorkflowSecurityTest(unittest.TestCase):
     def test_python_compilation_covers_the_entire_tooling_tree(self) -> None:
         for workflow, job in (
             ("build-gate.yml", "policy"),
-            ("refresh-release-status.yml", "refresh"),
+            ("refresh-release-status.yml", "validate"),
             ("sync-version-branches.yml", "validate"),
             ("handle-version-port-result.yml", "validate-repair"),
         ):
@@ -2583,8 +2263,11 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("--check", build)
         self.assertIn("scripts/release/workflow_guidance.py", build)
         self.assertIn("--guidance docs/ai/WORKFLOW.md", build)
-        self.assertIn("node --check site/assets/site.js", build)
-        self.assertIn("node --check site/assets/gallery.js", build)
+        # The site front end is mod-base code checked by the kit's own CI.
+        self.assertNotIn("node --check", build)
+        self.assertIn("python3 scripts/ci/mod_base_kit.py verify --network\n", build)
+        self.assertIn("python3 scripts/ci/mod_base_kit.py run template check --repo .\n", build)
+        self.assertRegex(build, r"uses: The-Plum-Team/mod-base/actions/setup@[0-9a-f]{40} # v\d+\.\d+\.\d+")
 
     def test_ai_jobs_are_read_only_patch_producers(self) -> None:
         for workflow, job in (

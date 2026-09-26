@@ -6,25 +6,45 @@ repository root.
 
 ## Documentation map
 
-- `AGENTS.md` is the import-only manifest for the complete coding-agent instruction set.
-- There is deliberately no `CLAUDE.md`. Claude Code 2.1.277 or later reads `AGENTS.md` and expands
-  its imports only while no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in the
-  working directory or above it.
+- `AGENTS.md` is the import-only manifest for the complete coding-agent instruction set: the two
+  managed shared documents first, then this file, `SOURCE-ARCHITECTURE.md`, `RUNTIME-INVARIANTS.md`
+  and `WORKFLOW.md`, exactly as `site/mod-base.json` `template.agents_local` lists them. There is
+  deliberately no `CLAUDE.md`: Claude Code 2.1.277 or later reads `AGENTS.md` and expands its
+  imports only while no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in the working
+  directory or above it.
+- [`docs/ai/shared/REPOSITORY.md`](shared/REPOSITORY.md) and
+  [`docs/ai/shared/PUBLIC-EVIDENCE.md`](shared/PUBLIC-EVIDENCE.md) are the generic repository,
+  workflow-security and public-evidence contract of the mod-base kit
+  (https://github.com/The-Plum-Team/mod-base), shared by every mod that pins it. They are
+  byte-identical to the pinned kit and change only through a kit bump. Quick Skin's local documents
+  add stricter rules and never relax them.
+- mod-base supplies the public-evidence pipeline and the GitHub Pages publisher at one pinned
+  commit. Every mod-base reference in `.github/workflows/*.yml` has the form
+  `uses: The-Plum-Team/mod-base/<path>@<40-hex> # vX.Y.Z`, all with the same SHA and version. The
+  managed bootstrap `scripts/ci/mod_base_kit.py` parses that pin, proves it released
+  (`verify --network`), resolves the verified kit for tests and tools, checks the managed files
+  (`run template check --repo .`) and performs bumps (`bump --to vX.Y.Z`).
+- Managed files are byte-identical to the pinned kit and never edited here: the bootstrap,
+  `.gitattributes`, both shared documents and the managed region of `.github/workflows/pages.yml`.
+  Quick Skin owns the adapter `scripts/pages/mod_base_adapter.py`, its configuration
+  `site/mod-base.json`, the caller's `ext-feature-coverage` extension job, and the fragment files
+  `.gitignore`, `.github/CODEOWNERS`, `.github/dependabot.yml`,
+  `.github/pull_request_template.md` and `AGENTS.md`, whose required lines, markers and structure
+  `template check` enforces. See
+  [ADR 0010](../architecture/decisions/0010-delegate-public-evidence-to-mod-base.md).
 - `CONTRIBUTING.md` is the human-facing path from an unfamiliar checkout to a reviewed pull
   request, including an AI-assisted workflow.
 - `README.md` is for users and builders; focused architecture documents own their subjects.
 - `RELEASING.md` owns immutable identity, publication, recovery, provenance, and GitHub governance.
-- `e2e/README.md`, `e2e/scenario-contract.json`, and `scripts/pages/` own packaged-scenario and
-  public visual-evidence identity, validation, rendering, and GitHub Pages publication.
+- `e2e/README.md` and `e2e/scenario-contract.json` own packaged-scenario identity, captures and
+  their semantics. The adapter projects them onto the kit's expectation and evidence schemas; the
+  kit owns public-evidence validation, rendering and GitHub Pages publication, documented in its
+  `docs/` (https://github.com/The-Plum-Team/mod-base/tree/main/docs).
 - `docs/ci/` holds bounded operational guides (repair preflight, acceptance observation, and the
   measured review, curation, baseline and Pages pipelines); `docs/ai` links to them rather than
   restating their procedures.
 - [`docs/architecture/decisions/`](../architecture/decisions/README.md)
   records evidence-backed architectural decisions that must survive individual worktrees.
-
-Do not put operational rules directly in `AGENTS.md`, do not add any of those `CLAUDE.md` files, and
-do not create another root instruction file that restates this contract. Add a nested `AGENTS.md` only when a directory
-genuinely needs narrower rules, and keep it limited to imports for those local deltas.
 
 Quick Skin is a client-and-server Minecraft mod built from one Stonecutter-managed source tree. The
 central release inventory is `release/release-matrix.json`. It is authoritative for supported
@@ -76,9 +96,12 @@ schema-2 snapshots retain their original branch/tag validation contract.
   There is no unattended scheduled runtime. A protected post-merge generation is complete only
   when its own diff is unproven or reaches the optional-mod coverage closure; the release profile
   and an explicit complete-capture manual run are always complete.
-- Pages publishes one atomic matrix-derived site. Selected evidence can cover unchanged features
-  only through independently authenticated full and selected components. Every reused image
-  retains the original tested commit/run/JAR and its separate coverage provenance.
+- The managed caller `.github/workflows/pages.yml` (workflow `Project site`) publishes one atomic
+  site with one key `mc<version>` per matrix target. Selected evidence covers unchanged features
+  only as a composed bundle: the adapter's `compose` hook joins an authenticated complete
+  `mb-baseline--` archive with the selected handoff, and the kit re-verifies both components
+  against the complete expectation. Every reused image retains the original tested
+  commit/run/JAR and its separate coverage provenance.
 - Schema 3 disables automatic version ports and retains independent immutable target release
   identities. Historical schema-2 controllers and evidence remain available for auditing old
   releases. See `RELEASING.md` and the migration plan for activation and acceptance evidence.
@@ -91,22 +114,29 @@ the repository.
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
   named seven-day exceptions are automatic-sync packaged evidence/input bundles needed by delayed
   compatibility review, compatibility plans/evidence/capsules/reports/block markers, queued visual
-  review capsules with their normalized reports and generation-block markers, compatibility Pages
-  handoffs, and rolling exact-policy visual verdict caches.
-  Named 90-day artifact classes include the semantic certificate, the
-  SHA-bound Pages cache, the matrix-derived lossless
-  Fabric 1.20.1 anchor handoff, the per-covered-branch mod-compatibility Pages cache, the
+  review capsules with their normalized reports and generation-block markers, the mod-compatibility
+  family handoff `mb-family-handoff--mod-compatibility--<key>--a<attempt>`, and rolling
+  exact-policy visual verdict caches. The ordinary public-evidence handoff
+  `mb-handoff--<key>--a<attempt>` keeps the one-day default.
+  Named 90-day artifact classes include the semantic certificate, the evidence caches
+  `mb-cache--<key>--<coverage_sha>`, the lossless anchor
+  `mb-anchor--mc1.20.1--<commit>--<run_id>--a<attempt>` of the matrix's unit-test target, the
+  family caches `mb-family-cache--mod-compatibility--<key>--<coverage_sha>`, the
   immutable `release-<release-id>` bundle, and its SBOM-recovery counterpart
   `release-recovery-<release-id>`. Shared-source feature coverage additionally retains its
-  complete healthy certificate and exact target/source/run compact Pages baselines for at most
-  90 days. Only a successfully deployed complete generation may create those public baselines;
-  partial generations reuse them without extending their lifetime. Missing or expired baseline
+  complete healthy certificate and the exact complete compact baselines
+  `mb-baseline--<key>--<commit>--<tested_run_id>` for at most 90 days. Only a successfully
+  deployed complete generation may create those public baselines; partial generations reuse them
+  without extending their lifetime. Missing or expired baseline
   artifacts restore complete runtime coverage. The release bundle
   spans protected environment approvals, provides bounded recovery for an interrupted publication,
-  and is the only source from which the pending-release verifier finalizes. After a successful Pages
-  replacement, protected rotation deletes by exact artifact ID the superseded cache, ordinary
-  consumed `pages-e2e-<branch>` and compatibility handoffs, older lossless anchor generations,
-  Pages fan-in artifacts, and the deploy artifact while preserving the current lossless anchor.
+  and is the only source from which the pending-release verifier finalizes. After the owning Pages
+  run is authenticated `completed/success`, the kit's separately locked rotation deletes by exact
+  artifact ID only the `mb-*` generations it superseded and that run's own `github-pages`
+  artifact; it keeps the newest anchor of each key and never deletes a baseline archive or any
+  other name. Legacy `pages-e2e-*`, `pages-cache-*`, `collected-pages-*`, `pages-full-baseline-*`
+  and `pages-mod-compatibility*` artifacts are never read or deleted again and expire under their
+  own retention.
   Ordinary raw packaged-E2E
   proof retains its one-day window because a concurrent branch attestation may still consume it;
   an automatic synchronization source retains seven days for the post-semantic compatibility wave.
@@ -164,18 +194,12 @@ Choose the target before editing:
 | Version/loader support inventory | `master`, matrix first | A validated target built from the same shared source |
 | Generated output or staged artifacts | Nowhere | Fix the tracked input instead |
 
-At the start of every task:
-
-1. Inspect `git status --short --branch` and preserve existing work.
-2. Read the active `release/release-matrix.json`; never infer support from directory names alone.
-3. Read the relevant focused document and module build file.
-4. Search canonical sources and every active overlay for the affected path or symbol.
-5. State the intended scope and run the smallest check that can disprove the change while
-   iterating.
+Follow "Starting a task" in the [shared repository contract](shared/REPOSITORY.md). In Quick Skin
+the release inventory is the active `release/release-matrix.json`, and "every active copy" means the
+canonical sources plus every active `legacy*` overlay of the affected path or symbol.
 
 Never develop directly on `automation/sync/*`; those branches are disposable workflow-owned PR
 heads. Human contributors start with `CONTRIBUTING.md` and use a separate topic branch.
 
 If intended behavior excludes a target, make the exception explicit in its owning module or
-API-family adapter and document the decision. Do not spread broad version conditions across
-unrelated features or create a second version inventory.
+API-family adapter and document the decision.

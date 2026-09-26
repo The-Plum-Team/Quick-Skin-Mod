@@ -205,9 +205,11 @@ Pending drafts created before the fix may lack a ledger; recovery registers one 
 
 Actions storage follows the same recovery boundary. Ordinary build, diagnostics, packaged-E2E,
 review, publication-receipt, synchronization, and Pages handoff artifacts are transient and expire
-after one day. Source PNGs exist only in the `pages-e2e-*` handoff; protected Pages code validates
-and replaces them with WebP derivatives before fan-in. Each branch's single compact SHA-bound Pages
-cache is retained for 90 days, with successful rotation deleting the previous generation. The
+after one day. The pinned mod-base kit owns the Pages artifacts (ADR 0010): source PNGs exist only
+in the one-day `mb-handoff--<key>--a<attempt>` handoff, which protected Pages code validates and
+replaces with WebP derivatives before fan-in, plus the lossless `mb-anchor--mc1.20.1--…` visual
+anchor. Each matrix key keeps one compact `mb-cache--<key>--<coverage_sha>` for 90 days, and the
+separately locked rotation deletes the previous generation only after a successful publication. The
 immutable `release-<release-id>` bundle, or `release-recovery-<release-id>` for an SBOM recovery, is
 the other 90-day exception so the same verified bytes survive protected-environment approvals,
 resume an interrupted GitHub Release or marketplace publication, and let `Verify pending releases`

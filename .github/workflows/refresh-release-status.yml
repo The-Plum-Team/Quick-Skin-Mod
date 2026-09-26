@@ -14,32 +14,46 @@ on:
   schedule:
     - cron: "23 4 * * 1"
 
-permissions:
-  actions: write
-  contents: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: refresh-release-status
   cancel-in-progress: true
 
 jobs:
-  refresh:
-    name: Regenerate version badges
+  # The complete policy suites (including the mod-base kit tests, which resolve the pinned kit
+  # through the bootstrap's anonymous fetch) run read-only without persisted credentials. Only the
+  # validated commit reaches the write-scoped refresh job below.
+  validate:
+    name: Validate repository tooling
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'schedule' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/master')
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # Both suites, each on every core; the release suite's mod-base conformance simulation alone
+    # takes 8 to 20 minutes.
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
 
     steps:
       - name: Check out current master
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: master
-          fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
+
+      - name: Record the validated commit
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
       - name: Install Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -52,6 +66,40 @@ jobs:
           --only-binary=:all:
           --require-hashes
           --requirement scripts/pages/requirements.txt
+
+      # The bootstrap refuses a kit tree that holds bytecode, so no import may write any.
+      - name: Validate repository tooling
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q e2e scripts
+          python3 scripts/ci/parallel_unittest.py -s scripts/ci/tests -p 'test_*.py' -v
+          python3 scripts/ci/parallel_unittest.py -s scripts/release/tests -p 'test_*.py' -v
+
+  refresh:
+    name: Regenerate version badges
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Check out the validated master commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
 
       - name: Validate the authoritative shared-source matrix
         run: python3 scripts/release/matrix.py --matrix release/release-matrix.json > /dev/null
@@ -72,17 +120,13 @@ jobs:
             printf 'changed=true\n' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Validate generated documentation and repository tooling
+      - name: Validate generated documentation
         run: |
           python3 scripts/release/branch_readme.py \
             --matrix release/release-matrix.json \
             --readme "$RUNNER_TEMP/generated-README.md" \
             --profile-branch master \
             --check
-          python3 -m compileall -q e2e scripts
-          python3 -m unittest discover -s scripts/ci/tests -p 'test_*.py' -v
-          python3 -m unittest discover \
-            -s scripts/release/tests -p 'test_*.py' -v
 
       - name: Update the automation branch and PR
         if: steps.candidate.outputs.changed == 'true'

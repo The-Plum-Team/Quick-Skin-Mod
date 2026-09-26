@@ -3,7 +3,16 @@
 - Status: Accepted
 - Date: 2026-08-06
 - Amended by: ADR 0004 on 2026-08-10 for queued read-only visual review
+- Amended by: [ADR 0010](0010-delegate-public-evidence-to-mod-base.md) on 2026-09-25 for the
+  Pages wake, publication identity and rotation
 - Scope: shared packaged-runtime, visual-evidence, Pages, and version-port automation
+
+ADR 0010 amends this record's Pages paragraph. A producer wakes Pages with a `workflow_dispatch`
+from a job that holds only `actions: write`; the publishing implementation is the protected
+`github.sha` plus the mod-base commit it pins; and the kit validates and renders the evidence,
+the caller deploys it atomically, and the kit's separately locked rotation retires exact artifact
+IDs after the owning run succeeds. A failed or premature wake still preserves the previous site
+and caches, and the rest of this record remains active.
 
 ## Context
 

@@ -234,17 +234,22 @@ class CiReuseTest(unittest.TestCase):
         self.assertEqual(("20", self.api.tested, "feature/hud", "true"),
             tuple(identity[key] for key in ("source_run_id", "source_sha", "source_branch", "reused")))
         source = reuse.runtime_source(self.api, 30, self.api.covered)
-        provenance = {key: {"run_id": str(run["id"]), "branch": run["head_branch"], "sha": commit,
-            "run_url": f"https://github.com/{self.api.repository}/actions/runs/{run['id']}",
-            "created_at": run["created_at"]}
-            for key, run, commit in (("source", source.execution, source.tested_sha),
-                                     ("target", source.generation, self.api.covered))}
-        manifest = {"provenance": provenance, "runtime_source": reference}
-        pages.verify_runtime_provenance(self.api, manifest, self.api.covered)
+        self.assertEqual(source.execution["created_at"], identity["source_created_at"])
+        self.assertEqual(str(source.execution["run_attempt"]), identity["source_run_attempt"])
+        extensions = json.loads(Path(identity["extensions_path"]).read_bytes())
+        self.assertEqual({pages.RUNTIME_SOURCE: reference}, extensions)
+        # The mod-base handoff claims the original execution as its tested run and the reusing
+        # master generation as its handoff run; the adapter reauthenticates both.
+        manifest = {"subject": {"branch": "master", "commit": self.api.covered}, "provenance": {
+            "tested": {"run_id": source.execution["id"], "run_attempt": source.execution["run_attempt"],
+                       "branch": source.execution["head_branch"], "commit": source.tested_sha},
+            "handoff": {"run_id": source.generation["id"], "run_attempt": source.generation["run_attempt"],
+                        "branch": "master", "commit": self.api.covered}}}
+        self.assertEqual(self.api.tested, pages.runtime_of(self.api, manifest, extensions).tested_sha)
         for value in (self.api.covered, self.api.head):
-            manifest["provenance"]["source"]["sha"] = value
+            manifest["provenance"]["tested"]["commit"] = value
             with self.assertRaisesRegex(ValueError, "provenance differs"):
-                pages.verify_runtime_provenance(self.api, manifest, self.api.covered)
+                pages.runtime_of(self.api, manifest, extensions)
 
     def test_selected_consumer_authenticates_original_pr_after_merge(self):
         import feature_coverage_consumer as consumer

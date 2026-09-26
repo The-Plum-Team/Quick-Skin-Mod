@@ -28,7 +28,10 @@ from compatibility_evidence import (  # noqa: E402
     CompatibilityEvidenceError,
     _verdict_is_clean,
     build_bundle,
+    validate_bundle,
 )
+import json  # noqa: E402
+import mod_base_fixtures  # noqa: E402
 
 
 REPOSITORY = "AkaNebur/Quick-Skin-Mod"
@@ -305,6 +308,56 @@ class PagesCompatibilityTest(unittest.TestCase):
 
         self.assertEqual(completed_before_post_success_failure, selected)
         self.assertEqual(SOURCE_SHA, owner_sha)
+
+
+
+class NativeBundleSchemaTest(unittest.TestCase):
+    """The shared (schema 6) native bundle mod-base's ``mod-compatibility`` family wraps."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.temporary.name) / "compatibility"
+        bundle = cls.root / "mc1.20.1"
+        bundle.mkdir(parents=True)
+        cls.manifest = mod_base_fixtures.compatibility_bundle(
+            bundle, key="mc1.20.1", repository=REPOSITORY, coverage_sha=SOURCE_SHA, target_sha=SOURCE_SHA,
+            publication_run={"event": "schedule", "created_at": "2026-09-08T20:10:00Z"}, publication_run_id=44,
+            images=(mod_base_fixtures.fixture_png(0), mod_base_fixtures.fixture_png(1)))
+        cls.path = bundle / "manifest.json"
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.temporary.cleanup()
+
+    def validate(self, mutate: Any = None) -> dict[str, Any]:
+        value = json.loads(json.dumps(self.manifest))
+        if mutate is not None:
+            mutate(value)
+        self.path.write_text(json.dumps(value))
+        try:
+            return validate_bundle(self.root, "mc1.20.1", expected_repository=REPOSITORY,
+                                   expected_coverage_sha=SOURCE_SHA)
+        finally:
+            self.path.write_text(json.dumps(self.manifest))
+
+    def test_the_recorded_publication_run_is_optional_but_strict(self) -> None:
+        self.assertEqual({"event": "schedule", "created_at": "2026-09-08T20:10:00Z"},
+                         self.validate()["provenance"]["publication_run"])
+        self.assertNotIn("publication_run",
+                         self.validate(lambda value: value["provenance"].pop("publication_run"))["provenance"])
+        for mutate in (lambda value: value["provenance"]["publication_run"].update(event="Push"),
+                       lambda value: value["provenance"]["publication_run"].update(created_at="yesterday"),
+                       lambda value: value["provenance"]["publication_run"].update(display_title=" "),
+                       lambda value: value["provenance"]["publication_run"].update(run_id=44),
+                       lambda value: value["provenance"].update(unknown=True)):
+            with self.subTest(mutate=mutate), self.assertRaises(CompatibilityEvidenceError):
+                self.validate(mutate)
+
+    def test_retired_public_schemas_are_refused(self) -> None:
+        for version in (1, 2, 3, 4, 7):
+            with self.subTest(version=version), self.assertRaisesRegex(CompatibilityEvidenceError, "identity"):
+                self.validate(lambda value: value.update(schema_version=version))
 
 
 if __name__ == "__main__":
