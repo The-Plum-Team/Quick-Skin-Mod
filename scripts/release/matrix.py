@@ -45,6 +45,7 @@ REQUIRED_RUNTIME_FIELDS = {
 
 KNOWN_LOADERS = {"fabric", "forge", "neoforge"}
 KNOWN_COMPATIBILITY_PATCHES = {"neoforge-26.1-break-event-v1"}
+MODRINTH_VERSION_NUMBER_LIMIT = 32
 LOADER_DISPLAY_NAMES = {
     "fabric": "Fabric",
     "forge": "Forge",
@@ -827,6 +828,19 @@ def release_id(data: dict[str, Any], mod_version: str, *, target: str | None = N
     return f"mc{'+'.join(versions)}-v{mod_version}"
 
 
+def publication_id(data: dict[str, Any], identity: str, artifact: dict[str, Any]) -> str:
+    """Name one marketplace file. Modrinth rejects a version number over 32 characters."""
+    full = f"{identity}-{artifact['artifact_node']}"
+    if data.get("schema_version") != 3 or len(full) <= MODRINTH_VERSION_NUMBER_LIMIT:
+        return full
+    # A schema-3 identity already names the target, and each target has one artifact per loader.
+    # Only names that Modrinth would reject are shortened, so published files keep their identity.
+    compact = f"{identity}-{artifact['loader']}"
+    if len(compact) > MODRINTH_VERSION_NUMBER_LIMIT:
+        raise MatrixError(f"publication identity {compact!r} exceeds Modrinth's version-number limit")
+    return compact
+
+
 def gha_matrix(
     data: dict[str, Any],
     kind: str,
@@ -860,7 +874,7 @@ def gha_matrix(
                 "modrinth_id": data["project"]["modrinth_id"],
                 "curseforge_id": data["project"]["curseforge_id"],
                 "release_id": identity,
-                "publication_id": f"{identity}-{artifact['artifact_node']}",
+                "publication_id": publication_id(data, identity, artifact),
             }
             if kind == "artifacts":
                 include.append(expanded)

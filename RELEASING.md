@@ -203,6 +203,19 @@ that the failed tag run had already uploaded. A failed tag run's pending `releas
 must be rejected rather than approved, because its tagged implementation still has the defect.
 Pending drafts created before the fix may lack a ledger; recovery registers one under the lock.
 
+Modrinth rejects a `version_number` longer than 32 characters. The NeoForge 1.21.10 and 1.21.11
+publication identities (`mc1.21.10-v3.0.0-neoforge-1.21.10`) were 33, so those two uploads failed
+with HTTP 400 and were never accepted. `matrix.py` now shortens only a schema-3 identity that
+would exceed the limit, dropping the target already named by its release identity
+(`mc1.21.10-v3.0.0-neoforge`), and fails closed if that is still too long. Every identity that
+fits is unchanged, so already published files keep reconciling. Recovery admits this
+`matrix.py` repair; the matrix data itself stays outside the allowlist.
+
+A row left `uploading` by a provider error stays fenced. An operator may restore it to
+`unstarted` under the publication lock only with evidence that the provider never accepted the
+file: a synchronous validation rejection, or a complete first-party listing in which later
+uploads of the same wave appear while that file does not.
+
 Actions storage follows the same recovery boundary. Ordinary build, diagnostics, packaged-E2E,
 review, publication-receipt, synchronization, and Pages handoff artifacts are transient and expire
 after one day. Source PNGs exist only in the `pages-e2e-*` handoff; protected Pages code validates
