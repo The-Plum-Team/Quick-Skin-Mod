@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing canonical tag whose publication failed on a missing SBOM serialNumber
+        description: Existing canonical tag whose publication failed on a since-repaired SBOM or publication ledger
         required: true
         type: string
       source_run_id:

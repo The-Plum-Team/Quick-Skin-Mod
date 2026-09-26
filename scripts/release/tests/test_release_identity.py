@@ -37,6 +37,21 @@ class UnifiedReleaseIdentityTest(unittest.TestCase):
             self.assertEqual(f"mc{row['artifact_version']}-v3.0.0", row["release_id"])
             self.assertTrue(row["publication_id"].startswith(row["release_id"] + "-"))
 
+    def test_publication_identities_fit_modrinth_and_only_overlong_names_are_shortened(self):
+        rows = release_matrix.gha_matrix(self.data, "publications", "3.0.0")["include"]
+        identities = {(row["artifact_node"], row["publication_id"]) for row in rows}
+        self.assertEqual(len(identities), len({identity for _, identity in identities}))
+        for node, identity in identities:
+            self.assertLessEqual(len(identity), release_matrix.MODRINTH_VERSION_NUMBER_LIMIT)
+            full = f"mc{node.split('-', 1)[1]}-v3.0.0-{node}"
+            expected = full if len(full) <= 32 else f"mc{node.split('-', 1)[1]}-v3.0.0-{node.split('-')[0]}"
+            self.assertEqual(expected, identity)
+        self.assertIn(("neoforge-1.21.10", "mc1.21.10-v3.0.0-neoforge"), identities)
+        self.assertIn(("fabric-1.21.10", "mc1.21.10-v3.0.0-fabric-1.21.10"), identities)
+        artifact = {"artifact_node": "neoforge-1.21.10", "loader": "neoforge"}
+        with self.assertRaisesRegex(release_matrix.MatrixError, "version-number limit"):
+            release_matrix.publication_id(self.data, "mc1.21.10-v3.0.0-release-candidate", artifact)
+
     def test_a_build_bundle_cannot_be_published_as_a_target(self):
         for event, ref_type in (("push", "tag"), ("workflow_dispatch", "branch")):
             bundle = release_identity.derive(self.path, self.data)

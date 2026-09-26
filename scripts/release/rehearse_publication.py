@@ -38,8 +38,11 @@ class SimulatedGitHub:
         self.uploads: list[str] = []
         self.interrupt = True
 
-    def json(self, endpoint: str) -> dict[str, Any]:
-        ledger.require(endpoint == f"releases/tags/{self.contract.tag}" and self.release is not None,
+    def json(self, endpoint: str) -> Any:
+        # Like GitHub, only the release listing and ID lookup expose a draft; a tag lookup does not.
+        if endpoint == "releases?per_page=100&page=1":
+            return [] if self.release is None else [copy.deepcopy(self.release)]
+        ledger.require(endpoint == "releases/1" and self.release is not None,
                        "unexpected simulated release lookup")
         return copy.deepcopy(self.release)
 
@@ -52,7 +55,7 @@ class SimulatedGitHub:
                            and "--verify-tag" in command, "unsafe simulated release create")
             self.release = {"id": 1, "tag_name": self.contract.tag, "draft": True, "body": "Release notes"}
         elif command[:3] == ["gh", "release", "view"]:
-            if self.release is None:
+            if self.release is None or self.release["tag_name"] != self.contract.tag:
                 return subprocess.CompletedProcess(command, 1, stdout="", stderr="release not found")
             output = json.dumps({"databaseId": 1, "tagName": self.contract.tag,
                                  "isDraft": self.release["draft"]})
@@ -75,9 +78,12 @@ class SimulatedGitHub:
             ledger.require(command[4] == self.prefix + "releases/1" and self.release is not None,
                            "unexpected simulated ledger mutation")
             payload = json.loads(kwargs["input"])
-            ledger.require(set(payload) == {"body"}, "ledger changed non-body release fields")
+            ledger.require(set(payload) <= {"body", "tag_name"} and "body" in payload,
+                           "ledger changed non-body release fields")
             ledger.decode(payload["body"])
             self.release["body"] = payload["body"]
+            # Like GitHub, a draft edit without tag_name detaches the draft from its tag.
+            self.release["tag_name"] = payload.get("tag_name", "untagged-rehearsal")
         elif command[:4] == ["gh", "api", "--paginate", "--slurp"]:
             output = json.dumps([[{"id": i, "name": name}
                                   for i, name in enumerate(self.assets, start=1)]])
