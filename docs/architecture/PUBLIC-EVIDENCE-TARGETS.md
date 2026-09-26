@@ -45,7 +45,8 @@ component is an authenticated `mb-baseline--` archive.
 
 The local tests exercise matrix-wide identity and optional-mod planning, the adapter hooks
 against the real contract and matrix, and the kit's conformance run for `mc1.20.1` and `mc26.3`
-with the compatibility family and a delegated-reuse handoff. Their PNGs are synthetic fixtures.
+with the compatibility family, a delegated-reuse handoff and a selective `hud-preview` generation
+composed with its certified baseline. Their PNGs are synthetic fixtures.
 They are not Minecraft image acceptance evidence.
 
 The shared-target producer is prepared in `on-demand-e2e.yml`, whose `notify-pages` job wakes the

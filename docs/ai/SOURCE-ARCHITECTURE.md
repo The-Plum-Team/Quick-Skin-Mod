@@ -440,10 +440,14 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   the matrix's unit-test target. `expected_source_jobs` returns no job graph in v1. The kit runs
   every hook in an isolated child process, gives a read-only token only to the declared network
   hooks and re-verifies every result before publishing. `scripts/pages/mod_base_fixtures.py`
-  supplies the conformance fixtures, including `delegated_extensions`, which seeds the `ci_reuse`
-  seal and descriptor through the kit's seeding API. It defines no `selected_extensions`: the kit
-  simulates a selected handoff at its baseline's own commit, where a Quick Skin Git admission
-  selects nothing, so `ComposedEvidenceTest` covers `compose` and R3 on real selections instead.
+  supplies the conformance fixtures: `delegated_extensions` seeds the `ci_reuse` seal and
+  descriptor through the kit's seeding API, naming the tested pull-request run's branch and
+  commit as the kit's tested claim does; `selected_extensions` admits the real Git diff from the
+  published baseline's commit to the kit's `selected` head (one commit adding `SELECTED_CHANGE`, a
+  `hud-preview` source) through `e2e_selection.admit`, and seeds the complete job graph and the
+  `healthy-e2e-baseline` certificate that `compose` reauthenticates (every matrix target's retained
+  baseline, stand-ins from `ctx.api.retained_baseline` outside `--keys`); `ComposedEvidenceTest`
+  additionally covers whole-scenario selections.
 - `scripts/pages/evidence_target.py` owns the `mc<version>` key inventory, `target_for_key` and
   `--kind matrix|keys|source-branch`; `e2e/visual_review.py`, `scripts/ci/visual_review_targets.py`,
   `scripts/ci/feature_coverage.py`, the adapter and the E2E producer share it. The E2E job

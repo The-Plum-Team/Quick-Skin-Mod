@@ -121,8 +121,9 @@ curation exits before it. Its Pages wakes were `repository_dispatch` events, whi
   ones), and the kit composes them per frame, as Quick Skin's schema-7 view did: every frame keeps
   the epoch, tested run and JAR its pixels came from; a partly re-captured lane is the selected
   execution's record and records the baseline execution of its older frames as `baseline_run`;
-  and R3 re-verifies both epochs against their sources. This needs kit `v0.9.2` or later, so the
-  adoption pins `v1.0.0`; earlier releases refused a lane that mixed the two epochs.
+  and R3 re-verifies both epochs against their sources. This needs kit `v0.9.2` or later, because
+  earlier releases refused a lane that mixed the two epochs. The adoption pins `v1.0.1`, whose
+  conformance run also composes a real Quick Skin selection with its certified baseline.
 - Rollback is a revert of the adoption: the kit never touched the old artifacts, so the old
   pipeline needs only one fresh E2E dispatch. Disabling `pages.yml` is the kill switch; the
   deployed site stays online and producers keep working.
@@ -135,5 +136,6 @@ curation exits before it. Its Pages wakes were `repository_dispatch` events, whi
   ```
 - Platform behaviour that only GitHub Actions can show (cross-repository `referenced_workflows`,
   callee job names, deploying a callee-built artifact) was proven by the kit's canary repository
-  at `v0.9.3` and again at `v1.0.0`, the release this adoption pins; a failure there would still
-  keep the previous site.
+  at `v0.9.3` and again at `v1.0.0`. The pinned `v1.0.1` changes no action or managed file: only
+  the conformance simulation, the template manifest checks and the tree-digest literal of the
+  kit's reusable workflows. A platform failure would still keep the previous site.

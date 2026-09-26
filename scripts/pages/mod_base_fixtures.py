@@ -21,20 +21,23 @@ exactly the one conformance proves:
   ``tested-source-e2e`` seal and the handoff run's ``reused-source-e2e`` descriptor, and returns
   that descriptor as the ``quick-skin.runtime_source`` reference the adapter's
   ``authenticate_extensions`` binds to the handoff's tested claim and downloads again;
+* :func:`selected_extensions` (the conformance fixture) proves a selective generation the way Quick
+  Skin's producer and ``feature_coverage_consumer`` do. The kit's ``selected`` head is one commit
+  after the published baseline's, adding :data:`SELECTED_CHANGE` (a ``hud-preview`` source), so
+  ``e2e_selection.admit`` of that real Git diff selects the HUD checkpoints. Through ``ctx.api`` it
+  gives the handoff run the complete protected job graph, seeds a successful
+  ``feature-coverage`` run and the ``healthy-e2e-baseline`` certificate it issued at the baseline
+  commit (naming every matrix target's retained ``mb-baseline``: ``ctx.api.retained_baseline``),
+  and returns the admission with exactly the coverage proof the consumer recomputes, which the
+  adapter's ``compose`` reauthenticates in full before composing;
 * :func:`fixture_png` is the deterministic 1920x1080 plaid the Pages tests used before mod-base.
-
-The optional ``selected_extensions`` fixture is deliberately absent. The kit simulates the
-selected handoff at the same commit as the baseline it composes with, while a Quick Skin selection
-is the protected Git admission of the non-empty diff from its baseline commit to the tested head
-(``feature_coverage_consumer`` recomputes it with ``e2e_selection.admit``): no selection exists
-there. ``test_mod_base_adapter.py`` (``ComposedEvidenceTest``) runs the kit's ``compose`` and R3
-against Quick Skin's real selections instead.
 """
 
 from __future__ import annotations
 
 import hashlib
 import io
+import itertools
 import json
 import struct
 import tempfile
@@ -69,6 +72,13 @@ RUNTIME_SOURCE = "quick-skin.runtime_source"
 SEAL_ARTIFACT, SEAL_FILE = "tested-source-e2e", "tested-source.json"
 DESCRIPTOR_ARTIFACT, DESCRIPTOR_FILE = "reused-source-e2e", "reused-source.json"
 PULL_REQUEST = 1
+FEATURE_SELECTION = "quick-skin.feature_selection"
+#: The new file of the kit's ``selected`` head (mod-base ``SELECTED_CHANGE``): a ``hud-preview``
+#: source, so the admission of the diff from the baseline's commit selects the HUD checkpoints only.
+SELECTED_CHANGE = "modules/hud-preview/src/main/java/example/Feature.java"
+#: The coverage certificate: its file and the synthetic ids of its review and source artifacts.
+CERTIFICATE_FILE = "baseline.json"
+CERTIFICATE_IDS = 910_001
 
 
 def fixture_png(variant: int) -> bytes:
@@ -191,14 +201,22 @@ def write_packaged_lanes(root: Path, lanes: list[dict[str, Any]], *, images: tup
 
 def synthesize(ctx: Any, target: dict[str, Any], expectation: dict[str, Any], out_root: str,
                image_factory: Callable[[int, int, int], bytes]) -> None:
-    """Conformance: Quick Skin's packaged output for every lane of ``expectation``."""
+    """Conformance: Quick Skin's packaged output for every lane of ``expectation``; a selective
+    runtime reports exactly the steps of its selection (the contract projected onto it)."""
 
     width, height = expectation["image_policy"]["source_size"]
     images = tuple(image_factory(width, height, seed) for seed in PACKAGED_SEEDS)
-    selection = None
+    selection, contract = None, None
     if expectation["scope"]["kind"] == "selected":
-        selection = expectation["scope"]["detail"]["selection_sha256"]
-    write_packaged_lanes(Path(out_root), expectation["lanes"], images=images, selection_sha256=selection)
+        import feature_evidence
+        from selection import project_contract
+
+        detail = expectation["scope"]["detail"]
+        selection = detail["selection_sha256"]
+        contract = project_contract(scenario_contract.load_contract(SCENARIO_CONTRACT),
+                                    feature_evidence.SelectionView.from_detail(detail))
+    write_packaged_lanes(Path(out_root), expectation["lanes"], images=images, contract=contract,
+                         selection_sha256=selection)
 
 
 def _record_zip(filename: str, value: Any) -> bytes:
@@ -216,20 +234,18 @@ def delegated_extensions(ctx: Any, target: dict[str, Any], tested_run: dict[str,
     ``ci_reuse`` records the reused execution as a ``quick-skin-tested-source`` seal, uploaded by
     the tested run, and the master generation's ``quick-skin-merged-source`` descriptor naming that
     seal, uploaded by the handoff run (``ctx.api.handoff_run``). Both are seeded here and the
-    descriptor is returned. The adapter binds it to the handoff's tested claim, which the kit's
-    delegated variant takes from the handoff run's environment: the claim's branch and commit (and
-    so the seal's ``head_branch`` and ``tested_sha``) are the handoff's, where Quick Skin's
-    producer records the pull request's branch and merge commit. The seal record therefore names
-    the handoff's branch although the kit's tested run is on another one; only
-    ``feature_pages.verify_runtime_tree``, which the variant does not run, compares the two."""
+    descriptor is returned. The adapter binds it to the handoff's tested claim, which names the
+    tested run itself (mod-base v1.0.1): its branch and commit, as Quick Skin's producer records
+    the pull request's branch and merge commit. So the seal's ``head_branch`` and ``tested_sha``
+    are the tested run's (``conformance/reused-pull-request`` at the subject commit)."""
 
     handoff, subject = ctx.api.handoff_run, target["subject"]
     repository = ctx.api.repository
     source = {"schema_version": 1, "kind": "quick-skin-tested-source", "repository": repository,
               "workflow": ci_reuse.WORKFLOWS["e2e"], "run_id": tested_run["id"],
               "run_attempt": tested_run["run_attempt"], "head_sha": tested_run["head_sha"],
-              "head_branch": handoff["head_branch"], "head_repository": repository,
-              "tested_sha": handoff["head_sha"], "tree_sha": subject["tree"], "pull_request": PULL_REQUEST,
+              "head_branch": tested_run["head_branch"], "head_repository": repository,
+              "tested_sha": tested_run["head_sha"], "tree_sha": subject["tree"], "pull_request": PULL_REQUEST,
               "base_sha": subject["commit"]}
     ci_reuse.validate_seal(source, "e2e")
     seal = ctx.api.add_artifact(tested_run["id"], SEAL_ARTIFACT, _record_zip(SEAL_FILE, source))
@@ -242,6 +258,100 @@ def delegated_extensions(ctx: Any, target: dict[str, Any], tested_run: dict[str,
     ci_reuse.validate_reference(reference, "e2e")
     ctx.api.add_artifact(handoff["id"], DESCRIPTOR_ARTIFACT, _record_zip(DESCRIPTOR_FILE, reference))
     return {RUNTIME_SOURCE: reference}
+
+
+def selected_extensions(ctx: Any, target: dict[str, Any], baseline: dict[str, Any]) -> dict[str, Any]:
+    """Conformance: the ``quick-skin.feature_selection`` of a selective generation composed with
+    ``baseline``, as Quick Skin's producer hands it off and ``feature_coverage_consumer`` proves it.
+
+    The admission is ``e2e_selection.admit`` of the real Git diff from the baseline's commit to the
+    selected head (the kit's ``selected`` head adds :data:`SELECTED_CHANGE`). Through ``ctx.api`` the
+    handoff run gets the complete ``pr-anchors`` job graph a selective runtime must show, and a
+    successful ``feature-coverage`` run at the baseline commit gets its issuer job and the
+    ``healthy-e2e-baseline`` certificate: the complete coverage of that commit under the executing
+    policy, naming the retained public baseline of every matrix target (``baseline`` for this key;
+    ``ctx.api.retained_baseline`` for the others) and synthetic review and source artifact ids. The
+    coverage proof is exactly what ``feature_coverage_consumer._from_artifact`` recomputes; the
+    public baselines are not authenticated here. The adapter's ``compose`` refuses a forged
+    ``baseline`` that a source run uploaded, because its owner is no successful Pages run with the
+    required jobs. One that a Pages run uploaded outside its refresh job's retention step passes
+    ``compose``, whose owner check reads job conclusions but not step windows, and the kit's R3
+    refuses it."""
+
+    import feature_coverage as coverage
+    import feature_coverage_consumer as consumer
+    import feature_coverage_github as publisher
+    from e2e_job_graph import BUILD_JOB, GATE_JOB, POLICY_JOB
+
+    repository, api, key = Path(ctx.repo_root), ctx.api, target["key"]
+    head = target["subject"]["commit"]
+    named = publisher.parse_public_baseline_name(baseline["name"])
+    if named is None or named[0] != key:
+        raise ValueError(f"{baseline['name']} is not a public baseline of {key}")
+    base, source_run = named[1], named[2]
+    selected = coverage.admission.admit(repository, base=base, head=head, policy=head)
+    plan = selected.require_selection()
+    handoff = api.handoff_run
+    expected = coverage.expected_scenario_jobs_for(coverage.DEFAULT_MATRIX, "pr-anchors")
+    api.add_jobs(handoff["id"], handoff["run_attempt"],
+                 [{"name": name} for name in (POLICY_JOB, BUILD_JOB, GATE_JOB, *sorted(expected))])
+    issuer = api.add_run({"path": publisher.WORKFLOW, "event": "workflow_dispatch", "head_branch": "master",
+                          "head_sha": base, "display_title": "Feature coverage"})
+    api.add_jobs(issuer["id"], issuer["run_attempt"], [{"name": consumer.ISSUER_JOB}])
+
+    graph, contract = coverage.load_graph(), coverage.default_contract()
+    matrix = coverage.load_matrix(coverage.DEFAULT_MATRIX)
+    captures = sum(step.capture is not None for name in contract.scenarios_for_profile("pr")
+                   for role in contract.scenario(name).roles for step in role.steps)
+    identifiers = itertools.count(CERTIFICATE_IDS)
+    targets, reviews, public = [], {}, {}
+    for row in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]:
+        bundle_key = row["bundle_key"]
+        nodes = sorted(item["artifact_node"]
+                       for item in coverage.select_release_target(matrix, row["minecraft_target"])["artifacts"])
+        digests = {field: hashlib.sha256(f"{field}:{bundle_key}".encode()).hexdigest()
+                   for field in ("proof_sha256", "manifest_sha256", "report_sha256")}
+        targets.append({"bundle_key": bundle_key, "artifact_nodes": nodes,
+                        "source_artifact_ids": [next(identifiers) for _node in nodes],
+                        "frame_count": len(nodes) * captures, **digests})
+        reviews[bundle_key] = {"id": next(identifiers), "owner_run_id": next(identifiers),
+                               "name": f"visual-review-{source_run}--{bundle_key}", "size_in_bytes": 1024,
+                               "digest": "sha256:" + hashlib.sha256(f"review:{bundle_key}".encode()).hexdigest()}
+        record = (api.get_json(f"/repos/{api.repository}/actions/artifacts/{baseline['id']}") if bundle_key == key
+                  else api.retained_baseline(bundle_key))
+        public[bundle_key] = {"id": record["id"], "owner_run_id": record["workflow_run"]["id"],
+                              "name": record["name"], "digest": record["digest"],
+                              "size_in_bytes": record["size_in_bytes"]}
+    before = coverage.module_fingerprints(repository, base, graph)
+    value = {"schema_version": 1, "kind": coverage.BASELINE_KIND, "profile": "pr", "coverage": "full",
+             "source_sha": base, "source_run_id": source_run, "source_run_attempt": 1,
+             "matrix_sha256": coverage.digest(coverage.DEFAULT_MATRIX.read_bytes()),
+             "scenario_contract_sha256": contract.sha256, "module_graph_sha256": graph.sha256,
+             "policy_sha256": coverage.policy_fingerprint(repository, head, verify_executing=True),
+             "module_fingerprints": before, "targets": targets,
+             "issuer": {"workflow": publisher.WORKFLOW, "run_id": issuer["id"], "sha": base},
+             "source_job_graph": {"schema_version": 1, "runtime_policy": "full",
+                                  "expected_scenario_jobs": sorted(expected),
+                                  "observed_scenario_jobs": sorted(expected)},
+             "review_artifacts": reviews, "public_artifacts": public}
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(zipfile.ZipInfo(CERTIFICATE_FILE, date_time=(2026, 9, 1, 12, 0, 0)),
+                         coverage.admission.canonical(value))
+    certificate = api.add_artifact(issuer["id"], coverage.BASELINE_ARTIFACT_NAME, stream.getvalue())
+    after = coverage.module_fingerprints(repository, head)
+    unaffected = sorted(set(before) - set(plan.affected_modules))
+    if any(before[name] != after[name] for name in unaffected):
+        raise ValueError("the selected change moved a module outside its selection")
+    proof = {"schema_version": 1, "selective": True, "reason": selected.reason,
+             "selection_sha256": selected.sha256,
+             "baseline": {"id": certificate["id"], "owner_run_id": issuer["id"], "source_sha": base,
+                          "name": certificate["name"], "digest": certificate["digest"],
+                          "size_in_bytes": certificate["size_in_bytes"]},
+             "baseline_sha256": coverage.digest(coverage.admission.canonical(value)),
+             "public_baseline_artifacts": public, "baseline_source_run_id": source_run,
+             "unchanged_module_fingerprints": {name: before[name] for name in unaffected}}
+    return {FEATURE_SELECTION: {"admission": selected.to_dict(), "coverage": proof}}
 
 
 def _pair_image(png: bytes, scratch: Path, bundle: Path, cache: dict[str, dict[str, Any]]) -> dict[str, Any]:

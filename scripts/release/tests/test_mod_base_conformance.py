@@ -4,10 +4,12 @@ The pinned kit simulates complete generations for the anchor key ``mc1.20.1`` (F
 the lossless anchor, every optional-mod lane) and the newest no-remap key ``mc26.3`` (every
 optional mod not applicable), with the ``mod-compatibility`` family, through its own simulated
 GitHub: producer, admission, collection, build, refresh, rotations and later generations whose
-family legs are carried forward, and a handoff reusing a pull-request execution whose
-``quick-skin.runtime_source`` the adapter authenticates against seeded ``ci_reuse`` artifacts. A
-skipped variant does not fail the run, so the variants Quick Skin expects are asserted here, with
-the documented reason for each one it cannot run.
+family legs are carried forward, a handoff reusing a pull-request execution whose
+``quick-skin.runtime_source`` the adapter authenticates against seeded ``ci_reuse`` artifacts, and
+a selective hud-preview generation one commit after the published baseline, admitted from that
+real Git diff and composed with the baseline its seeded coverage certificate names. A skipped
+variant does not fail the run, so the variants Quick Skin expects are asserted here, with the
+documented reason for each one it cannot run.
 """
 
 from __future__ import annotations
@@ -72,16 +74,19 @@ class ModBaseConformanceTest(unittest.TestCase):
         self.assertEqual("passed", self.report["variants"]["delegated"])
         self.assertIn("authenticate_extensions", self.report["hooks"])
 
+    def test_a_real_selection_is_composed_with_its_certified_baseline(self) -> None:
+        # mod_base_fixtures.selected_extensions admits the diff from the baseline commit to the
+        # kit's selected head (SELECTED_CHANGE, a hud-preview source): its two HUD checkpoints
+        # re-capture two lanes of mc1.20.1 partly, and every other lane stays the baseline's.
+        self.assertEqual("passed", self.report["variants"]["selected"])
+        self.assertEqual({"baseline": 12, "mixed": 2, "selected": 0}, self.report["site"]["composed_lanes"])
+        self.assertIn("compose", self.report["hooks"])
+
     def test_skipped_variants_are_exactly_the_documented_ones(self) -> None:
         self.assertEqual({
             "attested": "skipped: config.source.attestation_job is null",
             "newest-run": "skipped: config.source.require_newest_run is false",
-            # The kit simulates the selected handoff at its baseline's own commit, where Quick
-            # Skin's Git admission (a non-empty diff from the baseline commit) selects nothing;
-            # test_mod_base_adapter.py (ComposedEvidenceTest) runs compose and R3 on real selections.
-            "selected": "skipped: the fixtures module defines no selected_extensions",
         }, {name: value for name, value in self.report["variants"].items() if value.startswith("skipped")})
-        self.assertNotIn("composed_lanes", self.report["site"])
 
     def test_hooks_budgets_and_site_facts(self) -> None:
         self.assertTrue({"targets", "expectation", "collect", "anchor_selection", "family_validate",

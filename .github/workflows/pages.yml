@@ -105,7 +105,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    uses: The-Plum-Team/mod-base/.github/workflows/publish.yml@fb575eba9bc819b18fede944f368ef2c99eb3aab # v1.0.0
+    uses: The-Plum-Team/mod-base/.github/workflows/publish.yml@c6b5e1687ef831d9c5f0ff0903a17016d3be5f96 # v1.0.1
     with:
       kit-sha: ${{ needs.verify-kit.outputs.kit_sha }}
       operation: ${{ github.event_name == 'schedule' && 'recovery' || inputs.operation }}
@@ -186,7 +186,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    uses: The-Plum-Team/mod-base/.github/workflows/finalize.yml@fb575eba9bc819b18fede944f368ef2c99eb3aab # v1.0.0
+    uses: The-Plum-Team/mod-base/.github/workflows/finalize.yml@c6b5e1687ef831d9c5f0ff0903a17016d3be5f96 # v1.0.1
     with:
       kit-sha: ${{ needs.verify-kit.outputs.kit_sha }}
       bundle-keys: ${{ needs.publish.outputs.bundle_keys }}
@@ -253,7 +253,7 @@ jobs:
     permissions:
       actions: write
       contents: read
-    uses: The-Plum-Team/mod-base/.github/workflows/rotate.yml@fb575eba9bc819b18fede944f368ef2c99eb3aab # v1.0.0
+    uses: The-Plum-Team/mod-base/.github/workflows/rotate.yml@c6b5e1687ef831d9c5f0ff0903a17016d3be5f96 # v1.0.1
     with:
       kit-sha: ${{ needs.verify-kit.outputs.kit_sha }}
       pages-run-id: ${{ inputs.run_id }}
