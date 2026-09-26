@@ -191,6 +191,9 @@ GitHub's tag lookup, which never returns a draft, so every ledger read failed be
 marketplace upload. The offline rehearsal had simulated that lookup returning the draft.
 `publication_state.py` now finds the single release with the exact tag in the bounded release
 listing and rereads it by its immutable ID, and the rehearsal models GitHub's draft visibility.
+The first recovery then showed that a draft edited without `tag_name` loses its tag and becomes
+`untagged-…`, so the ledger's confirming read failed after its first write. Every ledger write now
+restates the exact tag, and the rehearsal detaches a draft edited without it.
 
 Such a tag keeps its version, tag and bytes. Dispatch the same `release-recovery.yml` with the
 target's successful validation-only rehearsal on the tagged commit. When that bundle's SBOM is
