@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Recover only a missing SBOM serial number while retaining a tested immutable release."""
+"""Recover a tested immutable release after a repaired SBOM or publication-protocol defect.
+
+A bundle whose SBOM lacks only its serial number receives that one repair. A complete bundle is
+published byte for byte; only the protected publication implementation differs from its tag.
+"""
 
 from __future__ import annotations
 
@@ -37,13 +41,20 @@ METADATA_REPAIR_PATHS = frozenset({
     "scripts/release/generate_sbom.py",
     "scripts/release/github_governance.py",
     "scripts/release/github_release.py",
+    "scripts/release/publication_state.py",
     "scripts/release/recover_sbom_release.py",
+    "scripts/release/rehearse_publication.py",
     "scripts/release/tests/test_sbom.py",
     "scripts/release/tests/test_github_governance.py",
     "scripts/release/tests/test_github_release.py",
+    "scripts/release/tests/test_publication_rehearsal.py",
+    "scripts/release/tests/test_publication_state.py",
     "scripts/release/tests/test_recover_sbom_release.py",
     "scripts/ci/tests/test_workflow_security.py",
 })
+
+# The repair itself must change the SBOM generator or the publication ledger protocol.
+REPAIRED_PROTOCOLS = frozenset({"scripts/release/generate_sbom.py", "scripts/release/publication_state.py"})
 
 
 def require(condition: bool, message: str) -> None:
@@ -60,8 +71,9 @@ def git(*arguments: str) -> str:
 def check_source_diff(paths: list[str]) -> None:
     require(bool(paths) and len(paths) == len(set(paths)), "empty or duplicate recovery diff")
     require(set(paths) <= METADATA_REPAIR_PATHS,
-            "recovery cannot cross changes outside the SBOM metadata repair")
-    require("scripts/release/generate_sbom.py" in paths, "source has no SBOM generator repair")
+            "recovery cannot cross changes outside the release metadata repair")
+    require(bool(set(paths) & REPAIRED_PROTOCOLS),
+            "source has no SBOM generator or publication protocol repair")
 
 
 def authenticate_identity(api: Api, tag: str, policy_sha: str) -> tuple[Any, dict[str, Any], str]:
@@ -191,6 +203,13 @@ def repair_document(original: bytes, corrected: dict[str, Any]) -> bytes:
     return canonical_bytes(corrected)
 
 
+def repaired_sbom(original: bytes, corrected: dict[str, Any]) -> bytes | None:
+    """Return the one permitted SBOM repair, or None when the tagged SBOM is already complete."""
+    if original == canonical_bytes(corrected):
+        return None
+    return repair_document(original, corrected)
+
+
 def verify_provenance(api: Api, stage: Path, manifest: dict[str, Any], tag: str, source_sha: str) -> None:
     for record in manifest["artifacts"]:
         raw = subprocess.check_output([
@@ -247,8 +266,13 @@ def prepare(api: Api, stage: Path, run_id: int, artifact_id: int, identity: Any,
     validate_inventory(stage, manifest)
     corrected = build_cyclonedx(ROOT, matrix_path, matrix, manifest, stage,
                                 expected_commit=source_sha, expected_release=identity.manifest())
-    expected = repair_document((stage / SBOM_RELATIVE_PATH).read_bytes(), corrected)
+    expected = repaired_sbom((stage / SBOM_RELATIVE_PATH).read_bytes(), corrected)
     verify_provenance(api, stage, manifest, identity.tag, source_sha)
+    if expected is None:
+        # Only the publication protocol was repaired: every staged byte, the manifest included,
+        # must stay identical to the tagged bundle and any draft assets it already uploaded.
+        verify_stage(stage, identity, matrix, source_sha)
+        return hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     manifest["sbom"] = stage_sbom(ROOT, matrix_path, stage, matrix, manifest)
     require((stage / SBOM_RELATIVE_PATH).read_bytes() == expected, "SBOM regeneration differs")
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -301,7 +325,7 @@ def main() -> int:
         print(json.dumps(output, sort_keys=True))
         return 0
     except (ValueError, RuntimeError, OSError, KeyError, TypeError, subprocess.SubprocessError) as exc:
-        parser.exit(1, f"SBOM release recovery failed: {exc}\n")
+        parser.exit(1, f"release recovery failed: {exc}\n")
 
 
 if __name__ == "__main__":

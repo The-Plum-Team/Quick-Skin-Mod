@@ -85,10 +85,47 @@ class PublicationStateTest(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 ledger.bind({**self.state, key: value}, self.matrix, self.path)
 
+    @staticmethod
+    def releases_api(release, *, listing=None):
+        api = Mock(prefix="repos/owner/repo/")
+
+        def json(endpoint):
+            if endpoint.startswith("releases?"):
+                page = int(endpoint.rsplit("=", 1)[1])
+                pages = listing if listing is not None else [[release]]
+                return copy.deepcopy(pages[page - 1] if page <= len(pages) else [])
+            if endpoint == f"releases/{release['id']}":
+                return copy.deepcopy(release)
+            raise AssertionError(f"unexpected release lookup: {endpoint}")
+
+        api.json.side_effect = json
+        return api
+
+    def test_draft_is_located_through_the_listing_and_read_by_immutable_id(self):
+        tag = self.state["tag"]
+        draft = {"id": 777, "tag_name": tag, "draft": True, "body": "notes"}
+        others = [{"id": i, "tag_name": f"mc26.1-v0.{i}", "draft": False} for i in range(1, 101)]
+        api = self.releases_api(draft, listing=[others, [draft]])
+        self.assertEqual(ledger.read_release(api, tag), draft)
+        endpoints = [call.args[0] for call in api.json.call_args_list]
+        self.assertEqual(endpoints, ["releases?per_page=100&page=1", "releases?per_page=100&page=2",
+                                     "releases/777"])
+
+    def test_missing_duplicate_or_retagged_release_is_rejected(self):
+        tag = self.state["tag"]
+        draft = {"id": 777, "tag_name": tag, "draft": True, "body": "notes"}
+        for listing in ([[]], [[draft, {**draft, "id": 778}]]):
+            with self.subTest(count=len(listing[0])), self.assertRaisesRegex(ValueError, "no single"):
+                ledger.read_release(self.releases_api(draft, listing=listing), tag)
+        retagged = self.releases_api({**draft, "tag_name": "mc26.1-v9.9.9"}, listing=[[draft]])
+        with self.assertRaisesRegex(ValueError, "identity differs"):
+            ledger.read_release(retagged, tag)
+        with self.assertRaisesRegex(ValueError, "pagination"):
+            ledger.read_release(self.releases_api(draft, listing=[[{"id": 1}] * 100] * 11), tag)
+
     def test_stale_body_or_published_release_cannot_be_mutated(self):
         release = {"id": 1, "tag_name": self.state["tag"], "draft": True, "body": "notes"}
-        api = Mock()
-        api.json.return_value = {**release, "body": "concurrent edit"}
+        api = self.releases_api({**release, "body": "concurrent edit"})
         with patch.object(ledger.subprocess, "run") as mutation:
             with self.assertRaisesRegex(ValueError, "release body changed"):
                 ledger.save(api, release, self.state)
@@ -98,8 +135,7 @@ class PublicationStateTest(unittest.TestCase):
 
     def test_unconfirmed_body_write_cannot_authorize_upload(self):
         release = {"id": 1, "tag_name": self.state["tag"], "draft": True, "body": "notes"}
-        api = Mock(prefix="repos/owner/repo/")
-        api.json.return_value = release
+        api = self.releases_api(release)
         with patch.object(ledger.subprocess, "run") as mutation:
             with self.assertRaisesRegex(ValueError, "write was not confirmed"):
                 ledger.save(api, release, self.state)

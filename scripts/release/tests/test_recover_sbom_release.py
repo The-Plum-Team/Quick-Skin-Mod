@@ -112,6 +112,27 @@ class SbomRecoveryTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             recovery.check_source_diff([])
 
+    def test_publication_protocol_repair_is_a_recoverable_source_diff(self) -> None:
+        recovery.check_source_diff(["scripts/release/publication_state.py",
+                                    "scripts/release/rehearse_publication.py",
+                                    "scripts/release/tests/test_publication_state.py"])
+        with self.assertRaisesRegex(ValueError, "no SBOM generator or publication protocol repair"):
+            recovery.check_source_diff(["RELEASING.md", "scripts/release/rehearse_publication.py"])
+
+    def test_complete_tagged_sbom_is_kept_byte_for_byte(self) -> None:
+        fixture = test_sbom.CycloneDxSbomTest()
+        fixture.setUp()
+        self.addCleanup(fixture.tearDown)
+        corrected = json.loads(fixture.build())
+        self.assertIsNone(recovery.repaired_sbom(recovery.canonical_bytes(corrected), corrected))
+        original = copy.deepcopy(corrected)
+        original.pop("serialNumber")
+        payload = (json.dumps(original, ensure_ascii=False, sort_keys=True,
+                              separators=(",", ":")) + "\n").encode()
+        self.assertEqual(recovery.repaired_sbom(payload, corrected), recovery.canonical_bytes(corrected))
+        with self.assertRaisesRegex(ValueError, "more than"):
+            recovery.repaired_sbom(payload.replace(b'"CycloneDX"', b'"Other"'), corrected)
+
     def test_only_adds_the_missing_serial_number_to_canonical_original_bytes(self) -> None:
         fixture = test_sbom.CycloneDxSbomTest()
         fixture.setUp()

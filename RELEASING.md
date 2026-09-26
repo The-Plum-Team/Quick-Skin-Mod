@@ -179,10 +179,26 @@ claim that its current orchestration commit produced the original JARs. An advan
 unavailable source archive, changed non-repair input or byte conflict stops recovery.
 
 This path recovered `mc26.1-v3.0.0` once, in run `34722137405`. Its admission requires a
-`generate_sbom.py` repair between the tag and protected `master` and no other change outside its
-allowlist, so it cannot admit a tag built with the deterministic generator, or any tag once
-`master` carries unrelated changes. It remains the audited record of that recovery; a new
-publication defect needs its own reviewed recovery or a new logical version.
+`generate_sbom.py` or `publication_state.py` repair between the tag and protected `master` and
+no other change outside its allowlist, so it cannot admit any tag once `master` carries unrelated
+changes. Keep `master` at the repair until every recovery run it serves has finished.
+
+### Recover an unpublished release after a publication-ledger repair
+
+The first tag runs of the durable ledger (`mc1.20.1-v3.0.0` through `mc1.21.11-v3.0.0` and
+`mc26.3-v3.0.0`, tagged at `fd8e7dbf`) could not publish: they located the draft through
+GitHub's tag lookup, which never returns a draft, so every ledger read failed before any
+marketplace upload. The offline rehearsal had simulated that lookup returning the draft.
+`publication_state.py` now finds the single release with the exact tag in the bounded release
+listing and rereads it by its immutable ID, and the rehearsal models GitHub's draft visibility.
+
+Such a tag keeps its version, tag and bytes. Dispatch the same `release-recovery.yml` with the
+target's successful validation-only rehearsal on the tagged commit. When that bundle's SBOM is
+already complete, recovery adds no repair: it authenticates the same evidence as above and
+publishes every staged byte, the manifest included, unchanged, so it also matches draft assets
+that the failed tag run had already uploaded. A failed tag run's pending `release` approvals
+must be rejected rather than approved, because its tagged implementation still has the defect.
+Pending drafts created before the fix may lack a ledger; recovery registers one under the lock.
 
 Actions storage follows the same recovery boundary. Ordinary build, diagnostics, packaged-E2E,
 review, publication-receipt, synchronization, and Pages handoff artifacts are transient and expire

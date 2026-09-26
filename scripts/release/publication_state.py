@@ -28,6 +28,7 @@ from reconcile_publication import (PublicationPendingError, Reconciliation, insp
 MARKER = "<!-- quick-skin-publication-state:v1\n"
 END = "\n-->"
 MAX_BODY_BYTES = 60_000
+MAX_RELEASE_PAGES = 10
 TAG = re.compile(r"mc[0-9]+(?:\.[0-9]+){1,2}-v[0-9A-Za-z][0-9A-Za-z._-]{0,100}")
 SHA = re.compile(r"[0-9a-f]{40}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
@@ -105,10 +106,29 @@ def encode(body: str, state: dict[str, Any]) -> str:
     return result
 
 
+def release_id(api: Api, tag: str) -> int:
+    # GitHub's tag lookup omits drafts, and every ledger write happens while the release is one.
+    matches: list[int] = []
+    for page in range(1, MAX_RELEASE_PAGES + 1):
+        releases = api.json(f"releases?per_page=100&page={page}")
+        require(isinstance(releases, list) and len(releases) <= 100, "invalid release inventory")
+        for release in releases:
+            require(isinstance(release, dict) and type(release.get("id")) is int and release["id"] > 0,
+                    "malformed release inventory")
+            if release.get("tag_name") == tag:
+                matches.append(release["id"])
+        if len(releases) < 100:
+            require(len(matches) == 1, "release tag has no single GitHub release")
+            return matches[0]
+    raise ValueError("release inventory exceeds its pagination limit")
+
+
 def read_release(api: Api, tag: str) -> dict[str, Any]:
     require(TAG.fullmatch(tag) is not None, "invalid release tag")
-    release = api.json(f"releases/tags/{tag}")
-    require(isinstance(release, dict) and release.get("tag_name") == tag
+    identifier = release_id(api, tag)
+    release = api.json(f"releases/{identifier}")
+    require(isinstance(release, dict) and release.get("id") == identifier
+            and release.get("tag_name") == tag
             and type(release.get("id")) is int and release["id"] > 0
             and type(release.get("draft")) is bool, "GitHub release identity differs")
     decode(release.get("body") or "")
