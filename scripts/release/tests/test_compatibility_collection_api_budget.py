@@ -216,12 +216,16 @@ class CompatibilityCollectionApiBudgetTest(unittest.TestCase):
                     self.select(api, validated_owners=memo)
                 self.assertEqual({}, memo)
 
-    def collect(self, api, output):
+    def collect(self, api, output, *, shared=False, built=None):
         identity = {"source_sha": SHA, "target_sha": SHA, "branch": "master",
                     "bundle_key": "mc1.20.1"}
+        if shared:
+            identity["matrix_sha256"] = "d" * 64
         rows = {"fabric-ears": {}, "forge-ears": {}}
 
         def build(**arguments):
+            if built is not None:
+                built.append(arguments["publication_run"])
             # Image/schema validation is covered separately; this boundary checks that the
             # real downloader and collector preserve the latest capsule/report bytes.
             for index, lane in enumerate(sorted(rows)):
@@ -255,6 +259,27 @@ class CompatibilityCollectionApiBudgetTest(unittest.TestCase):
         self.assertEqual(Counter({item: 2 for item in (1, 2, 10, 11, 20, 21, 40, 41)}),
                          Counter(api.artifact_reads))
         self.assertEqual(Counter(api.artifact_reads), Counter(api.downloads))
+
+    def test_shared_bundle_records_its_own_live_publication_run_once(self):
+        api = CollectionApi()
+        api.owners[300] = owner(300, status="in_progress", conclusion=None, event="repository_dispatch",
+                                created_at="2026-09-08T20:10:00Z", display_title="AI mod compatibility review")
+        built = []
+        with tempfile.TemporaryDirectory() as temporary:
+            destination, summary = self.collect(api, Path(temporary) / "shared", shared=True, built=built)
+            self.assertTrue((destination / "fixture.json").is_file())
+        self.assertEqual([{"event": "repository_dispatch", "created_at": "2026-09-08T20:10:00Z",
+                           "display_title": "AI mod compatibility review"}], built)
+        self.assertEqual(1, api.owner_reads.count(300))
+        self.assertNotIn("artifact_name", summary)
+        historical = []
+        with tempfile.TemporaryDirectory() as temporary:
+            self.collect(CollectionApi(), Path(temporary) / "historical", built=historical)
+        self.assertEqual([None], historical)
+        api.owners[300]["status"] = "completed"
+        with tempfile.TemporaryDirectory() as temporary, \
+                self.assertRaisesRegex(collector.CollectionError, "not this protected publication run"):
+            self.collect(api, Path(temporary) / "finished", shared=True)
 
     def test_owner_memo_cannot_bypass_the_report_exact_id_download_guard(self):
         api = CollectionApi()

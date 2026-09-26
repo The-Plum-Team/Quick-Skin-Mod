@@ -99,6 +99,11 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Verify the pinned mod-base kit tree
+        uses: The-Plum-Team/mod-base/actions/setup@fb575eba9bc819b18fede944f368ef2c99eb3aab # v1.0.0
+        with:
+          install-imaging: "false"
+
       - name: Validate central matrix
         run: python scripts/release/matrix.py --matrix release/release-matrix.json > /dev/null
 
@@ -142,11 +147,20 @@ jobs:
             --profile-branch "$profile_branch" \
             --check
 
-      - name: Validate Python and JavaScript syntax
+      # PR code, like every policy test: the pin must be a released mod-base commit reachable
+      # from its protected main (impostor defense), and every managed file must equal the kit.
+      # Only the network verification receives the read-only token.
+      - name: Verify the pinned mod-base kit and managed files
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          python -m compileall -q e2e scripts
-          node --check site/assets/site.js
-          node --check site/assets/gallery.js
+          set -euo pipefail
+          python3 scripts/ci/mod_base_kit.py verify --network
+          env -u GH_TOKEN python3 scripts/ci/mod_base_kit.py run template check --repo .
+
+      - name: Validate Python syntax
+        run: python -m compileall -q e2e scripts
 
       - name: Upload build diagnostics
         if: failure()
@@ -179,6 +193,9 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
+      # The kit tree is verified against this checkout's pin and exported to the mod tests.
+      - name: Verify the pinned mod-base kit tree
+        uses: The-Plum-Team/mod-base/actions/setup@fb575eba9bc819b18fede944f368ef2c99eb3aab # v1.0.0
       - name: Install hash-locked Pages image dependency
         run: >-
           python -m pip install
@@ -234,6 +251,9 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
+      # The kit tree is verified against this checkout's pin and exported to the mod tests.
+      - name: Verify the pinned mod-base kit tree
+        uses: The-Plum-Team/mod-base/actions/setup@fb575eba9bc819b18fede944f368ef2c99eb3aab # v1.0.0
       - name: Install hash-locked Pages image dependency
         run: >-
           python -m pip install

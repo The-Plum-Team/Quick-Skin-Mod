@@ -1,0 +1,11 @@
+# Protected control-plane, publication and agent-guidance paths request the owner's review.
+# The governed pull-request rule keeps `require_code_owner_review` off
+# (scripts/release/github_governance.py), so these rules assign reviewers without blocking a
+# merge. mod-base `template check` requires every rule below to keep at least one owner; an
+# owner-less rule would remove ownership instead.
+/.github/ @AkaNebur
+/site/ @AkaNebur
+/scripts/pages/ @AkaNebur
+/scripts/ci/ @AkaNebur
+/AGENTS.md @AkaNebur
+/docs/ai/ @AkaNebur

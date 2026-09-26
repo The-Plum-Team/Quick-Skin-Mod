@@ -1,6 +1,7 @@
 # ADR 0004: Anchor AI visual review to Minecraft 1.20.1
 
-- Status: Superseded in part by ADR 0005
+- Status: Superseded in part by ADR 0005, and by
+  [ADR 0010](0010-delegate-public-evidence-to-mod-base.md) on 2026-09-25
 - Date: 2026-08-09
 - Updated: 2026-08-22
 - Scope: advisory packaged-E2E image review across release branches
@@ -8,6 +9,15 @@
 ADR 0005 supersedes this record's cross-loader anchor-establishment and all-at-once propagation
 rules. Its lossless semantic `capture_id` comparison, bounded queue, and selective-review mechanics
 remain active for versions reviewed after the anchor is independently certified.
+
+ADR 0010 supersedes this record's reference source and raw retention. No reviewer selects a
+lossless `pages-e2e-<branch>` handoff any more: the historical reference comparison in
+`visual-review.yml` and `visual-review-drain.yml` fails closed, and tag `pre-mod-base-gallery`
+keeps it auditable. The lossless 1.20.1 frames are retained as the kit's
+`mb-anchor--mc1.20.1--…` artifact under its anchor rule, and shared-source curation takes each
+later version's reference from the same run's Fabric 1.20.1 frames. The semantic `capture_id`
+pairing, the exact 1920x1080 comparison, the bounded queue and the selective-review mechanics
+remain active.
 
 ## Context
 

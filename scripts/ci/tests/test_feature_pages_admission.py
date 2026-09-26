@@ -1,9 +1,14 @@
+"""``feature_pages.compose_selected`` admits the runtime, the selection certificate and the exact
+retained baseline before any baseline byte is downloaded or composed."""
+
 from __future__ import annotations
 
 import copy
 import io
 import json
 import sys
+import tempfile
+import types
 import unittest
 import zipfile
 from pathlib import Path
@@ -11,131 +16,160 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts/ci"))
-sys.path.insert(0, str(ROOT / "scripts/release/tests"))
+sys.path.insert(0, str(ROOT / "scripts/ci/tests"))
 
-import feature_pages as pages
-import test_feature_pages as image_fixtures
+import mod_base_path  # noqa: E402
+
+mod_base_path.kit_root()
+
+import feature_pages as pages  # noqa: E402
+import feature_evidence  # noqa: E402
+import feature_review  # noqa: E402
+
+KEY = "mc1.20.1"
+BASE, SOURCE = "a" * 40, "b" * 40
 
 
 class PublicApi(pages.publisher.Api):
-    def __init__(self, fixture):
+    def __init__(self):
         super().__init__("The-Plum-Team/Quick-Skin-Mod")
-        self.current = fixture.source_sha
-        self.source = {"id": 55, "created_at": "2026-09-06T02:00:00Z", "head_branch": "master",
-            "head_sha": fixture.source_sha, "head_repository": {"full_name": self.repository},
-            "path": ".github/workflows/on-demand-e2e.yml", "event": "workflow_dispatch",
-            "status": "completed", "conclusion": "success"}
-        names = [pages.ci_reuse.POLICY_JOB, pages.ci_reuse.BUILD_JOB, pages.ci_reuse.GATE_JOB,
-                 *pages.ci_reuse.expected_scenario_jobs_for(pages.coverage.DEFAULT_MATRIX, "pr-anchors")]
-        self.runtime_jobs = [{"jobs": [{"name": name, "status": "completed", "conclusion": "success"}
-                                      for name in names]}]
-        self.owner = {"id": 8000, "head_branch": "master", "head_sha": fixture.baseline_sha,
-            "head_repository": {"full_name": self.repository}, "path": ".github/workflows/pages.yml",
-            "event": "workflow_dispatch", "status": "completed", "conclusion": "success"}
-        self.record = {"id": 20000, "name": pages.publisher.public_baseline_name(fixture.key, fixture.baseline_sha, 42),
-            "expired": False, "workflow_run": {"id": 8000, "head_branch": "master", "head_sha": fixture.baseline_sha}}
+        self.current = SOURCE
+        self.owner = {"id": 8000, "run_attempt": 1, "head_branch": "master", "head_sha": BASE,
+                      "head_repository": {"full_name": self.repository}, "path": ".github/workflows/pages.yml",
+                      "event": "workflow_dispatch", "status": "completed", "conclusion": "success"}
+        build, deploy, refresh = pages.publisher.PUBLIC_BASELINE_JOBS
         self.jobs_record = [{"jobs": [{"name": name, "status": "completed", "conclusion": "success"}
-            for name in ("Build atomic static site", "Deploy GitHub Pages", f"Refresh evidence cache for {fixture.key}")]}]
+                                      for name in (build, deploy, refresh.format(key=KEY))]}]
         buffer = io.BytesIO()
-        root = fixture.root / "base-compact"
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-            for path in root.rglob("*"):
-                if path.is_file(): archive.writestr(path.relative_to(root).as_posix(), path.read_bytes())
+            archive.writestr("manifest.json", b"{}\n")
         self.raw = buffer.getvalue()
-        self.record.update(size_in_bytes=len(self.raw), digest="sha256:" + pages.coverage.digest(self.raw))
+        self.record = {"id": 20000, "name": pages.publisher.public_baseline_name(KEY, BASE, 42), "expired": False,
+                       "size_in_bytes": len(self.raw), "digest": "sha256:" + pages.coverage.digest(self.raw),
+                       "workflow_run": {"id": 8000, "head_branch": "master", "head_sha": BASE}}
         self.downloads = []
-
-    def run(self, identifier):
-        if identifier == 55: return self.source
-        if identifier == 8000: return self.owner
-        raise AssertionError("unexpected run")
-
-    def artifact(self, identifier):
-        if identifier != 20000: raise AssertionError("unexpected artifact")
-        return self.record
-
-    def jobs(self, owner):
-        if owner["id"] == 55: return self.runtime_jobs
-        if owner["id"] != 8000: raise AssertionError("unexpected job owner")
-        return self.jobs_record
-
-    def artifacts(self, *, run_id=None, name=None):
-        if run_id != 55 or name is not None: raise AssertionError("unexpected artifact inventory")
-        return []  # Admission and the retained baseline are exercised below; no reused-source wrapper.
 
     def current_sha(self):
         return self.current
 
-    def get(self, endpoint, *, maximum):
-        if endpoint != self.prefix + "actions/artifacts/20000/zip": raise AssertionError("unexpected download")
-        self.downloads.append(endpoint)
-        if len(self.raw) > maximum: raise ValueError("fixture exceeds archive bound")
-        return self.raw
+    def run(self, identifier):
+        if identifier != 8000:
+            raise AssertionError("unexpected run")
+        return self.owner
+
+    def artifact(self, identifier):
+        if identifier != 20000:
+            raise AssertionError("unexpected artifact")
+        return self.record
+
+    def jobs(self, owner):
+        if owner["id"] != 8000:
+            raise AssertionError("unexpected job owner")
+        return self.jobs_record
+
+    def archive(self, metadata, *, maximum):
+        self.downloads.append(metadata["id"])
+        if len(self.raw) > maximum:
+            raise ValueError("fixture exceeds archive bound")
+        return pages.publisher.check_archive(self.raw, metadata)
 
 
-class FeaturePagesAdmissionTest(unittest.TestCase):
+class ComposeSelectedAdmissionTest(unittest.TestCase):
     def setUp(self):
-        self.fixture = image_fixtures.FeaturePagesTest()
-        self.fixture.setUp()
-        self.addCleanup(self.fixture.doCleanups)
-        self.api = PublicApi(self.fixture)
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.api = PublicApi()
         metadata = pages.publisher.validate_public_owner(self.api.record, self.api.owner, self.api.jobs_record,
-            github_repository=self.api.repository, source_sha=self.fixture.baseline_sha, source_run_id=42,
-            bundle_key=self.fixture.key)
-        self.proof = {"baseline_source_run_id": 42, "public_baseline_artifacts": {self.fixture.key: metadata}}
+            github_repository=self.api.repository, source_sha=BASE, source_run_id=42, bundle_key=KEY)
+        self.proof = {"baseline_source_run_id": 42, "public_baseline_artifacts": {KEY: metadata}}
+        self.selection = types.SimpleNamespace(base_commit=BASE)
+        self.manifest = {"key": KEY, "repository": self.api.repository,
+                         "subject": {"branch": "master", "commit": SOURCE, "tree": "c" * 40}}
+        self.extensions = {pages.FEATURE_SELECTION: {"admission": {}, "coverage": {}}}
+        self.tested = 42
 
-    def collect(self, source="selected", output="published", owner=55, verify_error=None):
-        scratch = self.fixture.root / (output + "-scratch")
+    def compose(self, name="composed", *, verify_error=None):
+        scratch = self.root / f"{name}-scratch"
         scratch.mkdir()
-        with patch.object(pages.consumer, "verify", return_value=(self.fixture.selection, self.proof),
-                          side_effect=verify_error) as admission, patch.object(pages.publisher, "_get", side_effect=self.api.get):
-            result = pages.collect(self.api, repository=ROOT, evidence_root=self.fixture.root / source,
-                output=self.fixture.root / output, bundle_key=self.fixture.key, source_sha=self.fixture.source_sha,
-                artifact_run_id=owner, scratch=scratch)
-            self.assertEqual(self.fixture.source_sha, admission.call_args.kwargs["head"])
-            self.assertEqual(self.fixture.source_sha, admission.call_args.kwargs["policy"])
-            self.assertEqual(55, admission.call_args.kwargs["run_id"])
+        runtime = types.SimpleNamespace(reference=None)
+        with patch.object(pages, "runtime_of", return_value=runtime) as runtime_of, \
+                patch.object(feature_evidence, "read_selection") as read_selection, \
+                patch.object(feature_review, "verify_selection", return_value=(self.selection, self.proof),
+                             side_effect=verify_error) as verify, \
+                patch.object(feature_evidence, "compose") as compose:
+            result = pages.compose_selected(
+                self.api, repository=ROOT, key=KEY, manifest=self.manifest, selected_root=self.root / "selected",
+                output_root=self.root / name, extensions=self.extensions, complete_expectation={"key": KEY},
+                composed_extensions={}, scratch=scratch)
+        runtime_of.assert_called_once_with(self.api, self.manifest, self.extensions)
+        read_selection.assert_called_once_with(self.extensions[pages.FEATURE_SELECTION])
+        self.assertIs(runtime, verify.call_args.args[2])
+        self.assertEqual({"base_commit": BASE, "baseline_run_id": 42, "baseline_tested_run_id": self.tested,
+                          "key": KEY,
+                          "baseline_artifact": {name: self.api.record[name] for name in ("id", "name", "digest")}},
+                         {name: compose.call_args.kwargs[name]
+                          for name in ("base_commit", "baseline_run_id", "baseline_tested_run_id", "key",
+                                       "baseline_artifact")})
         return result
 
-    def test_current_raw_and_composed_cache_reauthenticate_the_exact_baseline_before_reuse(self):
-        output = self.collect()
-        value = pages.evidence.validate_bundle(output.parent, output.name, expected_kind="compact")
-        self.assertEqual(180, len(value["frames"]))
-        self.assertEqual(1, len(self.api.downloads))
-        cached = self.collect("published", "revalidated", owner=None)
-        self.assertEqual((output / "manifest.json").read_bytes(), (cached / "manifest.json").read_bytes())
-        self.assertEqual(2, len(self.api.downloads))
+    def test_the_certified_baseline_is_authenticated_downloaded_once_and_composed(self):
+        self.assertEqual({"id": 20000, "name": self.api.record["name"], "digest": self.api.record["digest"]},
+                         self.compose())
+        self.assertEqual([20000], self.api.downloads)
 
-    def test_failed_execution_baseline_or_handoff_ownership_never_decodes_public_images(self):
-        with self.assertRaises(ValueError): self.collect(verify_error=ValueError("unproven baseline"))
-        self.assertEqual([], self.api.downloads)
-        with self.assertRaises(ValueError): self.collect(output="foreign-owner", owner=56)
-        self.assertEqual([], self.api.downloads)
+    def test_failed_selection_foreign_owner_or_expired_baseline_never_downloads(self):
+        with self.assertRaisesRegex(ValueError, "unproven baseline"):
+            self.compose("unproven", verify_error=ValueError("unproven baseline"))
+        self.api.owner["event"] = "repository_dispatch"
+        with self.assertRaisesRegex(ValueError, "successful protected Pages owner"):
+            self.compose("foreign-owner")
+        self.api.owner["event"] = "workflow_dispatch"
         self.api.record["expired"] = True
-        with self.assertRaises(ValueError): self.collect(output="expired-baseline")
+        with self.assertRaisesRegex(ValueError, "successful protected Pages owner"):
+            self.compose("expired")
         self.assertEqual([], self.api.downloads)
 
-    def test_digest_metadata_capture_and_source_substitutions_cannot_publish(self):
-        self.api.current = "c" * 40
-        with self.assertRaisesRegex(ValueError, "advanced"): self.collect(output="source-advanced")
-        self.assertFalse((self.fixture.root / "source-advanced" / self.fixture.key).exists())
-        self.api.current = self.fixture.source_sha
-        self.api.downloads.clear()
-        original = copy.deepcopy(self.api.record)
-        self.api.record["size_in_bytes"] += 1
-        with self.assertRaises(ValueError): self.collect(output="metadata")
+    def test_certificate_substitution_archive_digest_and_source_moves_cannot_compose(self):
+        self.proof["public_baseline_artifacts"] = {}
+        with self.assertRaisesRegex(ValueError, "does not contain this target"):
+            self.compose("missing")
+        self.proof["public_baseline_artifacts"] = {KEY: {**self.api.record, "owner_run_id": 8000,
+                                                          "digest": "sha256:" + "0" * 64}}
+        self.proof["public_baseline_artifacts"][KEY].pop("expired")
+        self.proof["public_baseline_artifacts"][KEY].pop("workflow_run")
+        with self.assertRaisesRegex(ValueError, "differs from the complete coverage certificate"):
+            self.compose("substituted")
         self.assertEqual([], self.api.downloads)
-        self.api.record = original
-        raw = self.api.raw
-        self.api.raw = raw[:-1] + bytes([raw[-1] ^ 1])
-        with self.assertRaises(ValueError): self.collect(output="digest")
-        self.api.raw = raw
-        path = self.fixture.root / "selected" / self.fixture.key / "manifest.json"
-        manifest = json.loads(path.read_bytes())
-        manifest["frames"].pop()
-        path.write_text(json.dumps(manifest))
-        with self.assertRaises(ValueError): self.collect(output="partial")
-        self.assertFalse((self.fixture.root / "partial" / self.fixture.key).exists())
+        self.setUp()
+        self.api.raw = self.api.raw[:-1] + bytes([self.api.raw[-1] ^ 1])
+        with self.assertRaisesRegex(ValueError, "differs from its authenticated metadata"):
+            self.compose("digest")
+        self.api.current = "f" * 40
+        with self.assertRaisesRegex(ValueError, "advanced before"):
+            self.compose("advanced")
+        self.manifest["key"] = "mc26.3"
+        self.api.current = SOURCE
+        with self.assertRaisesRegex(ValueError, "another key"):
+            self.compose("foreign-key")
+
+    def test_a_reused_generation_composes_with_the_tested_run_its_retained_name_carries(self):
+        # A generation that reused pull-request run 4400: mod-base names the archive by 4400.
+        self.api.record["name"] = pages.publisher.public_baseline_name(KEY, BASE, 4400)
+        self.proof["public_baseline_artifacts"][KEY]["name"] = self.api.record["name"]
+        self.tested = 4400
+        self.compose()
+        self.assertEqual([20000], self.api.downloads)
+
+    def test_a_certificate_naming_another_targets_or_commits_baseline_never_downloads(self):
+        for name in (pages.publisher.public_baseline_name("mc26.3", BASE, 42),
+                     pages.publisher.public_baseline_name(KEY, SOURCE, 42), "pages-full-baseline-mc1.20.1"):
+            with self.subTest(name=name):
+                self.proof["public_baseline_artifacts"][KEY] = {**self.proof["public_baseline_artifacts"][KEY],
+                                                                "name": name}
+                with self.assertRaisesRegex(ValueError, "another target's or commit's public baseline"):
+                    self.compose(f"foreign-{len(name)}-{name[-2:]}")
+        self.assertEqual([], self.api.downloads)
 
 
 if __name__ == "__main__":

@@ -86,9 +86,10 @@ It rechecks unchanged module fingerprints, exact Git ancestry, all runtime jobs,
 reviews, and available complete public evidence. Missing or expired coverage selects full profiles.
 `feature_review.py` emits schema 7 for partial scope and schema 8 for complete scope; both use the
 same runtime generation's Fabric reference. Only complete coverage can seed a healthy baseline.
-The feature Pages consumer separately authenticates baseline and selected components, preserving
-original tested SHA/run/JAR provenance for every reused frame. A consumer expecting full evidence
-must reject a selected report, even when that selection happens to contain all authored steps.
+The adapter's `compose` hook and the kit's re-verification separately authenticate the baseline
+and selected components of a composed Pages bundle, preserving original tested SHA/run/JAR
+provenance for every reused frame. A consumer expecting full evidence must reject a selected
+report, even when that selection happens to contain all authored steps.
 
 `PlayerOwnSkinBootstrap` belongs to `skin-import`, including its bounded async startup task,
 closed-state guard, and persisted own-skin selection. `SavedAppearanceRestorer` belongs to
@@ -227,6 +228,13 @@ codecs remain for historical schema-2 evidence and explicit recovery; their cont
 
 ## Visual evidence and static-site sources
 
+The pinned mod-base kit owns the generic public-evidence pipeline and the GitHub Pages publisher:
+handoff preparation, schemas, source-run authentication, admission, collection, rendering,
+deployment, cache refresh and rotation. Its invariants are the managed
+[shared public-evidence contract](shared/PUBLIC-EVIDENCE.md); its schemas, adapter protocol and
+operations are in the kit's documentation (https://github.com/The-Plum-Team/mod-base/tree/main/docs).
+Quick Skin's sources below own the scenarios, the adapter and the review semantics.
+
 - `e2e/scenario-contract.json` is the sole packaged-suite control-plane source. It owns execution
   profiles, scenario orchestration, roles, ordered steps, mandatory assertions, the fixed
   1920x1080 screenshot size, screenshot checkpoints, authored review regions, semantic probes, and
@@ -248,7 +256,7 @@ codecs remain for historical schema-2 evidence and explicit recovery; their cont
 - `e2e/visual_evidence.py` reads successful `result.json` reports, verifies the scenario-contract
   hash and exact graph, bounded printable passed-assertion messages, PNG containment, full decode,
   dimensions, SHA-256, probes, and comparisons, and exposes the shared evidence model used by the
-  AI review and public site.
+  AI review and by the adapter's `collect` hook.
 - `e2e/mod-compatibility-contract.json` is the reviewed optional-mod artifact lock. It owns the
   supported integration ids, applicability rules, authored loader/version exclusions with reasons,
   Modrinth project identities, and every immutable
@@ -310,19 +318,22 @@ codecs remain for historical schema-2 evidence and explicit recovery; their cont
   derivative metrics, deterministic assertions, clean booleans, and provenance; ordinary-suite
   captures stay in the authenticated runtime artifact and never enter the model capsule. Raw
   provider text stays in short-lived private artifacts. Manual publication recovery consumes the
-  same already-complete reports and never calls a model. Public schema v5 binds
-  `reviewed_frame_count` to the mod-selective two-, five-, or seven-checkpoint product; the
-  validator keeps schemas v1 through v4 readable for older complete-scenario, local-only,
-  four-checkpoint, and five-checkpoint rolling caches.
-- `scripts/pages/select_compatibility_artifact.py` selects either that short-lived handoff or the
-  newest successful protected Pages cache. Pages may carry its `coverage_sha` to a current release
-  descendant only when `scripts/ci/mod_compatibility_impact.py` proves the complete intervening diff
-  cannot affect optional-mod compatibility. A cache whose scenario or compatibility contract has
-  been superseded is omitted as unavailable; every other validation failure remains fatal.
-  `scripts/pages/build_site.py` validates and renders the optional bundle beside ordinary release
-  evidence; `scripts/pages/rotate_artifacts.py` retains one
-  current compatibility cache per covered branch and retires older caches, consumed handoffs, and
-  fan-in artifacts only after a successful atomic deployment.
+  same already-complete reports and never calls a model. The shared-source native bundle is public
+  compatibility schema v6, whose `reviewed_frame_count` equals the mod-selective two-, five-, or
+  seven-checkpoint product. The `publish-evidence` job uploads it unchanged, wrapped by the kit's
+  `publish-family` composite, as the family handoff
+  `mb-family-handoff--mod-compatibility--<key>--a<attempt>`; the separate `notify-family` job, which
+  holds only `actions: write` and checks out nothing, wakes the Pages caller with
+  `operation=family`. The Pages path never reads the retired compatibility schemas v1 through v5.
+- The adapter's `family_validate` hook validates that native bundle with
+  `compatibility_evidence.validate_bundle`, projects its clean pairs into the kit's
+  `mod-base.family.paired` view (`compatibility_evidence.project_paired`), and may carry its
+  `coverage_sha` to a current descendant only when `scripts/ci/mod_compatibility_impact.py` proves
+  the complete intervening diff cannot affect optional-mod compatibility; the kit independently
+  proves that ancestry before it publishes. A bundle whose scenario or compatibility contract has
+  been superseded maps to `superseded` and a lineage or impact refusal to `unavailable`: both omit
+  that key's compatibility gallery, while every other validation failure remains fatal. The kit
+  retains the newest family cache per key.
 - `scripts/ci/feature_review.py` curates complete and selected shared targets from the exact
   successful current-master runtime. Both secretless curation and model admission authenticate
   the complete job graph and immutable artifact partition. Paired targets use the same run's
@@ -356,11 +367,13 @@ codecs remain for historical schema-2 evidence and explicit recovery; their cont
 - `e2e/visual_review.py` binds each raw artifact to exactly one protected matrix row and its complete
   scenario product, requires one production JAR digest, derives the stable Fabric 1.20.1 reference
   identity from protected `master`, and pairs every later-version candidate with the same semantic
-  capture from authenticated lossless raw Pages handoff evidence for historical schema-2 sources.
-  Shared-source curation supplies the same-run reference through the same renderer. For a 1.20.1 source it instead
-  requires complete, identical Fabric/Forge capture-id sets and exposes each frame without any
-  reference. It requires both sides to remain exactly 1920x1080 and atomically re-encodes candidates
-  and references as metadata-free RGB PNGs without resizing. `e2e/visual_similarity.py` computes
+  capture. Shared-source curation supplies the same-run reference through the same renderer. For a
+  1.20.1 source it instead requires complete, identical Fabric/Forge capture-id sets and exposes
+  each frame without any reference. The historical schema-2 reference comparison against lossless
+  raw Pages handoffs is retired and fails closed in `visual-review.yml` and
+  `visual-review-drain.yml` (ADR 0010); tag `pre-mod-base-gallery` keeps it auditable. It requires
+  both sides to remain exactly 1920x1080 and atomically re-encodes candidates and references as
+  metadata-free RGB PNGs without resizing. `e2e/visual_similarity.py` computes
   exact decoded-RGB fingerprints for contract-authored regions plus non-authoritative perceptual
   routing metrics. `e2e/check_visual_review.py` recomputes those values while validating the
   all-single or all-paired bounded capsule,
@@ -411,48 +424,53 @@ codecs remain for historical schema-2 evidence and explicit recovery; their cont
   owner head, preserving current-workflow reviews of older capsules as well as legacy owners.
   An arbitrary third revision remains ineligible; exact proof/manifest bytes and all successful
   same-attempt upload checks remain mandatory.
-- `scripts/pages/evidence.py` creates and validates a small branch-scoped raw handoff, then
-  atomically compacts a validated bundle to protected WebP derivatives. It may copy only contracted
-  screenshots, structured provenance, and each capture's bounded printable passed-assertion
-  message—never runtime logs or arbitrary HTML. That assertion message is validated when present
-  but stays optional in `OPTIONAL_FRAME_FIELDS` until every release branch has republished its
-  evidence, so an older rolling cache still validates. The compact schema
-  preserves separate source and derivative identities, hashes, dimensions, pixel metrics, and
-  comparison metrics. Raw PNG bytes normally stop at the one-day E2E handoff; the single
-  matrix-derived Fabric 1.20.1 visual anchor is retained losslessly and rotated as current state.
-- `scripts/pages/select_artifact.py` authenticates exact-current E2E handoffs and SHA-bound rolling
-  caches, then selects the newest valid source. Its AI mode requires a raw handoff and refuses a
-  compact fallback. A branch-only cache name is migration fallback only. Under
-  `--allow-continuation` it may additionally nominate the newest earlier head on the branch's
-  bounded commit page that still owns an authenticated bundle; it never decides that the range is
-  safe. Only the collector publishes such a nomination, and only after it independently proves strict
-  ancestry from the comparison API and reclassifies that exact bounded file inventory through
-  `scripts/ci/visual_review_impact.py`. It must never fetch the release branch: this job is
-  privileged on the default branch, so untrusted history cannot enter a workspace that can write
-  the Actions cache. `scripts/pages/evidence.py carry-forward` then records the
-  reached head in the optional `provenance.coverage_sha` while the packaged provenance keeps naming
-  the run and commit that produced the pixels.
-- `scripts/pages/publication_progress.py` is the advisory cost-admission controller in Pages
-  discovery. From bounded metadata only, it authenticates the newest successful atomic Pages
-  owner's exact-attempt jobs and cache upload windows plus current-head E2E and compatibility
-  handoffs, then admits the initial ordinary publication, a later complete same-head ordinary
-  attempt, the compatibility halfway and final milestones, or a 45-minute partial deadline. It
-  nominates exact handoff IDs; `select_artifact.py` and `select_compatibility_artifact.py`
-  reauthenticate a nominated `--preferred-artifact-id` and fail closed instead of falling back
-  to an older cache. It never downloads, validates pixels, deploys, rotates or dispatches. See
-  [Pages publication progress](../ci/PAGES-PUBLICATION-PROGRESS.md).
-- `scripts/pages/rotate_artifacts.py` owns post-deployment retention. It may delete only exact
-  Actions artifact IDs whose protected run provenance, branch, SHA, age, and successful replacement
-  have all been revalidated, including Pages-run intermediates; it never implements screenshot or
-  version discovery itself. Exact-name queries cover legacy caches and duplicate uploads under the
-  replacement's current SHA name. Other SHA names and complete baseline archives retain their
-  independent expiry policy without a repository-wide prefix scan. Cache and handoff candidates
-  undergo separate provenance validation, so an invalid historical handoff cannot prevent retiring
-  authenticated duplicate caches. The shared deletion budget counts attempts only after owner and
-  replacement validation; final metadata or deletion failures still spend an attempt. Summaries
-  retain confirmed deletions when later work is deferred. It preserves exactly the current validated
-  raw visual-anchor handoff and retires only its older generations. Raw packaged-E2E artifacts remain
-  retention-bound inputs for concurrent attestations and are outside rotation ownership.
+- `scripts/pages/mod_base_adapter.py` is Quick Skin's mod-base adapter (`ADAPTER_API = 1`), with
+  its data in `site/mod-base.json`. It wraps the Quick Skin modules below and copies none of them.
+  `targets` lists one key `mc<version>` per matrix target through `evidence_target.inventory()`.
+  `expectation` projects the scenario contract, the selected matrix row and, for a selected
+  generation, the authenticated `quick-skin.feature_selection` extension. `collect` reads the
+  packaged `result.json` reports through `e2e/visual_evidence.py` and the runtime pixel metrics
+  through `packaged_runtime.inspect_screenshot`; it runs at the producer and again at the
+  collector, and the kit requires identical results. `authenticate_extensions` verifies the
+  `quick-skin.runtime_source` reuse reference through `ci_reuse.validate_reference` and the feature
+  selection through `feature_evidence` and `scripts/ci/e2e_selection.py`. `compose` joins an
+  authenticated complete `mb-baseline--` archive with a selected handoff, `verify_publication`
+  reauthenticates the runtime trees of reused evidence (`feature_pages.verify_runtime_tree`),
+  `family_validate` is described above, and `anchor_selection` names the Fabric and Forge lanes of
+  the matrix's unit-test target. `expected_source_jobs` returns no job graph in v1. The kit runs
+  every hook in an isolated child process, gives a read-only token only to the declared network
+  hooks and re-verifies every result before publishing. `scripts/pages/mod_base_fixtures.py`
+  supplies the conformance fixtures, including `delegated_extensions`, which seeds the `ci_reuse`
+  seal and descriptor through the kit's seeding API. It defines no `selected_extensions`: the kit
+  simulates a selected handoff at its baseline's own commit, where a Quick Skin Git admission
+  selects nothing, so `ComposedEvidenceTest` covers `compose` and R3 on real selections instead.
+- `scripts/pages/evidence_target.py` owns the `mc<version>` key inventory, `target_for_key` and
+  `--kind matrix|keys|source-branch`; `e2e/visual_review.py`, `scripts/ci/visual_review_targets.py`,
+  `scripts/ci/feature_coverage.py`, the adapter and the E2E producer share it. The E2E job
+  `Prepare public evidence for <key> (advisory)` publishes each target's handoff
+  `mb-handoff--<key>--a<attempt>` through the kit's `prepare-evidence` composite in its step
+  `Upload stable public evidence for this Minecraft target`; that composite also uploads the
+  lossless anchor `mb-anchor--<key>--<commit>--<run_id>--a<attempt>` for an eligible
+  unit-test-target run. The separate `notify-pages` job holds only `actions: write`, checks out
+  nothing and wakes the Pages caller with `operation=deploy`.
+- `scripts/pages/feature_evidence.py` and `scripts/ci/feature_pages.py` own Quick Skin's selected
+  and composed evidence. `feature_pages.py --runtime-identity` resolves the producer's exact
+  runtime identity and writes the extensions document (`runtime_source` and, for a selective
+  generation, the authenticated selection). Both import the kit lazily, so modules that do not
+  touch Pages need no kit. Every verified selection is handed off. `feature_evidence.compose`
+  works per frame: a re-tested lane is the selected execution's record, and when the selection
+  re-captured only some of its checkpoints (the `hud-preview` selection re-captures 2 of the 63
+  `full` ones) it also carries `baseline_run`, the baseline lane's `profile`, `status`,
+  `elapsed_s` and `jars` its older frames were tested with. The kit's R3 re-verifies both epochs
+  against their sources.
+  `verify_runtime_tree` reauthenticates only the runtime generations whose evidence the draft
+  publishes; for a bundle reused from a cache it reads the handoff run from that bundle's exact
+  `mb-collected--<key>` artifact. A retained baseline may name a handoff run other than the
+  certified generation only when both reused the same pull-request run. Certificate issuance binds
+  each `mb-baseline--` archive's name, owner jobs, digest and size; its contents are validated
+  where composition consumes them. `scripts/ci/feature_coverage_github.py` recognizes the kit's exact
+  Pages job names and the `mb-baseline--<key>--<commit>--<tested_run_id>` archive grammar as
+  literals; `scripts/ci/tests/test_mod_base_names.py` proves they equal the kit's.
 - `scripts/ci/visual_review_queue.py` authenticates queued capsules, completed reports, and
   sanitized attempt markers from protected workflow owners, applies retry cooldowns, and selects
   the oldest eligible source except that a completed certifiable automatic 1.20.1 anchor preempts
@@ -504,12 +522,11 @@ codecs remain for historical schema-2 evidence and explicit recovery; their cont
   renames classify both old and new paths and malformed, incomplete, or unprovable inventories
   fail closed. The compatibility scenarios therefore declare in `covers.modules` every product
   module their harness exercises, not only the assembly.
-- `scripts/ci/github_api_retry.sh` is the protected Pages-side wrapper for read-only GitHub API
-  calls after checkout. It keeps response bytes isolated on stdout and retries only classified
+- `scripts/ci/github_api_retry.sh` is the protected wrapper for read-only GitHub API calls after
+  checkout in Quick Skin's own review, compatibility and gate workflows; the Pages caller uses the
+  kit's own copy. It keeps response bytes isolated on stdout and retries only classified
   rate-limit, transport, and server failures with bounded run-skewed backoff; provenance and exact
-  identity checks remain in each caller. Pages discovery records one advisory snapshot of the
-  calling Actions token's REST core limit, usage, remaining requests and reset time. Only validated
-  numeric counters reach the log; unavailable telemetry cannot authorize or reject evidence.
+  identity checks remain in each caller.
 - `scripts/ci/gradle_cache_policy.py` is the fail-closed writer policy for Gradle state. It permits
   writes only from protected `master`; release branches, packaged E2E, and release jobs remain
   read-only.
@@ -523,13 +540,6 @@ codecs remain for historical schema-2 evidence and explicit recovery; their cont
   requests may restore their base branch. Only the protected pruner's own run is ignored, because
   that workflow never configures Gradle; an unrecognized workflow fails closed as a potential
   consumer.
-- `scripts/pages/build_site.py` combines exact compact branch bundles and copies their already
-  content-addressed WebP assets while rendering the tracked assets under `site/`. `site/` contains
-  presentation code, not a support/version inventory; supported versions always come from
-  validated evidence discovered from release branches. Its `gallery-data.json` publishes the
-  complete per-capture validation record—contract identity and expectation, the passed assertion
-  message, source and published pixel metrics, the required pixel comparisons, the packaged lane
-  with its JAR digest, and both provenance runs—so the gallery never has to restate a fact the
-  validated bundle does not carry.
-- `_site/`, `public-evidence/`, and downloaded Actions artifacts are generated output. Do not commit
-  them or edit them as source.
+- `site/` holds only the mod-base configuration `site/mod-base.json`; the static front end and the
+  rendered `gallery-data.json` belong to the kit. `_site/`, `public-evidence/`, `out/` and
+  downloaded Actions artifacts are generated output. Do not commit them or edit them as source.
