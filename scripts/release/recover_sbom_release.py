@@ -41,6 +41,7 @@ METADATA_REPAIR_PATHS = frozenset({
     "scripts/release/generate_sbom.py",
     "scripts/release/github_governance.py",
     "scripts/release/github_release.py",
+    "scripts/release/matrix.py",
     "scripts/release/publication_state.py",
     "scripts/release/recover_sbom_release.py",
     "scripts/release/rehearse_publication.py",
@@ -50,11 +51,15 @@ METADATA_REPAIR_PATHS = frozenset({
     "scripts/release/tests/test_publication_rehearsal.py",
     "scripts/release/tests/test_publication_state.py",
     "scripts/release/tests/test_recover_sbom_release.py",
+    "scripts/release/tests/test_release_identity.py",
     "scripts/ci/tests/test_workflow_security.py",
 })
 
-# The repair itself must change the SBOM generator or the publication ledger protocol.
-REPAIRED_PROTOCOLS = frozenset({"scripts/release/generate_sbom.py", "scripts/release/publication_state.py"})
+# The repair itself must change the SBOM generator, the publication ledger protocol, or the
+# marketplace publication identities derived by matrix.py. Every staged byte is still verified
+# against the unchanged release matrix data, so none of these can admit different artifacts.
+REPAIRED_PROTOCOLS = frozenset({"scripts/release/generate_sbom.py", "scripts/release/matrix.py",
+                                "scripts/release/publication_state.py"})
 
 
 def require(condition: bool, message: str) -> None:

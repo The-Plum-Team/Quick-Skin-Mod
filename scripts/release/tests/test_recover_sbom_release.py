@@ -116,6 +116,10 @@ class SbomRecoveryTest(unittest.TestCase):
         recovery.check_source_diff(["scripts/release/publication_state.py",
                                     "scripts/release/rehearse_publication.py",
                                     "scripts/release/tests/test_publication_state.py"])
+        recovery.check_source_diff(["scripts/release/matrix.py",
+                                    "scripts/release/tests/test_release_identity.py"])
+        with self.assertRaisesRegex(ValueError, "outside"):
+            recovery.check_source_diff(["scripts/release/matrix.py", "release/release-matrix.json"])
         with self.assertRaisesRegex(ValueError, "no SBOM generator or publication protocol repair"):
             recovery.check_source_diff(["RELEASING.md", "scripts/release/rehearse_publication.py"])
 
