@@ -38,8 +38,11 @@ class SimulatedGitHub:
         self.uploads: list[str] = []
         self.interrupt = True
 
-    def json(self, endpoint: str) -> dict[str, Any]:
-        ledger.require(endpoint == f"releases/tags/{self.contract.tag}" and self.release is not None,
+    def json(self, endpoint: str) -> Any:
+        # Like GitHub, only the release listing and ID lookup expose a draft; a tag lookup does not.
+        if endpoint == "releases?per_page=100&page=1":
+            return [] if self.release is None else [copy.deepcopy(self.release)]
+        ledger.require(endpoint == "releases/1" and self.release is not None,
                        "unexpected simulated release lookup")
         return copy.deepcopy(self.release)
 
