@@ -39,6 +39,17 @@ exact configured release-branch head, and a manual run from another branch.
 Create the derived target tag at the already-tested `master` head and push only that new tag. Do not
 move, reuse, or delete a release tag.
 
+Keep `master` frozen from the merge of the release commit until every target's tag run has passed
+`Validate requested release identity`. Rehearsals and tag runs both require the exact branch head,
+and a tag run waits for one of the four build slots, so it may validate an hour after its push.
+Any merge in that window, a CI-only one included, fails every rehearsal or tag run that has not
+validated yet.
+
+Push each tag on its own. GitHub creates no `push` event, and therefore no `Release` run, when one
+`git push` carries more than three tags; those tags then exist without a run and cannot simply be
+pushed again. Recheck the `master` head before every push and confirm that the tag's `Release` run
+exists before pushing the next tag.
+
 ```bash
 git fetch origin --tags
 git switch master
@@ -46,6 +57,7 @@ git pull --ff-only origin master
 python scripts/release/release_identity.py --target 1.20.1
 git tag --sign mc1.20.1-v3.0.0
 git push origin refs/tags/mc1.20.1-v3.0.0
+gh run list --workflow release.yml --event push --branch mc1.20.1-v3.0.0
 ```
 
 Replace the example Minecraft target and identity with the exact values derived from the matrix. The
@@ -141,6 +153,19 @@ The offline rehearsal runs in the release-policy tests before tagging and on eac
 target bundle before attestation. It checks our publication contracts and recovery behavior;
 it cannot predict live provider outages or moderation time. Re-run it locally on an existing
 verified bundle with `python3 scripts/release/rehearse_publication.py --stage build/release`.
+
+### Retry a tag whose run staged nothing
+
+A tag whose `Release` run never started, because it was pushed together with more than three tags,
+or that stopped at `Validate requested release identity`, because `master` had moved, staged
+nothing: no draft release, no publication ledger and no marketplace file. Retrying needs the same
+tag name, and the `Quick Skin immutable release tags` ruleset forbids deleting it. First confirm
+that no GitHub release or draft and no Modrinth or CurseForge version exists for the tag. Only
+with the maintainer's explicit authorization, an administrator then saves the ruleset, sets its
+enforcement to `disabled`, deletes exactly those tags, restores `active` at once and compares the
+ruleset with the saved copy. Rehearse and tag again from the current `master` head, which needs a
+new release commit if the version itself must change. A tag that staged anything is never
+deleted; publish a new version instead. 3.0.1 needed this once, on 2026-09-27.
 
 ### Recover an unpublished release with a missing SBOM serial number
 
