@@ -1,6 +1,6 @@
 {
   "coverage_sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-  "observed_at": "2026-09-27T12:31:55Z",
+  "observed_at": "2026-09-27T13:53:02Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -97,10 +97,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -247,10 +247,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -397,10 +397,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -547,10 +547,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -697,10 +697,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -847,10 +847,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -997,10 +997,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -1147,10 +1147,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -1297,10 +1297,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -1447,10 +1447,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -1597,10 +1597,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -1747,10 +1747,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -1897,10 +1897,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -2047,10 +2047,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -2197,10 +2197,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -2347,10 +2347,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
@@ -2497,10 +2497,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 36319249788,
           "sha": "ec11320186f9f923f5d846fd8ea1a1546c049637",
-          "status": "queued",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/36319249788/attempts/1"
         },
         "jobs": [
