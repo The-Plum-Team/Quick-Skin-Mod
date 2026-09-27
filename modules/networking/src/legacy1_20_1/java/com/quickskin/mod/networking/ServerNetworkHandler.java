@@ -23,8 +23,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.Set;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
@@ -46,6 +49,15 @@ public class ServerNetworkHandler {
     private static final int MAX_UPLOAD_COMMITS_PER_TICK = 4;
     private static final int MAX_RESPONSE_PACKETS_PER_TICK = 64;
     private static final int MAX_RESPONSE_BYTES_PER_TICK = 2 * 1024 * 1024;
+    private static final int LATE_PEER_PROBE_INTERVAL_TICKS = 20;
+    /**
+     * Exact connections whose previous probe advertised only the v1 channels. Architectury on Forge
+     * learns a client's channels only after the join callback, so a legacy peer is classified once
+     * two probes agree (a list still being filled cannot downgrade a v2 client). Server thread only;
+     * entries leave with their connection.
+     */
+    private static final Set<Object> LEGACY_ONLY_ON_LAST_PROBE =
+            Collections.newSetFromMap(new WeakHashMap<>());
 
     /**
      * Checks if a player's client has QuickSkin installed and can receive our packets.
@@ -53,6 +65,27 @@ public class ServerNetworkHandler {
      */
     private static boolean canReceiveQuickSkin(ServerPlayer player) {
         return ProtocolNetwork.canReceive(player);
+    }
+
+    /**
+     * Classifies legacy peers whose channels arrived after the join-time probe, which on Forge
+     * always sees an empty client channel list. Without this, a v1 client is served only after it
+     * happens to send a legacy packet itself.
+     */
+    private static void tickLatePeerClassification(MinecraftServer server) {
+        if (server.getTickCount() % LATE_PEER_PROBE_INTERVAL_TICKS != 0) return;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            Object connection = player.connection;
+            if (ProtocolNetwork.profile(player).mode() != ProtocolProfile.Mode.LOCAL_ONLY
+                    || !ProtocolNetwork.advertisesOnlyLegacyChannels(player)) {
+                LEGACY_ONLY_ON_LAST_PROBE.remove(connection);
+                continue;
+            }
+            if (LEGACY_ONLY_ON_LAST_PROBE.add(connection)) continue;
+            LEGACY_ONLY_ON_LAST_PROBE.remove(connection);
+            ProtocolNetwork.classifyServerPeer(player);
+            if (canReceiveQuickSkin(player)) onProtocolReady(player);
+        }
     }
 
     /** Completes bootstrap after the exact live connection selects a protocol schema. */
@@ -734,6 +767,7 @@ public class ServerNetworkHandler {
 
     /** Emits a bounded, round-robin slice of requested texture packets after each server tick. */
     public static void tickTextureResponses(MinecraftServer server) {
+        tickLatePeerClassification(server);
         tickAppearanceControls(server);
         drainPreparedTextureUploads(server);
         int packetsRemaining = MAX_RESPONSE_PACKETS_PER_TICK;

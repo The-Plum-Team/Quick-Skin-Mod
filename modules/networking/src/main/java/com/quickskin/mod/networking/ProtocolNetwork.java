@@ -151,6 +151,14 @@ public final class ProtocolNetwork {
     /** Classifies old and vanilla peers from explicit registered S2C channels at join time. */
     public static void classifyServerPeer(ServerPlayer player) {
         if (player == null || profile(player).mode() != ProtocolProfile.Mode.LOCAL_ONLY) return;
+        if (advertisesOnlyLegacyChannels(player)) {
+            ProtocolSessions.getInstance().classifyLegacyClient(
+                    player.getUUID(), player.connection);
+        }
+    }
+
+    /** Whether the peer currently registers the immutable v1 receivers but no protocol ACK. */
+    public static boolean advertisesOnlyLegacyChannels(ServerPlayer player) {
         //? if <1.21 {
         boolean helloCapable = NetworkTransport.INSTANCE.canPlayerReceiveProtocolAck(player);
         boolean legacyCapable = NetworkTransport.INSTANCE.canPlayerReceiveLegacyProtocol(player);
@@ -158,10 +166,7 @@ public final class ProtocolNetwork {
         boolean helloCapable = NetworkTransport.INSTANCE.canPlayerReceive(player, ProtocolAckPayload.TYPE);
         boolean legacyCapable = NetworkTransport.INSTANCE.canPlayerReceive(player, SyncAppearancePayload.TYPE);
         //?}
-        if (!helloCapable && legacyCapable) {
-            ProtocolSessions.getInstance().classifyLegacyClient(
-                    player.getUUID(), player.connection);
-        }
+        return !helloCapable && legacyCapable;
     }
 
     public static String translateContentId(ServerPlayer recipient, String contentId) {
