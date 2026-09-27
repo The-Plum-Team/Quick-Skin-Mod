@@ -69,6 +69,8 @@ public class ClientNetworkHandler {
         ProtocolProfile acceptedProfile = ProtocolSessions.getInstance().acceptClientAcknowledgement(
                 localPlayer.getUUID(), sourceConnection, nonce, acknowledgement);
         if (acceptedProfile.negotiated()) {
+            LOGGER.info("Quick Skin protocol v{} negotiated with the server",
+                    acceptedProfile.version());
             context.queue(() -> {
                 if (!isCurrentConnection(sourceConnection)) return;
                 NetworkSyncService.getInstance().onProtocolAcknowledged(sourceConnection);
@@ -560,24 +562,28 @@ public class ClientNetworkHandler {
                 requestTransparencyReload(now);
             }
 
-            // Bootstrap exactly once per connection; config replays must not re-upload assets.
-            Minecraft mc = Minecraft.getInstance();
-            if (!appearanceBootstrapSent && mc.player != null) {
-                UUID playerId = mc.player.getUUID();
-                com.quickskin.mod.common.data.PlayerAppearance currentAppearance =
-                    com.quickskin.mod.common.data.PlayerAppearanceRepository.getInstance().getAppearance(playerId);
-
-                if (currentAppearance != null) {
-                    appearanceBootstrapSent = true;
-                    NetworkSyncService.getInstance().syncAppearance(
-                        playerId,
-                        currentAppearance.getSkinId(),
-                        currentAppearance.getCapeId(),
-                        currentAppearance.getModel()
-                    );
-                }
-            }
+            bootstrapLocalAppearance();
         });
+    }
+
+    /**
+     * Sends the local appearance once per connection, as soon as the server can receive it.
+     * Config replays must not re-upload assets. Runs on the client thread.
+     */
+    static void bootstrapLocalAppearance() {
+        Minecraft mc = Minecraft.getInstance();
+        if (appearanceBootstrapSent || mc.player == null) return;
+        UUID playerId = mc.player.getUUID();
+        com.quickskin.mod.common.data.PlayerAppearance currentAppearance =
+            com.quickskin.mod.common.data.PlayerAppearanceRepository.getInstance().getAppearance(playerId);
+        if (currentAppearance == null) return;
+        appearanceBootstrapSent = true;
+        NetworkSyncService.getInstance().syncAppearance(
+            playerId,
+            currentAppearance.getSkinId(),
+            currentAppearance.getCapeId(),
+            currentAppearance.getModel()
+        );
     }
 
     /**

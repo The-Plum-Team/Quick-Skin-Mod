@@ -7,6 +7,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProtocolSessionsTest {
@@ -37,6 +39,66 @@ class ProtocolSessionsTest {
                         playerId, connection, hello.nonce() + 1L, acknowledgement).mode());
         assertTrue(sessions.acceptClientAcknowledgement(
                 playerId, connection, hello.nonce(), acknowledgement).negotiated());
+
+        sessions.clearClientSession(playerId, connection);
+    }
+
+    @Test
+    void lateChannelEvidenceRestartsOnlyTheExactWaitingSession() {
+        UUID playerId = UUID.randomUUID();
+        Object connection = new Object();
+        ProtocolSessions.ClientHello joined = sessions.beginClientSession(
+                playerId, connection, false, false);
+
+        assertFalse(joined.sendHello());
+        assertTrue(sessions.awaitingChannelEvidence(playerId, connection));
+        assertNull(sessions.reprobeClientSession(playerId, connection, false, false));
+        assertNull(sessions.reprobeClientSession(playerId, new Object(), true, true));
+        assertNull(sessions.reprobeClientSession(UUID.randomUUID(), connection, true, true));
+
+        ProtocolSessions.ClientHello late = sessions.reprobeClientSession(
+                playerId, connection, true, true);
+        assertTrue(late.sendHello());
+        assertNotEquals(joined.nonce(), late.nonce());
+        assertFalse(sessions.awaitingChannelEvidence(playerId, connection));
+        // The hello is on its way: a second probe must not replace its nonce.
+        assertNull(sessions.reprobeClientSession(playerId, connection, true, true));
+
+        ProtocolProfile negotiated = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY, QuickSkinProtocol.POLICY.offer());
+        assertTrue(sessions.acceptClientAcknowledgement(
+                playerId, connection, late.nonce(),
+                ProtocolAcknowledgement.accepted(negotiated)).negotiated());
+
+        sessions.clearClientSession(playerId, connection);
+    }
+
+    @Test
+    void lateLegacyEvidenceClassifiesTheWaitingSessionWithoutAHello() {
+        UUID playerId = UUID.randomUUID();
+        Object connection = new Object();
+        sessions.beginClientSession(playerId, connection, false, false);
+
+        ProtocolSessions.ClientHello late = sessions.reprobeClientSession(
+                playerId, connection, false, true);
+
+        assertFalse(late.sendHello());
+        assertEquals(ProtocolProfile.Mode.LEGACY_V1, sessions.clientProfile(connection).mode());
+        assertFalse(sessions.awaitingChannelEvidence(playerId, connection));
+
+        sessions.clearClientSession(playerId, connection);
+    }
+
+    @Test
+    void aSessionThatAlreadySentAHelloIsNeverReprobed() {
+        UUID playerId = UUID.randomUUID();
+        Object connection = new Object();
+        ProtocolSessions.ClientHello hello = sessions.beginClientSession(
+                playerId, connection, true, true);
+
+        assertTrue(hello.sendHello());
+        assertFalse(sessions.awaitingChannelEvidence(playerId, connection));
+        assertNull(sessions.reprobeClientSession(playerId, connection, true, true));
 
         sessions.clearClientSession(playerId, connection);
     }

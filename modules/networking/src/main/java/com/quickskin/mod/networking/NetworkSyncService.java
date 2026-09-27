@@ -5,6 +5,7 @@ import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.util.HashUtil;
+import com.quickskin.mod.networking.protocol.ClientChannelDiscovery;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
@@ -68,6 +69,9 @@ public class NetworkSyncService {
     private ProtocolSessions.ClientHello protocolHello;
     private int protocolHelloAttempts;
     private long protocolHelloRetryAtMillis;
+    private boolean helloExhaustionReported;
+    /** Non-null while the exact session still waits for the server to advertise its channels. */
+    private ClientChannelDiscovery channelDiscovery;
 
     private NetworkSyncService() {
     }
@@ -83,21 +87,17 @@ public class NetworkSyncService {
     public synchronized void beginAppearanceSnapshotRequest(
             UUID playerId, Object connection) {
         if (playerId == null || connection == null) return;
-        //? if <1.21 {
-        boolean helloAvailable = NetworkTransport.INSTANCE.canServerReceiveProtocolHello();
-        boolean legacyAvailable = NetworkTransport.INSTANCE.canServerReceiveLegacyProtocol();
-        //?} else {
-        boolean helloAvailable = NetworkTransport.INSTANCE.canServerReceive(ProtocolHelloPayload.TYPE);
-        boolean legacyAvailable = NetworkTransport.INSTANCE.canServerReceive(UpdateAppearancePayload.TYPE)
-                && NetworkTransport.INSTANCE.canServerReceive(RequestTexturePayload.TYPE);
-        //?}
-        ProtocolSessions.ClientHello hello = ProtocolSessions.getInstance().beginClientSession(
-                playerId, connection, helloAvailable, legacyAvailable);
         protocolPlayerId = playerId;
         protocolConnection = connection;
-        protocolHello = hello != null && hello.sendHello() ? hello : null;
-        protocolHelloAttempts = 0;
-        protocolHelloRetryAtMillis = 0L;
+        // The server's channel list may still be unknown or partial at this join callback. Only a
+        // hello channel is decisive now; anything else is settled by later ticks.
+        channelDiscovery = new ClientChannelDiscovery();
+        boolean helloAvailable = channelDiscovery.observe(
+                serverAcceptsProtocolHello(), serverAcceptsLegacyProtocol())
+                == ClientChannelDiscovery.Decision.HELLO;
+        if (helloAvailable) channelDiscovery = null;
+        startClientSession(ProtocolSessions.getInstance().beginClientSession(
+                playerId, connection, helloAvailable, false));
         tickProtocolHandshake();
         long requestId = snapshotRequestSequence.incrementAndGet();
         if (requestId <= 0L) {
@@ -310,6 +310,7 @@ public class NetworkSyncService {
 
     /** Emits a bounded number of already-prepared packets from the client tick. */
     public synchronized void tick() {
+        tickChannelDiscovery();
         tickProtocolHandshake();
         tickAppearanceSnapshotRequest();
         retryIfDue();
@@ -397,6 +398,65 @@ public class NetworkSyncService {
         activeSync = null;
     }
 
+    private boolean serverAcceptsProtocolHello() {
+        //? if <1.21 {
+        return NetworkTransport.INSTANCE.canServerReceiveProtocolHello();
+        //?} else {
+        return NetworkTransport.INSTANCE.canServerReceive(ProtocolHelloPayload.TYPE);
+        //?}
+    }
+
+    private boolean serverAcceptsLegacyProtocol() {
+        //? if <1.21 {
+        return NetworkTransport.INSTANCE.canServerReceiveLegacyProtocol();
+        //?} else {
+        return NetworkTransport.INSTANCE.canServerReceive(UpdateAppearancePayload.TYPE)
+                && NetworkTransport.INSTANCE.canServerReceive(RequestTexturePayload.TYPE);
+        //?}
+    }
+
+    private void startClientSession(ProtocolSessions.ClientHello hello) {
+        protocolHello = hello != null && hello.sendHello() ? hello : null;
+        protocolHelloAttempts = 0;
+        protocolHelloRetryAtMillis = 0L;
+        helloExhaustionReported = false;
+    }
+
+    /**
+     * Keeps probing a session that joined before the server advertised its channels, for as long
+     * as its connection lasts. Without this, a Forge 1.20.1 client never sends its hello when
+     * Architectury delivers the server's channel list after the join callback, and every
+     * appearance sync is dropped for the whole session.
+     */
+    private void tickChannelDiscovery() {
+        ClientChannelDiscovery discovery = channelDiscovery;
+        if (discovery == null) return;
+        ProtocolSessions sessions = ProtocolSessions.getInstance();
+        if (protocolConnection == null || !isCurrentConnection(protocolConnection)
+                || !sessions.awaitingChannelEvidence(protocolPlayerId, protocolConnection)) {
+            channelDiscovery = null;
+            return;
+        }
+        ClientChannelDiscovery.Decision decision = discovery.observe(
+                serverAcceptsProtocolHello(), serverAcceptsLegacyProtocol());
+        if (decision == ClientChannelDiscovery.Decision.WAIT) return;
+        channelDiscovery = null;
+        boolean hello = decision == ClientChannelDiscovery.Decision.HELLO;
+        ProtocolSessions.ClientHello restarted = sessions.reprobeClientSession(
+                protocolPlayerId, protocolConnection, hello, !hello);
+        if (restarted == null) return;
+        startClientSession(restarted);
+        snapshotRetryAtMillis = 0L;
+        if (hello) {
+            QuickSkinInfo.LOGGER.info(
+                    "Quick Skin server channels appeared after joining; negotiating");
+        } else {
+            QuickSkinInfo.LOGGER.info("Quick Skin legacy v1 server detected");
+            // The join-time restore was dropped while the session was still local-only.
+            ClientNetworkHandler.bootstrapLocalAppearance();
+        }
+    }
+
     private void tickProtocolHandshake() {
         ProtocolSessions.ClientHello hello = protocolHello;
         if (hello == null || protocolConnection == null
@@ -408,8 +468,15 @@ public class NetworkSyncService {
             return;
         }
         long now = System.currentTimeMillis();
-        if (protocolHelloAttempts >= MAX_PROTOCOL_HELLO_ATTEMPTS
-                || now < protocolHelloRetryAtMillis) return;
+        if (protocolHelloAttempts >= MAX_PROTOCOL_HELLO_ATTEMPTS) {
+            if (!helloExhaustionReported && now >= protocolHelloRetryAtMillis) {
+                helloExhaustionReported = true;
+                QuickSkinInfo.LOGGER.warn("The server has not answered the Quick Skin protocol"
+                        + " hello; skins stay local unless it answers late");
+            }
+            return;
+        }
+        if (now < protocolHelloRetryAtMillis) return;
         try {
             //? if <1.21 {
             NetworkTransport.INSTANCE.sendProtocolHelloToServer(hello.nonce(), hello.offer());
@@ -736,6 +803,8 @@ public class NetworkSyncService {
         protocolHello = null;
         protocolHelloAttempts = 0;
         protocolHelloRetryAtMillis = 0L;
+        helloExhaustionReported = false;
+        channelDiscovery = null;
         clearAppearanceSnapshotRequest();
     }
 
