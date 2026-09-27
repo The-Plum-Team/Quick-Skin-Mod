@@ -14,6 +14,9 @@ sys.path.insert(0, str(ROOT / "scripts" / "release"))
 import matrix as release_matrix  # noqa: E402
 import release_identity  # noqa: E402
 
+# The identities below follow the checked-in mod version, so a release bump needs no test edit.
+MOD_VERSION = release_identity.derive(ROOT / "release/release-matrix.json").mod_version
+
 
 class UnifiedReleaseIdentityTest(unittest.TestCase):
     def setUp(self):
@@ -24,33 +27,33 @@ class UnifiedReleaseIdentityTest(unittest.TestCase):
 
     def test_one_source_branch_has_independent_target_publication_identities(self):
         bundle = release_identity.derive(self.path, self.data)
-        self.assertEqual("build-v3.0.0", bundle.tag)
+        self.assertEqual(f"build-v{MOD_VERSION}", bundle.tag)
         self.assertEqual({row["artifact_version"] for row in self.data["artifacts"]},
                          set(bundle.minecraft_versions))
         selected = release_identity.derive(self.path, self.data, target=self.target)
-        self.assertEqual(f"mc{self.target}-v3.0.0", selected.tag)
+        self.assertEqual(f"mc{self.target}-v{MOD_VERSION}", selected.tag)
         self.assertEqual("master", selected.branch)
         self.assertEqual((self.target,), selected.minecraft_versions)
-        rows = release_matrix.gha_matrix(self.data, "publications", "3.0.0")["include"]
+        rows = release_matrix.gha_matrix(self.data, "publications", MOD_VERSION)["include"]
         self.assertEqual(self.data["lane_count"] * 2, len(rows))
         for row in rows:
-            self.assertEqual(f"mc{row['artifact_version']}-v3.0.0", row["release_id"])
+            self.assertEqual(f"mc{row['artifact_version']}-v{MOD_VERSION}", row["release_id"])
             self.assertTrue(row["publication_id"].startswith(row["release_id"] + "-"))
 
     def test_publication_identities_fit_modrinth_and_only_overlong_names_are_shortened(self):
-        rows = release_matrix.gha_matrix(self.data, "publications", "3.0.0")["include"]
+        rows = release_matrix.gha_matrix(self.data, "publications", MOD_VERSION)["include"]
         identities = {(row["artifact_node"], row["publication_id"]) for row in rows}
         self.assertEqual(len(identities), len({identity for _, identity in identities}))
         for node, identity in identities:
             self.assertLessEqual(len(identity), release_matrix.MODRINTH_VERSION_NUMBER_LIMIT)
-            full = f"mc{node.split('-', 1)[1]}-v3.0.0-{node}"
-            expected = full if len(full) <= 32 else f"mc{node.split('-', 1)[1]}-v3.0.0-{node.split('-')[0]}"
+            full = f"mc{node.split('-', 1)[1]}-v{MOD_VERSION}-{node}"
+            expected = full if len(full) <= 32 else f"mc{node.split('-', 1)[1]}-v{MOD_VERSION}-{node.split('-')[0]}"
             self.assertEqual(expected, identity)
-        self.assertIn(("neoforge-1.21.10", "mc1.21.10-v3.0.0-neoforge"), identities)
-        self.assertIn(("fabric-1.21.10", "mc1.21.10-v3.0.0-fabric-1.21.10"), identities)
+        self.assertIn(("neoforge-1.21.10", f"mc1.21.10-v{MOD_VERSION}-neoforge"), identities)
+        self.assertIn(("fabric-1.21.10", f"mc1.21.10-v{MOD_VERSION}-fabric-1.21.10"), identities)
         artifact = {"artifact_node": "neoforge-1.21.10", "loader": "neoforge"}
         with self.assertRaisesRegex(release_matrix.MatrixError, "version-number limit"):
-            release_matrix.publication_id(self.data, "mc1.21.10-v3.0.0-release-candidate", artifact)
+            release_matrix.publication_id(self.data, f"mc1.21.10-v{MOD_VERSION}-release-candidate", artifact)
 
     def test_a_build_bundle_cannot_be_published_as_a_target(self):
         for event, ref_type in (("push", "tag"), ("workflow_dispatch", "branch")):
@@ -87,8 +90,8 @@ class UnifiedReleaseIdentityTest(unittest.TestCase):
     def test_tags_cannot_override_or_guess_a_target_or_old_mod_version(self):
         canonical = release_identity.derive(self.path, self.data, target=self.target).tag
         for tag, override in ((canonical, self.target), (canonical + "-extra", None),
-                              (canonical.replace("v3.0.0", "v2.0.0"), None),
-                              ("build-v3.0.0", None), ("mcunsupported-v3.0.0", None)):
+                              (canonical.replace(f"v{MOD_VERSION}", "v2.0.0"), None),
+                              (f"build-v{MOD_VERSION}", None), (f"mcunsupported-v{MOD_VERSION}", None)):
             with self.subTest(tag=tag, override=override), self.assertRaises(release_identity.ReleaseIdentityError):
                 release_identity.resolve_event_target(self.path, data=self.data, requested_target=override,
                     event_name="push", ref_type="tag", ref_name=tag)
@@ -137,13 +140,13 @@ class ReleaseIdentityTest(unittest.TestCase):
         cls.identity = release_identity.derive(cls.matrix_path, cls.legacy)
 
     def test_identity_names_minecraft_era_and_logical_mod_version(self) -> None:
-        self.assertEqual(self.identity.release_id, "mc1.20.1-v3.0.0")
+        self.assertEqual(self.identity.release_id, f"mc1.20.1-v{MOD_VERSION}")
         self.assertEqual(self.identity.tag, self.identity.release_id)
         self.assertEqual(self.identity.branch, "forge-and-fabric-1.20.1")
 
     def test_publication_matrix_is_artifact_times_marketplace(self) -> None:
         data = copy.deepcopy(self.legacy)
-        matrix = release_matrix.gha_matrix(data, "publications", "3.0.0")
+        matrix = release_matrix.gha_matrix(data, "publications", MOD_VERSION)
         rows = matrix["include"]
         self.assertEqual(len(rows), data["lane_count"] * 2)
         self.assertEqual(
