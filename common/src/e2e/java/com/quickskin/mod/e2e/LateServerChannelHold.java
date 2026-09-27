@@ -27,11 +27,14 @@ import java.util.Map;
  * receiver only when the scenario calls {@link #release}, on the client thread.</p>
  *
  * <p>The receiver map exists only in Architectury's Forge implementation; on every other loader
- * the hold is not applicable and does nothing. On Forge any reflective drift is recorded and fails
- * the scenario's evidence instead of silently testing the fast path.</p>
+ * the hold is not applicable and does nothing. On Forge any reflective drift, including a missing
+ * implementation class, is recorded and fails the scenario's evidence instead of silently testing
+ * the fast path.</p>
  */
 public final class LateServerChannelHold {
 
+    /** Present only on Forge; Architectury for NeoForge ships a same-named impl without the map. */
+    private static final String FORGE_LOADER = "net.minecraftforge.network.NetworkHooks";
     private static final String FORGE_IMPL = "dev.architectury.networking.forge.NetworkManagerImpl";
     private static final String RECEIVER = "dev.architectury.networking.NetworkManager$NetworkReceiver";
     /** Safety valve so a failed step cannot keep the channel list away for the rest of the run. */
@@ -52,15 +55,15 @@ public final class LateServerChannelHold {
 
     /** Installs the hold before the client connects. Called once from the harness entry point. */
     public static synchronized void install() {
-        Class<?> impl;
         try {
-            impl = Class.forName(FORGE_IMPL);
+            Class.forName(FORGE_LOADER, false, LateServerChannelHold.class.getClassLoader());
         } catch (ClassNotFoundException notForge) {
             E2ELog.info("late server channel hold: not applicable on this loader");
             return;
         }
         applicable = true;
         try {
+            Class<?> impl = Class.forName(FORGE_IMPL);
             Field s2cField = impl.getDeclaredField("S2C");
             Field idField = impl.getDeclaredField("SYNC_IDS");
             s2cField.setAccessible(true);
