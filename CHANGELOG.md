@@ -22,6 +22,9 @@
 - Added log messages for when the connection with the server is set up, when the server's
   channels arrive late, and when the server does not answer.
 
+**Note: work on the features and bugs reported on Discord starts tomorrow; they should most likely
+be ready by the weekend.**
+
 ## 3.0.0 (2026-08-09)
 
 ### Added
