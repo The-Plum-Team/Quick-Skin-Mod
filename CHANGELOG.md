@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.0.1 (2026-09-27)
+
+### Fixed
+
+- Fixed skins and capes never syncing in large modpacks. On Forge 1.20.1, when the client was slow
+  to process the server's list of network channels (for example while JEI was still loading),
+  Quick Skin decided on joining that the server did not have the mod and kept every appearance
+  local for the whole session. The client now keeps checking for as long as it is connected and
+  starts syncing as soon as the server's channels show up.
+- Servers now also recognise Quick Skin 2.x clients whose channels arrive after they join.
+- The server now saves a player's skin and cape as soon as they change, instead of only when the
+  player leaves or the server stops, so a crash no longer loses the changes made in that session.
+
+### Changed
+
+- On Forge, skins and capes now load right after joining, even in large modpacks. Quick Skin reads
+  the server's mod list from Forge's login handshake instead of waiting for the channel list, so
+  appearances sync within a few seconds instead of after long loading freezes such as JEI's
+  startup (about 40 seconds in a 370-mod pack).
+- Added log messages for when the connection with the server is set up, when the server's
+  channels arrive late, and when the server does not answer.
+
+**Note: work on the features and bugs reported on Discord starts tomorrow; they should most likely
+be ready by the weekend.**
+
 ## 3.0.0 (2026-08-09)
 
 ### Added
