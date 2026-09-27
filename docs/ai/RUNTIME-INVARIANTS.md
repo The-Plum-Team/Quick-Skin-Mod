@@ -136,15 +136,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   intact skin instead of an ambiguous isolated sleeve; never accept an account import or the
   earlier generic fallback frame as stable baseline evidence. Restore first-person explicitly
   before any later checkpoint whose contract inspects the local arm.
-- A public screenshot is valid only when a successful packaged `result.json` references it and its
-  recorded SHA-256 and dimensions match the PNG. Do not infer scenario, role, or step from a
-  filename, and do not let sets or duplicate labels collapse two frames into false coverage.
-- Public evidence must be able to show why a capture was admitted. A published frame carries its
-  contract identity and expectation, the bounded printable message its mandatory assertion emitted,
-  the decoded pixel metrics of both the original PNG and the served derivative, its required
-  comparisons, its packaged lane with the exact tested JAR digest, and both provenance runs. A new
-  published field is a schema change: validate it fail-closed in the same strict frame contract
-  rather than letting a consumer read an unvalidated string.
+- Quick Skin's public evidence follows the managed
+  [shared public-evidence contract](shared/PUBLIC-EVIDENCE.md), which owns frame validity,
+  provenance, the schemas and their evolution, untrusted-artifact handling, derivatives,
+  publication, rotation and the front end. `runtime_evidence` is mandatory on every published
+  frame: each capture's passed assertion must emit a bounded printable message of 1 to 4096
+  characters, and a capture without one cannot be published. `site/mod-base.json` is the only
+  place Quick Skin's publication policy is set: one `mc<version>` key per matrix target, exact
+  1920x1080 sources cross-checked against the packaged runtime's own pixel metrics, `progress`
+  admission, the lossless anchor of the matrix's unit-test target, complete-scope baseline
+  archives and the `mod-compatibility` family.
 - Public optional-mod evidence is admitted only from a complete clean compatibility source wave.
   Finishing every available capsule in a failed runtime attempt settles only that attempt; missing
   runnable lanes forbid the source completion marker and publication. A later source attempt must
@@ -161,17 +162,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   run provenance. Never publish provider-authored explanations or anomaly text.
   `reviewed_frame_count` must equal that exact mod-selective two-, five-, or seven-checkpoint model
   product; the authenticated runtime result, not repeated model review of ordinary screenshots,
-  proves the complete base suite. Public compatibility schema v5 encodes that count; continue
-  accepting schema v4's five-checkpoint multiplayer count, schema v3's four-checkpoint multiplayer
-  count, schema v2's local-only count, and schema v1's complete-scenario count until every rolling
-  branch cache has been regenerated.
-- Adding a published field must not invalidate evidence that already exists. Each release branch
-  keeps one rolling cache built by its own checkout, and those caches are regenerated only when
-  that branch ports and re-runs its packaged suite—which can itself wait on unrelated approvals.
-  Introduce the field as optional in the strict frame contract, or bump the bundle schema version
-  and keep accepting the previous one; never redefine an existing version in place. Validate the
-  field whenever it is present, publish it whenever it is present, and let every consumer render
-  its absence. Tighten it to mandatory only once every discovered release branch carries it.
+  proves the complete base suite. The shared-source native bundle, public compatibility schema v6,
+  encodes that count and travels unchanged inside the kit's family envelope; the Pages path no
+  longer reads the rolling-cache schemas v1 through v5
+  ([ADR 0010](../architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)).
+- Public schemas follow the kit's N/N-1 rule: a kit release reads schema versions N and N-1 and
+  writes N, a schema version only gains optional fields, and there are no converters, so a kit
+  bump never invalidates existing evidence while a `pixel_metrics_version` change forces
+  regeneration. A Quick Skin-specific public field travels only in a declared adapter extension
+  (`quick-skin.runtime_source`, `quick-skin.feature_selection`) that `authenticate_extensions`
+  verifies before publication; never let a consumer read an unvalidated field.
 - `e2e/scenario-contract.json` is the only authored source for scenario ids, execution profiles,
   orchestration, roles, ordered steps, mandatory assertions, captures, expectations, review tiers,
   exact 1920x1080 screenshot size, authored review regions, probes, and comparisons. Capture ids
@@ -346,90 +346,44 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   harness jar's remapper rewrites it. Resolving a Minecraft name from a string resolves only on
   Mojang-mapped loaders and fails on Fabric's intermediary runtime, so a string lookup additionally
   requires an explicit intermediary fallback.
-- Public evidence is bound to source run/branch/SHA and final run/branch/SHA. Pages may select a
-  bundle only when its authenticated originating target run and manifest both match the head that
-  bundle covers; a later protected Pages run may only roll that already validated bundle
-  into cache. That covered head is the packaged target head unless a protected carry-forward
-  recorded an optional `provenance.coverage_sha`, which a non-visual synchronization port may
-  advance because it deliberately never re-runs packaged Minecraft. Carrying evidence requires the
-  collector's own strict-ancestry proof from the comparison API plus a fresh `replicated-port`
-  impact classification of that exact bounded inventory, never a flag from the selector and never
-  a fetch of untrusted release-branch history into this privileged workspace; the packaged provenance never moves, so a run can
-  never appear to have tested a head it did not. The field stays optional until every release
-  branch has republished, and the AI oracle never consumes a continued bundle.
-- Pages repository wakes and deploys use one shared publication concurrency group so a branch wave
-  cannot fan out multiple collectors. Discovery may defer on active release attestations. Its
-  advisory progress controller may nominate exact current-head handoff IDs from bounded metadata,
-  but never downloads or validates a bundle; each collector reauthenticates its nomination, fails
-  closed if it changed or disappeared, and otherwise owns exact current-head selection; retryable GitHub API and installation-rate-limit failures use bounded
-  jittered backoff and remain distinguishable from authenticated evidence absence.
-  Reuse of an authenticated runtime reference, terminal review owner, or successful public Pages
-  owner lasts only for one admission. Each capsule and artifact retains its own identity and
-  integrity checks, including each public archive's own retention job; a failed authentication never
-  enters that invocation's reuse map. Quota telemetry is advisory and emits
-  only numeric counters from the affected token.
-- Shared Pages collectors authenticate artifact owners and complete bounded bundles. Before
-  rendering or uploading the site, Build reauthenticates each distinct runtime generation once
-  across the complete matrix fan-in and compares every manifest's original and target provenance
-  with that result. This reuse lasts only for that invocation; fresh source-head checks bracket
-  admission and deployment. Selected components retain their separate baseline authentication,
-  and historical direct-source bundles retain their collector gate. Private collected artifacts
-  cannot substitute for successful final admission or become reusable public caches themselves.
-- Pages publication progress is advisory cost admission from exact current-head handoffs and one
-  successful atomic cache owner. Authenticate its complete exact-attempt job graph and each
-  artifact's upload window before suppressing fan-out. Admit the initial ordinary publication, a
-  later complete same-head ordinary attempt, and halfway and final compatibility coverage, with a
-  45-minute partial eligibility deadline and a bounded hourly recovery sweep. Final completeness
-  adds no coalescing delay. Three failed or cancelled publications without newer readiness stop
-  automatic fan-out; `operation=manual` remains the operator recovery. Completed generations do not self-dispatch;
-  neither a cancelled owner nor stale/foreign evidence advances progress. Preserve the complete
-  collectors/runtime fan-in and actual successful-owner rotation. See
-  [Pages publication progress](../ci/PAGES-PUBLICATION-PROGRESS.md) for bounds and measured versus
-  simulated operation counts.
-- Published current state selects one durable Pages cache per matrix bundle key and exactly one
-  lossless raw handoff for the matrix-derived Fabric 1.20.1 visual anchor. Select at most one durable
-  mod-compatibility Pages cache for each key that has published evidence. Rotation retires duplicate
-  uploads under the replacement's exact SHA name; other SHA generations and complete baseline
-  archives retain their independent expiry policy. Treat raw packaged-E2E uploads, every other
-  `pages-e2e-<branch>`, compatibility
-  handoffs, Pages fan-in, and the
-  deploy artifact as short-lived handoffs. Rotation happens in a separate protected workflow after
-  the owning Pages run is `completed/success`; it must recheck run provenance, the release head,
-  replacement artifact identity, and every deletion ID before retiring the exact ordinary consumed
-  handoff, older lossless-anchor generations, Pages-run intermediates, and caches older than the
-  successful replacement. It must revalidate the retained raw anchor before every deletion. Raw
-  packaged-E2E proof normally expires after one day; an automatic synchronization source and its
-  immutable input bundle retain seven days so delayed semantic approval can still launch and
-  compare the compatibility wave. Do not delete either during promotion because a concurrent branch
-  attestation or compatibility curator may still consume it. A failed E2E, deployment, validation,
-  or rotation must
-  preserve the previous usable cache and raw anchor, and a delayed rotation must never delete a
-  concurrent newer generation.
+- Ordinary public evidence proves exactly the commit and run that produced it and is never carried
+  forward to a newer head. The producer is `on-demand-e2e.yml` on `master` (dispatched after every
+  merge by Build gate's `request-shared-e2e`); its `notify-pages` job wakes the managed caller with
+  `operation=deploy`, and the caller's publication admission, collection, deployment and rotation
+  follow the shared contract. Delegated reuse through `quick-skin.runtime_source` keeps the original
+  tested run, commit and JAR of a reused runtime. Reuse of an authenticated runtime reference,
+  terminal review owner, or successful public Pages owner lasts only for one admission. Each
+  capsule and artifact retains its own identity and integrity checks, including each public
+  archive's own retention job; a failed authentication never enters that invocation's reuse map.
+  Quota telemetry is advisory and emits only numeric counters from the affected token.
+- Published current state is one `mb-cache--` generation per `mc<version>` key, at most one
+  `mb-family-cache--mod-compatibility--` generation per key that has published compatibility
+  evidence, and exactly one current `mb-anchor--mc1.20.1--…` under the kit's anchor rule; the
+  matrix's unit-test target supplies that key. Raw packaged-E2E proof normally expires after one
+  day; an automatic synchronization source and its immutable input bundle retain seven days so
+  delayed semantic approval can still launch and compare the compatibility wave. Do not delete
+  either during promotion, because a concurrent attestation or compatibility curator may still
+  consume it. A failed E2E, publication, validation or rotation must preserve the previous site
+  and caches.
 - Compatibility evidence may be rebound from its tested target to a current descendant only when
   both commits are authenticated ancestors and the protected complete-diff classifier returns
-  non-impacting. A runtime, loader, assembly, harness, contract, lock, workflow, classifier,
-  mixed, malformed, or unknown change invalidates that carry-forward and requires a new
-  compatibility wave; a change made only of module-owned sources invalidates it exactly when the
-  module graph proves its reverse dependency closure reaches a compatibility scenario step or a
-  clean reference capture, and is carried forward otherwise. A change that invalidates the
+  non-impacting. The adapter's `family_validate` hook decides the impact; the kit proves the
+  ancestry itself before it publishes. A runtime, loader, assembly, harness, contract, lock,
+  workflow, classifier, mixed, malformed, or unknown change invalidates that carry-forward and
+  requires a new compatibility wave; a change made only of module-owned sources invalidates it
+  exactly when the module graph proves its reverse dependency closure reaches a compatibility
+  scenario step or a clean reference capture, and is carried forward otherwise. A change that invalidates the
   carry-forward also keeps the complete packaged profile, so the generation that invalidated the
   published evidence is the generation that regenerates it. Evidence that no generation has
   produced yet, or whose wave never completed, is restored by the next change that reaches that
   closure or by a manual complete run, not by a later non-impacting merge. Publication-only review
   workflow changes are explicitly non-impacting so
   generating the compact bundle cannot recursively schedule the expensive matrix.
-- A selected compatibility cache bound to a superseded scenario or optional-mod contract is
-  unavailable, not a failure of the atomic ordinary site. Omit that branch's optional gallery until
-  a current wave replaces it. Any malformed bundle or validation failure under the current contract
-  remains fatal and must never be downgraded to absence.
-- Discovery records one protected `master` SHA for the Pages run. Every collection and render job
-  checks out that exact implementation revision; an advancing `master` may affect only a later run.
-- Treat downloaded artifacts and their JSON as untrusted. Require the exact curated tree, exact
-  schemas, complete contract and comparison products, canonical identities, one loader per branch
-  loader, and one JAR digest per artifact. Reject traversal, symlinks, unknown contract entries,
-  duplicate identities, non-pass lanes, stale SHAs, invalid PNGs, arbitrary nested fields, and
-  size-limit violations. Protected rendering must decode and recompute screenshot/comparison pixel
-  metrics before publishing. Presentation code must use escaped/text DOM APIs and local assets.
+- A compatibility bundle bound to a superseded scenario or optional-mod contract is `superseded`,
+  and a lineage or impact refusal is `unavailable`; neither is a failure of the atomic ordinary
+  site. The kit omits that key's compatibility gallery until a current wave replaces it. Any
+  malformed bundle or validation failure under the current contract remains fatal and must never
+  be downgraded to absence.
 - Secret-bearing visual review has the fixed boundary `authenticate -> curate without secrets ->
   durable queue -> secretless preparation handoff -> artifact-scoped review in a fresh capsule ->
   retention-safe cleanup`. Curating
@@ -438,9 +392,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   it must import the authenticated source commit only as inert Git objects and never check out or
   execute source-head files in the privileged default-branch workflow;
   for the 1.20.1 anchor, require complete Fabric/Forge coverage and emit only unpaired frames; for
-  later versions, authenticate the exact current-head lossless 1.20.1 Pages source and its run
-  provenance; fully decode and require exact 1920x1080 dimensions, then canonically re-encode
-  bounded RGB PNGs without source metadata or resizing; and emit a
+  later versions, pair against the same runtime generation's authenticated Fabric 1.20.1 captures
+  (the historical lossless Pages reference is retired and fails closed); fully decode and require
+  exact 1920x1080 dimensions, then canonically re-encode bounded RGB PNGs without source metadata
+  or resizing; and emit a
   source/implementation/candidate/reference-artifact-bound proof. Queue
   selection must authenticate protected owners, survive pending-run replacement, accept a curated
   capsule whose later wake step failed, and cool recent failed attempts without blocking other
@@ -565,13 +520,3 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   lanes remain independently recoverable.
 - Schema-2 version-port and anchor fan-out invariants apply only to historical recovery; they
   live in [VERSION-BRANCHES.md](../../VERSION-BRANCHES.md#historical-automation-invariants).
-- Optimized gallery images are derivatives, not the source proof. Publish separate source and
-  derivative hashes/dimensions, and content-address each public image URL with the bytes actually
-  served. Original PNGs may exist only in `pages-e2e-*` handoffs; all are one-day transients except
-  the current matrix-derived Fabric 1.20.1 visual anchor, which is retained for 90 days and rotated
-  only after a validated replacement. Protected conversion must revalidate source bytes and metrics
-  before atomically producing the WebP-only fan-in/cache; every later cache/render read must
-  revalidate the retained source record, derivative bytes, derivative metrics, and derivative
-  comparisons. AI comparison must never use the lossy derivative as its baseline.
-- Pages is an advisory, atomic publication surface. Failure must preserve the previous site and
-  must not weaken or replace the required Build and Packaged E2E gates.

@@ -134,13 +134,15 @@ reviews use the selected Fabric reference from the same runtime. Its schema-7 cu
 describes partial coverage separately from semantic/comparison judgment and cannot certify a new
 complete baseline.
 
-Pages uses separate public schemas: complete raw/compact targets remain 3/4, selected raw/compact
-targets use 5/6, and a schema-7 compact composition retains exactly one complete baseline and one
-cumulative selected update. The protected collector reauthenticates their source jobs, baseline
-certificate, immutable deployed baseline archive and dependency fingerprints. Every displayed
-frame retains its actual tested commit, run and JAR; reused frames also expose the newer covered
-commit. A composition never becomes a complete baseline or recursively chains older compositions.
-The exact `pages-full-baseline-<target>--<sha>--<run>` compact artifact has a bounded 90-day lifetime.
+Public evidence records that scope in the mod-base schemas: a `complete` or `selected` handoff
+per target, and a `composed` compact bundle that retains exactly one complete baseline and one
+cumulative selected update, composed per frame (see
+[Public visual evidence](#public-visual-evidence)). The adapter's `compose` hook
+and the kit's re-verification reauthenticate their source jobs, baseline certificate, immutable
+deployed baseline archive and dependency fingerprints. Every displayed frame retains its actual tested commit, run and JAR;
+reused frames also expose the newer covered commit. A composition never becomes a complete
+baseline or recursively chains older compositions. The exact
+`mb-baseline--<target>--<commit>--<tested_run_id>` compact artifact has a bounded 90-day lifetime.
 Only a deployed complete generation can publish it; missing retained evidence restores full runs.
 
 The first shared-source migration has no trusted baseline and therefore runs complete coverage.
@@ -471,8 +473,10 @@ visible contradiction. A 1.20.1 run exposes every Fabric and Forge frame without
 image. Both loaders must have the same complete `capture_id` set, and each screenshot is judged
 independently against its expectation. This prevents a shared renderer, state, or equipment bug
 from becoming correct merely because both loaders agree. For each semantic `capture_id`, a
-later-version candidate is paired with the authenticated current-head Fabric 1.20.1 frame selected
-only from the protected lossless Pages handoff; the compact WebP cache is never an AI oracle.
+later-version candidate is paired with the authenticated Fabric 1.20.1 frame of the same runtime
+generation; a compact WebP cache is never an AI oracle. The historical schema-2 comparison against
+a lossless Pages handoff is retired and fails closed
+([ADR 0010](../docs/architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)).
 Candidate and reference must already have the same contracted dimensions. The
 reference is semantic rather than a strict whole-pixel golden image: legitimate Vanilla, loader,
 camera, lighting, and framing differences remain acceptable. Missing anchor-loader coverage or a
@@ -742,7 +746,11 @@ reviewed images are not public.
 ## Public visual evidence
 
 The architectural rationale, evaluated alternatives, and external precedents are recorded in
-[ADR 0002](../docs/architecture/decisions/0002-publish-curated-e2e-evidence-with-github-pages.md).
+[ADR 0002](../docs/architecture/decisions/0002-publish-curated-e2e-evidence-with-github-pages.md),
+and [ADR 0010](../docs/architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)
+delegates the publication pipeline to the pinned mod-base kit. The kit's shared contract is
+[`docs/ai/shared/PUBLIC-EVIDENCE.md`](../docs/ai/shared/PUBLIC-EVIDENCE.md); Quick Skin supplies
+its adapter `scripts/pages/mod_base_adapter.py` and configuration `site/mod-base.json`.
 
 The required runtime does not treat a filename as screenshot identity. Each validated capture has
 the semantic key `<artifact>/<scenario>/<client-role>/<step>`, and
@@ -758,85 +766,93 @@ tier; the bounded assertion message the packaged client emitted; decoded pixel m
 original PNG and the served derivative; every required before/after comparison with its measured
 and minimum change; the packaged lane with its exact production JAR digest and wall time; and the
 tested plus publishing runs, commits and contract hash. `gallery-data.json` carries ordinary and
-optional-mod records as schema version 3, so the page derives them and never restates an
-unvalidated fact.
-
-Historical caches created before assertion messages were included can validate without that field;
-the record explicitly marks its absence. Newly captured shared-source evidence includes the
-contract-authored passed assertion.
+optional-mod records as `mod-base.gallery` version 1, so the page derives them and never restates
+an unvalidated fact. The assertion message is the mandatory `runtime_evidence` of every published
+frame; evidence without it is never published.
 
 `visual_review_workflow.js` is an optional manual Workflow adapter, not the GitHub Actions entry
 point. It consumes the generated manifest and emits the same exact verdict-array contract that CI
 extracts from its structured `reviews` result before passing it to `check_visual_review.py`; keep
 that adapter and the CI prompt/checker schema aligned.
 
-After a successful shared manual generation, the advisory `prepare-pages-evidence` job creates
-one `pages-e2e-mc<TARGET>` handoff per matrix target. Full raw/compact bundles use schemas 3/4;
-selected raw/compact bundles use schemas 5/6. The protected Pages consumer independently
-authenticates feature admission, the complete baseline and public artifacts before producing a
-schema-7 composition of a full compact baseline and current selected compact evidence. Each frame
-keeps its original tested commit/run/JAR and separate coverage provenance. A partial generation
-cannot refresh the lifetime of the full baseline. Historical schema-2 runs retain their original
-`pages-e2e-<branch>` handoff and attestation contract. The handoff contains only contract-selected source PNGs plus a validated
-manifest; logs, caches, crash reports, Minecraft directories, and AI-authored HTML are never copied.
-Ordinary handoffs retain one day. The release matrix's Fabric 1.20.1 handoff retains 90 days as the
-current lossless visual anchor and is generation-rotated after replacement. The producer then sends
-the explicit authenticated `pages-evidence-ready` event; it does not depend on recursive
-token-triggered workflow behavior.
+After a successful shared manual generation, the advisory job `Prepare public evidence for <key>
+(advisory)` runs the kit's `prepare-evidence` composite once per matrix target. Its step `Upload
+stable public evidence for this Minecraft target` runs the adapter's `collect` hook over the
+packaged output, validates the handoff and uploads the private one-day
+`mb-handoff--mc<TARGET>--a<attempt>`; for the release matrix's unit-test target it also uploads the
+lossless anchor `mb-anchor--mc<TARGET>--<commit>--<run_id>--a<attempt>`, which the kit retains for
+90 days under its anchor rule. The handoff records a complete or selected generation as its scope,
+and the Pages side can compose a selected handoff with its authenticated full baseline archive.
+The composition works per frame, so every verified selection is handed off, including one that
+re-captures only some checkpoints of a lane (today's `hud-preview` selection re-captures 2 of the
+63 `full` ones). Such a lane is the selected execution's record and keeps the baseline execution
+of its older frames as `baseline_run` (see
+[ADR 0010](../docs/architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)).
+Each frame keeps its original tested commit/run/JAR and separate coverage provenance, and a partial
+generation cannot refresh the lifetime of the full baseline. The handoff contains only
+contract-selected source PNGs plus a validated manifest; logs, caches, crash reports, Minecraft
+directories, and AI-authored HTML are never copied. The separate `notify-pages` job, which holds
+only `actions: write` and checks out nothing, then wakes the managed `pages.yml` caller with
+`operation=deploy`; it does not depend on recursive token-triggered workflow behavior. This
+explicit wake replaces the retired `pages-evidence-ready` repository dispatch.
 
-The `Project site` controller executes only the protected generator from `master`. It authenticates
-each wake-up, coalesces concurrent events, derives targets from the shared matrix, and accepts
-evidence only for the authenticated current source generation. Before collection fan-out,
-`scripts/pages/publication_progress.py` admits only an authenticated coverage milestone: the
-initial complete ordinary publication, a later complete same-head ordinary attempt, the
-compatibility halfway (after ten minutes of coalescing) and final milestones, or a partial set whose
-oldest unpublished handoff has waited 45 minutes. Each collector reauthenticates the exact handoff
-ID that discovery nominates and fails closed rather than falling back to an older cache; see
-[Pages publication progress](../docs/ci/PAGES-PUBLICATION-PROGRESS.md). It authenticates both recorded
-Actions runs, validates the exact curated tree and every path/hash/dimension/contract identity,
-rechecks all heads, converts each raw bundle to an exact-schema WebP derivative bundle before the
-`collected-pages-*` fan-in, and publishes the complete site as one atomic GitHub Pages artifact. A
-missing, stale, or invalid version aborts the new deployment, preserving the previous site.
+The `Project site` caller runs the kit's reusable publisher at the single pinned mod-base commit,
+bound to the protected `master` head. Its admission authenticates each wake, coalesces concurrent
+events, lists the targets through the adapter and accepts evidence only for the authenticated
+current source generation. Quick Skin configures the kit's `progress` admission: it publishes
+the first generation of a head, a complete newer attempt of the same head, half of the targets
+once the coalescing window has passed, every target when all are ready, a partial set whose oldest
+unpublished handoff has waited past the configured deadline, or an authenticated compatibility
+wake; see [Pages publication progress](../docs/ci/PAGES-PUBLICATION-PROGRESS.md). Each collector
+authenticates both recorded Actions runs, reruns the adapter's `collect` over the exact handoff,
+validates every path/hash/dimension/contract identity, rechecks the live head, and converts the
+raw bundle to its WebP derivative bundle. The site is published as one atomic GitHub Pages
+artifact by the caller's own `deploy` job. A missing, stale, or invalid version aborts the new
+deployment, preserving the previous site. The shared rules are in the
+[shared public-evidence contract](../docs/ai/shared/PUBLIC-EVIDENCE.md).
 
-Compatibility publication is optional alongside that required ordinary fan-in. Pages selects the
-newest authenticated `pages-mod-compatibility-<branch>` handoff or rolling
-`pages-mod-compatibility-cache-<branch>`, validates its exact schema, contracts, images and clean
-lane/N/A product, and carries it to a newer branch head only across a protected complete diff that
-cannot affect compatibility. The gallery exposes it under **Mod compatibility**, showing each
-clean/modded pair, the full review count, deterministic assertion and separate runtime, review and
-publication runs. Absence of such evidence does not claim that a mod is incompatible.
+Compatibility publication is optional alongside that required ordinary fan-in. The compatibility
+review publishes its complete clean wave as the family handoff
+`mb-family-handoff--mod-compatibility--<target>--a<attempt>`, and its `notify-family` job wakes the
+caller with `operation=family`. The adapter validates that native bundle's exact schema,
+contracts, images and clean lane/N/A product and may carry it to a newer head only across a
+protected complete diff that cannot affect compatibility; the kit proves that ancestry itself. The
+gallery exposes it under **Mod compatibility**, showing each clean/modded pair, the full review
+count, deterministic assertion and separate runtime, review and publication runs. Absence of such
+evidence does not claim that a mod is incompatible.
 
-After a successful deployment, the controller explicitly self-dispatches `operation=rotate`. The
-protected rotation authenticates its completed/successful owner and operates on exact artifact IDs,
-retaining one validated compact `pages-cache-*` bundle for each exact release head. This atomic,
-generation-safe rotation admits the replacement before deleting superseded exact IDs, and a delayed
-rotation cannot delete a newer cache. For the matrix-derived 1.20.1 anchor it also retains the exact
-current raw handoff, revalidates it before every deletion, and deletes only older raw generations.
-Original PNG bytes never enter the durable compact cache. Pages never relaunches Minecraft: its
-hourly schedule only recovers a lost wake or a stalled partial publication, and a generation whose
-caches are already complete exits in discovery without collecting or refreshing them. The same
-rotation retains one validated compatibility cache
-per covered matrix target and retires older compatibility caches and consumed handoffs only after
-the replacement deploys successfully. Pages and advisory AI reports do not replace the required
-Build or Packaged E2E gates. Full baseline archives have their own bounded retention and must still
-be available before any later feature selection can reuse their coverage.
+After a successful deployment and cache refresh, the caller requests `operation=rotate`. The
+separately locked rotation authenticates its completed/successful owner and deletes only superseded
+`mb-*` generations by exact artifact ID, retaining one compact `mb-cache--` generation per target,
+one `mb-family-cache--` generation per covered target and the newest lossless anchor. It never
+deletes a newer generation, a baseline archive or any legacy `pages-*` artifact, which expires
+under its own retention. Original PNG bytes never enter the durable compact cache. Pages never
+relaunches Minecraft: its hourly schedule only recovers a lost wake or a stalled partial
+publication, and a generation whose caches are already current ends in admission. Pages and
+advisory AI reports do not replace the required Build or Packaged E2E gates. Full baseline
+archives have their own bounded retention and must still be available before any later feature
+selection can reuse their coverage.
 
 Run the focused contracts in the project Python environment (CI installs the Linux renderer from
-the hash-locked `scripts/pages/requirements.txt`):
+the hash-locked `scripts/pages/requirements.txt`). The adapter and conformance tests find the
+pinned kit through `scripts/ci/mod_base_kit.py` and fail, never skip, when it is unavailable:
 
 ```bash
 python -m unittest \
   scripts.release.tests.test_visual_evidence \
-  scripts.release.tests.test_pages_site -v
+  scripts.release.tests.test_mod_base_adapter \
+  scripts.release.tests.test_mod_base_conformance -v
+python3 scripts/ci/mod_base_kit.py run conformance --repo . --keys mc1.20.1,mc26.3 --families
 ```
 
-The Pages pipeline hash-locks the same Pillow version as packaged E2E. Protected `master` code
-decodes every source PNG, recalculates its pixel metrics and required comparisons, and only then
-creates bounded WebP images in a temporary bundle. It records and validates source identity,
-hashes, dimensions and pixel metrics separately from the derivative identity, hashes, dimensions,
-pixel metrics and comparisons before atomically admitting that bundle to fan-in. Later cache and
-site reads revalidate the protected source record and the derivative bytes; the site copies the
-content-addressed WebP without re-encoding it. For a local dependency-free fixture output, call
-`scripts/pages/build_site.py --copy-images` with one or more already prepared branch bundles, then
-serve the resulting directory over HTTP; the static JavaScript deliberately fetches its JSON
-inventories rather than embedding untrusted data in HTML.
+The kit hash-locks the same Pillow version as packaged E2E, in lockstep with
+`e2e/requirements.txt` and `scripts/pages/requirements.txt`. Its single imaging implementation
+decodes every source PNG, recalculates its pixel metrics and required comparisons, cross-checks
+them against the packaged runtime's own metrics, and only then creates deterministic WebP images.
+It records and validates source identity, hashes, dimensions and pixel metrics separately from the
+derivative identity, hashes, dimensions, pixel metrics and comparisons before admitting a bundle
+to fan-in. Later cache and site reads revalidate the source record and the derivative bytes; the
+site copies the content-addressed WebP without re-encoding it. The conformance run above builds a
+complete fixture site from synthetic captures in a temporary directory and checks its
+content-security policy and inventory; the static JavaScript fetches its JSON inventories rather
+than embedding untrusted data in HTML.

@@ -291,6 +291,10 @@ into those branches. Their source matrices and existing evidence remain intact d
   retire older caches plus the consumed handoff.
   Never delete the fallback before its replacement succeeds, introduce a second version list,
   publish logs/crash reports, or make Pages a protected release check.
+  Since [ADR 0010](docs/architecture/decisions/0010-delegate-public-evidence-to-mod-base.md),
+  `master`'s Pages workflow no longer reads `pages-e2e-*`, `collected-pages-*`,
+  `pages-cache-*` or `pages-mod-compatibility-*` artifacts; recover this historical collector from
+  tag `pre-mod-base-gallery`.
 - A completely clean optional-mod wave may separately produce one
   `pages-mod-compatibility-<branch>` handoff. Its protected publisher reauthenticates the complete
   runtime plan and all normalized AI reports, then exposes the two local compatibility-specific
@@ -451,6 +455,8 @@ into those branches. Their source matrices and existing evidence remain intact d
   bounded collector reauthenticates in its single authoritative selection/provenance pass. Its GitHub API client applies bounded jittered backoff
   to installation-rate-limit and transient transport/server responses; those responses are never
   reclassified as missing evidence.
+  This is the publisher that ADR 0010 retired (recoverable from tag `pre-mod-base-gallery`); the
+  mod-base caller on `master` keeps separate publication and rotation locks.
 - Shared behavior changes start on `master`. A version-only fix starts on its release branch and
   must be reflected in canonical `master` sources when the same behavior applies elsewhere.
 - A shared change is not repository-wide delivery merely because it reached `master`. The

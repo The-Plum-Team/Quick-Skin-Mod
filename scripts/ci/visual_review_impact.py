@@ -33,15 +33,12 @@ REPLICATED_SAFE_EXACT_PATHS = frozenset(
         "scripts/ci/version_port_failure_policy.py",
         "scripts/ci/visual_nonimpact_certification.py",
         "scripts/ci/visual_review_queue.py",
-        "scripts/pages/build_site.py",
-        "scripts/pages/rotate_artifacts.py",
         "scripts/pages/collect_compatibility.py",
         "scripts/pages/compatibility_evidence.py",
-        "scripts/pages/select_artifact.py",
-        "scripts/pages/select_compatibility_artifact.py",
-        "scripts/release/tests/test_pages_artifact_rotation.py",
+        "scripts/pages/mod_base_adapter.py",
         "scripts/ci/visual_review_impact.py",
         "e2e/README.md",
+        "site/mod-base.json",
     }
 )
 SOURCE_PR_SAFE_EXACT_PATHS = frozenset(

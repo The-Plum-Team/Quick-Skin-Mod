@@ -35,7 +35,7 @@ class FeatureCoverageOwnerReuseTest(unittest.TestCase):
         for page in self.api.job_lists[8001]:
             for job in page["jobs"]:
                 job["run_id"] = 8001
-        public = [records[0] for name, records in self.api.records.items() if name.startswith("pages-full-baseline-")]
+        public = [records[0] for name, records in self.api.records.items() if name.startswith("mb-baseline--")]
         for record in public[len(public) // 2:]:
             record["workflow_run"]["id"] = 8001
         with patch.object(self.api, "run", wraps=self.api.run) as runs, \
@@ -47,7 +47,7 @@ class FeatureCoverageOwnerReuseTest(unittest.TestCase):
 
     def test_reused_owner_still_rejects_a_later_artifacts_foreign_head(self):
         record = next(records[0] for name, records in reversed(self.api.records.items())
-                      if name.startswith("pages-full-baseline-"))
+                      if name.startswith("mb-baseline--"))
         record["workflow_run"]["head_sha"] = "f" * 40
         with self.assertRaisesRegex(ValueError, "successful protected Pages owner"):
             self.fixture.prepare()

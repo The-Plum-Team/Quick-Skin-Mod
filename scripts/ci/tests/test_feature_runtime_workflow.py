@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -377,7 +376,7 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.assertLess(reviewer.index('--validate-plan "$plan"'), reviewer.index('pending_count='))
 
     def test_pages_completion_wakes_baseline_collection_and_stale_heads_do_not_dispatch(self):
-        script = step_script("pages.yml", "request-feature-coverage",
+        script = step_script("pages.yml", "ext-feature-coverage",
                              "Request a collector only for complete unscheduled readiness")
         self.binary("python3", "import json,os,sys\n"
             "if sys.argv[1]=='scripts/release/release_sources.py': print('shared')\n"
@@ -400,9 +399,12 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.assertEqual("stale-generation", scheduler.request(api, repository=ROOT,
             source_sha="b" * 40, source_id=10, producer_id=66, directory=self.root))
         self.assertEqual([], api.payloads)
-        job = job_block("pages.yml", "request-feature-coverage")
-        self.assertIn("needs.refresh-cache.result == 'success'", job)
-        self.assertIn("- refresh-compatibility-cache", job)
+        # The mod-local extension job of the managed caller runs after the kit's finalize has
+        # rolled the complete public baseline forward.
+        job = job_block("pages.yml", "ext-feature-coverage")
+        self.assertIn("needs.finalize.result == 'success'", job)
+        self.assertIn("needs.publish.outputs.eligible == 'true'", job)
+        self.assertIn("- finalize", job)
         self.assertIn("- request-rotation", job)
         self.assertIn("continue-on-error: true", job)
         consumer = job_block("feature-coverage.yml", "certify")
@@ -416,60 +418,43 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         declared = set(re.findall(r"^      ([a-z_0-9]+): \$\{\{ steps.result.outputs", policy, re.MULTILINE))
         self.assertTrue(set(re.findall(r"needs.feature-policy.outputs.([a-z_0-9]+)", producer)) <= declared)
         self.assertIn("needs.pages-inventory.result == 'success'", producer)
-        script = step_script("on-demand-e2e.yml", "prepare-pages-evidence", "Prepare the curated SHA-bound evidence bundle")
+        # The authenticated runtime reference and feature selection reach the adapter only
+        # through the identity step's extensions file, never from the policy job's outputs.
+        self.assertIn("extensions: ${{ steps.identity.outputs.extensions_path }}", producer)
+        self.assertIn("tested-run-attempt: ${{ steps.identity.outputs.source_run_attempt }}", producer)
+        self.assertNotIn("--selection-admission", producer)
+        script = step_script("on-demand-e2e.yml", "prepare-pages-evidence",
+                             "Bind the packaged runtime selection to its protected admission")
         e2e = self.root / "e2e-out"
         e2e.mkdir()
         (e2e / "selection.json").write_bytes(self.selection.read_bytes())
-        (e2e / "coverage.json").write_text("{}")
-        self.binary("python3", "import json,os,sys\nopen(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n")
-        environment = {"MINECRAFT_TARGET": "1.20.1", "SOURCE_RUN_ID": "55", "SOURCE_BRANCH": "master",
-            "SOURCE_SHA": "b" * 40, "SOURCE_CREATED_AT": "2026-09-06T02:00:00Z", "TARGET_SHA": "b" * 40,
-            "TARGET_CREATED_AT": "2026-09-06T02:00:00Z", "GITHUB_REF_NAME": "master",
-            "SELECTION_ENABLED": "true", "SELECTION_BASE": "a" * 40, "SELECTION_POLICY": "b" * 40,
-            "SELECTION_SHA256": hashlib.sha256(self.selection.read_bytes()).hexdigest()}
-        result, _outputs, calls = self.run_script(script, environment)
+        digest = hashlib.sha256(self.selection.read_bytes()).hexdigest()
+        result, _outputs, calls = self.run_script(script, {"SELECTION_ENABLED": "true", "SELECTION_SHA256": digest})
         self.assertEqual(0, result.returncode, result.stderr[:300])
-        self.assertEqual(1, len(calls))
-        for argument, value in (("--selection-base", "a" * 40), ("--selection-policy", "b" * 40),
-                                ("--source-sha", "b" * 40), ("--selection-admission", "e2e-out/selection.json")):
-            self.assertEqual(value, calls[0][calls[0].index(argument) + 1])
-        result, _outputs, calls = self.run_script(script, {**environment, "SELECTION_ENABLED": "false"})
-        self.assertEqual(0, result.returncode, result.stderr[:300])
-        self.assertNotIn("--selection-admission", calls[0])
-        result, _outputs, calls = self.run_script(script, {**environment, "REUSED_RUNTIME": "true",
-                                                                          "SOURCE_SHA": "c" * 40})
-        self.assertEqual(0, result.returncode, result.stderr[:300])
-        self.assertEqual(str(self.root / "public-runtime/runtime-source.json"),
-                         calls[0][calls[0].index("--runtime-source") + 1])
-        self.assertEqual("c" * 40, calls[0][calls[0].index("--source-sha") + 1])
-        result, _outputs, calls = self.run_script(script, {**environment, "SELECTION_SHA256": "0" * 64})
-        self.assertNotEqual(0, result.returncode)
         self.assertEqual([], calls)
+        result, _outputs, _calls = self.run_script(script, {"SELECTION_ENABLED": "false", "SELECTION_SHA256": ""})
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        result, _outputs, _calls = self.run_script(script, {"SELECTION_ENABLED": "true",
+                                                             "SELECTION_SHA256": "0" * 64})
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("differs from protected admission", result.stderr)
 
     def test_pages_routes_selected_handoffs_and_caches_through_reauthentication_before_promotion(self):
-        script = step_script("pages.yml", "collect", "Compose authenticated feature evidence with its complete baseline")
-        self.binary("python3", "import json,os,sys\nfrom pathlib import Path\n"
-            "open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n"
-            "root=Path('composed-evidence/mc1.20.1');root.mkdir(parents=True)\n"
-            "(root/'manifest.json').write_text('{}')\n")
-        for schema, artifact, expected_calls in ((3, "pages-e2e-mc1.20.1", 0),
-                (5, "pages-e2e-mc1.20.1", 1), (7, "pages-cache-mc1.20.1--" + "b" * 40, 1)):
-            with self.subTest(schema=schema):
-                for name in ("selected-evidence", "source-feature-evidence", "composed-evidence"):
-                    path = self.root / name
-                    if path.exists(): shutil.rmtree(path)
-                root = self.root / "selected-evidence/mc1.20.1"
-                root.mkdir(parents=True)
-                (root / "manifest.json").write_text(json.dumps({"schema_version": schema}))
-                result, _outputs, calls = self.run_script(script, {"BUNDLE_KEY": "mc1.20.1",
-                    "ARTIFACT_NAME": artifact, "OWNER_RUN_ID": "55", "SOURCE_SHA": "b" * 40})
-                self.assertEqual(0, result.returncode, result.stderr[:300])
-                self.assertEqual(expected_calls, len(calls))
-                if calls:
-                    self.assertEqual("b" * 40, calls[0][calls[0].index("--source-sha") + 1])
-                    self.assertEqual(schema == 5, "--artifact-run-id" in calls[0])
-                    self.assertTrue((self.root / "source-feature-evidence/mc1.20.1/manifest.json").is_file())
-
+        # mod-base's publish collector composes a selected handoff or cache with its complete
+        # baseline only through the adapter's compose hook (feature_pages as its backend), and
+        # re-authenticates the delegated runtime reference through authenticate_extensions.
+        config = json.loads((ROOT / "site" / "mod-base.json").read_text(encoding="utf-8"))
+        self.assertLessEqual({"compose", "authenticate_extensions"}, set(config["adapter"]["network_hooks"]))
+        self.assertIn("quick-skin.feature_selection", config["adapter"]["extensions"])
+        self.assertEqual("quick-skin.runtime_source", config["source"]["delegated_reuse_extension"])
+        self.assertTrue(config["baseline_archive"]["enabled"])
+        adapter = (ROOT / "scripts" / "pages" / "mod_base_adapter.py").read_text(encoding="utf-8")
+        self.assertRegex(adapter, r"(?m)^def compose\(")
+        self.assertRegex(adapter, r"(?m)^def authenticate_extensions\(")
+        self.assertIn("feature_pages", adapter)
+        caller = job_block("pages.yml", "publish")
+        self.assertNotIn("selection", caller)
+        self.assertNotIn("scripts/ci/feature_pages.py", (ROOT / ".github/workflows/pages.yml").read_text())
 
 if __name__ == "__main__":
     unittest.main()

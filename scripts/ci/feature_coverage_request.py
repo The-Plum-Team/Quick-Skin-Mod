@@ -91,9 +91,6 @@ def source_from_producer(api: publisher.Api, producer_id: int, source_sha: str, 
         raise coverage.CoverageError("baseline request substituted its producer owner")
     pages = owner["path"] == publisher.PAGES_WORKFLOW
     if owner.get("event") not in (publisher.PAGES_EVENTS if pages else coverage.DRAIN_EVENTS):
-        # Pages repository wakes own no published evidence.
-        if pages and owner.get("event") == "repository_dispatch":
-            return None
         raise coverage.CoverageError("baseline request has a foreign producer event")
     records = api.artifacts(run_id=producer_id)
     sources, targets = set(), set()
@@ -101,11 +98,10 @@ def source_from_producer(api: publisher.Api, producer_id: int, source_sha: str, 
     for record in records:
         name = record["name"]
         if pages:
-            if publisher.PUBLIC_BASELINE_NAME.fullmatch(name) is None:
+            parsed = publisher.parse_public_baseline_name(name)
+            if parsed is None or parsed[1] != source_sha:
                 continue
-            key, sha, source = name[len("pages-full-baseline-"):].split("--")
-            if sha != source_sha:
-                continue
+            key, source = parsed[0], parsed[2]  # the run that tested the retained pixels
         else:
             match = publisher.REPORT_NAME.fullmatch(name)
             if match is None or match.group("target") is None:
@@ -119,6 +115,8 @@ def source_from_producer(api: publisher.Api, producer_id: int, source_sha: str, 
         return None
     if len(sources) != 1 or not pages and len(targets) != 1:
         raise coverage.CoverageError("producer wake has an ambiguous runtime source")
+    if pages:
+        return publisher.generation_for_tested(api, source_sha, sources.pop())
     return sources.pop()
 
 
@@ -171,8 +169,12 @@ def matching_collector(run: dict[str, Any], source_id: int, attempt: int) -> boo
 
 
 def metadata_ready(api: publisher.Api, source_sha: str, source_id: int,
-                   producer_id: int | None = None) -> bool:
-    """Cheap scheduling hints only: no owner jobs, runtime archives, images or model input."""
+                   producer_id: int | None = None, *, tested_run: int | None = None) -> bool:
+    """Cheap scheduling hints only: no owner jobs, runtime archives, images or model input.
+
+    ``tested_run`` names the run whose pixels the generation's retained public baselines hold
+    (``feature_coverage_github.tested_run_id``; the generation itself by default)."""
+    tested_run = source_id if tested_run is None else tested_run
     targets = coverage.inventory(coverage.DEFAULT_MATRIX)["include"]
     # Test one public archive first, then interleave target reviews/public archives. This stops
     # at the first absent review without rereading sixteen already available public records.
@@ -184,7 +186,7 @@ def metadata_ready(api: publisher.Api, source_sha: str, source_id: int,
     admitted_metadata = []
     for public, target in checks:
         key = target["bundle_key"]
-        name = (publisher.public_baseline_name(key, source_sha, source_id) if public
+        name = (publisher.public_baseline_name(key, source_sha, tested_run) if public
                 else f"visual-review-{source_id}--{key}")
         candidates = api.artifacts(name=name)
         available = []
@@ -196,7 +198,7 @@ def metadata_ready(api: publisher.Api, source_sha: str, source_id: int,
                     raise coverage.CoverageError("readiness archive has no immutable owner")
                 record["owner_run_id"] = owner.get("id")
                 publisher.validate_public_record(record, bundle_key=key, source_sha=source_sha,
-                                                 source_run_id=source_id)
+                                                 source_run_id=source_id, tested_run_id=tested_run)
                 if (owner.get("head_sha") != source_sha or owner.get("head_branch") != "master"
                         or type(candidate.get("expired")) is not bool):
                     raise coverage.CoverageError("public readiness belongs to another generation")
@@ -281,7 +283,8 @@ def request(api: Api, *, repository: Path, source_sha: str, source_id: int,
         return "not-complete-source"
     if source["status"] != "completed" or source.get("conclusion") != "success":
         return "source-not-successful"
-    if any(record["name"] == coverage.SELECTION_ARTIFACT_NAME for record in api.artifacts(run_id=source_id)):
+    inventory = api.artifacts(run_id=source_id)
+    if any(record["name"] == coverage.SELECTION_ARTIFACT_NAME for record in inventory):
         return "selected-source"
     tail_id = active_tail(api, producer_id, source_sha, owner=producer_owner)
     attempt = source["run_attempt"]
@@ -290,7 +293,8 @@ def request(api: Api, *, repository: Path, source_sha: str, source_id: int,
         return "collector-active"
     if existing_available(api, repository=repository, source=source, source_sha=source_sha, directory=directory):
         return "certificate-available" if api.current_sha() == source_sha else "stale-generation"
-    if not metadata_ready(api, source_sha, source_id, tail_id):
+    tested_run = publisher.tested_run_id(api, source_id, source=source, inventory=inventory)
+    if not metadata_ready(api, source_sha, source_id, tail_id, tested_run=tested_run):
         return "evidence-incomplete"
     if api.current_sha() != source_sha or api.run(source_id).get("run_attempt") != attempt:
         return "source-advanced"

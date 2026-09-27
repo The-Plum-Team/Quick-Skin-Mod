@@ -12,7 +12,10 @@ contributing; submitting a pull request accepts its contribution terms.
 
 - [README.md](README.md) explains what the mod does and how to build it.
 - [AGENTS.md](AGENTS.md) is an import-only manifest. Every `@path.md` listed there is part of the
-  authoritative instruction set for coding assistants.
+  authoritative instruction set for coding assistants. Its first two imports, under
+  `docs/ai/shared/`, are shared with the team's other mods through the
+  [mod-base](https://github.com/The-Plum-Team/mod-base) kit; the four `docs/ai/` files after them
+  hold Quick Skin's own rules.
 - [VERSION-BRANCHES.md](VERSION-BRANCHES.md) explains shared-source development and historical branch recovery.
 - [RELEASING.md](RELEASING.md) explains immutable publication and repository governance.
 - [DEPENDENCY-SECURITY.md](DEPENDENCY-SECURITY.md) explains repository routing, checksums, and locks.
@@ -163,10 +166,17 @@ architecture document imported by `AGENTS.md`.
 | Packaged Minecraft test mod | `common/src/e2e` and loader `src/e2e` |
 | E2E loader/bootstrap integrity | `e2e/loader-bootstrap-contract.json` |
 | Supported artifacts and E2E lanes | `release/release-matrix.json` |
+| Public-evidence adapter and site settings | `scripts/pages/mod_base_adapter.py` and `site/mod-base.json` |
+| Managed mod-base files | Nowhere by hand: `scripts/ci/mod_base_kit.py bump` or `template sync` |
 
 Do not edit or commit anything below generated `versions/` trees, `build/`, `.gradle/`,
 `.architectury-transformer/`, `e2e-out/`, or `build/release/`. Minecraft runtime directories,
 screenshots, caches, staged jars, and IDE output also stay untracked.
+
+The managed mod-base files are byte-identical copies of the pinned kit:
+`scripts/ci/mod_base_kit.py`, `.gitattributes`, `docs/ai/shared/REPOSITORY.md`,
+`docs/ai/shared/PUBLIC-EVIDENCE.md`, and the marked managed region of `.github/workflows/pages.yml`.
+A local edit fails `template check`; propose the change in mod-base instead.
 
 When a class exists in both a canonical tree and an active overlay, changing only the canonical
 file does not change the overlaid release. Search before editing:
@@ -218,6 +228,8 @@ python scripts/release/workflow_guidance.py \
   --guidance docs/ai/WORKFLOW.md \
   --profile-branch master \
   --check
+python scripts/ci/mod_base_kit.py verify --network
+python scripts/ci/mod_base_kit.py run template check --repo .
 python -m unittest discover -s scripts/release/tests -p "test_*.py" -v
 python -m unittest discover -s scripts/ci/tests -p "test_*.py" -v
 ```
@@ -225,6 +237,20 @@ python -m unittest discover -s scripts/ci/tests -p "test_*.py" -v
 The build gate runs those two suites through `scripts/ci/parallel_unittest.py`, which takes the
 same `-s`/`-p` arguments, spreads one discovery across every core, and fails if any discovered
 test is lost, fails, errors or unexpectedly succeeds. Use it locally for a faster equivalent run.
+
+`verify --network` checks that every mod-base reference carries the one pin and that the pin is a
+released kit tag reachable from mod-base `main`; `template check` checks the managed files and the
+required lines of `AGENTS.md`, `.github/CODEOWNERS`, `.github/dependabot.yml`, `.gitignore` and the
+pull-request template. Tests that need the kit fail rather than skip when it is unavailable: the
+first run fetches the pinned kit into your user cache, which needs anonymous HTTPS access to
+GitHub once.
+
+Kit bumps are their own draft pull request. On a fresh branch run
+`python scripts/ci/mod_base_kit.py bump --to vX.Y.Z`, review the whole diff, commit it as
+`ci: bump mod-base to vX.Y.Z` and open it as a draft to `master`; maintainers land it through a
+batch pull request. A bump runs every Build and Packaged E2E lane. Dependabot is configured to
+ignore the kit and `actions/deploy-pages`, which the managed `pages.yml` pins; close any Dependabot
+pull request that touches a mod-base reference or the managed part of `pages.yml`.
 
 Do not run multiple Gradle commands at the same time on one machine. Architectury's transforms share
 JVM-global state, so local aggregate builds remain serial. GitHub compiles separate targets on

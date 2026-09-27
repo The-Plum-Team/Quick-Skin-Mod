@@ -280,8 +280,10 @@ class SharedPagesProducerTest(unittest.TestCase):
         self.assertEqual(names, covered)
         self.assertEqual({"mc" + row["artifact_version"] for row in data["artifacts"]},
                          {row["bundle_key"] for row in rows})
-        self.assertEqual([data["unit_test_version"]],
-                         [row["minecraft_target"] for row in rows if row["raw_retention_days"] == 90])
+        # Handoff and anchor retention belong to mod-base; the inventory only names targets.
+        for row in rows:
+            self.assertEqual({"bundle_key", "source_branch", "minecraft_target", "artifact_pattern"}, set(row))
+        self.assertIn(data["unit_test_version"], [row["minecraft_target"] for row in rows])
 
     def test_actual_inventory_shell_requires_the_real_source_branch(self):
         script = step_script("on-demand-e2e.yml", "pages-inventory",
@@ -307,87 +309,24 @@ class SharedPagesProducerTest(unittest.TestCase):
                         self.assertEqual("", output.read_text())
 
     def test_actual_pages_discovery_requires_complete_handoffs_without_version_branch_queries(self):
-        script = step_script("pages.yml", "discover", "Discover matrix targets and validate the wake-up event")
-        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-        rows = inventory()["include"]
-        artifacts = [{"id": index + 1, "name": "pages-e2e-" + row["bundle_key"],
-                      "expired": False, "size_in_bytes": 100,
-                      "workflow_run": {"id": 42, "head_branch": "master", "head_sha": sha}}
-                     for index, row in enumerate(rows)]
-        with tempfile.TemporaryDirectory() as temporary:
-            folder = Path(temporary)
-            for command in ("python3",):
-                executable = folder / command
-                executable.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + ' "$@"\n')
-                executable.chmod(0o755)
-            fixture_api = folder / "fixture_api.py"
-            fixture_api.write_text('''import json,os,sys
-from pathlib import Path
-args=sys.argv[1:]
-if not args or args[0] != "api": raise SystemExit("Only read-only API calls are allowed")
-endpoint=next((value for value in args[1:] if value.startswith("repos/")), "")
-with Path(os.environ["FIXTURE_CALLS"]).open("a") as output: output.write(endpoint+"\\n")
-repo="repos/The-Plum-Team/Quick-Skin-Mod"
-sha=os.environ["FIXTURE_SHA"]
-path=endpoint.split("?",1)[0]
-if path == repo+"/branches/master":
- data={"commit":{"sha":"b"*40 if os.environ["FIXTURE_CASE"] == "advanced" else sha}}
-elif path == repo+"/actions/workflows/on-demand-e2e.yml": data={"id":77}
-elif path == repo+"/actions/workflows/pages.yml": data={"id":88}
-elif path == repo+"/actions/runs/42":
- data={"id":42,"workflow_id":77,"status":"completed","conclusion":"success",
-       "event":"workflow_dispatch","head_branch":"master","head_sha":sha,
-       "path":".github/workflows/on-demand-e2e.yml",
-       "head_repository":{"full_name":"The-Plum-Team/Quick-Skin-Mod"}}
-elif path == repo+"/actions/runs/42/artifacts":
- items=json.loads(Path(os.environ["FIXTURE_ARTIFACTS"]).read_text())
- if os.environ["FIXTURE_CASE"] == "missing": items=items[:-1]
- data=[{"artifacts":items}]
-elif path == repo+"/actions/artifacts" and "name=pages-cache-mc" in endpoint:
- data=[{"artifacts":[]}]
-elif path == repo+"/actions/workflows/77/runs": data={"total_count":0,"workflow_runs":[]}
-else: raise SystemExit("Unexpected fixture endpoint: "+endpoint)
-if "--jq" in args:
- query=args[args.index("--jq")+1]
- if query == ".commit.sha": print(data["commit"]["sha"])
- elif query == ".id": print(data["id"])
- else: raise SystemExit("Unexpected jq query")
-else: print(json.dumps(data))
-''')
-            gh = folder / "gh"
-            gh.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + " " +
-                          shlex.quote(str(fixture_api)) + ' "$@"\n')
-            gh.chmod(0o755)
-            artifact_file = folder / "artifacts.json"
-            artifact_file.write_text(json.dumps(artifacts))
-            for case in ("manual", "complete", "missing", "advanced"):
-                with self.subTest(case=case):
-                    output, calls = folder / "output", folder / "calls"
-                    output.write_text("")
-                    calls.write_text("")
-                    env = {"PATH": str(folder) + os.pathsep + "/opt/homebrew/bin" + os.pathsep + os.defpath,
-                           "GITHUB_OUTPUT": str(output), "RUNNER_TEMP": str(folder),
-                           "GITHUB_REF": "refs/heads/master", "GITHUB_SHA": sha,
-                           "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod", "GH_TOKEN": "local-fixture",
-                           "DISPATCH_OPERATION": "manual" if case in {"manual", "advanced"} else "deploy",
-                           "DISPATCH_BRANCH": "master", "DISPATCH_RUN_ID": "42", "DISPATCH_SHA": sha,
-                           "FIXTURE_CASE": case, "FIXTURE_SHA": sha, "FIXTURE_CALLS": str(calls),
-                           "FIXTURE_ARTIFACTS": str(artifact_file)}
-                    result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
-                                            cwd=ROOT, env=env, text=True, capture_output=True, timeout=30)
-                    fields = dict(line.split("=", 1) for line in output.read_text().splitlines())
-                    if case in {"manual", "complete"}:
-                        self.assertEqual(0, result.returncode, result.stderr)
-                        self.assertEqual("true", fields["eligible"])
-                        self.assertEqual([row["bundle_key"] for row in rows], json.loads(fields["bundle_keys"]))
-                        self.assertEqual("master", fields["source_branch"])
-                        self.assertEqual(sha, fields["source_sha"])
-                    else:
-                        self.assertEqual("false", fields["eligible"])
-                        self.assertEqual("[]", fields["bundle_keys"])
-                        if case == "missing":
-                            self.assertNotEqual(0, result.returncode)
-                            self.assertIn("incomplete public target handoffs", result.stderr)
-                    branch_calls = [call for call in calls.read_text().splitlines() if "/branches" in call]
-                    self.assertTrue(branch_calls)
-                    self.assertEqual({"repos/The-Plum-Team/Quick-Skin-Mod/branches/master"}, set(branch_calls))
+        # Discovery is mod-base admission over the adapter's default-branch targets: one key per
+        # matrix artifact version, each admitted only from its own authenticated handoff of the
+        # canonical producer. No release or version branch is ever listed.
+        import test_mod_base_caller as caller
+
+        config = json.loads((ROOT / "site" / "mod-base.json").read_text(encoding="utf-8"))
+        self.assertEqual("master", config["canonical_branch"])
+        self.assertEqual("default-branch", config["targets"]["mode"])
+        self.assertGreaterEqual(config["targets"]["max"], len(inventory()["include"]))
+        self.assertEqual(".github/workflows/on-demand-e2e.yml", config["source"]["workflow"])
+        self.assertEqual(["workflow_dispatch"], config["source"]["events"]["canonical"])
+        self.assertEqual("progress", config["admission"]["mode"])
+        self.assertTrue(config["admission"]["defer_on_active_source_runs"])
+        workflow = caller.caller_text()
+        for retired in ("/branches?per_page=", "version_branches", "evidence_target.py",
+                        "--validate-handoffs", "pages-e2e-"):
+            with self.subTest(retired=retired):
+                self.assertNotIn(retired, workflow)
+        producer = job_block("on-demand-e2e.yml", "pages-inventory")
+        self.assertIn("python3 scripts/pages/evidence_target.py --kind matrix", producer)
+        self.assertNotIn("/branches?per_page=", producer)

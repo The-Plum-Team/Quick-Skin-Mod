@@ -124,7 +124,7 @@ class FeatureCoverageConsumerTest(unittest.TestCase):
 
     def test_expired_or_replaced_public_baseline_forces_complete_runtime_coverage(self):
         record = next(items[0] for name, items in self.api.records.items()
-                      if name.startswith("pages-full-baseline-"))
+                      if name.startswith("mb-baseline--"))
         original = copy.deepcopy(record)
         for change in ({"expired": True}, {"digest": "sha256:" + "0" * 64}):
             with self.subTest(change=change):

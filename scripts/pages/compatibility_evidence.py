@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Build and validate compact public evidence for optional-mod compatibility E2E."""
+"""Build and validate compact public evidence for optional-mod compatibility E2E.
+
+A shared-source (schema 6) bundle is also the native bundle of mod-base's ``mod-compatibility``
+family: :func:`project_paired` projects a validated bundle onto the kit's
+``mod-base.family.paired`` v1 view, and the optional ``provenance.publication_run`` records the
+producing publication run's API facts (``event``, ``created_at`` and ``display_title``) that the
+projection's producer ``RunRecord`` needs, because the kit's ``family_validate`` hook runs without
+API access.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +21,8 @@ import shutil
 import stat
 import sys
 import tempfile
+from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -59,7 +69,6 @@ from visual_evidence import (  # noqa: E402
 SCHEMA_VERSION = 5
 SHARED_SCHEMA_VERSION = 6
 CURRENT_SCHEMA_VERSIONS = frozenset({SCHEMA_VERSION, SHARED_SCHEMA_VERSION})
-LEGACY_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4})
 KIND = "quick-skin-public-mod-compatibility"
 MANIFEST_NAME = "manifest.json"
 SOURCE_SCENARIO = "mod-compatibility"
@@ -82,6 +91,8 @@ CPM_FIRST_PERSON_PUBLIC_CAPTURE_IDS = (
     "mod-compatibility-cpm-first-person.client_a.first_person_hand_after_10_seconds",
 )
 PUBLIC_IMAGE_SIZE = (1280, 720)
+PUBLIC_WEBP_QUALITY = 80
+PUBLIC_WEBP_METHOD = 6
 MAX_MANIFEST_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
 MAX_TOTAL_IMAGE_BYTES = 512 * 1024 * 1024
@@ -94,6 +105,9 @@ COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 SAFE_ID = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,255}$")
 LOADER = frozenset({"fabric", "forge", "neoforge"})
+EVENT = re.compile(r"^[a-z_]{1,40}$")
+TIMESTAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+MAX_DISPLAY_TITLE = 500
 
 MANIFEST_FIELDS = frozenset(
     {
@@ -108,6 +122,9 @@ MANIFEST_FIELDS = frozenset(
     }
 )
 CONTRACT_FIELDS = frozenset({"scenario_sha256", "compatibility_sha256"})
+#: ``provenance.publication_run`` (shared schema only, optional): the publication run's API facts.
+PUBLICATION_RUN_FIELDS = frozenset({"event", "created_at"})
+PUBLICATION_RUN_OPTIONAL_FIELDS = frozenset({"display_title"})
 RELEASE_FIELDS = frozenset({"branch", "version", "loaders"})
 PROVENANCE_FIELDS = frozenset(
     {
@@ -197,6 +214,22 @@ PROOF_ARTIFACT_FIELDS = frozenset(
 COMPLETION_FIELDS = frozenset(
     {"schema_version", "kind", "source_run_id", "lane", "report_sha256"}
 )
+#: The mod-base family projection (SPEC §3.5): kind, the family image policy these derivatives
+#: satisfy, the provenance link labels (display text of at most 40 characters, at most 16 links)
+#: and the PixelMetrics fields the kit types as integers.
+PROJECTION_KIND = "mod-base.family.paired"
+PROJECTION_IMAGE_POLICY = {
+    "derivative_box": list(PUBLIC_IMAGE_SIZE),
+    "webp_quality": PUBLIC_WEBP_QUALITY,
+    "webp_method": PUBLIC_WEBP_METHOD,
+}
+CLEAN_REFERENCE_LINK = "Clean reference run"
+RUNTIME_LINK = "Compatibility runtime run"
+REVIEW_LINK = "Complete AI review"
+PUBLICATION_LINK = "Publication run"
+MAX_PROJECTION_LINKS = 16
+INTEGER_METRICS = frozenset({"width", "height", "meaningful_colors"})
+DIGEST_METRICS = frozenset({"file_sha256", "pixel_sha256"})
 
 
 class CompatibilityEvidenceError(ValueError):
@@ -210,59 +243,38 @@ class CompatibilityContractDriftError(CompatibilityEvidenceError):
 def _public_capture_ids(
     scenario_contract: ScenarioContract,
     compatibility_mod: CompatibilityMod,
-    *,
-    schema_version: int = SCHEMA_VERSION,
 ) -> list[str]:
-    base = tuple(
-        capture.capture_id
-        for capture in scenario_contract.captures
-        if capture.scenario == SOURCE_SCENARIO
-    )
-    remote = tuple(
-        capture.capture_id
-        for capture in scenario_contract.captures
-        if capture.scenario == REMOTE_SOURCE_SCENARIO
-    )
-    late_join = tuple(
-        capture.capture_id
-        for capture in scenario_contract.captures
-        if capture.scenario == LATE_JOIN_SOURCE_SCENARIO
-    )
-    cpm_first_person = tuple(
-        capture.capture_id
-        for capture in scenario_contract.captures
-        if capture.scenario == CPM_FIRST_PERSON_SOURCE_SCENARIO
-    )
-    if (
-        base != BASE_PUBLIC_CAPTURE_IDS
-        or remote != REMOTE_PUBLIC_CAPTURE_IDS
-        or late_join != LATE_JOIN_PUBLIC_CAPTURE_IDS
-        or cpm_first_person != CPM_FIRST_PERSON_PUBLIC_CAPTURE_IDS
+    """The mod-selective public checkpoints: two local, plus CPM first-person, remote-observer
+    and late-join checkpoints for the integrations whose lock opts in (2, 5 or 7)."""
+
+    authored = {
+        SOURCE_SCENARIO: BASE_PUBLIC_CAPTURE_IDS,
+        REMOTE_SOURCE_SCENARIO: REMOTE_PUBLIC_CAPTURE_IDS,
+        LATE_JOIN_SOURCE_SCENARIO: LATE_JOIN_PUBLIC_CAPTURE_IDS,
+        CPM_FIRST_PERSON_SOURCE_SCENARIO: CPM_FIRST_PERSON_PUBLIC_CAPTURE_IDS,
+    }
+    if any(
+        tuple(capture.capture_id for capture in scenario_contract.captures if capture.scenario == scenario)
+        != capture_ids
+        for scenario, capture_ids in authored.items()
     ):
         raise CompatibilityEvidenceError(
             "public compatibility checkpoint contract drifted"
         )
-    if schema_version in CURRENT_SCHEMA_VERSIONS:
-        try:
-            selected_scenarios = frozenset(
-                compatibility_scenarios_for_mod(
-                    scenario_contract,
-                    compatibility_mod,
-                )
+    try:
+        selected_scenarios = frozenset(
+            compatibility_scenarios_for_mod(
+                scenario_contract,
+                compatibility_mod,
             )
-        except CompatibilityContractError as exc:
-            raise CompatibilityEvidenceError(str(exc)) from exc
-        return [
-            capture.capture_id
-            for capture in scenario_contract.captures
-            if capture.scenario in selected_scenarios
-        ]
-    selected = list(base)
-    if schema_version in {3, 4} and compatibility_mod.multiplayer is not None:
-        selected.extend(remote)
-    if schema_version == 4 and compatibility_mod.multiplayer is not None:
-        selected.extend(late_join)
-    return selected
+        )
+    except CompatibilityContractError as exc:
+        raise CompatibilityEvidenceError(str(exc)) from exc
+    return [
+        capture.capture_id
+        for capture in scenario_contract.captures
+        if capture.scenario in selected_scenarios
+    ]
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -278,7 +290,9 @@ def _reject_nonfinite(value: str) -> None:
     raise ValueError(f"non-finite JSON number {value!r}")
 
 
-def read_json(path: Path, label: str, *, maximum_bytes: int = MAX_MANIFEST_BYTES) -> Any:
+def _read_regular(path: Path, label: str, *, maximum_bytes: int) -> bytes:
+    """One stable, non-empty regular file of at most ``maximum_bytes``, never following a symlink."""
+
     descriptor = -1
     try:
         metadata = path.lstat()
@@ -305,17 +319,25 @@ def read_json(path: Path, label: str, *, maximum_bytes: int = MAX_MANIFEST_BYTES
             payload = handle.read(maximum_bytes + 1)
         if len(payload) != metadata.st_size:
             raise ValueError("file changed while reading")
+        return payload
+    except (OSError, ValueError) as exc:
+        raise CompatibilityEvidenceError(f"cannot read {label} {path}: {exc}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def read_json(path: Path, label: str, *, maximum_bytes: int = MAX_MANIFEST_BYTES) -> Any:
+    payload = _read_regular(path, label, maximum_bytes=maximum_bytes)
+    try:
         return json.loads(
             payload.decode("utf-8"),
             object_pairs_hook=_reject_duplicate_keys,
             parse_constant=_reject_nonfinite,
             parse_float=parse_finite_json_float,
         )
-    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+    except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
         raise CompatibilityEvidenceError(f"cannot read {label} {path}: {exc}") from exc
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
 
 
 def sha256_file(path: Path) -> str:
@@ -393,6 +415,53 @@ def _loader(value: Any, label: str) -> str:
     if text not in LOADER:
         raise CompatibilityEvidenceError(f"{label} is not a supported loader")
     return text
+
+
+def _display_title(value: Any, label: str) -> str:
+    """GitHub's run ``display_title`` under mod-base's evidence-text rule (1..500 characters,
+    non-empty when stripped, no C0 control character, DEL or lone surrogate)."""
+
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or len(value) > MAX_DISPLAY_TITLE
+        or any(
+            ord(character) < 32 or ord(character) == 127 or 0xD800 <= ord(character) <= 0xDFFF
+            for character in value
+        )
+    ):
+        raise CompatibilityEvidenceError(f"{label} must be bounded printable text")
+    return value
+
+
+def validate_publication_run(
+    value: Any, label: str = "provenance.publication_run"
+) -> dict[str, Any]:
+    """Validate the recorded publication run facts ``{event, created_at, display_title?}``."""
+
+    if not isinstance(value, dict) or not (
+        PUBLICATION_RUN_FIELDS
+        <= set(value)
+        <= PUBLICATION_RUN_FIELDS | PUBLICATION_RUN_OPTIONAL_FIELDS
+    ):
+        found = sorted(value) if isinstance(value, dict) else type(value).__name__
+        raise CompatibilityEvidenceError(
+            f"{label} fields disagree: expected={sorted(PUBLICATION_RUN_FIELDS)} "
+            f"with optional {sorted(PUBLICATION_RUN_OPTIONAL_FIELDS)}, found={found}"
+        )
+    event = value["event"]
+    if not isinstance(event, str) or EVENT.fullmatch(event) is None:
+        raise CompatibilityEvidenceError(f"{label}.event is not a workflow event name")
+    created_at = value["created_at"]
+    try:
+        if not isinstance(created_at, str) or TIMESTAMP.fullmatch(created_at) is None:
+            raise ValueError("not YYYY-MM-DDTHH:MM:SSZ")
+        datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise CompatibilityEvidenceError(f"{label}.created_at is not a UTC timestamp") from exc
+    if "display_title" in value:
+        _display_title(value["display_title"], f"{label}.display_title")
+    return dict(value)
 
 
 def _branch(value: Any, label: str) -> tuple[str, str, tuple[str, ...]]:
@@ -830,7 +899,13 @@ def _encode_webp(source: Path, destination: Path) -> None:
                 raise CompatibilityEvidenceError(
                     f"compatibility derivative size drifted: {rendered.size}"
                 )
-            rendered.save(destination, "WEBP", quality=80, method=6, exact=True)
+            rendered.save(
+                destination,
+                "WEBP",
+                quality=PUBLIC_WEBP_QUALITY,
+                method=PUBLIC_WEBP_METHOD,
+                exact=True,
+            )
     except CompatibilityEvidenceError:
         raise
     except (OSError, UnidentifiedImageError, ValueError) as exc:
@@ -937,8 +1012,13 @@ def build_bundle(
     scenario_contract_path: Path,
     compatibility_contract_path: Path,
     matrix_path: Path = DEFAULT_MATRIX,
+    publication_run: dict[str, Any] | None = None,
 ) -> Path:
-    """Validate every clean lane and publish only compatibility-specific image pairs."""
+    """Validate every clean lane and publish only compatibility-specific image pairs.
+
+    ``publication_run`` (:func:`validate_publication_run`) records the publication run's API facts
+    in a shared-source bundle; a historical release-branch bundle never carries it.
+    """
 
     if REPOSITORY.fullmatch(repository) is None:
         raise CompatibilityEvidenceError("repository must use the owner/name form")
@@ -947,6 +1027,8 @@ def build_bundle(
     )
     publication_run_id = _positive_int(publication_run_id, "publication_run_id")
     implementation_sha = _commit(implementation_sha, "implementation_sha")
+    if publication_run is not None:
+        publication_run = validate_publication_run(publication_run, "publication_run")
     try:
         scenario_contract = load_scenario_contract(scenario_contract_path)
         compatibility_contract = load_compatibility_contract(
@@ -965,6 +1047,10 @@ def build_bundle(
     if "runtime_source" in identity:
         _validate_runtime_source(identity["runtime_source"], source_sha=identity["source_sha"],
                                  repository=repository)
+    if publication_run is not None and "matrix_sha256" not in identity:
+        raise CompatibilityEvidenceError(
+            "only shared-source compatibility evidence records its publication run"
+        )
     if lanes_root.is_symlink():
         raise CompatibilityEvidenceError("lane evidence root cannot be a symlink")
     root = lanes_root.resolve()
@@ -1196,6 +1282,7 @@ def build_bundle(
                 "publication_run_id": publication_run_id,
                 "coverage_sha": identity["target_sha"],
                 **({"runtime_source": identity["runtime_source"]} if "runtime_source" in identity else {}),
+                **({"publication_run": publication_run} if publication_run is not None else {}),
             },
             "lanes": public_lanes,
             "not_applicable": not_applicable,
@@ -1328,7 +1415,7 @@ def validate_bundle(
     schema_version = manifest.get("schema_version")
     if (
         type(schema_version) is not int
-        or schema_version not in LEGACY_SCHEMA_VERSIONS | CURRENT_SCHEMA_VERSIONS
+        or schema_version not in CURRENT_SCHEMA_VERSIONS
         or manifest.get("kind") != KIND
     ):
         raise CompatibilityEvidenceError("compatibility manifest identity is invalid")
@@ -1369,8 +1456,14 @@ def validate_bundle(
         except EvidenceTargetError as exc:
             raise CompatibilityEvidenceError(str(exc)) from exc
         source_branch, version, loaders = target.branch, target.version, target.loaders
-        if release["matrix_sha256"] != target.matrix_sha256:
-            raise CompatibilityEvidenceError("compatibility release full matrix hash mismatch")
+        matrix_digest = _sha256(release.get("matrix_sha256"), "manifest.release.matrix_sha256")
+        if matrix_digest != target.matrix_sha256:
+            # The full release matrix is part of a shared bundle's contract identity: its lanes,
+            # loaders and N/A rows derive from it, so a superseded matrix is drift, not corruption.
+            raise CompatibilityContractDriftError(
+                "compatibility release full matrix hash mismatch: the evidence binds a superseded "
+                "release matrix"
+            )
     else:
         source_branch, version, loaders = _branch(branch, "branch")
     if (
@@ -1380,8 +1473,15 @@ def validate_bundle(
     ):
         raise CompatibilityEvidenceError("compatibility release identity mismatch")
     provenance = manifest.get("provenance")
-    origin_fields = {"runtime_source"} if shared and isinstance(provenance, dict) and "runtime_source" in provenance else set()
-    provenance = _exact_object(provenance, PROVENANCE_FIELDS | origin_fields, "manifest.provenance")
+    optional_fields = (
+        {"runtime_source", "publication_run"} & set(provenance)
+        if shared and isinstance(provenance, dict)
+        else set()
+    )
+    origin_fields = optional_fields & {"runtime_source"}
+    provenance = _exact_object(provenance, PROVENANCE_FIELDS | optional_fields, "manifest.provenance")
+    if "publication_run" in optional_fields:
+        validate_publication_run(provenance["publication_run"])
     for field in ("implementation_sha", "source_sha", "target_sha", "coverage_sha"):
         _commit(provenance.get(field), f"provenance.{field}")
     if shared and provenance["source_sha"] != provenance["target_sha"]:
@@ -1432,11 +1532,7 @@ def validate_bundle(
         }
         if any(lane.get(key) != value for key, value in expected_identity.items()):
             raise CompatibilityEvidenceError(f"compatibility lane identity drifted: {lane_id}")
-        expected_capture_ids = _public_capture_ids(
-            scenario_contract,
-            expected.mod,
-            schema_version=schema_version,
-        )
+        expected_capture_ids = _public_capture_ids(scenario_contract, expected.mod)
         _positive_int(lane.get("review_run_id"), f"lane {lane_id}.review_run_id")
         for field in (
             "review_manifest_sha256",
@@ -1447,12 +1543,7 @@ def validate_bundle(
         reviewed = _positive_int(
             lane.get("reviewed_frame_count"), f"lane {lane_id}.reviewed_frame_count"
         )
-        expected_reviewed = (
-            len(scenario_contract.captures)
-            if schema_version == 1
-            else len(expected_capture_ids)
-        )
-        if reviewed != expected_reviewed:
+        if reviewed != len(expected_capture_ids):
             raise CompatibilityEvidenceError(f"lane {lane_id} review count is invalid")
         frames = lane.get("frames")
         if not isinstance(frames, list) or [
@@ -1629,6 +1720,211 @@ def carry_forward(
         return destination
     finally:
         shutil.rmtree(temporary, ignore_errors=True)
+
+
+def _typed_metrics(value: dict[str, Any]) -> dict[str, Any]:
+    """Validated PixelMetrics with mod-base's exact JSON types: integer sizes and colour counts,
+    float entropy and fractions (the kit compares recorded metrics as canonical JSON, where ``0``
+    and ``0.0`` differ even though Quick Skin's validators accept both)."""
+
+    return {
+        field: (
+            value[field]
+            if field in DIGEST_METRICS
+            else int(value[field])
+            if field in INTEGER_METRICS
+            else float(value[field])
+        )
+        for field in sorted(value)
+    }
+
+
+def _same_metrics(inspected: dict[str, Any], recorded: dict[str, Any]) -> bool:
+    """``inspected`` names exactly ``recorded``'s fields with numerically equal values."""
+
+    return set(inspected) == set(recorded) and all(
+        not isinstance(recorded[field], bool) and inspected[field] == recorded[field]
+        for field in inspected
+    )
+
+
+def project_paired(
+    manifest: dict[str, Any],
+    *,
+    bundle: Path,
+    family: str,
+    key: str,
+    subject: dict[str, str],
+    coverage_sha: str,
+    producer: dict[str, Any],
+    image_policy: dict[str, Any],
+    inspect_derivative: Callable[[bytes, int, int], dict[str, Any]],
+    write_image: Callable[[str, bytes], None],
+) -> dict[str, Any]:
+    """Project a validated shared-source bundle onto ``mod-base.family.paired`` v1 (SPEC §3.5).
+
+    ``manifest`` must be what :func:`validate_bundle` returned for ``bundle`` (schema 6, clean
+    verdicts only). ``subject``, ``coverage_sha`` and ``producer`` (the producer ``RunRecord``) are
+    the caller's authenticated generation facts and are copied verbatim; ``image_policy`` must be
+    the family policy these derivatives were encoded with. Each native lane becomes one lane
+    ``<artifact_node>/<mod>`` whose variant is the locked optional mod; each frame becomes one pair
+    whose verdict is the published clean review (the runtime lane passed, or the bundle would hold
+    no capsule for it); ``review_regions`` stay native. Every distinct derivative is read once
+    from ``bundle``, bound to its recorded digest, inspected by
+    ``inspect_derivative(data, width, height)`` (the kit's WebP PixelMetrics, whose exact int and
+    float types the projection records), required to equal the native record numerically and
+    handed to ``write_image(asset, data)``. Source metrics are recorded with the same types. Links
+    name the clean reference, compatibility runtime, AI review and publication runs.
+    """
+
+    if manifest.get("schema_version") != SHARED_SCHEMA_VERSION or manifest.get("kind") != KIND:
+        raise CompatibilityEvidenceError(
+            "only a shared-source compatibility bundle has a mod-base projection"
+        )
+    if dict(image_policy) != PROJECTION_IMAGE_POLICY:
+        raise CompatibilityEvidenceError(
+            "the configured family image policy differs from the compatibility derivatives"
+        )
+    provenance = manifest["provenance"]
+    base_run_id = provenance["base_run_id"]
+    if "runtime_source" in provenance:
+        base_run_id = _validate_runtime_source(
+            provenance["runtime_source"],
+            source_sha=provenance["source_sha"],
+            repository=manifest["repository"],
+        )["run_id"]
+    review_runs = sorted({lane["review_run_id"] for lane in manifest["lanes"]})
+    if len(review_runs) > MAX_PROJECTION_LINKS - 3:
+        raise CompatibilityEvidenceError(
+            f"{len(review_runs)} review runs exceed the {MAX_PROJECTION_LINKS} projection links"
+        )
+    links = [
+        {"label": CLEAN_REFERENCE_LINK, "run_id": base_run_id},
+        {"label": RUNTIME_LINK, "run_id": provenance["compatibility_run_id"]},
+        *(
+            {
+                "label": REVIEW_LINK if len(review_runs) == 1 else f"{REVIEW_LINK} {index}",
+                "run_id": run_id,
+            }
+            for index, run_id in enumerate(review_runs, start=1)
+        ),
+        {"label": PUBLICATION_LINK, "run_id": provenance["publication_run_id"]},
+    ]
+    images: dict[str, dict[str, Any]] = {}
+
+    def side(record: dict[str, Any], label: str) -> dict[str, Any]:
+        derivative, source = record["derivative"], record["source"]
+        asset = derivative["asset"]
+        image = images.get(asset)
+        if image is None:
+            data = _read_regular(bundle / asset, f"{label} derivative", maximum_bytes=MAX_IMAGE_BYTES)
+            if hashlib.sha256(data).hexdigest() != derivative["file_sha256"]:
+                raise CompatibilityEvidenceError(f"{label} derivative changed after validation")
+            inspected = inspect_derivative(data, derivative["width"], derivative["height"])
+            if not _same_metrics(inspected, derivative["pixel_validation"]):
+                raise CompatibilityEvidenceError(
+                    f"{label} derivative metrics differ from the mod-base inspection"
+                )
+            image = {
+                "path": asset,
+                "sha256": derivative["file_sha256"],
+                "size": len(data),
+                "width": derivative["width"],
+                "height": derivative["height"],
+                "format": "webp",
+                "pixel": inspected,
+            }
+            write_image(asset, data)
+            images[asset] = image
+        return {
+            "image": image,
+            "source": {
+                "sha256": source["file_sha256"],
+                "width": source["width"],
+                "height": source["height"],
+                "pixel": _typed_metrics(source["pixel_validation"]),
+            },
+        }
+
+    lanes = []
+    for lane in manifest["lanes"]:
+        pairs = []
+        for frame in lane["frames"]:
+            label = f"lane {lane['lane_id']} {frame['capture_id']}"
+            pairs.append(
+                {
+                    "pair_id": frame["capture_id"],
+                    "capture_id": frame["capture_id"],
+                    "reference_capture_id": frame["reference_capture_id"],
+                    "title": frame["title"],
+                    "expectation": frame["expectation"],
+                    "runtime_evidence": frame["runtime_evidence"],
+                    "verdict": {
+                        "runtime_passed": True,
+                        "semantic_valid": frame["semantic_valid"],
+                        "matches_reference": frame["matches_reference"],
+                        "defect": frame["defect"],
+                    },
+                    "metrics": {
+                        "semantic_changed_fraction": float(frame["semantic_changed_fraction"]),
+                        "perceptual_delta": float(frame["perceptual_delta"]),
+                        "candidate_semantic_sha256": frame["candidate_semantic_sha256"],
+                        "reference_semantic_sha256": frame["reference_semantic_sha256"],
+                    },
+                    "reference": side(frame["reference"], f"{label} reference"),
+                    "candidate": side(frame["candidate"], f"{label} candidate"),
+                }
+            )
+        lanes.append(
+            {
+                "lane_id": f"{lane['artifact_node']}/{lane['mod']}",
+                "artifact_node": lane["artifact_node"],
+                "minecraft": lane["version"],
+                "loader": lane["loader"],
+                "variant": {
+                    "id": lane["mod"],
+                    "name": lane["mod_name"],
+                    "version": lane["mod_version"],
+                    "version_id": lane["mod_version_id"],
+                },
+                "review": {
+                    "reviewed_frame_count": lane["reviewed_frame_count"],
+                    "manifest_sha256": lane["review_manifest_sha256"],
+                    "proof_sha256": lane["curation_proof_sha256"],
+                    "report_sha256": lane["review_report_sha256"],
+                },
+                "pairs": pairs,
+            }
+        )
+    contracts = manifest["contracts"]
+    return {
+        "kind": PROJECTION_KIND,
+        "schema_version": 1,
+        "family": family,
+        "key": key,
+        "coverage_sha": coverage_sha,
+        "subject": dict(subject),
+        "status": "available",
+        "provenance": {"producer": dict(producer), "links": links},
+        "contracts": {
+            "mod-compatibility-contract": contracts["compatibility_sha256"],
+            "release-matrix": manifest["release"]["matrix_sha256"],
+            "scenario-contract": contracts["scenario_sha256"],
+        },
+        "image_policy": dict(PROJECTION_IMAGE_POLICY),
+        "lanes": lanes,
+        "not_applicable": [
+            {
+                "artifact_node": row["artifact_node"],
+                "minecraft": row["version"],
+                "loader": row["loader"],
+                "variant_id": row["mod"],
+                "variant_name": row["mod_name"],
+                "reason": row["reason"],
+            }
+            for row in manifest["not_applicable"]
+        ],
+    }
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

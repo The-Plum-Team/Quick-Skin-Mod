@@ -38,29 +38,25 @@ class VisualReviewImpactTest(unittest.TestCase):
             changed("scripts/ci/e2e_impact.py"),
             changed("scripts/ci/version_port_failure_policy.py", status="added"),
             changed("scripts/ci/visual_review_queue.py"),
-            changed("scripts/pages/build_site.py"),
             changed("scripts/pages/collect_compatibility.py", status="added"),
             changed("scripts/pages/compatibility_evidence.py", status="added"),
-            changed("scripts/pages/rotate_artifacts.py"),
-            changed("scripts/pages/select_artifact.py"),
-            changed("scripts/pages/select_compatibility_artifact.py", status="added"),
-            changed("scripts/release/tests/test_pages_artifact_rotation.py"),
+            changed("scripts/pages/mod_base_adapter.py", status="added"),
+            changed("site/mod-base.json", status="added"),
+            changed("scripts/release/tests/test_mod_base_adapter.py", status="added"),
             changed("scripts/ci/visual_review_impact.py"),
             changed("scripts/ci/tests/test_visual_review_impact.py", status="added"),
-            changed("site/assets/gallery.js"),
+            changed("site/assets/gallery.js", status="removed"),
             changed("e2e/README.md"),
             changed("docs/ai/PROJECT.md"),
         )
-        self.assertTrue(infrastructure_only(inventory, changed_files=19))
+        self.assertTrue(infrastructure_only(inventory, changed_files=17))
 
     def test_compatibility_publication_does_not_repeat_game_review(self) -> None:
         paths = [
-            "scripts/pages/build_site.py",
             "scripts/pages/collect_compatibility.py",
             "scripts/pages/compatibility_evidence.py",
-            "scripts/pages/rotate_artifacts.py",
-            "scripts/pages/select_compatibility_artifact.py",
-            "site/assets/gallery.js",
+            "scripts/pages/mod_base_adapter.py",
+            "site/mod-base.json",
             "e2e/README.md",
         ]
         for scope in ("replicated-port", "post-anchor-port"):
@@ -75,6 +71,13 @@ class VisualReviewImpactTest(unittest.TestCase):
             "e2e/visual_review_prompt.md",
             ".github/workflows/on-demand-e2e.yml",
             "README.md",
+            # Producer workflows carry the mod-base pin, and the retired Pages scripts are
+            # unknown once deleted; neither can skip ordinary visual review.
+            ".github/workflows/build-gate.yml",
+            "scripts/ci/mod_base_kit.py",
+            "scripts/pages/build_site.py",
+            "scripts/pages/select_artifact.py",
+            "scripts/pages/rotate_artifacts.py",
         ):
             with self.subTest(path=path):
                 self.assertFalse(

@@ -54,6 +54,11 @@ Check [GitHub Releases](https://github.com/The-Plum-Team/Quick-Skin-Mod/releases
 [Visual E2E gallery](https://the-plum-team.github.io/Quick-Skin-Mod/e2e/) ·
 [Machine-readable gallery inventory](https://the-plum-team.github.io/Quick-Skin-Mod/e2e/gallery-data.json)
 
+The site is built by the pinned [mod-base](https://github.com/The-Plum-Team/mod-base) kit from
+authenticated packaged-E2E evidence; its inventory is a `mod-base.gallery` version 1 document, and
+`build.json` names the exact Quick Skin and mod-base commits that rendered it
+([ADR 0010](docs/architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)).
+
 ## E2E validation flow
 
 A pull request builds the configured Minecraft/loader targets from one source revision. The build

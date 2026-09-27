@@ -4,14 +4,19 @@ Accepted project decisions:
 
 - [ADR 0001: Postpone consolidation of the Minecraft 1.21 release branches](0001-postpone-1-21-release-train-consolidation.md)
 - [ADR 0002: Publish curated E2E evidence with GitHub Pages](0002-publish-curated-e2e-evidence-with-github-pages.md)
+  (partially superseded by ADR 0010)
 - [ADR 0003: Standardize the packaged E2E platform](0003-standardize-packaged-e2e-platform.md)
+  (amended by ADR 0004 and ADR 0010)
 - [ADR 0004: Anchor AI visual review to Minecraft 1.20.1](0004-anchor-ai-visual-review-to-1-20-1.md)
-  (superseded in part by ADR 0005)
+  (superseded in part by ADR 0005 and ADR 0010)
 - [ADR 0005: Certify Minecraft 1.20.1 before version fan-out](0005-certify-1-20-1-before-version-fanout.md)
 - [ADR 0006: Admit AI review by generation and product impact](0006-admit-ai-by-generation-and-product-impact.md)
 - [ADR 0007: Admit optional-mod compatibility waves from module coverage](0007-admit-optional-mod-waves-from-module-coverage.md)
 - [ADR 0008: Transport the installed loader server between jobs](0008-transport-the-installed-loader-server-between-jobs.md)
 - [ADR 0009: Validate draft pull requests in batches](0009-validate-draft-pull-requests-in-batches.md)
+- [ADR 0010: Delegate public evidence to mod-base](0010-delegate-public-evidence-to-mod-base.md)
 
 An ADR records the evidence and trade-offs behind a decision. Operational instructions remain in
-the focused human and AI documentation linked from the repository root.
+the focused human and AI documentation linked from the repository root. A later decision marks an
+earlier record "Superseded by", "Partially superseded by" or "Amended by" instead of rewriting
+it.

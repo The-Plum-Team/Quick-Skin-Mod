@@ -33,7 +33,9 @@ class E2EImpactTest(unittest.TestCase):
                 "scripts/ci/visual_review_queue.py",
                 "scripts/pages/collect_compatibility.py",
                 "scripts/pages/compatibility_evidence.py",
-                "scripts/pages/select_compatibility_artifact.py",
+                "scripts/pages/mod_base_adapter.py",
+                "scripts/pages/mod_base_fixtures.py",
+                "site/mod-base.json",
                 "scripts/ci/tests/test_ai_patch_policy.py",
                 "scripts/ci/tests/test_version_port_failure_policy.py",
                 "scripts/ci/tests/test_visual_review_queue.py",
@@ -66,6 +68,27 @@ class E2EImpactTest(unittest.TestCase):
                 result = impact.classify([path])
                 self.assertTrue(result.runtime_required)
                 self.assertEqual(result.runtime_paths, (path,))
+
+    def test_retired_pages_scripts_and_the_kit_bootstrap_are_not_allowlisted(self) -> None:
+        # The deleted renderer, selectors and rotator left the allowlist with their files, and
+        # the managed bootstrap resolves the kit that tests and producers execute.
+        for path in (
+            "scripts/pages/build_site.py",
+            "scripts/pages/evidence.py",
+            "scripts/pages/rotate_artifacts.py",
+            "scripts/pages/select_artifact.py",
+            "scripts/pages/select_compatibility_artifact.py",
+            "scripts/pages/publication_progress.py",
+            "scripts/ci/mod_base_kit.py",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(impact.classify([path]).runtime_required)
+        for path in (
+            "scripts/release/tests/test_pages_site.py",
+            "scripts/release/tests/test_pages_artifact_rotation.py",
+        ):
+            with self.subTest(path=path):
+                self.assertNotIn(path, impact.EXACT_NON_RUNTIME_TESTS)
 
     def test_non_gate_workflows_can_skip_minecraft_alone_and_with_documentation(self) -> None:
         non_gate_workflows = (

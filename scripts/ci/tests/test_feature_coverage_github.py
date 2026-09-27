@@ -16,8 +16,10 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts/ci"))
 
+import ci_reuse as reuse
 import feature_coverage_github as publisher
 import test_feature_coverage as fixtures
+from test_ci_reuse import FixtureApi as ReuseFixtureApi
 from e2e_job_graph import BUILD_JOB, GATE_JOB, POLICY_JOB, SCENARIO_SUFFIX
 from test_workflow_security import job_block, step_script
 
@@ -57,8 +59,8 @@ class FixtureApi(publisher.Api):
             self.replace_archive(record, contents)
         pages = {**source, "id": 8000, "path": ".github/workflows/pages.yml", "event": "workflow_dispatch"}
         self.runs[8000] = pages
-        names = ["Build atomic static site", "Deploy GitHub Pages",
-                 *(f"Refresh evidence cache for {target['bundle_key']}" for target in fixture.targets)]
+        build, deploy, refresh = publisher.PUBLIC_BASELINE_JOBS
+        names = [build, deploy, *(refresh.format(key=target["bundle_key"]) for target in fixture.targets)]
         self.job_lists[8000] = [{"jobs": [self.job(name, 80000 + index, pages) for index, name in enumerate(names)]}]
         for index, target in enumerate(fixture.targets):
             name = publisher.public_baseline_name(target["bundle_key"], fixture.source, fixture.run_id)
@@ -187,6 +189,13 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
         self.assertEqual([self.fixture.run_id], [call.args[0] for call in runs.call_args_list])
         self.assertEqual([], self.api.downloaded)
 
+    def test_missing_report_defers_before_the_reuse_descriptor_or_any_public_inventory(self):
+        self.api.records.pop(f"visual-review-{self.fixture.run_id}--{self.fixture.targets[-1]['bundle_key']}")
+        with patch.object(publisher, "tested_run_id", side_effect=AssertionError("descriptor read before reports")):
+            self.assertIsNone(self.prepare())
+        self.assertFalse(any(query.startswith(publisher.PUBLIC_BASELINE_PREFIX) for query in self.api.queries))
+        self.assertEqual([], self.api.downloaded)
+
     def test_missing_public_inventory_defers_before_runtime_descriptors(self):
         self.api.records.pop(next(reversed(self.api.records)))
         with patch("ci_reuse.runtime_source", side_effect=AssertionError("partial public inventory resolved runtime")), \
@@ -272,7 +281,8 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
         self.assertEqual(self.fixture.run_id, publisher.source_from_trigger(self.api, 8000, self.fixture.source))
         self.assertEqual([], self.api.downloaded)
         source = self.api.runs[8000]
-        with patch.object(self.api, "run", side_effect=[{**source, "status": "in_progress"}, source]), \
+        generation = self.api.runs[self.fixture.run_id]
+        with patch.object(self.api, "run", side_effect=[{**source, "status": "in_progress"}, source, generation]), \
              patch.object(publisher.time, "sleep") as sleep:
             self.assertEqual(self.fixture.run_id, publisher.source_from_trigger(self.api, 8000, self.fixture.source))
             sleep.assert_called_once_with(2)
@@ -290,10 +300,121 @@ class FeatureCoverageGitHubTest(unittest.TestCase):
         with self.assertRaises(ValueError): publisher.source_from_trigger(self.api, 8000, self.fixture.source)
         self.assertEqual([], self.api.downloaded)
 
-    def test_pages_wake_is_not_a_publication_or_a_baseline_source(self):
-        self.api.runs[8000]["event"] = "repository_dispatch"
-        with patch.object(self.api, "artifacts", side_effect=AssertionError("wake has no public archive inventory")):
+    def test_only_a_mod_base_publication_event_can_name_a_baseline_source(self):
+        # mod-base's managed caller runs only on its hourly schedule and explicit dispatches; the
+        # retired repository_dispatch wakes are foreign producers, never a publication.
+        for event in ("repository_dispatch", "workflow_run", "push"):
+            with self.subTest(event=event):
+                self.api.runs[8000]["event"] = event
+                with patch.object(self.api, "artifacts", side_effect=AssertionError("foreign wake read artifacts")), \
+                        self.assertRaisesRegex(ValueError, "foreign protected producer"):
+                    publisher.source_from_trigger(self.api, 8000, self.fixture.source)
+
+    def test_retained_baselines_of_a_reused_generation_are_named_by_its_tested_run(self):
+        renamed = {}
+        for name, items in self.api.records.items():
+            parsed = publisher.parse_public_baseline_name(name)
+            if parsed is not None:
+                name = publisher.public_baseline_name(parsed[0], parsed[1], 4400)
+                for record in items:
+                    record["name"] = name
+            renamed[name] = items
+        self.api.records = renamed
+        with patch.object(publisher, "generation_for_tested", return_value=self.fixture.run_id) as generation:
+            self.assertEqual(self.fixture.run_id, publisher.source_from_trigger(self.api, 8000, self.fixture.source))
+        generation.assert_called_once_with(self.api, self.fixture.source, 4400)
+        with patch.object(publisher, "generation_for_tested", return_value=None):
             self.assertIsNone(publisher.source_from_trigger(self.api, 8000, self.fixture.source))
+        with patch.object(publisher, "tested_run_id", return_value=4400):
+            with self.assertRaisesRegex(ValueError, "name another tested runtime"):
+                self.prepare()
+        self.assertEqual([], self.api.downloaded)
+
+
+class GenerationApi(ReuseFixtureApi):
+    """Real reuse descriptors (``test_ci_reuse``) plus the head's master generation inventory."""
+
+    def __init__(self, root):
+        super().__init__(root)
+        self.listing = None
+
+    def json(self, endpoint):
+        if endpoint.startswith("actions/workflows/on-demand-e2e.yml/runs?event=workflow_dispatch&"):
+            self.queries.append(endpoint)
+            if self.listing is not None:
+                return self.listing
+            runs = [run for run in self.runs.values() if run["head_branch"] == "master"]
+            return {"total_count": len(runs), "workflow_runs": copy.deepcopy(runs)}
+        return super().json(endpoint)
+
+
+class GenerationForTestedTest(unittest.TestCase):
+    """``generation_for_tested`` maps an ``mb-baseline`` name's tested run to its master generation."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.api = GenerationApi(Path(temporary.name).resolve())
+        self.reference, _ = reuse.find_reference(self.api, self.api.covered, "e2e")
+        self.api.wrapper(self.reference, identifier=30)
+        self.api.downloaded.clear()
+
+    def generation(self, tested=20):
+        return publisher.generation_for_tested(self.api, self.api.covered, tested)
+
+    def reused(self, identifier):
+        with patch("zipfile.time.localtime", return_value=(2001, 1, 1, 0, 0, identifier % 60, 0, 1, -1)):
+            self.api.wrapper(self.reference, identifier=identifier)
+
+    def test_a_fresh_generation_is_its_own_tested_run(self):
+        run = {**self.api.runs[30], "id": 31}
+        self.api.runs[31], self.api.inventories[31] = run, []
+        self.api.queries.clear()
+        self.assertEqual(31, self.generation(31))
+        self.assertEqual([], self.api.queries)  # no generation listing is needed
+        self.assertEqual(31, publisher.tested_run_id(self.api, 31))
+
+    def test_a_reused_generation_is_resolved_through_its_reuse_descriptor(self):
+        self.assertEqual(20, publisher.tested_run_id(self.api, 30))
+        self.assertEqual([300], self.api.downloaded)  # only the generation's own descriptor
+        self.assertEqual(30, self.generation())
+        self.assertEqual([300, 300], self.api.downloaded)
+
+    def test_the_newest_of_two_generations_reusing_one_execution_is_chosen(self):
+        # Both publish the same tested pixels under one retained name; compose accepts either
+        # (feature_evidence.require_baseline_generation).
+        self.reused(31)
+        self.assertEqual(31, self.generation())
+
+    def test_a_selected_failed_or_foreign_generation_is_skipped(self):
+        self.reused(31)
+        self.api.add_artifact(31, 410, publisher.coverage.SELECTION_ARTIFACT_NAME)
+        self.assertEqual(30, self.generation())
+        for change in ({"conclusion": "failure"}, {"status": "in_progress", "conclusion": None},
+                       {"path": ".github/workflows/build-gate.yml"}, {"head_sha": "f" * 40}):
+            with self.subTest(change=change):
+                original = copy.deepcopy(self.api.runs[30])
+                self.api.runs[30].update(change)
+                self.assertIsNone(self.generation())
+                self.api.runs[30] = original
+
+    def test_a_tested_run_no_generation_reused_answers_none(self):
+        self.assertIsNone(self.generation(10))
+
+    def test_an_incomplete_or_oversized_generation_inventory_is_refused(self):
+        runs = [copy.deepcopy(self.api.runs[30])]
+        for listing in ({"total_count": 2, "workflow_runs": runs},
+                        {"total_count": 101, "workflow_runs": runs * 101},
+                        {"total_count": 1, "workflow_runs": {}}, []):
+            with self.subTest(listing=str(listing)[:40]):
+                self.api.listing = listing
+                with self.assertRaisesRegex(ValueError, "generation inventory"):
+                    self.generation()
+
+    def test_ambiguous_reuse_descriptors_are_refused(self):
+        self.api.add_descriptor(30, 301, "reused-source-e2e", "reused-source.json", self.reference)
+        with self.assertRaisesRegex(ValueError, "ambiguous runtime reuse descriptors"):
+            self.generation()
 
 
 class FeatureCoverageApiTest(unittest.TestCase):
@@ -353,7 +474,7 @@ else: raise SystemExit("Unexpected protected command")
                 with self.subTest(case=case):
                     called = folder / "called.json"
                     called.unlink(missing_ok=True)
-                    env = {"PATH": str(folder) + os.pathsep + os.defpath,
+                    env = {"PATH": str(folder) + os.pathsep + os.defpath, "PYTHONDONTWRITEBYTECODE": "1",
                            "GITHUB_SHA": "b" * 40 if case == "stale" else sha,
                            "GITHUB_REF": "refs/heads/feature" if case == "wrong-ref" else "refs/heads/master",
                            "GITHUB_EVENT_NAME": "workflow_dispatch" if case == "manual" else "repository_dispatch",

@@ -22,9 +22,16 @@ from bounded_zip import ExtractionLimits, extract_bounded_zip
 from visual_review_queue import INPUT_NAME, REPORT_NAME, REPOSITORY
 
 WORKFLOW = ".github/workflows/feature-coverage.yml"
+# mod-base's Pages caller, its events and the names its jobs API reports (mod_base.workflow and
+# mod_base.model.grammar are the single sources; scripts/ci/tests/test_mod_base_names.py pins
+# these literals to them).
 PAGES_WORKFLOW = ".github/workflows/pages.yml"
-PAGES_EVENTS = frozenset({"schedule", "workflow_dispatch", "workflow_run"})
-PUBLIC_BASELINE_NAME = re.compile(r"^pages-full-baseline-mc[0-9]+(?:\.[0-9]+){1,2}--[0-9a-f]{40}--[1-9][0-9]*$")
+PAGES_EVENTS = frozenset({"schedule", "workflow_dispatch"})
+PUBLIC_BASELINE_PREFIX = "mb-baseline--"
+PUBLIC_BASELINE_NAME = re.compile(r"^mb-baseline--mc[0-9]+(?:\.[0-9]+){1,2}--[0-9a-f]{40}--[1-9][0-9]*$")
+PUBLIC_BASELINE_JOBS = ("Publish / Build atomic static site", "Deploy GitHub Pages",
+                        "Finalize / Refresh evidence cache for {key}")
+REUSED_SOURCE_ARTIFACT = "reused-source-e2e"
 MAX_PUBLIC_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_API_BYTES = 8 * 1024 * 1024
 MAX_INVENTORY = 100
@@ -164,17 +171,26 @@ class Api:
                 raise coverage.CoverageError("artifact query contains a foreign name")
         return record["artifacts"]
 
+    def archive(self, metadata: dict[str, Any], *, maximum: int) -> bytes:
+        """The exact ZIP bytes of an authenticated artifact record (``id``, ``size_in_bytes``,
+        ``digest``), read to at most ``maximum`` bytes."""
+        return check_archive(_get(self.prefix + f"actions/artifacts/{metadata['id']}/zip", maximum=maximum),
+                             metadata)
+
     def download(self, metadata: dict[str, Any], destination: Path, *,
                  maximum: int = coverage.MAX_REPORT_ARCHIVE_BYTES) -> None:
         if type(maximum) is not int or not 0 < maximum <= coverage.MAX_REPORT_ARCHIVE_BYTES:
             raise coverage.CoverageError("artifact download has an invalid byte limit")
-        raw = _get(self.prefix + f"actions/artifacts/{metadata['id']}/zip",
-                   maximum=maximum)
-        if len(raw) != metadata["size_in_bytes"] or "sha256:" + coverage.digest(raw) != metadata["digest"]:
-            raise coverage.CoverageError("downloaded report archive differs from its authenticated metadata")
+        raw = self.archive(metadata, maximum=maximum)
         with destination.open("xb") as stream:
             stream.write(raw)
 
+
+def check_archive(raw: bytes, metadata: dict[str, Any]) -> bytes:
+    """``raw`` when it is exactly the archive ``metadata`` (``size_in_bytes``, ``digest``) names."""
+    if len(raw) != metadata["size_in_bytes"] or "sha256:" + coverage.digest(raw) != metadata["digest"]:
+        raise coverage.CoverageError("downloaded report archive differs from its authenticated metadata")
+    return raw
 
 def _review_files(api: Api, metadata: dict[str, Any], directory: Path) -> coverage.ReviewFiles:
     directory.mkdir()
@@ -200,12 +216,10 @@ def source_from_trigger(api: Api, trigger_run_id: int, source_sha: str) -> int |
     pages = owner.get("path") == PAGES_WORKFLOW
     if (owner.get("path") not in {coverage.DRAIN_WORKFLOW, PAGES_WORKFLOW}
             or owner.get("head_branch") != "master"
-            or owner.get("event") not in (PAGES_EVENTS | {"repository_dispatch"} if pages else coverage.DRAIN_EVENTS)
+            or owner.get("event") not in (PAGES_EVENTS if pages else coverage.DRAIN_EVENTS)
             or not isinstance(owner.get("head_repository"), dict)
             or owner["head_repository"].get("full_name") != api.repository):
         raise coverage.CoverageError("feature baseline wake has a foreign protected producer")
-    if pages and owner.get("event") == "repository_dispatch":
-        return None  # A Pages wake only dispatches its separate publication run; it owns no images.
     # The explicit wake is sent at the reviewer's tail; its final cleanup may still be settling.
     for _attempt in range(30):
         if owner.get("status") == "completed":
@@ -233,41 +247,114 @@ def source_from_trigger(api: Api, trigger_run_id: int, source_sha: str) -> int |
     return source_run_id
 
 
+def parse_public_baseline_name(name: Any) -> tuple[str, str, int] | None:
+    """``(key, commit, tested run)`` of an ``mb-baseline`` archive name, or ``None``."""
+    if not isinstance(name, str) or PUBLIC_BASELINE_NAME.fullmatch(name) is None:
+        return None
+    key, commit, tested = name[len(PUBLIC_BASELINE_PREFIX):].split("--")
+    return key, commit, int(tested)
+
+
+def tested_run_id(api: Api, source_run_id: int, *, source: dict[str, Any] | None = None,
+                  inventory: list[dict[str, Any]] | None = None) -> int:
+    """The run whose pixels a complete generation published, which names its retained baseline.
+
+    A fresh generation tested its own run. A generation that reused a merged pull request's
+    execution names that execution in its ``reused-source-e2e`` descriptor; this hint is read
+    inertly and every consumer still authenticates the complete runtime before relying on it."""
+    import ci_reuse
+
+    coverage._positive_integer(source_run_id, "source run")
+    inventory = api.artifacts(run_id=source_run_id) if inventory is None else inventory
+    references = [item for item in inventory if item.get("name") == REUSED_SOURCE_ARTIFACT]
+    if not references:
+        return source_run_id
+    if len(references) != 1:
+        raise coverage.CoverageError("generation has ambiguous runtime reuse descriptors")
+    run = api.run(source_run_id) if source is None else source
+    artifact = ci_reuse.validate_artifact(references[0], name=REUSED_SOURCE_ARTIFACT, run=run,
+                                          maximum=ci_reuse.MAX_DESCRIPTOR_ARCHIVE)
+    reference = ci_reuse.descriptor(api, artifact, "reused-source.json")
+    return ci_reuse.validate_reference(reference, "e2e")["run_id"]
+
+
+def generation_for_tested(api: Api, source_sha: str, tested: int) -> int | None:
+    """The complete master generation at ``source_sha`` whose pixels came from run ``tested``."""
+    import ci_reuse
+
+    run = api.run(tested)
+    if (run.get("path") == ci_reuse.WORKFLOWS["e2e"] and run.get("event") == "workflow_dispatch"
+            and run.get("head_branch") == "master" and run.get("head_sha") == source_sha):
+        return tested
+    record = api.json(f"actions/workflows/{Path(ci_reuse.WORKFLOWS['e2e']).name}/runs?"
+                      f"event=workflow_dispatch&head_sha={source_sha}&per_page={MAX_INVENTORY}")
+    runs = record.get("workflow_runs") if isinstance(record, dict) else None
+    if (not isinstance(runs, list) or type(record.get("total_count")) is not int
+            or record["total_count"] != len(runs) or len(runs) > MAX_INVENTORY):
+        raise coverage.CoverageError("generation inventory is incomplete or exceeds its limit")
+    candidates = sorted((item for item in runs if isinstance(item, dict) and type(item.get("id")) is int
+                         and item.get("path") == ci_reuse.WORKFLOWS["e2e"] and item.get("head_sha") == source_sha
+                         and item.get("head_branch") == "master" and item.get("status") == "completed"
+                         and item.get("conclusion") == "success"), key=lambda item: item["id"], reverse=True)
+    for candidate in candidates:
+        inventory = api.artifacts(run_id=candidate["id"])
+        if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in inventory):
+            continue  # A selected generation never supplies a complete baseline.
+        if tested_run_id(api, candidate["id"], source=candidate, inventory=inventory) == tested:
+            return candidate["id"]
+    return None
+
+
 def _source_from_pages(api: Api, owner: dict[str, Any], source_sha: str) -> int | None:
     """Resolve a complete public generation when publication finishes after its AI reviews."""
     expected = {target["bundle_key"] for target in coverage.inventory(coverage.DEFAULT_MATRIX)["include"]}
-    sources, records = set(), {}
+    tested, records = set(), {}
     for artifact in api.artifacts(run_id=owner["id"]):
-        name = artifact["name"]
-        if PUBLIC_BASELINE_NAME.fullmatch(name) is None:
+        parsed = parse_public_baseline_name(artifact["name"])
+        if parsed is None:
             continue
-        key, sha, source = name[len("pages-full-baseline-"):].split("--")
+        key, sha, run = parsed
         if sha != source_sha:
             continue  # Carried historical frames cannot seed the current source baseline.
         if key not in expected or key in records:
             raise coverage.CoverageError("Pages baseline wake has a foreign or duplicate target")
         records[key] = artifact
-        sources.add(int(source))
-    if set(records) != expected or len(sources) != 1:
+        tested.add(run)
+    if set(records) != expected or len(tested) != 1:
         return None  # Partial/composed publications cannot supply a complete runtime generation.
-    source_run_id = sources.pop()
+    tested_run = tested.pop()
+    source_run_id = generation_for_tested(api, source_sha, tested_run)
+    if source_run_id is None:
+        return None
     jobs = api.jobs(owner)
     for key, artifact in records.items():
         validate_public_owner(artifact, owner, jobs, github_repository=api.repository,
-            source_sha=source_sha, source_run_id=source_run_id, bundle_key=key)
+            source_sha=source_sha, source_run_id=source_run_id, bundle_key=key, tested_run_id=tested_run)
     return source_run_id
 
 
-def public_baseline_name(bundle_key: str, source_sha: str, source_run_id: int) -> str:
-    name = f"pages-full-baseline-{bundle_key}--{source_sha}--{source_run_id}"
-    if PUBLIC_BASELINE_NAME.fullmatch(name) is None or type(source_run_id) is not int:
+def public_baseline_name(bundle_key: str, source_sha: str, tested_run: int) -> str:
+    """``mb-baseline--<key>--<commit>--<tested run>`` (mod-base ``grammar.baseline_name``): the
+    retained complete generation of ``source_sha`` whose pixels run ``tested_run`` produced."""
+    name = f"{PUBLIC_BASELINE_PREFIX}{bundle_key}--{source_sha}--{tested_run}"
+    if PUBLIC_BASELINE_NAME.fullmatch(name) is None or type(tested_run) is not int:
         raise coverage.CoverageError("public baseline requires exact target/source/run identity")
     return name
 
 
-def validate_public_record(value: Any, *, bundle_key: str, source_sha: str, source_run_id: int) -> None:
+def validate_public_record(value: Any, *, bundle_key: str, source_sha: str, source_run_id: int,
+                           tested_run_id: int | None = None) -> None:
+    """A retained public baseline record of ``bundle_key`` at ``source_sha``.
+
+    ``source_run_id`` is the complete generation the certificate names. The archive is named by
+    the run that tested its pixels: ``tested_run_id`` when the caller authenticated it (the
+    issuer binds it to the generation's runtime), otherwise the certificate's recorded name."""
+    coverage._positive_integer(source_run_id, "baseline source run")
+    parsed = parse_public_baseline_name(value.get("name") if isinstance(value, dict) else None)
     if (not isinstance(value, dict) or set(value) != {"id", "owner_run_id", "name", "digest", "size_in_bytes"}
-            or value["name"] != public_baseline_name(bundle_key, source_sha, source_run_id)
+            or parsed is None or parsed[:2] != (bundle_key, source_sha)
+            or value["name"] != public_baseline_name(bundle_key, source_sha,
+                                                     parsed[2] if tested_run_id is None else tested_run_id)
             or type(value["id"]) is not int or value["id"] <= 0
             or type(value["owner_run_id"]) is not int or value["owner_run_id"] <= 0
             or type(value["size_in_bytes"]) is not int or not 0 < value["size_in_bytes"] <= MAX_PUBLIC_ARCHIVE_BYTES
@@ -276,7 +363,10 @@ def validate_public_record(value: Any, *, bundle_key: str, source_sha: str, sour
 
 
 def validate_public_owner(artifact: Any, owner: Any, jobs: Any, *, github_repository: str,
-                          source_sha: str, source_run_id: int, bundle_key: str) -> dict[str, Any]:
+                          source_sha: str, source_run_id: int, bundle_key: str,
+                          tested_run_id: int | None = None) -> dict[str, Any]:
+    """Authenticate a retained baseline's successful Pages owner: the build, deploy and this key's
+    refresh (retention) jobs of the exact mod-base publication all succeeded."""
     if (not isinstance(artifact, dict) or not isinstance(artifact.get("workflow_run"), dict)
             or artifact.get("expired") is not False or not isinstance(owner, dict)
             or type(owner.get("id")) is not int or artifact["workflow_run"].get("id") != owner["id"]
@@ -289,7 +379,7 @@ def validate_public_owner(artifact: Any, owner: Any, jobs: Any, *, github_reposi
             or not isinstance(owner.get("head_repository"), dict)
             or owner["head_repository"].get("full_name") != github_repository):
         raise coverage.CoverageError("public baseline lacks a successful protected Pages owner")
-    required = {"Build atomic static site", "Deploy GitHub Pages", f"Refresh evidence cache for {bundle_key}"}
+    required = {name.format(key=bundle_key) for name in PUBLIC_BASELINE_JOBS}
     if (not isinstance(jobs, list) or any(not isinstance(page, dict) or not isinstance(page.get("jobs"), list) for page in jobs)):
         raise coverage.CoverageError("public baseline owner has a malformed job inventory")
     records = [job for page in jobs for job in page["jobs"]]
@@ -299,7 +389,8 @@ def validate_public_owner(artifact: Any, owner: Any, jobs: Any, *, github_reposi
             raise coverage.CoverageError("public baseline was not built, deployed and retained successfully")
     result = {key: artifact.get(key) for key in ("id", "name", "digest", "size_in_bytes")}
     result["owner_run_id"] = owner["id"]
-    validate_public_record(result, bundle_key=bundle_key, source_sha=source_sha, source_run_id=source_run_id)
+    validate_public_record(result, bundle_key=bundle_key, source_sha=source_sha, source_run_id=source_run_id,
+                           tested_run_id=tested_run_id)
     return result
 
 
@@ -437,8 +528,9 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
         return None
     targets = coverage.inventory(coverage.DEFAULT_MATRIX)["include"]
     reports, public_candidates_by_key = {}, {}
-    # Every target must exist before any runtime descriptor, owner graph or report archive is
-    # resolved. An early wake cannot certify a partial generation, so defer at its first gap.
+    # Every target's report and retained public archive must exist before any runtime descriptor,
+    # owner graph or report archive is resolved. An early wake cannot certify a partial
+    # generation, so defer at its first gap, and read the reports first: they need no descriptor.
     for target in targets:
         key = target["bundle_key"]
         candidates = api.artifacts(name=f"visual-review-{source_run_id}--{key}")
@@ -447,13 +539,22 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
         if candidate is None:
             return None
         reports[key] = candidate
-        public_candidates_by_key[key] = invocation_api.artifacts(name=public_baseline_name(key, source_sha, source_run_id))
+    # mod-base names each retained generation by the run that tested its pixels. A reused
+    # generation's run is an inert hint from its own reuse descriptor (one download, spent only
+    # once every report exists); the runtime admission below binds it to the authenticated
+    # execution.
+    tested = tested_run_id(invocation_api, source_run_id, source=source, inventory=source_artifacts)
+    for target in targets:
+        key = target["bundle_key"]
+        public_candidates_by_key[key] = invocation_api.artifacts(name=public_baseline_name(key, source_sha, tested))
         if not any(candidate.get("expired") is not True for candidate in public_candidates_by_key[key]):
             return None
 
     runtime = ci_reuse.runtime_source(invocation_api, source_run_id, source_sha)
     if runtime.generation.get("run_attempt") != source.get("run_attempt"):
         raise coverage.CoverageError("runtime source attempt changed during complete admission")
+    if runtime.execution["id"] != tested:
+        raise coverage.CoverageError("retained public baselines name another tested runtime")
     graph = runtime.graph
     if any(item["name"] == coverage.SELECTION_ARTIFACT_NAME for item in runtime.artifacts):
         return None  # Partial generations retain their earlier complete baseline.
@@ -483,8 +584,13 @@ def prepare(api: Api, *, repository: Path, source_sha: str, source_run_id: int,
                 owner_jobs = api.jobs(owner)
             else:
                 owner, owner_jobs = admitted
+            # Issuance binds each retained archive's name, owner jobs, digest and size, as the
+            # retired pages-full-baseline issuer did; its contents are validated where they are
+            # consumed (feature_evidence.compose's validate_compact and mod-base's R3), so this
+            # workflow never needs the kit or the archives' bytes.
             public[key] = validate_public_owner(candidate, owner, owner_jobs,
-                github_repository=api.repository, source_sha=source_sha, source_run_id=source_run_id, bundle_key=key)
+                github_repository=api.repository, source_sha=source_sha, source_run_id=source_run_id, bundle_key=key,
+                tested_run_id=tested)
             # Only a successful admission enters this invocation's reuse map. Every later target
             # still validates its own archive identity and required retention job against it.
             admitted_pages_owners[owner_id] = (owner, owner_jobs)

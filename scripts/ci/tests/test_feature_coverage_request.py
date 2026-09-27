@@ -91,7 +91,8 @@ class RequestTests(unittest.TestCase):
         for public in (True, False):
             with self.subTest(public=public):
                 self.api = Api()
-                name = next(name for name in self.api.records if name.startswith("pages-") == public)
+                prefix = scheduler.publisher.PUBLIC_BASELINE_PREFIX
+                name = next(name for name in self.api.records if name.startswith(prefix) == public)
                 record = self.api.records.pop(name)
                 self.assertEqual(self.request(), "evidence-incomplete")
                 self.assertEqual(self.api.payloads, [])
@@ -100,7 +101,7 @@ class RequestTests(unittest.TestCase):
 
     def test_public_first_gap_does_not_enumerate_review_owners_or_download(self):
         self.api.records = {name: records for name, records in self.api.records.items()
-                            if not name.startswith("pages-")}
+                            if not name.startswith(scheduler.publisher.PUBLIC_BASELINE_PREFIX)}
         self.assertEqual(self.request(), "evidence-incomplete")
         inventories = [entry for entry in self.api.queries if isinstance(entry, tuple)
                        and entry[0] == "artifacts" and entry[2] is not None]
@@ -132,7 +133,7 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(self.api.payloads, [])
 
     def test_expired_public_archive_cannot_hide_behind_readiness(self):
-        name = next(name for name in self.api.records if name.startswith("pages-"))
+        name = next(name for name in self.api.records if name.startswith(scheduler.publisher.PUBLIC_BASELINE_PREFIX))
         self.api.records[name][0]["expired"] = True
         self.assertEqual(self.request(), "evidence-incomplete")
         self.api.records[name][0]["expired"] = False
@@ -247,7 +248,8 @@ class RequestTests(unittest.TestCase):
         outcomes = []
         for event in fixture["events"]:
             if event["kind"] == "pages":
-                self.api.records.update({name: value for name, value in records.items() if name.startswith("pages-")})
+                prefix = scheduler.publisher.PUBLIC_BASELINE_PREFIX
+                self.api.records.update({name: value for name, value in records.items() if name.startswith(prefix)})
             else:
                 name = f"visual-review-10--{event['target']}"
                 self.api.records[name] = records[name]
@@ -271,10 +273,10 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(self.api.payloads, [])
 
     def test_workflows_share_only_short_request_lock_and_keep_canonical_collector(self):
-        for filename in ("pages.yml", "visual-review-drain.yml"):
+        for filename, job in (("pages.yml", "ext-feature-coverage"),
+                              ("visual-review-drain.yml", "request-feature-coverage")):
             workflow = (ROOT / ".github/workflows" / filename).read_text()
-            tail = workflow.split("  request-feature-coverage:\n", 1)[1].split("\n  ", 1)[0]
-            self.assertIn("request-feature-coverage", workflow)
+            self.assertIn(f"  {job}:\n", workflow)
             self.assertIn("quick-skin-feature-baseline-request-${{ github.sha }}", workflow)
             self.assertIn("feature_coverage_request.py --producer-run-id", workflow)
         collector = (ROOT / ".github/workflows/feature-coverage.yml").read_text()
@@ -389,7 +391,7 @@ class CanonicalRequestTests(unittest.TestCase):
         inner.records.pop(scheduler.coverage.BASELINE_ARTIFACT_NAME)
         inner.runs[7900] = {**inner.runs[8000], "id": 7900, "conclusion": "failure"}
         for name, records in inner.records.items():
-            if name.startswith("pages-full-baseline-"):
+            if name.startswith(scheduler.publisher.PUBLIC_BASELINE_PREFIX):
                 older = copy.deepcopy(records[0])
                 older["id"] -= 1000
                 older["workflow_run"]["id"] = 7900

@@ -756,80 +756,9 @@ jobs:
             --validate-input-only
           )
           if [[ "$review_mode" == reference-comparison && "$proof_schema" != 7 && "$proof_schema" != 8 ]]; then
-            reference_identity="$(python3 e2e/visual_review.py \
-              --matrix release/release-matrix.json --reference-identity)"
-            reference_branch="$(jq -er .release_branch <<< "$reference_identity")"
-            reference_bundle_key="$(jq -er '.bundle_key // .release_branch' <<< "$reference_identity")"
-            reference_artifact_node="$(jq -er .artifact_node <<< "$reference_identity")"
-            reference_version="$(jq -er .version <<< "$reference_identity")"
-            reference_loader="$(jq -er .loader <<< "$reference_identity")"
-            reference_id="$(jq -er .visual_reference.artifact_id "$proof")"
-            reference_name="$(jq -er .visual_reference.artifact_name "$proof")"
-            reference_run_id="$(jq -er .visual_reference.artifact_run_id "$proof")"
-            reference_sha="$(jq -er .visual_reference.sha "$proof")"
-            reference_digest="$(jq -er .visual_reference.artifact_digest "$proof")"
-            reference_size="$(jq -er .visual_reference.artifact_size_in_bytes "$proof")"
-            if [[ "$reference_name" != "pages-e2e-$reference_bundle_key" ]]; then
-              printf 'Visual reference artifact disagrees with the protected target key.\n' >&2
-              exit 1
-            fi
-            reference_metadata="$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/actions/artifacts/$reference_id")"
-            jq -e \
-              --arg digest "$reference_digest" \
-              --arg name "$reference_name" \
-              --arg sha "$reference_sha" \
-              --argjson artifact_id "$reference_id" \
-              --argjson run_id "$reference_run_id" \
-              --argjson size "$reference_size" \
-              '.id == $artifact_id and .name == $name and .size_in_bytes == $size and
-               .digest == $digest and .expired == false and
-               .workflow_run.id == $run_id and .workflow_run.head_sha == $sha' \
-              <<< "$reference_metadata" > /dev/null
-            reference_run="$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$reference_run_id")"
-            jq -e \
-              --arg branch "$reference_branch" \
-              --arg repository "$GITHUB_REPOSITORY" \
-              --arg sha "$reference_sha" \
-              --argjson run_id "$reference_run_id" \
-              '.id == $run_id and .status == "completed" and .conclusion == "success" and
-               .event == "workflow_dispatch" and .head_branch == $branch and
-               .head_sha == $sha and .path == ".github/workflows/on-demand-e2e.yml" and
-               .head_repository.full_name == $repository' \
-              <<< "$reference_run" > /dev/null
-            [[ "$(github_api_retry \
-              "repos/$GITHUB_REPOSITORY/branches/$reference_branch" \
-              --jq .commit.sha)" == "$reference_sha" ]]
-            jq -e \
-              --arg reference_artifact_node "$reference_artifact_node" \
-              --arg reference_branch "$reference_branch" \
-              --arg reference_digest "$reference_digest" \
-              --arg reference_loader "$reference_loader" \
-              --arg reference_name "$reference_name" \
-              --arg reference_sha "$reference_sha" \
-              --arg reference_version "$reference_version" \
-              --argjson reference_id "$reference_id" \
-              --argjson reference_run_id "$reference_run_id" \
-              --argjson reference_size "$reference_size" \
-              '(.visual_reference | (keys | sort) == (["artifact_digest", "artifact_id",
-                "artifact_name", "artifact_node", "artifact_run_id",
-                "artifact_size_in_bytes", "branch", "evidence_kind", "loader",
-                "manifest_sha256", "sha", "version"] | sort)) and
-               .visual_reference.artifact_id == $reference_id and
-               .visual_reference.artifact_name == $reference_name and
-               .visual_reference.artifact_run_id == $reference_run_id and
-               .visual_reference.artifact_size_in_bytes == $reference_size and
-               .visual_reference.artifact_digest == $reference_digest and
-               .visual_reference.branch == $reference_branch and
-               .visual_reference.sha == $reference_sha and
-               .visual_reference.artifact_node == $reference_artifact_node and
-               .visual_reference.version == $reference_version and
-               .visual_reference.loader == $reference_loader and
-               .visual_reference.evidence_kind == "raw-png" and
-               (.visual_reference.manifest_sha256 | type == "string" and
-                 test("^[0-9a-f]{64}$"))' \
-              "$proof" > /dev/null
+            # The historical schema-2 reference was a retired pages-e2e raw handoff (ADR 0010).
+            printf 'Historical schema-2 reference comparison is retired (ADR 0010); recover from tag pre-mod-base-gallery.\n' >&2
+            exit 1
           fi
           if [[ "$review_mode" == reference-comparison ]]; then
             validation_arguments+=(--require-paired)

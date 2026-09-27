@@ -718,20 +718,27 @@ jobs:
           [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
           [[ "$target_sha" == "$GITHUB_SHA" ]]
 
-          source_created_at="$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id" --jq .created_at)"
+          source_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id")"
+          source_created_at="$(jq -r .created_at <<< "$source_run")"
+          source_run_attempt="$(jq -r .run_attempt <<< "$source_run")"
           target_created_at="$(gh api \
             "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .created_at)"
+          target_tree="$(git rev-parse "$GITHUB_SHA^{tree}")"
           test -n "$source_created_at"
           test -n "$target_created_at"
+          [[ "$source_run_attempt" =~ ^[1-9][0-9]*$ ]]
+          [[ "$target_tree" =~ ^[0-9a-f]{40}$ ]]
 
           printf 'publish=true\n' >> "$GITHUB_OUTPUT"
           printf 'source_run_id=%s\n' "$source_run_id" >> "$GITHUB_OUTPUT"
+          printf 'source_run_attempt=%s\n' "$source_run_attempt" >> "$GITHUB_OUTPUT"
           printf 'source_branch=%s\n' "$source_branch" >> "$GITHUB_OUTPUT"
           printf 'source_sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
           printf 'source_created_at=%s\n' "$source_created_at" >> "$GITHUB_OUTPUT"
           printf 'target_sha=%s\n' "$target_sha" >> "$GITHUB_OUTPUT"
           printf 'target_created_at=%s\n' "$target_created_at" >> "$GITHUB_OUTPUT"
+          printf 'target_tree=%s\n' "$target_tree" >> "$GITHUB_OUTPUT"
+          printf 'extensions_path=\n' >> "$GITHUB_OUTPUT"
 
       - name: Fetch exact packaged behavior evidence
         if: steps.identity.outputs.publish == 'true'
@@ -744,72 +751,47 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ steps.identity.outputs.source_run_id }}
 
-      - name: Prepare the curated SHA-bound evidence bundle
+      # The packaged runtime must have executed exactly the selection its protected admission
+      # authorized; the adapter then reads the same admission from the identity extensions.
+      - name: Bind the packaged runtime selection to its protected admission
         if: steps.identity.outputs.publish == 'true'
         shell: bash
         env:
-          MINECRAFT_TARGET: ${{ matrix.minecraft_target }}
-          SOURCE_RUN_ID: ${{ steps.identity.outputs.source_run_id }}
-          SOURCE_BRANCH: ${{ steps.identity.outputs.source_branch }}
-          SOURCE_SHA: ${{ steps.identity.outputs.source_sha }}
-          SOURCE_CREATED_AT: ${{ steps.identity.outputs.source_created_at }}
-          TARGET_SHA: ${{ steps.identity.outputs.target_sha }}
-          TARGET_CREATED_AT: ${{ steps.identity.outputs.target_created_at }}
           SELECTION_ENABLED: ${{ steps.identity.outputs.selective || needs.feature-policy.outputs.selective }}
-          SELECTION_BASE: ${{ steps.identity.outputs.selection_base || needs.feature-policy.outputs.base }}
-          SELECTION_POLICY: ${{ steps.identity.outputs.selection_policy || needs.feature-policy.outputs.policy }}
           SELECTION_SHA256: ${{ steps.identity.outputs.selection_sha256 || needs.feature-policy.outputs.selection_sha256 }}
-          REUSED_RUNTIME: ${{ steps.identity.outputs.reused }}
         run: |
           set -euo pipefail
-          target_argument=()
-          if [[ -n "$MINECRAFT_TARGET" ]]; then
-            target_argument=(--minecraft-target "$MINECRAFT_TARGET")
+          if [[ "$SELECTION_ENABLED" != true ]]; then
+            exit 0
           fi
-          selection_arguments=()
-          if [[ "$SELECTION_ENABLED" == true ]]; then
-            if [[ ! "$SELECTION_SHA256" =~ ^[0-9a-f]{64}$ ||
-                  "$(sha256sum e2e-out/selection.json | cut -d' ' -f1)" != "$SELECTION_SHA256" ]]; then
-              printf 'Public runtime selection differs from protected admission.\n' >&2
-              exit 1
-            fi
-            selection_arguments=(--selection-admission e2e-out/selection.json
-              --selection-coverage e2e-out/coverage.json --selection-base "$SELECTION_BASE"
-              --selection-policy "$SELECTION_POLICY")
+          if [[ ! "$SELECTION_SHA256" =~ ^[0-9a-f]{64}$ ||
+                "$(sha256sum e2e-out/selection.json | cut -d' ' -f1)" != "$SELECTION_SHA256" ]]; then
+            printf 'Public runtime selection differs from protected admission.\n' >&2
+            exit 1
           fi
-          source_arguments=()
-          if [[ "$REUSED_RUNTIME" == true ]]; then
-            source_arguments=(--runtime-source "$RUNNER_TEMP/public-runtime/runtime-source.json")
-          fi
-          python3 scripts/pages/evidence.py prepare \
-            --e2e-root e2e-out \
-            --matrix release/release-matrix.json \
-            --contract e2e/scenario-contract.json \
-            --output public-evidence \
-            --repository "$GITHUB_REPOSITORY" \
-            --source-run-id "$SOURCE_RUN_ID" \
-            --source-branch "$SOURCE_BRANCH" \
-            --source-sha "$SOURCE_SHA" \
-            --source-created-at "$SOURCE_CREATED_AT" \
-            --target-run-id "$GITHUB_RUN_ID" \
-            --target-branch "$GITHUB_REF_NAME" \
-            --target-sha "$TARGET_SHA" \
-            --target-created-at "$TARGET_CREATED_AT" \
-            ${target_argument[@]+"${target_argument[@]}"} \
-            ${source_arguments[@]+"${source_arguments[@]}"} \
-            ${selection_arguments[@]+"${selection_arguments[@]}"}
 
+      # The pinned mod-base composite runs the adapter's collect hook in its isolated host,
+      # validates the handoff in a fresh process and uploads the single-use mb-handoff (plus the
+      # durable mb-anchor for the matrix-derived 1.20.1 key). The step name is the progress
+      # admission's upload-window contract (site/mod-base.json source.handoff_step).
       - name: Upload stable public evidence for this Minecraft target
+        id: handoff
         if: steps.identity.outputs.publish == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: The-Plum-Team/mod-base/actions/prepare-evidence@1401a34dd19be17b2c42b4f494c0b43380919eac # v1.0.2
         with:
-          name: pages-e2e-${{ matrix.bundle_key }}
-          path: public-evidence/
-          if-no-files-found: error
-          compression-level: 6
-          # Ordinary raw handoffs are deleted after Pages promotion. The matrix-derived 1.20.1
-          # visual anchor remains lossless for bounded AI comparison and is rotated on replacement.
-          retention-days: ${{ matrix.raw_retention_days }}
+          e2e-root: e2e-out
+          key: ${{ matrix.bundle_key }}
+          subject-branch: ${{ github.ref_name }}
+          subject-commit: ${{ github.sha }}
+          subject-tree: ${{ steps.identity.outputs.target_tree }}
+          tested-run-id: ${{ steps.identity.outputs.source_run_id }}
+          tested-run-attempt: ${{ steps.identity.outputs.source_run_attempt }}
+          tested-branch: ${{ steps.identity.outputs.source_branch }}
+          tested-commit: ${{ steps.identity.outputs.source_sha }}
+          tested-controller-branch: master
+          tested-controller-sha: ${{ steps.identity.outputs.source_sha }}
+          extensions: ${{ steps.identity.outputs.extensions_path }}
+          anchor: auto
 
       - name: Confirm the exact handoff was published
         id: published
@@ -826,35 +808,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
-      contents: write
+      actions: write
 
+    # A pure-bash composite without checkout: it only dispatches this exact producer run to the
+    # default-branch Pages workflow, which re-authenticates every handoff from scratch.
     steps:
-      - name: Check out the protected notification policy
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Dispatch the exact producer run to the protected Pages publisher
+        uses: The-Plum-Team/mod-base/actions/notify-pages@1401a34dd19be17b2c42b4f494c0b43380919eac # v1.0.2
         with:
-          ref: master
-          persist-credentials: false
-
-      - name: Dispatch the exact release-branch handoff
-        shell: bash
-        env:
-          GITHUB_API_RETRY_ATTEMPTS: "10"
-          GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          source scripts/ci/github_api_retry.sh
-          payload="$RUNNER_TEMP/pages-evidence-ready.json"
-          jq -n \
-            --arg evidence_branch "$GITHUB_REF_NAME" \
-            --arg evidence_repository "$GITHUB_REPOSITORY" \
-            --arg evidence_run_id "$GITHUB_RUN_ID" \
-            --arg evidence_sha "$GITHUB_SHA" \
-            '{event_type:"pages-evidence-ready",client_payload:{evidence_branch:$evidence_branch,evidence_repository:$evidence_repository,evidence_run_id:$evidence_run_id,evidence_sha:$evidence_sha}}' \
-            > "$payload"
-          github_api_retry --method POST \
-            "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" \
-            > /dev/null
+          operation: deploy
+          run-id: ${{ github.run_id }}
+          sha: ${{ github.sha }}
 
   notify-target-status-start:
     name: Refresh target status after runtime policy (advisory)

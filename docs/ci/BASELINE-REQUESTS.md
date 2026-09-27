@@ -1,9 +1,10 @@
 # Complete-baseline request coalescing
 
-`feature_coverage_request.py` is a scheduling gate, not a certificate issuer. Review and
-Pages producers execute it in their existing final request jobs, sharing the short
-`quick-skin-feature-baseline-request-<protected SHA>` lock with `queue: max`. The actual
-collector retains its separate non-cancelling generation lock and complete authentication.
+`feature_coverage_request.py` is a scheduling gate, not a certificate issuer. The review
+producers' final request jobs and the Pages caller's `ext-feature-coverage` extension job execute
+it, sharing the short `quick-skin-feature-baseline-request-<protected SHA>` lock with
+`queue: max`. The actual collector retains its separate non-cancelling generation lock and
+complete authentication.
 
 ## Admission and recovery
 
@@ -58,10 +59,12 @@ opportunity (up to 60 minutes plus GitHub scheduling/runner delay). A source sti
 required evidence remains unissued; API failures stay visible. Recovery does not recursively
 dispatch itself. The hourly sweep has real steady-state runner/API cost and is reported
 separately from producer-burst savings. Job-level event guards exclude successful producer
-completion echoes, generic drain sweeps, Pages repository wakes and foreign/stale executions
-before assigning a runner. Successful producers have already executed their request tail.
-If that continue-on-error tail fails, its otherwise-successful owner does not receive an
-immediate second check: hourly/manual recovery provides the documented bounded opportunity.
+completion echoes, generic drain sweeps and foreign/stale executions before assigning a runner;
+Pages runs are woken only by `workflow_dispatch` and the schedule since
+[ADR 0010](../architecture/decisions/0010-delegate-public-evidence-to-mod-base.md). Successful
+producers have already executed their request tail. If that continue-on-error tail fails, its
+otherwise-successful owner does not receive an immediate second check: hourly/manual recovery
+provides the documented bounded opportunity.
 
 ## Verification and measurement
 

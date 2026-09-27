@@ -47,15 +47,14 @@ EXACT_NON_RUNTIME_PATHS = frozenset(
         "scripts/ci/version_port_failure_policy.py",
         "scripts/ci/visual_review_impact.py",
         "scripts/ci/visual_review_queue.py",
-        "scripts/pages/build_site.py",
         "scripts/pages/collect_compatibility.py",
         "scripts/pages/compatibility_evidence.py",
-        "scripts/pages/rotate_artifacts.py",
-        "scripts/pages/select_artifact.py",
-        "scripts/pages/select_compatibility_artifact.py",
+        "scripts/pages/mod_base_adapter.py",
+        "scripts/pages/mod_base_fixtures.py",
         "scripts/release/branch_readme.py",
         "scripts/release/status_table.py",
         "scripts/release/version_branches.py",
+        "site/mod-base.json",
     }
 )
 
@@ -91,9 +90,7 @@ EXACT_NON_RUNTIME_TESTS = frozenset(
         "scripts/ci/tests/test_visual_review_queue.py",
         "scripts/ci/tests/test_workflow_security.py",
         "scripts/release/tests/test_branch_readme.py",
-        "scripts/release/tests/test_pages_artifact_rotation.py",
         "scripts/release/tests/test_pages_compatibility.py",
-        "scripts/release/tests/test_pages_site.py",
         "scripts/release/tests/test_repository_guidance.py",
         "scripts/release/tests/test_status_table.py",
         "scripts/release/tests/test_version_branches.py",

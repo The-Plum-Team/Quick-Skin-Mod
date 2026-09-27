@@ -638,8 +638,10 @@ jobs:
 
       # This job has no secrets. It reauthenticates the full protected job graph, downloads each
       # immutable artifact by numeric ID, then passes only decoded, content-addressed PNGs onward.
-      # Later versions use current authenticated Fabric 1.20.1 Pages evidence; the 1.20.1 source
-      # itself is curated without a reference and requires complete Fabric/Forge capture parity.
+      # Shared targets pair later versions with the same run's Fabric anchor (feature_review.py); a
+      # 1.20.1 source is curated without a reference and requires complete Fabric/Forge capture
+      # parity. The historical schema-2 Pages-reference comparison is retired and fails closed
+      # (ADR 0010).
       - name: Validate and curate exact packaged evidence
         id: evidence
         shell: bash
@@ -819,19 +821,13 @@ jobs:
           mv "$RUNNER_TEMP/target-e2e-matrix.json" "$RUNNER_TEMP/expected-e2e-matrix.json"
 
           # Resolve the reference only after the candidate run, source commit, controller parity,
-          # job graph, and artifact inventory have all been authenticated by protected code.
-          # A shared contract rollout can update master a few minutes before the 1.20.1 release
-          # head and its lossless handoff rotate. Wait through that bounded, authenticated window
-          # instead of losing an otherwise valid review request to the old reference generation.
+          # job graph, and artifact inventory have all been authenticated by protected code. It now
+          # only selects anchor-semantic curation or the retired comparison that fails closed below.
           reference_identity="$(python3 e2e/visual_review.py \
             --matrix release/release-matrix.json \
             --reference-identity)"
           REFERENCE_BRANCH="$(jq -er .release_branch <<< "$reference_identity")"
           REFERENCE_BUNDLE_KEY="$(jq -er '.bundle_key // .release_branch' <<< "$reference_identity")"
-          reference_target_arguments=()
-          if [[ "$REFERENCE_BUNDLE_KEY" != "$REFERENCE_BRANCH" ]]; then
-            reference_target_arguments=(--bundle-key "$REFERENCE_BUNDLE_KEY")
-          fi
           REFERENCE_ARTIFACT_NODE="$(jq -er .artifact_node <<< "$reference_identity")"
           REFERENCE_VERSION="$(jq -er .version <<< "$reference_identity")"
           REFERENCE_LOADER="$(jq -er .loader <<< "$reference_identity")"
@@ -879,172 +875,19 @@ jobs:
             exit 0
           fi
 
+          # The historical schema-2 comparison consumed the retired pages-e2e raw handoffs. Shared
+          # curation exits above with its same-run Fabric anchor, so this path fails closed.
           if [[ "$review_mode" == reference-comparison ]]; then
-          reference_output="$(mktemp "$RUNNER_TEMP/reference-selection.XXXXXX")"
-          reference_contract="$(mktemp "$RUNNER_TEMP/reference-contract.XXXXXX.json")"
-          reference_error="$(mktemp "$RUNNER_TEMP/reference-selection.XXXXXX.err")"
-          reference_ready=false
-          reference_state=''
-          for attempt in {1..90}; do
-            : > "$reference_output"
-            : > "$reference_error"
-            next_state=evidence-pending
-            next_message='authenticated current-head reference evidence is not ready'
-            if python3 scripts/pages/select_artifact.py \
-                --repository "$GITHUB_REPOSITORY" \
-                --branch "$REFERENCE_BRANCH" \
-                "${reference_target_arguments[@]}" \
-                --require-raw \
-                --github-output "$reference_output" 2> "$reference_error"; then
-              [[ "$(wc -l < "$reference_output" | tr -d ' ')" == 5 ]]
-              candidate_reference_sha="$(sed -n 's/^sha=//p' "$reference_output")"
-              [[ "$candidate_reference_sha" =~ ^[0-9a-f]{40}$ ]]
-              if ! git cat-file -e "${candidate_reference_sha}^{commit}" 2> /dev/null; then
-                git fetch --no-tags origin "$candidate_reference_sha"
-                [[ "$(git rev-parse FETCH_HEAD)" == "$candidate_reference_sha" ]]
-              fi
-              git show "${candidate_reference_sha}:e2e/scenario-contract.json" \
-                > "$reference_contract"
-              reference_contract_sha256="$(sha256sum "$reference_contract" | cut -d ' ' -f 1)"
-              if [[ "$reference_contract_sha256" == "$master_contract_sha256" ]]; then
-                reference_ready=true
-                break
-              fi
-              next_state="contract:$reference_contract_sha256"
-              next_message='reference branch still carries the previous scenario contract'
-            elif [[ -s "$reference_error" ]]; then
-              next_message="$(tail -n 1 "$reference_error")"
-            fi
-            if [[ "$next_state" != "$reference_state" ]]; then
-              printf 'Visual reference pending (%s/90): %s\n' "$attempt" "$next_message"
-              reference_state="$next_state"
-            fi
-            if (( attempt < 90 )); then
-              sleep 5
-            fi
-          done
-          if [[ "$reference_ready" != true ]]; then
-            cat "$reference_error" >&2
-            printf 'visual reference did not reach protected scenario-contract parity in time\n' \
-              >&2
+            printf 'Historical schema-2 reference comparison is retired (ADR 0010); recover from tag pre-mod-base-gallery.\n' >&2
             exit 1
           fi
-          [[ "$(wc -l < "$reference_output" | tr -d ' ')" == 5 ]]
-          REFERENCE_ARTIFACT_ID="$(sed -n 's/^artifact_id=//p' "$reference_output")"
-          REFERENCE_ARTIFACT_NAME="$(sed -n 's/^name=//p' "$reference_output")"
-          REFERENCE_ARTIFACT_RUN_ID="$(sed -n 's/^run_id=//p' "$reference_output")"
-          REFERENCE_SHA="$(sed -n 's/^sha=//p' "$reference_output")"
-          REFERENCE_ARTIFACT_SIZE="$(sed -n 's/^size_in_bytes=//p' "$reference_output")"
-          rm -f -- "$reference_output" "$reference_contract" "$reference_error"
-
-          [[ "$REFERENCE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$REFERENCE_ARTIFACT_NAME" =~ ^pages-e2e-[A-Za-z0-9._/-]+$ ]]
-          [[ "$REFERENCE_ARTIFACT_NODE" =~ ^[A-Za-z0-9._-]+$ ]]
-          [[ "$REFERENCE_ARTIFACT_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          [[ "$REFERENCE_ARTIFACT_SIZE" =~ ^[1-9][0-9]*$ ]]
-          (( REFERENCE_ARTIFACT_SIZE <= 536870912 ))
-          [[ "$REFERENCE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
-          [[ "$REFERENCE_LOADER" == fabric ]]
-          [[ "$REFERENCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$REFERENCE_VERSION" == 1.20.1 ]]
-          if [[ "$REFERENCE_ARTIFACT_NAME" != "pages-e2e-$REFERENCE_BUNDLE_KEY" ]]; then
-            printf 'Visual reference artifact disagrees with the protected target key.\n' >&2
-            exit 1
-          fi
-
-          # Reauthenticate and normalize the exact current-head 1.20.1 Pages artifact. The
-          # selector already validated its owner workflow; the numeric-ID fetch below binds the
-          # bytes used by this run to that selection and to its immutable artifact digest.
-          reference_metadata="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$REFERENCE_ARTIFACT_ID")"
-          reference_artifact_digest="$(jq -er .digest <<< "$reference_metadata")"
-          [[ "$reference_artifact_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          jq -e \
-            --arg digest "$reference_artifact_digest" \
-            --arg name "$REFERENCE_ARTIFACT_NAME" \
-            --argjson artifact_id "$REFERENCE_ARTIFACT_ID" \
-            --argjson run_id "$REFERENCE_ARTIFACT_RUN_ID" \
-            --argjson size "$REFERENCE_ARTIFACT_SIZE" \
-            '.id == $artifact_id and .name == $name and .size_in_bytes == $size and
-             .digest == $digest and .expired == false and
-             .workflow_run.id == $run_id' \
-            <<< "$reference_metadata" > /dev/null
-          reference_archive="$RUNNER_TEMP/reference-artifact-$REFERENCE_ARTIFACT_ID.zip"
-          github_api_retry_to_file "$reference_archive" \
-            -H 'Accept: application/vnd.github+json' \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts/$REFERENCE_ARTIFACT_ID/zip" \
-            > /dev/null
-          [[ "$(stat -c %s "$reference_archive")" == "$REFERENCE_ARTIFACT_SIZE" ]]
-          [[ "sha256:$(sha256sum "$reference_archive" | cut -d ' ' -f 1)" \
-            == "$reference_artifact_digest" ]]
-          reference_selected="$RUNNER_TEMP/reference-selected"
-          python3 scripts/ci/bounded_zip.py \
-            "$reference_archive" "$reference_selected" \
-            --max-archive-bytes 536870912 \
-            --max-entries 512 \
-            --max-total-bytes 536870912 \
-            --max-file-bytes 33554432 \
-            --max-compression-ratio 200 \
-            > "$RUNNER_TEMP/reference-extraction.json"
-          rm -f -- "$reference_archive"
-
-          python3 scripts/pages/evidence.py validate \
-            --evidence-root "$reference_selected" \
-            --bundle-key "$REFERENCE_BUNDLE_KEY" \
-            --only-branch \
-            --kind raw \
-            --repository "$GITHUB_REPOSITORY" \
-            --target-sha "$REFERENCE_SHA" \
-            --target-run-id "$REFERENCE_ARTIFACT_RUN_ID"
-          reference_manifest="$reference_selected/$REFERENCE_BUNDLE_KEY/manifest.json"
-          reference_manifest_sha256="$(sha256sum "$reference_manifest" | cut -d ' ' -f 1)"
-          reference_source_run_id="$(jq -er .provenance.source.run_id "$reference_manifest")"
-          reference_source_branch="$(jq -er .provenance.source.branch "$reference_manifest")"
-          reference_source_sha="$(jq -er .provenance.source.sha "$reference_manifest")"
-          reference_source_created_at="$(jq -er \
-            .provenance.source.created_at "$reference_manifest")"
-          reference_target_run_id="$(jq -er .provenance.target.run_id "$reference_manifest")"
-          reference_target_created_at="$(jq -er \
-            .provenance.target.created_at "$reference_manifest")"
-          reference_source_run="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$reference_source_run_id")"
-          reference_target_run="$(github_api_retry \
-            "repos/$GITHUB_REPOSITORY/actions/runs/$reference_target_run_id")"
-          jq -e \
-            --arg branch "$reference_source_branch" \
-            --arg created "$reference_source_created_at" \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg sha "$reference_source_sha" \
-            --argjson run_id "$reference_source_run_id" \
-            '.id == $run_id and .status == "completed" and .conclusion == "success" and
-             .event == "workflow_dispatch" and .head_branch == $branch and
-             .head_sha == $sha and .created_at == $created and
-             .path == ".github/workflows/on-demand-e2e.yml" and
-             .head_repository.full_name == $repository' \
-            <<< "$reference_source_run" > /dev/null
-          jq -e \
-            --arg branch "$REFERENCE_BRANCH" \
-            --arg created "$reference_target_created_at" \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg sha "$REFERENCE_SHA" \
-            --argjson run_id "$reference_target_run_id" \
-            '.id == $run_id and .status == "completed" and .conclusion == "success" and
-             .event == "workflow_dispatch" and .head_branch == $branch and
-             .head_sha == $sha and .created_at == $created and
-             .path == ".github/workflows/on-demand-e2e.yml" and
-             .head_repository.full_name == $repository' \
-            <<< "$reference_target_run" > /dev/null
-          [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/$REFERENCE_BRANCH" \
-            --jq .commit.sha)" == "$REFERENCE_SHA" ]]
-          else
-            REFERENCE_ARTIFACT_ID=0
-            REFERENCE_ARTIFACT_NAME=''
-            REFERENCE_ARTIFACT_RUN_ID=0
-            REFERENCE_ARTIFACT_SIZE=0
-            REFERENCE_SHA=''
-            reference_artifact_digest=''
-            reference_manifest_sha256=''
-          fi
+          REFERENCE_ARTIFACT_ID=0
+          REFERENCE_ARTIFACT_NAME=''
+          REFERENCE_ARTIFACT_RUN_ID=0
+          REFERENCE_ARTIFACT_SIZE=0
+          REFERENCE_SHA=''
+          reference_artifact_digest=''
+          reference_manifest_sha256=''
 
           raw_root="$RUNNER_TEMP/raw-review-evidence"
           mkdir -p "$raw_root/artifacts" "$raw_root/e2e-out/profiles"
