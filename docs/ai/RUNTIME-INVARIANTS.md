@@ -222,6 +222,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   the third-person camera. The subject is allowed to have completed its custom apply before the
   observer launches; startup speed must never decide whether that custom subject leaks into a
   checkpoint whose contract says it is still outside the later inspection frame.
+- On Forge, the sequential propagation scenario holds `architectury:sync_ids` until the subject
+  has applied its look and the observer starts `confirm_self`, reproducing a pack whose client
+  thread handles the server's channel list long after joining. Its assertions must prove the list
+  arrived while Quick Skin was still local-only and was released by the scenario, never by the
+  hold's safety valve; `propagation-live` keeps the prompt path.
 - Remote propagation inspection must pin the disposable subject's previous/current yaw plus head
   and body rotations, keep the observer at an asserted rear-vector cosine, and include that geometry
   in passed runtime evidence. A facial head turn must not make a rear-mounted cape look like it
