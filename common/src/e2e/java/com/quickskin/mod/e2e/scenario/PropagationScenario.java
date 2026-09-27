@@ -10,12 +10,14 @@ import com.quickskin.mod.common.data.PlayerAppearance;
 import com.quickskin.mod.common.data.PlayerAppearanceRepository;
 import com.quickskin.mod.e2e.DefaultSkinEvidenceView;
 import com.quickskin.mod.e2e.E2ELog;
+import com.quickskin.mod.e2e.LateServerChannelHold;
 import com.quickskin.mod.e2e.Scenario;
 import com.quickskin.mod.e2e.Step;
 import com.quickskin.mod.e2e.TestAssets;
 import com.quickskin.mod.e2e.VanillaShim;
 import com.quickskin.mod.e2e.generated.ScenarioContract.ScenarioId;
 import com.quickskin.mod.networking.NetworkSyncService;
+import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -46,9 +48,10 @@ import java.util.UUID;
  *
  * <h3>Observer (B)</h3>
  * <ol>
- *   <li><b>confirm_self</b> - sends one C2S packet ({@code syncAppearance(B,"","","classic")}) so the
- *       server confirms the exact connection's negotiated or legacy protocol session; only then
- *       does it relay other players' appearances to B (and back-fill A's applied look).</li>
+ *   <li><b>confirm_self</b> - once the exact connection's protocol is negotiated or legacy, sends
+ *       one C2S packet ({@code syncAppearance(B,"","","classic")}) so the server confirms that
+ *       session; only then does it relay other players' appearances to B (and back-fill A's
+ *       applied look).</li>
  *   <li><b>await_propagation</b> - waits (tick timeout, never wall-clock) until B has received A's
  *       appearance + skin bytes and the render path resolves the skin to the network location, the
  *       cloak to the bundled {@code known:test} resource, and the renderer-facing model to
@@ -56,6 +59,13 @@ import java.util.UUID;
  *   <li><b>observe_a</b> - frames A in B's camera from a fixed rear vantage and screenshots it,
  *       re-asserting the full check.</li>
  * </ol>
+ * <h3>Late server channel list (Forge)</h3>
+ * On Forge both clients run with {@link LateServerChannelHold}: Architectury's server channel list
+ * reaches the client only when A has applied its look and when B starts {@code confirm_self}, so
+ * Quick Skin joins believing the server has no Quick Skin channels, as it does in a large modpack.
+ * A's upload is therefore dropped while local-only and must still reach B through the late
+ * negotiation and the local-appearance bootstrap. Both assertions prove the list was held.
+ *
  * The render-truthful assertion casts A's entity to {@link AbstractClientPlayer} and checks
  * {@code getSkinTextureLocation()} equals {@code quickskin:network/skin/<hash>} (the location
  * {@code NetworkTextureCache} registers received bytes under), {@code getCloakTextureLocation()}
@@ -73,6 +83,10 @@ public final class PropagationScenario implements Scenario {
 
     /** Set by A's apply action; read by A's ready/assert. */
     private volatile String skinHash;
+    /** Whether A applied its look while its server channel list was still being held. */
+    private boolean appliedWhileChannelsHeld;
+    /** Whether B has sent its confirm C2S on an established protocol session. */
+    private boolean confirmSent;
 
     /** B's cached observation vantage (computed once from A's pose) + walk/settle bookkeeping. */
     private double tgtX, tgtY, tgtZ;
@@ -101,6 +115,7 @@ public final class PropagationScenario implements Scenario {
         steps.add(Step.of("apply_local_look")
                 .action(() -> {
                     DefaultSkinEvidenceView.enterFirstPerson(mc);
+                    appliedWhileChannelsHeld = LateServerChannelHold.holdingNow(mc);
                     try {
                         Path skinFile = TestAssets.makeSlimSkin();
                         AssetMetadata skinMeta = SkinImporter.importSkin(skinFile);
@@ -117,10 +132,15 @@ public final class PropagationScenario implements Scenario {
                                 + " model=auto (importer detected " + skinMeta.skinModel() + ")");
                     } catch (Exception e) {
                         E2ELog.error("apply_local_look action failed", e);
+                    } finally {
+                        // The sync above was dropped while local-only; the late channel list must
+                        // still negotiate and bootstrap this look for the observer to see it.
+                        LateServerChannelHold.release("scenario");
                     }
                 })
                 .minTicks(40)
                 .ready(() -> skinHash != null
+                        && (!LateServerChannelHold.applicable() || usableProfile(mc))
                         && appearance.getAppearance(uuid) != null
                         && appearance.getSkinLocation(uuid) != null
                         && appearance.getCapeLocation(uuid) != null)
@@ -149,8 +169,17 @@ public final class PropagationScenario implements Scenario {
                         return Step.Result.fail("skin ResourceLocation did not resolve");
                     if (appearance.getCapeLocation(uuid) == null)
                         return Step.Result.fail("cape ResourceLocation did not resolve");
-                    return Step.Result.pass("A applied+synced skin=" + es + " cape=" + BUNDLED_CAPE_ID
-                            + " model=auto->slim (metadata skinModel=slim, renderer model=slim)");
+                    String applied = "A applied+synced skin=" + es + " cape=" + BUNDLED_CAPE_ID
+                            + " model=auto->slim (metadata skinModel=slim, renderer model=slim)";
+                    if (!LateServerChannelHold.applicable()) return Step.Result.pass(applied);
+                    if (!appliedWhileChannelsHeld)
+                        return Step.Result.fail("look was applied after the server channel list arrived");
+                    Step.Result late = LateServerChannelHold.verifyReleased();
+                    if (!late.pass()) return late;
+                    if (!usableProfile(mc)) return Step.Result.fail("protocol not established after "
+                            + late.message() + ": " + LateServerChannelHold.clientProfile(mc));
+                    return Step.Result.pass(applied + "; applied while the server channel list was held; "
+                            + late.message() + "; then " + describeProfile(mc));
                 }));
 
         // After this the harness idles in DONE, keeping A connected so B can observe it.
@@ -168,20 +197,35 @@ public final class PropagationScenario implements Scenario {
 
         // 1. Speak first so the exact session is ready and the server relays/back-fills A to B.
         steps.add(Step.of("confirm_self")
-                .action(() -> {
-                    try {
-                        NetworkSyncService.getInstance().syncAppearance(me, "", "", "classic");
-                        E2ELog.info("B sent confirm C2S (empty appearance)");
-                    } catch (Throwable t) {
-                        E2ELog.error("confirm_self failed", t);
-                    }
-                })
+                .action(() -> LateServerChannelHold.release("scenario"))
                 .minTicks(10)
-                .ready(() -> Minecraft.getInstance().getConnection() != null)
-                .timeoutTicks(200)
-                .assertion(() -> mc.getConnection() != null
-                        ? Step.Result.pass("connected; sent confirm C2S")
-                        : Step.Result.fail("no server connection")));
+                .ready(() -> {
+                    // A sync sent while the session is still local-only is dropped, so confirm only
+                    // once the exact connection's protocol is established.
+                    if (mc.getConnection() == null || !usableProfile(mc)) return false;
+                    if (!confirmSent) {
+                        confirmSent = true;
+                        try {
+                            NetworkSyncService.getInstance().syncAppearance(me, "", "", "classic");
+                            E2ELog.info("B sent confirm C2S (empty appearance)");
+                        } catch (Throwable t) {
+                            E2ELog.error("confirm_self failed", t);
+                        }
+                    }
+                    return true;
+                })
+                .timeoutTicks(400)
+                .assertion(() -> {
+                    if (mc.getConnection() == null) return Step.Result.fail("no server connection");
+                    if (!confirmSent) return Step.Result.fail("protocol never established: "
+                            + LateServerChannelHold.clientProfile(mc));
+                    Step.Result late = LateServerChannelHold.verifyReleased();
+                    if (!late.pass()) return late;
+                    String confirmed = "connected; " + describeProfile(mc) + "; sent confirm C2S";
+                    return Step.Result.pass(LateServerChannelHold.applicable()
+                            ? late.message() + "; " + confirmed
+                            : confirmed);
+                }));
 
         // 2. Wait until A's appearance + bytes arrived and the render path resolves to network/<hash>.
         //    This IS the propagation assertion (recorded with full detail).
@@ -218,6 +262,18 @@ public final class PropagationScenario implements Scenario {
     }
 
     // ===== shared =========================================================================
+    private static boolean usableProfile(Minecraft mc) {
+        ProtocolProfile profile = LateServerChannelHold.clientProfile(mc);
+        return profile.negotiated() || profile.mode() == ProtocolProfile.Mode.LEGACY_V1;
+    }
+
+    private static String describeProfile(Minecraft mc) {
+        ProtocolProfile profile = LateServerChannelHold.clientProfile(mc);
+        return profile.negotiated()
+                ? "protocol v" + profile.version() + " negotiated"
+                : "protocol " + profile.mode() + " (" + profile.reason() + ")";
+    }
+
     private Step baseline(Minecraft mc, String v, String role) {
         boolean observer = "client_b".equals(role);
         return Step.of("baseline")

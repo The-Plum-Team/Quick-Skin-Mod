@@ -89,6 +89,11 @@ public final class E2EHarness {
         String role = System.getProperty("quickskin.e2e.role", "client_a");
         String scenarioId = System.getProperty("quickskin.e2e.scenario", "phase0-smoke");
         E2ELog.info("activating: version=" + version + " role=" + role + " scenario=" + scenarioId);
+        if (ScenarioId.fromExternal(scenarioId) == ScenarioId.PROPAGATION) {
+            // Before connecting: the sequential propagation scenario joins before the server's
+            // channel list arrives, as in a large modpack. See PropagationScenario.
+            LateServerChannelHold.install();
+        }
         E2EHarness h = new E2EHarness(version, role, scenarioId);
         ClientTickEvent.CLIENT_POST.register(h::onTick);
         ClientGuiEvent.RENDER_HUD.register((graphics, delta) -> h.onHudRendered());
