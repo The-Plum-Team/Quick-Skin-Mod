@@ -1,8 +1,13 @@
 package com.quickskin.mod.platform.forge;
 
+import net.minecraft.network.Connection;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLLoader;
 import net.minecraftforge.fml.loading.FMLPaths;
+import net.minecraftforge.network.ConnectionData;
+import net.minecraftforge.network.NetworkHooks;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.nio.file.Path;
 
@@ -50,5 +55,24 @@ public class PlatformHelperImpl {
 
     public static boolean isDevelopmentEnvironment() {
         return !FMLLoader.isProduction();
+    }
+
+    /** From the server's FML mod data, which Forge receives before the client joins the world. */
+    public static String getRemoteModVersion(Object connection, String modId) {
+        ConnectionData data = connectionData(connection);
+        if (data == null || modId == null) return null;
+        Pair<String, String> mod = data.getModData().get(modId);
+        String version = mod != null ? mod.getRight() : null;
+        return version == null || version.isEmpty() ? null : version;
+    }
+
+    public static boolean remoteDeclaresChannel(Object connection, String channelId) {
+        ConnectionData data = connectionData(connection);
+        ResourceLocation channel = channelId != null ? ResourceLocation.tryParse(channelId) : null;
+        return data != null && channel != null && data.getChannels().containsKey(channel);
+    }
+
+    private static ConnectionData connectionData(Object connection) {
+        return connection instanceof Connection network ? NetworkHooks.getConnectionData(network) : null;
     }
 }
