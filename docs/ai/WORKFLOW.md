@@ -317,6 +317,30 @@ The `capture_coverage=full` manual input restores complete coverage. A selected 
 Pages bundle must retain its separate coverage identity and may never issue a complete baseline.
 Public frames keep their original tested commit/run/JAR when unaffected dependencies permit reuse.
 
+## Release publication
+
+[`RELEASING.md`](../../RELEASING.md) owns the procedure. These rules come from releases that failed
+and must not fail the same way again:
+
+- Land the version bump and its dated changelog section through a ready PR. The whole
+  `CHANGELOG.md` is uploaded as the Modrinth and CurseForge changelog. Tests derive the expected
+  release identities from the checked-in version and must never hardcode it.
+- Freeze `master` from that merge until every target's tag run has passed `Validate requested
+  release identity`. Rehearsals and tag runs require the exact branch head, and a queued tag run
+  may validate an hour after its push. Coordinate with every other session or automation that
+  can merge: one merge in that window fails every run that has not validated yet.
+- Before creating any tag, rehearse every matrix target with a validation-only `release.yml`
+  dispatch on that exact head and require `Build and verify` and `Packaged E2E gate` on it.
+- Push exactly one release tag per `git push`. GitHub creates no push event when more than three
+  tags are pushed together, which leaves tags without runs. Recheck the `master` head before each
+  push and confirm that its `Release` run started before pushing the next tag.
+- Release tags are immutable by ruleset, so get them right the first time. A tag whose run staged
+  nothing is retried only as `RELEASING.md` describes, never by moving or reusing a tag silently.
+- Each tag run waits for the `release` environment before it stages and publishes, and
+  `release-verify.yml` asks again to finalize once both marketplaces verify every file. A release
+  is finished only when every target's GitHub release is published and every ledger row is
+  `verified`.
+
 ## Documentation maintenance
 
 The shared repository contract owns the generic documentation rules; Quick Skin's documents and
