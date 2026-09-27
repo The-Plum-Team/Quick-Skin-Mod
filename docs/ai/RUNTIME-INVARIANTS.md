@@ -106,6 +106,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   over-budget appearance gracefully instead of weakening the cap.
 - Server cache deletion belongs on the bounded cache-I/O executor. Remove a cache entry from the
   live namespace before scheduling deletion so a concurrent replacement cannot be deleted.
+- A committed server appearance change is saved at once on that same executor, not only at
+  disconnect or shutdown, so a crash cannot lose it. Capture the JSON on the server thread, keep at
+  most one queued save per player holding its latest change, and write under the storage lock so a
+  later synchronous disconnect/shutdown save is never overwritten by an older queued one. A full or
+  stopped queue defers the save to the disconnect; a queued save never writes into a released world.
 - Cape atlases produced by the editor or custom import paths must keep the complete vanilla Elytra
   alpha envelope at every supported scale and in every animation frame. That envelope includes
   the transparent inner 10x20 face as well as the tapered outer face; otherwise an opaque source
