@@ -12,6 +12,7 @@ import com.quickskin.mod.server.data.ServerPlayerAppearanceRepository;
 import com.quickskin.mod.server.data.ServerTextureResponseCoordinator;
 import com.quickskin.mod.server.data.ServerUploadCoordinator;
 import com.quickskin.mod.server.storage.ServerAnimationCache;
+import com.quickskin.mod.server.storage.ServerAppearanceStorage;
 import com.quickskin.mod.server.storage.ServerTextureCache;
 import com.quickskin.mod.server.storage.TextureChunkAssembler;
 import dev.architectury.networking.NetworkManager;
@@ -964,6 +965,7 @@ public class ServerNetworkHandler {
             sendAppearanceToPlayer(player, playerId);
             return;
         }
+        ServerAppearanceStorage.getInstance().scheduleSavePlayerAppearance(playerId);
 
         if (isSkinChanging && cooldownSeconds > 0) {
             ServerCooldownManager.getInstance().recordSkinChange(playerId);
