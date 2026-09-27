@@ -25,6 +25,13 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   explicit v1 evidence, and absent Quick Skin channels remain local-only. Reject v2 traffic before
   successful negotiation and clear only the exact profile on disconnect or all profiles at
   shutdown.
+- Channel evidence is not final at the client's join callback. Architectury on Forge 1.20.1 delivers
+  the server's channel list after the join, either on the network thread (a race) or on the client
+  thread queued behind other work (40 seconds behind JEI in a 370-mod pack). The client keeps
+  observing for the connection's lifetime (`ClientChannelDiscovery`), sends its hello as soon as the
+  hello channel appears, concludes v1 only after two agreeing observations, and never replaces a
+  nonce after its hello was sent. On Forge the server's join-time probe always sees an empty client
+  list, so the server re-probes unclassified exact connections with the same two-observation rule.
 - Admit protocol hellos through the exact-connection rate budget before queuing main-thread work,
   and bound cached ACK replay to the client's finite retries for that nonce. The authenticated
   hello itself is ACK-channel evidence where Forge/Architectury channel queries are unreliable.
