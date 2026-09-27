@@ -32,6 +32,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   hello channel appears, concludes v1 only after two agreeing observations, and never replaces a
   nonce after its hello was sent. On Forge the server's join-time probe always sees an empty client
   list, so the server re-probes unclassified exact connections with the same two-observation rule.
+- On Forge the FML login handshake, which completes before the join, is earlier hello evidence: a
+  server that declares Quick Skin 3 or newer together with Architectury's `architectury:network`
+  channel receives the hello at the join. That declaration is a peer hint, not authority; only the
+  authenticated acknowledgement negotiates, a negotiated v2 profile (not the late channel list)
+  gates the snapshot request, and a server declaring neither is left to channel discovery.
 - Admit protocol hellos through the exact-connection rate budget before queuing main-thread work,
   and bound cached ACK replay to the client's finite retries for that nonce. The authenticated
   hello itself is ACK-channel evidence where Forge/Architectury channel queries are unreliable.
@@ -224,9 +229,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   checkpoint whose contract says it is still outside the later inspection frame.
 - On Forge, the sequential propagation scenario holds `architectury:sync_ids` until the subject
   has applied its look and the observer starts `confirm_self`, reproducing a pack whose client
-  thread handles the server's channel list long after joining. Its assertions must prove the list
-  arrived while Quick Skin was still local-only and was released by the scenario, never by the
-  hold's safety valve; `propagation-live` keeps the prompt path.
+  thread handles the server's channel list long after joining. Its assertions must prove the
+  protocol was negotiated from the login handshake before the list arrived and that the scenario,
+  never the hold's safety valve, released it; `propagation-live` keeps the prompt path.
 - Remote propagation inspection must pin the disposable subject's previous/current yaw plus head
   and body rotations, keep the observer at an asserted rear-vector cosine, and include that geometry
   in passed runtime evidence. A facial head turn must not make a rear-mounted cape look like it

@@ -1,11 +1,13 @@
 package com.quickskin.mod.networking;
 
+import com.quickskin.mod.platform.PlatformHelper;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.util.HashUtil;
 import com.quickskin.mod.networking.protocol.ClientChannelDiscovery;
+import com.quickskin.mod.networking.protocol.HandshakeProtocolEvidence;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
@@ -44,6 +46,8 @@ public class NetworkSyncService {
     private static final long SNAPSHOT_REQUEST_RETRY_MILLIS = 15_000L;
     private static final long PROTOCOL_HELLO_RETRY_MILLIS = 3_000L;
     private static final int MAX_PROTOCOL_HELLO_ATTEMPTS = 5;
+    /** Architectury's single Forge channel, which carries every Quick Skin packet. */
+    private static final String ARCHITECTURY_TRANSPORT_CHANNEL = "architectury:network";
 
     private final AtomicLong syncSequence = new AtomicLong();
     private final AtomicLong snapshotRequestSequence = new AtomicLong();
@@ -70,6 +74,7 @@ public class NetworkSyncService {
     private int protocolHelloAttempts;
     private long protocolHelloRetryAtMillis;
     private boolean helloExhaustionReported;
+    private boolean handshakeEvidenceReported;
     /** Non-null while the exact session still waits for the server to advertise its channels. */
     private ClientChannelDiscovery channelDiscovery;
 
@@ -400,11 +405,35 @@ public class NetworkSyncService {
 
     private boolean serverAcceptsProtocolHello() {
         //? if <1.21 {
-        return NetworkTransport.INSTANCE.canServerReceiveProtocolHello();
+        return NetworkTransport.INSTANCE.canServerReceiveProtocolHello()
+                || handshakeDeclaresProtocolHello();
         //?} else {
         return NetworkTransport.INSTANCE.canServerReceive(ProtocolHelloPayload.TYPE);
         //?}
     }
+
+    //? if <1.21 {
+    /**
+     * Forge learns the server's mods during the FML login, long before Architectury's channel
+     * list, which a busy client may process only after other mods finish loading. A server that
+     * declares Quick Skin 3 and its transport channel receives the hello at the join instead.
+     */
+    private boolean handshakeDeclaresProtocolHello() {
+        net.minecraft.client.multiplayer.ClientPacketListener listener =
+                Minecraft.getInstance().getConnection();
+        if (listener == null) return false;
+        Object connection = listener.getConnection();
+        boolean declared = HandshakeProtocolEvidence.declaresProtocolHello(
+                PlatformHelper.getRemoteModVersion(connection, QuickSkinInfo.MOD_ID),
+                PlatformHelper.remoteDeclaresChannel(connection, ARCHITECTURY_TRANSPORT_CHANNEL));
+        if (declared && !handshakeEvidenceReported) {
+            handshakeEvidenceReported = true;
+            QuickSkinInfo.LOGGER.info(
+                    "The server's login handshake declares Quick Skin; negotiating");
+        }
+        return declared;
+    }
+    //?}
 
     private boolean serverAcceptsLegacyProtocol() {
         //? if <1.21 {
@@ -513,7 +542,10 @@ public class NetworkSyncService {
         long now = System.currentTimeMillis();
         if (now < snapshotRetryAtMillis) return;
         //? if <1.21 {
-        if (!NetworkTransport.INSTANCE.canServerReceiveAppearanceSnapshot()) {
+        // The acknowledged v2 profile already asserts the server's snapshot receiver, while
+        // Architectury's channel list may still be on its way.
+        if (!profile.negotiated()
+                && !NetworkTransport.INSTANCE.canServerReceiveAppearanceSnapshot()) {
         //?} else {
         if (!NetworkTransport.INSTANCE.canServerReceive(
                 RequestAppearanceSnapshotPayload.TYPE)) {
@@ -804,6 +836,7 @@ public class NetworkSyncService {
         protocolHelloAttempts = 0;
         protocolHelloRetryAtMillis = 0L;
         helloExhaustionReported = false;
+        handshakeEvidenceReported = false;
         channelDiscovery = null;
         clearAppearanceSnapshotRequest();
     }

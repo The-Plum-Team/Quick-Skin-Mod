@@ -57,4 +57,16 @@ public class PlatformHelperImpl {
         return !FMLEnvironment.isProduction();
         //?}
     }
+
+    /**
+     * NeoForge negotiates payload channels during configuration, before the join callback, so
+     * its channel queries are already final and no handshake hint is needed.
+     */
+    public static String getRemoteModVersion(Object connection, String modId) {
+        return null;
+    }
+
+    public static boolean remoteDeclaresChannel(Object connection, String channelId) {
+        return false;
+    }
 }

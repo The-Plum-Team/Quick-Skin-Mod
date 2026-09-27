@@ -404,12 +404,12 @@ On Forge, `propagation` also reproduces a large modpack's late channel list. Arc
 the server's receivable channels from `architectury:sync_ids`, which a busy client handles long
 after joining; with few mods it usually wins the race and the late path is never exercised. The
 harness's `LateServerChannelHold` therefore holds that one payload until the subject has applied
-its look and the observer starts `confirm_self`, so Quick Skin joins believing the server has no
-Quick Skin channels and the subject's upload is dropped while local-only. The observer must still
-see the look through the late negotiation and the local-appearance bootstrap. Both assertions
-require the list to have been released by the scenario while Quick Skin was still local-only; a
-broken hold fails instead of silently testing the fast path. `propagation-live` keeps the prompt
-path on Forge, and the hold does not apply to other loaders.
+its look and the observer starts `confirm_self`. Quick Skin must nevertheless negotiate at the
+join from the server's FML login handshake, so the subject applies and uploads its look on the
+negotiated protocol while the list is still held. Both assertions require the list to have been
+released by the scenario, after the protocol was negotiated; a broken hold fails instead of
+silently testing the fast path. `propagation-live` keeps the prompt path on Forge, the late
+channel-discovery fallback is covered by unit tests, and the hold does not apply to other loaders.
 
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves
