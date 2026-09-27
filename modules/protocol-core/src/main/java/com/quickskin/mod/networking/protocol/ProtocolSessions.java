@@ -11,6 +11,8 @@ public final class ProtocolSessions {
     /** Initial acknowledgement plus the client's four possible hello retries. */
     private static final int MAX_ACKNOWLEDGEMENTS_PER_HELLO = 5;
     private static final ProtocolSessions INSTANCE = new ProtocolSessions();
+    /** The join-time probe saw no Quick Skin channel; later channel evidence may still arrive. */
+    private static final String CHANNEL_UNAVAILABLE = "quickskin-channel-unavailable";
 
     private final AtomicLong nonces = new AtomicLong();
     private final Map<SessionKey, ServerSession> serverProfiles = new LinkedHashMap<>();
@@ -41,11 +43,36 @@ public final class ProtocolSessions {
             initial = ProtocolProfile.legacy("legacy-channel-confirmed");
             sendHello = false;
         } else {
-            initial = ProtocolProfile.localOnly("quickskin-channel-unavailable");
+            initial = ProtocolProfile.localOnly(CHANNEL_UNAVAILABLE);
             sendHello = false;
         }
         clientSession = new ClientSession(playerId, connection, nonce, initial);
         return new ClientHello(nonce, QuickSkinProtocol.POLICY.offer(), sendHello);
+    }
+
+    /**
+     * Restarts the exact session that is still waiting for channel evidence once that evidence
+     * arrives (see {@link ClientChannelDiscovery}). A session that already sent a hello, negotiated
+     * or classified legacy is never restarted, so no nonce is ever replaced after it was sent.
+     *
+     * @return the restarted session's hello, or {@code null} when nothing changed
+     */
+    public synchronized ClientHello reprobeClientSession(
+            UUID playerId, Object connection,
+            boolean helloChannelAvailable, boolean legacyChannelAvailable) {
+        if (!awaitingChannelEvidence(playerId, connection)
+                || (!helloChannelAvailable && !legacyChannelAvailable)) return null;
+        return beginClientSession(
+                playerId, connection, helloChannelAvailable, legacyChannelAvailable);
+    }
+
+    /** Whether the exact session is local-only only because no channel was advertised yet. */
+    public synchronized boolean awaitingChannelEvidence(UUID playerId, Object connection) {
+        ClientSession session = clientSession;
+        return session != null && playerId != null && session.connection == connection
+                && session.playerId.equals(playerId)
+                && session.profile.mode() == ProtocolProfile.Mode.LOCAL_ONLY
+                && CHANNEL_UNAVAILABLE.equals(session.profile.reason());
     }
 
     public synchronized ProtocolProfile acceptClientAcknowledgement(
