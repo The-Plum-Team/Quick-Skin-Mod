@@ -47,4 +47,13 @@ public class PlatformHelperImpl {
     public static boolean isDevelopmentEnvironment() {
         return FabricLoader.getInstance().isDevelopmentEnvironment();
     }
+
+    /** Fabric has no login-handshake mod list; channel queries remain the only evidence. */
+    public static String getRemoteModVersion(Object connection, String modId) {
+        return null;
+    }
+
+    public static boolean remoteDeclaresChannel(Object connection, String channelId) {
+        return false;
+    }
 }

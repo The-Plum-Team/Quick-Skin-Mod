@@ -61,10 +61,10 @@ import java.util.UUID;
  * </ol>
  * <h3>Late server channel list (Forge)</h3>
  * On Forge both clients run with {@link LateServerChannelHold}: Architectury's server channel list
- * reaches the client only when A has applied its look and when B starts {@code confirm_self}, so
- * Quick Skin joins believing the server has no Quick Skin channels, as it does in a large modpack.
- * A's upload is therefore dropped while local-only and must still reach B through the late
- * negotiation and the local-appearance bootstrap. Both assertions prove the list was held.
+ * reaches the client only when A has applied its look and when B starts {@code confirm_self}, as
+ * in a large modpack. Quick Skin must still negotiate at the join from the FML login handshake, so
+ * A's upload goes out on the negotiated protocol while the list is held. Both assertions prove the
+ * list was held and the protocol negotiated without it.
  *
  * The render-truthful assertion casts A's entity to {@link AbstractClientPlayer} and checks
  * {@code getSkinTextureLocation()} equals {@code quickskin:network/skin/<hash>} (the location
@@ -85,6 +85,8 @@ public final class PropagationScenario implements Scenario {
     private volatile String skinHash;
     /** Whether A applied its look while its server channel list was still being held. */
     private boolean appliedWhileChannelsHeld;
+    /** Whether A's protocol was already negotiated when it applied its look. */
+    private boolean appliedNegotiated;
     /** Whether B has sent its confirm C2S on an established protocol session. */
     private boolean confirmSent;
 
@@ -115,7 +117,8 @@ public final class PropagationScenario implements Scenario {
         steps.add(Step.of("apply_local_look")
                 .action(() -> {
                     DefaultSkinEvidenceView.enterFirstPerson(mc);
-                    appliedWhileChannelsHeld = LateServerChannelHold.holdingNow(mc);
+                    appliedWhileChannelsHeld = LateServerChannelHold.stillHeld();
+                    appliedNegotiated = LateServerChannelHold.clientProfile(mc).negotiated();
                     try {
                         Path skinFile = TestAssets.makeSlimSkin();
                         AssetMetadata skinMeta = SkinImporter.importSkin(skinFile);
@@ -133,8 +136,7 @@ public final class PropagationScenario implements Scenario {
                     } catch (Exception e) {
                         E2ELog.error("apply_local_look action failed", e);
                     } finally {
-                        // The sync above was dropped while local-only; the late channel list must
-                        // still negotiate and bootstrap this look for the observer to see it.
+                        // The sync above went out without the channel list; deliver it only now.
                         LateServerChannelHold.release("scenario");
                     }
                 })
@@ -174,12 +176,12 @@ public final class PropagationScenario implements Scenario {
                     if (!LateServerChannelHold.applicable()) return Step.Result.pass(applied);
                     if (!appliedWhileChannelsHeld)
                         return Step.Result.fail("look was applied after the server channel list arrived");
+                    if (!appliedNegotiated)
+                        return Step.Result.fail("look was applied before the protocol was negotiated");
                     Step.Result late = LateServerChannelHold.verifyReleased();
                     if (!late.pass()) return late;
-                    if (!usableProfile(mc)) return Step.Result.fail("protocol not established after "
-                            + late.message() + ": " + LateServerChannelHold.clientProfile(mc));
-                    return Step.Result.pass(applied + "; applied while the server channel list was held; "
-                            + late.message() + "; then " + describeProfile(mc));
+                    return Step.Result.pass(applied + "; applied on " + describeProfile(mc)
+                            + " while the server channel list was held; " + late.message());
                 }));
 
         // After this the harness idles in DONE, keeping A connected so B can observe it.

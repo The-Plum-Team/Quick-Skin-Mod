@@ -22,9 +22,10 @@ import java.util.Map;
  * {@code architectury:sync_ids}, which the server sends from its own login event. With few mods the
  * client handles that payload on the network thread and usually wins the race against the join
  * callback. In a large pack it is queued on the client thread behind other work (JEI took 40
- * seconds), so Quick Skin joins while every server channel still looks absent. This hold replaces
+ * seconds), so every server channel still looks absent when Quick Skin joins. This hold replaces
  * that one S2C receiver with a wrapper that copies the payload and hands it to the original
- * receiver only when the scenario calls {@link #release}, on the client thread.</p>
+ * receiver only when the scenario calls {@link #release}, on the client thread. Quick Skin must
+ * nevertheless negotiate at the join from the FML login handshake, which completes before it.</p>
  *
  * <p>The receiver map exists only in Architectury's Forge implementation; on every other loader
  * the hold is not applicable and does nothing. On Forge any reflective drift, including a missing
@@ -46,7 +47,7 @@ public final class LateServerChannelHold {
     private static volatile Pending pending;
     private static int ticksInWorld;
     private static int releasedAfterTicks = -1;
-    private static boolean releasedWhileLocalOnly;
+    private static boolean negotiatedBeforeRelease;
     private static String releaseReason;
 
     private record Pending(Method receive, ByteBuf payload, Object context) {}
@@ -128,8 +129,8 @@ public final class LateServerChannelHold {
         if (!applicable || held == null || releaseReason != null) return;
         pending = null;
         Minecraft mc = Minecraft.getInstance();
-        releasedWhileLocalOnly = mc.player != null && mc.getConnection() != null
-                && clientProfile(mc).mode() == ProtocolProfile.Mode.LOCAL_ONLY;
+        negotiatedBeforeRelease = mc.player != null && mc.getConnection() != null
+                && clientProfile(mc).negotiated();
         releasedAfterTicks = ticksInWorld;
         releaseReason = reason;
         try {
@@ -147,10 +148,9 @@ public final class LateServerChannelHold {
         return applicable;
     }
 
-    /** Whether Quick Skin's session is still local-only because the channel list is being held. */
-    public static boolean holdingNow(Minecraft mc) {
-        return applicable && pending != null && releaseReason == null
-                && clientProfile(mc).mode() == ProtocolProfile.Mode.LOCAL_ONLY;
+    /** Whether the server's channel list has arrived and is still being held from Architectury. */
+    public static boolean stillHeld() {
+        return applicable && pending != null && releaseReason == null;
     }
 
     public static ProtocolProfile clientProfile(Minecraft mc) {
@@ -158,8 +158,8 @@ public final class LateServerChannelHold {
     }
 
     /**
-     * Fails unless the list really arrived late: held, released by the scenario while Quick Skin
-     * was still local-only, and not by the safety valve.
+     * Fails unless the list really arrived late, held until the scenario released it rather than
+     * the safety valve, and Quick Skin had already negotiated without it.
      */
     public static Step.Result verifyReleased() {
         if (!applicable) return Step.Result.pass("channel list hold not applicable on this loader");
@@ -168,10 +168,10 @@ public final class LateServerChannelHold {
         if (!"scenario".equals(releaseReason)) {
             return Step.Result.fail("architectury:sync_ids released by " + releaseReason);
         }
-        if (!releasedWhileLocalOnly) {
-            return Step.Result.fail("Quick Skin was not local-only when the held channel list arrived");
+        if (!negotiatedBeforeRelease) {
+            return Step.Result.fail("Quick Skin had not negotiated before the held channel list arrived");
         }
         return Step.Result.pass("architectury:sync_ids delivered " + releasedAfterTicks
-                + " ticks after joining, while Quick Skin was still local-only");
+                + " ticks after joining; the protocol was already negotiated from the login handshake");
     }
 }
