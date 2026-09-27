@@ -184,6 +184,8 @@ class ArtifactManifestRoundTripTest(unittest.TestCase):
         self.data = release_matrix.load_matrix(ROOT / "release/release-matrix.json")
         self.matrix_path.write_text(json.dumps(self.data) + "\n", encoding="utf-8")
         (self.repository / "gradle.properties").write_bytes((ROOT / "gradle.properties").read_bytes())
+        # The copied properties carry the checked-in version, not this fixture's.
+        self.mod_version = derive_release_identity(ROOT / "release/release-matrix.json").mod_version
         for artifact in self.data["artifacts"]:
             for key in ("jar", "harness_jar"):
                 path = self.repository / artifact[key].format(mod_version=self.mod_version)

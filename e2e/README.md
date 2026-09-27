@@ -400,6 +400,17 @@ removal. Each phase is released by an explicit observer acknowledgement relayed 
 server. Every optional-mod lane ends with a lane-specific `integration_visual` checkpoint whose
 reviewer expectation is overridden per mod.
 
+On Forge, `propagation` also reproduces a large modpack's late channel list. Architectury fills
+the server's receivable channels from `architectury:sync_ids`, which a busy client handles long
+after joining; with few mods it usually wins the race and the late path is never exercised. The
+harness's `LateServerChannelHold` therefore holds that one payload until the subject has applied
+its look and the observer starts `confirm_self`. Quick Skin must nevertheless negotiate at the
+join from the server's FML login handshake, so the subject applies and uploads its look on the
+negotiated protocol while the list is still held. Both assertions require the list to have been
+released by the scenario, after the protocol was negotiated; a broken hold fails instead of
+silently testing the fast path. `propagation-live` keeps the prompt path on Forge, the late
+channel-discovery fallback is covered by unit tests, and the hold does not apply to other loaders.
+
 The title-screen z-order probe replaces vanilla's randomly selected splash in the E2E-only screen
 with fixed yellow text. It still measures vanilla's rendered position and animation, then proves
 that the production preview covers those exact pixels; formatted or seasonal splash selection is

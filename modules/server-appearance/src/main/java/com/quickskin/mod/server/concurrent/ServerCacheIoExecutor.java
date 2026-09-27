@@ -11,7 +11,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Bounded, lifecycle-owned worker for cache eviction filesystem cleanup. */
+/** Bounded, lifecycle-owned worker for cache eviction cleanup and appearance saves. */
 public final class ServerCacheIoExecutor implements AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerCacheIoExecutor.class);
     private static final ServerCacheIoExecutor INSTANCE =
@@ -49,7 +49,7 @@ public final class ServerCacheIoExecutor implements AutoCloseable {
                 new ThreadPoolExecutor.AbortPolicy());
     }
 
-    /** Returns false when stopped or full; filesystem cleanup is never run on the caller thread. */
+    /** Returns false when stopped or full; filesystem work is never run on the caller thread. */
     public boolean submit(Runnable operation) {
         if (operation == null) return false;
         ThreadPoolExecutor executor;
@@ -62,7 +62,7 @@ public final class ServerCacheIoExecutor implements AutoCloseable {
                 try {
                     operation.run();
                 } catch (RuntimeException | LinkageError error) {
-                    LOGGER.warn("QuickSkin cache I/O cleanup failed", error);
+                    LOGGER.warn("QuickSkin cache I/O task failed", error);
                 }
             });
             return true;
