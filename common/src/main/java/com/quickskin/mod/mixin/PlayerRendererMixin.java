@@ -99,15 +99,15 @@ public class PlayerRendererMixin {
         // Try service-based lookup (covers registered data from Essential compat or server sync)
 //? if <1.21.2 {
         service.markSkinVisible(player.getUUID());
-        if (service.hasActiveSkin(player.getUUID())) {
+        if (!CPMCompatIntegration.ownsLocalPlayerTexture(player.getUUID()) && service.hasActiveSkin(player.getUUID())) {
             ResourceLocation customSkin = service.getSkinLocation(player.getUUID());
 //?} else if <1.21.11 {
         service.markSkinVisible(playerUUID);
-        if (service.hasActiveSkin(playerUUID)) {
+        if (!CPMCompatIntegration.ownsLocalPlayerTexture(playerUUID) && service.hasActiveSkin(playerUUID)) {
             ResourceLocation customSkin = service.getSkinLocation(playerUUID);
 //?} else {
         service.markSkinVisible(playerUUID);
-        if (service.hasActiveSkin(playerUUID)) {
+        if (!CPMCompatIntegration.ownsLocalPlayerTexture(playerUUID) && service.hasActiveSkin(playerUUID)) {
             Identifier customSkin = service.getSkinLocation(playerUUID);
 //?}
             if (customSkin != null) {

@@ -572,11 +572,14 @@ public final class CPMCompatIntegration {
 
     /**
      * Switches the local player from an explicit model file back to normal skin
-     * mode, then forces CPM to recreate its cached definition.
+     * mode, then forces CPM to recreate its cached definition. A model that is
+     * still Quick Skin's selection is kept: choosing a skin empties that selection
+     * through {@link CpmModelWorkflow#activateSkin} before the skin is applied, so
+     * any other local update, such as a transparency reload, must not drop it.
      */
     public static void forceReRegisterSkins(java.util.UUID playerId) {
         java.util.UUID localUuid = getLocalPlayerUuid();
-        if (localUuid != null && localUuid.equals(playerId)) {
+        if (localUuid != null && localUuid.equals(playerId) && !hasSelectedCpmModel()) {
             resetToSkinMode();
         } else {
             schedulePlayerCacheInvalidation();
@@ -792,6 +795,23 @@ public final class CPMCompatIntegration {
         } catch (RuntimeException ignored) {
         }
         return null;
+    }
+
+    private static boolean hasSelectedCpmModel() {
+        String modelHash = ClientConfig.getInstance().activeCpmModelHash;
+        return modelHash != null && !modelHash.isEmpty();
+    }
+
+    /**
+     * Returns whether CPM textures this player: the local player while Quick Skin's selection is
+     * a CPM model. CPM binds the model's texture from the tail of the renderer's texture lookup,
+     * so an earlier Quick Skin return there would leave the model without its texture.
+     */
+    public static boolean ownsLocalPlayerTexture(java.util.UUID playerId) {
+        return playerId != null
+                && isAvailable()
+                && hasSelectedCpmModel()
+                && playerId.equals(getLocalPlayerUuid());
     }
 
     /**
