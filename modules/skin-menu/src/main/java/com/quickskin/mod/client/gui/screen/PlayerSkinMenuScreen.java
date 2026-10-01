@@ -1542,25 +1542,55 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 .thenAccept(skinData -> {
                     // Execute on main thread
                     if (this.minecraft != null) {
-                        this.minecraft.execute(() -> {
-                            if (skinData != null) {
-                                handleMojangSkinFetched(skinData);
-                            } else {
-                                showError(Component.translatable("quickskin.error.player_not_found", username));
-                                resetSearchButton();
-                            }
-                        });
+                        this.minecraft.execute(() -> handleMojangSkinFetched(skinData));
                     }
                 })
                 .exceptionally(throwable -> {
+                    logMojangSearchFailure(username, throwable);
                     if (this.minecraft != null) {
                         this.minecraft.execute(() -> {
-                            showError(Component.translatable("quickskin.error.fetch_skin_failed", throwable.getMessage()));
+                            showError(mojangSearchError(throwable, username));
                             resetSearchButton();
                         });
                     }
                     return null;
                 });
+    }
+
+    /** One log line per failed search, so a report can quote the step that failed. */
+    private static void logMojangSearchFailure(String username, Throwable throwable) {
+        MojangApiService.ImportFailure failure = MojangApiService.findFailure(throwable);
+        if (failure == null) {
+            QuickSkinInfo.LOGGER.warn("Username skin search for '{}' failed unexpectedly", username, throwable);
+            return;
+        }
+        switch (failure.reason()) {
+            case INVALID_USERNAME, NOT_FOUND, NO_CUSTOM_SKIN ->
+                    QuickSkinInfo.LOGGER.info("Username skin search for '{}': {}", username, failure.getMessage());
+            // A transport error names the host or timeout. A parse error could quote the response
+            // body, so every other cause is logged by its class only.
+            case NETWORK -> QuickSkinInfo.LOGGER.warn("Username skin search for '{}' failed: {} - {}", username,
+                    failure.getMessage(), String.valueOf(failure.getCause()));
+            default -> QuickSkinInfo.LOGGER.warn("Username skin search for '{}' failed: {}{}", username,
+                    failure.getMessage(), failure.getCause() == null ? ""
+                            : " [" + failure.getCause().getClass().getSimpleName() + "]");
+        }
+    }
+
+    private static Component mojangSearchError(Throwable throwable, String username) {
+        MojangApiService.ImportFailure failure = MojangApiService.findFailure(throwable);
+        if (failure == null) return Component.translatable("quickskin.error.skin_search_failed");
+        return switch (failure.reason()) {
+            case INVALID_USERNAME -> Component.translatable("quickskin.error.invalid_username");
+            case NOT_FOUND -> Component.translatable("quickskin.error.player_not_found", username);
+            case NO_CUSTOM_SKIN -> Component.translatable("quickskin.error.no_custom_skin");
+            case INVALID_RESPONSE, RESPONSE_TOO_LARGE -> Component.translatable("quickskin.error.invalid_skin_response");
+            case HTTP, NETWORK -> Component.translatable(switch (failure.stage()) {
+                case LOOKUP -> "quickskin.error.lookup_unavailable";
+                case PROFILE -> "quickskin.error.profile_unavailable";
+                case DOWNLOAD -> "quickskin.error.download_unavailable";
+            });
+        };
     }
 
     /**
