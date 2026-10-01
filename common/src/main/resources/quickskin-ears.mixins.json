@@ -5,6 +5,7 @@
   "minVersion": "0.8",
   "plugin": "com.quickskin.mod.mixin.compat.EarsMixinPlugin",
   "client": [
+    "EtfPlayerTextureMixin",
     "EarsLayerRendererMixin",
     "EarsModMixin",
     "CpmModelDefinitionLoaderMixin",

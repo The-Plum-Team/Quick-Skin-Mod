@@ -62,6 +62,7 @@ DEGRADABLE_MIXINS = {
 # the optional-config plugin or are harmless vanilla interception points whose handlers no-op when
 # the integration is absent.
 OPTIONAL_MIXINS = {
+    "main:com/quickskin/mod/mixin/compat/EtfPlayerTextureMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmModelDefinitionLoaderMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
@@ -283,6 +284,29 @@ class MixinPolicyTest(unittest.TestCase):
     def test_packaged_clients_enable_expect_counting(self) -> None:
         runtime = (ROOT / "e2e" / "packaged_runtime.py").read_text(encoding="utf-8")
         self.assertIn('"-Dmixin.debug.countInjections=true"', runtime)
+
+    def test_etf_bridge_is_registered_for_every_target(self) -> None:
+        # An overlay config replaces the canonical one, and the plugin rejects unknown mixins, so
+        # a missing entry in either silently disables the bridge on those targets.
+        for path in self.configs_named("quickskin-ears.mixins.json"):
+            with self.subTest(config=relative(path)):
+                config = json.loads(path.read_text(encoding="utf-8"))
+                self.assertIn("EtfPlayerTextureMixin", config["client"])
+        plugin = (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/compat/EarsMixinPlugin.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"EtfPlayerTextureMixin"', plugin)
+
+    def test_fabric_renderer_hook_cancels_only_when_vanilla_differs(self) -> None:
+        # An unconditional cancel at HEAD skips other mods' RETURN callbacks on this lookup,
+        # which is where Entity Texture Features builds a player's skin features.
+        source = (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/PlayerRendererMixin.java"
+        ).read_text(encoding="utf-8")
+        calls = [line for line in source.splitlines() if "cir.setReturnValue(" in line]
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            self.assertIn(".equals(vanillaSkin)", call)
 
 
 if __name__ == "__main__":
