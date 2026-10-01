@@ -9,7 +9,8 @@
     "EarsModMixin",
     "CpmModelDefinitionLoaderMixin",
     "CpmRenderDepthMixin",
-    "CpmSubmitCollectorMixin"
+    "CpmSubmitCollectorMixin",
+    "RealCameraTextureIdMixin"
   ],
   "injectors": {
     "defaultRequire": 0

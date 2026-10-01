@@ -67,6 +67,7 @@ OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
+    "main:com/quickskin/mod/mixin/compat/RealCameraTextureIdMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
     "overlay:com/quickskin/mod/mixin/compat/ReplayModCompatMixin.java",
 }
@@ -217,6 +218,7 @@ class MixinPolicyTest(unittest.TestCase):
                 config = json.loads(path.read_text(encoding="utf-8"))
                 self.assertIs(config["required"], False)
                 self.assertEqual(config["injectors"]["defaultRequire"], 0)
+                self.assertIn("RealCameraTextureIdMixin", config["client"])
 
     def test_configured_mixins_exist_and_dynamic_mixins_are_audited(self) -> None:
         configs = self.configs_named("quickskin.mixins.json") + self.configs_named(
@@ -243,6 +245,7 @@ class MixinPolicyTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('"CpmModelDefinitionLoaderMixin"', plugin)
         self.assertIn('"CpmRenderDepthMixin"', plugin)
+        self.assertIn('"RealCameraTextureIdMixin"', plugin)
         configured.add("CpmRenderDepthMixin")
 
         source_classes = {source.stem for source in self.mixin_sources()}
