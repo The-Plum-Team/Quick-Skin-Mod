@@ -130,6 +130,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private Button searchButton;
     private Button sortButton;
     private boolean isSearching = false;
+    private long lastEnterKeyAt;
 
     public PlayerSkinMenuScreen(@Nullable Screen parent) {
 //? if <1.21 {
@@ -884,6 +885,16 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Allow ESC to close
         if (keyCode == InputConstants.KEY_ESCAPE) {
             this.onClose();
+            return true;
+        }
+        // Enter in the username field submits the search, like clicking Search. A held key
+        // repeats this event, so only an Enter that follows a pause starts a search.
+        if ((keyCode == InputConstants.KEY_RETURN || keyCode == InputConstants.KEY_NUMPADENTER)
+                && usernameSearchField != null && usernameSearchField.isFocused()) {
+            long now = System.currentTimeMillis();
+            boolean held = now - lastEnterKeyAt < 1000L;
+            lastEnterKeyAt = now;
+            if (!held) searchMojangSkin();
             return true;
         }
 //? if <1.21.9 {
