@@ -1,7 +1,10 @@
 package com.quickskin.mod.client.compat;
 
 import com.quickskin.mod.common.data.AssetMetadata;
+import com.quickskin.mod.config.AccountSkinPreferences;
+import com.quickskin.mod.config.AccountSkinSession;
 import com.quickskin.mod.config.ClientConfig;
+import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +111,8 @@ public final class CpmModelWorkflow {
         config.activeSkinHash = "";
         config.activeCpmModelHash = metadata.hash();
         config.pendingCpmSkinModeReset = false;
+        config.accountSkins.remove(currentAccount());
+        AccountSkinSession.getInstance().selected();
         config.save();
         return true;
     }
@@ -124,7 +129,23 @@ public final class CpmModelWorkflow {
         } else if (wasUsingCpmModel) {
             config.pendingCpmSkinModeReset = true;
         }
+        if (config.activeSkinHash.isEmpty()) {
+            config.accountSkins.remove(currentAccount());
+        } else {
+            config.accountSkins.select(currentAccount(), config.activeSkinHash);
+        }
+        AccountSkinSession.getInstance().selected();
         config.save();
+    }
+
+    /**
+     * The launcher account that owns a selection made now, or null when it cannot be read. A
+     * selection outranks a server record its session may still be waiting for.
+     */
+    private static String currentAccount() {
+        Minecraft minecraft = Minecraft.getInstance();
+        var user = minecraft != null ? minecraft.getUser() : null;
+        return user != null ? AccountSkinPreferences.key(user.getProfileId(), user.getName()) : null;
     }
 
     /** Clears dangling state and returns CPM to skin mode after an active model is deleted. */

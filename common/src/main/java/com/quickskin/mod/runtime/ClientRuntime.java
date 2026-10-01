@@ -17,6 +17,8 @@ import com.quickskin.mod.client.storage.NetworkTextureCache;
 import com.quickskin.mod.client.storage.TextureChunkReceiver;
 import com.quickskin.mod.common.data.PlayerAppearanceRepository;
 import com.quickskin.mod.common.util.TextureAlphaDetector;
+import com.quickskin.mod.config.AccountSkinPreferences;
+import com.quickskin.mod.config.AccountSkinSession;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.networking.ClientNetworkHandler;
 import com.quickskin.mod.networking.ClientTextureIngressLimiter;
@@ -102,8 +104,30 @@ public final class ClientRuntime implements AutoCloseable {
         resetSessionState();
         activePlayerId = localPlayerId;
         activeSessionIdentity = sessionIdentity;
+        // A replay uploads nothing: it keeps the active skin and never waits for a recorded record.
+        AccountSkinSession.getInstance().begin(localPlayerId, sessionIdentity,
+                com.quickskin.mod.client.compat.ReplayModHelper.isInReplay()
+                        || selectAccountSkin());
         com.quickskin.mod.networking.NetworkSyncService.getInstance()
                 .beginAppearanceSnapshotRequest(localPlayerId, sessionIdentity);
+    }
+
+    /**
+     * Makes the active skin the one the joining launcher account selected in this instance, so
+     * the selection of another account that played here is neither shown nor uploaded for it.
+     * Returns false when the account has no selection: its session then waits for the skin the
+     * server saved for the player. An unreadable account keeps the instance-wide selection.
+     */
+    private static boolean selectAccountSkin() {
+        var user = net.minecraft.client.Minecraft.getInstance().getUser();
+        String account = user == null ? null
+                : AccountSkinPreferences.key(user.getProfileId(), user.getName());
+        ClientConfig config = ClientConfig.getInstance();
+        AccountSkinPreferences.Projection projection = config.accountSkins.project(
+                account, config.activeSkinHash, !config.activeCpmModelHash.isEmpty());
+        config.activeSkinHash = projection.activeSkinHash();
+        if (projection.changed()) config.save();
+        return projection.hasSelection();
     }
 
     /** Persists local preferences and releases all connection-owned state. */
@@ -145,6 +169,7 @@ public final class ClientRuntime implements AutoCloseable {
         runCleanup("clear deferred network UI work", ClientNetworkHandler::clearTransientState);
         runCleanup("clear pending appearance uploads",
                 com.quickskin.mod.networking.NetworkSyncService.getInstance()::clearSession);
+        runCleanup("clear account skin session", AccountSkinSession.getInstance()::clear);
         runCleanup("clear client texture ingress budget",
                 ClientTextureIngressLimiter.getInstance()::clear);
         runCleanup("clear server configuration override", ClientConfig.getInstance()::clearServerOverride);
