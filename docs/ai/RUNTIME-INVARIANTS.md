@@ -53,6 +53,13 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   SHA-1 alias, retain every strong entry but refuse to resolve or emit that ambiguous legacy alias.
 - Peer-advertised texture and chunk limits may only reduce local hard caps. Codecs, assemblers,
   pacing, and caches continue to enforce the local bounds even after negotiation.
+- A legacy v1 (Quick Skin 2.x) server persists each uploaded texture and relays it, at the upload
+  and again whenever a player joins or changes dimension, to the other Quick Skin players as one
+  unchunked `quickskin:send_texture` payload. A client in `LEGACY_V1` mode therefore uploads at
+  most `TextureTransferLimits.MAX_LEGACY_UPLOAD_BYTES` (`ProtocolProfile.maximumUploadBytes()`)
+  and sends the appearance with a larger texture's id empty, so that server replaces the copy it
+  stored instead of relaying it again. The bound never applies to the same profile on a 3.x
+  server, which serves 2.x clients in chunks.
 - Keep packet codecs, chunk assemblers, rate limiters, request maps, retry state, and caches bounded.
 - Large texture bytes are demand-driven: advertise appearances/hashes, and send bytes only after a
   missing client requests them. Preserve the global per-tick response and upload pacing.

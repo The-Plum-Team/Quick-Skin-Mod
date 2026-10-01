@@ -75,6 +75,8 @@ public class NetworkSyncService {
     private long protocolHelloRetryAtMillis;
     private boolean helloExhaustionReported;
     private boolean handshakeEvidenceReported;
+    /** Written by the upload preparation worker, cleared with the session on the client thread. */
+    private volatile boolean legacyUploadCapReported;
     /** Non-null while the exact session still waits for the server to advertise its channels. */
     private ClientChannelDiscovery channelDiscovery;
 
@@ -234,7 +236,7 @@ public class NetworkSyncService {
             PreparedUpload upload = prepareUpload(
                     skinId.substring("local_skin:".length()), "skin", protocolProfile);
             if (upload == null) return null;
-            serverSkinId = "local_skin:" + upload.networkHash;
+            serverSkinId = upload.networkHash == null ? "" : "local_skin:" + upload.networkHash;
             if (!upload.alreadySent) uploads.add(upload);
         }
         if (syncSequence.get() != token || !isCurrentConnection(sourceConnection)) return null;
@@ -242,10 +244,10 @@ public class NetworkSyncService {
             String localHash = capeId.substring("local_cape:".length());
             PreparedUpload upload = prepareUpload(localHash, "cape", protocolProfile);
             if (upload == null) return null;
-            serverCapeId = "local_cape:" + upload.networkHash;
+            serverCapeId = upload.networkHash == null ? "" : "local_cape:" + upload.networkHash;
             if (!upload.alreadySent) uploads.add(upload);
-            AnimationMetadata animation =
-                    LocalAssetManager.getInstance().getAnimationMetadata(localHash);
+            AnimationMetadata animation = upload.networkHash == null ? null
+                    : LocalAssetManager.getInstance().getAnimationMetadata(localHash);
             if (animation != null && (!protocolProfile.negotiated()
                     || protocolProfile.supports(ProtocolCapability.ANIMATION_METADATA))) {
                 String json = animation.toJson();
@@ -272,7 +274,20 @@ public class NetworkSyncService {
         byte[] textureData = LocalAssetManager.getInstance()
                 .loadCanonicalTexture(localHash, textureType);
         if (textureData == null) return null;
-        if (textureData.length > protocolProfile.maximumTextureBytes()) return null;
+        if (textureData.length > protocolProfile.maximumUploadBytes()) {
+            if (protocolProfile.negotiated()) return null;
+            if (!legacyUploadCapReported) {
+                legacyUploadCapReported = true;
+                QuickSkinInfo.LOGGER.warn("This legacy v1 (Quick Skin 2.x) server relays textures"
+                        + " unchunked; the {} byte {} is over the {} byte limit for such a server"
+                        + " and is withdrawn from the synced appearance", textureData.length,
+                        textureType, protocolProfile.maximumUploadBytes());
+            }
+            // No network hash: the appearance is sent with this id empty, which also replaces a
+            // copy that server stored earlier and would relay again at every join.
+            return new PreparedUpload(
+                    key, null, textureType, new byte[0][], true, protocolProfile);
+        }
         String networkHash = protocolProfile.negotiated()
                 ? HashUtil.computeContentId(textureData)
                 : HashUtil.computeHash(textureData);
@@ -837,6 +852,7 @@ public class NetworkSyncService {
         protocolHelloRetryAtMillis = 0L;
         helloExhaustionReported = false;
         handshakeEvidenceReported = false;
+        legacyUploadCapReported = false;
         channelDiscovery = null;
         clearAppearanceSnapshotRequest();
     }

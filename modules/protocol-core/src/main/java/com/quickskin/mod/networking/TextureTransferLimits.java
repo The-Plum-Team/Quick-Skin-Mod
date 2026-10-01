@@ -23,6 +23,13 @@ public final class TextureTransferLimits {
     public static final int MAX_TEXTURE_BYTES = 16 * 1024 * 1024;
     public static final int MAX_CHUNKS =
             (MAX_TEXTURE_BYTES + CHUNK_BYTES - 1) / CHUNK_BYTES;
+    /**
+     * Largest texture a client uploads to a legacy v1 (Quick Skin 2.x) server. That server relays
+     * each upload to every other player as one unchunked {@code quickskin:send_texture} payload,
+     * so the texture plus its header must fit the 1 MiB clientbound payload budget and stay well
+     * below the 21-bit frame limit.
+     */
+    public static final int MAX_LEGACY_UPLOAD_BYTES = 1024 * 1024 - 1024;
 
     public static final int MAX_IMAGE_WIDTH = 2048;
     public static final int MAX_IMAGE_HEIGHT = 32 * 1024;
