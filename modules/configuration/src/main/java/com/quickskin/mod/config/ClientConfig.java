@@ -35,6 +35,8 @@ public class ClientConfig {
     public int previewScale = 30;
     public int guiScale = 1; // GUI scaling factor (1-4)
     public boolean enablePlayerPreviewCustomization = false; // Enable customization (resize, reposition) of player previews
+    public boolean showTitleScreenPreview = true; // Show the player preview and its controls on the title screen
+    public boolean showPauseMenuPreview = true; // Show the player preview and its controls in the pause menu
     public float hudOverlayRotation = 20.0f;
 
     // Player Preview Slider Percentages (1-100%) for different contexts
