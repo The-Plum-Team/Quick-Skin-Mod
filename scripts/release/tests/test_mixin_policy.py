@@ -65,6 +65,8 @@ OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/CpmModelDefinitionLoaderMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
+    "main:com/quickskin/mod/mixin/compat/EarsFiveBuzzMixin.java",
+    "main:com/quickskin/mod/mixin/compat/EarsFiveMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
@@ -279,6 +281,13 @@ class MixinPolicyTest(unittest.TestCase):
             with self.subTest(resources=relative(resource_root)):
                 self.assertTrue(compat_mixins.isdisjoint(core_names))
                 self.assertTrue(compat_mixins <= optional_names | dynamic_names)
+
+    def test_ears_five_lookup_selects_every_overload(self) -> None:
+        source = (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/compat/EarsFiveMixin.java"
+        ).read_text(encoding="utf-8")
+        # A bare name selects only the first declared overload, which this handler does not match.
+        self.assertIn('method = "getEarsFeatures*"', source)
 
     def test_packaged_clients_enable_expect_counting(self) -> None:
         runtime = (ROOT / "e2e" / "packaged_runtime.py").read_text(encoding="utf-8")
