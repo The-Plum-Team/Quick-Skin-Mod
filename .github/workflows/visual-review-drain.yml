@@ -945,7 +945,8 @@ jobs:
                 --arg implementation_sha "$head_sha" \
                 --arg repository "$GITHUB_REPOSITORY" \
                 '((.status == "completed" and .conclusion == "failure") or
-                  (.status == "in_progress" and .conclusion == null)) and
+                  ((.status | IN("requested", "waiting", "pending", "queued", "in_progress")) and
+                   .conclusion == null)) and
                  (.event == "repository_dispatch" or .event == "schedule" or
                   .event == "workflow_dispatch") and
                  .head_branch == "master" and .head_sha == $implementation_sha and
@@ -1010,7 +1011,8 @@ jobs:
                 --arg repository "$GITHUB_REPOSITORY" \
                 '((.status == "completed" and
                    (.conclusion == "success" or .conclusion == "failure")) or
-                  (.status == "in_progress" and .conclusion == null)) and
+                  ((.status | IN("requested", "waiting", "pending", "queued", "in_progress")) and
+                   .conclusion == null)) and
                  (.event == "repository_dispatch" or .event == "schedule" or
                   .event == "workflow_dispatch") and
                  .head_branch == "master" and
@@ -1047,7 +1049,8 @@ jobs:
             if [[ -n "$attempt_run" ]] && jq -e \
                 --arg repository "$GITHUB_REPOSITORY" \
                 '((.status == "completed" and .conclusion == "failure") or
-                  (.status == "in_progress" and .conclusion == null)) and
+                  ((.status | IN("requested", "waiting", "pending", "queued", "in_progress")) and
+                   .conclusion == null)) and
                  (.event == "repository_dispatch" or .event == "schedule" or
                   .event == "workflow_dispatch") and
                  .head_branch == "master" and
@@ -1261,7 +1264,8 @@ jobs:
                 --argjson run_id "$candidate_run_id" \
                 '.id == $run_id and
                  ((.status == "completed") or
-                  (.status == "in_progress" and .conclusion == null)) and
+                  ((.status | IN("requested", "waiting", "pending", "queued", "in_progress")) and
+                   .conclusion == null)) and
                  (.event == "repository_dispatch" or .event == "schedule" or
                   .event == "workflow_dispatch") and
                  .head_branch == "master" and
