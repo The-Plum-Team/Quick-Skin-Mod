@@ -121,7 +121,10 @@ def _resize_model_png(source: Path) -> tuple[str, bytes]:
                 )
             rendered = rendered.resize(MODEL_IMAGE_SIZE, Image.Resampling.LANCZOS)
             output = io.BytesIO()
-            rendered.save(output, format="PNG", optimize=False, compress_level=9)
+            # PNG is lossless at every level, so the model sees the same pixels. zlib's default
+            # level encodes these transient copies several times faster than level 9 for a few
+            # percent more bytes; they are never uploaded and no verdict binds their bytes.
+            rendered.save(output, format="PNG", optimize=False, compress_level=6)
     except RunnerError:
         raise
     except (OSError, UnidentifiedImageError, ValueError) as exc:
@@ -698,7 +701,8 @@ class ClaudeProvider:
                 continue
 
     def _stage_model_path(self, raw_path: str) -> str:
-        cached = self._model_paths.get(raw_path)
+        with self._artifact_lock:
+            cached = self._model_paths.get(raw_path)
         if cached is not None:
             return cached
         try:
@@ -714,30 +718,34 @@ class ClaudeProvider:
         if source.parent != source_root:
             raise RunnerError("invalid_model_image", "model_images", transient=False)
 
+        # Decode, resize and encode outside the lock so chunk workers stage in parallel and a
+        # chunk launches as soon as its own images exist. Only publication is serialized: two
+        # workers staging one shared image write it once and then compare identical bytes.
         digest, payload = _resize_model_png(source)
-        self.model_images.mkdir(mode=0o700, parents=True, exist_ok=True)
-        destination = self.model_images / f"{digest}.png"
-        if destination.exists() or destination.is_symlink():
-            try:
-                if destination.is_symlink() or destination.read_bytes() != payload:
-                    raise OSError("model image digest collision")
-            except OSError as exc:
-                raise RunnerError(
-                    "invalid_model_image", "model_images", transient=False
-                ) from exc
-        else:
-            try:
-                with destination.open("xb") as handle:
-                    handle.write(payload)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.chmod(destination, 0o644)
-            except OSError as exc:
-                raise RunnerError(
-                    "invalid_model_image", "model_images", transient=False
-                ) from exc
-        relative = destination.relative_to(self.capsule).as_posix()
-        self._model_paths[raw_path] = relative
+        with self._artifact_lock:
+            self.model_images.mkdir(mode=0o700, parents=True, exist_ok=True)
+            destination = self.model_images / f"{digest}.png"
+            if destination.exists() or destination.is_symlink():
+                try:
+                    if destination.is_symlink() or destination.read_bytes() != payload:
+                        raise OSError("model image digest collision")
+                except OSError as exc:
+                    raise RunnerError(
+                        "invalid_model_image", "model_images", transient=False
+                    ) from exc
+            else:
+                try:
+                    with destination.open("xb") as handle:
+                        handle.write(payload)
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                    os.chmod(destination, 0o644)
+                except OSError as exc:
+                    raise RunnerError(
+                        "invalid_model_image", "model_images", transient=False
+                    ) from exc
+            relative = destination.relative_to(self.capsule).as_posix()
+            self._model_paths[raw_path] = relative
         return relative
 
     def _prepare_model_manifest(
@@ -787,8 +795,9 @@ class ClaudeProvider:
             raise RunnerError("internal", "provider", transient=False)
         chunk_name = f"{stage}-{chunk_index:03d}"
         manifest_path = self.work_root / "chunks" / f"{chunk_name}.json"
+        # Staging takes the non-reentrant artifact lock itself, only around publication.
+        model_manifest = self._prepare_model_manifest(manifest)
         with self._artifact_lock:
-            model_manifest = self._prepare_model_manifest(manifest)
             _write_json_new(manifest_path, model_manifest)
         manifest_relative = manifest_path.relative_to(self.capsule).as_posix()
         model_images_relative = self.model_images.relative_to(

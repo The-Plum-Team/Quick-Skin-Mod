@@ -933,6 +933,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
         self.assertIn("MODEL_IMAGE_SIZE = (1280, 720)", runner)
         self.assertIn("Image.Resampling.LANCZOS", runner)
+        self.assertIn("compress_level=6", runner)
         self.assertIn('f"Read(./{model_images_relative}/**)"', runner)
         self.assertNotIn('"Read(./review-input/images/**)"', runner)
         self.assertIn("ThreadPoolExecutor", runner)
