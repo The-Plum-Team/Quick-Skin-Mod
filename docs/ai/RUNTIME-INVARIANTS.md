@@ -123,6 +123,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Opaque-fill, import fallback, local/network presentation, and animation processing must share
   the same structural mask; content-addressed source bytes remain immutable when only presentation
   requires normalization.
+- A cape saved through the cape editor keeps its original PNG or GIF in
+  `quickskin_cache/cape_editor_sources/<cape content ID>.<ext>` (`CapeEditorSources`). That file
+  only reopens `CapeAdjustScreen`: it is never scanned, registered as a texture or animation, or
+  substituted for a cape that has none. An edit writes the new metadata and source association
+  first, replaces the catalogued PNG in place, and re-points the active cape and its animation
+  speed to the new content ID; a source is removed only when no catalogued cape carries its ID.
 - An active Quick Skin cape is authoritative for both the renderer's cape and profile-Elytra
   texture inputs. Never retain an unrelated Mojang/profile Elytra beside a custom cape: vanilla
   gives that dedicated field priority and would otherwise replace only the worn wings when the
