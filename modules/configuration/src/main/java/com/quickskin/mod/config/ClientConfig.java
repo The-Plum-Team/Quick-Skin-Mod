@@ -99,6 +99,8 @@ public class ClientConfig {
     public String activeModelType = "auto"; // "auto", "classic", "slim" (deprecated - kept for compatibility)
     public String activeCapeHash = ""; // Active cape hash
     public String playerOwnSkinHash = ""; // Hash of the player's own Mojang skin (protected from deletion)
+    public String playerOwnSkinAccount = ""; // Launcher account that playerOwnSkinHash was downloaded for
+    public AccountSkinPreferences accountSkins = new AccountSkinPreferences(); // Skin selection per launcher account
 
     // Server Config Override (set by server, not saved to file)
     public transient volatile ServerConfig serverOverride = null;
@@ -337,6 +339,9 @@ public class ClientConfig {
         if (activeCapeHash == null || activeCapeHash.length() > 256
                 || activeCapeHash.chars().anyMatch(Character::isISOControl)) activeCapeHash = "";
         playerOwnSkinHash = validHashOrEmpty(playerOwnSkinHash);
+        if (!AccountSkinPreferences.isKey(playerOwnSkinAccount)) playerOwnSkinAccount = "";
+        if (accountSkins == null) accountSkins = new AccountSkinPreferences();
+        accountSkins.normalize();
     }
 
     private static void writeAtomically(Path target, String content) throws IOException {

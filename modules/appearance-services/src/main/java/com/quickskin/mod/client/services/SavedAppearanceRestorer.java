@@ -12,6 +12,11 @@ public final class SavedAppearanceRestorer {
     }
 
     public static void restore(UUID targetPlayerId) {
+        // A session that shows the look the server saved for this player keeps it on respawn.
+        if (com.quickskin.mod.config.AccountSkinSession.getInstance().adopted(targetPlayerId,
+                net.minecraft.client.Minecraft.getInstance().getConnection())) {
+            return;
+        }
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
         com.quickskin.mod.client.services.LocalAssetManager assetManager =
                 com.quickskin.mod.client.services.LocalAssetManager.getInstance();
