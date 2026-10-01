@@ -843,7 +843,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("Retire the consumed exact-policy verdict cache shards", review)
         self.assertIn("--max-entries 1", review)
         self.assertIn("steps.verdict-cache-artifact.outputs.artifact-id", review)
-        self.assertIn("Retire superseded caches for obsolete review policies", review)
+        # Anchor-semantic and reference-comparison caches are both current, so a reviewer must
+        # never delete a cache merely because its exact-policy name differs from its own.
+        self.assertNotIn("Retire superseded caches", review)
         self.assertIn(
             "visual-review-wave-block-$GENERATION_SHA", review
         )
