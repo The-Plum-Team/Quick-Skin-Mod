@@ -634,6 +634,10 @@ public class PlayerModelRenderer {
         float originalXRot = playerToRender.getXRot();
         float originalYHeadRot = playerToRender.yHeadRot;
         float originalYBodyRot = playerToRender.yBodyRot;
+        float originalYRotO = playerToRender.yRotO;
+        float originalXRotO = playerToRender.xRotO;
+        float originalYHeadRotO = playerToRender.yHeadRotO;
+        float originalYBodyRotO = playerToRender.yBodyRotO;
         int originalTickCount = playerToRender.tickCount;
 
         // Set rotation for preview using the yRotation parameter
@@ -643,6 +647,15 @@ public class PlayerModelRenderer {
         playerToRender.setXRot(0.0F);
         playerToRender.yHeadRot = targetRotation + playerData.getHeadYaw();
         playerToRender.yBodyRot = targetRotation;
+
+        // The draw runs at partial tick 1, so vanilla ignores the previous-tick rotation. A hook
+        // that interpolates with the frame's own partial tick does not (Player Animator adjustment
+        // modifiers, as TaCZ registers) and would sweep the model between the live and the preview
+        // orientation once per tick. Vanilla's inventory doll pins yHeadRotO likewise.
+        playerToRender.yRotO = playerToRender.getYRot();
+        playerToRender.xRotO = playerToRender.getXRot();
+        playerToRender.yHeadRotO = playerToRender.yHeadRot;
+        playerToRender.yBodyRotO = playerToRender.yBodyRot;
 
         // Set tickCount for idle animation ONLY when on title screen (no world)
         // When in-game, the entity already has its own natural tickCount from the game loop
@@ -902,6 +915,10 @@ public class PlayerModelRenderer {
         playerToRender.setXRot(originalXRot);
         playerToRender.yHeadRot = originalYHeadRot;
         playerToRender.yBodyRot = originalYBodyRot;
+        playerToRender.yRotO = originalYRotO;
+        playerToRender.xRotO = originalXRotO;
+        playerToRender.yHeadRotO = originalYHeadRotO;
+        playerToRender.yBodyRotO = originalYBodyRotO;
         if (DETERMINISTIC_E2E_RENDER) {
             playerToRender.tickCount = originalTickCount;
         }
@@ -911,6 +928,10 @@ public class PlayerModelRenderer {
             playerToRender.setXRot(originalXRot);
             playerToRender.yHeadRot = originalYHeadRot;
             playerToRender.yBodyRot = originalYBodyRot;
+            playerToRender.yRotO = originalYRotO;
+            playerToRender.xRotO = originalXRotO;
+            playerToRender.yHeadRotO = originalYHeadRotO;
+            playerToRender.yBodyRotO = originalYBodyRotO;
             if (DETERMINISTIC_E2E_RENDER) {
                 playerToRender.tickCount = originalTickCount;
             }

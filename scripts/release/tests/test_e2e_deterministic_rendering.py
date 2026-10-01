@@ -127,6 +127,28 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         self.assertIn(": System.currentTimeMillis()", source)
         self.assertIn("DETERMINISTIC_E2E_RENDER ? 1.0f : 0.15f", source)
 
+    def test_preview_pins_the_previous_tick_rotation_for_the_draw(self) -> None:
+        source = PLAYER.read_text(encoding="utf-8")
+
+        for field, current in (
+            ("yRotO", "getYRot()"),
+            ("xRotO", "getXRot()"),
+            ("yHeadRotO", "yHeadRot"),
+            ("yBodyRotO", "yBodyRot"),
+        ):
+            saved = "original" + field[0].upper() + field[1:]
+            with self.subTest(field=field):
+                self.assertEqual(1, source.count(f"float {saved} = playerToRender.{field};"))
+                self.assertEqual(
+                    1, source.count(f"playerToRender.{field} = playerToRender.{current};")
+                )
+                self.assertEqual(2, source.count(f"playerToRender.{field} = {saved};"))
+
+        # The pin copies the preview rotation, so it must follow it and precede the first draw.
+        pin = source.index("playerToRender.yBodyRotO = playerToRender.yBodyRot;")
+        self.assertLess(source.index("playerToRender.yBodyRot = targetRotation;"), pin)
+        self.assertLess(pin, source.index("InventoryScreen.renderEntityInInventory("))
+
     def test_disposable_world_uses_a_fixed_spawn(self) -> None:
         properties = SERVER_PROPERTIES.read_text(encoding="utf-8")
         world_load, world_tick, _world_load_tag, world_tick_tag = world_function_paths(
