@@ -2977,19 +2977,32 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_pending_verification_is_secretless_and_finalization_remains_protected(self) -> None:
         workflow = (WORKFLOWS / "release-verify.yml").read_text(encoding="utf-8")
+        discovery = job_block("release-verify.yml", "discover")
         probe = job_block("release-verify.yml", "verify")
         final = job_block("release-verify.yml", "finalize")
         self.assertIn("workflow_run:", workflow)
         self.assertIn("schedule:", workflow)
         self.assertNotIn("secrets.", workflow)
         self.assertNotIn("mc-publish", workflow)
+        # GitHub shows drafts only to a token with push access. Discovery holds one without an
+        # approval, so it reads release metadata only; the job that downloads bytes stays read-only.
+        self.assertIn("contents: write", discovery)
+        self.assertNotIn("actions:", discovery)
+        self.assertNotIn("environment:", discovery)
+        self.assertIn("--discover", discovery)
+        self.assertNotIn("--finalize", discovery)
+        self.assertNotIn("-artifact@", discovery)
+        self.assertIn("needs: discover", probe)
+        self.assertIn("PENDING_DRAFTS: ${{ needs.discover.outputs.pending }}", probe)
+        self.assertNotIn("release_tag", probe)
+        self.assertNotIn("--discover", probe)
         self.assertNotIn("contents: write", probe)
         self.assertNotIn("environment:", probe)
         self.assertNotIn("--finalize", probe)
         self.assertIn("environment: release", final)
         self.assertIn("group: release-publish", final)
         self.assertIn("--finalize", final)
-        for block in (probe, final):
+        for block in (discovery, probe, final):
             self.assertIn("ref: ${{ github.sha }}", block)
             self.assertIn("persist-credentials: false", block)
             self.assertIn("verify_pending_publications.py", block)

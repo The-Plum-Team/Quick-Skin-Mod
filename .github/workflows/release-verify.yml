@@ -24,8 +24,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # GitHub lists draft releases only to a token with push access. This job reads release
+  # metadata and nothing else; artifact bytes stay in the read-only job below.
+  discover:
+    name: Discover recorded pending drafts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      pending: ${{ steps.drafts.outputs.pending }}
+      count: ${{ steps.drafts.outputs.count }}
+    steps:
+      - name: Check out the protected verifier implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: List recorded drafts without reading any artifact
+        id: drafts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PENDING_TAG: ${{ inputs.release_tag || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          arguments=()
+          if [[ -n "$PENDING_TAG" ]]; then arguments+=(--tag "$PENDING_TAG"); fi
+          python scripts/release/verify_pending_publications.py --discover \
+            "${arguments[@]}" --github-output "$GITHUB_OUTPUT"
+
   verify:
     name: Observe pending marketplace approvals
+    needs: discover
+    if: ${{ needs.discover.outputs.count != '0' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -52,14 +90,10 @@ jobs:
         id: pending
         env:
           GH_TOKEN: ${{ github.token }}
-          PENDING_TAG: ${{ inputs.release_tag || '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          arguments=()
-          if [[ -n "$PENDING_TAG" ]]; then arguments+=(--tag "$PENDING_TAG"); fi
-          python scripts/release/verify_pending_publications.py \
-            "${arguments[@]}" --github-output "$GITHUB_OUTPUT"
+          PENDING_DRAFTS: ${{ needs.discover.outputs.pending }}
+        run: >-
+          python scripts/release/verify_pending_publications.py
+          --github-output "$GITHUB_OUTPUT"
 
   finalize:
     name: Finalize verified ${{ matrix.tag }}
