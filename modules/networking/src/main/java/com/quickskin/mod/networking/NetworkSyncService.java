@@ -6,6 +6,7 @@ import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.util.HashUtil;
+import com.quickskin.mod.config.AccountSkinSession;
 import com.quickskin.mod.networking.protocol.ClientChannelDiscovery;
 import com.quickskin.mod.networking.protocol.HandshakeProtocolEvidence;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
@@ -79,6 +80,10 @@ public class NetworkSyncService {
     private volatile boolean legacyUploadCapReported;
     /** Non-null while the exact session still waits for the server to advertise its channels. */
     private ClientChannelDiscovery channelDiscovery;
+    private volatile String adoptedSkinId;
+    private volatile String adoptedCapeId;
+    /** The latest sync requested while the session waited for the server's record of its player. */
+    private HeldSync heldSync;
 
     private NetworkSyncService() {
     }
@@ -154,6 +159,12 @@ public class NetworkSyncService {
         ProtocolProfile protocolProfile =
                 ProtocolSessions.getInstance().clientProfile(sourceConnection);
         if (!isUsableProfile(protocolProfile)) return;
+        if (awaitsOwnServerState(playerId, sourceConnection)) {
+            synchronized (this) {
+                heldSync = new HeldSync(sourceConnection, playerId, skinId, capeId, model);
+            }
+            return;
+        }
         //? if >=1.21 {
         if (protocolProfile.negotiated()
                 && (!NetworkTransport.INSTANCE.canServerReceive(UpdateAppearanceV2Payload.TYPE)
@@ -167,6 +178,7 @@ public class NetworkSyncService {
                 token, sourceConnection, playerId,
                 safeSkinId, safeCapeId, safeModel, protocolProfile);
         synchronized (this) {
+            heldSync = null;
             latestDesired = desired;
             awaitingAcknowledgement = null;
             latestAcknowledgedSyncToken = 0L;
@@ -174,6 +186,44 @@ public class NetworkSyncService {
             retryAttempt = 0;
         }
         startPreparation(desired);
+    }
+
+    /**
+     * True while a launcher account without a skin selection here still waits for the record the
+     * server saved for its player; nothing is uploaded meanwhile and the latest requested sync is
+     * held. Only a peer that completes the appearance snapshot can end that wait, so every other
+     * peer keeps the immediate upload.
+     */
+    boolean awaitsOwnServerState(UUID playerId, Object connection) {
+        ProtocolProfile profile = ProtocolSessions.getInstance().clientProfile(connection);
+        return profile.negotiated()
+                && profile.supports(ProtocolCapability.APPEARANCE_SNAPSHOT_ACK)
+                && AccountSkinSession.getInstance().awaitingServerState(playerId, connection);
+    }
+
+    /**
+     * Remembers the ids of the adopted server record: the server already owns their textures. A
+     * sync held during the wait described the look that record replaces, so it is dropped.
+     */
+    synchronized void adoptServerAppearance(String skinId, String capeId) {
+        adoptedSkinId = skinId;
+        adoptedCapeId = capeId;
+        heldSync = null;
+    }
+
+    /**
+     * Sends the sync that was held while the session waited, once the wait ended without a server
+     * skin to show. Returns false when none was requested: the bootstrap upload then applies.
+     */
+    boolean releaseHeldSync(Object connection) {
+        HeldSync held;
+        synchronized (this) {
+            held = heldSync;
+            heldSync = null;
+        }
+        if (held == null || held.connection != connection) return false;
+        syncAppearance(held.playerId, held.skinId, held.capeId, held.model);
+        return true;
     }
 
     /**
@@ -235,12 +285,16 @@ public class NetworkSyncService {
         if (skinId.startsWith("local_skin:")) {
             PreparedUpload upload = prepareUpload(
                     skinId.substring("local_skin:".length()), "skin", protocolProfile);
-            if (upload == null) return null;
-            serverSkinId = upload.networkHash == null ? "" : "local_skin:" + upload.networkHash;
-            if (!upload.alreadySent) uploads.add(upload);
+            // An adopted id names a texture of the server, so it is sent back unchanged when
+            // this instance has no file for it.
+            if (upload == null && !skinId.equals(adoptedSkinId)) return null;
+            if (upload != null) {
+                serverSkinId = upload.networkHash == null ? "" : "local_skin:" + upload.networkHash;
+                if (!upload.alreadySent) uploads.add(upload);
+            }
         }
         if (syncSequence.get() != token || !isCurrentConnection(sourceConnection)) return null;
-        if (capeId.startsWith("local_cape:")) {
+        if (capeId.startsWith("local_cape:") && !capeId.equals(adoptedCapeId)) {
             String localHash = capeId.substring("local_cape:".length());
             PreparedUpload upload = prepareUpload(localHash, "cape", protocolProfile);
             if (upload == null) return null;
@@ -854,10 +908,17 @@ public class NetworkSyncService {
         handshakeEvidenceReported = false;
         legacyUploadCapReported = false;
         channelDiscovery = null;
+        adoptedSkinId = null;
+        adoptedCapeId = null;
+        heldSync = null;
         clearAppearanceSnapshotRequest();
     }
 
     private record UploadKey(String localHash, String textureType) {
+    }
+
+    private record HeldSync(
+            Object connection, UUID playerId, String skinId, String capeId, String model) {
     }
 
     private record SentUpload(String networkHash, long sentAtMillis) {

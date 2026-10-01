@@ -12,6 +12,22 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   decoding, hashing, chunk assembly, and other bulk work belong on the bounded worker executors.
 - Executors, queues, prepared handoffs, and pending transfers must remain bounded and must release
   leases on success, failure, cancellation, disconnect, and shutdown.
+- A skin selection belongs to the launcher account (profile UUID plus exact name), never to the
+  instance. At every join outside a replay `ClientRuntime` makes `ClientConfig.activeSkinHash`
+  the joining account's selection (`AccountSkinPreferences.project`); the selection that
+  predates per-account storage goes to the first account that joins, once.
+  `CpmModelWorkflow.activateSkin` records one, which includes the skin menu's programmatic
+  selections; the own-skin auto-selection of `PlayerOwnSkinBootstrap` / `SavedAppearanceRestorer`
+  and a skin adopted from the server do not. Capes and CPM models stay instance-wide.
+- A session whose account has no selection uploads nothing until it has seen the server's record
+  of its own player (`AccountSkinSession`), and only on a negotiated connection that completes
+  appearance snapshots; the latest sync requested meanwhile is held, never dropped. A saved
+  `local_skin:` record is then adopted whole: its skin, cape and model replace the look applied
+  at the join and nothing is uploaded, so a cape such an account picked while disconnected is
+  not worn until it is picked again. Any other record, or the snapshot completion, sends the
+  held sync or else the usual bootstrap upload. An account with a selection, a v1 server, a
+  replay and every later own-player update keep the earlier rule: own updates are confirmations
+  only.
 
 ## Networking and texture identity
 
