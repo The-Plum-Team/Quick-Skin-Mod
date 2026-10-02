@@ -11,7 +11,7 @@ import tempfile
 
 from feature_coverage_github import Api, _review_files, coverage
 from visual_review_preparation import SHA, WORKFLOW
-from visual_review_queue import REPORT_NAME, parse_artifact, valid_owner
+from visual_review_queue import ACTIVE_RUN_STATUSES, REPORT_NAME, parse_artifact, valid_owner
 from check_visual_review import load, validate
 
 
@@ -23,7 +23,7 @@ def cache_owner_complete(api: Api, owner_id: int, artifact_id: int, *, expected_
     """
     owner = api.run(owner_id)
     if (owner.get("head_branch") != "master" or owner.get("path") != WORKFLOW
-            or owner.get("status") not in {"in_progress", "completed"}
+            or owner.get("status") not in ACTIVE_RUN_STATUSES | {"completed"}
             or not isinstance(owner.get("head_sha"), str) or SHA.fullmatch(owner["head_sha"]) is None
             or owner.get("event") not in coverage.DRAIN_EVENTS
             or (owner.get("head_repository") or {}).get("full_name") != api.repository):

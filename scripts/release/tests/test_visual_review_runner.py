@@ -7,8 +7,10 @@ import sys
 import tempfile
 import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -32,6 +34,7 @@ from visual_review_runner import (  # noqa: E402
     build_review_plan,
     execute_review,
 )
+import visual_review_runner as runner  # noqa: E402
 
 
 def paired(
@@ -167,6 +170,77 @@ class VisualReviewRunnerTest(unittest.TestCase):
             with Image.open(model_path) as image:
                 self.assertEqual(MODEL_IMAGE_SIZE, image.size)
                 self.assertEqual("RGB", image.mode)
+
+    def test_provider_stages_lossless_copies_outside_the_artifact_lock(self) -> None:
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as temporary:
+            capsule = Path(temporary)
+            source_images = capsule / "review-input" / "images"
+            source_images.mkdir(parents=True)
+            names = ("first.png", "second.png", "shared.png")
+            for index, name in enumerate(names):
+                image = Image.linear_gradient("L").resize(SOURCE_IMAGE_SIZE).convert("RGB")
+                image.paste((40 * index, 90, 200 - 40 * index), (0, 0, 640, 360))
+                image.save(source_images / name)
+            work_root = capsule / "review-work"
+            work_root.mkdir()
+            provider = ClaudeProvider(
+                capsule=capsule,
+                work_root=work_root,
+                claude=Path(sys.executable),
+                triage_prompt="triage",
+                verify_prompt="verify",
+                triage_model="opus",
+                verify_model="opus",
+                paired=True,
+                attempts=1,
+                call_spacing_seconds=0,
+            )
+            chunks = [
+                [
+                    paired(
+                        f"fabric-1.21.1/full/client_a/step{index}",
+                        f"review-input/images/{names[index % 2]}",
+                        "review-input/images/shared.png",
+                    )
+                ]
+                for index in range(8)
+            ]
+            resize = runner._resize_model_png
+            lock_held: list[bool] = []
+
+            def observed_resize(source: Path) -> tuple[str, bytes]:
+                lock_held.append(provider._artifact_lock.locked())
+                return resize(source)
+
+            def call(index: int) -> None:
+                with self.assertRaises(runner.RunnerError) as error:
+                    provider("triage", index, chunks[index], {})
+                self.assertEqual("cli_unavailable", error.exception.category)
+
+            with patch.object(runner.subprocess, "Popen", side_effect=OSError("no cli")):
+                # One worker alone: the CPU-bound copy must not hold the lock every launch needs.
+                with patch.object(runner, "_resize_model_png", side_effect=observed_resize):
+                    call(0)
+                self.assertEqual([False, False], lock_held)
+                # Concurrent workers sharing one reference publish each image exactly once.
+                provider._model_paths.clear()
+                with ThreadPoolExecutor(max_workers=len(chunks)) as executor:
+                    list(executor.map(call, range(1, len(chunks))))
+
+            self.assertEqual(len(names), len(list(provider.model_images.glob("*.png"))))
+            for name in names:
+                model_path = capsule / provider._model_paths[f"review-input/images/{name}"]
+                self.assertEqual(
+                    model_path.stem,
+                    hashlib.sha256(model_path.read_bytes()).hexdigest(),
+                )
+                with Image.open(source_images / name) as source, Image.open(model_path) as model:
+                    expected = source.convert("RGB").resize(
+                        MODEL_IMAGE_SIZE, Image.Resampling.LANCZOS
+                    )
+                    self.assertEqual(expected.tobytes(), model.convert("RGB").tobytes())
 
     def test_provider_reports_only_sanitized_attempt_and_retry_counts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
