@@ -725,6 +725,23 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("actionGap != 4", feature)
         self.assertIn("Minecraft-owned center icon row", contract)
 
+    def test_essential_title_checkpoints_leave_the_packaged_world(self) -> None:
+        """A title screen set over the live world keeps the in-game HUD rendering under it."""
+
+        feature = (
+            E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+        essential = feature[feature.index("final class EssentialFeature"):]
+        essential = essential[: essential.index("final class ReplayModFeature")]
+        self.assertIn("VanillaShim.disconnectToTitle(minecraft)", essential)
+        self.assertIn("return minecraft.player == null && minecraft.level == null", essential)
+        self.assertIn("&& minecraft.getConnection() == null;", essential)
+        checks = essential[essential.index("private String essentialTitleFailure(boolean"):]
+        self.assertLess(
+            checks.index("if (!offline())"),
+            checks.index("Screen screen = VanillaShim.currentScreen"),
+        )
+
     def test_string_class_lookups_declare_an_intermediary_fallback(self) -> None:
         """Fabric serves intermediary names at runtime; a Mojang name alone resolves only on Forge."""
 
