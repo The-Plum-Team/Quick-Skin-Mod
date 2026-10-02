@@ -18,6 +18,7 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
             "CpmRenderDepthMixin"
     );
     private static final String CPM_SUBMIT_COLLECTOR_MIXIN = "CpmSubmitCollectorMixin";
+    private static final String ETF_PLAYER_TEXTURE_MIXIN = "EtfPlayerTextureMixin";
     private static final String REPLAY_MOD_COMPAT_MIXIN = "ReplayModCompatMixin";
 
     @Override
@@ -44,6 +45,11 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // visible, even though Mixin can resolve and transform that target later in startup.
         if (CPM_MIXINS.stream().anyMatch(name -> mixinNamed(mixinClassName, name))
                 || mixinNamed(mixinClassName, CPM_SUBMIT_COLLECTOR_MIXIN)) {
+            return true;
+        }
+        // Entity Texture Features' target is @Pseudo too and, for the same reason, not
+        // resource-gated: without that mod its class never loads and the mixin never applies.
+        if (mixinNamed(mixinClassName, ETF_PLAYER_TEXTURE_MIXIN)) {
             return true;
         }
         // The ReplayMod bridge targets a vanilla packet and contains no references to ReplayMod
