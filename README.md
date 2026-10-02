@@ -94,7 +94,8 @@ certify those images. Version-branch synchronization is retired under the shared
 - Import static and animated capes, with server-configurable change cooldowns.
 - Choose automatic, classic, or slim player models.
 - Preview appearances in an interactive 3D player widget.
-- Synchronize Quick Skin appearances when the mod is installed on the server.
+- Synchronize Quick Skin appearances between players who run Quick Skin when the mod is also
+  installed on the server.
 - Use optional integrations with Customizable Player Models (`.cpmmodel`), Ears, 3D Skin Layers,
   CustomNPCs, Essential, and ReplayMod when the matching third-party mod is installed.
 
@@ -120,6 +121,15 @@ Choose the jar whose Minecraft version and loader match your instance. Quick Ski
 - NeoForge when using the NeoForge artifact.
 
 Install Quick Skin on the client for local appearance management. Install it on the server as well when you want Quick Skin appearance synchronization, shared texture transfer, or server-enforced cooldowns.
+
+Players who do not run Quick Skin never see a Quick Skin appearance, even on a server that has
+Quick Skin. An unmodded client only shows a skin that Mojang hosts and signs, so those players see
+your Mojang account skin, or a default skin on an offline-mode server. With a paid account on an
+online-mode server you can change your account skin from Quick Skin: hover a skin in the Quick Skin
+menu, press the ↑ button (Upload to Mojang) and rejoin the server. If you host a LAN world, restart
+the game instead. Mojang accepts only standard 64x64 or legacy 64x32 skins; custom capes, HD skins
+and CPM models stay visible only to players who run Quick Skin. See
+[ADR 0011](docs/architecture/decisions/0011-show-quick-skin-appearances-only-to-quick-skin-clients.md).
 
 ## Using Quick Skin
 
