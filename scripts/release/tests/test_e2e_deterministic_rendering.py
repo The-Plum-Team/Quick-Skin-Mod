@@ -236,6 +236,140 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         self.assertEqual(["SkinPreviewOverlay.java"], callers)
         self.assertEqual([], third_party_imports)
 
+    def test_tacz_animates_its_actions_only_while_the_hud_preview_shows_the_gun(self) -> None:
+        source = PLAYER.read_text(encoding="utf-8")
+        decision = source[
+            source.index("previewVisibleSlots(\n") : source.index(
+                "public static boolean suppressesPreviewEquipment("
+            )
+        ]
+        # Only the draw that leaves the gun visible says that the preview shows it, after every
+        # condition of that decision, and nothing else answers the hook. A mark made earlier would
+        # let TaCZ animate for a menu preview, a hidden hand or another player.
+        self.assertEqual(1, source.count("HELD_GUN_PRESENCE.drawn("))
+        self.assertEqual(
+            1,
+            len(
+                re.findall(
+                    r"HELD_GUN_PRESENCE\.drawn\(player\);\s*return HELD_GUN_SLOTS;", decision
+                )
+            ),
+        )
+        self.assertEqual(1, source.count("HELD_GUN_PRESENCE.showing("))
+        self.assertEqual(
+            1,
+            len(
+                re.findall(
+                    r"public static boolean previewShowsHeldGun\(Object player\) \{\s*"
+                    r"return HELD_GUN_PRESENCE\.showing\(player\);\s*\}",
+                    source,
+                )
+            ),
+        )
+
+        hook_path = (
+            ROOT
+            / "common/src/main/java/com/quickskin/mod/mixin/compat"
+            / "TaczPreviewAnimationMixin.java"
+        )
+        code = re.sub(
+            r"//[^\n]*|/\*.*?\*/", "", hook_path.read_text(encoding="utf-8"), flags=re.DOTALL
+        )
+        # TaCZ and Player Animator are named by string only: nothing to compile against, and a
+        # target that is absent or never loaded leaves the mixin unapplied.
+        self.assertEqual(1, code.count("@Pseudo"))
+        self.assertIn(
+            '@Mixin(targets = "com.tacz.guns.compat.playeranimator.animation.AnimationManager")',
+            code,
+        )
+        for package in ("com.tacz", "dev.kosmx"):
+            self.assertNotIn("import " + package, code)
+        # One hook into TaCZ, and it is the redirect of the vanilla camera question in the four
+        # handlers that start TaCZ's action animations. It starts, stops and chooses nothing.
+        self.assertEqual(
+            ["Redirect"], re.findall(r"@(?:\w+\.)*(\w+)\s*\(\s*method\b", code)
+        )
+        self.assertEqual(1, code.count("@At("))
+        methods = re.search(r"method = \{(.*?)\}", code, flags=re.DOTALL)
+        self.assertIsNotNone(methods)
+        assert methods is not None
+        self.assertEqual(
+            [
+                "onFire(Lcom/tacz/guns/api/event/common/GunShootEvent;)V",
+                "onReload(Lcom/tacz/guns/api/event/common/GunReloadEvent;)V",
+                "onMelee(Lcom/tacz/guns/api/event/common/GunMeleeEvent;)V",
+                "onDraw(Lcom/tacz/guns/api/event/common/GunDrawEvent;)V",
+            ],
+            re.findall(r'"([^"]*)"', methods.group(1)),
+        )
+        # The first camera question of each handler and no other: the count cannot pass four.
+        self.assertEqual(
+            1,
+            len(
+                re.findall(
+                    r'at = @At\(\s*value = "INVOKE",\s*'
+                    r'target = "Lnet/minecraft/client/CameraType;isFirstPerson\(\)Z",\s*'
+                    r"ordinal = 0,\s*remap = true\s*\)",
+                    code,
+                )
+            ),
+        )
+        # TaCZ's own answer in every case but one: first person stays first person unless the HUD
+        # preview is showing the local player with the gun. Third person is never changed. The
+        # handler is an instance method because TaCZ's handlers are: Mixin rejects a redirect whose
+        # static modifier differs from its target, and the whole mixin with it (seen at runtime).
+        self.assertEqual(
+            1,
+            len(
+                re.findall(
+                    r"private boolean quickskin\$firstPersonUnlessPreviewed"
+                    r"\(CameraType camera\) \{\s*"
+                    r"return camera\.isFirstPerson\(\)\s*"
+                    r"&& !PlayerModelRenderer\.previewShowsHeldGun\("
+                    r"Minecraft\.getInstance\(\)\.player\);\s*\}",
+                    code,
+                )
+            ),
+        )
+
+        askers = []
+        for owner in ("modules", "common", "fabric", "forge", "neoforge"):
+            for path in sorted((ROOT / owner).glob("**/src/*/java/**/*.java")):
+                relative = path.relative_to(ROOT).as_posix()
+                if "/build/" in relative or "/src/test/" in relative:
+                    continue
+                if ".previewShowsHeldGun(" in path.read_text(encoding="utf-8"):
+                    askers.append(path.name)
+        self.assertEqual(["TaczPreviewAnimationMixin.java"], askers)
+
+        # An overlay copy of the optional mixin config replaces the canonical one. The 1.20.1
+        # overlay is the lane official TaCZ exists for, and no lane with TaCZ would notice.
+        configs = sorted((ROOT / "common/src").glob("*/resources/quickskin-ears.mixins.json"))
+        self.assertIn(ROOT / "common/src/main/resources/quickskin-ears.mixins.json", configs)
+        self.assertIn(
+            ROOT / "common/src/legacy1_20_1/resources/quickskin-ears.mixins.json", configs
+        )
+        for config in configs:
+            with self.subTest(config=config.relative_to(ROOT).as_posix()):
+                self.assertIn('"TaczPreviewAnimationMixin"', config.read_text(encoding="utf-8"))
+        # Gated on TaCZ's class file like Ears, so a client without TaCZ never looks for the
+        # target: an absent @Pseudo target costs a Mixin warning at every start (seen at runtime).
+        plugin = hook_path.with_name("EarsMixinPlugin.java").read_text(encoding="utf-8")
+        self.assertIn('"TaczPreviewAnimationMixin"', plugin)
+        self.assertIn(
+            '"com/tacz/guns/compat/playeranimator/animation/AnimationManager.class"', plugin
+        )
+        self.assertEqual(
+            1,
+            len(
+                re.findall(
+                    r"if \(mixinNamed\(mixinClassName, TACZ_PREVIEW_ANIMATION_MIXIN\)\) \{\s*"
+                    r"return classFileExists\(TACZ_ANIMATION_MANAGER\);\s*\}",
+                    plugin,
+                )
+            ),
+        )
+
     def test_disposable_world_uses_a_fixed_spawn(self) -> None:
         properties = SERVER_PROPERTIES.read_text(encoding="utf-8")
         world_load, world_tick, _world_load_tag, world_tick_tag = world_function_paths(

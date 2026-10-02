@@ -418,6 +418,8 @@ public class PlayerModelRenderer {
     private static final Set<PreviewEquipmentPolicy.Slot> NO_VISIBLE_SLOTS = Collections.emptySet();
     private static final Set<PreviewEquipmentPolicy.Slot> HELD_GUN_SLOTS =
             Collections.unmodifiableSet(EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND));
+    private static final PreviewHeldGunPresence HELD_GUN_PRESENCE =
+            new PreviewHeldGunPresence(System::nanoTime);
 
     private static void beginPreviewEquipment(
             Player player, Set<PreviewEquipmentPolicy.Slot> visible) {
@@ -455,6 +457,8 @@ public class PlayerModelRenderer {
      *
      * <p>Only the inline draw before 1.21.6 has this exception. The render-state path keeps
      * blanking both hands: no TaCZ exists for those versions.
+     *
+     * <p>A draw that shows the gun says so to {@link #previewShowsHeldGun}, and only such a draw.
      */
     private static Set<PreviewEquipmentPolicy.Slot> previewVisibleSlots(
             Player player, PreviewPlayerData playerData) {
@@ -464,7 +468,22 @@ public class PlayerModelRenderer {
         if (!PreviewHeldGun.TACZ.matches(player.getMainHandItem().getItem())) {
             return NO_VISIBLE_SLOTS;
         }
+        HELD_GUN_PRESENCE.drawn(player);
         return HELD_GUN_SLOTS;
+    }
+
+    /**
+     * Whether the HUD preview is on screen showing {@code player} with the TaCZ gun it holds.
+     *
+     * <p>TaCZ starts the reload, recoil and melee animations of the player's third-person model
+     * from its gun events and skips them for the local player while the camera is first person,
+     * because nothing draws that model then. The HUD preview does. The optional TaCZ hook asks
+     * here, when such an event fires, whether that is the case right now; the answer comes from
+     * the preview's own last draws ({@link PreviewHeldGunPresence}), so a preview that is switched
+     * off, hidden or showing anything but that player with a gun answers no.
+     */
+    public static boolean previewShowsHeldGun(Object player) {
+        return HELD_GUN_PRESENCE.showing(player);
     }
 
     /**

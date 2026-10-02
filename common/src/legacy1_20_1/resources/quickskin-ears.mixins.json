@@ -10,7 +10,8 @@
     "CpmModelDefinitionLoaderMixin",
     "CpmRenderDepthMixin",
     "CpmSubmitCollectorMixin",
-    "ReplayModCompatMixin"
+    "ReplayModCompatMixin",
+    "TaczPreviewAnimationMixin"
   ],
   "injectors": {
     "defaultRequire": 0
