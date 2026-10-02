@@ -149,6 +149,93 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         self.assertLess(source.index("playerToRender.yBodyRot = targetRotation;"), pin)
         self.assertLess(pin, source.index("InventoryScreen.renderEntityInInventory("))
 
+    def test_only_the_hud_preview_keeps_a_held_tacz_gun_visible(self) -> None:
+        source = PLAYER.read_text(encoding="utf-8")
+
+        # Both Stonecutter variants of the inline draw (before 1.21 and 1.21 to 1.21.5) decide what
+        # the draw leaves visible and open the equipment scope with it; changing one alone compiles
+        # on every target. The decision reads the held item, so it comes before the scope answers
+        # the hand as empty, and before the cape is bound: nothing that reads the player may sit
+        # between a binding and the try that releases it.
+        self.assertEqual(
+            2,
+            len(
+                re.findall(
+                    r"Set<PreviewEquipmentPolicy\.Slot> visibleSlots =\s*"
+                    r"previewVisibleSlots\(playerToRender, playerData\);\s*"
+                    r"bindPreviewCape\(playerToRender, playerData\);\s*"
+                    r"beginPreviewEquipment\(playerToRender, visibleSlots\);\s*"
+                    r"try \{\s*"
+                    r"InventoryScreen\.renderEntityInInventory\(",
+                    source,
+                )
+            ),
+        )
+        self.assertEqual(2, source.count("previewVisibleSlots(playerToRender, playerData);"))
+        self.assertEqual(2, source.count("beginPreviewEquipment(playerToRender, "))
+        self.assertEqual(1, source.count("PREVIEW_EQUIPMENT_SCOPE.begin("))
+        self.assertEqual(1, source.count("PREVIEW_EQUIPMENT_SCOPE.begin(player, visible);"))
+        # The equipment-read hook asks the scope of this draw, which knows the visible slots. The
+        # bare rule would hide the gun again, and no lane with TaCZ exists to notice.
+        self.assertEqual(
+            1,
+            len(
+                re.findall(
+                    r"return PREVIEW_EQUIPMENT_SCOPE\.openScopes\(\) != 0\s*"
+                    r"&& PREVIEW_EQUIPMENT_SCOPE\.suppresses\(player, previewSlotOf\(slot\)\);",
+                    source,
+                )
+            ),
+        )
+        self.assertNotIn("PreviewEquipmentPolicy.suppresses(previewSlotOf(", source)
+        decision = source[
+            source.index("previewVisibleSlots(\n") : source.index(
+                "public static boolean suppressesPreviewEquipment("
+            )
+        ]
+        conditions = (
+            "!playerData.isHeldGunVisible()",
+            "player != Minecraft.getInstance().player",
+            "PreviewHeldGun.TACZ.matches(player.getMainHandItem().getItem())",
+        )
+        for condition in conditions:
+            self.assertEqual(1, decision.count(condition), condition)
+        # A preview that did not ask pays no item read, and only the live local player qualifies.
+        self.assertEqual(
+            sorted(conditions, key=decision.index), list(conditions), "conditions out of order"
+        )
+        self.assertEqual(1, decision.count("return HELD_GUN_SLOTS;"))
+        self.assertIn("EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND)", source)
+        # The render-state path (1.21.6 and newer, where no TaCZ exists) keeps blanking the hands.
+        self.assertEqual(1, source.count("isHeldGunVisible()"))
+        self.assertEqual(1, source.count("HELD_GUN_SLOTS;"))
+        self.assertIn(
+            "armed.rightArmPose = net.minecraft.client.model.HumanoidModel.ArmPose.EMPTY;", source
+        )
+
+        detector = PLAYER.with_name("PreviewHeldGun.java").read_text(encoding="utf-8")
+        self.assertIn('PlatformHelper.isModLoaded("tacz")', detector)
+        self.assertIn('"com.tacz.guns.api.item.IGun"', detector)
+        self.assertNotIn("Class.forName(name, true", detector)
+        self.assertNotIn("Class.forName(name)", detector)
+
+        callers = []
+        third_party_imports = []
+        for owner in ("modules", "common", "fabric", "forge", "neoforge"):
+            for path in sorted((ROOT / owner).glob("**/src/*/java/**/*.java")):
+                relative = path.relative_to(ROOT).as_posix()
+                if "/build/" in relative or "/src/test/" in relative:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                if ".markHeldGunVisible()" in text:
+                    callers.append(path.name)
+                if "import com.tacz." in text:
+                    third_party_imports.append(relative)
+        # The skin menu, the cape menu, the cape editor and the title and pause previews are
+        # cosmetic: they keep showing the skin and the cape and nothing the player holds.
+        self.assertEqual(["SkinPreviewOverlay.java"], callers)
+        self.assertEqual([], third_party_imports)
+
     def test_disposable_world_uses_a_fixed_spawn(self) -> None:
         properties = SERVER_PROPERTIES.read_text(encoding="utf-8")
         world_load, world_tick, _world_load_tag, world_tick_tag = world_function_paths(

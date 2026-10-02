@@ -142,6 +142,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
+- A preview hides everything the previewed player wears or holds. The one exception is the HUD
+  preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
+  that model as it does in the world. It exists only on the inline draw before 1.21.6; the
+  render-state path keeps blanking both hands, because no TaCZ exists for those versions. TaCZ is
+  not a supported integration and has no compatibility lane: recognise its gun type by name only,
+  never compile against, call or hook TaCZ, and fall back to the hidden hand whenever the mod is
+  absent or changed. Keep the exception to the main hand of the live local player (TaCZ's Player
+  Animator layers shed their fades only when that player ticks), keep every menu preview free of
+  held items, and keep the previewed player's previous-tick rotation pinned for the draw, which
+  TaCZ's layers read.
 
 ## Public E2E evidence
 

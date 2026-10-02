@@ -66,7 +66,10 @@ import java.util.LinkedHashMap;
 import java.util.IdentityHashMap;
     //?}
 //?}
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Utility for rendering player models in GUI using vanilla Minecraft rendering
@@ -412,12 +415,56 @@ public class PlayerModelRenderer {
     private static final PreviewEquipmentPolicy.Scope<Object> PREVIEW_EQUIPMENT_SCOPE =
             new PreviewEquipmentPolicy.Scope<>();
 
-    private static void beginPreviewEquipment(Player player) {
-        PREVIEW_EQUIPMENT_SCOPE.begin(player);
+    private static final Set<PreviewEquipmentPolicy.Slot> NO_VISIBLE_SLOTS = Collections.emptySet();
+    private static final Set<PreviewEquipmentPolicy.Slot> HELD_GUN_SLOTS =
+            Collections.unmodifiableSet(EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND));
+
+    private static void beginPreviewEquipment(
+            Player player, Set<PreviewEquipmentPolicy.Slot> visible) {
+        PREVIEW_EQUIPMENT_SCOPE.begin(player, visible);
     }
 
     private static void endPreviewEquipment(Player player) {
         PREVIEW_EQUIPMENT_SCOPE.end(player);
+    }
+
+    /**
+     * The slots one draw leaves visible: the main hand while the HUD preview draws the live local
+     * player holding a TaCZ gun, and nothing in every other case.
+     *
+     * <p>TaCZ (Timeless and Classics Zero) hooks the player model and reads the main hand in every
+     * draw of the player, this one included: a gun there puts the arms in its rifle stance, anything
+     * else stops its animation layers. Answering "empty" therefore left the HUD model in a stance
+     * holding nothing whenever the world draw had started the stance, and made the two draws start
+     * and stop TaCZ's layers against each other every frame. With the real stack readable, vanilla's
+     * item-in-hand layer draws the gun through TaCZ's own item renderer and both draws agree. No
+     * TaCZ code is called or hooked from here, and every other slot stays hidden.
+     *
+     * <p>Three conditions, each of which falls back to the hidden hand:
+     * <ul>
+     * <li>the preview asked for it - only the HUD overlay does, a menu shows the skin and the cape;
+     * <li>the subject is the live local player, never the cached player of a world that was left.
+     *     TaCZ stacks a fade on its rotation layer in every draw that sees a gun and only the
+     *     player's own tick removes them, so a player that no longer ticks must not be shown one;
+     * <li>the main-hand item is a TaCZ gun, read here, before the scope opens, so it is the real
+     *     stack - TaCZ absent or changed answers no.
+     * </ul>
+     *
+     * <p>Call it before anything is bound for the draw: it reads the player and resolves a class,
+     * and whatever that could throw must not leave a cape binding or an open scope behind.
+     *
+     * <p>Only the inline draw before 1.21.6 has this exception. The render-state path keeps
+     * blanking both hands: no TaCZ exists for those versions.
+     */
+    private static Set<PreviewEquipmentPolicy.Slot> previewVisibleSlots(
+            Player player, PreviewPlayerData playerData) {
+        if (!playerData.isHeldGunVisible() || player != Minecraft.getInstance().player) {
+            return NO_VISIBLE_SLOTS;
+        }
+        if (!PreviewHeldGun.TACZ.matches(player.getMainHandItem().getItem())) {
+            return NO_VISIBLE_SLOTS;
+        }
+        return HELD_GUN_SLOTS;
     }
 
     /**
@@ -426,11 +473,14 @@ public class PlayerModelRenderer {
      * <p>Called from the equipment-read hook before 1.21.6, where the layers read the live entity.
      * The scope is thread confined and identity keyed, so it can only ever answer for the entity
      * being previewed on the thread drawing it; every other caller, including the integrated
-     * server's own copy of the player, gets the real equipment.
+     * server's own copy of the player, gets the real equipment. A slot the draw left visible
+     * ({@link #previewVisibleSlots}) reads as it really is.
      */
     public static boolean suppressesPreviewEquipment(Object player, EquipmentSlot slot) {
-        return PREVIEW_EQUIPMENT_SCOPE.isActiveFor(player)
-                && PreviewEquipmentPolicy.suppresses(previewSlotOf(slot));
+        // Every equipment read the hook sees lands here. No preview being drawn anywhere is the
+        // overwhelmingly common answer and costs the one volatile read; the scope answers the rest.
+        return PREVIEW_EQUIPMENT_SCOPE.openScopes() != 0
+                && PREVIEW_EQUIPMENT_SCOPE.suppresses(player, previewSlotOf(slot));
     }
 
     /**
@@ -731,8 +781,12 @@ public class PlayerModelRenderer {
             // The entity render runs inline, so the previewed entity keys the preview cape and the
             // binding is released as soon as the call returns. Equipment suppression is scoped the
             // same way: the layers read the live entity during this call and nowhere else.
+            // What the draw leaves visible is decided first, so nothing that reads the player sits
+            // between a binding and the try that releases it.
+            Set<PreviewEquipmentPolicy.Slot> visibleSlots =
+                    previewVisibleSlots(playerToRender, playerData);
             bindPreviewCape(playerToRender, playerData);
-            beginPreviewEquipment(playerToRender);
+            beginPreviewEquipment(playerToRender, visibleSlots);
             try {
             InventoryScreen.renderEntityInInventory(
                     graphics,
@@ -743,8 +797,12 @@ public class PlayerModelRenderer {
             // The entity render runs inline, so the previewed entity keys the preview cape and the
             // binding is released as soon as the call returns. Equipment suppression is scoped the
             // same way: the layers read the live entity during this call and nowhere else.
+            // What the draw leaves visible is decided first, so nothing that reads the player sits
+            // between a binding and the try that releases it.
+            Set<PreviewEquipmentPolicy.Slot> visibleSlots =
+                    previewVisibleSlots(playerToRender, playerData);
             bindPreviewCape(playerToRender, playerData);
-            beginPreviewEquipment(playerToRender);
+            beginPreviewEquipment(playerToRender, visibleSlots);
             try {
             InventoryScreen.renderEntityInInventory(
                     graphics,
