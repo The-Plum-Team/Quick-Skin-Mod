@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -25,6 +26,21 @@ LEGACY_PLAYER_INFO_MIXIN = (
     / "mod"
     / "mixin"
     / "PlayerInfoMixin.java"
+)
+CPM_INTEGRATION = (
+    java_source('client/compat/CPMCompatIntegration.java', source_set='main', repository=ROOT)
+)
+PLAYER_RENDERER_MIXIN = (
+    ROOT
+    / "common"
+    / "src"
+    / "main"
+    / "java"
+    / "com"
+    / "quickskin"
+    / "mod"
+    / "mixin"
+    / "PlayerRendererMixin.java"
 )
 SESSION_SCENARIO = (
     ROOT
@@ -67,6 +83,48 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
             "the CPM refresh must remain outside the nullable skin-location block",
         )
         self.assertIn("A cleared skin has no location", apply_look)
+
+    def test_selected_cpm_model_survives_local_skin_refreshes(self) -> None:
+        integration = CPM_INTEGRATION.read_text(encoding="utf-8")
+        refresh = integration[
+            integration.index("public static void forceReRegisterSkins") : integration.index(
+                "/** Clears CPM's selectedModel key"
+            )
+        ]
+
+        self.assertEqual(1, refresh.count("resetToSkinMode();"))
+        self.assertIn("&& !hasSelectedCpmModel()) {", refresh)
+        self.assertLess(
+            refresh.index("&& !hasSelectedCpmModel()) {"),
+            refresh.index("resetToSkinMode();"),
+        )
+        self.assertIn("schedulePlayerCacheInvalidation();", refresh)
+
+    def test_renderer_override_leaves_a_selected_cpm_model_to_cpm(self) -> None:
+        integration = CPM_INTEGRATION.read_text(encoding="utf-8")
+        self.assertEqual(
+            1,
+            integration.count("public static boolean ownsLocalPlayerTexture("),
+            "CPMCompatIntegration must declare ownsLocalPlayerTexture(UUID)",
+        )
+        owner = integration[
+            integration.index("public static boolean ownsLocalPlayerTexture(") : integration.index(
+                "public static boolean isLocalPlayerWearingCpmModel()"
+            )
+        ]
+        self.assertIn("&& hasSelectedCpmModel()", owner)
+        self.assertIn("&& playerId.equals(getLocalPlayerUuid());", owner)
+
+        # Every Stonecutter variant of the cancelling lookup carries the same guard.
+        mixin = PLAYER_RENDERER_MIXIN.read_text(encoding="utf-8")
+        lookups = mixin.count("service.hasActiveSkin(")
+        guarded = re.findall(
+            r"if \(!CPMCompatIntegration\.ownsLocalPlayerTexture\((.+?)\)"
+            r" && service\.hasActiveSkin\(\1\)\) \{",
+            mixin,
+        )
+        self.assertGreater(lookups, 0)
+        self.assertEqual(lookups, len(guarded))
 
     def test_legacy_player_info_discards_stale_skin_before_reregistering(self) -> None:
         active_common_overlays = frozenset(

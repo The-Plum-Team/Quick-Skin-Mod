@@ -139,6 +139,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   The compatibility harness must authenticate these local poses before visual review.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
+- A CPM model selected through Quick Skin (`ClientConfig.activeCpmModelHash`) stays CPM's selected
+  model until a skin is chosen or the model is deleted. Re-applying the local appearance for any
+  other reason, such as a transparency reload, must not reset CPM to skin mode, and the
+  renderer-level texture override leaves the local player to CPM so its own hook on that lookup
+  can bind the model's texture.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
