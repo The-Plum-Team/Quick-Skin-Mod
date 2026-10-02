@@ -1,6 +1,7 @@
 package com.quickskin.mod.client.importing;
 
 import com.quickskin.mod.client.services.LocalAssetManager;
+import com.quickskin.mod.client.services.MojangApiService;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import net.fabricmc.api.EnvType;
@@ -94,7 +95,8 @@ public final class PlayerOwnSkinBootstrap {
                 .exceptionally(throwable -> {
                     Throwable cause = throwable instanceof java.util.concurrent.CompletionException
                             && throwable.getCause() != null ? throwable.getCause() : throwable;
-                    if (!(cause instanceof java.util.concurrent.CancellationException)) {
+                    if (!(cause instanceof java.util.concurrent.CancellationException)
+                            && MojangApiService.findFailure(throwable) == null) {
                         QuickSkinInfo.LOGGER.warn("Could not download the local player's Mojang skin", throwable);
                     }
                     return null;
