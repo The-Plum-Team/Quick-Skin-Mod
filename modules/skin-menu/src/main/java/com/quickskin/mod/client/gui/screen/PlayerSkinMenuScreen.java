@@ -1210,6 +1210,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
             // Save the model type preference for THIS SPECIFIC SKIN
             LocalAssetManager.getInstance().setSkinModelPreference(metadata.hash(), newModelType);
+            // Like a skin selection, this choice outranks a server record not seen yet.
+            com.quickskin.mod.config.AccountSkinSession.getInstance().selected();
 
             // Apply to the actual player in-game (if in-game)
             if (this.minecraft != null && this.minecraft.player != null) {

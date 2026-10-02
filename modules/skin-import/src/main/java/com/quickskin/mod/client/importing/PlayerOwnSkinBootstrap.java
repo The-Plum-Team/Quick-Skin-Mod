@@ -70,6 +70,17 @@ public final class PlayerOwnSkinBootstrap {
         String playerName = minecraft.getUser().getName();
         playerOwnSkinBootstrapped = true;
 
+        // The own skin belongs to the launcher account it was downloaded for. One that predates
+        // this record goes to the first account seen; another account downloads its own.
+        String account = com.quickskin.mod.config.AccountSkinPreferences.key(
+                minecraft.getUser().getProfileId(), playerName);
+        if (account != null && !account.equals(config.playerOwnSkinAccount)) {
+            if (!config.playerOwnSkinAccount.isEmpty()) {
+                config.playerOwnSkinHash = "";
+            }
+            config.playerOwnSkinAccount = config.playerOwnSkinHash.isEmpty() ? "" : account;
+        }
+
         // Check if we already have the player's skin hash and it exists
         if (!config.playerOwnSkinHash.isEmpty()) {
             AssetMetadata existingMetadata = LocalAssetManager.getInstance().getMetadata(config.playerOwnSkinHash);
@@ -86,7 +97,7 @@ public final class PlayerOwnSkinBootstrap {
                     if (!closed && minecraft != null) {
                         minecraft.execute(() -> {
                             if (!closed && skinData != null) {
-                                handlePlayerOwnSkinFetched(skinData);
+                                handlePlayerOwnSkinFetched(skinData, account);
                             }
                         });
                     }
@@ -105,7 +116,8 @@ public final class PlayerOwnSkinBootstrap {
      * Handle the fetched player's own skin data
      * Smart mode: checks if skin already exists before saving a duplicate
      */
-    private static void handlePlayerOwnSkinFetched(com.quickskin.mod.client.services.MojangApiService.MojangSkinData skinData) {
+    private static void handlePlayerOwnSkinFetched(
+            com.quickskin.mod.client.services.MojangApiService.MojangSkinData skinData, String account) {
         try {
             // Process the image to get its final form before hashing and saving.
             // This ensures the hash we check against is the same as the one that will be generated from the saved file.
@@ -152,6 +164,7 @@ public final class PlayerOwnSkinBootstrap {
             // Now that the skin is guaranteed to be in the asset manager, set its hash in the config.
             com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
             config.playerOwnSkinHash = finalHash;
+            config.playerOwnSkinAccount = account != null ? account : "";
 
             if (config.activeSkinHash.isEmpty() && config.activeCpmModelHash.isEmpty()) {
                 config.activeSkinHash = finalHash;
