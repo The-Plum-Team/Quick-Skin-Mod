@@ -27,8 +27,11 @@ build. Every other layer below stays in force.
   Gradle no longer rejects a mismatch, but `e2e/packaged_runtime.py` still resolves the exact
   SHA-256 it pins for each packaged-runtime download from this file, so keep it accurate.
 - `gradle/dependency-locks/` strictly locks only `shadowBundle`, the external graph physically
-  embedded in each release JAR. Locking Loom's generated configurations is deliberately avoided;
-  their external inputs remain pinned by coordinate-specific verification metadata.
+  embedded in each release JAR. Fabric merges it into the mod JAR; Forge and NeoForge nest each
+  library unmodified under `META-INF/jarjar/`, because FML loads the mod JAR as one Java module
+  and a merged library would collide with another mod's copy. Locking Loom's generated
+  configurations is deliberately avoided; their external inputs remain pinned by
+  coordinate-specific verification metadata.
 - `scripts/release/generate_sbom.py` converts that exact per-lane embedded graph into one
   deterministic CycloneDX document. Every production JAR is represented by its staged hashes and
   depends only on coordinates present in its strict lock; every listed library carries the exact

@@ -158,7 +158,7 @@ configurations {
     findByName("developmentNeoForge")?.extendsFrom(configurations["common"])
 }
 
-// Only the dependency physically shaded into the release JAR is version-locked. Loom's generated
+// Only the dependency physically embedded in the release JAR is version-locked. Loom's generated
 // Minecraft, mappings, remap, and development configurations remain checksum-verified without
 // brittle lock state tied to generated Stonecutter project directories.
 dependencyLocking {
@@ -227,6 +227,14 @@ if (isNoRemap) {
         inputFile.set(shadowJar.get().archiveFile)
     }
 }
+
+// FML gives the mod JAR one Java module, so the external library is nested, never merged into it.
+tasks.named<ShadowJar>("shadowJar") {
+    dependencies {
+        exclude(dependency("org.sejda.imageio:webp-imageio"))
+    }
+}
+apply(from = rootProject.file("gradle/fml-nested-library-conventions.gradle.kts"))
 
 extensions.extraProperties["quickSkinE2ESourceSet"] = e2eSourceSet
 extensions.extraProperties["quickSkinE2ELoaderLabel"] = "NeoForge"
