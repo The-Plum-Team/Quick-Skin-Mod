@@ -26,6 +26,25 @@ class PreviewLayoutBoxTest {
         assertEquals(76.364f, PreviewLayoutBox.scaleForPercentage(32), 0.001f);
     }
 
+    /** The scroll-wheel resize's scale-to-percentage formula before it moved here, written out independently. */
+    private static int legacyPercentage(float scale) {
+        return Math.round(((scale - 20.0f) / (200.0f - 20.0f)) * 99.0f) + 1;
+    }
+
+    @Test
+    void percentageForScaleIsTheScrollResizeFormulaAndInvertsScaleForPercentage() {
+        for (int percentage = 1; percentage <= 100; percentage++) {
+            float scale = PreviewLayoutBox.scaleForPercentage(percentage);
+            assertEquals(percentage, PreviewLayoutBox.percentageForScale(scale), "percentage " + percentage);
+        }
+        for (float scale = 20.0f; scale <= 200.0f; scale += 0.37f) {
+            assertEquals(legacyPercentage(scale), PreviewLayoutBox.percentageForScale(scale), "scale " + scale);
+        }
+        assertEquals(20.0f, PreviewLayoutBox.clampToConfiguredRange(5.0f));
+        assertEquals(200.0f, PreviewLayoutBox.clampToConfiguredRange(250.0f));
+        assertEquals(87.2f, PreviewLayoutBox.clampToConfiguredRange(87.2f));
+    }
+
     @Test
     void naturalBoxUsesTheDebugBorderArithmetic() {
         float scale = PreviewLayoutBox.scaleForPercentage(30);

@@ -412,21 +412,21 @@ public final class MenuIntegration {
                 int rotateButtonX = buttonX;
                 int rotateButtonY = buttonY - rotateButtonSize - spacing;
 
-                com.quickskin.mod.client.gui.widget.RotateButton rotateButton =
+                com.quickskin.mod.client.gui.widget.RotateButton newRotateButton =
                         new com.quickskin.mod.client.gui.widget.RotateButton(
                                 rotateButtonX,
                                 rotateButtonY,
                                 rotateButtonSize,
                                 button -> playerWidget.toggleRotation()
                         );
-                FancyMenuWidgets.setIdentifier(rotateButton, FancyMenuWidgets.ROTATE_ID);
-                screenAccess.addRenderableWidget(rotateButton);
-                MenuIntegration.rotateButton = rotateButton;
+                FancyMenuWidgets.setIdentifier(newRotateButton, FancyMenuWidgets.ROTATE_ID);
+                screenAccess.addRenderableWidget(newRotateButton);
+                rotateButton = newRotateButton;
 
                 //? if <1.21 {
                 playerWidget.clearPriorityWidgets(); // Clear old priorities
                 playerWidget.addPriorityWidget(changeSkinButton); // Change Skin button
-                playerWidget.addPriorityWidget(rotateButton); // Rotate button
+                playerWidget.addPriorityWidget(newRotateButton); // Rotate button
                 //?}
                 // Clear animation buttons from previous screen
                 animationToggleButton = null;
@@ -471,7 +471,7 @@ public final class MenuIntegration {
 
                         animButton.visible = false;
                         animButton.active = false;
-                        FancyMenuWidgets.setIdentifier(animButton, FancyMenuWidgets.ANIMATION_ID_PREFIX + (index + 1));
+                        FancyMenuWidgets.setIdentifier(animButton, FancyMenuWidgets.animationButtonId(animName));
                         animationButtons.add(animButton);
                         screenAccess.addRenderableWidget(animButton);
                         //? if <1.21 {

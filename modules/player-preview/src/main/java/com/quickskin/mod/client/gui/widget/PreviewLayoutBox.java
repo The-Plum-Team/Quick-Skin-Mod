@@ -33,6 +33,18 @@ final class PreviewLayoutBox {
         return MIN_SCALE + percentageAsFloat * (MAX_SCALE - MIN_SCALE);
     }
 
+    /** Converts a model scale in {@code MIN_SCALE..MAX_SCALE} to the configured size percentage (1..100). */
+    static int percentageForScale(float scale) {
+        float scaleRange = MAX_SCALE - MIN_SCALE;
+        float currentScaleOffset = scale - MIN_SCALE;
+        return Math.round((currentScaleOffset / scaleRange) * 99.0f) + 1; // 1-100%
+    }
+
+    /** Limits a scale to the configured preview size range. */
+    static float clampToConfiguredRange(float scale) {
+        return Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+    }
+
     /** The drawn model box; the same arithmetic as the preview's debug border and hit area. */
     static Box natural(int centerX, int feetY, float scale) {
         int height = (int) (scale * 2.0f);
