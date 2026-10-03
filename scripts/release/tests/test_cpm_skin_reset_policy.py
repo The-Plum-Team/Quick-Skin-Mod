@@ -42,6 +42,12 @@ PLAYER_RENDERER_MIXIN = (
     / "mixin"
     / "PlayerRendererMixin.java"
 )
+CPM_MODEL_WORKFLOW = (
+    java_source('client/compat/CpmModelWorkflow.java', source_set='main', repository=ROOT)
+)
+NETWORK_TEXTURE_CACHE = (
+    java_source('client/storage/NetworkTextureCache.java', source_set='main', repository=ROOT)
+)
 SESSION_SCENARIO = (
     ROOT
     / "common"
@@ -84,47 +90,101 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
         )
         self.assertIn("A cleared skin has no location", apply_look)
 
-    def test_selected_cpm_model_survives_local_skin_refreshes(self) -> None:
+    def test_appearance_refresh_never_resets_cpm_to_skin_mode(self) -> None:
         integration = CPM_INTEGRATION.read_text(encoding="utf-8")
+        self.assertIn("public static void forceReRegisterSkins", integration)
+        self.assertIn("/** Clears CPM's selectedModel key", integration)
         refresh = integration[
             integration.index("public static void forceReRegisterSkins") : integration.index(
                 "/** Clears CPM's selectedModel key"
             )
         ]
 
-        self.assertEqual(1, refresh.count("resetToSkinMode();"))
-        self.assertIn("&& !hasSelectedCpmModel()) {", refresh)
-        self.assertLess(
-            refresh.index("&& !hasSelectedCpmModel()) {"),
-            refresh.index("resetToSkinMode();"),
-        )
+        # A model CPM has, from any source, survives every Quick Skin appearance update.
+        self.assertNotIn("resetToSkinMode", refresh)
         self.assertIn("schedulePlayerCacheInvalidation();", refresh)
+        self.assertIn("if (!localPlayer || !skinModeResetQueued.get()) {", refresh)
 
-    def test_renderer_override_leaves_a_selected_cpm_model_to_cpm(self) -> None:
-        integration = CPM_INTEGRATION.read_text(encoding="utf-8")
-        self.assertEqual(
-            1,
-            integration.count("public static boolean ownsLocalPlayerTexture("),
-            "CPMCompatIntegration must declare ownsLocalPlayerTexture(UUID)",
-        )
-        owner = integration[
-            integration.index("public static boolean ownsLocalPlayerTexture(") : integration.index(
-                "public static boolean isLocalPlayerWearingCpmModel()"
+    def test_every_skin_click_resets_cpm_to_skin_mode(self) -> None:
+        workflow = CPM_MODEL_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("public static void activateSkin(", workflow)
+        activate_skin = workflow[
+            workflow.index("public static void activateSkin(") : workflow.index(
+                "public static void onModelDeleted("
             )
         ]
-        self.assertIn("&& hasSelectedCpmModel()", owner)
-        self.assertIn("&& playerId.equals(getLocalPlayerUuid());", owner)
+        # A Quick Skin skin is the latest look choice, whatever CPM had selected before it.
+        guard = "if (CPMCompatIntegration.isAvailable()) {"
+        self.assertIn(guard, activate_skin)
+        self.assertLess(
+            activate_skin.index(guard),
+            activate_skin.index("CPMCompatIntegration.resetToSkinMode()"),
+        )
+        self.assertEqual(1, activate_skin.count("resetToSkinMode()"))
+        self.assertNotIn("wasUsingCpmModel ||", activate_skin)
 
-        # Every Stonecutter variant of the cancelling lookup carries the same guard.
+    def test_renderer_override_stands_down_for_any_cpm_model(self) -> None:
+        integration = CPM_INTEGRATION.read_text(encoding="utf-8")
+        self.assertIn("public static boolean isWearingCpmModel(", integration)
+        self.assertIn("private static Object gameProfileOf(", integration)
+        probe = integration[
+            integration.index("public static boolean isWearingCpmModel(") : integration.index(
+                "private static Object gameProfileOf("
+            )
+        ]
+        # The condition of CPM's render gate on the entry CPM already has. The probe never loads
+        # a player and never calls the gate itself, which starts resolving a new definition.
+        self.assertIn("getLoadedPlayerMethod.invoke(loaderInstance, profile)", probe)
+        self.assertIn("getModelDefinition0Method.invoke(player)", probe)
+        self.assertIn("Boolean.TRUE.equals(doRenderMethod.invoke(definition))", probe)
+        self.assertNotIn("getModelDefinitionMethod", probe)
+        self.assertIn('.getMethod("getModelDefinition0")', integration)
+        self.assertIn('.getMethod("doRender")', integration)
+        # The renderer asks several times per frame: a bounded, short-lived answer per player.
+        self.assertIn("PLAYER_MODEL_PROBE_TTL_NANOS = 100_000_000L;", integration)
+        self.assertIn("if (playerModelProbes.size() >= MAX_PLAYER_MODEL_PROBES) {", probe)
+        clear = integration[integration.index("public static void clearHttpTextureCache()") :]
+        clear = clear[: clear.index("httpTextureCache.clear();")]
+        self.assertIn("playerModelProbes.clear();", clear)
+        self.assertIn("|| !isAvailable() ||", probe)
+        self.assertNotIn("loadPlayer", probe)
+        self.assertNotIn("getCurrentClientPlayer", probe)
+        self.assertIn('getMethod("getLoadedPlayer", Object.class)', integration)
+        self.assertNotIn("ownsLocalPlayerTexture", integration)
+
+        # Every Stonecutter variant of the cancelling lookup carries the same stand-down.
         mixin = PLAYER_RENDERER_MIXIN.read_text(encoding="utf-8")
         lookups = mixin.count("service.hasActiveSkin(")
         guarded = re.findall(
-            r"if \(!CPMCompatIntegration\.ownsLocalPlayerTexture\((.+?)\)"
-            r" && service\.hasActiveSkin\(\1\)\) \{",
+            r"if \(service\.hasActiveSkin\((.+?)\)"
+            r" && !CPMCompatIntegration\.isWearingCpmModel\(\1\)\) \{",
             mixin,
         )
         self.assertGreater(lookups, 0)
         self.assertEqual(lookups, len(guarded))
+        self.assertIn("CPMCompatIntegration.shouldDeferToCPM()", mixin)
+
+    def test_network_skin_arrival_refreshes_cpm_where_it_reads_quick_skin_skins(self) -> None:
+        cache = NETWORK_TEXTURE_CACHE.read_text(encoding="utf-8")
+        commit = cache[
+            cache.index("private boolean commitPreparedTexture(") : cache.index(
+                "public static final class PreparedTexture"
+            )
+        ]
+        self.assertIn(
+            'if (stored && existingOriginal == null && "skin".equals(textureType)) {', commit
+        )
+        self.assertIn("CPMCompatIntegration.onNetworkSkinStored();", commit)
+
+        integration = CPM_INTEGRATION.read_text(encoding="utf-8")
+        self.assertIn("public static void onNetworkSkinStored()", integration)
+        hook = integration[
+            integration.index("public static void onNetworkSkinStored()") : integration.index(
+                "public static boolean isLocalPlayerWearingCpmModel()"
+            )
+        ]
+        self.assertIn("CpmCapabilities.current().supportsHttpTextureBridge()", hook)
+        self.assertIn("schedulePlayerCacheInvalidation();", hook)
 
     def test_legacy_player_info_discards_stale_skin_before_reregistering(self) -> None:
         active_common_overlays = frozenset(

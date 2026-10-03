@@ -139,11 +139,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   The compatibility harness must authenticate these local poses before visual review.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
-- A CPM model selected through Quick Skin (`ClientConfig.activeCpmModelHash`) stays CPM's selected
-  model until a skin is chosen or the model is deleted. Re-applying the local appearance for any
-  other reason, such as a transparency reload, must not reset CPM to skin mode, and the
-  renderer-level texture override leaves the local player to CPM so its own hook on that lookup
-  can bind the model's texture.
+- Quick Skin never hides a model CPM draws, whatever its source: chosen in Quick Skin or in
+  CPM's own screen, set by the server, or embedded in the skin. The renderer-level texture
+  override stands down for every player CPM draws a model for
+  (`CPMCompatIntegration.isWearingCpmModel`, the condition of CPM's own render gate read on the
+  entry CPM already has, kept per player for 100 ms), so CPM's hook at the tail of that lookup
+  binds the model's texture. Re-applying an appearance only refreshes CPM's player cache and
+  never resets CPM; only choosing a Quick Skin skin resets CPM to skin mode
+  (`CpmModelWorkflow.activateSkin`). Where CPM reads Quick Skin skins (the embedded-PNG bridge),
+  a network skin's arrival refreshes CPM so a model embedded in it loads.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
