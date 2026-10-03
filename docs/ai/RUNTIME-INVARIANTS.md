@@ -146,8 +146,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   entry CPM already has, kept per player for 100 ms), so CPM's hook at the tail of that lookup
   binds the model's texture. Re-applying an appearance only refreshes CPM's player cache and
   never resets CPM; only choosing a Quick Skin skin resets CPM to skin mode
-  (`CpmModelWorkflow.activateSkin`). Where CPM reads Quick Skin skins (the embedded-PNG bridge),
-  a network skin's arrival refreshes CPM so a model embedded in it loads.
+  (`CpmModelWorkflow.activateSkin`). Choosing a model in the Quick Skin menu withdraws the
+  applied skin locally and on the server with an empty skin id (the cape stays), and a join with
+  a model selected and nothing else applied sends that empty appearance, so other players stop
+  drawing the old skin. Where CPM reads Quick Skin skins (the embedded-PNG bridge), a network
+  skin's arrival refreshes CPM so a model embedded in it loads.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.

@@ -1132,6 +1132,21 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 );
                 if (!com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
                     showError(Component.literal("Unable to select CPM model."));
+                    return;
+                }
+                // The model replaces the applied Quick Skin skin. Withdraw it here and on the
+                // server (the cape stays), or other players keep drawing the old skin.
+                if (this.minecraft != null && this.minecraft.player != null) {
+//? if <1.21 {
+                    java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
+//?} else {
+                    java.util.UUID targetUUID = this.minecraft.player.getUUID();
+//?}
+                    com.quickskin.mod.client.services.PlayerAppearanceService appearances =
+                            com.quickskin.mod.client.services.PlayerAppearanceService.getInstance();
+                    if (targetUUID != null && appearances.hasActiveSkin(targetUUID)) {
+                        appearances.applySkin(targetUUID, "", null);
+                    }
                 }
                 return;
             }

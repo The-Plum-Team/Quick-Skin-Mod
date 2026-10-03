@@ -45,6 +45,12 @@ PLAYER_RENDERER_MIXIN = (
 CPM_MODEL_WORKFLOW = (
     java_source('client/compat/CpmModelWorkflow.java', source_set='main', repository=ROOT)
 )
+PLAYER_SKIN_MENU_SCREEN = (
+    java_source('client/gui/screen/PlayerSkinMenuScreen.java', source_set='main', repository=ROOT)
+)
+SAVED_APPEARANCE_RESTORER = (
+    java_source('client/services/SavedAppearanceRestorer.java', source_set='main', repository=ROOT)
+)
 NETWORK_TEXTURE_CACHE = (
     java_source('client/storage/NetworkTextureCache.java', source_set='main', repository=ROOT)
 )
@@ -163,6 +169,34 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
         self.assertGreater(lookups, 0)
         self.assertEqual(lookups, len(guarded))
         self.assertIn("CPMCompatIntegration.shouldDeferToCPM()", mixin)
+
+    def test_choosing_a_model_withdraws_the_applied_skin(self) -> None:
+        menu = PLAYER_SKIN_MENU_SCREEN.read_text(encoding="utf-8")
+        self.assertIn("public void onSkinSelected(", menu)
+        selected = menu[menu.index("public void onSkinSelected(") :]
+        model_branch = selected[
+            selected.index("if (metadata.isCpmModel()) {") : selected.index(
+                "com.quickskin.mod.config.ClientConfig config ="
+            )
+        ]
+        self.assertIn("CpmModelWorkflow.activateModel(metadata)", model_branch)
+        self.assertIn('appearances.applySkin(targetUUID, "", null);', model_branch)
+        activate = model_branch.index("CpmModelWorkflow.activateModel(metadata)")
+        refused = model_branch.index("showError(", activate)
+        withdraw = model_branch.index('appearances.applySkin(targetUUID, "", null);')
+        self.assertLess(refused, model_branch.index("return;", refused))
+        self.assertLess(model_branch.index("return;", refused), withdraw)
+        self.assertIn("appearances.hasActiveSkin(targetUUID)", model_branch)
+        self.assertIn("ReplayModHelper.getTargetPlayerUUID()", model_branch)
+
+        restorer = SAVED_APPEARANCE_RESTORER.read_text(encoding="utf-8")
+        self.assertIn("!config.activeCpmModelHash.isEmpty()", restorer)
+        self.assertIn(".getAppearance(targetPlayerId) == null) {", restorer)
+        self.assertIn(".applyLook(targetPlayerId, null, null, null);", restorer)
+        self.assertLess(
+            restorer.index(".applyLook(targetPlayerId, skinId, capeId, modelType);"),
+            restorer.index(".applyLook(targetPlayerId, null, null, null);"),
+        )
 
     def test_network_skin_arrival_refreshes_cpm_where_it_reads_quick_skin_skins(self) -> None:
         cache = NETWORK_TEXTURE_CACHE.read_text(encoding="utf-8")
