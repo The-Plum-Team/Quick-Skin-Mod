@@ -176,6 +176,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   parts. Preserve their baked local poses; copying the parent pose onto a child applies the pivot
   twice and detaches both the flat outer layers and the 3D Skin Layers geometry in offline previews.
   The compatibility harness must authenticate these local poses before visual review.
+- FancyMenu layout support for the title/pause preview lives in `menu-integration` and reaches
+  FancyMenu's per-widget API by reflection only: no dependency, mixin or module edge. Only when
+  that API is present does the preview report its drawn model box as its size, and only from its
+  screen's first rendered frame; while the screen is being built it reports 0x0, so mods that
+  measure overlaps during init (In-Game Account Switcher) never move away from it. A hidden
+  preview hides its rotate and animation controls. FancyMenu is not a compatibility lane.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
 - The latest look choice between Quick Skin and CPM is the local player's look, for every other
