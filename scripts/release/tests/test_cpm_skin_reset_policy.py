@@ -76,6 +76,10 @@ NEOFORGE_SKIN_MANAGER_MIXIN = (
     ROOT / "neoforge" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "neoforge"
     / "mixin" / "SkinManagerMixin.java"
 )
+SERVER_NETWORK_HANDLERS = tuple(
+    java_source('networking/ServerNetworkHandler.java', source_set=source_set, repository=ROOT)
+    for source_set in ("main", "legacy1_20_1")
+)
 CLIENT_EVENTS = (
     ROOT / "common" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "event"
     / "ClientEvents.java"
@@ -363,6 +367,24 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
             "!com.quickskin.mod.client.compat.CpmLook.owner().withholdsQuickSkinSkin()",
             skin_branch,
         )
+
+    def test_returning_to_the_worn_skin_is_no_cooldown_change(self) -> None:
+        for path in SERVER_NETWORK_HANDLERS:
+            with self.subTest(path=path.parent.name):
+                handler = path.read_text(encoding="utf-8")
+                apply = handler[handler.index("private static void applyAppearance(") :]
+                apply = apply[: apply.index("broadcastAppearanceToPlayers(")]
+                changing = apply.index(
+                    "boolean isSkinChanging = ServerCooldownManager.getInstance().isSkinChange("
+                )
+                self.assertLess(changing, apply.index(".isPlayerOnCooldown(playerId)) return;"))
+                saved = apply.index("scheduleSavePlayerAppearance(playerId);")
+                worn = apply.index(
+                    "ServerCooldownManager.getInstance()"
+                    ".recordWornSkin(playerId, appearance.skinId());"
+                )
+                self.assertLess(saved, worn)
+                self.assertLess(worn, apply.index("if (isSkinChanging && cooldownSeconds > 0) {"))
 
     def test_empty_skin_id_restores_the_vanilla_skin_and_model(self) -> None:
         source = PLAYER_APPEARANCE_SERVICE.read_text(encoding="utf-8")
