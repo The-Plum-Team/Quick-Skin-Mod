@@ -189,7 +189,9 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
 
     def test_latest_look_choice_withholds_the_local_quick_skin_skin(self) -> None:
         look = CPM_LOOK.read_text(encoding="utf-8")
-        decide = look[look.index("static Owner decide(") : look.index("public static Owner owner()")]
+        decide = look[
+            look.index("static Owner decide(") : look.index("public static Owner owner()")
+        ]
         order = [
             "if (!cpmInstalled || quickSkinResetPending) {",
             "if (!selectionReadable || (quickSkinHasModel && quickSkinModel == null)) {",
@@ -322,6 +324,44 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
         self.assertLess(
             restorer.index(".applyLook(targetPlayerId, skinId, capeId, modelType);"),
             restorer.index(".applyLook(targetPlayerId, null, null, null);"),
+        )
+
+    def test_opening_the_menu_is_no_look_choice(self) -> None:
+        menu = PLAYER_SKIN_MENU_SCREEN.read_text(encoding="utf-8")
+        restore = menu[menu.index("private void restoreSavedState()") :]
+        restore = restore[
+            : restore.index("// Restore model type preference for the selected skin")
+        ]
+        # While CPM's own model is the look, the menu selects (and so applies) no entry.
+        gate = restore.index("if (cpmOwnsLook) {")
+        self.assertLess(restore.index("CpmLook.Owner.CPM;"), gate)
+        self.assertLess(
+            gate,
+            restore.index(
+                "} else if (!config.activeSkinHash.isEmpty() && skinListPanel != null) {"
+            ),
+        )
+        self.assertNotIn("setSelected(", restore[gate : restore.index("} else if (", gate)])
+
+        selected = menu[menu.index("public void onSkinSelected(") :]
+        model_branch = selected[
+            selected.index("if (metadata.isCpmModel()) {") : selected.index(
+                "com.quickskin.mod.config.ClientConfig config ="
+            )
+        ]
+        # The menu opening on Quick Skin's model, still the look, does not select it again.
+        self.assertIn("CpmLook.Owner.QUICK_SKIN_MODEL;", model_branch)
+        self.assertIn(
+            "if (!modelIsTheLook\n                        && !com.quickskin.mod.client.compat"
+            ".CpmModelWorkflow.activateModel(metadata)) {",
+            model_branch,
+        )
+        # The saved skin is applied again when chosen after a CPM model became the look.
+        skin_branch = selected[selected.index("boolean isSkinAlreadyActive") :]
+        skin_branch = skin_branch[: skin_branch.index(";") + 1]
+        self.assertIn(
+            "!com.quickskin.mod.client.compat.CpmLook.owner().withholdsQuickSkinSkin()",
+            skin_branch,
         )
 
     def test_empty_skin_id_restores_the_vanilla_skin_and_model(self) -> None:

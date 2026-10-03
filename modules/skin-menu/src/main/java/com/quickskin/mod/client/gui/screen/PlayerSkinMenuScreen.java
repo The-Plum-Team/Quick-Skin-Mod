@@ -466,9 +466,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Check if we're restoring from a resize (savedModelType is not null)
         boolean isResizing = savedModelType != null;
 
-        // Restore active skin selection first
+        // Restore active skin selection first. Opening the menu is no look choice: while CPM's
+        // own model is the look, no Quick Skin entry is selected (selecting one applies it).
+        boolean cpmOwnsLook = com.quickskin.mod.client.compat.CpmLook.owner()
+                == com.quickskin.mod.client.compat.CpmLook.Owner.CPM;
         AssetMetadata selectedSkin = null;
-        if (!config.activeSkinHash.isEmpty() && skinListPanel != null) {
+        if (cpmOwnsLook) {
+            // Keep CPM's model; the saved Quick Skin skin is still listed and can be chosen.
+        } else if (!config.activeSkinHash.isEmpty() && skinListPanel != null) {
             AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(config.activeSkinHash);
             if (metadata != null) {
                 // Don't trigger callback during resize - we'll set model type manually
@@ -1130,7 +1135,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                                 metadata.hash(), TextureQuality.PREVIEW)
 //?}
                 );
-                if (!com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
+                // Re-selecting Quick Skin's model while it is still the look (the menu opening on
+                // it) is no new choice: CPM already has it.
+                boolean modelIsTheLook = metadata.hash().equals(
+                        com.quickskin.mod.config.ClientConfig.getInstance().activeCpmModelHash)
+                        && com.quickskin.mod.client.compat.CpmLook.owner()
+                                == com.quickskin.mod.client.compat.CpmLook.Owner.QUICK_SKIN_MODEL;
+                if (!modelIsTheLook
+                        && !com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
                     showError(Component.literal("Unable to select CPM model."));
                     return;
                 }
@@ -1153,9 +1165,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
             com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
 
-            // Check if this skin is already the active skin
+            // Check if this skin is already the active skin. While a CPM model is the look, the
+            // saved skin is only remembered, and choosing it applies it.
             boolean isSkinAlreadyActive = metadata.hash().equals(config.activeSkinHash)
-                    && config.activeCpmModelHash.isEmpty();
+                    && config.activeCpmModelHash.isEmpty()
+                    && !com.quickskin.mod.client.compat.CpmLook.owner().withholdsQuickSkinSkin();
             // Get the model type preference for this specific skin
 //? if <1.21 {
             String modelPreference = LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash());
