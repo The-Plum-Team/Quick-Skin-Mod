@@ -101,6 +101,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
 
         // Update skin
         if (skinId != null) {
+            boolean hadSkin = appearance.getSkinId() != null && !appearance.getSkinId().isEmpty();
             appearance.setSkinId(skinId);
 
             // Resolve model type
@@ -108,9 +109,18 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
             String resolvedModel = modelService.getModelType(playerId, skinId, requestedModel);
             appearance.setModel(resolvedModel);
 
-            // Store the REQUESTED model (not resolved) as override
-            // This allows "auto" to re-detect each time instead of locking to the first detection
-            modelService.setModelOverride(playerId, requestedModel);
+            if (skinId.isEmpty()) {
+                // No Quick Skin skin: the vanilla skin keeps its own model (its profile's or the
+                // UUID default's). A forced model would draw a slim default skin with wide arms.
+                modelService.clearModelOverride(playerId);
+                if (hadSkin) {
+                    refreshVanillaSkinLookup(playerId);
+                }
+            } else {
+                // Store the REQUESTED model (not resolved) as override
+                // This allows "auto" to re-detect each time instead of locking to the first detection
+                modelService.setModelOverride(playerId, requestedModel);
+            }
 
             //? if <1.21.11 {
             ResourceLocation skinLocation = skinService.getSkinLocation(playerId, skinId);
@@ -211,6 +221,21 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
                 appearance.getCapeId(),
                 appearance.getModel()
             );
+        }
+    }
+
+    /**
+     * A withdrawn skin may still be baked into the skin this player's PlayerInfo resolved while it
+     * was active (Minecraft 1.21 and later). Rebuild that lookup so the vanilla skin returns.
+     */
+    private static void refreshVanillaSkinLookup(UUID playerId) {
+        Minecraft mc = Minecraft.getInstance();
+        net.minecraft.client.multiplayer.ClientPacketListener connection =
+                mc != null ? mc.getConnection() : null;
+        net.minecraft.client.multiplayer.PlayerInfo info =
+                connection != null ? connection.getPlayerInfo(playerId) : null;
+        if (info instanceof com.quickskin.mod.client.compat.QuickSkinSkinLookupAccess lookup) {
+            lookup.quickskin$refreshSkinLookup();
         }
     }
 

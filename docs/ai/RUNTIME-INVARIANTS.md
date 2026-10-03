@@ -149,8 +149,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   (`CpmModelWorkflow.activateSkin`). Choosing a model in the Quick Skin menu withdraws the
   applied skin locally and on the server with an empty skin id (the cape stays), and a join with
   a model selected and nothing else applied sends that empty appearance, so other players stop
-  drawing the old skin. Where CPM reads Quick Skin skins (the embedded-PNG bridge), a network
-  skin's arrival refreshes CPM so a model embedded in it loads.
+  drawing the old skin. An empty skin id sets no model override, so the vanilla skin keeps its
+  own model, and from Minecraft 1.21 it rebuilds the vanilla skin lookup PlayerInfo resolved
+  while the skin was active (`QuickSkinSkinLookupAccess`). Where CPM reads Quick Skin skins (the
+  embedded-PNG bridge), a network skin's arrival refreshes CPM so a model embedded in it loads.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.

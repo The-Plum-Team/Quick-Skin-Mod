@@ -54,6 +54,15 @@ SAVED_APPEARANCE_RESTORER = (
 NETWORK_TEXTURE_CACHE = (
     java_source('client/storage/NetworkTextureCache.java', source_set='main', repository=ROOT)
 )
+MODEL_SERVICE = (
+    java_source('client/services/ModelService.java', source_set='main', repository=ROOT)
+)
+PLAYER_INFO_MIXINS = (
+    ROOT / "common" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "mixin"
+    / "PlayerInfoMixin.java",
+    ROOT / "neoforge" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "neoforge"
+    / "mixin" / "PlayerInfoMixin.java",
+)
 SESSION_SCENARIO = (
     ROOT
     / "common"
@@ -197,6 +206,42 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
             restorer.index(".applyLook(targetPlayerId, skinId, capeId, modelType);"),
             restorer.index(".applyLook(targetPlayerId, null, null, null);"),
         )
+
+    def test_empty_skin_id_restores_the_vanilla_skin_and_model(self) -> None:
+        source = PLAYER_APPEARANCE_SERVICE.read_text(encoding="utf-8")
+        apply_look = source[
+            source.index("public void applyLook(") : source.index(
+                "} else if (model != null) {", source.index("public void applyLook(")
+            )
+        ]
+        had_skin = apply_look.index(
+            "boolean hadSkin = appearance.getSkinId() != null && !appearance.getSkinId().isEmpty();"
+        )
+        set_skin = apply_look.index("appearance.setSkinId(skinId);")
+        empty = apply_look.index("if (skinId.isEmpty()) {")
+        clear = apply_look.index("modelService.clearModelOverride(playerId);")
+        refresh = apply_look.index("refreshVanillaSkinLookup(playerId);")
+        override = apply_look.index("modelService.setModelOverride(playerId, requestedModel);")
+        self.assertLess(had_skin, set_skin)
+        self.assertLess(set_skin, empty)
+        self.assertLess(empty, clear)
+        self.assertLess(clear, refresh)
+        self.assertLess(refresh, override)
+        self.assertIn("if (hadSkin) {", apply_look[clear:refresh])
+        self.assertIn("} else {", apply_look[refresh:override])
+        self.assertEqual(1, apply_look.count("setModelOverride("))
+
+        self.assertIn("QuickSkinSkinLookupAccess lookup", source)
+        self.assertIn("lookup.quickskin$refreshSkinLookup();", source)
+        self.assertIn("modelOverrides.remove(playerId);", MODEL_SERVICE.read_text(encoding="utf-8"))
+
+        for path in PLAYER_INFO_MIXINS:
+            mixin = path.read_text(encoding="utf-8")
+            self.assertIn("implements com.quickskin.mod.client.compat.QuickSkinSkinLookupAccess", mixin)
+            # Before 1.21.9 the lookup is final and built once; later getSkin() rebuilds a null one.
+            self.assertIn("@Mutable", mixin)
+            self.assertIn("this.skinLookup = createSkinLookup(this.profile);", mixin)
+            self.assertIn("this.skinLookup = null;", mixin)
 
     def test_network_skin_arrival_refreshes_cpm_where_it_reads_quick_skin_skins(self) -> None:
         cache = NETWORK_TEXTURE_CACHE.read_text(encoding="utf-8")
