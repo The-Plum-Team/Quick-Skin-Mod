@@ -39,8 +39,8 @@ public class PlayerWidget extends AbstractWidget {
     // Display settings
     private float scale = 87.2f; // 10% smaller than previous (96.9 * 0.9 = 87.21)
     private static final float DEFAULT_SCALE = 87.2f; // Default scale value
-    private static final float MIN_SCALE = 20.0f; // Minimum scale for resize
-    private static final float MAX_SCALE = 200.0f; // Maximum scale for resize
+    // The configured size range and its percentage conversion live in PreviewLayoutBox, so the
+    // scroll-wheel resize and the FancyMenu layout box share one formula.
     private static final float SCALE_STEP = 3.0f; // Scale change per scroll tick (smaller for smoother resizing)
 
     // Pivot point for scaling (at the feet position - where the red crosshair is)
@@ -601,8 +601,7 @@ public class PlayerWidget extends AbstractWidget {
         int savedPercentage = getSliderPercentageFromConfig(config);
 
         // Convert percentage (1-100%) to scale value
-        float percentageAsFloat = (savedPercentage - 1) / 99.0f; // Convert 1-100 to 0.0-1.0
-        scale = MIN_SCALE + percentageAsFloat * (MAX_SCALE - MIN_SCALE);
+        scale = PreviewLayoutBox.scaleForPercentage(savedPercentage);
 
         // Ensure cape animation is registered before rendering
         if (previewData.getCapeId() != null && previewData.getCapeLocation() != null) {
@@ -926,7 +925,10 @@ public class PlayerWidget extends AbstractWidget {
     // first rendered frame on: overlap checks run while the screen is built and still see 0x0, and
     // the layout editor sees the box. The call goes through super so the editor's own size
     // overrides on AbstractWidget apply. AbstractWidget.render does not change the cursor, so a
-    // non-zero size has no cursor side effect.
+    // non-zero size has no cursor side effect. Where hover is computed from these getters (1.21
+    // and later, and FancyMenu's own hover hook) the model box becomes hoverable from then on: the
+    // narrator can read the preview's narration, a FancyMenu hover sound can play, and keyboard
+    // navigation sees a real rectangle. This happens only with FancyMenu installed.
     @Override
     public int getWidth() {
         return reportsModelBounds && layoutBoundsPublished ? super.getWidth() : 0;
@@ -1185,14 +1187,12 @@ public class PlayerWidget extends AbstractWidget {
 //?}
 
         // Clamp to min/max
-        scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+        scale = PreviewLayoutBox.clampToConfiguredRange(scale);
 
         // Only save if scale actually changed
         if (scale != oldScale) {
             // Calculate and save percentage
-            float scaleRange = MAX_SCALE - MIN_SCALE;
-            float currentScaleOffset = scale - MIN_SCALE;
-            int percentage = Math.round((currentScaleOffset / scaleRange) * 99.0f) + 1; // 1-100%
+            int percentage = PreviewLayoutBox.percentageForScale(scale); // 1-100%
 
             // Save to config
             saveSliderPercentageToConfig(percentage);

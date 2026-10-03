@@ -57,6 +57,13 @@ class FancyMenuWidgetsTest {
     }
 
     @Test
+    void animationButtonIdsComeFromTheAnimationName() {
+        assertEquals("quickskin_preview_animation_idle", FancyMenuWidgets.animationButtonId("idle"));
+        assertEquals("quickskin_preview_animation_walk", FancyMenuWidgets.animationButtonId("walk"));
+        assertEquals("quickskin_preview_animation_sit", FancyMenuWidgets.animationButtonId("sit"));
+    }
+
+    @Test
     void withoutFancyMenuEveryCallIsANoOp() {
         FancyMenuWidgets.Api api = new FancyMenuWidgets.Api(PlainWidget.class);
         PlainWidget widget = new PlainWidget();

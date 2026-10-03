@@ -23,13 +23,22 @@ final class FancyMenuWidgets {
     static final String CHANGE_SKIN_ID = "quickskin_change_skin_button";
     static final String ROTATE_ID = "quickskin_preview_rotate_button";
     static final String ANIMATION_TOGGLE_ID = "quickskin_preview_animation_toggle";
-    static final String ANIMATION_ID_PREFIX = "quickskin_preview_animation_";
+    private static final String ANIMATION_ID_PREFIX = "quickskin_preview_animation_";
 
     private static final String SET_IDENTIFIER = "setWidgetIdentifierFancyMenu";
     private static final String IS_HIDDEN = "isHiddenFancyMenu";
     private static final Logger LOGGER = LoggerFactory.getLogger("QuickSkin-FancyMenu");
 
     private FancyMenuWidgets() {
+    }
+
+    /**
+     * The layout identifier of the animation button that selects {@code animation} ("idle", "walk",
+     * "sit"). It is built from the animation's name, not the button's position in the dropdown, so a
+     * saved layout keeps addressing the same animation when animations are added or reordered.
+     */
+    static String animationButtonId(String animation) {
+        return ANIMATION_ID_PREFIX + animation;
     }
 
     /** True when FancyMenu's widget API is present on {@link AbstractWidget}. */
