@@ -63,11 +63,11 @@ DEGRADABLE_MIXINS = {
 # the integration is absent.
 OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/CpmModelDefinitionLoaderMixin.java",
+    "main:com/quickskin/mod/mixin/compat/TaczPreviewAnimationMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
-    "main:com/quickskin/mod/mixin/compat/TaczPreviewAnimationMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
     "overlay:com/quickskin/mod/mixin/compat/ReplayModCompatMixin.java",
 }

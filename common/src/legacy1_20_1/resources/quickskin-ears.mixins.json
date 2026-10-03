@@ -8,10 +8,10 @@
     "EarsLayerRendererMixin",
     "EarsModMixin",
     "CpmModelDefinitionLoaderMixin",
+    "TaczPreviewAnimationMixin",
     "CpmRenderDepthMixin",
     "CpmSubmitCollectorMixin",
-    "ReplayModCompatMixin",
-    "TaczPreviewAnimationMixin"
+    "ReplayModCompatMixin"
   ],
   "injectors": {
     "defaultRequire": 0
