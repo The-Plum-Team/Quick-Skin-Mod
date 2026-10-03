@@ -55,6 +55,10 @@ public final class CPMCompatIntegration {
         return java.util.Objects.requireNonNull(assetAccess, "CPM asset access has not been configured");
     }
 
+    static boolean assetsConfigured() {
+        return assetAccess != null;
+    }
+
     private static final Logger CPMLOG = LoggerFactory.getLogger("QuickSkin-CPM");
     private static final String CPM_CLIENT_RESOURCE = "com/tom/cpm/client/CustomPlayerModelsClient.class";
     private static final long STALE_RENDER_DEPTH_NANOS = 2_000_000_000L;
@@ -100,6 +104,8 @@ public final class CPMCompatIntegration {
     private static Method getLoadedPlayerMethod;
     private static Method getModelDefinition0Method;
     private static Method doRenderMethod;
+    private static Method getServerModelMethod;
+    private static java.lang.reflect.Field forcedSkinField;
 
     private static final AtomicBoolean cacheUnavailableLogged = new AtomicBoolean();
     private static final AtomicBoolean cacheInvocationFailedLogged = new AtomicBoolean();
@@ -114,6 +120,7 @@ public final class CPMCompatIntegration {
     private static final AtomicBoolean staleRenderDepthLogged = new AtomicBoolean();
     private static final AtomicBoolean localModelProbeFailedLogged = new AtomicBoolean();
     private static final AtomicBoolean playerModelProbeFailedLogged = new AtomicBoolean();
+    private static final AtomicBoolean serverModelLookupFailedLogged = new AtomicBoolean();
     private static final AtomicBoolean cacheInvalidationQueued = new AtomicBoolean();
     private static final AtomicBoolean cacheSchedulingFailedLogged = new AtomicBoolean();
     private static final AtomicBoolean skinModeResetQueued = new AtomicBoolean();
@@ -252,6 +259,18 @@ public final class CPMCompatIntegration {
             playerModelProbeDisabled = true;
             if (playerModelProbeFailedLogged.compareAndSet(false, true)) {
                 CPMLOG.warn("CPM player-model lookup is unavailable; Quick Skin skins keep their renderer override", e);
+            }
+        }
+        try {
+            // Erased ModelDefinitionLoader<GP>.getModel(GP): the model data CPM's server sent.
+            getServerModelMethod = loaderInstance.getClass().getMethod("getModel", Object.class);
+            forcedSkinField = Class.forName("com.tom.cpm.shared.config.Player").getField("forcedSkin");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            getServerModelMethod = null;
+            forcedSkinField = null;
+            if (serverModelLookupFailedLogged.compareAndSet(false, true)) {
+                CPMLOG.warn("CPM server-model lookup is unavailable; a model the server assigns is not "
+                        + "counted as a look choice", e);
             }
         }
     }
@@ -630,7 +649,7 @@ public final class CPMCompatIntegration {
         //?}
     }
 
-    /** Clears CPM's selectedModel key and conditionally notifies a CPM server. */
+    /** Clears CPM's selectedModel key and conditionally notifies a CPM server, as CPM's Reset does. */
     public static boolean resetToSkinMode() {
         if (!isAvailable()) {
             return false;
@@ -695,7 +714,13 @@ public final class CPMCompatIntegration {
             String selectedModel = (String) configGetStringMethod.invoke(
                     configInstance, "selectedModel", (Object) null);
             if (selectedModel == null) {
-                schedulePlayerCacheInvalidation();
+                // CPM has no model of its own selected, but the server may have assigned one
+                // (/cpm setskin). Ask CPM's server to drop it, as CPM's own Reset does; CPM's
+                // server keeps a forced model, and CpmLook then keeps it the look.
+                if (localServerModel() == null || !notifyServerIfInstalled("resetToSkinMode")) {
+                    schedulePlayerCacheInvalidation();
+                }
+                CpmLook.onQuickSkinReset();
                 return true;
             }
             configClearValueMethod.invoke(configInstance, "selectedModel");
@@ -704,10 +729,28 @@ public final class CPMCompatIntegration {
             if (!notifyServerIfInstalled("resetToSkinMode")) {
                 schedulePlayerCacheInvalidation();
             }
+            CpmLook.onQuickSkinReset();
             return true;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
             CPMLOG.warn("Failed to reset CPM to skin mode", e);
             return false;
+        }
+    }
+
+    /** Whether CPM's own selection (common config {@code selectedModel}) can be read now. */
+    static boolean canReadSelectedModel() {
+        return isAvailable() && hasConfigHandles();
+    }
+
+    /** CPM's selectedModel, or null when none is selected or it cannot be read. */
+    static String selectedModel() {
+        if (!canReadSelectedModel()) {
+            return null;
+        }
+        try {
+            return (String) configGetStringMethod.invoke(configInstance, "selectedModel", (Object) null);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            return null;
         }
     }
 
@@ -775,7 +818,7 @@ public final class CPMCompatIntegration {
         }
     }
 
-    private static String normalizeRelativeModelName(String modelFileName) {
+    static String normalizeRelativeModelName(String modelFileName) {
         if (modelFileName == null || modelFileName.isBlank()) {
             return null;
         }
@@ -899,6 +942,55 @@ public final class CPMCompatIntegration {
             }
         }
         return null;
+    }
+
+    /**
+     * The model data CPM's server sent for the local player ({@code ModelDefinitionLoader.getModel}):
+     * the echo of the player's own selection, or a model the server assigned with /cpm setskin.
+     * Null when there is none, outside a world, or when the handle is missing.
+     */
+    static byte[] localServerModel() {
+        Object profile = localGameProfile();
+        Method getServerModel = getServerModelMethod;
+        if (profile == null || getServerModel == null) {
+            return null;
+        }
+        try {
+            return getServerModel.invoke(loaderInstance, profile) instanceof byte[] data ? data : null;
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            getServerModelMethod = null;
+            if (serverModelLookupFailedLogged.compareAndSet(false, true)) {
+                CPMLOG.warn("CPM server-model lookup failed and has been disabled", e);
+            }
+            return null;
+        }
+    }
+
+    /** Whether CPM marked the local player's server model as forced (/cpm setskin -f). */
+    static boolean isLocalServerModelForced() {
+        Object profile = localGameProfile();
+        java.lang.reflect.Field forced = forcedSkinField;
+        if (profile == null || forced == null || getLoadedPlayerMethod == null) {
+            return false;
+        }
+        try {
+            Object player = getLoadedPlayerMethod.invoke(loaderInstance, profile);
+            return player != null && forced.getBoolean(player);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            return false;
+        }
+    }
+
+    private static Object localGameProfile() {
+        if (!isAvailable()) {
+            return null;
+        }
+        ensureRuntimeHandles();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (loaderInstance == null || minecraft == null || minecraft.player == null) {
+            return null;
+        }
+        return gameProfileOf(minecraft.player.getUUID());
     }
 
     /**

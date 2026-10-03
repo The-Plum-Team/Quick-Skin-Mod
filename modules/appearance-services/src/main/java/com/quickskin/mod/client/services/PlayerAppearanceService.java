@@ -91,6 +91,13 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
         if (playerId == null) {
             return;
         }
+        // While a CPM model is the local player's latest look choice, re-applying a saved or
+        // menu appearance must not bring the Quick Skin skin back; the cape stays. Network and
+        // transparency re-applies are not choices.
+        if (skinId != null && !skinId.isEmpty() && !applyingNetworkUpdate && !reloadingTransparency
+                && CpmLookArbiter.withholdsSkin(playerId)) {
+            skinId = "";
+        }
 
         // Get or create appearance
         PlayerAppearance appearance = repository.getAppearance(playerId);

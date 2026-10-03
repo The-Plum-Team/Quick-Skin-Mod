@@ -139,18 +139,23 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   The compatibility harness must authenticate these local poses before visual review.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
-- Quick Skin never hides a model CPM draws, whatever its source: chosen in Quick Skin or in
-  CPM's own screen, set by the server, or embedded in the skin. The renderer-level texture
-  override stands down for every player CPM draws a model for
+- The latest look choice between Quick Skin and CPM is the local player's look, for every other
+  player as well and across relogs and restarts (`CpmLook`). It is derived from CPM's persisted
+  `selectedModel`, Quick Skin's selection and, per connection, a model the server assigned: a
+  CPM selection equal to Quick Skin's model is Quick Skin's model, any other CPM selection or a
+  server model that arrived without one is CPM's, and otherwise the look is Quick Skin's. Every
+  skin chosen in Quick Skin resets CPM to skin mode and asks CPM's server to drop its model
+  (`CpmModelWorkflow.activateSkin`); CPM keeps a forced one, which then stays the look. While a
+  CPM model is the look, whether CPM's own, a server's or one chosen in Quick Skin, the local
+  player wears no Quick Skin skin, locally or on the server (an empty skin id; the cape stays):
+  `CpmLookArbiter` withdraws it and `PlayerAppearanceService.applyLook` withholds a re-applied
+  local skin. When the look returns to Quick Skin, the saved Quick Skin look is applied again.
+  Re-applying an appearance never resets CPM. Quick Skin never hides a model CPM draws: the
+  renderer-level texture override stands down for every player CPM draws a model for
   (`CPMCompatIntegration.isWearingCpmModel`, the condition of CPM's own render gate read on the
   entry CPM already has, kept per player for 100 ms), so CPM's hook at the tail of that lookup
-  binds the model's texture. Re-applying an appearance only refreshes CPM's player cache and
-  never resets CPM; only choosing a Quick Skin skin resets CPM to skin mode
-  (`CpmModelWorkflow.activateSkin`). Choosing a model in the Quick Skin menu withdraws the
-  applied skin locally and on the server with an empty skin id (the cape stays), and a join with
-  a model selected and nothing else applied sends that empty appearance, so other players stop
-  drawing the old skin. An empty skin id sets no model override, so the vanilla skin keeps its
-  own model, and from Minecraft 1.21 it rebuilds the vanilla skin lookup PlayerInfo resolved
+  binds the model's texture. An empty skin id sets no model override, so the vanilla skin keeps
+  its own model, and from Minecraft 1.21 it rebuilds the vanilla skin lookup PlayerInfo resolved
   while the skin was active (`QuickSkinSkinLookupAccess`). Where CPM reads Quick Skin skins (the
   embedded-PNG bridge), a network skin's arrival refreshes CPM so a model embedded in it loads.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,

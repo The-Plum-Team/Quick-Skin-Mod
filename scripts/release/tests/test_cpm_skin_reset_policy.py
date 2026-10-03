@@ -57,6 +57,29 @@ NETWORK_TEXTURE_CACHE = (
 MODEL_SERVICE = (
     java_source('client/services/ModelService.java', source_set='main', repository=ROOT)
 )
+CPM_LOOK = (
+    java_source('client/compat/CpmLook.java', source_set='main', repository=ROOT)
+)
+CPM_LOOK_ARBITER = (
+    java_source('client/services/CpmLookArbiter.java', source_set='main', repository=ROOT)
+)
+SKIN_MANAGER_MIXIN = (
+    ROOT / "common" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "mixin"
+    / "SkinManagerMixin.java"
+)
+LEGACY_SKIN_MANAGER_MIXIN = (
+    ROOT / "common" / "src" / "legacy1_20_1" / "java" / "com" / "quickskin" / "mod" / "mixin"
+    / "MixinSkinManager.java"
+)
+# NeoForge loads only its own mixin configuration, so this replaces the common SkinManagerMixin.
+NEOFORGE_SKIN_MANAGER_MIXIN = (
+    ROOT / "neoforge" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "neoforge"
+    / "mixin" / "SkinManagerMixin.java"
+)
+CLIENT_EVENTS = (
+    ROOT / "common" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "event"
+    / "ClientEvents.java"
+)
 PLAYER_INFO_MIXINS = (
     ROOT / "common" / "src" / "main" / "java" / "com" / "quickskin" / "mod" / "mixin"
     / "PlayerInfoMixin.java",
@@ -108,10 +131,10 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
     def test_appearance_refresh_never_resets_cpm_to_skin_mode(self) -> None:
         integration = CPM_INTEGRATION.read_text(encoding="utf-8")
         self.assertIn("public static void forceReRegisterSkins", integration)
-        self.assertIn("/** Clears CPM's selectedModel key", integration)
+        self.assertIn("public static boolean resetToSkinMode()", integration)
         refresh = integration[
             integration.index("public static void forceReRegisterSkins") : integration.index(
-                "/** Clears CPM's selectedModel key"
+                "public static boolean resetToSkinMode()"
             )
         ]
 
@@ -136,7 +159,100 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
             activate_skin.index("CPMCompatIntegration.resetToSkinMode()"),
         )
         self.assertEqual(1, activate_skin.count("resetToSkinMode()"))
-        self.assertNotIn("wasUsingCpmModel ||", activate_skin)
+        self.assertNotIn("wasUsingCpmModel", activate_skin)
+        # Without CPM the reset waits, so a model left in CPM's config is dropped when it returns.
+        without_cpm = activate_skin[activate_skin.index("} else {") :]
+        self.assertTrue(
+            without_cpm.split()[3:5] == ["config.pendingCpmSkinModeReset", "="]
+            and without_cpm.split()[5] == "true;",
+            without_cpm[:120],
+        )
+
+    def test_skin_reset_asks_cpms_server_to_drop_an_assigned_model(self) -> None:
+        integration = CPM_INTEGRATION.read_text(encoding="utf-8")
+        reset = integration[
+            integration.index("private static boolean performSkinModeReset()") : integration.index(
+                "static boolean canReadSelectedModel()"
+            )
+        ]
+        no_selection = reset[reset.index("if (selectedModel == null) {") : reset.index(
+            'configClearValueMethod.invoke(configInstance, "selectedModel");'
+        )]
+        self.assertIn(
+            'if (localServerModel() == null || !notifyServerIfInstalled("resetToSkinMode")) {',
+            no_selection,
+        )
+        # The server's reply to Quick Skin's own reset is never read as a new look choice.
+        self.assertEqual(2, reset.count("CpmLook.onQuickSkinReset();"))
+        self.assertIn('getMethod("getModel", Object.class)', integration)
+        self.assertIn('.getField("forcedSkin")', integration)
+
+    def test_latest_look_choice_withholds_the_local_quick_skin_skin(self) -> None:
+        look = CPM_LOOK.read_text(encoding="utf-8")
+        decide = look[look.index("static Owner decide(") : look.index("public static Owner owner()")]
+        order = [
+            "if (!cpmInstalled || quickSkinResetPending) {",
+            "if (!selectionReadable || (quickSkinHasModel && quickSkinModel == null)) {",
+            "if (selectedModel != null) {",
+            "return serverAssigned ? Owner.CPM : Owner.QUICK_SKIN;",
+        ]
+        positions = [decide.index(line) for line in order]
+        self.assertEqual(sorted(positions), positions)
+        observe = look[look.index("public static Owner observe()") : look.index(
+            "public static void resetSession()"
+        )]
+        self.assertIn('config.activeCpmModelHash = "";', observe)
+
+        service = PLAYER_APPEARANCE_SERVICE.read_text(encoding="utf-8")
+        apply_look = service[service.index("public void applyLook(") :]
+        gate = apply_look.index("CpmLookArbiter.withholdsSkin(playerId)")
+        self.assertLess(apply_look.index("if (playerId == null) {"), gate)
+        self.assertLess(gate, apply_look.index("// Get or create appearance"))
+        self.assertIn(
+            "!applyingNetworkUpdate && !reloadingTransparency", apply_look[: gate]
+        )
+
+        arbiter = CPM_LOOK_ARBITER.read_text(encoding="utf-8")
+        tick = arbiter[arbiter.index("public static void tick()") : arbiter.index(
+            "public static boolean withholdsSkin("
+        )]
+        self.assertIn("if (!CPMCompatIntegration.isAvailable() || !isLiveSession()) {", tick)
+        self.assertIn("CpmLook.resetSession();", tick)
+        self.assertIn('appearances.applySkin(local, "", null);', tick)
+        self.assertIn("SavedAppearanceRestorer.restore(local);", tick)
+        self.assertLess(tick.index("owner.withholdsQuickSkinSkin()"), tick.index(
+            'appearances.applySkin(local, "", null);'
+        ))
+
+        # The saved skin stays the skin to return to; the local skin lookups must not wear it.
+        modern = SKIN_MANAGER_MIXIN.read_text(encoding="utf-8")
+        self.assertIn(
+            "if (isLocalPlayer && !com.quickskin.mod.client.services.CpmLookArbiter"
+            ".withholdsSkin(uuid)) {",
+            modern,
+        )
+        if LEGACY_SKIN_MANAGER_MIXIN.exists():
+            legacy = LEGACY_SKIN_MANAGER_MIXIN.read_text(encoding="utf-8")
+            self.assertEqual(2, legacy.count("CpmLookArbiter.withholdsSkin(localUuid)"))
+        # NeoForge's own copy uses the saved skin in a world on 1.21.4, 1.21.5 and from 1.21.9.
+        neoforge = NEOFORGE_SKIN_MANAGER_MIXIN.read_text(encoding="utf-8")
+        gate = "!com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(uuid)"
+        for guarded in (
+            "if (uuid.equals(Minecraft.getInstance().getUser().getProfileId())\n"
+            "                && " + gate + ") {",
+            "|| !config.activeCapeHash.isEmpty())\n                && " + gate + ";",
+            "if (isLocalPlayer && " + gate + ") {",
+            "if (!hasServiceOverrides && isLocalPlayer\n                && " + gate + ") {",
+        ):
+            self.assertIn(guarded, neoforge)
+        self.assertEqual(4, neoforge.count(gate))
+
+        events = CLIENT_EVENTS.read_text(encoding="utf-8")
+        client_tick = events[events.index("ClientTickEvent.CLIENT_POST.register(") :]
+        client_tick = client_tick[: client_tick.index("});")]
+        self.assertIn("CpmLookArbiter.tick();", client_tick)
+        self.assertIn("CpmLookArbiter.bindLiveSession(", events)
+        self.assertIn("ReplayModHelper.isInReplay()", events)
 
     def test_renderer_override_stands_down_for_any_cpm_model(self) -> None:
         integration = CPM_INTEGRATION.read_text(encoding="utf-8")
@@ -200,6 +316,7 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
 
         restorer = SAVED_APPEARANCE_RESTORER.read_text(encoding="utf-8")
         self.assertIn("!config.activeCpmModelHash.isEmpty()", restorer)
+        self.assertIn("CpmLook.owner().withholdsQuickSkinSkin()", restorer)
         self.assertIn(".getAppearance(targetPlayerId) == null) {", restorer)
         self.assertIn(".applyLook(targetPlayerId, null, null, null);", restorer)
         self.assertLess(

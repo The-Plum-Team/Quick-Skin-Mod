@@ -75,7 +75,9 @@ public class MixinSkinManager {
 
         ClientConfig config = ClientConfig.getInstance();
 
-        if (localUuid != null && localUuid.equals(profile.getId()) && !config.activeSkinHash.isEmpty()) {
+        // While a CPM model is the latest look choice, the saved skin is only remembered, not worn.
+        if (localUuid != null && localUuid.equals(profile.getId()) && !config.activeSkinHash.isEmpty()
+                && !com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(localUuid)) {
             LocalAssetManager assetManager = LocalAssetManager.getInstance();
             AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
 
@@ -227,7 +229,8 @@ public class MixinSkinManager {
 
         if (localUuid != null && localUuid.equals(profile.getId())) {
             ClientConfig config = ClientConfig.getInstance();
-            if (config.activeSkinHash.isEmpty()) return;
+            if (config.activeSkinHash.isEmpty()
+                    || com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(localUuid)) return;
             hash = config.activeSkinHash;
 
             LocalAssetManager assetManager = LocalAssetManager.getInstance();
