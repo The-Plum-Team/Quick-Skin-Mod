@@ -290,6 +290,9 @@ public class SkinPreviewOverlay {
         previewData.setSkinLocation(skinTexture);
         previewData.setCapeLocation(null); // No cape for HUD preview
         previewData.setModelType(modelType);
+        // The HUD mirrors the player in the world. A gun mod poses the arms around the weapon it
+        // finds in the main hand, so hiding that one item leaves a rifle stance holding nothing.
+        previewData.markHeldGunVisible();
 
         //? if <1.21.6 {
         PoseStack poseStack = graphics.pose();

@@ -237,6 +237,150 @@ class PreviewEquipmentPolicyTest {
         assertEquals(0, scope.openScopes());
     }
 
+    // ===== the one way around the rule: a draw names slots it leaves visible =================
+
+    @Test
+    void anOrdinaryDrawSuppressesEverySlotOfItsSubjectOnly() {
+        PreviewEquipmentPolicy.Scope<Subject> scope = new PreviewEquipmentPolicy.Scope<>();
+        Subject previewed = new Subject("player");
+        Subject other = new Subject("player");
+
+        for (PreviewEquipmentPolicy.Slot slot : PreviewEquipmentPolicy.Slot.values()) {
+            assertFalse(scope.suppresses(previewed, slot), "suppressed with no scope open: " + slot);
+        }
+
+        scope.begin(previewed);
+        try {
+            for (PreviewEquipmentPolicy.Slot slot : PreviewEquipmentPolicy.Slot.values()) {
+                assertTrue(scope.suppresses(previewed, slot), "not suppressed: " + slot);
+                assertFalse(scope.suppresses(other, slot), "suppressed for another entity: " + slot);
+            }
+            // A vanilla slot a player cannot fill maps to null and must be left alone.
+            assertFalse(scope.suppresses(previewed, null));
+            assertFalse(scope.suppresses(null, PreviewEquipmentPolicy.Slot.CHEST));
+        } finally {
+            scope.end(previewed);
+        }
+    }
+
+    @Test
+    void aDrawCanLeaveOneSlotVisibleWhileEveryOtherStaysSuppressed() {
+        // The HUD preview keeping a held gun readable: the hand shows, and the elytra, the armour
+        // and the off hand - what the rule was written for - still read as empty.
+        PreviewEquipmentPolicy.Scope<Subject> scope = new PreviewEquipmentPolicy.Scope<>();
+        Subject previewed = new Subject("player");
+
+        scope.begin(previewed, EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND));
+        try {
+            assertTrue(scope.isActiveFor(previewed));
+            assertFalse(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.MAIN_HAND));
+            for (PreviewEquipmentPolicy.Slot slot : EnumSet.complementOf(
+                    EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND))) {
+                assertTrue(scope.suppresses(previewed, slot), "not suppressed: " + slot);
+            }
+        } finally {
+            scope.end(previewed);
+        }
+
+        // The rule itself never narrowed: the exception was the draw's, not the policy's.
+        assertTrue(PreviewEquipmentPolicy.suppresses(PreviewEquipmentPolicy.Slot.MAIN_HAND));
+    }
+
+    @Test
+    void theVisibleSlotsEndWithTheDrawThatNamedThem() {
+        PreviewEquipmentPolicy.Scope<Subject> scope = new PreviewEquipmentPolicy.Scope<>();
+        Subject previewed = new Subject("player");
+
+        scope.begin(previewed, EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND));
+        scope.end(previewed);
+        assertFalse(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.MAIN_HAND));
+
+        // The next draw of the same player - a menu preview, say - hides the hand again.
+        scope.begin(previewed);
+        try {
+            assertTrue(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.MAIN_HAND));
+        } finally {
+            scope.end(previewed);
+        }
+    }
+
+    @Test
+    void aNestedBeginCanNeitherRevealNorHideASlotOfTheOuterDraw() {
+        PreviewEquipmentPolicy.Scope<Subject> scope = new PreviewEquipmentPolicy.Scope<>();
+        Subject previewed = new Subject("player");
+
+        scope.begin(previewed);
+        scope.begin(previewed, EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND));
+        assertTrue(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.MAIN_HAND),
+                "an inner begin revealed a slot the outer draw hides");
+        scope.end(previewed);
+        scope.end(previewed);
+
+        scope.begin(previewed, EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND));
+        scope.begin(previewed);
+        assertFalse(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.MAIN_HAND),
+                "an inner begin hid a slot the outer draw shows");
+        scope.end(previewed);
+        assertFalse(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.MAIN_HAND));
+        scope.end(previewed);
+        assertEquals(0, scope.openScopes());
+    }
+
+    @Test
+    void theVisibleSlotsAreFixedWhenTheDrawBegins() {
+        PreviewEquipmentPolicy.Scope<Subject> scope = new PreviewEquipmentPolicy.Scope<>();
+        Subject previewed = new Subject("player");
+        Set<PreviewEquipmentPolicy.Slot> visible = EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND);
+
+        scope.begin(previewed, visible);
+        try {
+            visible.add(PreviewEquipmentPolicy.Slot.CHEST);
+            visible.remove(PreviewEquipmentPolicy.Slot.MAIN_HAND);
+
+            assertTrue(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.CHEST));
+            assertFalse(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.MAIN_HAND));
+        } finally {
+            scope.end(previewed);
+        }
+    }
+
+    @Test
+    void aNullSetOfVisibleSlotsMeansNone() {
+        PreviewEquipmentPolicy.Scope<Subject> scope = new PreviewEquipmentPolicy.Scope<>();
+        Subject previewed = new Subject("player");
+
+        scope.begin(previewed, null);
+        try {
+            assertTrue(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.MAIN_HAND));
+        } finally {
+            scope.end(previewed);
+        }
+    }
+
+    @Test
+    void anotherThreadSeesNeitherTheSuppressionNorTheVisibleSlot() throws Exception {
+        // The integrated server reads its own player's hand on its own thread mid-draw: it must get
+        // the real stack because the scope is not its own, not because the slot happens to show.
+        PreviewEquipmentPolicy.Scope<Subject> scope = new PreviewEquipmentPolicy.Scope<>();
+        Subject previewed = new Subject("player");
+
+        scope.begin(previewed, EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND));
+        try {
+            AtomicBoolean suppressedElsewhere = new AtomicBoolean(true);
+            Thread other = new Thread(() -> suppressedElsewhere.set(
+                    scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.CHEST)),
+                    "not-the-render-thread");
+            other.start();
+            other.join(TimeUnit.SECONDS.toMillis(10));
+
+            assertFalse(other.isAlive(), "the other thread never finished");
+            assertFalse(suppressedElsewhere.get(), "a scope opened on one thread leaked to another");
+            assertTrue(scope.suppresses(previewed, PreviewEquipmentPolicy.Slot.CHEST));
+        } finally {
+            scope.end(previewed);
+        }
+    }
+
     @Test
     void anExceptionInTheDrawStillClosesTheScope() {
         // The renderer opens the scope before the entity render and closes it in the matching
