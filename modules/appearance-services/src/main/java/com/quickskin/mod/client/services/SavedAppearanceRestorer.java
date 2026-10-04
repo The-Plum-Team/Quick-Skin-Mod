@@ -13,8 +13,16 @@ public final class SavedAppearanceRestorer {
 
     public static void restore(UUID targetPlayerId) {
         // A session that shows the look the server saved for this player keeps it on respawn.
+        // When a CPM model was the look meanwhile, the skin was withdrawn and only the skin comes
+        // back: activeSkinHash names the skin now worn (the server's, or one chosen since).
         if (com.quickskin.mod.config.AccountSkinSession.getInstance().adopted(targetPlayerId,
                 net.minecraft.client.Minecraft.getInstance().getConnection())) {
+            PlayerAppearanceService appearances = PlayerAppearanceService.getInstance();
+            String wornSkinHash = com.quickskin.mod.config.ClientConfig.getInstance().activeSkinHash;
+            if (!appearances.hasActiveSkin(targetPlayerId) && !wornSkinHash.isEmpty()) {
+                appearances.applySkin(targetPlayerId, "local_skin:" + wornSkinHash,
+                        LocalAssetManager.getInstance().getSkinModelPreference(wornSkinHash));
+            }
             return;
         }
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
