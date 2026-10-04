@@ -62,7 +62,7 @@ public class LinkButtonsPanel extends AbstractWidget {
         int currentX = getX() + width - BUTTON_SIZE; // Start from right edge
 
         // Settings button (far right)
-        screen.registerWidget(new LinkButton(
+        screen.registerForegroundControl(new LinkButton(
             currentX,
             linkButtonY,
             BUTTON_SIZE,
@@ -91,7 +91,7 @@ public class LinkButtonsPanel extends AbstractWidget {
 
         // Discord button (left of settings)
         currentX -= (BUTTON_SIZE + SPACING);
-        screen.registerWidget(new LinkButton(
+        screen.registerForegroundControl(new LinkButton(
             currentX,
             linkButtonY,
             BUTTON_SIZE,
@@ -103,7 +103,7 @@ public class LinkButtonsPanel extends AbstractWidget {
 
         // CurseForge button (left of Discord)
         currentX -= (BUTTON_SIZE + SPACING);
-        screen.registerWidget(new LinkButton(
+        screen.registerForegroundControl(new LinkButton(
             currentX,
             linkButtonY,
             BUTTON_SIZE,
@@ -115,7 +115,7 @@ public class LinkButtonsPanel extends AbstractWidget {
 
         // Modrinth button (left of CurseForge)
         currentX -= (BUTTON_SIZE + SPACING);
-        screen.registerWidget(new LinkButton(
+        screen.registerForegroundControl(new LinkButton(
             currentX,
             linkButtonY,
             BUTTON_SIZE,

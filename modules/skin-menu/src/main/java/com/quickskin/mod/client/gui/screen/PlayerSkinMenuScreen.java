@@ -30,6 +30,7 @@ import com.quickskin.mod.client.services.MojangApiService;
 //?} else {
 //?}
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
@@ -83,6 +84,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private SkinListPanel skinListPanel;
     private PlayerPreviewPanel playerPreviewPanel;
     private ActionButtonsPanel actionButtonsPanel;
+
+    // Controls that stay above the player preview (drawn after it, clicked before it)
+    private final List<AbstractWidget> foregroundControls = new ArrayList<>();
 
     // Panel dimensions
     private int panelX;
@@ -242,6 +246,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
         super.init();
         clearWidgets();
+        foregroundControls.clear();
 
         // Save rotation state and model type from existing player preview panel before it's destroyed
         if (playerPreviewPanel != null) {
@@ -737,8 +742,31 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         graphics.pose().popMatrix();
 //?}
 
+        // Foreground controls and error toasts go above the player preview. Up to 1.21.5 the GUI
+        // is depth tested: the model sits at z 50 and reaches forward by its scale (200 at most),
+        // tooltips are at z 400. From 1.21.6 a later stratum is drawn on top.
+//? if <1.21.6 {
+        graphics.pose().pushPose();
+        // Stay flat behind a dialog that draws this screen as its backdrop
+        if (Minecraft.getInstance().screen == this) {
+            graphics.pose().translate(0.0F, 0.0F, 350.0F);
+        }
+//?} else {
+        graphics.nextStratum();
+//?}
+        for (AbstractWidget control : foregroundControls) {
+//? if <26.1 {
+            control.render(graphics, mouseX, mouseY, partialTick);
+//?} else {
+            control.extractRenderState(graphics, mouseX, mouseY, partialTick);
+//?}
+        }
+
         // Render error toasts (on top of everything)
         renderErrorToasts(graphics);
+//? if <1.21.6 {
+        graphics.pose().popPose();
+//?}
     }
 
     /**
@@ -896,8 +924,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
 //? if <1.21 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (clickForegroundControls(button, control -> control.mouseClicked(mouseX, mouseY, button))) return true;
 //?} else if <1.21.9 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (clickForegroundControls(button, control -> control.mouseClicked(mouseX, mouseY, button))) return true;
         // Give PlayerWidget input priority for its customization feature
         if (playerPreviewPanel != null) {
             PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
@@ -915,6 +945,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         double mouseX = event.x();
         double mouseY = event.y();
         int button = event.buttonInfo().button();
+        if (clickForegroundControls(button, control -> control.mouseClicked(event, focused))) return true;
         // Give PlayerWidget input priority for its customization feature
         if (playerPreviewPanel != null) {
             PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
@@ -932,6 +963,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         double mouseX = GuiCompat.mouseX(event);
         double mouseY = GuiCompat.mouseY(event);
         int button = GuiCompat.mouseButton(event);
+        if (clickForegroundControls(button, control -> control.mouseClicked(event, focused))) return true;
         // Give PlayerWidget input priority for its customization feature
         if (playerPreviewPanel != null) {
             PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
@@ -954,6 +986,22 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
         return super.mouseClicked(event, focused);
 //?}
+    }
+
+    /**
+     * Offer a click to the foreground controls before the player preview can take it
+     */
+    private boolean clickForegroundControls(int button, java.util.function.Predicate<AbstractWidget> click) {
+        for (AbstractWidget control : foregroundControls) {
+            if (click.test(control)) {
+                this.setFocused(control);
+                if (button == InputConstants.MOUSE_BUTTON_LEFT) {
+                    this.setDragging(true);
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -1242,6 +1290,15 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
      */
     public <T extends net.minecraft.client.gui.components.events.GuiEventListener & net.minecraft.client.gui.components.Renderable & net.minecraft.client.gui.narration.NarratableEntry> void registerWidget(T widget) {
         this.addRenderableWidget(widget);
+    }
+
+    /**
+     * Register a control that stays above the player preview. It is not a renderable:
+     * render() draws it in its own pass after the preview.
+     */
+    public void registerForegroundControl(AbstractWidget widget) {
+        foregroundControls.add(widget);
+        this.addWidget(widget);
     }
 
     /**
