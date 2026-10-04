@@ -87,17 +87,35 @@ public final class CpmLookArbiter {
     }
 
     /**
-     * Whether a CPM model is the local player's look, for Quick Skin's previews of that look, on
-     * the title screen too: the latest decision of {@link #tick()}, or the decision itself before
-     * the first one of a connection. False without CPM, in a replay and while nothing is decided.
-     * Cheap enough to ask every frame.
+     * Whether a CPM model is the local player's look, for a preview drawn every frame (the HUD
+     * overlay): the latest decision of {@link #tick()}. False without CPM, in a replay and while
+     * nothing has been decided since the connection changed, as the world player then keeps
+     * the saved skin. Reads one field.
      */
     public static boolean cpmModelIsTheLook() {
         if (!CPMCompatIntegration.isAvailable() || !isLiveSession()) {
             return false;
         }
-        CpmLook.Owner owner = lastOwner;
-        return (owner != null ? owner : CpmLook.owner()).withholdsQuickSkinSkin();
+        return cpmModelIsTheLook(null, lastOwner);
+    }
+
+    /**
+     * Whether a CPM model is the local player's look now, for a preview built once (a screen's
+     * init): the choice as it stands, so a choice made since the last tick already counts, or the
+     * latest decision of {@link #tick()} while the choice cannot be read. False without CPM and
+     * in a replay. Not for every frame: it reads CPM's state.
+     */
+    public static boolean cpmModelIsTheLookNow() {
+        if (!CPMCompatIntegration.isAvailable() || !isLiveSession()) {
+            return false;
+        }
+        return cpmModelIsTheLook(CpmLook.owner(), lastOwner);
+    }
+
+    /** The choice now when it is known, else the latest decision; neither counts as Quick Skin's. */
+    static boolean cpmModelIsTheLook(CpmLook.Owner now, CpmLook.Owner decided) {
+        CpmLook.Owner owner = now != null && now != CpmLook.Owner.UNKNOWN ? now : decided;
+        return owner != null && owner.withholdsQuickSkinSkin();
     }
 
     private static boolean isLiveSession() {

@@ -327,8 +327,8 @@ public final class MenuIntegration {
                             modelType = player.getSkin().model() == net.minecraft.world.entity.player.PlayerModelType.SLIM ? "slim" : "classic";
                             //?}
                         }
-                    } else if ("auto".equals(modelType)) {
-                        // No custom skin active, use vanilla player's model
+                    } else {
+                        // No custom skin active, use the player's own model
                         //? if <1.21.9 {
                             //? if <1.21 {
                         modelType = player.getModelName(); // "default" or "slim"

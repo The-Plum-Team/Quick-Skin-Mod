@@ -153,11 +153,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   the server's skin-change cooldown does not count that return to the skin worn before as a change
   (`ServerCooldownManager.isSkinChange`). Opening the skin menu is no look choice: it selects no
   entry while CPM's own model is the look and does not select Quick Skin's model again. Quick
-  Skin's previews of the local look follow the same choice (`LocalLookPreview`): in a world they
-  draw the live player, whose model CPM draws; while a CPM model is the look their skin data is
-  never the saved Quick Skin skin, and the title-screen preview, where CPM draws nothing, shows the
-  player's imported own skin. Re-applying an appearance never resets CPM. Quick Skin never hides a model CPM draws: the
-  renderer-level texture override stands down for every player CPM draws a model for
+  Skin's previews of the local look (the HUD overlay, the title and pause menu widgets and the cape
+  screens) follow the same choice (`LocalLookPreview`): in a world they draw the live player, whose
+  model CPM draws; while a CPM model is the look their skin data is never the saved Quick Skin
+  skin, and a title-screen preview that has no player entity to draw, where CPM draws nothing,
+  shows the player's imported own skin. Screens read the choice as it stands when they are built;
+  the HUD overlay reads `CpmLookArbiter`'s latest decision every frame. Re-applying an appearance
+  never resets CPM. Quick Skin never hides a model CPM draws: the renderer-level texture override
+  stands down for every player CPM draws a model for
   (`CPMCompatIntegration.isWearingCpmModel`, the condition of CPM's own render gate read on the
   entry CPM already has, kept per player for 100 ms), so CPM's hook at the tail of that lookup
   binds the model's texture. An empty skin id sets no model override, so the vanilla skin keeps

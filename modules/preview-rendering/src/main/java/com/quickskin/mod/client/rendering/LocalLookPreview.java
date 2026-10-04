@@ -23,14 +23,26 @@ public final class LocalLookPreview {
     }
 
     /**
-     * The skin hash to preview, or an empty string for the caller's own vanilla skin.
+     * The skin hash a preview built once (a screen's init) shows, or an empty string for the
+     * caller's own vanilla skin. It reads the look choice as it stands now.
      *
      * @param inWorld whether the local player exists (false on the title screen)
      */
     public static String skinHash(boolean inWorld) {
+        return skinHash(inWorld, CpmLookArbiter.cpmModelIsTheLookNow());
+    }
+
+    /**
+     * The skin hash the in-world HUD preview shows every frame, or an empty string for the live
+     * player's own skin. It reads the latest decided look choice, which costs one field read.
+     */
+    public static String hudSkinHash() {
+        return skinHash(true, CpmLookArbiter.cpmModelIsTheLook());
+    }
+
+    private static String skinHash(boolean inWorld, boolean cpmModelIsTheLook) {
         ClientConfig config = ClientConfig.getInstance();
-        return skinHash(config.activeSkinHash, config.playerOwnSkinHash,
-                CpmLookArbiter.cpmModelIsTheLook(), inWorld);
+        return skinHash(config.activeSkinHash, config.playerOwnSkinHash, cpmModelIsTheLook, inWorld);
     }
 
     static String skinHash(String savedSkinHash, String ownSkinHash, boolean cpmModelIsTheLook,

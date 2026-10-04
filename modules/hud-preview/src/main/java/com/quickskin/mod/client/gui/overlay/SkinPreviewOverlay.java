@@ -93,7 +93,7 @@ public class SkinPreviewOverlay {
         // Update-on-change logic for huge performance gain
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
         // The saved skin, unless a CPM model is the latest look choice (then the player's own skin).
-        String activeSkinHash = LocalLookPreview.skinHash(true);
+        String activeSkinHash = LocalLookPreview.hudSkinHash();
 
         // Use .equals() for string comparison. lastCheckedSkinHash can be null initially.
         boolean needsUpdate = (lastCheckedSkinHash == null) || !lastCheckedSkinHash.equals(activeSkinHash);

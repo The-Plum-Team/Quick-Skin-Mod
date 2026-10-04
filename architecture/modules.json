@@ -544,6 +544,7 @@
         "minecraft-adapter",
         "platform-api",
         "player-preview",
+        "preview-rendering",
         "ui-foundation"
       ],
       "runtime_only": [],
