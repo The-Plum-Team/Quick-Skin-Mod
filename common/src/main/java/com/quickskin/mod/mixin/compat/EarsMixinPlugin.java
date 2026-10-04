@@ -20,6 +20,10 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
     private static final String CPM_SUBMIT_COLLECTOR_MIXIN = "CpmSubmitCollectorMixin";
     private static final String REPLAY_MOD_COMPAT_MIXIN = "ReplayModCompatMixin";
 
+    private static final String TACZ_PREVIEW_ANIMATION_MIXIN = "TaczPreviewAnimationMixin";
+    private static final String TACZ_ANIMATION_MANAGER =
+            "com/tacz/guns/compat/playeranimator/animation/AnimationManager.class";
+
     @Override
     public void onLoad(String mixinPackage) {
     }
@@ -33,6 +37,13 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         // Use resource lookup instead of Class.forName() to avoid loading the class
         // (which would transitively load AbstractClientPlayer before mixins can transform it)
+        // TaCZ's target is @Pseudo, but resource-gated like the Ears targets below: an ungated @Pseudo
+        // target that is absent costs a Mixin warning at every start of every client without TaCZ. The
+        // resource is visible here on Forge 1.20.1, the lane official TaCZ exists for. TaCZ itself
+        // loads that class only when Player Animator is installed.
+        if (mixinNamed(mixinClassName, TACZ_PREVIEW_ANIMATION_MIXIN)) {
+            return classFileExists(TACZ_ANIMATION_MANAGER);
+        }
         if (mixinClassName.contains("EarsLayerRendererMixin")) {
             return classFileExists("com/unascribed/ears/EarsLayerRenderer.class");
         }

@@ -26,6 +26,7 @@ public class PreviewPlayerData {
     private String modelType; // "classic" or "slim"
     private String capeId;
     private boolean capeAuthoritative;
+    private boolean heldGunVisible;
     private SkinResolution resolution;
     private float yRotation; // Y-axis rotation in degrees
     private float headYaw; // Head yaw for looking around
@@ -128,6 +129,23 @@ public class PreviewPlayerData {
     /** Marks the editor's cape selection - including "no cape" - as authoritative for this preview. */
     public void markCapeAuthoritative() {
         this.capeAuthoritative = true;
+    }
+
+    /**
+     * Whether this preview keeps a held gun of a gun mod visible instead of hiding it with the rest
+     * of the player's equipment.
+     *
+     * <p>Off for every cosmetic preview: a menu shows the skin and the cape. Only a preview that
+     * mirrors the live player in the world asks for it, and the renderer still decides per draw
+     * whether the main-hand item qualifies.
+     */
+    public boolean isHeldGunVisible() {
+        return heldGunVisible;
+    }
+
+    /** Asks the renderer to keep a held gun of a gun mod visible in this preview. */
+    public void markHeldGunVisible() {
+        this.heldGunVisible = true;
     }
 
     public String getModelType() {
