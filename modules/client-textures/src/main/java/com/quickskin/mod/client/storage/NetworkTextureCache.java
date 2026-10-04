@@ -77,6 +77,7 @@ public class NetworkTextureCache {
     //? if <1.21.11 {
     private final Map<TextureKey, Path> tempFileCache = new ConcurrentHashMap<>();
     //?}
+    private final CpmMissedSkinFiles cpmMissedSkinFiles = new CpmMissedSkinFiles();
 
     private NetworkTextureCache() {}
 
@@ -188,6 +189,10 @@ public class NetworkTextureCache {
         if (existingOriginal == null) {
             cachedBytes += prepared.original().length;
             cachedPixels += prepared.pixelCount();
+            if ("skin".equals(textureType) && cpmMissedSkinFiles.takeMiss(hash)) {
+                // CPM loaded a player wearing this skin before the bytes existed and kept no model.
+                com.quickskin.mod.client.compat.CPMCompatIntegration.onMissedNetworkSkinStored(hash);
+            }
         }
         textureDataCache.put(key, prepared.processed());
         NativeImage oldPreparedImage = preparedNativeImages.put(key, nativeImage);
@@ -521,7 +526,9 @@ public class NetworkTextureCache {
         if (existing != null && Files.exists(existing)) {
             return existing;
         }
-        byte[] original = originalTextureData.get(key);
+        // A miss is remembered so the arrival of these bytes makes CPM load the player again.
+        byte[] original = cpmMissedSkinFiles.lookupOrRecordMiss(
+                hash, () -> originalTextureData.get(key));
         if (original == null) return null;
         try {
             Path cpmCacheDir = PlatformHelper.getGameDirectory().resolve("quickskin").resolve("cpm-cache");
@@ -571,6 +578,7 @@ public class NetworkTextureCache {
         //?}
 
         originalTextureData.clear();
+        cpmMissedSkinFiles.clear();
         textureDataCache.clear();
         for (NativeImage image : preparedNativeImages.values()) image.close();
         preparedNativeImages.clear();

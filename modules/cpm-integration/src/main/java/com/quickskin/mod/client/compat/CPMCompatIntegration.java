@@ -537,6 +537,26 @@ public final class CPMCompatIntegration {
     }
 
     /**
+     * The bytes of a network skin arrived after the file-backed bridge had looked for its file.
+     * CPM loads a player once and keeps "no model" while the skin file is missing, so make it load
+     * its players again on the next frame; it then reads the file and finds a model embedded in
+     * the skin. The texture cache calls this once per missed skin, and calls in one frame
+     * coalesce. A no-op without CPM and where CPM does not read Quick Skin's file (1.21.4+).
+     */
+    public static void onMissedNetworkSkinStored(String hash) {
+        if (!isAvailable() || !CpmCapabilities.current().supportsHttpTextureBridge()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft != null && !minecraft.isSameThread()) {
+            minecraft.execute(() -> onMissedNetworkSkinStored(hash));
+            return;
+        }
+        CPMLOG.info("Network skin {} arrived after CPM looked for its file; reloading CPM players", hash);
+        schedulePlayerCacheInvalidation();
+    }
+
+    /**
      * Refreshes CPM after its current extracted/render-state frame has finished. Clearing the
      * definition loader synchronously can leave CPM's already-built renderer pointing at a model
      * whose render types were just discarded (notably Fabric 26.1/26.1.1). CPM exposes this
