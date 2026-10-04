@@ -146,6 +146,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 - CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, and ReplayMod are optional. Guard their entry
   points and preserve the normal skin/cape path when an optional mod or API is absent.
+- Real Camera finds the first-person body by a captured texture id containing `minecraft:skins/`.
+  `RealCameraTextureIdMixin` prefixes Quick Skin skin ids inside Real Camera's own buffer record
+  only; it is a fail-open shim without a compatibility lane. Do not rename the registered
+  `quickskin:` texture locations for another mod.
 - From Minecraft 1.21.2 onward, the vanilla outer skin parts are children of their matching body
   parts. Preserve their baked local poses; copying the parent pose onto a child applies the pivot
   twice and detaches both the flat outer layers and the 3D Skin Layers geometry in offline previews.
