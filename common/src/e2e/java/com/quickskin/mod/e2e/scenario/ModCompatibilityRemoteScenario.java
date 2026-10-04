@@ -38,6 +38,8 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
     private List<Step> buildSubject(Minecraft minecraft) {
         String modId = ModCompatibilityRemoteEvidence.selectedMod();
         ModCompatibilityFeature feature = ModCompatibilityFeature.create(modId, minecraft);
+        // CPM: Alice keeps her embedded-model skin until Bob confirms CPM showed it to him.
+        feature.holdQuickSkinResetUntil(() -> evidence.observerSawEmbeddedCpm(minecraft));
         List<Step> steps = new ArrayList<>();
         steps.add(evidence.integrationStep(modId));
 
@@ -121,13 +123,19 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                 .minTicks(5)
                 .ready(() -> {
                     evidence.stepTowardVantage(minecraft);
-                    return evidence.observerReady(
-                            "observe_remote_applied", minecraft, modId, true);
+                    return evidence.observeEmbeddedCpm(minecraft, modId, observerId)
+                            && (evidence.embeddedCpmFailed()
+                                    || evidence.observerReady(
+                                            "observe_remote_applied", minecraft, modId, true));
                 })
                 .settleTicks(20)
-                .timeoutTicks(20 * 90)
+                // CPM: Bob enters this step before Alice starts her 150 s apply step, so his budget
+                // outlasts hers and a failure on Alice's side is reported by Alice, not hidden.
+                .timeoutTicks("cpm".equals(modId) ? 20 * 180 : 20 * 90)
                 .screenshot(version + "_compat_remote_02_applied_" + role + ".png")
                 .assertion(() -> {
+                    Step.Result embedded = evidence.embeddedCpmProof(modId);
+                    if (!embedded.pass()) return embedded;
                     if (!evidence.remoteBaselineObserved()) {
                         return Step.Result.fail(
                                 "no asserted remote baseline was captured before the change");
@@ -139,8 +147,10 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                     if (!rendered.pass()) return rendered;
                     Step.Result rear = evidence.checkRearComposition(minecraft);
                     if (!rear.pass()) return rear;
+                    String first = embedded.message().isEmpty()
+                            ? "" : "; first " + embedded.message();
                     return Step.Result.pass("remote optional-mod transition witnessed: "
-                            + state.message() + "; " + rear.message());
+                            + state.message() + "; " + rear.message() + first);
                 }));
         return steps;
     }

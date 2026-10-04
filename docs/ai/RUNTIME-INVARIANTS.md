@@ -106,6 +106,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Use `BoundedFileReader`, `SafeImageReader`, and the established GIF preflight path. Do not add
   production `ImageIO.read`, unbounded `Files.readAllBytes`/`readString`, or decode-before-dimension
   validation.
+- Skin import copies decoded pixels that have alpha exactly and never composites them, except in
+  its intended transforms (resizing to a supported resolution and the 64x32 legacy conversion);
+  images without alpha keep the plain blit, so greyscale skins are not gamma-shifted. Transparency
+  flattening forces opacity only on vanilla's own opaque regions, (0,0)-(32,16), (0,16)-(64,32)
+  and (16,48)-(48,64), so data that other mods store in unused texels, such as a CPM model
+  embedded in the skin, survives import with every alpha and colour byte intact.
 - Resolve content-addressed paths through the containment helpers. Reject invalid content IDs,
   symbolic-link targets, and paths outside the configured root.
 - Persist mutable state using a temporary file plus atomic replace where supported. Keep the
@@ -375,6 +381,18 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   and rear vantage, that the observer's renderer has compiled the terrain at and below the
   subject. Vanilla skips entities in uncompiled sections, so appearance state alone can pass on
   a sky-only frame.
+- The CPM apply checkpoints (`mod-compatibility` local apply and the live remote apply/observe
+  pair) first prove, without a capture, Quick Skin's own skin that carries a CPM model in its
+  pixels, imported through the ordinary skin import: on every band the stored file (locally) and
+  the bytes the observer received (remotely) hash to their id and equal the bundled fixture texel
+  for texel; on the file-backed bridge band (1.20.1 to 1.21.3) CPM must also load that very model,
+  recognised by the pose the skin encodes rather than by any new healthy definition, for the
+  local player and for the remote observer, whose acknowledgement the server must confirm before
+  the subject resets.
+  The harness sets the band from the runtime version and fails when `CpmCapabilities` disagrees,
+  so a capability regression cannot silently skip the model check. The phase ends in the same
+  normal-skin state, so frames, captures and checkpoint counts are unchanged; its proof is
+  appended to the bounded `runtime_evidence`.
 - Every orchestrator invocation writes into a fresh owned workspace and promotes only its bounded
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's

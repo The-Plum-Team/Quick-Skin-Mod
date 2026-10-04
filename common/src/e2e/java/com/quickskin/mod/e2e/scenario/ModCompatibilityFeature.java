@@ -42,6 +42,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 /**
  * One real optional-mod workflow behind the two stable public compatibility checkpoints.
@@ -85,6 +86,13 @@ interface ModCompatibilityFeature {
 
     default int appliedTimeoutTicks() {
         return 600;
+    }
+
+    /**
+     * Holds an intermediate phase of {@link #applyQuickSkinFeature()} until {@code gate} holds,
+     * so a remote observer can check it first. Only CPM has such a phase.
+     */
+    default void holdQuickSkinResetUntil(BooleanSupplier gate) {
     }
 
     static void prepareBeforeWorldJoin(String modId) {
@@ -210,6 +218,19 @@ interface ModCompatibilityFeature {
     final class CpmFeature extends BaseFeature {
         private volatile AssetMetadata model;
         private volatile boolean modelActivated;
+        /** CPM's definition object for the protected model, latched by the baseline assertion. */
+        private volatile Object baselineDefinition;
+        private volatile String baselineDefinitionDetail = "baseline assertion did not run";
+        /** Phase E of the apply step: the embedded-model skin, checked without a screenshot. */
+        private volatile boolean embeddedPhase;
+        private volatile String embeddedBytesProof;
+        private volatile String embeddedProof;
+        private volatile BooleanSupplier resetGate = () -> true;
+        private volatile boolean resetGateLogged;
+        private volatile CpmEmbeddedSkinProof.Band band;
+        private int plaidPolls;
+        private final CpmEmbeddedSkinProof.WaitLog embeddedWait =
+                new CpmEmbeddedSkinProof.WaitLog("CPM embedded skin phase");
 //? if <1.21.9 {
         private volatile long firstPersonRenderTypeCheckpoint;
 //?} else {
@@ -253,6 +274,9 @@ interface ModCompatibilityFeature {
             if (!CPMCompatIntegration.isLocalPlayerWearingCpmModel()) {
                 return Step.Result.fail("CPM definition cache does not report the selected model");
             }
+            CpmEmbeddedSkinProof.Definition baseline = CpmEmbeddedSkinProof.definition(playerId);
+            baselineDefinition = baseline.definition();
+            baselineDefinitionDetail = baseline.detail();
             return Step.Result.pass("Quick Skin imported, selected and rendered protected complex "
                     + "CPM fixture " + model.hash());
         }
@@ -315,31 +339,122 @@ interface ModCompatibilityFeature {
             }
         }
 
+        /**
+         * Two phases. Phase E imports Quick Skin's own skin that carries a CPM model through the
+         * ordinary skin import: the stored file must equal the bundled fixture texel for texel
+         * (otherwise the step fails at once), and on the file-backed bridge band CPM must load
+         * that model for the local player. Phase E takes no screenshot; once it holds (and any
+         * remote observer released {@link #holdQuickSkinResetUntil}), the plaid skin is applied
+         * and the step ends exactly as before, in CPM skin mode with the normal skin.
+         */
         @Override
         public void applyQuickSkinFeature() {
-            importAndApply(safeFixture(TestAssets::makeClassicSkin, "normal skin"));
+            embeddedPhase = true;
+            plaidPolls = 0;
+            band = CpmEmbeddedSkinProof.band();
+            if (band.mismatch() != null) {
+                failure = band.mismatch();
+                return;
+            }
+            if (band.bridge() && baselineDefinition == null) {
+                // Without it a rebuilt protected model could not be told apart by identity.
+                failure = "CPM's definition of the protected baseline model was not captured: "
+                        + baselineDefinitionDetail;
+                return;
+            }
+            Path fixture = safeFixture(TestAssets::makeCpmEmbeddedSkin, "CPM embedded-model skin");
+            AssetMetadata embedded = fixture == null ? null : importAndApply(fixture);
+            if (embedded != null) {
+                Step.Result bytes = CpmEmbeddedSkinProof.storedFileExact(
+                        embedded.path(), embedded.hash());
+                if (!bytes.pass()) {
+                    failure = "stored embedded CPM skin " + embedded.hash()
+                            + " differs from the bundled fixture: " + bytes.message();
+                } else {
+                    embeddedBytesProof = bytes.message();
+                }
+            }
             holdFullBody();
         }
 
         @Override
+        public void holdQuickSkinResetUntil(BooleanSupplier gate) {
+            resetGate = gate;
+        }
+
+        @Override
         public boolean quickSkinFeatureReady() {
-            return failure == null
+            if (failure != null) return true;
+            if (embeddedPhase) {
+                holdFullBody();
+                if (!embeddedSkinReady()) return false;
+                if (!resetGate.getAsBoolean()) {
+                    if (!resetGateLogged) {
+                        resetGateLogged = true;
+                        E2ELog.info("CPM embedded skin phase holds until the observer confirms it");
+                    }
+                    return false;
+                }
+                embeddedPhase = false;
+                E2ELog.info("CPM embedded skin phase passed; applying the normal skin");
+                importAndApply(safeFixture(TestAssets::makeClassicSkin, "normal skin"));
+                return failure != null;
+            }
+            plaidPolls++;
+            return plaidPolls >= appliedMinTicks()
                     && activeSkinReady()
                     && ClientConfig.getInstance().activeCpmModelHash.isEmpty()
                     && !CPMCompatIntegration.isLocalPlayerWearingCpmModel()
                     && holdFullBody();
         }
 
+        private boolean embeddedSkinReady() {
+            if (embeddedProof != null) return true;
+            String reason = null;
+            if (!activeSkinReady()) {
+                reason = "the embedded-model skin has not reached the renderer";
+            } else if (!ClientConfig.getInstance().activeCpmModelHash.isEmpty()) {
+                reason = "the CPM model hash is still selected";
+            } else if (ClientConfig.getInstance().pendingCpmSkinModeReset) {
+                reason = "Quick Skin's reset of CPM to skin mode is still pending";
+            } else if (band.bridge()) {
+                reason = CpmEmbeddedSkinProof.modelWaitReason(
+                        CpmEmbeddedSkinProof.definition(playerId), baselineDefinition);
+            }
+            embeddedWait.note(reason);
+            if (reason != null) return false;
+            embeddedProof = "embedded CPM skin " + skinHash + " stored: " + embeddedBytesProof
+                    + "; " + (band.bridge()
+                    ? "CPM loaded its model for the local player ("
+                            + CpmEmbeddedSkinProof.FIXTURE_MODEL + "; renderable, no error; "
+                            + band.describe() + ")"
+                    : "CPM is not asked to read it (" + band.describe() + ")");
+            E2ELog.info(embeddedProof);
+            return true;
+        }
+
+        @Override
+        public int appliedTimeoutTicks() {
+            return 20 * 150;
+        }
+
         @Override
         public Step.Result assertQuickSkinFeature() {
+            if (failure != null) return Step.Result.fail(failure);
+            if (embeddedPhase || embeddedProof == null) {
+                return Step.Result.fail("the embedded CPM skin phase did not complete");
+            }
             if (!ClientConfig.getInstance().activeCpmModelHash.isEmpty()) {
                 return Step.Result.fail("normal skin left the CPM model hash selected");
             }
             if (CPMCompatIntegration.isLocalPlayerWearingCpmModel()) {
                 return Step.Result.fail("CPM kept rendering its model after Quick Skin selected a skin");
             }
-            return activeSkinAssertion(
+            Step.Result reset = activeSkinAssertion(
                     "Quick Skin reset CPM to skin mode and restored its normal skin renderer");
+            return reset.pass()
+                    ? Step.Result.pass(reset.message() + "; first " + embeddedProof)
+                    : reset;
         }
 
         private Path safeFixture(FixtureFactory factory, String label) {
