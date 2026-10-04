@@ -302,8 +302,11 @@ Preserve the durable draft-body ledger: save `uploading` before the upload, `pen
 submission, and `verified` only after identity/hash reconciliation. Missing public listings never
 reset upload intent. The secretless scheduled verifier reads original source inputs as inert data,
 authenticates the original release evidence, and requests protected-environment finalization only
-after every row is verified. An upload workflow can succeed with pending moderation; report that
-state explicitly and retain the original tag, version, bundle and publication identities.
+after every row is verified. Its discovery job holds `contents: write` without an approval only
+because GitHub lists drafts to no other token; it reads release metadata and never an artifact,
+and the probe that downloads artifact bytes stays read-only. An upload workflow can succeed with
+pending moderation; report that state explicitly and retain the original tag, version, bundle and
+publication identities.
 
 The separate SBOM recovery workflow may retain a canonical tag's already tested JARs only after
 authenticating its full release rehearsal and original tag-push provenance. Its bounded metadata

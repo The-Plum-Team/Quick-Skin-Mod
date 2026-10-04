@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from publication_state import (ROOT, SHA, Api, bind, check_all, decode, read_release, ready, report,
-                               require, save)
+                               require, save, unique_object, validate)
 from bounded_zip import ExtractionLimits, extract_bounded_zip
 from feature_coverage_github import _get
 from github_release import load_contract, publish_release, write_checksums
@@ -23,6 +23,8 @@ from verify_release import verify_staged_manifest
 
 MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_PENDING = 32
+# The ledgers reach the probe as one environment string, which Linux caps at 128 KiB.
+MAX_HANDOFF_BYTES = 120_000
 WORKFLOWS = {".github/workflows/release.yml": "push",
              ".github/workflows/release-recovery.yml": "workflow_dispatch"}
 
@@ -32,8 +34,18 @@ def git(*arguments: str) -> str:
                                    stderr=subprocess.DEVNULL, timeout=60).strip()
 
 
-def pending_tags(api: Api) -> list[str]:
-    tags: list[str] = []
+def pending_drafts(api: Api, tag: str | None = None) -> list[dict[str, Any]]:
+    # GitHub shows a draft only to a token with push access; any other token sees none here.
+    if tag is not None:
+        release = read_release(api, tag)
+        state = decode(release.get("body") or "")
+        require(state is not None, "draft has no publication ledger")
+        require(state["tag"] == tag, "draft and publication ledger differ")
+        if not release["draft"]:
+            require(ready(state), "published release has an incomplete ledger")
+            return []
+        return [state]
+    drafts: list[dict[str, Any]] = []
     seen: set[int] = set()
     for page in range(1, 11):
         releases = api.json(f"releases?per_page=100&page={page}")
@@ -47,12 +59,29 @@ def pending_tags(api: Api) -> list[str]:
             state = decode(release.get("body") or "")
             if state is not None:
                 require(release.get("tag_name") == state["tag"], "draft and publication ledger differ")
-                tags.append(state["tag"])
-                require(len(tags) <= MAX_PENDING, "pending release inventory exceeds its limit")
+                drafts.append(state)
+                require(len(drafts) <= MAX_PENDING, "pending release inventory exceeds its limit")
         if len(releases) < 100:
-            require(len(tags) == len(set(tags)), "duplicate pending release tag")
-            return sorted(tags)
+            require(len({state["tag"] for state in drafts}) == len(drafts), "duplicate pending release tag")
+            return sorted(drafts, key=lambda state: state["tag"])
     raise ValueError("release inventory exceeds its pagination limit")
+
+
+def encode_drafts(drafts: list[dict[str, Any]]) -> str:
+    raw = json.dumps(drafts, sort_keys=True, separators=(",", ":"))
+    require(len(raw.encode()) <= MAX_HANDOFF_BYTES, "pending release handoff exceeds its limit")
+    return raw
+
+
+def decode_drafts(raw: str) -> list[dict[str, Any]]:
+    # The probe cannot reread a draft, so it validates the discovery job's ledgers as untrusted data.
+    require(isinstance(raw, str) and 0 < len(raw.encode()) <= MAX_HANDOFF_BYTES,
+            "missing or oversized pending release handoff")
+    drafts = json.loads(raw, object_pairs_hook=unique_object)
+    require(isinstance(drafts, list) and len(drafts) <= MAX_PENDING, "invalid pending release handoff")
+    tags = [validate(state)["tag"] for state in drafts]
+    require(len(tags) == len(set(tags)), "duplicate pending release tag")
+    return drafts
 
 
 def latest_jobs(api: Api, run: dict[str, Any]) -> list[dict[str, Any]]:
@@ -181,13 +210,20 @@ def authenticate_tag(api: Api, state: dict[str, Any], policy_sha: str) -> None:
             "immutable release tag differs from the original source")
 
 
-def verify(api: Api, tag: str, directory: Path, policy_sha: str, *, finalize: bool) -> bool:
-    release = read_release(api, tag)
-    state = decode(release.get("body") or "")
-    require(state is not None, "draft has no publication ledger")
-    if not release["draft"]:
-        require(ready(state), "published release has an incomplete ledger")
-        return False
+def verify(api: Api, tag: str, directory: Path, policy_sha: str, *, finalize: bool,
+           recorded: dict[str, Any] | None = None) -> bool:
+    if recorded is None:
+        release = read_release(api, tag)
+        state = decode(release.get("body") or "")
+        require(state is not None, "draft has no publication ledger")
+        if not release["draft"]:
+            require(ready(state), "published release has an incomplete ledger")
+            return False
+    else:
+        # A read-only token cannot see a draft: observe the ledger the discovery job handed over.
+        require(not finalize, "finalization must reread its own draft")
+        require(recorded["tag"] == tag, "handed-over ledger names another release tag")
+        release, state = None, recorded
     run = api.run(state["run_id"])
     if run.get("status") != "completed":
         print(f"{tag}: original publication workflow is still running")
@@ -229,11 +265,15 @@ def verify(api: Api, tag: str, directory: Path, policy_sha: str, *, finalize: bo
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tag")
+    parser.add_argument("--discover", action="store_true")
     parser.add_argument("--finalize", action="store_true")
     parser.add_argument("--github-output", type=Path)
     args = parser.parse_args()
     try:
         require(not args.finalize or args.tag is not None, "finalization needs one exact tag")
+        require(not (args.discover and args.finalize), "discovery never finalizes")
+        require(args.tag is None or args.discover or args.finalize,
+                "an exact tag needs --discover or --finalize")
         require(os.environ.get("GITHUB_REF") == "refs/heads/master"
                 and os.environ.get("GITHUB_EVENT_NAME") in {"schedule", "workflow_run", "workflow_dispatch"},
                 "verification must run from protected master")
@@ -241,13 +281,24 @@ def main() -> int:
         policy_sha = os.environ["GITHUB_SHA"]
         require(git("rev-parse", "HEAD") == policy_sha == api.current_sha(),
                 "verifier must execute the current protected master implementation")
-        tags = [args.tag] if args.tag else pending_tags(api)
+        if args.discover:
+            drafts = pending_drafts(api, args.tag)
+            print("\n".join(f"{state['tag']}: recorded pending draft" for state in drafts)
+                  or "no recorded pending draft")
+            if args.github_output:
+                with args.github_output.open("a", encoding="utf-8") as output:
+                    output.write(f"pending={encode_drafts(drafts)}\ncount={len(drafts)}\n")
+            return 0
+        recorded = {} if args.finalize else {
+            state["tag"]: state for state in decode_drafts(os.environ.get("PENDING_DRAFTS", ""))}
+        tags = [args.tag] if args.finalize else list(recorded)
         complete: list[dict[str, str]] = []
         failures: list[str] = []
         for tag in tags:
             try:
                 with tempfile.TemporaryDirectory(prefix="pending-release-") as temporary:
-                    if verify(api, tag, Path(temporary), policy_sha, finalize=args.finalize):
+                    if verify(api, tag, Path(temporary), policy_sha, finalize=args.finalize,
+                              recorded=recorded.get(tag)):
                         complete.append({"tag": tag})
             except (ValueError, RuntimeError, OSError, KeyError, TypeError, subprocess.SubprocessError) as exc:
                 # One broken draft must not prevent checking other independent targets.
