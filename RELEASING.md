@@ -120,7 +120,9 @@ flag, or invent a second version ID to hide a partial release. A genuine byte co
 new logical version and therefore a new immutable identity.
 
 `Verify pending releases` wakes after a release/recovery run and on a five-minute schedule
-(GitHub may delay scheduled runs). Its read-only probe checks each pending draft once using
+(GitHub may delay scheduled runs). GitHub lists draft releases only to a token with push access,
+so a small discovery job holds `contents: write`, reads release metadata only and hands the
+recorded ledgers to the probe. The read-only probe checks each pending draft once using
 public marketplace APIs, without upload secrets or a publication lock. It authenticates the
 original producer, protected source history, immutable tag, successful preparation and release
 E2E jobs, archive ID/digest, manifest and every staged file. Old source metadata is read as inert
