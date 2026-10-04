@@ -1,6 +1,6 @@
 {
   "coverage_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-  "observed_at": "2026-10-04T23:56:29Z",
+  "observed_at": "2026-10-04T23:56:55Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -82,11 +82,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -100,36 +100,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842742,
+            "name": "neoforge-26_3--26_3--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842742"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842820,
+            "name": "fabric-26_3--26_3--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842820"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         25
@@ -218,11 +232,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -236,36 +250,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842779,
+            "name": "fabric-26_2--26_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842779"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842796,
+            "name": "neoforge-26_2--26_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842796"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         25
@@ -354,11 +382,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -372,36 +400,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842730,
+            "name": "neoforge-26_1_2--26_1_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842730"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842784,
+            "name": "fabric-26_1_2--26_1_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842784"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         25
@@ -490,11 +532,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -508,36 +550,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842723,
+            "name": "fabric-26_1_1--26_1_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842723"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842763,
+            "name": "neoforge-26_1_1--26_1_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842763"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         25
@@ -626,11 +682,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -644,36 +700,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842743,
+            "name": "neoforge-26_1--26_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842743"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842791,
+            "name": "fabric-26_1--26_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842791"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         25
@@ -762,11 +832,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -780,36 +850,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842712,
+            "name": "neoforge-1_21_11--1_21_11--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842712"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842748,
+            "name": "fabric-1_21_11--1_21_11--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842748"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -898,11 +982,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -916,36 +1000,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842687,
+            "name": "neoforge-1_21_10--1_21_10--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842687"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842733,
+            "name": "fabric-1_21_10--1_21_10--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842733"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -1034,11 +1132,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -1052,36 +1150,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842700,
+            "name": "fabric-1_21_9--1_21_9--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842700"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842725,
+            "name": "neoforge-1_21_9--1_21_9--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842725"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -1170,11 +1282,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -1188,36 +1300,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842647,
+            "name": "neoforge-1_21_8--1_21_8--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842647"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842755,
+            "name": "fabric-1_21_8--1_21_8--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842755"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -1306,11 +1432,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -1324,36 +1450,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842624,
+            "name": "fabric-1_21_7--1_21_7--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842624"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842726,
+            "name": "neoforge-1_21_7--1_21_7--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842726"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -1442,11 +1582,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -1460,36 +1600,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842648,
+            "name": "neoforge-1_21_6--1_21_6--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842648"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842661,
+            "name": "fabric-1_21_6--1_21_6--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842661"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -1578,11 +1732,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -1596,36 +1750,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842684,
+            "name": "fabric-1_21_5--1_21_5--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842684"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842691,
+            "name": "neoforge-1_21_5--1_21_5--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842691"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -1714,11 +1882,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -1732,36 +1900,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842627,
+            "name": "fabric-1_21_4--1_21_4--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842627"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842697,
+            "name": "neoforge-1_21_4--1_21_4--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842697"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -1850,11 +2032,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -1868,36 +2050,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842645,
+            "name": "neoforge-1_21_3--1_21_3--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842645"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842656,
+            "name": "fabric-1_21_3--1_21_3--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842656"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -1986,11 +2182,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -2004,36 +2200,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842614,
+            "name": "neoforge-1_21_2--1_21_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842614"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842635,
+            "name": "fabric-1_21_2--1_21_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842635"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -2122,11 +2332,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -2140,36 +2350,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842617,
+            "name": "fabric-1_21_1--1_21_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842617"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842634,
+            "name": "neoforge-1_21_1--1_21_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842634"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         21
@@ -2258,11 +2482,11 @@
       "e2e": {
         "execution": {
           "attempt": 1,
-          "conclusion": null,
-          "id": 37245524899,
-          "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
+          "conclusion": "success",
+          "id": 37243873278,
+          "sha": "75f1921fbc69a3605285980be0837b2ac546f6cd",
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/attempts/1"
         },
         "expected_jobs": [
           "Classify packaged runtime impact",
@@ -2276,36 +2500,50 @@
           "conclusion": null,
           "id": 37245524899,
           "sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905",
-          "status": "in_progress",
+          "status": "queued",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/attempts/1"
         },
         "jobs": [
           {
             "conclusion": "success",
-            "id": 111562545926,
+            "id": 111557794220,
             "name": "Classify packaged runtime impact",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562545926"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557794220"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562596724,
+            "conclusion": "success",
+            "id": 111557814261,
             "name": "Resolve the exact source Build bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562596724"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111557814261"
           },
           {
-            "conclusion": "skipped",
-            "id": 111562597215,
+            "conclusion": "success",
+            "id": 111559776401,
             "name": "Build immutable E2E input bundle",
             "status": "completed",
-            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37245524899/job/111562597215"
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559776401"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842612,
+            "name": "forge-1_20_1--1_20_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842612"
+          },
+          {
+            "conclusion": "success",
+            "id": 111559842673,
+            "name": "fabric-1_20_1--1_20_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37243873278/job/111559842673"
           }
         ],
-        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
-        "reused": false,
-        "state": "running",
-        "tested_sha": "1a2e7314dee2a16575ae23bd7f5435e95738e905"
+        "reason": "All target jobs and shared prerequisites passed.",
+        "reused": true,
+        "state": "success",
+        "tested_sha": "b3be3d19c0783b20ab1e6386304e650f8ac6fdef"
       },
       "java": [
         17
