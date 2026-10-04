@@ -135,7 +135,7 @@ matching, new retry loop or extra dispatch is added. Historical implementation c
 without this typed signal retain their original classification behavior.
 
 Both generic and exact queue selectors suppress retained inputs while their authenticated
-reports have successful, failed or in-progress owners, and reopen them after cancellation.
+reports have successful, failed or unfinished owners, and reopen them after cancellation.
 Fresh reports start their own seven-day retention after their reviewed input's upload,
 so those markers outlive their inputs and suppress another review. An already-reviewed
 input from a later recuration can instead outlive the other owner's older report; if that
@@ -188,6 +188,59 @@ or substitute the configured delay for a measurement. Updating runner instrument
 changes its exact cache-policy digest. The first new-policy wave therefore uses a new
 cache namespace: retain the old keys, do not migrate verdicts or weaken policy hashing,
 and report actual cold-namespace inference/cache counts separately from overlap savings.
+
+## Where the runner stage went
+
+The runner starts no model process before its first `Sanitized model progress` line, which
+it writes right after the first `Popen`. Splitting the runner step of every review job at that
+line and at the first verification launch, from the exact-attempt job logs of the two complete
+waves that followed the preparation split:
+
+| Generation | Review jobs | Before the first launch | Triage | Verification | Runner step |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `e7ad2618` (2026-09-14) | 16 | 1,949 s | 771 s | 944 s | 3,664 s |
+| `157d3cac` (2026-09-19) | 17 | 1,941 s | 889 s | 935 s | 3,764 s |
+
+About half of that stage therefore had no call in flight: 83–148 s in every job. The
+independent validation step repeats the same input validation in about 9 s; the rest was
+model-image staging. Every chunk decoded, resized and re-encoded its 1920x1080 sources at PNG
+level 9 while holding the one artifact lock that each launch takes again.
+
+The runner now encodes those transient copies at zlib's default level and stages them in the
+chunk workers, holding the lock only to publish a finished copy. They remain deterministic
+1280x720 PNGs with identical pixels, are never uploaded, and no verdict binds their bytes.
+Replaying the retained 180-frame `mc1.20.1` capsule of `26c400a5` through the provider, with
+the model process replaced by a recorder (Windows workstation, four logical CPUs, 23 chunks),
+moved the first launch from 15–26 s to 2–3 s and the last from 44–49 s to 8–12 s; the 156
+staged images grew from 45.0 to 46.9 MiB (4.3 %). That is a local replay, **not a hosted or
+live timing**, and the effect on a complete wave is unknown until one is measured.
+
+The split in the table no longer isolates staging. The first progress line now follows the
+first staged chunk, and the other chunks stage while those calls are in flight, so staging
+moves into the triage column instead of disappearing. Compare a later wave by its runner-step
+total and by the time to its last triage launch (the first progress line whose `triage_chunks`
+equals the `Visual review plan` count, while the plan has no more chunks than parallel calls),
+never by the time to the first launch, and report it with that wave's model attempts and
+cache hits.
+
+The same change removes two causes of repeated inference seen in both waves:
+
+- A reviewer no longer deletes verdict caches whose exact-policy name differs from its own.
+  `anchor-semantic` and `reference-comparison` have different policy digests, so each mode
+  retired the other's current cache: the paired job that followed the anchor restored no
+  shard. Shards of a superseded policy now simply expire after their seven days.
+- A drain whose next job is still waiting has no running job. The guards accepted an owner
+  only as `in_progress` or terminal, and in that interval they ignored the cache, report,
+  attempt marker and generation block it had uploaded: the only other paired job that restored
+  no shard followed such an owner, and on `26c400a5` a sibling reviewed all 180 frames of a
+  generation whose block had been uploaded seconds earlier. The status GitHub reports in that
+  interval was not recorded, so every non-terminal status without a conclusion now counts as
+  the live owner. Its authority is unchanged: the exact successful steps, the upload window
+  and the immutable artifact metadata.
+
+Both edits cost one cold wave. The runner's digest is part of the exact cache policy of the
+ordinary and the optional-mod reviewer, and older shards no longer come from a byte-identical
+cache-producing workflow.
 
 ## Offline replay, overhead and live acceptance
 
@@ -250,9 +303,10 @@ preparation/model queue and stage times, wrapper transfer size/time, cache count
 provider attempts/retries, report/cache upload order and complete-current-head admission.
 The runner now emits only bounded numeric counters to the job summary for that comparison.
 Do not report the modeled saving as achieved, or launch a duplicate full inference wave
-solely to manufacture a benchmark. The model/provider interval remains the dominant
-critical path; a regression beyond the measured overlap budget requires revisiting this
-split rather than increasing concurrent model/cache owners.
+solely to manufacture a benchmark. The serialized runner stage remains the dominant
+critical path, although about half of it was image staging rather than provider time (see
+"Where the runner stage went"); a regression beyond the measured overlap budget requires
+revisiting this split rather than increasing concurrent model/cache owners.
 
 The first deployment had to begin its new-policy live wave only after any already-running
 old-policy model job finished: a previously started immutable workflow keeps its old

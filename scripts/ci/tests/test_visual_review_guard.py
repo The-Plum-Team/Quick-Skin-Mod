@@ -61,7 +61,8 @@ class VisualReviewGuardTest(unittest.TestCase):
         }
 
     def guard(self, bundle="mc1.20.1", *, legacy=False, overrides=None, marker=None, marker_key=None,
-              wave_block=None, archive_path="visual-review-wave-block.json", fresh_workspace=False):
+              wave_block=None, archive_path="visual-review-wave-block.json", fresh_workspace=False,
+              marker_owner=("completed", "failure")):
         review_key = "55" + (f"--{bundle}" if bundle else "")
         name = "visual-review-input-55"
         if not legacy:
@@ -93,7 +94,7 @@ class VisualReviewGuardTest(unittest.TestCase):
                                "workflow_run": {"id": 99}, "created_at": "2099-01-01T00:00:00Z"}]
             }]
             responses[prefix + "runs/99"] = {
-                **owner, "id": 99, "conclusion": "failure",
+                **owner, "id": 99, "status": marker_owner[0], "conclusion": marker_owner[1],
                 "path": ".github/workflows/visual-review-drain.yml",
             }
         if wave_block is not None:
@@ -107,7 +108,7 @@ class VisualReviewGuardTest(unittest.TestCase):
                     "workflow_run": {"id": 99, "head_sha": "a" * 40}}]
             }]
             responses[prefix + "runs/99"] = {
-                **owner, "id": 99, "conclusion": "failure",
+                **owner, "id": 99, "status": marker_owner[0], "conclusion": marker_owner[1],
                 "path": ".github/workflows/visual-review-drain.yml",
             }
             responses[prefix + "artifacts/99/zip"] = {"__archive": archive.name}
@@ -290,6 +291,28 @@ class VisualReviewGuardTest(unittest.TestCase):
                     else:
                         self.assertNotIn(flag, output)
                         self.assertIn("/artifacts/77", requests)
+
+    def test_an_owner_between_two_jobs_still_blocks_suppresses_and_cools(self) -> None:
+        # A drain whose next job is still waiting has no running job and need not be in_progress;
+        # the block, report and attempt marker it uploaded still count.
+        for status in ("queued", "pending"):
+            with self.subTest(status=status, marker="wave-block"):
+                result, output, _ = self.guard(wave_block=self.block(), marker_owner=(status, None))
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn("wave_blocked=true", output)
+                # A runner extracts one block once; the next status starts without it.
+                shutil.rmtree(self.folder / "visual-review-wave-block-99")
+            for marker, flag in (("visual-review", "already_reviewed=true"),
+                                 ("visual-review-attempt", "cooling=true")):
+                with self.subTest(status=status, marker=marker):
+                    result, output, _ = self.guard(marker=marker, marker_owner=(status, None))
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertIn(flag, output)
+                    self.assertIn("reviewable=false", output)
+        # An active status counts only while the run has no conclusion.
+        result, output, _ = self.guard(marker="visual-review", marker_owner=("pending", "failure"))
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("already_reviewed=true", output)
 
 
 if __name__ == "__main__":
