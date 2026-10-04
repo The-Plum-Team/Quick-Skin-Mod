@@ -945,7 +945,8 @@ jobs:
                 --arg implementation_sha "$head_sha" \
                 --arg repository "$GITHUB_REPOSITORY" \
                 '((.status == "completed" and .conclusion == "failure") or
-                  (.status == "in_progress" and .conclusion == null)) and
+                  ((.status | IN("requested", "waiting", "pending", "queued", "in_progress")) and
+                   .conclusion == null)) and
                  (.event == "repository_dispatch" or .event == "schedule" or
                   .event == "workflow_dispatch") and
                  .head_branch == "master" and .head_sha == $implementation_sha and
@@ -1010,7 +1011,8 @@ jobs:
                 --arg repository "$GITHUB_REPOSITORY" \
                 '((.status == "completed" and
                    (.conclusion == "success" or .conclusion == "failure")) or
-                  (.status == "in_progress" and .conclusion == null)) and
+                  ((.status | IN("requested", "waiting", "pending", "queued", "in_progress")) and
+                   .conclusion == null)) and
                  (.event == "repository_dispatch" or .event == "schedule" or
                   .event == "workflow_dispatch") and
                  .head_branch == "master" and
@@ -1047,7 +1049,8 @@ jobs:
             if [[ -n "$attempt_run" ]] && jq -e \
                 --arg repository "$GITHUB_REPOSITORY" \
                 '((.status == "completed" and .conclusion == "failure") or
-                  (.status == "in_progress" and .conclusion == null)) and
+                  ((.status | IN("requested", "waiting", "pending", "queued", "in_progress")) and
+                   .conclusion == null)) and
                  (.event == "repository_dispatch" or .event == "schedule" or
                   .event == "workflow_dispatch") and
                  .head_branch == "master" and
@@ -1261,7 +1264,8 @@ jobs:
                 --argjson run_id "$candidate_run_id" \
                 '.id == $run_id and
                  ((.status == "completed") or
-                  (.status == "in_progress" and .conclusion == null)) and
+                  ((.status | IN("requested", "waiting", "pending", "queued", "in_progress")) and
+                   .conclusion == null)) and
                  (.event == "repository_dispatch" or .event == "schedule" or
                   .event == "workflow_dispatch") and
                  .head_branch == "master" and
@@ -1849,57 +1853,6 @@ jobs:
               exit 1
             fi
           done
-
-      - name: Retire superseded caches for obsolete review policies
-        if: >-
-          always() && steps.verdict-cache-artifact.outputs.artifact-id != ''
-        shell: bash
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          current_id="${{ steps.verdict-cache-artifact.outputs.artifact-id }}"
-          current_name="${{ steps.publish-verdict-cache.outputs.artifact_name }}"
-          [[ "$current_id" =~ ^[1-9][0-9]*$ ]]
-          [[ "$current_name" =~ ^visual-review-verdict-cache-[0-9a-f]{64}$ ]]
-          # This is best-effort hygiene for seven-day cache shards. Only inspect the newest
-          # bounded page; walking the repository-wide artifact history makes cleanup slower and
-          # eventually impossible as ordinary E2E evidence grows.
-          inventory="$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100")"
-          jq -e \
-            'type == "object" and (.artifacts | type == "array") and
-             (.artifacts | length <= 100)' \
-            <<< "$inventory" > /dev/null
-          while IFS=$'\t' read -r stale_id stale_name stale_run_id; do
-            [[ "$stale_id" =~ ^[1-9][0-9]*$ ]]
-            [[ "$stale_name" =~ ^visual-review-verdict-cache-[0-9a-f]{64}$ ]]
-            [[ "$stale_run_id" =~ ^[1-9][0-9]*$ ]]
-            [[ "$stale_id" != "$current_id" ]]
-            stale_run="$(gh api \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$stale_run_id" \
-              2>/dev/null || true)"
-            if [[ -z "$stale_run" ]] || ! jq -e \
-                --arg repository "$GITHUB_REPOSITORY" \
-                --argjson run_id "$stale_run_id" \
-                '.id == $run_id and .status == "completed" and
-                 (.conclusion == "success" or .conclusion == "failure") and
-                 (.event == "repository_dispatch" or .event == "schedule" or
-                  .event == "workflow_dispatch") and
-                 .head_branch == "master" and
-                 .path == ".github/workflows/visual-review-drain.yml" and
-                 .head_repository.full_name == $repository' \
-                <<< "$stale_run" > /dev/null; then
-              continue
-            fi
-            gh api --method DELETE \
-              "repos/$GITHUB_REPOSITORY/actions/artifacts/$stale_id"
-          done < <(jq -r --arg current_name "$current_name" \
-            '.artifacts[] |
-             select(.expired == false and .name != $current_name and
-               (.name | test("^visual-review-verdict-cache-[0-9a-f]{64}$"))) |
-             [.id, .name, .workflow_run.id] | @tsv' <<< "$inventory")
 
       - name: Certify a clean synchronized 1.20.1 anchor
         id: certify

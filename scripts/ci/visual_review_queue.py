@@ -41,6 +41,9 @@ PREPARE_WORKFLOW = ".github/workflows/visual-review.yml"
 DRAIN_WORKFLOW = ".github/workflows/visual-review-drain.yml"
 PREPARE_EVENTS = frozenset({"repository_dispatch", "workflow_run"})
 DRAIN_EVENTS = frozenset({"repository_dispatch", "schedule", "workflow_dispatch"})
+# A run whose next job waits for a runner or a concurrency group has no running job, yet it
+# still owns what its finished jobs uploaded: every non-terminal status is a live owner.
+ACTIVE_RUN_STATUSES = frozenset({"requested", "waiting", "pending", "queued", "in_progress"})
 MAX_ARTIFACTS = 10_000
 MAX_INPUT_BYTES = 536_870_912
 DEFAULT_COOLDOWN_MINUTES = 30
@@ -167,7 +170,7 @@ def valid_owner(
     )
     active = (
         allow_in_progress
-        and run.get("status") == "in_progress"
+        and run.get("status") in ACTIVE_RUN_STATUSES
         and run.get("conclusion") is None
     )
     return bool(
