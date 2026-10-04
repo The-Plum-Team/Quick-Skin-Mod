@@ -1,8 +1,8 @@
 package com.quickskin.mod.client.services;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.common.util.SafeImageReader;
 import net.fabricmc.api.EnvType;
@@ -16,8 +16,11 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 /**
@@ -34,7 +37,54 @@ public final class MojangApiService {
     private static final Pattern USERNAME = Pattern.compile("[A-Za-z0-9_]{1,16}");
     private static final Pattern TEXTURE_PATH =
             Pattern.compile("/texture/[0-9a-fA-F]{32,128}");
-    private MojangApiService() {}
+
+    public enum Stage { LOOKUP, PROFILE, DOWNLOAD }
+
+    public enum Reason {
+        INVALID_USERNAME, NOT_FOUND, NO_CUSTOM_SKIN, HTTP, NETWORK, INVALID_RESPONSE, RESPONSE_TOO_LARGE
+    }
+
+    /** Bounded diagnostic categories; response bodies and exception text are never user messages. */
+    public static final class ImportFailure extends RuntimeException {
+        private final Stage stage;
+        private final Reason reason;
+        private final Integer httpStatus;
+
+        private ImportFailure(Stage stage, Reason reason, Integer httpStatus, Throwable cause) {
+            super("Mojang skin import: " + stage + "/" + reason
+                    + (httpStatus == null ? "" : " (HTTP " + httpStatus + ")"), cause);
+            this.stage = stage;
+            this.reason = reason;
+            this.httpStatus = httpStatus;
+        }
+
+        public Stage stage() { return stage; }
+        public Reason reason() { return reason; }
+        public Integer httpStatus() { return httpStatus; }
+    }
+
+    public static ImportFailure findFailure(Throwable throwable) {
+        while ((throwable instanceof CompletionException || throwable instanceof ExecutionException)
+                && throwable.getCause() != null) {
+            throwable = throwable.getCause();
+        }
+        return throwable instanceof ImportFailure failure ? failure : null;
+    }
+
+    @FunctionalInterface
+    interface ConnectionFactory {
+        HttpURLConnection open(URL url) throws IOException;
+    }
+
+    private final ConnectionFactory connections;
+
+    private MojangApiService() {
+        this(url -> (HttpURLConnection) url.openConnection());
+    }
+
+    MojangApiService(ConnectionFactory connections) {
+        this.connections = Objects.requireNonNull(connections);
+    }
 
     public static MojangApiService getInstance() {
         return INSTANCE;
@@ -47,39 +97,23 @@ public final class MojangApiService {
     /**
      * Fetch a player's UUID from their username
      * @param username The player's username
-     * @return CompletableFuture containing the UUID, or null if not found
+     * @return the UUID, or an exceptional future carrying an ImportFailure
      */
     public CompletableFuture<UUID> getUuidFromUsername(String username) {
         if (username == null || !USERNAME.matcher(username).matches()) {
-            return CompletableFuture.completedFuture(null);
+            return CompletableFuture.failedFuture(new ImportFailure(Stage.LOOKUP, Reason.INVALID_USERNAME, null, null));
         }
         return ClientIoExecutor.supplyAsync(() -> {
-            HttpURLConnection connection = null;
+            byte[] body = readResponse(MOJANG_API_BASE + "/users/profiles/minecraft/" + username,
+                    Stage.LOOKUP, 5000, MAX_JSON_BYTES);
             try {
-                String urlString = MOJANG_API_BASE + "/users/profiles/minecraft/" + username;
-                URL url = new URL(urlString);
-                connection = openConnection(url, 5000);
-
-                int responseCode = connection.getResponseCode();
-                if (responseCode == 200) {
-                    JsonObject json = JsonParser.parseString(
-                            readUtf8Body(connection, MAX_JSON_BYTES)).getAsJsonObject();
-                    String uuidString = json.get("id").getAsString();
-
-                    // Add dashes to UUID string
-                    String formattedUuid = uuidString.replaceFirst(
-                        "(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}+)",
-                        "$1-$2-$3-$4-$5"
-                    );
-
-                    return UUID.fromString(formattedUuid);
-                }
-            } catch (Exception e) {
-                QuickSkinInfo.LOGGER.debug("Unable to resolve Mojang profile for {}", username, e);
-            } finally {
-                if (connection != null) connection.disconnect();
+                String id = requiredString(parseObject(body), "id");
+                if (!id.matches("[0-9a-fA-F]{32}")) throw new IllegalArgumentException("Invalid UUID");
+                return UUID.fromString(id.substring(0, 8) + "-" + id.substring(8, 12) + "-"
+                        + id.substring(12, 16) + "-" + id.substring(16, 20) + "-" + id.substring(20));
+            } catch (RuntimeException malformed) {
+                throw new ImportFailure(Stage.LOOKUP, Reason.INVALID_RESPONSE, 200, malformed);
             }
-            return null;
         });
     }
 
@@ -90,55 +124,49 @@ public final class MojangApiService {
      */
     public CompletableFuture<SkinTextureData> getSkinTextureData(UUID uuid) {
         if (uuid == null) {
-            return CompletableFuture.completedFuture(null);
+            return CompletableFuture.failedFuture(new ImportFailure(Stage.PROFILE, Reason.INVALID_RESPONSE, null, null));
         }
         return ClientIoExecutor.supplyAsync(() -> {
-            HttpURLConnection connection = null;
+            byte[] body = readResponse(SESSION_SERVER_BASE + "/session/minecraft/profile/"
+                    + uuid.toString().replace("-", ""), Stage.PROFILE, 5000, MAX_JSON_BYTES);
             try {
-                String uuidString = uuid.toString().replace("-", "");
-                String urlString = SESSION_SERVER_BASE + "/session/minecraft/profile/" + uuidString;
-                URL url = new URL(urlString);
-                connection = openConnection(url, 5000);
-
-                int responseCode = connection.getResponseCode();
-                if (responseCode == 200) {
-                    JsonObject json = JsonParser.parseString(
-                            readUtf8Body(connection, MAX_JSON_BYTES)).getAsJsonObject();
-                    JsonObject properties = json.getAsJsonArray("properties").get(0).getAsJsonObject();
-                    String texturesBase64 = properties.get("value").getAsString();
-                    if (texturesBase64.length() > MAX_JSON_BYTES) {
-                        return null;
-                    }
-
-                    // Decode the base64 textures
-                    byte[] decodedTextures = Base64.getDecoder().decode(texturesBase64);
-                    if (decodedTextures.length > MAX_JSON_BYTES) return null;
-                    String texturesJson = new String(decodedTextures, StandardCharsets.UTF_8);
-                    JsonObject texturesObject = JsonParser.parseString(texturesJson).getAsJsonObject();
-                    JsonObject textures = texturesObject.getAsJsonObject("textures");
-
-                    if (textures.has("SKIN")) {
-                        JsonObject skinObject = textures.getAsJsonObject("SKIN");
-                        URL skinUrl = validateTextureUrl(skinObject.get("url").getAsString());
-
-                        // Determine model type (slim/default)
-                        String modelType = "default";
-                        if (skinObject.has("metadata")) {
-                            JsonObject metadata = skinObject.getAsJsonObject("metadata");
-                            if (metadata.has("model") && metadata.get("model").getAsString().equals("slim")) {
-                                modelType = "slim";
-                            }
-                        }
-
-                        return new SkinTextureData(skinUrl.toString(), modelType);
+                JsonElement properties = parseObject(body).get("properties");
+                if (properties == null || !properties.isJsonArray()) {
+                    throw new IllegalArgumentException("Missing profile properties");
+                }
+                String encoded = null;
+                for (JsonElement entry : properties.getAsJsonArray()) {
+                    JsonObject property = entry.getAsJsonObject();
+                    if ("textures".equals(requiredString(property, "name"))) {
+                        encoded = requiredString(property, "value");
+                        break;
                     }
                 }
-            } catch (Exception e) {
-                QuickSkinInfo.LOGGER.debug("Unable to resolve Mojang skin texture for {}", uuid, e);
-            } finally {
-                if (connection != null) connection.disconnect();
+                if (encoded == null) throw new IllegalArgumentException("Missing textures property");
+                if (encoded.length() > MAX_JSON_BYTES) {
+                    throw new ImportFailure(Stage.PROFILE, Reason.RESPONSE_TOO_LARGE, 200, null);
+                }
+                byte[] decoded = Base64.getDecoder().decode(encoded);
+                if (decoded.length > MAX_JSON_BYTES) {
+                    throw new ImportFailure(Stage.PROFILE, Reason.RESPONSE_TOO_LARGE, 200, null);
+                }
+                JsonObject textures = requiredObject(parseObject(decoded), "textures");
+                if (!textures.has("SKIN")) {
+                    throw new ImportFailure(Stage.PROFILE, Reason.NO_CUSTOM_SKIN, 200, null);
+                }
+                JsonObject skin = requiredObject(textures, "SKIN");
+                URL skinUrl = validateTextureUrl(requiredString(skin, "url"));
+                String model = "default";
+                if (skin.has("metadata")) {
+                    JsonObject metadata = requiredObject(skin, "metadata");
+                    if (metadata.has("model") && "slim".equals(requiredString(metadata, "model"))) model = "slim";
+                }
+                return new SkinTextureData(skinUrl.toString(), model);
+            } catch (ImportFailure failure) {
+                throw failure;
+            } catch (Exception malformed) {
+                throw new ImportFailure(Stage.PROFILE, Reason.INVALID_RESPONSE, 200, malformed);
             }
-            return null;
         });
     }
 
@@ -149,21 +177,18 @@ public final class MojangApiService {
      */
     public CompletableFuture<BufferedImage> downloadSkinImage(String skinUrl) {
         return ClientIoExecutor.supplyAsync(() -> {
-            HttpURLConnection connection = null;
+            URL url;
             try {
-                URL url = validateTextureUrl(skinUrl);
-                connection = openConnection(url, 10000);
-
-                int responseCode = connection.getResponseCode();
-                if (responseCode == 200) {
-                    return SafeImageReader.readSkin(readBody(connection, MAX_SKIN_BYTES));
-                }
-            } catch (Exception e) {
-                QuickSkinInfo.LOGGER.debug("Unable to download Mojang skin texture", e);
-            } finally {
-                if (connection != null) connection.disconnect();
+                url = validateTextureUrl(skinUrl);
+            } catch (Exception malformed) {
+                throw new ImportFailure(Stage.DOWNLOAD, Reason.INVALID_RESPONSE, null, malformed);
             }
-            return null;
+            byte[] body = readResponse(url.toString(), Stage.DOWNLOAD, 10000, MAX_SKIN_BYTES);
+            try {
+                return SafeImageReader.readSkin(body);
+            } catch (IOException | RuntimeException malformed) {
+                throw new ImportFailure(Stage.DOWNLOAD, Reason.INVALID_RESPONSE, 200, malformed);
+            }
         });
     }
 
@@ -175,32 +200,56 @@ public final class MojangApiService {
      */
     public CompletableFuture<MojangSkinData> fetchSkinByUsername(String username) {
         return getUuidFromUsername(username)
-            .thenCompose(uuid -> {
-                if (uuid == null) {
-                    return CompletableFuture.completedFuture(null);
-                }
-                return getSkinTextureData(uuid)
-                    .thenCompose(textureData -> {
-                        if (textureData == null) {
-                            return CompletableFuture.completedFuture(null);
-                        }
-                        return downloadSkinImage(textureData.url)
-                            .thenApply(image -> {
-                                if (image == null) {
-                                    return null;
-                                }
-                                return new MojangSkinData(username, uuid, image, textureData.modelType);
-                            });
-                    });
-            });
+                .thenCompose(uuid -> getSkinTextureData(uuid)
+                        .thenCompose(texture -> downloadSkinImage(texture.url)
+                                .thenApply(image -> new MojangSkinData(username, uuid, image, texture.modelType))));
     }
 
-    private static HttpURLConnection openConnection(URL url, int timeoutMillis)
+    private byte[] readResponse(String url, Stage stage, int timeout, int maximum) {
+        HttpURLConnection connection = null;
+        Integer status = null;
+        try {
+            connection = openConnection(new URL(url), timeout);
+            status = connection.getResponseCode();
+            if (status != 200) {
+                // The name lookup answers a missing player with 404 (an empty 204 before Mojang
+                // changed it). Any other status is a failed request rather than a missing player.
+                Reason reason = stage == Stage.LOOKUP && (status == 404 || status == 204)
+                        ? Reason.NOT_FOUND : Reason.HTTP;
+                throw new ImportFailure(stage, reason, status, null);
+            }
+            return readBody(connection, maximum, stage);
+        } catch (IOException network) {
+            throw new ImportFailure(stage, Reason.NETWORK, status, network);
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private static JsonObject parseObject(byte[] body) {
+        return JsonParser.parseString(new String(body, StandardCharsets.UTF_8)).getAsJsonObject();
+    }
+
+    private static String requiredString(JsonObject object, String name) {
+        JsonElement value = object.get(name);
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
+            throw new IllegalArgumentException("Missing or invalid string: " + name);
+        }
+        return value.getAsString();
+    }
+
+    private static JsonObject requiredObject(JsonObject object, String name) {
+        JsonElement value = object.get(name);
+        if (value == null || !value.isJsonObject()) throw new IllegalArgumentException("Missing or invalid object: " + name);
+        return value.getAsJsonObject();
+    }
+
+    private HttpURLConnection openConnection(URL url, int timeoutMillis)
             throws IOException {
         if (!"https".equalsIgnoreCase(url.getProtocol())) {
             throw new IOException("Mojang request must use HTTPS");
         }
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        HttpURLConnection connection = connections.open(url);
         connection.setInstanceFollowRedirects(false);
         connection.setRequestMethod("GET");
         connection.setConnectTimeout(timeoutMillis);
@@ -210,24 +259,19 @@ public final class MojangApiService {
         return connection;
     }
 
-    private static byte[] readBody(HttpURLConnection connection, int maxBytes)
+    private static byte[] readBody(HttpURLConnection connection, int maxBytes, Stage stage)
             throws IOException {
         long advertisedLength = connection.getContentLengthLong();
         if (advertisedLength > maxBytes) {
-            throw new IOException("Mojang response exceeds " + maxBytes + " bytes");
+            throw new ImportFailure(stage, Reason.RESPONSE_TOO_LARGE, 200, null);
         }
         try (InputStream input = connection.getInputStream()) {
             byte[] body = input.readNBytes(maxBytes + 1);
             if (body.length > maxBytes) {
-                throw new IOException("Mojang response grew beyond " + maxBytes + " bytes");
+                throw new ImportFailure(stage, Reason.RESPONSE_TOO_LARGE, 200, null);
             }
             return body;
         }
-    }
-
-    private static String readUtf8Body(HttpURLConnection connection, int maxBytes)
-            throws IOException {
-        return new String(readBody(connection, maxBytes), StandardCharsets.UTF_8);
     }
 
     /** Accept historical HTTP payloads only for Mojang's exact texture host, then upgrade them. */
