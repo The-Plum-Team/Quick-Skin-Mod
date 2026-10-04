@@ -189,10 +189,6 @@ public class NetworkTextureCache {
         if (existingOriginal == null) {
             cachedBytes += prepared.original().length;
             cachedPixels += prepared.pixelCount();
-            if ("skin".equals(textureType) && cpmMissedSkinFiles.takeMiss(hash)) {
-                // CPM loaded a player wearing this skin before the bytes existed and kept no model.
-                com.quickskin.mod.client.compat.CPMCompatIntegration.onMissedNetworkSkinStored(hash);
-            }
         }
         textureDataCache.put(key, prepared.processed());
         NativeImage oldPreparedImage = preparedNativeImages.put(key, nativeImage);
@@ -204,6 +200,10 @@ public class NetworkTextureCache {
         cachedBytes += prepared.processed().length;
         accessOrder.put(key, Boolean.TRUE);
         evictToLimits();
+        if (cpmMissedSkinFiles.takeStoredSkinMiss(textureType, hash, textureDataCache.containsKey(key))) {
+            // CPM may have loaded a player wearing this skin before the bytes existed (no model).
+            com.quickskin.mod.client.compat.CPMCompatIntegration.onMissedNetworkSkinStored(hash);
+        }
         prepared.releaseLease();
         return textureDataCache.containsKey(key);
     }

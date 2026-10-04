@@ -69,16 +69,47 @@ class CpmMissedSkinFilesTest {
     }
 
     @Test
-    void theSetIsBoundedAndClearedWithTheSession() {
+    void aFullSetDropsOnlyTheMissAskedForLeastRecently() {
         CpmMissedSkinFiles misses = new CpmMissedSkinFiles();
-        for (int i = 0; i < CpmMissedSkinFiles.MAX_ENTRIES + 10; i++) {
+        for (int i = 0; i < CpmMissedSkinFiles.MAX_ENTRIES; i++) {
             misses.lookupOrRecordMiss("sha256-" + i, () -> null);
-            assertTrue(misses.size() <= CpmMissedSkinFiles.MAX_ENTRIES);
         }
-        assertTrue(misses.takeMiss("sha256-" + (CpmMissedSkinFiles.MAX_ENTRIES + 9)));
+        // Skin 0 is still rendered every frame while its bytes are missing; skin 1 is not.
+        misses.lookupOrRecordMiss("sha256-0", () -> null);
+        misses.lookupOrRecordMiss("sha256-new", () -> null);
+
+        assertEquals(CpmMissedSkinFiles.MAX_ENTRIES, misses.size());
+        assertTrue(misses.takeMiss("sha256-0"));
+        assertFalse(misses.takeMiss("sha256-1"));
+        assertTrue(misses.takeMiss("sha256-2"));
+        assertTrue(misses.takeMiss("sha256-new"));
+    }
+
+    @Test
+    void onlyAStoredSkinAnswersItsMiss() {
+        CpmMissedSkinFiles misses = new CpmMissedSkinFiles();
+        misses.lookupOrRecordMiss(HASH, () -> null);
+
+        // A cape or elytra with the same hash, or a skin that was not kept, leaves the miss pending.
+        assertFalse(misses.takeStoredSkinMiss("cape", HASH, true));
+        assertFalse(misses.takeStoredSkinMiss("elytra", HASH, true));
+        assertFalse(misses.takeStoredSkinMiss("skin", HASH, false));
+        assertEquals(1, misses.size());
+
+        assertTrue(misses.takeStoredSkinMiss("skin", HASH, true));
+        // Storing the same skin again (or a skin nobody missed) does not reload CPM.
+        assertFalse(misses.takeStoredSkinMiss("skin", HASH, true));
+        assertFalse(misses.takeStoredSkinMiss("skin", "sha256-" + "c".repeat(64), true));
+    }
+
+    @Test
+    void theSetIsClearedWithTheSession() {
+        CpmMissedSkinFiles misses = new CpmMissedSkinFiles();
+        misses.lookupOrRecordMiss(HASH, () -> null);
 
         misses.clear();
         assertEquals(0, misses.size());
+        assertFalse(misses.takeMiss(HASH));
         assertNull(misses.lookupOrRecordMiss(null, () -> null));
         assertEquals(0, misses.size());
         assertFalse(misses.takeMiss(null));
