@@ -19,6 +19,7 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
     );
     private static final String CPM_SUBMIT_COLLECTOR_MIXIN = "CpmSubmitCollectorMixin";
     private static final String REPLAY_MOD_COMPAT_MIXIN = "ReplayModCompatMixin";
+    private static final String REAL_CAMERA_TEXTURE_ID_MIXIN = "RealCameraTextureIdMixin";
 
     private static final String TACZ_PREVIEW_ANIMATION_MIXIN = "TaczPreviewAnimationMixin";
     private static final String TACZ_ANIMATION_MANAGER =
@@ -61,6 +62,11 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // classes. It is therefore safe to transform unconditionally; its handler no-ops unless
         // the active connection is ReplayMod's fake playback connection.
         if (mixinNamed(mixinClassName, REPLAY_MOD_COMPAT_MIXIN)) {
+            return true;
+        }
+        // The Real Camera target is @Pseudo, so Mixin already skips it when that mod is absent; a
+        // resource gate could only switch the shim off by mistake (see the CPM note above).
+        if (mixinNamed(mixinClassName, REAL_CAMERA_TEXTURE_ID_MIXIN)) {
             return true;
         }
         return false;
