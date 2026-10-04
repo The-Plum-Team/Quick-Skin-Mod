@@ -1222,20 +1222,6 @@ public final class VanillaShim {
         }
     }
 
-    /**
-     * Set the window's GUI scale factor. The caller must reopen its screen afterwards, because the
-     * scaled dimensions a screen lays itself out against are read once, when it is opened.
-     */
-    public static boolean setGuiScale(Minecraft mc, int scale) {
-        try {
-            mc.getWindow().setGuiScale(scale);
-            return true;
-        } catch (Throwable t) {
-            E2ELog.warn("setGuiScale: " + t);
-            return false;
-        }
-    }
-
     /** The actual vanilla head-visibility rule, kept separate from Quick Skin's texture binding. */
     public record TabListHeadPolicy(boolean visible, String rule) {}
 
