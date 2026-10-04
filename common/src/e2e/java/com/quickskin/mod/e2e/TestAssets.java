@@ -42,6 +42,21 @@ public final class TestAssets {
     private static final String CPM_MODEL_CONTENT_ID =
             "sha256-2acd67e358456caf86aa0fad54f88b2e2fe0dfd2bc1160638b6f69b1689e1845";
 
+    /**
+     * Quick Skin's own skin carrying a CPM model in its pixels: a byte copy of
+     * {@code modules/image-core/src/test/resources/cpm/cpm-embedded-full.png}, written with CPM's
+     * own writer (see the README there). Seven model texels have alpha 1 to 254 and three have
+     * alpha 0 with colour, so an import that composites or flattens them breaks the model.
+     */
+    private static final String BUNDLED_CPM_EMBEDDED_SKIN = "/qs_e2e_cpm_embedded_skin.png";
+
+    /** Exact identity of {@link #BUNDLED_CPM_EMBEDDED_SKIN}. */
+    public static final String CPM_EMBEDDED_SKIN_CONTENT_ID =
+            "sha256-d07c4907d7e1018bf4e16a2e82008fd07abba096b188bb34b1401324111c251e";
+
+    /** Read cap for the embedded-model skin resource (the file is 1564 bytes). */
+    private static final int MAX_CPM_EMBEDDED_SKIN_BYTES = 64 * 1024;
+
     /** The production BMO atlas used to prove that the editor preserves bundled cape UVs. */
     private static final String BUNDLED_BMO_CAPE =
             "/assets/quickskin/textures/capes/bmo.png";
@@ -520,6 +535,44 @@ public final class TestAssets {
         }
         E2ELog.info("using protected complex CPM fixture " + CPM_MODEL_CONTENT_ID);
         return fixture;
+    }
+
+    /**
+     * Copies the bundled skin that carries an embedded CPM model, after checking its pinned
+     * identity, so the compatibility lane imports it through Quick Skin's ordinary skin path.
+     */
+    public static Path makeCpmEmbeddedSkin() throws Exception {
+        byte[] bytes = cpmEmbeddedSkinBytes();
+        Path fixture = deterministicFixture("qs_e2e_cpm_embedded_skin.png");
+        Files.write(fixture, bytes);
+        E2ELog.info("using bundled CPM embedded-model skin " + CPM_EMBEDDED_SKIN_CONTENT_ID);
+        return fixture;
+    }
+
+    /** The 64x64 ARGB texels of the embedded-model skin, the reference for every stored copy. */
+    public static int[] cpmEmbeddedSkinArgb() throws Exception {
+        BufferedImage image = ImageIO.read(new java.io.ByteArrayInputStream(cpmEmbeddedSkinBytes()));
+        if (image == null || image.getWidth() != 64 || image.getHeight() != 64) {
+            throw new IllegalStateException("CPM embedded-model skin must be a 64x64 PNG");
+        }
+        return image.getRGB(0, 0, 64, 64, null, 0, 64);
+    }
+
+    private static byte[] cpmEmbeddedSkinBytes() throws Exception {
+        byte[] bytes;
+        try (InputStream in = TestAssets.class.getResourceAsStream(BUNDLED_CPM_EMBEDDED_SKIN)) {
+            if (in == null) {
+                throw new IllegalStateException(
+                        "missing bundled resource " + BUNDLED_CPM_EMBEDDED_SKIN);
+            }
+            bytes = BoundedFileReader.readBytes(in, MAX_CPM_EMBEDDED_SKIN_BYTES);
+        }
+        String contentId = HashUtil.computeContentId(bytes);
+        if (!CPM_EMBEDDED_SKIN_CONTENT_ID.equals(contentId)) {
+            throw new IllegalStateException(
+                    "CPM embedded-model skin has unexpected content identity " + contentId);
+        }
+        return bytes;
     }
 
     private static BufferedImage bundledSkinCopy() throws Exception {

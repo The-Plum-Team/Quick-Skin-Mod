@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import unittest
@@ -553,8 +554,14 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         evidence = (
             E2E_JAVA / "scenario" / "ModCompatibilityRemoteEvidence.java"
         ).read_text(encoding="utf-8")
+        # The CPM definition probe lives in the shared embedded-skin proof since both the local
+        # and the remote CPM checks read it.
+        cpm_probe = (
+            E2E_JAVA / "scenario" / "CpmEmbeddedSkinProof.java"
+        ).read_text(encoding="utf-8")
         harness = (E2E_JAVA / "E2EHarness.java").read_text(encoding="utf-8")
 
+        self.assertIn("CpmEmbeddedSkinProof.definition(subjectId)", evidence)
         self.assertIn("MOD_COMPATIBILITY_REMOTE", harness)
         self.assertIn("MOD_COMPATIBILITY_LATE_JOIN", harness)
         self.assertEqual(2, remote.count(".screenshot("))
@@ -607,20 +614,142 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn('E2ELog.info(step + " waiting: " + reason)', evidence)
         self.assertIn("NetworkTextureCache.getInstance().hasTexture", evidence)
         self.assertIn('"quickskin:network/skin/" + hash', evidence)
-        self.assertIn('getMethod("getGP_UUID", Object.class)', evidence)
-        self.assertIn('getMethod("getLoadedPlayer", Object.class)', evidence)
+        self.assertIn('getMethod("getGP_UUID", Object.class)', cpm_probe)
+        self.assertIn('getMethod("getLoadedPlayer", Object.class)', cpm_probe)
         self.assertIn(
-            'getMethod("loadPlayer", Object.class, String.class)', evidence
+            'getMethod("loadPlayer", Object.class, String.class)', cpm_probe
         )
-        self.assertIn("getOrLoadCpmPlayer(loader, gamePlayer)", evidence)
-        self.assertIn('getMethod("getModelDefinition")', evidence)
-        self.assertIn('getMethod("doRender")', evidence)
-        self.assertIn('getMethod("getError")', evidence)
+        self.assertIn("getOrLoadCpmPlayer(loader, gamePlayer)", cpm_probe)
+        self.assertIn('getMethod("getModelDefinition")', cpm_probe)
+        self.assertIn('getMethod("doRender")', cpm_probe)
+        self.assertIn('getMethod("getError")', cpm_probe)
         self.assertIn('getMethod("getById", UUID.class)', evidence)
         self.assertIn('"TALL".equals(publicField(value, "earMode"))', evidence)
         self.assertIn('"BACK".equals(publicField(value, "tailMode"))', evidence)
         self.assertIn("DefaultSkinEvidenceView.checkRearView", evidence)
         self.assertIn("without another Alice-side change", late_join)
+
+    def test_cpm_lane_proves_a_model_embedded_in_a_skin_without_new_captures(self) -> None:
+        """The CPM apply steps first check Quick Skin's own embedded-model skin, uncaptured."""
+
+        assets = (E2E_JAVA / "TestAssets.java").read_text(encoding="utf-8")
+        feature = (
+            E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+        local = (
+            E2E_JAVA / "scenario" / "ModCompatibilityScenario.java"
+        ).read_text(encoding="utf-8")
+        remote = (
+            E2E_JAVA / "scenario" / "ModCompatibilityRemoteScenario.java"
+        ).read_text(encoding="utf-8")
+        evidence = (
+            E2E_JAVA / "scenario" / "ModCompatibilityRemoteEvidence.java"
+        ).read_text(encoding="utf-8")
+        proof = (
+            E2E_JAVA / "scenario" / "CpmEmbeddedSkinProof.java"
+        ).read_text(encoding="utf-8")
+        verify_release = (ROOT / "scripts/release/verify_release.py").read_text(
+            encoding="utf-8"
+        )
+
+        # Our own fixture, written by CPM's writer for the image-core tests; never the protected
+        # model, so no secret is needed and the protected-fixture policy is unchanged.
+        fixture = CPM_RESOURCES / "qs_e2e_cpm_embedded_skin.png"
+        source = (
+            ROOT / "modules/image-core/src/test/resources/cpm/cpm-embedded-full.png"
+        )
+        self.assertEqual(fixture.read_bytes(), source.read_bytes())
+        digest = hashlib.sha256(fixture.read_bytes()).hexdigest()
+        self.assertIn(f'"sha256-{digest}"', assets)
+        self.assertEqual(list(CPM_RESOURCES.glob("*.cpmmodel")), [])
+        self.assertIn('"/qs_e2e_cpm_embedded_skin.png"', assets)
+        self.assertIn("public static Path makeCpmEmbeddedSkin()", assets)
+        self.assertIn("CPM_EMBEDDED_SKIN_CONTENT_ID.equals(contentId)", assets)
+        self.assertIn('"qs_e2e_cpm_embedded_skin.png",', verify_release)
+
+        # Local: phase E imports through the ordinary skin import and fails fast on altered bytes.
+        cpm = feature[
+            feature.index("final class CpmFeature") : feature.index("final class EarsFeature")
+        ]
+        self.assertIn("TestAssets::makeCpmEmbeddedSkin", cpm)
+        self.assertIn("importAndApply(fixture)", cpm)
+        self.assertIn("CpmEmbeddedSkinProof.storedFileExact(", cpm)
+        self.assertIn("if (failure != null) return true;", cpm)
+        self.assertIn("CpmEmbeddedSkinProof.band()", cpm)
+        self.assertIn("baseline = CpmEmbeddedSkinProof.definition(playerId);", cpm)
+        self.assertIn("baselineDefinition = baseline.definition();", cpm)
+        # On the bridge band a missing baseline definition fails instead of skipping the guard.
+        self.assertIn("if (band.bridge() && baselineDefinition == null) {", cpm)
+        self.assertIn("CpmEmbeddedSkinProof.modelWaitReason(", cpm)
+        self.assertIn("ClientConfig.getInstance().pendingCpmSkinModeReset", cpm)
+        self.assertIn('"; first " + embeddedProof', cpm)
+        self.assertIn("return 20 * 150;", cpm)
+        self.assertLess(
+            cpm.index("TestAssets::makeCpmEmbeddedSkin"),
+            cpm.index("TestAssets::makeClassicSkin"),
+        )
+        self.assertLess(
+            cpm.index("resetGate.getAsBoolean()"), cpm.index("TestAssets::makeClassicSkin")
+        )
+        self.assertIn("default void holdQuickSkinResetUntil(BooleanSupplier gate)", feature)
+
+        # The proof: exact bytes everywhere, the model where CPM reads Quick Skin's file, and a
+        # harness band that must agree with the product capability.
+        self.assertIn("HashUtil.computeContentId(bytes)", proof)
+        self.assertIn("texels differ from the bundled embedded-model", proof)
+        self.assertIn("CpmCapabilities.current().supportsHttpTextureBridge()", proof)
+        self.assertIn("if (minor == 21) return patch <= 3;", proof)
+        self.assertIn("if (harness != product)", proof)
+        self.assertIn("state.definition() == baselineDefinition", proof)
+        # The loaded definition must be the fixture's own model, not any new healthy one.
+        self.assertIn("String mismatch = fixtureModelMismatch(state.definition());", proof)
+        self.assertIn('mainRoot(definition, elementFor, parts, "HEAD")', proof)
+        self.assertIn('getMethod("isHidden")', proof)
+        self.assertIn('getField("rotN")', proof)
+        payload = (
+            ROOT / "modules/image-core/src/test/resources/cpm/cpm-embedded-full.payload.bin"
+        ).read_bytes()
+        for part_id, constant, short in ((3, "RIGHT_ARM_Z", 21845), (5, "RIGHT_LEG_Z", 5461)):
+            block = payload.index(bytes([0x07, 0x0D, part_id]))
+            # PLAYER_PARTPOS block: id, a 6-byte position, then x, y, z angles as shorts.
+            angles = payload[block + 9 : block + 15]
+            self.assertEqual(angles, bytes(4) + short.to_bytes(2, "big"))
+            self.assertIn(f"{constant} = (float) ({short} / 65535f * 2 * Math.PI);", proof)
+            self.assertIn(f"{constant.replace('_Z', '_ID')} = {part_id};", proof)
+        self.assertNotIn("CpmMissedSkinFiles", proof)
+        self.assertNotIn("onMissedNetworkSkinStored", proof)
+
+        # Remote: Bob checks the bytes he received, acknowledges once, and only then may Alice
+        # reset; the model-less embedded skin can never pass as the applied state.
+        self.assertIn(
+            "feature.holdQuickSkinResetUntil(() -> evidence.observerSawEmbeddedCpm(minecraft))",
+            remote,
+        )
+        self.assertIn("evidence.observeEmbeddedCpm(minecraft, modId, observerId)", remote)
+        self.assertIn("evidence.embeddedCpmProof(modId)", remote)
+        self.assertIn('"quickskin_e2e_observer_saw_embedded_cpm"', evidence)
+        self.assertIn(
+            "cache.getTextureData(hash, \"skin\"), hash", evidence
+        )
+        self.assertIn(
+            'if (!"cpm".equals(modId) || embeddedAcknowledged || embeddedFailure != null) '
+            "return true;",
+            evidence,
+        )
+        # Bob's acknowledgement counts only once the server acknowledged it, and a definite
+        # failure (band mismatch, altered fixture bytes) ends his wait at once.
+        self.assertIn("observerId, OBSERVER_EMBEDDED_CPM_SKIN_ID)) {", evidence)
+        self.assertIn("evidence.embeddedCpmFailed()", remote)
+        self.assertIn("bytes.alteredFixture()", evidence)
+        self.assertIn('"cpm".equals(modId) ? 20 * 180 : 20 * 90', remote)
+        self.assertIn("Alice still wears the embedded CPM skin", evidence)
+
+        # No new step and no new capture: the public checkpoint products stay 2/5/7.
+        self.assertEqual(2, local.count(".screenshot("))
+        self.assertEqual(2, remote.count(".screenshot("))
+        self.assertEqual(0, feature.count(".screenshot("))
+        self.assertEqual(0, proof.count(".screenshot("))
+        self.assertNotIn("Step.of(", proof)
 
     def test_cpm_first_person_hand_is_captured_again_after_ten_seconds(self) -> None:
         scenario = (
