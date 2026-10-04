@@ -181,9 +181,20 @@ class CpmEmbeddedSkinImportTest {
             assertPixelsEqual(decoded, importSkin(decoded, true), names[i]);
         }
 
+        // Greyscale without alpha (8 and 16 bit): getRGB would gamma-convert these, vanilla shows raw grey.
+        BufferedImage gray8 = new BufferedImage(64, 64, BufferedImage.TYPE_BYTE_GRAY);
+        BufferedImage gray16 = new BufferedImage(64, 64, BufferedImage.TYPE_USHORT_GRAY);
+        for (int y = 0; y < 64; y++) {
+            for (int x = 0; x < 64; x++) {
+                gray8.getRaster().setSample(x, y, 0, (x * 4 + y) & 0xFF);
+                gray16.getRaster().setSample(x, y, 0, ((x * 4 + y) & 0xFF) * 257);
+            }
+        }
+
         // An opaque skin must encode exactly as before, so its content id does not move.
         for (BufferedImage opaque : new BufferedImage[] {
-                SafeImageReader.readSkin(png(rgb)), SafeImageReader.readSkin(png(opaqueArgb(translucent)))}) {
+                SafeImageReader.readSkin(png(rgb)), SafeImageReader.readSkin(png(opaqueArgb(translucent))),
+                SafeImageReader.readSkin(png(gray8)), SafeImageReader.readSkin(png(gray16))}) {
             BufferedImage composited = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
             Graphics2D graphics = composited.createGraphics();
             graphics.drawImage(opaque, 0, 0, null);

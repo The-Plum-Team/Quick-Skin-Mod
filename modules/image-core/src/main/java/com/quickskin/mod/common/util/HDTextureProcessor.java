@@ -47,10 +47,12 @@ public class HDTextureProcessor {
                 return null;
             }
 
-            // Exact non-premultiplied copy: compositing (drawImage) would rewrite the colour of every
-            // pixel whose alpha is below 255, which corrupts data stored in those pixels (e.g. CPM models).
+            // Images with alpha take an exact non-premultiplied copy: compositing (drawImage) would
+            // rewrite the colour of every pixel whose alpha is below 255, which corrupts data stored in
+            // those pixels (e.g. CPM models). Images without alpha keep the drawImage blit, which copies
+            // raw grey samples as vanilla shows them (getRGB would gamma-convert CS_GRAY images).
             if (image.getType() != BufferedImage.TYPE_INT_ARGB) {
-                image = copyToIntArgb(image);
+                image = image.getColorModel().hasAlpha() ? copyToIntArgb(image) : drawToIntArgb(image);
             }
 
             int width = image.getWidth();
@@ -97,6 +99,15 @@ public class HDTextureProcessor {
             source.getRGB(0, y, width, 1, row, 0, width);
             copy.setRGB(0, y, width, 1, row, 0, width);
         }
+        return copy;
+    }
+
+    /** Blits an image without alpha into a new TYPE_INT_ARGB image; nothing is translucent to composite. */
+    private static BufferedImage drawToIntArgb(BufferedImage source) {
+        BufferedImage copy = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = copy.createGraphics();
+        g.drawImage(source, 0, 0, null);
+        g.dispose();
         return copy;
     }
 
