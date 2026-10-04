@@ -629,7 +629,9 @@ workflow for each locked mod:
   renderer-resolved texture must reach the requested skin.
 - Essential keeps ownership of its title player model, anchors exactly one Quick Skin action to
   the bottom of Essential's right-hand action rail, suppresses Quick Skin's duplicate preview, and
-  verifies Essential retained the selected appearance.
+  verifies Essential retained the selected appearance. Both title captures are taken after the
+  client has left the packaged world through the vanilla disconnect, with no player, level or
+  connection, so no in-game HUD can render under the title screen.
 - ReplayMod records the real multiplayer Quick Skin exchange, closes the recording, opens the
   resulting `.mcpr`, and requires a recorded Quick Skin payload to traverse the production bridge
   before capturing the recorded player in playback.
