@@ -38,6 +38,8 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
     private List<Step> buildSubject(Minecraft minecraft) {
         String modId = ModCompatibilityRemoteEvidence.selectedMod();
         ModCompatibilityFeature feature = ModCompatibilityFeature.create(modId, minecraft);
+        // CPM: Alice keeps her embedded-model skin until Bob confirms CPM showed it to him.
+        feature.holdQuickSkinResetUntil(() -> evidence.observerSawEmbeddedCpm(minecraft));
         List<Step> steps = new ArrayList<>();
         steps.add(evidence.integrationStep(modId));
 
@@ -121,11 +123,12 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                 .minTicks(5)
                 .ready(() -> {
                     evidence.stepTowardVantage(minecraft);
-                    return evidence.observerReady(
-                            "observe_remote_applied", minecraft, modId, true);
+                    return evidence.observeEmbeddedCpm(minecraft, modId, observerId)
+                            && evidence.observerReady(
+                                    "observe_remote_applied", minecraft, modId, true);
                 })
                 .settleTicks(20)
-                .timeoutTicks(20 * 90)
+                .timeoutTicks("cpm".equals(modId) ? 20 * 150 : 20 * 90)
                 .screenshot(version + "_compat_remote_02_applied_" + role + ".png")
                 .assertion(() -> {
                     if (!evidence.remoteBaselineObserved()) {
@@ -139,8 +142,12 @@ public final class ModCompatibilityRemoteScenario implements Scenario {
                     if (!rendered.pass()) return rendered;
                     Step.Result rear = evidence.checkRearComposition(minecraft);
                     if (!rear.pass()) return rear;
+                    Step.Result embedded = evidence.embeddedCpmProof(modId);
+                    if (!embedded.pass()) return embedded;
+                    String first = embedded.message().isEmpty()
+                            ? "" : "; first " + embedded.message();
                     return Step.Result.pass("remote optional-mod transition witnessed: "
-                            + state.message() + "; " + rear.message());
+                            + state.message() + "; " + rear.message() + first);
                 }));
         return steps;
     }

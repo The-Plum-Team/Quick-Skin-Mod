@@ -253,6 +253,7 @@ def verify_jar(
                         "qs_e2e_test_skin.png",
                         "qs_e2e_test_cape.gif",
                         "qs_e2e_zoom_source.png",
+                        "qs_e2e_cpm_embedded_skin.png",
                     }
                     for name in names
                 ),

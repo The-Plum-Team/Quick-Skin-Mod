@@ -26,6 +26,9 @@ import java.util.UUID;
 final class ModCompatibilityRemoteEvidence {
     private static final String OBSERVER_READY_SKIN_ID =
             "quickskin_e2e_observer_ready";
+    /** Bob's one acknowledgement that CPM showed Alice's embedded-model skin as required. */
+    private static final String OBSERVER_EMBEDDED_CPM_SKIN_ID =
+            "quickskin_e2e_observer_saw_embedded_cpm";
     private static final double VANTAGE_DISTANCE = 5.0;
     private static final double VANTAGE_SIDE = 1.5;
     private static final float SUBJECT_REAR_YAW = 180.0f;
@@ -33,6 +36,11 @@ final class ModCompatibilityRemoteEvidence {
     private volatile CompatibilityProbe.Result probe =
             new CompatibilityProbe.Result(false, "probe not executed");
     private volatile boolean remoteBaselineObserved;
+    private volatile Object remoteBaselineDefinition;
+    private volatile String embeddedHash;
+    private volatile String embeddedProof;
+    private volatile boolean embeddedAcknowledged;
+    private CpmEmbeddedSkinProof.Band embeddedBand;
     private String lastWaitReason;
     private int waitReasonLogs;
 
@@ -143,12 +151,91 @@ final class ModCompatibilityRemoteEvidence {
                 if (!rendered.pass()) reason = rendered.message();
             }
         }
+        noteWait(step, reason);
+        return reason == null;
+    }
+
+    private void noteWait(String step, String reason) {
         if (reason != null && !reason.equals(lastWaitReason) && waitReasonLogs < 32) {
             waitReasonLogs++;
             E2ELog.info(step + " waiting: " + reason);
         }
         lastWaitReason = reason;
-        return reason == null;
+    }
+
+    /**
+     * Bob's intermediate CPM phase of {@code observe_remote_applied}, before Alice's plaid reset:
+     * the bytes Bob received for Alice's embedded-model skin must hash to its id and equal the
+     * bundled fixture texel for texel, and on the file-backed bridge band CPM must have loaded
+     * Alice's model from them. Bob then acknowledges once, which releases Alice's reset. Other
+     * mods have no such phase.
+     */
+    boolean observeEmbeddedCpm(Minecraft minecraft, String modId, UUID observerId) {
+        if (!"cpm".equals(modId) || embeddedAcknowledged) return true;
+        String reason = embeddedCpmWaitReason(minecraft);
+        noteWait("observe_remote_applied (embedded CPM skin)", reason);
+        if (reason != null) return false;
+        try {
+            NetworkSyncService.getInstance().syncAppearance(
+                    observerId, OBSERVER_EMBEDDED_CPM_SKIN_ID, "", "slim");
+            embeddedAcknowledged = true;
+            E2ELog.info("Bob acknowledged Alice's embedded CPM skin: " + embeddedProof);
+            return true;
+        } catch (Throwable failure) {
+            E2ELog.error("failed to acknowledge the embedded CPM skin", failure);
+            return false;
+        }
+    }
+
+    private String embeddedCpmWaitReason(Minecraft minecraft) {
+        if (embeddedBand == null) embeddedBand = CpmEmbeddedSkinProof.band();
+        if (embeddedBand.mismatch() != null) return embeddedBand.mismatch();
+        AbstractClientPlayer subject = findOther(minecraft);
+        if (subject == null) return "Alice is not present on Bob's client";
+        PlayerAppearance appearance = PlayerAppearanceRepository.getInstance()
+                .getAppearance(subject.getUUID());
+        String skinId = appearance == null ? null : appearance.getSkinId();
+        if (skinId == null || !skinId.startsWith("local_skin:")) {
+            return "Alice's skin id is not network-backed: " + skinId;
+        }
+        String hash = skinId.substring("local_skin:".length());
+        NetworkTextureCache cache = NetworkTextureCache.getInstance();
+        if (!cache.hasTexture(hash, "skin")) return "Alice's skin bytes are not cached: " + hash;
+        Step.Result bytes = CpmEmbeddedSkinProof.bytesExact(cache.getTextureData(hash, "skin"), hash);
+        if (!bytes.pass()) {
+            return "Alice's skin " + hash + " is not the embedded-model skin: " + bytes.message();
+        }
+        String model = "Bob's CPM is not asked to read it (" + embeddedBand.describe() + ")";
+        if (embeddedBand.bridge()) {
+            String modelReason = CpmEmbeddedSkinProof.modelWaitReason(
+                    CpmEmbeddedSkinProof.definition(subject.getUUID()), remoteBaselineDefinition);
+            if (modelReason != null) return modelReason;
+            model = "Bob's CPM loaded Alice's embedded model (new definition, renderable, no "
+                    + "error; " + embeddedBand.describe() + ")";
+        }
+        embeddedHash = hash;
+        embeddedProof = "embedded CPM skin " + hash + " received: " + bytes.message() + "; "
+                + model;
+        return null;
+    }
+
+    /** Alice's side: whether Bob acknowledged her embedded-model skin. */
+    boolean observerSawEmbeddedCpm(Minecraft minecraft) {
+        AbstractClientPlayer observer = findOther(minecraft);
+        if (observer == null) return false;
+        PlayerAppearance acknowledgement = PlayerAppearanceRepository.getInstance()
+                .getAppearance(observer.getUUID());
+        return acknowledgement != null
+                && OBSERVER_EMBEDDED_CPM_SKIN_ID.equals(acknowledgement.getSkinId());
+    }
+
+    /** The latched remote proof, or a failure when the CPM embedded phase never completed. */
+    Step.Result embeddedCpmProof(String modId) {
+        if (!"cpm".equals(modId)) return Step.Result.pass("");
+        String proof = embeddedProof;
+        return embeddedAcknowledged && proof != null
+                ? Step.Result.pass(proof)
+                : Step.Result.fail("Bob never confirmed Alice's embedded CPM model");
     }
 
     /**
@@ -354,6 +441,7 @@ final class ModCompatibilityRemoteEvidence {
             return Step.Result.fail("CPM has not loaded a healthy renderable model for Alice: "
                     + state.detail());
         }
+        remoteBaselineDefinition = state.definition();
         return Step.Result.pass("Bob's CPM definition loader has a healthy renderable model "
                 + "for remote Alice: " + state.detail());
     }
@@ -362,8 +450,15 @@ final class ModCompatibilityRemoteEvidence {
         if (!remoteBaselineObserved) {
             return Step.Result.fail("CPM remote model baseline was not latched");
         }
+        if (!embeddedAcknowledged || embeddedHash == null) {
+            return Step.Result.fail("Bob has not confirmed Alice's embedded CPM skin yet");
+        }
         Step.Result skin = checkRemoteQuickSkin(subject);
         if (!skin.pass()) return skin;
+        if (("local_skin:" + embeddedHash).equals(PlayerAppearanceRepository.getInstance()
+                .getAppearance(subject.getUUID()).getSkinId())) {
+            return Step.Result.fail("Alice still wears the embedded CPM skin, not the plaid reset");
+        }
         CpmRemoteState state = inspectRemoteCpm(subject.getUUID());
         if (!state.inspected()) return Step.Result.fail(state.detail());
         if (state.errorPresent()) {
@@ -403,59 +498,10 @@ final class ModCompatibilityRemoteEvidence {
     }
 
     private CpmRemoteState inspectRemoteCpm(UUID subjectId) {
-        try {
-            Class<?> accessClass = Class.forName("com.tom.cpm.shared.MinecraftClientAccess");
-            Object access = accessClass.getMethod("get").invoke(null);
-            if (access == null) return CpmRemoteState.failed("CPM client access is null");
-            Object loader = accessClass.getMethod("getDefinitionLoader").invoke(access);
-            if (loader == null) return CpmRemoteState.failed("CPM definition loader is null");
-            Object playersValue = accessClass.getMethod("getPlayers").invoke(access);
-            if (!(playersValue instanceof Iterable<?> players)) {
-                return CpmRemoteState.failed("CPM client players are not iterable");
-            }
-            Method getUuid = loader.getClass().getMethod("getGP_UUID", Object.class);
-            for (Object gamePlayer : players) {
-                if (gamePlayer == null || !subjectId.equals(getUuid.invoke(loader, gamePlayer))) {
-                    continue;
-                }
-                Object loadedPlayer = getOrLoadCpmPlayer(loader, gamePlayer);
-                if (loadedPlayer == null) {
-                    return new CpmRemoteState(true, true, false, false,
-                            false, false, "Alice profile present; loaded CPM player absent");
-                }
-                Object definition = loadedPlayer.getClass()
-                        .getMethod("getModelDefinition").invoke(loadedPlayer);
-                if (definition == null) {
-                    return new CpmRemoteState(true, true, true, false,
-                            false, false, "Alice CPM player loaded; model definition absent");
-                }
-                Object error = definition.getClass().getMethod("getError").invoke(definition);
-                boolean renderable = Boolean.TRUE.equals(
-                        definition.getClass().getMethod("doRender").invoke(definition));
-                return new CpmRemoteState(true, true, true, true,
-                        renderable, error != null,
-                        "definition=" + definition.getClass().getName()
-                                + "; renderable=" + renderable + "; error=" + error);
-            }
-            return new CpmRemoteState(true, false, false, false,
-                    false, false, "CPM client player list does not contain Alice");
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
-            return CpmRemoteState.failed(
-                    "remote CPM inspection failed: " + concise(failure));
-        }
-    }
-
-    private static Object getOrLoadCpmPlayer(Object loader, Object gamePlayer)
-            throws ReflectiveOperationException {
-        try {
-            return loader.getClass().getMethod("getLoadedPlayer", Object.class)
-                    .invoke(loader, gamePlayer);
-        } catch (NoSuchMethodException unsupported) {
-            // CPM 0.6.22 and earlier expose only the public lazy-loading lookup. Later releases
-            // added getLoadedPlayer, which remains preferable because it has no loading side effect.
-            return loader.getClass().getMethod("loadPlayer", Object.class, String.class)
-                    .invoke(loader, gamePlayer, "player");
-        }
+        CpmEmbeddedSkinProof.Definition state = CpmEmbeddedSkinProof.definition(subjectId);
+        return new CpmRemoteState(state.inspected(), state.profilePresent(),
+                state.playerLoaded(), state.definition() != null, state.renderable(),
+                state.error() != null, state.definition(), "Alice: " + state.detail());
     }
 
     private Object rendererFeatures(Object playerRenderer, AbstractClientPlayer subject)
@@ -595,10 +641,7 @@ final class ModCompatibilityRemoteEvidence {
             boolean definitionPresent,
             boolean renderable,
             boolean errorPresent,
+            Object definition,
             String detail) {
-        private static CpmRemoteState failed(String detail) {
-            return new CpmRemoteState(
-                    false, false, false, false, false, false, detail);
-        }
     }
 }

@@ -29,3 +29,10 @@ Generation (offline, outside the build; nothing here runs CPM in tests)
   same SkinDataOutputStream for the payload and reads the template for the maps.
 - CPM's own reader (SkinDataInputStream plus ModelDefinitionLoader's sequence) loads
   cpm-embedded-full.png with checksum OK and returns exactly cpm-embedded-full.payload.bin.
+
+Harness copy
+- common/src/e2e/resources/qs_e2e_cpm_embedded_skin.png is a byte copy of cpm-embedded-full.png
+  (sha256 d07c4907d7e1018bf4e16a2e82008fd07abba096b188bb34b1401324111c251e). The CPM compatibility
+  lane imports it through Quick Skin's skin import and checks the stored and received bytes
+  against it (TestAssets.makeCpmEmbeddedSkin, CpmEmbeddedSkinProof). Change both together;
+  test_e2e_compatibility_policy requires them to stay equal.
