@@ -47,4 +47,10 @@ public interface IModelService {
      * @return True if the player has a model override
      */
     boolean hasModelOverride(UUID playerId);
+
+    /**
+     * Removes a player's model override, so the vanilla skin keeps its own model
+     * @param playerId The player's UUID
+     */
+    void clearModelOverride(UUID playerId);
 }

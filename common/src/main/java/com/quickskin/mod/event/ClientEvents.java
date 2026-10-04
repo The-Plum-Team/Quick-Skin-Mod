@@ -60,6 +60,8 @@ public class ClientEvents {
         initialized = true;
 
         registerInternalListeners();
+        com.quickskin.mod.client.services.CpmLookArbiter.bindLiveSession(
+                () -> !com.quickskin.mod.client.compat.ReplayModHelper.isInReplay());
 
         CapeTransparencyEvents.register();
 
@@ -77,6 +79,8 @@ public class ClientEvents {
             AnimatedTextureManager.getInstance().tick();
             com.quickskin.mod.networking.ClientNetworkHandler.tick();
             com.quickskin.mod.networking.NetworkSyncService.getInstance().tick();
+            // The latest look choice between Quick Skin and CPM decides the local look.
+            com.quickskin.mod.client.services.CpmLookArbiter.tick();
             //? if >=1.21 {
             com.quickskin.mod.client.compat.ReplayModHelper.tick();
             //?}

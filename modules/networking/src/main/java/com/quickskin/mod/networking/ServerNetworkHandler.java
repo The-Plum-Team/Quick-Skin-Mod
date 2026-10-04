@@ -950,10 +950,10 @@ public class ServerNetworkHandler {
         int cooldownSeconds = ServerConfig.getInstance().skinChangeCooldownSeconds;
         PlayerAppearance currentAppearance =
                 ServerPlayerAppearanceRepository.getInstance().getAppearance(playerId);
-        boolean isSkinChanging = appearance.skinId() != null
-                && !appearance.skinId().isEmpty()
-                && (currentAppearance == null
-                        || !appearance.skinId().equals(currentAppearance.getSkinId()));
+        // Returning to the skin worn before a withdrawal (a CPM model was the look) is no change.
+        boolean isSkinChanging = ServerCooldownManager.getInstance().isSkinChange(
+                playerId, appearance.skinId(),
+                currentAppearance != null ? currentAppearance.getSkinId() : null);
 
         if (isSkinChanging && cooldownSeconds > 0
                 && ServerCooldownManager.getInstance().isPlayerOnCooldown(playerId)) return;
@@ -966,6 +966,7 @@ public class ServerNetworkHandler {
             return;
         }
         ServerAppearanceStorage.getInstance().scheduleSavePlayerAppearance(playerId);
+        ServerCooldownManager.getInstance().recordWornSkin(playerId, appearance.skinId());
 
         if (isSkinChanging && cooldownSeconds > 0) {
             ServerCooldownManager.getInstance().recordSkinChange(playerId);
