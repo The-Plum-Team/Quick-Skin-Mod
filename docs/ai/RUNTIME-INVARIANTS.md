@@ -99,6 +99,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Use `BoundedFileReader`, `SafeImageReader`, and the established GIF preflight path. Do not add
   production `ImageIO.read`, unbounded `Files.readAllBytes`/`readString`, or decode-before-dimension
   validation.
+- Skin import copies decoded pixels exactly and never composites them, except in its intended
+  transforms (resizing to a supported resolution and the 64x32 legacy conversion). Transparency
+  flattening forces opacity only on vanilla's own opaque regions, (0,0)-(32,16), (0,16)-(64,32)
+  and (16,48)-(48,64), so data that other mods store in unused texels, such as a CPM model
+  embedded in the skin, survives import with every alpha and colour byte intact.
 - Resolve content-addressed paths through the containment helpers. Reject invalid content IDs,
   symbolic-link targets, and paths outside the configured root.
 - Persist mutable state using a temporary file plus atomic replace where supported. Keep the

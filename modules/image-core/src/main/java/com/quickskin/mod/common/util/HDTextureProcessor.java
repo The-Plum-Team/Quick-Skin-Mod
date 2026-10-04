@@ -47,14 +47,10 @@ public class HDTextureProcessor {
                 return null;
             }
 
-            // Ensure image has alpha channel (TYPE_INT_ARGB = 2). Use hardware-accelerated
-            // blit via Graphics2D instead of per-pixel loop.
+            // Exact non-premultiplied copy: compositing (drawImage) would rewrite the colour of every
+            // pixel whose alpha is below 255, which corrupts data stored in those pixels (e.g. CPM models).
             if (image.getType() != BufferedImage.TYPE_INT_ARGB) {
-                BufferedImage argbImage = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g = argbImage.createGraphics();
-                g.drawImage(image, 0, 0, null);
-                g.dispose();
-                image = argbImage;
+                image = copyToIntArgb(image);
             }
 
             int width = image.getWidth();
@@ -86,6 +82,22 @@ public class HDTextureProcessor {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * Copies an image into a new TYPE_INT_ARGB image without compositing, so every pixel keeps its
+     * exact non-premultiplied ARGB value, including the colour of translucent and transparent pixels.
+     */
+    private static BufferedImage copyToIntArgb(BufferedImage source) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        BufferedImage copy = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        int[] row = new int[width]; // row by row: O(width) extra memory, not 16 MB at 2048x2048
+        for (int y = 0; y < height; y++) {
+            source.getRGB(0, y, width, 1, row, 0, width);
+            copy.setRGB(0, y, width, 1, row, 0, width);
+        }
+        return copy;
     }
 
     /**
@@ -346,8 +358,9 @@ public class HDTextureProcessor {
             return true;
         }
 
-        // Right arm overlay (40-55, 32-47)
-        if (x >= 40 && x < 56 && y >= 32 && y < 48) {
+        // Right arm overlay and the unused x56-63 corner: the whole y32-47 band keeps alpha, exactly
+        // as vanilla, which forces opacity only on (0,0)-(32,16), (0,16)-(64,32) and (16,48)-(48,64)
+        if (x >= 40 && x < 64 && y >= 32 && y < 48) {
             return true;
         }
 
