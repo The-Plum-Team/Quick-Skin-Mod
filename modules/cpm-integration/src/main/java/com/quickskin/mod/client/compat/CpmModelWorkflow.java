@@ -115,13 +115,11 @@ public final class CpmModelWorkflow {
     /** Persists the inverse transition before a normal QuickSkin skin is applied. */
     public static void activateSkin(String skinHash) {
         ClientConfig config = ClientConfig.getInstance();
-        boolean wasUsingCpmModel = config.activeCpmModelHash != null
-                && !config.activeCpmModelHash.isEmpty();
         config.activeSkinHash = skinHash != null ? skinHash : "";
         config.activeCpmModelHash = "";
         if (CPMCompatIntegration.isAvailable()) {
             config.pendingCpmSkinModeReset = !CPMCompatIntegration.resetToSkinMode();
-        } else if (wasUsingCpmModel) {
+        } else {
             config.pendingCpmSkinModeReset = true;
         }
         config.save();

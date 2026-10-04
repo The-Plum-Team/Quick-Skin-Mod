@@ -544,6 +544,7 @@
         "minecraft-adapter",
         "platform-api",
         "player-preview",
+        "preview-rendering",
         "ui-foundation"
       ],
       "runtime_only": [],
@@ -722,6 +723,7 @@
         "appearance-services",
         "ui-foundation",
         "player-preview",
+        "preview-rendering",
         "essential-integration",
         "cpm-integration"
       ],

@@ -200,7 +200,12 @@ public class NetworkTextureCache {
         accessOrder.put(key, Boolean.TRUE);
         evictToLimits();
         prepared.releaseLease();
-        return textureDataCache.containsKey(key);
+        boolean stored = textureDataCache.containsKey(key);
+        if (stored && existingOriginal == null && "skin".equals(textureType)) {
+            // CPM may have read this player's skin before the bytes existed (embedded models).
+            com.quickskin.mod.client.compat.CPMCompatIntegration.onNetworkSkinStored();
+        }
+        return stored;
     }
 
     /** Opaque result of bounded image work. Its arrays never escape this cache. */

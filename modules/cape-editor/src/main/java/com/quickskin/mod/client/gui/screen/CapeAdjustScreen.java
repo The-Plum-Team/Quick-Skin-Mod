@@ -9,13 +9,13 @@ import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
+import com.quickskin.mod.client.rendering.LocalLookPreview;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.CapeOpaqueFill;
 import com.quickskin.mod.common.util.CapeZoomRange;
-import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.platform.MinecraftCompat;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -359,14 +359,16 @@ public class CapeAdjustScreen extends Screen {
             //?}
             String modelType = "classic";
             LocalPlayer player = Minecraft.getInstance().player;
-            ClientConfig config = ClientConfig.getInstance();
+            // The saved skin, unless a CPM model is the latest look choice: then the player's own
+            // skin (the live one in a world, the imported one on the title screen).
+            String previewSkinHash = LocalLookPreview.skinHash(player != null);
 
-            if (!config.activeSkinHash.isEmpty()) {
+            if (!previewSkinHash.isEmpty()) {
                 LocalAssetManager assetManager = LocalAssetManager.getInstance();
-                AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
+                AssetMetadata metadata = assetManager.getMetadata(previewSkinHash);
                 if (metadata != null) {
-                    skinLocation = assetManager.getTextureLocation(config.activeSkinHash, TextureQuality.FULL);
-                    modelType = assetManager.getSkinModelPreference(config.activeSkinHash);
+                    skinLocation = assetManager.getTextureLocation(previewSkinHash, TextureQuality.FULL);
+                    modelType = assetManager.getSkinModelPreference(previewSkinHash);
                     if ("auto".equals(modelType)) {
                         modelType = metadata.skinModel();
                     }
@@ -382,19 +384,18 @@ public class CapeAdjustScreen extends Screen {
                 //?} else {
                 skinLocation = player.getSkin().body().texturePath();
                 //?}
-                if ("auto".equals(modelType)) {
-                    //? if <1.21.9 {
-                        //? if <1.21 {
-                    String vanillaModel = player.getModelName(); // "default" or "slim"
-                    modelType = "slim".equals(vanillaModel) ? "slim" : "classic";
-                        //?} else {
-                    modelType = "slim".equals(player.getSkin().model().id()) ? "slim" : "classic";
-                        //?}
+                // The player's own skin is drawn, so its model is the player's too.
+                //? if <1.21.9 {
+                    //? if <1.21 {
+                String vanillaModel = player.getModelName(); // "default" or "slim"
+                modelType = "slim".equals(vanillaModel) ? "slim" : "classic";
                     //?} else {
-                    modelType = player.getSkin().model()
-                            == net.minecraft.world.entity.player.PlayerModelType.SLIM ? "slim" : "classic";
+                modelType = "slim".equals(player.getSkin().model().id()) ? "slim" : "classic";
                     //?}
-                }
+                //?} else {
+                modelType = player.getSkin().model()
+                        == net.minecraft.world.entity.player.PlayerModelType.SLIM ? "slim" : "classic";
+                //?}
             }
             if (skinLocation == null) {
                 //? if <1.21.11 {

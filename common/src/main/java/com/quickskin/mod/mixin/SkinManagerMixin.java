@@ -186,9 +186,9 @@ public class SkinManagerMixin {
         // Title screen config fallback
         if (Minecraft.getInstance().level == null) {
 //?} else {
-        // Config-based fallback for local player (title screen and in-world)
+        // Config-based fallback for local player (title screen and in-world), not while a CPM model is the look
         boolean isLocalPlayer = uuid.equals(Minecraft.getInstance().getUser().getProfileId());
-        if (isLocalPlayer) {
+        if (isLocalPlayer && !com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(uuid)) {
 //?}
             ClientConfig config = ClientConfig.getInstance();
             boolean hasSkin = !config.activeSkinHash.isEmpty();

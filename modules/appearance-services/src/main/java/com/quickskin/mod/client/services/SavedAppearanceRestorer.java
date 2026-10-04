@@ -86,6 +86,17 @@ public final class SavedAppearanceRestorer {
                     .applyLook(targetPlayerId, skinId, capeId, modelType);
                     //?}
         }
+
+        // A CPM model that is the latest look choice replaces the Quick Skin skin. When nothing
+        // above was applied, create the empty appearance the connection bootstrap sends, so the
+        // server stops relaying a skin it saved in an earlier session.
+        if ((com.quickskin.mod.client.compat.CpmLook.owner().withholdsQuickSkinSkin()
+                || (config.activeSkinHash.isEmpty() && !config.activeCpmModelHash.isEmpty()))
+                && com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
+                        .getAppearance(targetPlayerId) == null) {
+            com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
+                    .applyLook(targetPlayerId, null, null, null);
+        }
     }
 
 }
