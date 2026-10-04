@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -25,6 +26,11 @@ from artifact_manifest import (
 from generate_sbom import SbomError, stage_sbom, verify_staged_sbom
 from matrix import MatrixError, load_matrix, select_release_target
 from release_identity import ReleaseIdentityError, derive as derive_release_identity
+
+
+WEBP_CLASS = "com/luciad/imageio/webp/WebP.class"
+WEBP_IDENTIFIER = {"group": "org.sejda.imageio", "artifact": "webp-imageio"}
+JARJAR_METADATA = "META-INF/jarjar/metadata.json"
 
 
 class VerificationError(RuntimeError):
@@ -221,6 +227,48 @@ def verify_fml_pack_metadata(raw: bytes, artifact: dict[str, Any]) -> None:
     )
 
 
+def verify_webp_packaging(
+    jar: zipfile.ZipFile,
+    names: set[str],
+    artifact: dict[str, Any],
+    label: str,
+) -> None:
+    """Require the WebP decoder merged on Fabric and JarJar-nested on Forge/NeoForge.
+
+    FML loads the mod JAR as one Java module, so a merged copy collides with every other mod
+    that ships the same library as its own module.
+    """
+
+    if artifact["loader"] == "fabric":
+        require(WEBP_CLASS in names, f"bundled WebP dependency missing from {label}")
+        return
+    merged = sorted(
+        name
+        for name in names
+        if name.startswith(("com/luciad/", "native/", "META-INF/services/javax.imageio.spi."))
+    )
+    require(not merged, f"WebP dependency is merged into the mod module of {label}: {merged[:1]}")
+    require(JARJAR_METADATA in names, f"JarJar metadata missing from {label}")
+    try:
+        nested = json.loads(jar.read(JARJAR_METADATA))["jars"]
+        require(
+            [entry["identifier"] for entry in nested] == [WEBP_IDENTIFIER],
+            f"JarJar metadata of {label} must nest exactly the WebP dependency",
+        )
+        nested_path = nested[0]["path"]
+        require(
+            isinstance(nested_path, str) and nested_path in names,
+            f"nested WebP dependency missing from {label}",
+        )
+        with zipfile.ZipFile(io.BytesIO(jar.read(nested_path))) as library:
+            require(
+                library.testzip() is None and WEBP_CLASS in library.namelist(),
+                f"nested WebP dependency is not the decoder library in {label}",
+            )
+    except (UnicodeDecodeError, json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+        raise VerificationError(f"invalid JarJar metadata in {label}: {exc!r}") from exc
+
+
 def verify_jar(
     path: Path,
     artifact: dict[str, Any],
@@ -264,10 +312,7 @@ def verify_jar(
                 len([name for name in names if name.endswith("/PlatformMethods.class")]) == 1,
                 f"expected one transformed Architectury PlatformMethods class in {path.name}",
             )
-            require(
-                "com/luciad/imageio/webp/WebP.class" in names,
-                f"bundled WebP dependency missing from {path.name}",
-            )
+            verify_webp_packaging(jar, names, artifact, path.name)
             manifest = jar.read("META-INF/MANIFEST.MF").decode("utf-8", errors="replace")
             require("Stonecutter-" not in manifest, f"Stonecutter metadata leaked into {path.name}")
             metadata_file = artifact["metadata"]["file"]
