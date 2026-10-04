@@ -1136,6 +1136,10 @@ interface ModCompatibilityFeature {
     }
 
     final class EssentialFeature extends BaseFeature {
+        private static final String OFFLINE_EVIDENCE =
+                "; captured after leaving the packaged world: player=null, level=null, "
+                + "connection=null";
+
         EssentialFeature(Minecraft minecraft) {
             super(minecraft);
         }
@@ -1148,7 +1152,8 @@ interface ModCompatibilityFeature {
         @Override
         public boolean baselineReady() {
             pinCursorAwayFromEssentialWidgets();
-            return failure == null && essentialTitleFailure(false) == null;
+            // A recorded failure ends the wait, so the assertion reports it instead of a timeout.
+            return failure != null || essentialTitleFailure(false) == null;
         }
 
         @Override
@@ -1158,7 +1163,7 @@ interface ModCompatibilityFeature {
             return problem == null
                     ? Step.Result.pass("Essential owns the title player model; Quick Skin suppresses "
                     + "its duplicate preview and places exactly one action immediately left of "
-                    + "Essential's bottom right-rail widget")
+                    + "Essential's bottom right-rail widget" + OFFLINE_EVIDENCE)
                     : Step.Result.fail(problem);
         }
 
@@ -1176,7 +1181,7 @@ interface ModCompatibilityFeature {
         @Override
         public boolean quickSkinFeatureReady() {
             pinCursorAwayFromEssentialWidgets();
-            return failure == null && essentialTitleFailure(true) == null;
+            return failure != null || essentialTitleFailure(true) == null;
         }
 
         @Override
@@ -1186,12 +1191,30 @@ interface ModCompatibilityFeature {
             if (problem != null) return Step.Result.fail(problem);
             return Step.Result.pass("Essential's title model owns the layout while Quick Skin "
                     + "registers local_skin:" + skinHash + " and keeps its single action icon "
-                    + "immediately left of Essential's bottom right-rail widget");
+                    + "immediately left of Essential's bottom right-rail widget"
+                    + OFFLINE_EVIDENCE);
         }
 
         private void openTitle() {
-            VanillaShim.setScreen(minecraft, new TitleScreen());
+            // A title screen set over the live packaged world keeps the in-game HUD rendering
+            // under it, a state no player can reach. Leave through the vanilla quit lifecycle
+            // first; once offline, the second checkpoint only needs a fresh title screen.
+            if (!offline()) {
+                String problem = VanillaShim.disconnectToTitle(minecraft);
+                if (problem != null) {
+                    failure = "Essential could not leave the packaged world: " + problem;
+                    return;
+                }
+            } else if (!VanillaShim.setScreen(minecraft, new TitleScreen())) {
+                failure = "Essential could not open the offline title screen";
+                return;
+            }
             pinCursorAwayFromEssentialWidgets();
+        }
+
+        private boolean offline() {
+            return minecraft.player == null && minecraft.level == null
+                    && minecraft.getConnection() == null;
         }
 
         private void pinCursorAwayFromEssentialWidgets() {
@@ -1219,6 +1242,9 @@ interface ModCompatibilityFeature {
         }
 
         private String essentialTitleFailure(boolean requireSkin) {
+            if (!offline()) {
+                return "Essential title checkpoint still has a live player, level or connection";
+            }
             Screen screen = VanillaShim.currentScreen(minecraft);
             if (!(screen instanceof TitleScreen)) return "Essential title screen is not open";
             GuiEventListener essentialAnchor =
