@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Locale;
@@ -32,7 +33,7 @@ import java.util.Locale;
  */
 @Environment(EnvType.CLIENT)
 public final class CapeImportProcessor {
-    private static final long MAX_SOURCE_BYTES = 32L * 1024L * 1024L;
+    static final long MAX_SOURCE_BYTES = 32L * 1024L * 1024L;
     private static final int MAX_STATIC_DIMENSION = 4096;
     private static final long MAX_ATLAS_PIXELS = 64L * 1024L * 1024L / 4L;
 
@@ -130,16 +131,74 @@ public final class CapeImportProcessor {
         }
         requireDirectory(targetDirectory);
 
+        int frameCount = adjustedFrameCount(adjustedAtlas);
+        BufferedImage finalAtlas = compositeElytraIfNeeded(adjustedAtlas, frameCount, vanillaElytra);
+        return savePngUnique(prepared.source(), finalAtlas, targetDirectory,
+                metadataDirectory, frameCount > 1 ? prepared.animationMetadata() : null);
+    }
+
+    /**
+     * Saves a new adjustment of an editor import over its catalogued file.
+     *
+     * <p>The bytes change, and with them the cape's content ID. The animation metadata and the
+     * retained editor source are written under the new ID before the file is replaced, so a
+     * failure leaves the cape, its metadata, and its source as they were. A source copy first
+     * written for the new ID is removed again when the replacement itself fails.</p>
+     */
+    public static Path replaceAdjusted(
+            PreparedCape prepared,
+            BufferedImage adjustedAtlas,
+            Path existingCape,
+            Path cacheDirectory,
+            BufferedImage vanillaElytra
+    ) throws IOException {
+        if (adjustedAtlas == null) {
+            throw new IOException("Cape adjustment produced no image");
+        }
+        if (existingCape == null || existingCape.getParent() == null
+                || !Files.isRegularFile(existingCape, LinkOption.NOFOLLOW_LINKS)
+                || !existingCape.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".png")) {
+            throw new IOException("Cape file does not exist or is not an editable PNG");
+        }
+
+        int frameCount = adjustedFrameCount(adjustedAtlas);
+        BufferedImage finalAtlas = compositeElytraIfNeeded(adjustedAtlas, frameCount, vanillaElytra);
+        Path temporary = Files.createTempFile(
+                existingCape.getParent(), ".quickskin-cape-", ".png.tmp");
+        try {
+            writePng(finalAtlas, temporary);
+            SafeImageReader.readPng(temporary);
+            saveMetadata(cacheDirectory, temporary,
+                    frameCount > 1 ? prepared.animationMetadata() : null);
+            boolean hadSource = CapeEditorSources.find(cacheDirectory, HashUtil.computeAssetContentId(
+                    BoundedFileReader.readBytes(temporary, (int) MAX_SOURCE_BYTES), "cape")) != null;
+            Path retained = CapeEditorSources.retain(cacheDirectory, temporary, prepared.source());
+            try {
+                atomicReplace(temporary, existingCape);
+            } catch (IOException | RuntimeException replaceError) {
+                if (!hadSource) {
+                    try {
+                        Files.deleteIfExists(retained);
+                    } catch (IOException cleanupError) {
+                        replaceError.addSuppressed(cleanupError);
+                    }
+                }
+                throw replaceError;
+            }
+            return existingCape;
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    private static int adjustedFrameCount(BufferedImage adjustedAtlas) throws IOException {
         int frameHeight = adjustedAtlas.getWidth() / 2;
         if (frameHeight <= 0 || adjustedAtlas.getHeight() % frameHeight != 0) {
             throw new IOException("Adjusted cape must contain complete 2:1 frames");
         }
         int frameCount = adjustedAtlas.getHeight() / frameHeight;
         validateAtlas(adjustedAtlas.getWidth(), frameHeight, frameCount);
-
-        BufferedImage finalAtlas = compositeElytraIfNeeded(adjustedAtlas, frameCount, vanillaElytra);
-        return savePngUnique(prepared.source(), finalAtlas, targetDirectory,
-                metadataDirectory, frameCount > 1 ? prepared.animationMetadata() : null);
+        return frameCount;
     }
 
     public static BufferedImage compositeElytraIfNeeded(
@@ -350,7 +409,7 @@ public final class CapeImportProcessor {
         }
     }
 
-    private static void atomicReplace(Path source, Path target) throws IOException {
+    static void atomicReplace(Path source, Path target) throws IOException {
         try {
             Files.move(source, target,
                     StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);

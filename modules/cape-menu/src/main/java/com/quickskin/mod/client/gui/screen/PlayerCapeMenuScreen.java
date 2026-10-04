@@ -15,6 +15,7 @@ import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 //?} else {
 import com.quickskin.mod.client.gui.GuiCompat;
 //?}
+import com.quickskin.mod.client.gui.util.CapeEditorSources;
 import com.quickskin.mod.client.gui.util.CapeImportProcessor;
 import com.quickskin.mod.client.gui.util.CapeImportWorkflow;
 //? if <1.21 {
@@ -169,6 +170,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private int importMessageColor = 0xFFFFFFFF;
     private CapeImportWorkflow capeImportWorkflow;
     private int capeImportGeneration;
+    private int capeEditGeneration;
+    /** Set while an editor source is being loaded or an edit is being saved */
+    private boolean capeEditBusy;
 
     public PlayerCapeMenuScreen(@Nullable Screen parent) {
         super(Component.empty());
@@ -445,11 +449,13 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         // Add "None" option first
         this.localCapes.add(CapeEntry.fromKnown(KnownCapes.NONE));
 
-        // Then add local capes
+        // Then add local capes, each with the editor source retained for it (if any)
         List<AssetMetadata> localCapeAssets = LocalAssetManager.getInstance()
                 .getAssetsByType("cape");
+        Path cacheDirectory = LocalAssetManager.getInstance().getCacheDirectory();
         for (AssetMetadata localCape : localCapeAssets) {
-            this.localCapes.add(CapeEntry.fromLocal(localCape));
+            this.localCapes.add(CapeEntry.fromLocal(
+                    localCape, CapeEditorSources.find(cacheDirectory, localCape.hash())));
         }
 
         // --- Section 2: Default Capes ---
@@ -640,6 +646,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         int generation = ++this.capeImportGeneration;
+        this.capeEditGeneration++;
         LocalAssetManager assets = LocalAssetManager.getInstance();
         CapeImportWorkflow workflow = new CapeImportWorkflow(
                 sources,
@@ -696,6 +703,154 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         showImportMessage(message, GuiTextColor.opaqueRgb(0xFF5555), 200);
     }
 
+    /**
+     * Reopen the cape editor with the original image retained when this cape was imported
+     */
+    private void startCapeEdit(CapeEntry capeEntry) {
+        Minecraft client = this.minecraft;
+        Path source = capeEntry.getEditorSource();
+        if (client == null || source == null || this.capeImportWorkflow != null || this.capeEditBusy) {
+            return;
+        }
+
+        int generation = ++this.capeEditGeneration;
+        this.capeEditBusy = true;
+        showImportMessage(Component.translatable("quickskin.cape.processing").getString(),
+                GuiTextColor.opaqueRgb(0x55AAFF), 60);
+        ClientIoExecutor.supplyAsync(() -> {
+            try {
+                return CapeImportProcessor.prepare(source, MinecraftGifDecoder.INSTANCE);
+            } catch (IOException error) {
+                throw new java.io.UncheckedIOException(error);
+            }
+        }).whenComplete((prepared, error) -> client.execute(() -> {
+            this.capeEditBusy = false;
+            if (generation != this.capeEditGeneration
+                    || com.quickskin.mod.client.gui.GuiCompat.currentScreen() != this) {
+                return;
+            }
+            if (error != null) {
+                // The source vanished or no longer decodes; never fall back to another image
+                showImportMessage(Component.translatable("quickskin.cape.error", rootMessage(error)).getString(),
+                        GuiTextColor.opaqueRgb(0xFF5555), 200);
+                refreshCapeList();
+                return;
+            }
+            // Loaded: a cancelled editor must not come back to a stale "processing" message
+            this.importMessageTimer = 0;
+            com.quickskin.mod.client.gui.GuiCompat.openScreen(new CapeAdjustScreen(
+                    this, prepared.atlas(), prepared.frameCount(),
+                    adjusted -> saveCapeEdit(capeEntry, prepared, adjusted), () -> { }));
+        }));
+    }
+
+    private void saveCapeEdit(CapeEntry capeEntry, CapeImportProcessor.PreparedCape prepared,
+                              java.awt.image.BufferedImage adjusted) {
+        Minecraft client = this.minecraft;
+        AssetMetadata localCape = capeEntry.getLocalCape();
+        Path capePath = capeEntry.getPath();
+        if (client == null || localCape == null || capePath == null) {
+            return;
+        }
+
+        // Captured here: the entry and the active cape may both change while the file is written
+        String previousId = capeEntry.getCapeId();
+        boolean wasSelected = isSelected(capeEntry);
+        String activeAtApply = ClientConfig.getInstance().activeCapeHash;
+        Path cacheDirectory = LocalAssetManager.getInstance().getCacheDirectory();
+        java.awt.image.BufferedImage vanillaElytra = getVanillaElytraImage();
+
+        this.capeEditBusy = true;
+        showImportMessage(Component.translatable("quickskin.cape.processing").getString(),
+                GuiTextColor.opaqueRgb(0x55AAFF), 60);
+        ClientIoExecutor.supplyAsync(() -> {
+            try {
+                CapeImportProcessor.replaceAdjusted(
+                        prepared, adjusted, capePath, cacheDirectory, vanillaElytra);
+                return (String) null;
+            } catch (IOException | RuntimeException error) {
+                return rootMessage(error);
+            }
+        }).whenComplete((error, throwable) -> client.execute(() -> completeCapeEdit(
+                capePath, localCape.hash(), previousId, wasSelected, activeAtApply,
+                throwable != null ? rootMessage(throwable) : error)));
+    }
+
+    /**
+     * Runs even when the menu was closed meanwhile: the file has already been replaced, so the
+     * active cape and its animation speed must follow it to the new content ID.
+     */
+    private void completeCapeEdit(Path capePath, String previousHash, String previousId,
+                                  boolean wasSelected, String activeAtApply, @Nullable String error) {
+        this.capeEditBusy = false;
+        if (error != null) {
+            showImportMessage(Component.translatable("quickskin.cape.error", error).getString(),
+                    GuiTextColor.opaqueRgb(0xFF5555), 200);
+            return;
+        }
+
+        LocalAssetManager.getInstance().reload();
+        refreshCapeList();
+        updateGridDimensions();
+
+        CapeEntry updated = null;
+        for (CapeEntry candidate : this.localCapes) {
+            if (capePath.equals(candidate.getPath())) {
+                updated = candidate;
+                break;
+            }
+        }
+
+        ClientConfig config = ClientConfig.getInstance();
+        // Decided now, not at Apply: the old tile could still be selected while the file was written
+        boolean stillActive = previousId.equals(config.activeCapeHash)
+                || (wasSelected && activeAtApply.equals(config.activeCapeHash));
+        if (updated == null) {
+            if (stillActive) {
+                removeCape();
+            }
+        } else if (!updated.getCapeId().equals(previousId)) {
+            // The new bytes have a new content ID: carry the animation speed and selection over
+            Float speed = config.capeAnimationSpeeds != null
+                    ? config.capeAnimationSpeeds.remove(previousId) : null;
+            if (speed != null) {
+                config.setCapeAnimationSpeed(updated.getCapeId(), speed);
+            }
+            if (stillActive) {
+                this.selectedCape = updated;
+                applyCape(updated);
+            } else if (speed != null) {
+                config.save();
+            }
+        }
+        releaseEditorSource(previousHash);
+
+        showImportMessage(Component.translatable("quickskin.cape.edited").getString(),
+                GuiTextColor.opaqueRgb(0x55FF55), 200);
+    }
+
+    /**
+     * Drop a retained editor source once no catalogued cape carries its content ID any more.
+     * Byte-identical capes share one ID and one source, so the catalogue decides, not the caller.
+     */
+    private static void releaseEditorSource(String capeHash) {
+        LocalAssetManager assets = LocalAssetManager.getInstance();
+        if (assets.getMetadata(capeHash) != null) {
+            return;
+        }
+        try {
+            CapeEditorSources.delete(assets.getCacheDirectory(), capeHash);
+        } catch (IOException ignored) {
+            // An orphaned source is never listed, rendered, or offered for another cape
+        }
+    }
+
+    private static String rootMessage(Throwable error) {
+        Throwable cause = error;
+        while (cause.getCause() != null && cause != cause.getCause()) cause = cause.getCause();
+        return cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName();
+    }
+
     private void removeCape() {
         // Always update preview widget (works both in-game and on title screen)
         playerWidget.setCape(null, null);
@@ -740,7 +895,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             return;
         }
 
-        if (minecraft == null) {
+        // An edit in flight still reads this cape's source or is about to replace its file
+        if (minecraft == null || this.capeEditBusy) {
             return;
         }
 
@@ -795,6 +951,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         try {
             Files.deleteIfExists(capePath);
             LocalAssetManager.getInstance().discoverLocalAssets();
+            releaseEditorSource(capeEntry.getLocalCape().hash());
             refreshCapeList();
             updateGridDimensions();
 
@@ -957,7 +1114,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         if (isMouseOverGrid(mouseX, mouseY)) {
             CapeEntry hoveredCape = getCapeAt(mouseX, mouseY);
             if (hoveredCape != null) {
-                boolean deleteHovered = false;
+                Component actionTooltip = null;
                 int[] pos = getCapePosition(hoveredCape);
                 if (pos != null && hoveredCape.isLocal()) {
                     int x = pos[0];
@@ -966,30 +1123,35 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
                     int deleteButtonX = x + capeDisplaySize - ACTION_BUTTON_SIZE - margin;
                     int deleteButtonY = y + margin;
+                    int editButtonY = deleteButtonY + ACTION_BUTTON_SIZE + 2;
                     if (isMouseOver(mouseX, mouseY, deleteButtonX, deleteButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE)) {
+                        actionTooltip = Component.translatable("quickskin.tooltip.delete_cape");
+                    } else if (hoveredCape.isEditable()
+                            && isMouseOver(mouseX, mouseY, deleteButtonX, editButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE)) {
+                        actionTooltip = Component.translatable("quickskin.tooltip.edit_cape");
+                    }
+                    if (actionTooltip != null) {
 //? if <1.21 {
                         GuiCompat.tooltip(
-                                graphics, this.font, Component.translatable("quickskin.tooltip.delete_cape"),
+                                graphics, this.font, actionTooltip,
                                 mouseX, mouseY);
 //?} else if <1.21.6 {
-                        graphics.renderTooltip(this.font, Component.translatable("quickskin.tooltip.delete_cape"), mouseX, mouseY);
+                        graphics.renderTooltip(this.font, actionTooltip, mouseX, mouseY);
 //?} else if <26.1 {
                         // 1.21.11: renderTooltip takes List<ClientTooltipComponent>
-                        Component tooltipText = Component.translatable("quickskin.tooltip.delete_cape");
                         List<ClientTooltipComponent> tooltipComponents = List.of(
-                            ClientTooltipComponent.create(tooltipText.getVisualOrderText())
+                            ClientTooltipComponent.create(actionTooltip.getVisualOrderText())
                         );
                         graphics.renderTooltip(this.font, tooltipComponents, mouseX, mouseY, DefaultTooltipPositioner.INSTANCE, null);
 //?} else {
                         GuiCompat.tooltip(
                                 graphics, this.font,
-                                Component.translatable("quickskin.tooltip.delete_cape"), mouseX, mouseY
+                                actionTooltip, mouseX, mouseY
                         );
 //?}
-                        deleteHovered = true;
                     }
                 }
-                if (!deleteHovered) {
+                if (actionTooltip == null) {
 //? if <1.21 {
                     GuiCompat.tooltip(graphics, this.font, getCapeTooltip(hoveredCape), mouseX, mouseY);
 //?} else if <1.21.6 {
@@ -1252,6 +1414,19 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
             graphics.text(this.font, "x", deleteButtonX + 3, deleteButtonY + 1, 0xFFFFFFFF);
 //?}
+
+            // Render edit button below delete button (only for capes that kept their editor source)
+            if (cape.isEditable()) {
+                int editButtonY = deleteButtonY + ACTION_BUTTON_SIZE + 2;
+                boolean editHovered = isMouseOver(mouseX, mouseY, deleteButtonX, editButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE);
+                int editBgColor = editHovered ? 0xA040C0C0 : 0x80408080;
+                graphics.fill(deleteButtonX, editButtonY, deleteButtonX + ACTION_BUTTON_SIZE, editButtonY + ACTION_BUTTON_SIZE, editBgColor);
+//? if <26.1 {
+                graphics.drawString(this.font, "\u270E", deleteButtonX + 2, editButtonY + 1, 0xFFFFFFFF);
+//?} else {
+                graphics.text(this.font, "\u270E", deleteButtonX + 2, editButtonY + 1, 0xFFFFFFFF);
+//?}
+            }
         }
     }
 
@@ -1488,6 +1663,13 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                         int deleteButtonY = y + margin;
                         if (isMouseOver((int) mouseX, (int) mouseY, deleteButtonX, deleteButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE)) {
                             showDeleteConfirmation(clickedCape);
+                            return true;
+                        }
+
+                        int editButtonY = deleteButtonY + ACTION_BUTTON_SIZE + 2;
+                        if (clickedCape.isEditable()
+                                && isMouseOver((int) mouseX, (int) mouseY, deleteButtonX, editButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE)) {
+                            startCapeEdit(clickedCape);
                             return true;
                         }
                     }
@@ -1891,6 +2073,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
     public void onClose() {
         this.capeImportGeneration++;
+        this.capeEditGeneration++;
         CapeImportWorkflow workflow = this.capeImportWorkflow;
         this.capeImportWorkflow = null;
         if (workflow != null) {
