@@ -464,8 +464,11 @@ class CompletedReviewRecoveryTest(unittest.TestCase):
     def test_successful_immutable_cache_commit_survives_unrelated_tail_and_job_state(self):
         api = self.committed_cache({})
         expected = copy.deepcopy(api.metadata)
-        api.owner.update(status="in_progress", conclusion=None)
-        self.assertTrue(cache_owner_complete(api, 10, 20, expected_metadata=expected))
+        # Between two of its jobs the owner has no running job and need not be in_progress.
+        for status in ("queued", "pending", "waiting", "requested", "in_progress"):
+            with self.subTest(owner=status):
+                api.owner.update(status=status, conclusion=None)
+                self.assertTrue(cache_owner_complete(api, 10, 20, expected_metadata=expected))
         api.job_list[0].update(status="in_progress", conclusion=None)
         self.assertTrue(cache_owner_complete(api, 10, 20, expected_metadata=expected))
         api.job_list[0]["steps"][2].update(status="in_progress", conclusion=None)
