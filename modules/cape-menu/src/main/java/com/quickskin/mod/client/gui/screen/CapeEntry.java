@@ -18,19 +18,25 @@ public class CapeEntry {
     private final AssetMetadata localCape;
     private final KnownCapes knownCape;
     private final boolean isLocal;
+    private final Path editorSource;
 
-    private CapeEntry(AssetMetadata localCape, KnownCapes knownCape, boolean isLocal) {
+    private CapeEntry(AssetMetadata localCape, KnownCapes knownCape, boolean isLocal, Path editorSource) {
         this.localCape = localCape;
         this.knownCape = knownCape;
         this.isLocal = isLocal;
+        this.editorSource = editorSource;
     }
 
     public static CapeEntry fromLocal(AssetMetadata metadata) {
-        return new CapeEntry(metadata, null, true);
+        return fromLocal(metadata, null);
+    }
+
+    public static CapeEntry fromLocal(AssetMetadata metadata, @Nullable Path editorSource) {
+        return new CapeEntry(metadata, null, true, editorSource);
     }
 
     public static CapeEntry fromKnown(KnownCapes cape) {
-        return new CapeEntry(null, cape, false);
+        return new CapeEntry(null, cape, false, null);
     }
 
     public boolean isLocal() {
@@ -102,6 +108,18 @@ public class CapeEntry {
     @Nullable
     public Path getPath() {
         return isLocal && localCape != null ? localCape.path() : null;
+    }
+
+    /**
+     * The original image this cape was made from in the cape editor, if one was retained
+     */
+    @Nullable
+    public Path getEditorSource() {
+        return editorSource;
+    }
+
+    public boolean isEditable() {
+        return isLocal && localCape != null && editorSource != null;
     }
 
     public boolean isCustom() {
