@@ -676,8 +676,12 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("CpmEmbeddedSkinProof.storedFileExact(", cpm)
         self.assertIn("if (failure != null) return true;", cpm)
         self.assertIn("CpmEmbeddedSkinProof.band()", cpm)
-        self.assertIn("baselineDefinition = CpmEmbeddedSkinProof.definition(playerId)", cpm)
+        self.assertIn("baseline = CpmEmbeddedSkinProof.definition(playerId);", cpm)
+        self.assertIn("baselineDefinition = baseline.definition();", cpm)
+        # On the bridge band a missing baseline definition fails instead of skipping the guard.
+        self.assertIn("if (band.bridge() && baselineDefinition == null) {", cpm)
         self.assertIn("CpmEmbeddedSkinProof.modelWaitReason(", cpm)
+        self.assertIn("ClientConfig.getInstance().pendingCpmSkinModeReset", cpm)
         self.assertIn('"; first " + embeddedProof', cpm)
         self.assertIn("return 20 * 150;", cpm)
         self.assertLess(
@@ -697,6 +701,21 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("if (minor == 21) return patch <= 3;", proof)
         self.assertIn("if (harness != product)", proof)
         self.assertIn("state.definition() == baselineDefinition", proof)
+        # The loaded definition must be the fixture's own model, not any new healthy one.
+        self.assertIn("String mismatch = fixtureModelMismatch(state.definition());", proof)
+        self.assertIn('mainRoot(definition, elementFor, parts, "HEAD")', proof)
+        self.assertIn('getMethod("isHidden")', proof)
+        self.assertIn('getField("rotN")', proof)
+        payload = (
+            ROOT / "modules/image-core/src/test/resources/cpm/cpm-embedded-full.payload.bin"
+        ).read_bytes()
+        for part_id, constant, short in ((3, "RIGHT_ARM_Z", 21845), (5, "RIGHT_LEG_Z", 5461)):
+            block = payload.index(bytes([0x07, 0x0D, part_id]))
+            # PLAYER_PARTPOS block: id, a 6-byte position, then x, y, z angles as shorts.
+            angles = payload[block + 9 : block + 15]
+            self.assertEqual(angles, bytes(4) + short.to_bytes(2, "big"))
+            self.assertIn(f"{constant} = (float) ({short} / 65535f * 2 * Math.PI);", proof)
+            self.assertIn(f"{constant.replace('_Z', '_ID')} = {part_id};", proof)
         self.assertNotIn("CpmMissedSkinFiles", proof)
         self.assertNotIn("onMissedNetworkSkinStored", proof)
 
@@ -712,7 +731,17 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn(
             "cache.getTextureData(hash, \"skin\"), hash", evidence
         )
-        self.assertIn('if (!"cpm".equals(modId) || embeddedAcknowledged) return true;', evidence)
+        self.assertIn(
+            'if (!"cpm".equals(modId) || embeddedAcknowledged || embeddedFailure != null) '
+            "return true;",
+            evidence,
+        )
+        # Bob's acknowledgement counts only once the server acknowledged it, and a definite
+        # failure (band mismatch, altered fixture bytes) ends his wait at once.
+        self.assertIn("observerId, OBSERVER_EMBEDDED_CPM_SKIN_ID)) {", evidence)
+        self.assertIn("evidence.embeddedCpmFailed()", remote)
+        self.assertIn("bytes.alteredFixture()", evidence)
+        self.assertIn('"cpm".equals(modId) ? 20 * 180 : 20 * 90', remote)
         self.assertIn("Alice still wears the embedded CPM skin", evidence)
 
         # No new step and no new capture: the public checkpoint products stay 2/5/7.

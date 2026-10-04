@@ -319,8 +319,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   pair) first prove, without a capture, Quick Skin's own skin that carries a CPM model in its
   pixels, imported through the ordinary skin import: on every band the stored file (locally) and
   the bytes the observer received (remotely) hash to their id and equal the bundled fixture texel
-  for texel; on the file-backed bridge band (1.20.1 to 1.21.3) CPM must also load that model for
-  the local player and for the remote observer, who acknowledges it before the subject resets.
+  for texel; on the file-backed bridge band (1.20.1 to 1.21.3) CPM must also load that very model,
+  recognised by the pose the skin encodes rather than by any new healthy definition, for the
+  local player and for the remote observer, whose acknowledgement the server must confirm before
+  the subject resets.
   The harness sets the band from the runtime version and fails when `CpmCapabilities` disagrees,
   so a capability regression cannot silently skip the model check. The phase ends in the same
   normal-skin state, so frames, captures and checkpoint counts are unchanged; its proof is

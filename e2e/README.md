@@ -618,7 +618,8 @@ workflow for each locked mod:
   `cpm-embedded-full.png` fixture written with CPM's own writer) through the ordinary skin import,
   without a screenshot. The stored file must hash to its id and equal the fixture texel for texel,
   otherwise the step fails at once, and where CPM reads Quick Skin's skin file (1.20.1 to 1.21.3)
-  CPM must load that model for the player. The harness derives that band from the runtime version
+  CPM must load that very model for the player (its head hidden and its right arm and leg posed
+  as the skin encodes them, so a rebuilt protected model cannot pass). The harness derives that band from the runtime version
   and fails when `CpmCapabilities` disagrees; later versions check the bytes only, because CPM
   reads the Mojang profile there. Its dedicated first-person scenario reloads the protected
   fixture, captures the custom hand, holds first-person view for at least 200 ticks (10 seconds),
@@ -686,9 +687,12 @@ storage, and renderer lookup, while CPM requires a healthy remote model definiti
 change and an inactive definition after its server reset. For CPM, Alice first wears the
 embedded-model skin without a capture: Bob requires the bytes he received to hash to their id and
 equal the fixture texel for texel, and on 1.20.1 to 1.21.3 also requires CPM to load Alice's model
-from them, then acknowledges once through the relay; only then does Alice reset to the normal
-skin, and Bob's applied checkpoint refuses the embedded skin as the reset state. The late-join
-scenario keeps the protected model. Before both live captures, and again in
+from them (the same pose check), then acknowledges once through the relay and waits for the
+server's acknowledgement; only then does Alice reset to the normal skin, and Bob's applied
+checkpoint refuses the embedded skin as the reset state. Bob fails at once on a band mismatch or
+on received bytes that are the fixture with altered texels. The late-join scenario keeps the
+protected model, so a player who joins after Alice already wears an embedded-model skin is not
+covered here. Before both live captures, and again in
 both assertions, Bob's renderer must have compiled the terrain at and below Alice; vanilla skips
 entities in uncompiled sections, so passing appearance checks alone once produced identical
 sky-only frames. Each changed waiting reason is logged, up to a bound, so a timeout names the

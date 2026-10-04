@@ -106,10 +106,34 @@ final class CpmEmbeddedSkinProof {
      * 64x64 texels, alpha and colour of every texel included.
      */
     static Step.Result bytesExact(byte[] bytes, String hash) {
-        if (bytes == null || bytes.length == 0) return Step.Result.fail("no skin bytes");
+        Comparison comparison = compare(bytes, hash);
+        return comparison.differing() == 0
+                ? Step.Result.pass(comparison.message())
+                : Step.Result.fail(comparison.message());
+    }
+
+    /**
+     * Below this many differing texels a decoded 64x64 skin counts as the bundled fixture altered
+     * by an import rather than another skin (3.0.1's import changed 10 of them).
+     */
+    static final int ALTERED_FIXTURE_MAX_TEXELS = 256;
+
+    /**
+     * {@code differing} is 0 when the bytes are exact, the number of differing texels for a
+     * decoded 64x64 skin whose bytes hash to {@code hash}, and -1 otherwise.
+     */
+    record Comparison(int differing, String message) {
+        /** The bundled fixture with a few texels changed: a corrupting import, not another skin. */
+        boolean alteredFixture() {
+            return differing > 0 && differing < ALTERED_FIXTURE_MAX_TEXELS;
+        }
+    }
+
+    static Comparison compare(byte[] bytes, String hash) {
+        if (bytes == null || bytes.length == 0) return new Comparison(-1, "no skin bytes");
         String contentId = HashUtil.computeContentId(bytes);
         if (contentId == null || !contentId.equals(hash)) {
-            return Step.Result.fail("bytes hash to " + contentId + ", not their id " + hash);
+            return new Comparison(-1, "bytes hash to " + contentId + ", not their id " + hash);
         }
         BufferedImage image;
         int[] expected;
@@ -117,10 +141,10 @@ final class CpmEmbeddedSkinProof {
             image = ImageIO.read(new ByteArrayInputStream(bytes));
             expected = expectedArgb();
         } catch (Exception failure) {
-            return Step.Result.fail("skin bytes do not decode: " + concise(failure));
+            return new Comparison(-1, "skin bytes do not decode: " + concise(failure));
         }
         if (image == null || image.getWidth() != SIZE || image.getHeight() != SIZE) {
-            return Step.Result.fail("skin is not a 64x64 PNG");
+            return new Comparison(-1, "skin is not a 64x64 PNG");
         }
         int[] actual = image.getRGB(0, 0, SIZE, SIZE, null, 0, SIZE);
         int differing = 0;
@@ -132,11 +156,12 @@ final class CpmEmbeddedSkinProof {
             }
         }
         if (differing > 0) {
-            return Step.Result.fail(differing + " texels differ from the bundled embedded-model "
-                    + "skin, first (" + (first % SIZE) + "," + (first / SIZE) + ") "
+            return new Comparison(differing, differing
+                    + " texels differ from the bundled embedded-model skin, first ("
+                    + (first % SIZE) + "," + (first / SIZE) + ") "
                     + argb(expected[first]) + "->" + argb(actual[first]));
         }
-        return Step.Result.pass("sha256 equals the id, " + actual.length + "/" + actual.length
+        return new Comparison(0, "sha256 equals the id, " + actual.length + "/" + actual.length
                 + " texels equal the bundled embedded-model skin");
     }
 
@@ -224,7 +249,9 @@ final class CpmEmbeddedSkinProof {
 
     /**
      * Why CPM does not yet show the embedded model for a player, or null when it does: a loaded,
-     * renderable, error-free definition that is not the protected baseline model's object.
+     * renderable, error-free definition that is not the protected baseline model's object and
+     * carries the bundled fixture's own pose ({@link #fixtureModelMismatch}), so a rebuilt
+     * protected model or any other model cannot pass.
      */
     static String modelWaitReason(Definition state, Object baselineDefinition) {
         if (!state.inspected()) return state.detail();
@@ -234,6 +261,72 @@ final class CpmEmbeddedSkinProof {
         }
         if (state.error() != null) return "CPM model failed: " + state.detail();
         if (!state.renderable()) return "CPM model is not renderable: " + state.detail();
+        String mismatch = fixtureModelMismatch(state.definition());
+        return mismatch == null ? null : "CPM model is not the embedded one: " + mismatch;
+    }
+
+    /** What {@link #fixtureModelMismatch} proved, for the runtime evidence. */
+    static final String FIXTURE_MODEL =
+            "head hidden, right arm and right leg posed as encoded in the skin";
+
+    // The fixture's definition (modules/image-core/src/test/resources/cpm/
+    // cpm-embedded-full.payload.bin) hides the head and turns the right arm by 120 degrees and the
+    // right leg by 30 degrees about z. CPM stores an angle as an unsigned short of a full turn
+    // (0x5555 and 0x1555 there) and reads it back as short / 65535 * 2 * PI radians.
+    private static final int RIGHT_ARM_ID = 3;
+    private static final int RIGHT_LEG_ID = 5;
+    private static final float RIGHT_ARM_Z = (float) (21845 / 65535f * 2 * Math.PI);
+    private static final float RIGHT_LEG_Z = (float) (5461 / 65535f * 2 * Math.PI);
+    private static final float ANGLE_TOLERANCE = 1.0e-3f;
+
+    /**
+     * Null when CPM's loaded {@code definition} is the bundled fixture's model, otherwise what
+     * differs. Reads what CPM's own parts wrote: the head root's hidden flag (set through
+     * {@code getModelElementFor(part).getMainRoot()}) and the model rotation {@code rotN} its
+     * player-pose parts set on elements 3 (right arm) and 5 (right leg) through
+     * {@code getElementById}.
+     */
+    static String fixtureModelMismatch(Object definition) {
+        try {
+            Class<?> parts = Class.forName("com.tom.cpm.shared.model.PlayerModelParts");
+            Method elementFor = definition.getClass().getMethod("getModelElementFor",
+                    Class.forName("com.tom.cpm.shared.model.render.VanillaModelPart"));
+            Object head = mainRoot(definition, elementFor, parts, "HEAD");
+            if (head == null) return "no head root";
+            if (!Boolean.TRUE.equals(head.getClass().getMethod("isHidden").invoke(head))) {
+                return "the head is shown";
+            }
+            Method elementById = definition.getClass().getMethod("getElementById", int.class);
+            String arm = rotationMismatch(
+                    elementById.invoke(definition, RIGHT_ARM_ID), "right arm", RIGHT_ARM_Z);
+            if (arm != null) return arm;
+            return rotationMismatch(
+                    elementById.invoke(definition, RIGHT_LEG_ID), "right leg", RIGHT_LEG_Z);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
+            return "CPM model inspection failed: " + concise(failure);
+        }
+    }
+
+    private static Object mainRoot(Object definition, Method elementFor, Class<?> parts,
+            String part) throws ReflectiveOperationException {
+        Object root = elementFor.invoke(definition, parts.getField(part).get(null));
+        return root == null ? null : root.getClass().getMethod("getMainRoot").invoke(root);
+    }
+
+    private static String rotationMismatch(Object root, String label, float expectedZ)
+            throws ReflectiveOperationException {
+        if (root == null) return "no " + label + " root";
+        Object rotation = root.getClass().getField("rotN").get(root);
+        if (rotation == null) return "the " + label + " has no model rotation";
+        float x = rotation.getClass().getField("x").getFloat(rotation);
+        float y = rotation.getClass().getField("y").getFloat(rotation);
+        float z = rotation.getClass().getField("z").getFloat(rotation);
+        if (Math.abs(x) > ANGLE_TOLERANCE || Math.abs(y) > ANGLE_TOLERANCE
+                || Math.abs(z - expectedZ) > ANGLE_TOLERANCE) {
+            return String.format(java.util.Locale.ROOT,
+                    "the %s rotation is (%.4f,%.4f,%.4f), not (0,0,%.4f)",
+                    label, x, y, z, expectedZ);
+        }
         return null;
     }
 

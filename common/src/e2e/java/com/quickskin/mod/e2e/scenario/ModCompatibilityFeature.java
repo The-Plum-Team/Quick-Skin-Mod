@@ -220,6 +220,7 @@ interface ModCompatibilityFeature {
         private volatile boolean modelActivated;
         /** CPM's definition object for the protected model, latched by the baseline assertion. */
         private volatile Object baselineDefinition;
+        private volatile String baselineDefinitionDetail = "baseline assertion did not run";
         /** Phase E of the apply step: the embedded-model skin, checked without a screenshot. */
         private volatile boolean embeddedPhase;
         private volatile String embeddedBytesProof;
@@ -273,7 +274,9 @@ interface ModCompatibilityFeature {
             if (!CPMCompatIntegration.isLocalPlayerWearingCpmModel()) {
                 return Step.Result.fail("CPM definition cache does not report the selected model");
             }
-            baselineDefinition = CpmEmbeddedSkinProof.definition(playerId).definition();
+            CpmEmbeddedSkinProof.Definition baseline = CpmEmbeddedSkinProof.definition(playerId);
+            baselineDefinition = baseline.definition();
+            baselineDefinitionDetail = baseline.detail();
             return Step.Result.pass("Quick Skin imported, selected and rendered protected complex "
                     + "CPM fixture " + model.hash());
         }
@@ -353,6 +356,12 @@ interface ModCompatibilityFeature {
                 failure = band.mismatch();
                 return;
             }
+            if (band.bridge() && baselineDefinition == null) {
+                // Without it a rebuilt protected model could not be told apart by identity.
+                failure = "CPM's definition of the protected baseline model was not captured: "
+                        + baselineDefinitionDetail;
+                return;
+            }
             Path fixture = safeFixture(TestAssets::makeCpmEmbeddedSkin, "CPM embedded-model skin");
             AssetMetadata embedded = fixture == null ? null : importAndApply(fixture);
             if (embedded != null) {
@@ -406,6 +415,8 @@ interface ModCompatibilityFeature {
                 reason = "the embedded-model skin has not reached the renderer";
             } else if (!ClientConfig.getInstance().activeCpmModelHash.isEmpty()) {
                 reason = "the CPM model hash is still selected";
+            } else if (ClientConfig.getInstance().pendingCpmSkinModeReset) {
+                reason = "Quick Skin's reset of CPM to skin mode is still pending";
             } else if (band.bridge()) {
                 reason = CpmEmbeddedSkinProof.modelWaitReason(
                         CpmEmbeddedSkinProof.definition(playerId), baselineDefinition);
@@ -414,8 +425,9 @@ interface ModCompatibilityFeature {
             if (reason != null) return false;
             embeddedProof = "embedded CPM skin " + skinHash + " stored: " + embeddedBytesProof
                     + "; " + (band.bridge()
-                    ? "CPM loaded its model for the local player (new definition, renderable, "
-                            + "no error; " + band.describe() + ")"
+                    ? "CPM loaded its model for the local player ("
+                            + CpmEmbeddedSkinProof.FIXTURE_MODEL + "; renderable, no error; "
+                            + band.describe() + ")"
                     : "CPM is not asked to read it (" + band.describe() + ")");
             E2ELog.info(embeddedProof);
             return true;

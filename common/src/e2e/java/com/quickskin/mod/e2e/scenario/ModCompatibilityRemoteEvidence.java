@@ -10,6 +10,7 @@ import com.quickskin.mod.e2e.CompatibilityProbe;
 import com.quickskin.mod.e2e.DefaultSkinEvidenceView;
 import com.quickskin.mod.e2e.E2ELog;
 import com.quickskin.mod.e2e.Step;
+import com.quickskin.mod.e2e.TestAssets;
 import com.quickskin.mod.e2e.VanillaShim;
 import com.quickskin.mod.networking.NetworkSyncService;
 import net.minecraft.client.Minecraft;
@@ -37,10 +38,18 @@ final class ModCompatibilityRemoteEvidence {
             new CompatibilityProbe.Result(false, "probe not executed");
     private volatile boolean remoteBaselineObserved;
     private volatile Object remoteBaselineDefinition;
+    /** Alice's Quick Skin skin id when Bob latched her protected CPM baseline. */
+    private volatile String remoteBaselineSkinId;
     private volatile String embeddedHash;
     private volatile String embeddedProof;
+    /** Bob sent his acknowledgement; {@link #embeddedAcknowledged} waits for the server's ack. */
+    private volatile boolean embeddedAckSent;
     private volatile boolean embeddedAcknowledged;
+    /** A definite failure of the embedded phase, which ends Bob's wait at once. */
+    private volatile String embeddedFailure;
     private CpmEmbeddedSkinProof.Band embeddedBand;
+    private final CpmEmbeddedSkinProof.WaitLog embeddedWait =
+            new CpmEmbeddedSkinProof.WaitLog("observe_remote_applied (embedded CPM skin)");
     private String lastWaitReason;
     private int waitReasonLogs;
 
@@ -171,25 +180,46 @@ final class ModCompatibilityRemoteEvidence {
      * mods have no such phase.
      */
     boolean observeEmbeddedCpm(Minecraft minecraft, String modId, UUID observerId) {
-        if (!"cpm".equals(modId) || embeddedAcknowledged) return true;
+        if (!"cpm".equals(modId) || embeddedAcknowledged || embeddedFailure != null) return true;
+        if (embeddedAckSent) {
+            if (NetworkSyncService.getInstance().isLatestAppearanceAcknowledged(
+                    observerId, OBSERVER_EMBEDDED_CPM_SKIN_ID)) {
+                embeddedAcknowledged = true;
+                E2ELog.info("server acknowledged Bob's embedded CPM confirmation");
+                return true;
+            }
+            embeddedWait.note("the server has not acknowledged Bob's confirmation yet");
+            return false;
+        }
         String reason = embeddedCpmWaitReason(minecraft);
-        noteWait("observe_remote_applied (embedded CPM skin)", reason);
+        embeddedWait.note(reason);
+        if (embeddedFailure != null) {
+            E2ELog.info("observe_remote_applied (embedded CPM skin) failed: " + embeddedFailure);
+            return true;
+        }
         if (reason != null) return false;
         try {
             NetworkSyncService.getInstance().syncAppearance(
                     observerId, OBSERVER_EMBEDDED_CPM_SKIN_ID, "", "slim");
-            embeddedAcknowledged = true;
-            E2ELog.info("Bob acknowledged Alice's embedded CPM skin: " + embeddedProof);
-            return true;
+            embeddedAckSent = true;
+            E2ELog.info("Bob confirmed Alice's embedded CPM skin: " + embeddedProof);
         } catch (Throwable failure) {
             E2ELog.error("failed to acknowledge the embedded CPM skin", failure);
-            return false;
         }
+        return false;
+    }
+
+    /** Whether Bob's embedded CPM phase already failed, so the step stops waiting. */
+    boolean embeddedCpmFailed() {
+        return embeddedFailure != null;
     }
 
     private String embeddedCpmWaitReason(Minecraft minecraft) {
         if (embeddedBand == null) embeddedBand = CpmEmbeddedSkinProof.band();
-        if (embeddedBand.mismatch() != null) return embeddedBand.mismatch();
+        if (embeddedBand.mismatch() != null) {
+            embeddedFailure = embeddedBand.mismatch();
+            return embeddedFailure;
+        }
         AbstractClientPlayer subject = findOther(minecraft);
         if (subject == null) return "Alice is not present on Bob's client";
         PlayerAppearance appearance = PlayerAppearanceRepository.getInstance()
@@ -201,17 +231,28 @@ final class ModCompatibilityRemoteEvidence {
         String hash = skinId.substring("local_skin:".length());
         NetworkTextureCache cache = NetworkTextureCache.getInstance();
         if (!cache.hasTexture(hash, "skin")) return "Alice's skin bytes are not cached: " + hash;
-        Step.Result bytes = CpmEmbeddedSkinProof.bytesExact(cache.getTextureData(hash, "skin"), hash);
-        if (!bytes.pass()) {
-            return "Alice's skin " + hash + " is not the embedded-model skin: " + bytes.message();
+        CpmEmbeddedSkinProof.Comparison bytes =
+                CpmEmbeddedSkinProof.compare(cache.getTextureData(hash, "skin"), hash);
+        if (bytes.differing() != 0) {
+            String reason = "Alice's skin " + hash + " is not the embedded-model skin: "
+                    + bytes.message();
+            boolean newSkin = !skinId.equals(remoteBaselineSkinId);
+            if (newSkin && (bytes.alteredFixture()
+                    || TestAssets.CPM_EMBEDDED_SKIN_CONTENT_ID.equals(hash))) {
+                // Alice's new skin is the fixture with changed texels, or carries the fixture's
+                // id with other bytes: waiting cannot fix it.
+                embeddedFailure = reason;
+            }
+            return reason;
         }
         String model = "Bob's CPM is not asked to read it (" + embeddedBand.describe() + ")";
         if (embeddedBand.bridge()) {
             String modelReason = CpmEmbeddedSkinProof.modelWaitReason(
                     CpmEmbeddedSkinProof.definition(subject.getUUID()), remoteBaselineDefinition);
             if (modelReason != null) return modelReason;
-            model = "Bob's CPM loaded Alice's embedded model (new definition, renderable, no "
-                    + "error; " + embeddedBand.describe() + ")";
+            model = "Bob's CPM loaded Alice's embedded model ("
+                    + CpmEmbeddedSkinProof.FIXTURE_MODEL + "; renderable, no error; "
+                    + embeddedBand.describe() + ")";
         }
         embeddedHash = hash;
         embeddedProof = "embedded CPM skin " + hash + " received: " + bytes.message() + "; "
@@ -232,6 +273,9 @@ final class ModCompatibilityRemoteEvidence {
     /** The latched remote proof, or a failure when the CPM embedded phase never completed. */
     Step.Result embeddedCpmProof(String modId) {
         if (!"cpm".equals(modId)) return Step.Result.pass("");
+        if (embeddedFailure != null) {
+            return Step.Result.fail("Bob's embedded CPM check failed: " + embeddedFailure);
+        }
         String proof = embeddedProof;
         return embeddedAcknowledged && proof != null
                 ? Step.Result.pass(proof)
@@ -442,6 +486,9 @@ final class ModCompatibilityRemoteEvidence {
                     + state.detail());
         }
         remoteBaselineDefinition = state.definition();
+        PlayerAppearance appearance = PlayerAppearanceRepository.getInstance()
+                .getAppearance(subject.getUUID());
+        remoteBaselineSkinId = appearance == null ? null : appearance.getSkinId();
         return Step.Result.pass("Bob's CPM definition loader has a healthy renderable model "
                 + "for remote Alice: " + state.detail());
     }
@@ -455,8 +502,10 @@ final class ModCompatibilityRemoteEvidence {
         }
         Step.Result skin = checkRemoteQuickSkin(subject);
         if (!skin.pass()) return skin;
-        if (("local_skin:" + embeddedHash).equals(PlayerAppearanceRepository.getInstance()
-                .getAppearance(subject.getUUID()).getSkinId())) {
+        PlayerAppearance current = PlayerAppearanceRepository.getInstance()
+                .getAppearance(subject.getUUID());
+        if (current == null
+                || ("local_skin:" + embeddedHash).equals(current.getSkinId())) {
             return Step.Result.fail("Alice still wears the embedded CPM skin, not the plaid reset");
         }
         CpmRemoteState state = inspectRemoteCpm(subject.getUUID());
