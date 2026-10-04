@@ -142,6 +142,27 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
+- A preview hides everything the previewed player wears or holds. The one exception is the HUD
+  preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
+  that model as it does in the world. It exists only on the inline draw before 1.21.6; the
+  render-state path keeps blanking both hands, because no TaCZ exists for those versions. TaCZ is
+  not a supported integration and has no compatibility lane: recognise its gun type by name only,
+  never compile against or call TaCZ, and fall back to the hidden hand whenever the mod is absent
+  or changed. Keep the exception to the main hand of the live local player (TaCZ's Player
+  Animator layers shed their fades only when that player ticks), keep every menu preview free of
+  held items, and keep the previewed player's previous-tick rotation pinned for the draw, which
+  TaCZ's layers read.
+- TaCZ starts the local player's third-person reload, recoil and melee animations, and resets
+  the stance on a gun switch, from its gun events and only while the camera is not first person.
+  The optional `TaczPreviewAnimationMixin` is the only hook into TaCZ: it redirects that one
+  camera check in TaCZ's four event handlers and answers "not first person" only while the HUD
+  preview is showing the local player with the gun, which the preview's own draws record. Never
+  start, stop or choose a TaCZ animation from Quick Skin, and never widen the hook beyond that
+  check. It must stay fail-open (`@Pseudo`, targets named by string, gated on TaCZ's class file in
+  `EarsMixinPlugin`, `require = 0`) and listed in every copy of `quickskin-ears.mixins.json`,
+  because the 1.20.1 overlay replaces the canonical file on the only lane official TaCZ exists
+  for. The animation plays on the real local player, so other first-person draws of that
+  player's model show it too; it never reaches the first-person arms.
 
 ## Public E2E evidence
 
