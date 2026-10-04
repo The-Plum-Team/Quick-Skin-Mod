@@ -422,23 +422,31 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
             self.assertIn("this.skinLookup = createSkinLookup(this.profile);", mixin)
             self.assertIn("this.skinLookup = null;", mixin)
 
-    def test_network_skin_arrival_refreshes_cpm_where_it_reads_quick_skin_skins(self) -> None:
+    def test_network_skin_arrival_refreshes_cpm_only_after_a_recorded_miss(self) -> None:
         cache = NETWORK_TEXTURE_CACHE.read_text(encoding="utf-8")
         commit = cache[
             cache.index("private boolean commitPreparedTexture(") : cache.index(
                 "public static final class PreparedTexture"
             )
         ]
+        # Exactly one CPM refresh: the one for a skin whose file CPM asked for too early.
+        self.assertEqual(commit.count("CPMCompatIntegration."), 1)
         self.assertIn(
-            'if (stored && existingOriginal == null && "skin".equals(textureType)) {', commit
+            "if (cpmMissedSkinFiles.takeStoredSkinMiss(textureType, hash, "
+            "textureDataCache.containsKey(key))) {",
+            commit,
         )
-        self.assertIn("CPMCompatIntegration.onNetworkSkinStored();", commit)
+        self.assertIn("CPMCompatIntegration.onMissedNetworkSkinStored(hash);", commit)
+        self.assertNotIn("onNetworkSkinStored", cache)
+        temp_file = cache[cache.index("public Path getOrCreateTempFile(") :]
+        self.assertIn("cpmMissedSkinFiles.lookupOrRecordMiss(", temp_file)
 
         integration = CPM_INTEGRATION.read_text(encoding="utf-8")
-        self.assertIn("public static void onNetworkSkinStored()", integration)
+        self.assertNotIn("onNetworkSkinStored()", integration)
+        hook_start = integration.index("public static void onMissedNetworkSkinStored(String hash)")
         hook = integration[
-            integration.index("public static void onNetworkSkinStored()") : integration.index(
-                "public static boolean isLocalPlayerWearingCpmModel()"
+            hook_start : integration.index(
+                "private static void schedulePlayerCacheInvalidation()", hook_start
             )
         ]
         self.assertIn("CpmCapabilities.current().supportsHttpTextureBridge()", hook)

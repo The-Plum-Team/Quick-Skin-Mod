@@ -189,7 +189,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   binds the model's texture. An empty skin id sets no model override, so the vanilla skin keeps
   its own model, and from Minecraft 1.21 it rebuilds the vanilla skin lookup PlayerInfo resolved
   while the skin was active (`QuickSkinSkinLookupAccess`). Where CPM reads Quick Skin skins (the
-  embedded-PNG bridge), a network skin's arrival refreshes CPM so a model embedded in it loads.
+  embedded-PNG bridge), a network skin whose file CPM asked for before its bytes arrived makes CPM
+  load its players again once it is stored, so a model embedded in it loads. That one coalesced
+  reload (`CpmMissedSkinFiles`, at most 256 misses, `onMissedNetworkSkinStored`) is the only
+  CPM refresh on a network skin's arrival; a skin CPM never missed needs none.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.

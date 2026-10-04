@@ -1012,17 +1012,6 @@ public final class CPMCompatIntegration {
     }
 
     /**
-     * A network skin's bytes arrived. Where CPM reads Quick Skin skins (the embedded-PNG bridge),
-     * it may have loaded that player before the file existed and kept "no model"; refresh it so a
-     * model embedded in the skin is found.
-     */
-    public static void onNetworkSkinStored() {
-        if (isAvailable() && CpmCapabilities.current().supportsHttpTextureBridge()) {
-            schedulePlayerCacheInvalidation();
-        }
-    }
-
-    /**
      * Queries CPM's definition cache for the local player's currently loaded
      * model. This covers both explicit model files and old-band embedded data.
      */
