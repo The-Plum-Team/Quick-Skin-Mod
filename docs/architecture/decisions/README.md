@@ -15,6 +15,7 @@ Accepted project decisions:
 - [ADR 0008: Transport the installed loader server between jobs](0008-transport-the-installed-loader-server-between-jobs.md)
 - [ADR 0009: Validate draft pull requests in batches](0009-validate-draft-pull-requests-in-batches.md)
 - [ADR 0010: Delegate public evidence to mod-base](0010-delegate-public-evidence-to-mod-base.md)
+- [ADR 0011: Show Quick Skin appearances only to Quick Skin clients](0011-show-quick-skin-appearances-only-to-quick-skin-clients.md)
 
 An ADR records the evidence and trade-offs behind a decision. Operational instructions remain in
 the focused human and AI documentation linked from the repository root. A later decision marks an
