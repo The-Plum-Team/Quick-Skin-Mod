@@ -22,7 +22,7 @@
   },
   "build_scripts": {
     "fabric": "b7c2eee94f1f0d92b5f4fcac0081247d746d51106e33cd0cad3174be699d4894",
-    "forge": "3606bdad2788d13351e452c9aa17561007bd4ce0206e44d6588693b00ffbd386",
-    "neoforge": "e251fe82e81aa431991fa9430ab7bfdd8888f4a19bb1dfbf9748ef135f048910"
+    "forge": "9f889b1c5e83686f3664bb4aa0891991ac0008dd5a438d3a38ad7093497d92ca",
+    "neoforge": "5061d8f171f48c7d24822cef49a56f52649c2fbe7b0ffa1016ec39ab9fb81391"
   }
 }
