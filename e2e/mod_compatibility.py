@@ -38,10 +38,12 @@ from matrix import gha_matrix, load_matrix, read_mod_version, select_release_tar
 
 
 DEFAULT_CONTRACT = Path(__file__).with_name("mod-compatibility-contract.json")
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 MAX_CONTRACT_BYTES = 2 * 1024 * 1024
 MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
 MAX_FILES_PER_ARTIFACT = 4
+MAX_LOCKED_DEPENDENCIES = 4
+MAX_INSTALL_FILES = 16
 MAX_ARTIFACTS = 256
 IDENTIFIER = re.compile(r"^[a-z][a-z0-9-]{1,63}$")
 SAFE_VALUE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+ -]{0,255}$")
@@ -81,6 +83,18 @@ class LockedFile:
 
 
 @dataclass(frozen=True)
+class LockedDependency:
+    """One exact third-party JAR set that the locked mod needs and the harness does not provide."""
+
+    project_id: str
+    version_id: str
+    version_number: str
+    version_type: str
+    published_at: str
+    files: tuple[LockedFile, ...]
+
+
+@dataclass(frozen=True)
 class LockedArtifact:
     version_id: str
     version_number: str
@@ -89,6 +103,13 @@ class LockedArtifact:
     loader: str
     game_versions: tuple[str, ...]
     files: tuple[LockedFile, ...]
+    dependencies: tuple[LockedDependency, ...] = ()
+
+
+@dataclass(frozen=True)
+class DependencyProject:
+    project_id: str
+    name: str
 
 
 @dataclass(frozen=True)
@@ -139,6 +160,7 @@ class CompatibilityMod:
     artifacts: tuple[LockedArtifact, ...]
     reference_captures: CompatibilityReferenceCaptures | None = None
     additional_execution_profiles: tuple[str, ...] = ()
+    locked_dependencies: tuple[DependencyProject, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -171,6 +193,16 @@ class CompatibilityLane:
             .replace(".", "_")
         )
 
+    @property
+    def install_files(self) -> tuple[LockedFile, ...]:
+        """Every exact JAR this lane installs: the mod's files, then its locked dependencies."""
+
+        return self.artifact.files + tuple(
+            locked
+            for dependency in self.artifact.dependencies
+            for locked in dependency.files
+        )
+
     def public_identity(self) -> dict[str, Any]:
         return {
             "contract_sha256": self.contract_sha256,
@@ -184,17 +216,29 @@ class CompatibilityLane:
             "published_at": self.artifact.published_at,
             "loader": self.loader,
             "runtime_version": self.runtime_version,
-            "files": [
+            "files": [_public_file(item) for item in self.artifact.files],
+            "dependencies": [
                 {
-                    "filename": item.filename,
-                    "url": item.url,
-                    "size": item.size,
-                    "sha256": item.sha256,
-                    "sha512": item.sha512,
+                    "project_id": dependency.project_id,
+                    "version_id": dependency.version_id,
+                    "version_number": dependency.version_number,
+                    "version_type": dependency.version_type,
+                    "published_at": dependency.published_at,
+                    "files": [_public_file(item) for item in dependency.files],
                 }
-                for item in self.artifact.files
+                for dependency in self.artifact.dependencies
             ],
         }
+
+
+def _public_file(item: LockedFile) -> dict[str, Any]:
+    return {
+        "filename": item.filename,
+        "url": item.url,
+        "size": item.size,
+        "sha256": item.sha256,
+        "sha512": item.sha512,
+    }
 
 
 def resolve_reference_capture_id(
@@ -352,6 +396,46 @@ def _validate_file(value: Any, label: str) -> LockedFile:
     )
 
 
+def _validate_files(value: Any, label: str) -> tuple[LockedFile, ...]:
+    if not isinstance(value, list) or not 1 <= len(value) <= MAX_FILES_PER_ARTIFACT:
+        raise CompatibilityContractError(f"{label} is empty or too large")
+    locked_files = tuple(
+        _validate_file(entry, f"{label}[{index}]")
+        for index, entry in enumerate(value)
+    )
+    if len({entry.filename.casefold() for entry in locked_files}) != len(locked_files):
+        raise CompatibilityContractError(f"{label} contains colliding names")
+    return locked_files
+
+
+def _validate_dependency(value: Any, label: str) -> LockedDependency:
+    item = _exact_keys(
+        value,
+        {
+            "project_id",
+            "version_id",
+            "version_number",
+            "version_type",
+            "published_at",
+            "files",
+        },
+        label,
+    )
+    version_type = _string(item["version_type"], f"{label}.version_type", IDENTIFIER)
+    if version_type not in VERSION_TYPES:
+        raise CompatibilityContractError(f"{label}.version_type is unsupported")
+    return LockedDependency(
+        project_id=_string(item["project_id"], f"{label}.project_id", MODRINTH_ID),
+        version_id=_string(item["version_id"], f"{label}.version_id", MODRINTH_ID),
+        version_number=_string(item["version_number"], f"{label}.version_number"),
+        version_type=version_type,
+        published_at=_string(
+            item["published_at"], f"{label}.published_at", PUBLISHED_AT
+        ),
+        files=_validate_files(item["files"], f"{label}.files"),
+    )
+
+
 def _validate_artifact(value: Any, label: str) -> LockedArtifact:
     item = _exact_keys(
         value,
@@ -363,6 +447,7 @@ def _validate_artifact(value: Any, label: str) -> LockedArtifact:
             "loader",
             "game_versions",
             "files",
+            "dependencies",
         },
         label,
     )
@@ -372,15 +457,30 @@ def _validate_artifact(value: Any, label: str) -> LockedArtifact:
     version_type = _string(item["version_type"], f"{label}.version_type", IDENTIFIER)
     if version_type not in VERSION_TYPES:
         raise CompatibilityContractError(f"{label}.version_type is unsupported")
-    files = item["files"]
-    if not isinstance(files, list) or not 1 <= len(files) <= MAX_FILES_PER_ARTIFACT:
-        raise CompatibilityContractError(f"{label}.files is empty or too large")
-    locked_files = tuple(
-        _validate_file(entry, f"{label}.files[{index}]")
-        for index, entry in enumerate(files)
+    locked_files = _validate_files(item["files"], f"{label}.files")
+    dependencies_value = item["dependencies"]
+    if (
+        not isinstance(dependencies_value, list)
+        or len(dependencies_value) > MAX_LOCKED_DEPENDENCIES
+    ):
+        raise CompatibilityContractError(f"{label}.dependencies must be a bounded list")
+    dependencies = tuple(
+        _validate_dependency(entry, f"{label}.dependencies[{index}]")
+        for index, entry in enumerate(dependencies_value)
     )
-    if len({entry.filename.casefold() for entry in locked_files}) != len(locked_files):
-        raise CompatibilityContractError(f"{label}.files contains colliding names")
+    install_names = [
+        entry.filename.casefold()
+        for entry in (
+            *locked_files,
+            *(locked for dependency in dependencies for locked in dependency.files),
+        )
+    ]
+    if len(install_names) > MAX_INSTALL_FILES:
+        raise CompatibilityContractError(f"{label} installs too many files")
+    if len(set(install_names)) != len(install_names):
+        raise CompatibilityContractError(
+            f"{label} mod and dependency files contain colliding names"
+        )
     return LockedArtifact(
         version_id=_string(item["version_id"], f"{label}.version_id", MODRINTH_ID),
         version_number=_string(item["version_number"], f"{label}.version_number"),
@@ -393,7 +493,56 @@ def _validate_artifact(value: Any, label: str) -> LockedArtifact:
             item["game_versions"], f"{label}.game_versions", pattern=VERSION
         ),
         files=locked_files,
+        dependencies=dependencies,
     )
+
+
+def _check_file_identity(
+    locked_file: LockedFile, project_id: str, version_id: str, label: str
+) -> None:
+    path_parts = urllib.parse.urlsplit(locked_file.url).path.split("/")
+    if (
+        len(path_parts) != 6
+        or path_parts[:2] != ["", "data"]
+        or path_parts[2] != project_id
+        or path_parts[3] != "versions"
+        or path_parts[4] != version_id
+        or urllib.parse.unquote(path_parts[5]) != locked_file.filename
+    ):
+        raise CompatibilityContractError(
+            f"{label} file URL disagrees with its project/version/filename identity"
+        )
+
+
+def _validate_locked_dependencies(
+    value: Any,
+    label: str,
+    *,
+    project_id: str,
+    provided: tuple[str, ...],
+) -> tuple[DependencyProject, ...]:
+    if not isinstance(value, list) or len(value) > MAX_LOCKED_DEPENDENCIES:
+        raise CompatibilityContractError(f"{label} must be a bounded list")
+    projects: list[DependencyProject] = []
+    for index, raw in enumerate(value):
+        entry_label = f"{label}[{index}]"
+        entry = _exact_keys(raw, {"project_id", "name"}, entry_label)
+        projects.append(
+            DependencyProject(
+                project_id=_string(
+                    entry["project_id"], f"{entry_label}.project_id", MODRINTH_ID
+                ),
+                name=_string(entry["name"], f"{entry_label}.name"),
+            )
+        )
+    identities = [item.project_id for item in projects]
+    if len(set(identities)) != len(identities):
+        raise CompatibilityContractError(f"{label} contains duplicates")
+    if project_id in identities or set(identities) & set(provided):
+        raise CompatibilityContractError(
+            f"{label} must name projects other than the mod and its provided dependencies"
+        )
+    return tuple(projects)
 
 
 def _validate_mod(value: Any, label: str) -> CompatibilityMod:
@@ -407,6 +556,7 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
             "loaders",
             "allowed_version_types",
             "provided_dependencies",
+            "locked_dependencies",
             "evidence",
             "review_regions",
             "reference_captures",
@@ -580,6 +730,20 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
         _validate_artifact(entry, f"{label}.artifacts[{index}]")
         for index, entry in enumerate(artifacts_value)
     )
+    project_id = _string(item["project_id"], f"{label}.project_id", MODRINTH_ID)
+    provided_dependencies = _string_list(
+        item["provided_dependencies"],
+        f"{label}.provided_dependencies",
+        pattern=MODRINTH_ID,
+        allow_empty=True,
+    )
+    locked_dependencies = _validate_locked_dependencies(
+        item["locked_dependencies"],
+        f"{label}.locked_dependencies",
+        project_id=project_id,
+        provided=provided_dependencies,
+    )
+    locked_dependency_ids = tuple(entry.project_id for entry in locked_dependencies)
     lane_owners: dict[tuple[str, str], str] = {}
     for artifact in artifacts:
         if artifact.loader not in loaders:
@@ -591,17 +755,26 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
                 f"{label} locks disallowed version type {artifact.version_type}"
             )
         for locked_file in artifact.files:
-            path_parts = urllib.parse.urlsplit(locked_file.url).path.split("/")
-            if (
-                len(path_parts) != 6
-                or path_parts[:2] != ["", "data"]
-                or path_parts[2] != item["project_id"]
-                or path_parts[3] != "versions"
-                or path_parts[4] != artifact.version_id
-                or urllib.parse.unquote(path_parts[5]) != locked_file.filename
-            ):
+            _check_file_identity(locked_file, project_id, artifact.version_id, label)
+        if tuple(dependency.project_id for dependency in artifact.dependencies) != (
+            locked_dependency_ids
+        ):
+            raise CompatibilityContractError(
+                f"{label} artifact {artifact.version_id} must lock exactly its declared "
+                "dependencies in order"
+            )
+        for dependency in artifact.dependencies:
+            if dependency.version_type not in version_types:
                 raise CompatibilityContractError(
-                    f"{label} file URL disagrees with its project/version/filename identity"
+                    f"{label} locks disallowed dependency version type "
+                    f"{dependency.version_type}"
+                )
+            for locked_file in dependency.files:
+                _check_file_identity(
+                    locked_file,
+                    dependency.project_id,
+                    dependency.version_id,
+                    f"{label} dependency {dependency.project_id}",
                 )
         for game_version in artifact.game_versions:
             key = (game_version, artifact.loader)
@@ -622,16 +795,11 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
     return CompatibilityMod(
         id=mod_id,
         name=_string(item["name"], f"{label}.name"),
-        project_id=_string(item["project_id"], f"{label}.project_id", MODRINTH_ID),
+        project_id=project_id,
         install_on=install_on,
         loaders=loaders,
         allowed_version_types=version_types,
-        provided_dependencies=_string_list(
-            item["provided_dependencies"],
-            f"{label}.provided_dependencies",
-            pattern=MODRINTH_ID,
-            allow_empty=True,
-        ),
+        provided_dependencies=provided_dependencies,
         evidence=evidence,
         review_regions=review_regions,
         multiplayer=multiplayer,
@@ -640,12 +808,22 @@ def _validate_mod(value: Any, label: str) -> CompatibilityMod:
         artifacts=artifacts,
         reference_captures=reference_captures,
         additional_execution_profiles=additional_execution_profiles,
+        locked_dependencies=locked_dependencies,
     )
 
 
 def load_contract(path: Path = DEFAULT_CONTRACT) -> CompatibilityContract:
     try:
         raw = path.read_bytes()
+    except OSError as exc:
+        raise CompatibilityContractError(f"cannot read compatibility contract {path}: {exc}") from exc
+    return load_contract_bytes(raw, path)
+
+
+def load_contract_bytes(raw: bytes, path: Path) -> CompatibilityContract:
+    """Validate one exact contract payload; ``path`` only names it."""
+
+    try:
         if not raw or len(raw) > MAX_CONTRACT_BYTES:
             raise ValueError(f"contract must contain 1..{MAX_CONTRACT_BYTES} bytes")
         data = json.loads(
@@ -903,7 +1081,7 @@ def materialize_lane(lane: CompatibilityLane, destination: Path) -> tuple[Path, 
     outputs: list[Path] = []
     context = ssl.create_default_context()
     try:
-        for locked in lane.artifact.files:
+        for locked in lane.install_files:
             target = staging / locked.filename
             request = urllib.request.Request(
                 locked.url,

@@ -150,8 +150,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 ## Optional integrations
 
-- CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, and ReplayMod are optional. Guard their entry
-  points and preserve the normal skin/cape path when an optional mod or API is absent.
+- CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, ReplayMod, and FancyMenu are optional. Guard
+  their entry points and preserve the normal skin/cape path when an optional mod or API is absent.
 - Real Camera finds the first-person body by a captured texture id containing `minecraft:skins/`.
   `RealCameraTextureIdMixin` prefixes Quick Skin skin ids inside Real Camera's own buffer record
   only; it is a fail-open shim without a compatibility lane. Do not rename the registered
@@ -165,7 +165,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   that API is present does the preview report its drawn model box as its size, and only from its
   screen's first rendered frame; while the screen is being built it reports 0x0, so mods that
   measure overlaps during init (In-Game Account Switcher) never move away from it. A hidden
-  preview hides its rotate and animation controls. FancyMenu is not a compatibility lane.
+  preview hides its rotate and animation controls. FancyMenu's compatibility lane locks its required
+  Konkrete and Melody JARs beside it; every scenario runs with FancyMenu installed and nothing
+  customized, and only the `mod-compatibility` scenario seeds the layouts that hide the title
+  preview and move and enlarge the pause preview.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
 - The latest look choice between Quick Skin and CPM is the local player's look, for every other

@@ -1371,12 +1371,13 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "customnpcs",
                 "essential",
                 "replaymod",
+                "fancymenu",
             },
             {item["id"] for item in contract["mods"]},
         )
         self.assertNotIn("player-armor-stands", execution_workflow.lower())
         self.assertNotIn("player-armor-stands", review_workflow.lower())
-        self.assertEqual(7, contract["schema_version"])
+        self.assertEqual(8, contract["schema_version"])
         self.assertEqual(
             ["compatibility-cpm"],
             next(

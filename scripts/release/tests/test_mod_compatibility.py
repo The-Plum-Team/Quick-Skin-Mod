@@ -61,7 +61,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
         path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         return path
 
-    def test_lock_declares_only_the_six_supported_integrations(self) -> None:
+    def test_lock_declares_only_the_seven_supported_integrations(self) -> None:
         contract = mod_compatibility.load_contract(self.contract_path)
 
         self.assertEqual(
@@ -72,11 +72,12 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 "customnpcs",
                 "essential",
                 "replaymod",
+                "fancymenu",
             },
             {item.id for item in contract.mods},
         )
         self.assertNotIn("player-armor-stands", {item.id for item in contract.mods})
-        self.assertEqual(104, sum(len(item.artifacts) for item in contract.mods))
+        self.assertEqual(127, sum(len(item.artifacts) for item in contract.mods))
         cpm = contract.mod("cpm")
         self.assertIsNotNone(cpm.multiplayer)
         self.assertEqual(("compatibility-cpm",), cpm.additional_execution_profiles)
@@ -112,11 +113,22 @@ class ModCompatibilityContractTest(unittest.TestCase):
             "full.client_a.skin_menu_screen",
             skin_layers.reference_captures.apply_local_skin_with_mod,
         )
+        fancymenu = contract.mod("fancymenu")
+        self.assertIsNotNone(fancymenu.reference_captures)
+        assert fancymenu.reference_captures is not None
+        self.assertEqual(
+            "full.client_a.title_screen_splash_order",
+            fancymenu.reference_captures.baseline_with_mod,
+        )
+        self.assertEqual(
+            "session.client_a.pause_menu_preview",
+            fancymenu.reference_captures.apply_local_skin_with_mod,
+        )
         self.assertTrue(
             all(
                 item.reference_captures is None
                 for item in contract.mods
-                if item.id != "skin-layers-3d"
+                if item.id not in {"skin-layers-3d", "fancymenu"}
             )
         )
         self.assertIsNotNone(contract.mod("ears").multiplayer)
@@ -140,6 +152,354 @@ class ModCompatibilityContractTest(unittest.TestCase):
                     self.assertTrue(locked_file.url.startswith("https://cdn.modrinth.com/data/"))
                     self.assertRegex(locked_file.sha256, r"^[0-9a-f]{64}$")
                     self.assertRegex(locked_file.sha512, r"^[0-9a-f]{128}$")
+
+    def test_fancymenu_locks_konkrete_and_melody_beside_every_artifact(self) -> None:
+        contract = mod_compatibility.load_contract(self.contract_path)
+        fancymenu = contract.mod("fancymenu")
+
+        self.assertEqual(
+            (("J81TRJWm", "Konkrete"), ("CVT4pFB2", "Melody")),
+            tuple((item.project_id, item.name) for item in fancymenu.locked_dependencies),
+        )
+        self.assertEqual(("P7dR8mSH",), fancymenu.provided_dependencies)
+        self.assertEqual(
+            {
+                ("1.21.1", "fabric"),
+                ("1.21.5", "fabric"),
+                ("1.21.7", "fabric"),
+                ("1.21.8", "fabric"),
+                ("26.1.2", "fabric"),
+                ("26.1.2", "neoforge"),
+                ("26.2", "fabric"),
+                ("26.3", "fabric"),
+                ("26.3", "neoforge"),
+            },
+            {(item.runtime_version, item.loader) for item in fancymenu.excluded_lanes},
+        )
+        self.assertTrue(fancymenu.artifacts)
+        for artifact in fancymenu.artifacts:
+            self.assertEqual(
+                ["J81TRJWm", "CVT4pFB2"],
+                [dependency.project_id for dependency in artifact.dependencies],
+            )
+            for dependency in artifact.dependencies:
+                for locked_file in dependency.files:
+                    self.assertTrue(
+                        locked_file.url.startswith(
+                            f"https://cdn.modrinth.com/data/{dependency.project_id}"
+                            f"/versions/{dependency.version_id}/"
+                        )
+                    )
+        for compatibility_mod in contract.mods:
+            if compatibility_mod.id != "fancymenu":
+                self.assertEqual((), compatibility_mod.locked_dependencies)
+                self.assertTrue(
+                    all(not artifact.dependencies for artifact in compatibility_mod.artifacts)
+                )
+
+        lane = mod_compatibility.resolve_lane(
+            contract,
+            mod_id="fancymenu",
+            artifact_node="forge-1.20.1",
+            runtime_version="1.20.1",
+            loader="forge",
+        )
+        self.assertEqual(3, len(lane.install_files))
+        self.assertEqual(lane.artifact.files[0], lane.install_files[0])
+        identity = lane.public_identity()
+        self.assertEqual(
+            ["J81TRJWm", "CVT4pFB2"],
+            [item["project_id"] for item in identity["dependencies"]],
+        )
+        self.assertEqual(
+            {item.filename for item in lane.install_files},
+            {
+                entry["filename"]
+                for entry in (
+                    *identity["files"],
+                    *(
+                        locked
+                        for dependency in identity["dependencies"]
+                        for locked in dependency["files"]
+                    ),
+                )
+            },
+        )
+
+        plan = mod_compatibility.build_plan(
+            ROOT / "release" / "release-matrix.json", self.contract_path
+        )
+        runnable = {
+            lane["artifact_node"]
+            for lane in plan["runnable"]
+            if lane["compatibility_mod"] == "fancymenu"
+        }
+        self.assertIn("forge-1.20.1", runnable)
+        self.assertNotIn("fabric-1.21.1", runnable)
+        reasons = {
+            lane["artifact_node"]: lane["reason"]
+            for lane in plan["not_applicable"]
+            if lane["mod"] == "fancymenu"
+        }
+        self.assertIn("requires Fabric Loader 0.16.10", reasons["fabric-1.21.1"])
+
+    def test_dependency_lock_rejects_foreign_missing_and_colliding_files(self) -> None:
+        def fancymenu(payload: dict[str, object]) -> dict[str, object]:
+            return next(item for item in payload["mods"] if item["id"] == "fancymenu")
+
+        foreign_url = copy.deepcopy(self.payload)
+        dependency = fancymenu(foreign_url)["artifacts"][0]["dependencies"][0]
+        dependency["files"][0]["url"] = dependency["files"][0]["url"].replace(
+            dependency["project_id"], "AbCd1234"
+        )
+        missing = copy.deepcopy(self.payload)
+        fancymenu(missing)["artifacts"][0]["dependencies"].pop()
+        reordered = copy.deepcopy(self.payload)
+        fancymenu(reordered)["artifacts"][0]["dependencies"].reverse()
+        undeclared = copy.deepcopy(self.payload)
+        undeclared["mods"][0]["artifacts"][0]["dependencies"] = copy.deepcopy(
+            fancymenu(self.payload)["artifacts"][0]["dependencies"]
+        )
+        colliding = copy.deepcopy(self.payload)
+        artifact = fancymenu(colliding)["artifacts"][0]
+        artifact["dependencies"][0]["files"][0]["filename"] = artifact["files"][0]["filename"]
+        provided = copy.deepcopy(self.payload)
+        fancymenu(provided)["locked_dependencies"].append(
+            {"project_id": "P7dR8mSH", "name": "Fabric API"}
+        )
+        self_dependency = copy.deepcopy(self.payload)
+        fancymenu(self_dependency)["locked_dependencies"].append(
+            {"project_id": "Wq5SjeWM", "name": "FancyMenu"}
+        )
+        missing_key = copy.deepcopy(self.payload)
+        del missing_key["mods"][0]["artifacts"][0]["dependencies"]
+        old_schema = copy.deepcopy(self.payload)
+        old_schema["schema_version"] = 7
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for label, mutation in (
+                ("foreign dependency URL", foreign_url),
+                ("missing dependency", missing),
+                ("reordered dependencies", reordered),
+                ("undeclared dependency", undeclared),
+                ("colliding dependency filename", colliding),
+                ("provided dependency also locked", provided),
+                ("mod locks itself", self_dependency),
+                ("artifact without dependencies key", missing_key),
+                ("schema 7", old_schema),
+            ):
+                with self.subTest(label=label):
+                    path = self.write_contract(root, mutation)
+                    with self.assertRaises(mod_compatibility.CompatibilityContractError):
+                        mod_compatibility.load_contract(path)
+
+    def test_materialization_installs_the_locked_dependency_files(self) -> None:
+        payloads = {
+            "https://cdn.modrinth.com/data/AbCd1234/versions/EfGh5678/mod.jar": b"mod jar",
+            "https://cdn.modrinth.com/data/IjKl9012/versions/MnOp3456/dependency.jar": (
+                b"dependency jar"
+            ),
+        }
+
+        def locked(url: str) -> mod_compatibility.LockedFile:
+            return mod_compatibility.LockedFile(
+                filename=url.rsplit("/", 1)[1],
+                url=url,
+                size=len(payloads[url]),
+                sha256=hashlib.sha256(payloads[url]).hexdigest(),
+                sha512=hashlib.sha512(payloads[url]).hexdigest(),
+            )
+
+        mod_url, dependency_url = payloads
+        artifact = mod_compatibility.LockedArtifact(
+            version_id="EfGh5678",
+            version_number="1.0.0",
+            version_type="release",
+            published_at="2026-08-13T00:00:00Z",
+            loader="forge",
+            game_versions=("1.20.1",),
+            files=(locked(mod_url),),
+            dependencies=(
+                mod_compatibility.LockedDependency(
+                    project_id="IjKl9012",
+                    version_id="MnOp3456",
+                    version_number="2.0.0",
+                    version_type="release",
+                    published_at="2026-08-12T00:00:00Z",
+                    files=(locked(dependency_url),),
+                ),
+            ),
+        )
+        lane = mod_compatibility.CompatibilityLane(
+            contract_sha256="a" * 64,
+            mod=mock.Mock(id="sample-mod"),
+            artifact=artifact,
+            artifact_node="forge-1.20.1",
+            runtime_version="1.20.1",
+            loader="forge",
+        )
+
+        def respond(request: object, **_kwargs: object) -> _Response:
+            url = request.full_url  # type: ignore[attr-defined]
+            return _Response(payloads[url], url)
+
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.object(
+            mod_compatibility.urllib.request, "urlopen", side_effect=respond
+        ):
+            destination = Path(temporary) / "materialized"
+            outputs = mod_compatibility.materialize_lane(lane, destination)
+            self.assertEqual(
+                (destination / "mod.jar", destination / "dependency.jar"), outputs
+            )
+            self.assertEqual(b"dependency jar", outputs[1].read_bytes())
+
+    def test_updater_locks_dependencies_per_lane_and_refreshes_only_named_mods(self) -> None:
+        def upstream(
+            project_id: str,
+            version_id: str,
+            loaders: list[str],
+            requires: list[str],
+            published: str = "2026-08-13T00:00:00Z",
+        ) -> dict[str, object]:
+            return {
+                "id": version_id,
+                "version_number": f"1.0-{version_id}",
+                "version_type": "release",
+                "date_published": published,
+                "game_versions": ["1.20.1"],
+                "loaders": loaders,
+                "dependencies": [
+                    {"dependency_type": "required", "project_id": item} for item in requires
+                ],
+                "files": [
+                    {
+                        "filename": f"{version_id}.jar",
+                        "url": (
+                            f"https://cdn.modrinth.com/data/{project_id}"
+                            f"/versions/{version_id}/{version_id}.jar"
+                        ),
+                        "size": 10,
+                        "hashes": {"sha512": "b" * 128},
+                        "primary": True,
+                    }
+                ],
+            }
+
+        mod = copy.deepcopy(
+            next(item for item in self.payload["mods"] if item["id"] == "fancymenu")
+        )
+        versions = {
+            "Wq5SjeWM": [
+                upstream("Wq5SjeWM", "FmFab001", ["fabric"], ["J81TRJWm", "CVT4pFB2", "P7dR8mSH"]),
+                upstream("Wq5SjeWM", "FmFor001", ["forge"], ["J81TRJWm", "CVT4pFB2"]),
+            ],
+            "J81TRJWm": [
+                upstream("J81TRJWm", "KoFab001", ["fabric"], ["P7dR8mSH"]),
+                upstream("J81TRJWm", "KoAll001", ["fabric", "forge"], [], "2026-08-01T00:00:00Z"),
+                upstream("J81TRJWm", "KoFor002", ["forge"], []),
+            ],
+            "CVT4pFB2": [
+                upstream("CVT4pFB2", "MeAll001", ["fabric", "forge"], []),
+            ],
+        }
+        selected = update_mod_compatibility_lock.select_artifacts(
+            mod,
+            ["1.20.1"],
+            versions["Wq5SjeWM"],
+            {key: value for key, value in versions.items() if key != "Wq5SjeWM"},
+        )
+        self.assertEqual(
+            [("fabric", ["KoFab001", "MeAll001"]), ("forge", ["KoFor002", "MeAll001"])],
+            [
+                (item["loader"], [entry[1]["id"] for entry in item["_dependencies"]])
+                for item in selected
+            ],
+        )
+
+        without_forge_melody = {
+            **versions,
+            "CVT4pFB2": [upstream("CVT4pFB2", "MeFab001", ["fabric"], [])],
+        }
+        with self.assertRaisesRegex(
+            mod_compatibility.CompatibilityContractError, "author an exclusion"
+        ):
+            update_mod_compatibility_lock.select_artifacts(
+                mod, ["1.20.1"], versions["Wq5SjeWM"], without_forge_melody
+            )
+        transitive = {
+            **versions,
+            "CVT4pFB2": [upstream("CVT4pFB2", "MeAll001", ["fabric", "forge"], ["ZyXw9876"])],
+        }
+        with self.assertRaisesRegex(
+            mod_compatibility.CompatibilityContractError, "needs unlocked projects"
+        ):
+            update_mod_compatibility_lock.select_artifacts(
+                mod, ["1.20.1"], versions["Wq5SjeWM"], transitive
+            )
+
+        def hashed(source: dict[str, object], _cache: Path) -> dict[str, object]:
+            return {
+                "filename": source["filename"],
+                "url": source["url"],
+                "size": source["size"],
+                "sha256": "c" * 64,
+                "sha512": "b" * 128,
+            }
+
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "mod-compatibility-contract.json"
+            path.write_bytes(self.contract_path.read_bytes())
+            with mock.patch.object(
+                update_mod_compatibility_lock,
+                "_project_versions",
+                side_effect=lambda _data, project_id, _label: versions[project_id],
+            ) as project_versions, mock.patch.object(
+                update_mod_compatibility_lock, "_download_and_hash", side_effect=hashed
+            ):
+                refreshed = update_mod_compatibility_lock.refresh(
+                    path,
+                    versions=["1.20.1"],
+                    cache=Path(temporary) / "cache",
+                    lock_date="2026-10-05",
+                    mod_ids=["fancymenu"],
+                )
+            self.assertEqual(
+                {"Wq5SjeWM", "J81TRJWm", "CVT4pFB2"},
+                {call.args[1] for call in project_versions.call_args_list},
+            )
+            update_mod_compatibility_lock.write_atomic(path, refreshed)
+            contract = mod_compatibility.load_contract(path)
+        for before in self.payload["mods"]:
+            if before["id"] != "fancymenu":
+                self.assertEqual(
+                    before,
+                    next(item for item in refreshed["mods"] if item["id"] == before["id"]),
+                )
+        fancymenu = contract.mod("fancymenu")
+        self.assertEqual(["fabric", "forge"], [item.loader for item in fancymenu.artifacts])
+        self.assertEqual(
+            ["KoFor002", "MeAll001"],
+            [item.version_id for item in fancymenu.artifacts[1].dependencies],
+        )
+        self.assertEqual("2026-10-05", contract.lock_revision)
+        with self.assertRaisesRegex(
+            mod_compatibility.CompatibilityContractError, "unknown compatibility mods"
+        ):
+            update_mod_compatibility_lock.refresh(
+                self.contract_path,
+                versions=["1.20.1"],
+                cache=Path("unused"),
+                lock_date="2026-10-05",
+                mod_ids=["not-a-mod"],
+            )
+
+    def test_updater_keeps_review_regions_on_one_line(self) -> None:
+        payload = self.contract_path.read_bytes().replace(b"\r\n", b"\n")
+        self.assertEqual(
+            payload,
+            update_mod_compatibility_lock._serialize(json.loads(payload)),
+        )
 
     def test_player_armor_stands_integration_is_fully_retired(self) -> None:
         retired = {"PasCompatService.java", "PasConfiguratorAccessor.java", "PasConfiguratorMixin.java"}
@@ -186,7 +546,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
             len(plan["runnable"]) + len(plan["not_applicable"]),
         )
         if plan["release_branch"] == "forge-and-fabric-1.20.1":
-            self.assertEqual(11, len(plan["runnable"]))
+            self.assertEqual(13, len(plan["runnable"]))
             self.assertEqual(1, len(plan["not_applicable"]))
             self.assertEqual(
                 ("forge-1.20.1", "replaymod", "not-applicable"),
@@ -616,6 +976,38 @@ class ModCompatibilityContractTest(unittest.TestCase):
         ):
             visual_evidence.validate_installed_compatibility(
                 installed[1:],
+                expected_roles={"client_a"},
+                lane=lane,
+                label="installed",
+            )
+
+    def test_visual_evidence_requires_every_locked_dependency_copy(self) -> None:
+        contract = mod_compatibility.load_contract(self.contract_path)
+        lane = mod_compatibility.resolve_lane(
+            contract,
+            mod_id="fancymenu",
+            artifact_node="forge-1.20.1",
+            runtime_version="1.20.1",
+            loader="forge",
+        )
+        installed = [
+            {"path": f"client_a/mods/{locked.filename}", "sha256": locked.sha256}
+            for locked in lane.install_files
+        ]
+        self.assertEqual(3, len(installed))
+        accepted = visual_evidence.validate_installed_compatibility(
+            installed,
+            expected_roles={"client_a"},
+            lane=lane,
+            label="installed",
+        )
+        self.assertEqual(3, len(accepted))
+        with self.assertRaisesRegex(
+            visual_evidence.VisualEvidenceError,
+            "every declared compatibility file/install root",
+        ):
+            visual_evidence.validate_installed_compatibility(
+                installed[:1],
                 expected_roles={"client_a"},
                 lane=lane,
                 label="installed",

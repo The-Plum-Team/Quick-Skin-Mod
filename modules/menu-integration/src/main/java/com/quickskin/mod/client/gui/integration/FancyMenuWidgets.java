@@ -15,14 +15,17 @@ import java.lang.reflect.Method;
  * <p>FancyMenu's mixin adds these public methods to every {@link AbstractWidget}. They are
  * FancyMenu's own names and are never remapped, so a plain lookup finds them on every loader. When
  * the lookup fails, FancyMenu is absent (or cannot customize widgets), and every call is a no-op.
+ *
+ * <p>Public only for the packaged compatibility harness, which proves the integration active
+ * through {@link #isAvailable()} and reads {@link #isHidden} instead of reaching into FancyMenu.
  */
 @Environment(EnvType.CLIENT)
-final class FancyMenuWidgets {
+public final class FancyMenuWidgets {
     /** The layout identifier of the title and pause player preview. */
-    static final String PREVIEW_ID = "quickskin_player_preview";
-    static final String CHANGE_SKIN_ID = "quickskin_change_skin_button";
-    static final String ROTATE_ID = "quickskin_preview_rotate_button";
-    static final String ANIMATION_TOGGLE_ID = "quickskin_preview_animation_toggle";
+    public static final String PREVIEW_ID = "quickskin_player_preview";
+    public static final String CHANGE_SKIN_ID = "quickskin_change_skin_button";
+    public static final String ROTATE_ID = "quickskin_preview_rotate_button";
+    public static final String ANIMATION_TOGGLE_ID = "quickskin_preview_animation_toggle";
     private static final String ANIMATION_ID_PREFIX = "quickskin_preview_animation_";
 
     private static final String SET_IDENTIFIER = "setWidgetIdentifierFancyMenu";
@@ -46,6 +49,11 @@ final class FancyMenuWidgets {
         return Installed.API.isPresent();
     }
 
+    /** The optional-integration probe: true when Quick Skin can address FancyMenu layouts. */
+    public static boolean isAvailable() {
+        return isPresent();
+    }
+
     /** Give {@code widget} a stable FancyMenu layout identifier; does nothing without FancyMenu. */
     static void setIdentifier(@Nullable AbstractWidget widget, String identifier) {
         if (widget != null) {
@@ -54,7 +62,7 @@ final class FancyMenuWidgets {
     }
 
     /** True when a FancyMenu layout hides {@code widget}; false without FancyMenu. */
-    static boolean isHidden(AbstractWidget widget) {
+    public static boolean isHidden(AbstractWidget widget) {
         return Installed.API.isHidden(widget);
     }
 

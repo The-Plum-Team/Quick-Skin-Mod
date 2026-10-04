@@ -96,4 +96,10 @@ class FancyMenuWidgetsTest {
         // Invoking a method of one class on an object of another is a failure, not "hidden".
         assertFalse(api.isHidden(new PlainWidget()));
     }
+
+    @Test
+    void theCompatibilityProbeReportsFancyMenuUnavailableWithoutIt() {
+        assertFalse(FancyMenuWidgets.isAvailable());
+        assertEquals(FancyMenuWidgets.isPresent(), FancyMenuWidgets.isAvailable());
+    }
 }

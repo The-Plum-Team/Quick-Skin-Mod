@@ -12,7 +12,8 @@ public final class CompatibilityProbe {
             "skin-layers-3d", "com.quickskin.mod.client.rendering.SkinLayers3DIntegration",
             "customnpcs", "com.quickskin.mod.client.compat.CustomNPCsIntegration",
             "essential", "com.quickskin.mod.client.compat.EssentialCompatIntegration",
-            "replaymod", "com.quickskin.mod.client.compat.ReplayModHelper"
+            "replaymod", "com.quickskin.mod.client.compat.ReplayModHelper",
+            "fancymenu", "com.quickskin.mod.client.gui.integration.FancyMenuWidgets"
     );
 
     public record Result(boolean active, String detail) {}
