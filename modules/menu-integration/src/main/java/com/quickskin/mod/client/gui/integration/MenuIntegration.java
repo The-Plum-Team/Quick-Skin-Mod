@@ -266,19 +266,22 @@ public final class MenuIntegration {
                 LocalPlayer player = Minecraft.getInstance().player;
 
                 com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+                // The saved skin, unless a CPM model is the latest look choice: then the player's
+                // own skin (the live one in a world, the imported one on the title screen).
+                String previewSkinHash = com.quickskin.mod.client.rendering.LocalLookPreview.skinHash(player != null);
 
-                // First priority: Use saved skin from config (works on title screen when player is null)
-                if (!config.activeSkinHash.isEmpty()) {
+                // First priority: Use that skin from the catalog (works on title screen when player is null)
+                if (!previewSkinHash.isEmpty()) {
                     com.quickskin.mod.client.services.LocalAssetManager assetManager =
                             com.quickskin.mod.client.services.LocalAssetManager.getInstance();
-                    com.quickskin.mod.common.data.AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
+                    com.quickskin.mod.common.data.AssetMetadata metadata = assetManager.getMetadata(previewSkinHash);
 
                     if (metadata != null) {
                         // Load the saved skin texture
-                        skinLocation = assetManager.getTextureLocation(config.activeSkinHash, com.quickskin.mod.common.data.TextureQuality.FULL);
+                        skinLocation = assetManager.getTextureLocation(previewSkinHash, com.quickskin.mod.common.data.TextureQuality.FULL);
 
                         // Get saved model type preference for this skin
-                        modelType = assetManager.getSkinModelPreference(config.activeSkinHash);
+                        modelType = assetManager.getSkinModelPreference(previewSkinHash);
 
                         // If auto mode, use the detected model type from metadata
                         if ("auto".equals(modelType)) {
@@ -300,10 +303,10 @@ public final class MenuIntegration {
                     //?}
 
                     // Get model type from the active skin if available
-                    if (!config.activeSkinHash.isEmpty()) {
+                    if (!previewSkinHash.isEmpty()) {
                         LocalAssetManager assetManager = LocalAssetManager.getInstance();
-                        modelType = assetManager.getSkinModelPreference(config.activeSkinHash);
-                        AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
+                        modelType = assetManager.getSkinModelPreference(previewSkinHash);
+                        AssetMetadata metadata = assetManager.getMetadata(previewSkinHash);
 
                         // If auto mode, detect from the active custom skin (if any)
                         if ("auto".equals(modelType) && metadata != null) {

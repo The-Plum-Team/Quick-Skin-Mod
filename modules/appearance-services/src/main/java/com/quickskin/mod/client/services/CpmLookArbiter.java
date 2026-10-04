@@ -86,6 +86,20 @@ public final class CpmLookArbiter {
         return CpmLook.owner().withholdsQuickSkinSkin();
     }
 
+    /**
+     * Whether a CPM model is the local player's look, for Quick Skin's previews of that look, on
+     * the title screen too: the latest decision of {@link #tick()}, or the decision itself before
+     * the first one of a connection. False without CPM, in a replay and while nothing is decided.
+     * Cheap enough to ask every frame.
+     */
+    public static boolean cpmModelIsTheLook() {
+        if (!CPMCompatIntegration.isAvailable() || !isLiveSession()) {
+            return false;
+        }
+        CpmLook.Owner owner = lastOwner;
+        return (owner != null ? owner : CpmLook.owner()).withholdsQuickSkinSkin();
+    }
+
     private static boolean isLiveSession() {
         try {
             return liveSession.getAsBoolean();

@@ -722,6 +722,7 @@
         "appearance-services",
         "ui-foundation",
         "player-preview",
+        "preview-rendering",
         "essential-integration",
         "cpm-integration"
       ],
