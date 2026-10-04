@@ -1,5 +1,7 @@
 package com.quickskin.mod.networking.protocol;
 
+import com.quickskin.mod.networking.TextureTransferLimits;
+
 /** Immutable per-connection result of application-level protocol negotiation. */
 public record ProtocolProfile(
         Mode mode,
@@ -33,6 +35,16 @@ public record ProtocolProfile(
 
     public boolean supports(ProtocolCapability capability) {
         return capability != null && (capabilityMask & capability.mask()) != 0L;
+    }
+
+    /**
+     * Upload bound for the local client. A legacy v1 server relays each upload unchunked; servers
+     * keep using {@link #maximumTextureBytes()} for what they accept and serve in chunks.
+     */
+    public int maximumUploadBytes() {
+        return mode == Mode.LEGACY_V1
+                ? Math.min(maximumTextureBytes, TextureTransferLimits.MAX_LEGACY_UPLOAD_BYTES)
+                : maximumTextureBytes;
     }
 
     public enum Mode {
