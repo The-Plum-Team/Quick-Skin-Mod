@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 import unittest
 from pathlib import Path
 
@@ -298,6 +299,32 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             "remote subject present behind third-person camera", scenario
         )
 
+    def test_fancymenu_layout_box_is_the_same_in_the_runtime_seed_and_the_harness(self) -> None:
+        feature = (
+            E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+        probe = (E2E_JAVA / "CompatibilityProbe.java").read_text(encoding="utf-8")
+        sys.path.insert(0, str(ROOT / "e2e"))
+        import packaged_runtime  # noqa: PLC0415
+
+        declared = tuple(
+            int(re.search(rf"static final int {name} = (\d+);", feature).group(1))
+            for name in ("PAUSE_BOX_X", "PAUSE_BOX_Y", "PAUSE_BOX_WIDTH", "PAUSE_BOX_HEIGHT")
+        )
+        self.assertEqual(packaged_runtime.FANCYMENU_PAUSE_PREVIEW_BOX, declared)
+        self.assertEqual("quickskin_player_preview", packaged_runtime.FANCYMENU_PREVIEW_ID)
+        widgets = java_source(
+            "client/gui/integration/FancyMenuWidgets.java", source_set="main", repository=ROOT
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            f'public static final String PREVIEW_ID = "{packaged_runtime.FANCYMENU_PREVIEW_ID}";',
+            widgets,
+        )
+        self.assertIn("public static boolean isAvailable()", widgets)
+        self.assertIn(
+            '"fancymenu", "com.quickskin.mod.client.gui.integration.FancyMenuWidgets"', probe
+        )
+
     def test_arm_checkpoints_restore_first_person_after_full_body_baselines(self) -> None:
         for name in (
             "Phase0Smoke.java",
@@ -351,6 +378,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             "customnpcs",
             "essential",
             "replaymod",
+            "fancymenu",
         ):
             with self.subTest(mod_id=mod_id):
                 self.assertIn(f'case "{mod_id}"', feature)
@@ -365,6 +393,10 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
             "EssentialCompatIntegration.findBottomEssentialWidget",
             "ReplayModBridge.getInterceptedPacketCount",
             "startReplay(finalizedReplayPath)",
+            "FancyMenuWidgets.isHidden(widget)",
+            "new PauseScreen(true)",
+            'menuControl("rotateButton")',
+            'menuControl("animationToggleButton")',
         ):
             with self.subTest(proof=required_feature_proof):
                 self.assertIn(required_feature_proof, feature)

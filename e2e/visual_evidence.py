@@ -547,7 +547,7 @@ def validate_installed_compatibility(
     if lane.mod.install_on == "client-and-server":
         expected_roots.add("server")
     expected_files = {
-        item.filename: item.sha256 for item in lane.artifact.files
+        item.filename: item.sha256 for item in lane.install_files
     }
     expected_pairs = {
         (root, filename)

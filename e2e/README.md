@@ -602,9 +602,14 @@ explicit reason when upstream metadata advertises a lane that upstream itself do
 the lock updater preserves those authored exclusions.
 
 [`mod-compatibility-contract.json`](mod-compatibility-contract.json) locks Customizable Player
-Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, and ReplayMod. Player Armor Stands
-is intentionally absent and unsupported. A runtime may install only the exact URL, filename, byte
-size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth for `latest`.
+Models, Ears, 3D Skin Layers, CustomNPCs-Unofficial, Essential, ReplayMod, and FancyMenu. Player
+Armor Stands is intentionally absent and unsupported. A runtime may install only the exact URL,
+filename, byte size, SHA-256, and SHA-512 recorded in that contract. It never queries Modrinth for
+`latest`. A mod whose upstream requires projects that the packaged runtime does not install names
+them as `locked_dependencies` (FancyMenu: Konkrete and Melody); the lock updater selects each one
+per lane like the mod itself, and every artifact records the exact dependency JARs beside the
+mod's own. `e2e/update_mod_compatibility_lock.py --mod <id>` refreshes only the named mods and
+leaves every other mod's artifacts unchanged.
 The contract also owns each mod's two local feature-specific expectations and normalized review
 regions, an optional comparable clean-reference capture override, an optional multiplayer pair,
 and any mod-specific execution profiles, so caching and AI focus on the rendered integration
@@ -643,6 +648,13 @@ workflow for each locked mod:
 - ReplayMod records the real multiplayer Quick Skin exchange, closes the recording, opens the
   resulting `.mcpr`, and requires a recorded Quick Skin payload to traverse the production bridge
   before capturing the recorded player in playback.
+- FancyMenu runs every scenario with only its options file (no welcome screen, no editor overlays)
+  and no customized screen, so the ordinary suite proves that installing it changes nothing. For
+  the `mod-compatibility` scenario alone the runtime also seeds two layouts for Quick Skin's
+  `quickskin_player_preview` identifier: the title layout hides the preview, and the control
+  capture requires the rotate button and animation toggle to be hidden and inactive with it while
+  Change Skin stays; the pause layout moves and enlarges the preview, and the applied capture
+  requires the preview's exact layout box, the applied skin, and the rotate button back.
 
 The protected CPM fixture is the freely available `.cpmmodel` from
 [Alphs' Super Mario Skin Pack](https://ko-fi.com/s/1e9ed29b27). Alphs retains authorship; Quick Skin

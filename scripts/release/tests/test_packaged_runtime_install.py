@@ -656,7 +656,7 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
         game_dir = self.root / "replaymod-game"
 
         config_path = packaged_runtime.write_compatibility_client_config(
-            game_dir, "replaymod"
+            game_dir, "replaymod", "mod-compatibility"
         )
 
         self.assertEqual(game_dir / "config" / "replaymod.json", config_path)
@@ -681,17 +681,87 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
             packaged_runtime.RuntimeFailure,
             "compatibility client config must start absent",
         ):
-            packaged_runtime.write_compatibility_client_config(game_dir, "replaymod")
+            packaged_runtime.write_compatibility_client_config(
+                game_dir, "replaymod", "full"
+            )
 
     def test_other_compatibility_mods_do_not_receive_foreign_config(self) -> None:
         game_dir = self.root / "ears-game"
 
         config_path = packaged_runtime.write_compatibility_client_config(
-            game_dir, "ears"
+            game_dir, "ears", "mod-compatibility"
         )
 
         self.assertIsNone(config_path)
         self.assertFalse(game_dir.exists())
+
+    def test_fancymenu_layouts_are_seeded_only_for_the_compatibility_scenario(self) -> None:
+        fancymenu = Path("config") / "fancymenu"
+        ordinary = self.root / "fancymenu-full"
+        options = packaged_runtime.write_compatibility_client_config(
+            ordinary, "fancymenu", "full"
+        )
+
+        self.assertEqual(ordinary / fancymenu / "options.txt", options)
+        self.assertEqual(
+            [fancymenu / "options.txt"],
+            sorted(path.relative_to(ordinary) for path in ordinary.rglob("*") if path.is_file()),
+        )
+        text = (ordinary / fancymenu / "options.txt").read_text(encoding="utf-8")
+        for setting in (
+            "B:show_welcome_screen = 'false';",
+            "B:show_customization_overlay = 'false';",
+            "B:show_debug_overlay = 'false';",
+        ):
+            self.assertIn(setting, text)
+
+        modded = self.root / "fancymenu-compatibility"
+        packaged_runtime.write_compatibility_client_config(
+            modded, "fancymenu", "mod-compatibility"
+        )
+        self.assertEqual(
+            sorted(
+                [
+                    fancymenu / "options.txt",
+                    fancymenu / "customizablemenus.txt",
+                    fancymenu / "customization" / "quickskin_title_hidden.txt",
+                    fancymenu / "customization" / "quickskin_pause_moved.txt",
+                ]
+            ),
+            sorted(path.relative_to(modded) for path in modded.rglob("*") if path.is_file()),
+        )
+        menus = (modded / fancymenu / "customizablemenus.txt").read_text(encoding="utf-8")
+        self.assertIn("net.minecraft.client.gui.screens.TitleScreen {", menus)
+        self.assertIn("net.minecraft.client.gui.screens.PauseScreen {", menus)
+        hidden = (
+            modded / fancymenu / "customization" / "quickskin_title_hidden.txt"
+        ).read_text(encoding="utf-8")
+        self.assertIn("identifier = net.minecraft.client.gui.screens.TitleScreen", hidden)
+        self.assertIn("instance_identifier = quickskin_player_preview", hidden)
+        self.assertIn("is_hidden = true", hidden)
+        moved = (
+            modded / fancymenu / "customization" / "quickskin_pause_moved.txt"
+        ).read_text(encoding="utf-8")
+        self.assertIn("identifier = net.minecraft.client.gui.screens.PauseScreen", moved)
+        self.assertIn("instance_identifier = quickskin_player_preview", moved)
+        x, y, width, height = packaged_runtime.FANCYMENU_PAUSE_PREVIEW_BOX
+        for line in (
+            "anchor_point = top-left",
+            f"x = {x}",
+            f"y = {y}",
+            f"width = {width}",
+            f"height = {height}",
+            "is_hidden = false",
+        ):
+            self.assertIn(f"  {line}\n", moved)
+
+        with self.assertRaisesRegex(
+            packaged_runtime.RuntimeFailure,
+            "compatibility client config must start absent",
+        ):
+            packaged_runtime.write_compatibility_client_config(
+                modded, "fancymenu", "mod-compatibility"
+            )
 
 
 class PackagedRuntimeDependencyTest(unittest.TestCase):

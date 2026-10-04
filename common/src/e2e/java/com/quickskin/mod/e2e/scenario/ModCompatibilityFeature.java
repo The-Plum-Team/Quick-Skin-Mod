@@ -6,16 +6,21 @@ import com.quickskin.mod.client.compat.CpmModelWorkflow;
 import com.quickskin.mod.client.compat.CustomNPCsIntegration;
 import com.quickskin.mod.client.compat.EarsCompatIntegration;
 import com.quickskin.mod.client.compat.EssentialCompatIntegration;
+import com.quickskin.mod.client.gui.integration.FancyMenuWidgets;
+import com.quickskin.mod.client.gui.integration.MenuIntegration;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.client.gui.util.GuiScaleManager;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.IconActionButton;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
+import com.quickskin.mod.client.rendering.PreviewPlayerData;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
+import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.PlayerAppearance;
+import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.e2e.DefaultSkinEvidenceView;
 import com.quickskin.mod.e2e.E2ELog;
@@ -26,7 +31,9 @@ import com.quickskin.mod.networking.NetworkSyncService;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.model.geom.ModelPart;
@@ -109,6 +116,7 @@ interface ModCompatibilityFeature {
             case "customnpcs" -> new CustomNpcsFeature(minecraft);
             case "essential" -> new EssentialFeature(minecraft);
             case "replaymod" -> new ReplayModFeature(minecraft);
+            case "fancymenu" -> new FancyMenuFeature(minecraft);
             default -> new UnsupportedFeature(minecraft, modId);
         };
     }
@@ -156,6 +164,34 @@ interface ModCompatibilityFeature {
 
         final boolean holdFullBody() {
             return DefaultSkinEvidenceView.hold(minecraft, false);
+        }
+
+        /**
+         * Park the native cursor in the window's top-left corner so no hover state of a menu
+         * widget enters a capture. A failure is recorded as {@code owner}'s cursor probe failure.
+         */
+        final void pinCursorToWindowCorner(String owner) {
+            try {
+                Object window = minecraft.getWindow();
+                for (String accessor : new String[] {
+                        "getWindow", "handle", "method_4490", "m_85439_"
+                }) {
+                    try {
+                        Object value = window.getClass().getMethod(accessor).invoke(window);
+                        if (value instanceof Number number) {
+                            String warp = VanillaShim.warpNativeCursor(number.longValue(), 1.0, 1.0);
+                            if (warp != null) {
+                                failure = owner + " cursor probe failed: " + warp;
+                            }
+                            return;
+                        }
+                    } catch (NoSuchMethodException ignored) {
+                    }
+                }
+                failure = owner + " cursor probe found no native window handle";
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = owner + " cursor probe failed: " + concise(exception);
+            }
         }
 
         final Step.Result activeSkinAssertion(String integrationProof) {
@@ -1333,27 +1369,7 @@ interface ModCompatibilityFeature {
         }
 
         private void pinCursorAwayFromEssentialWidgets() {
-            try {
-                Object window = minecraft.getWindow();
-                for (String accessor : new String[] {
-                        "getWindow", "handle", "method_4490", "m_85439_"
-                }) {
-                    try {
-                        Object value = window.getClass().getMethod(accessor).invoke(window);
-                        if (value instanceof Number number) {
-                            String warp = VanillaShim.warpNativeCursor(number.longValue(), 1.0, 1.0);
-                            if (warp != null) {
-                                failure = "Essential cursor probe failed: " + warp;
-                            }
-                            return;
-                        }
-                    } catch (NoSuchMethodException ignored) {
-                    }
-                }
-                failure = "Essential cursor probe found no native window handle";
-            } catch (ReflectiveOperationException | RuntimeException exception) {
-                failure = "Essential cursor probe failed: " + concise(exception);
-            }
+            pinCursorToWindowCorner("Essential");
         }
 
         private String essentialTitleFailure(boolean requireSkin) {
@@ -1400,6 +1416,224 @@ interface ModCompatibilityFeature {
             String expected = "local_skin:" + skinHash;
             return appearance != null && expected.equals(appearance.getSkinId())
                     ? null : "Essential menu appearance did not retain " + expected;
+        }
+    }
+
+    /**
+     * FancyMenu layouts drive Quick Skin's title and pause preview through its stable layout
+     * identifier. The packaged runtime seeds two layouts for this scenario only: the title layout
+     * hides the preview, the pause layout moves and enlarges it. The control capture proves that a
+     * hidden preview takes its rotate and animation controls with it while Change Skin stays; the
+     * applied capture proves the preview is drawn in FancyMenu's box wearing the applied skin, with
+     * its rotate control back.
+     */
+    final class FancyMenuFeature extends BaseFeature {
+        /** The pause layout box, equal to {@code packaged_runtime.FANCYMENU_PAUSE_PREVIEW_BOX}. */
+        static final int PAUSE_BOX_X = 24;
+        static final int PAUSE_BOX_Y = 40;
+        static final int PAUSE_BOX_WIDTH = 165;
+        static final int PAUSE_BOX_HEIGHT = 270;
+        private static final String CHANGE_SKIN_KEY = "quickskin.button.change_skin";
+
+        private volatile int readinessPolls;
+
+        FancyMenuFeature(Minecraft minecraft) {
+            super(minecraft);
+        }
+
+        @Override
+        public int baselineTimeoutTicks() {
+            return 600;
+        }
+
+        @Override
+        public void prepareBaseline() {
+            readinessPolls = 0;
+            VanillaShim.setScreen(minecraft, new TitleScreen());
+            pinCursorToWindowCorner("FancyMenu");
+        }
+
+        @Override
+        public boolean baselineReady() {
+            pinCursorToWindowCorner("FancyMenu");
+            return failure == null && logProgress(hiddenTitleProblem()) == null;
+        }
+
+        @Override
+        public Step.Result assertBaseline() {
+            if (failure != null) return Step.Result.fail(failure);
+            String problem = hiddenTitleProblem();
+            if (problem != null) return Step.Result.fail(problem);
+            return Step.Result.pass("FancyMenu layout hides Quick Skin's title preview "
+                    + FancyMenuWidgets.PREVIEW_ID + " (FancyMenuWidgets.isHidden=true, active=false); "
+                    + "rotate and animation toggle hidden and inactive with it; Change Skin "
+                    + "visible and active");
+        }
+
+        @Override
+        public void applyQuickSkinFeature() {
+            readinessPolls = 0;
+            try {
+                importAndApply(TestAssets.makeClassicSkin());
+                if (minecraft.options != null) {
+                    minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+                }
+                if (minecraft.player != null) {
+                    DefaultSkinEvidenceView.pinStandingPose(minecraft.player, 180f);
+                }
+                VanillaShim.setScreen(minecraft, new PauseScreen(true));
+                pinCursorToWindowCorner("FancyMenu");
+            } catch (Exception exception) {
+                failure = "FancyMenu skin fixture failed: " + concise(exception);
+            }
+        }
+
+        @Override
+        public boolean quickSkinFeatureReady() {
+            pinCursorToWindowCorner("FancyMenu");
+            if (minecraft.player != null) {
+                DefaultSkinEvidenceView.pinStandingMotion(minecraft.player);
+            }
+            return failure == null && activeSkinReady() && logProgress(movedPauseProblem()) == null;
+        }
+
+        @Override
+        public Step.Result assertQuickSkinFeature() {
+            if (failure != null) return Step.Result.fail(failure);
+            String problem = movedPauseProblem();
+            if (problem != null) return Step.Result.fail(problem);
+            PlayerWidget widget = singlePlayerWidget(VanillaShim.currentScreen(minecraft));
+            return activeSkinAssertion("FancyMenu layout places Quick Skin's pause preview "
+                    + FancyMenuWidgets.PREVIEW_ID + " at x=" + widget.getX() + " y=" + widget.getY()
+                    + " size=" + widget.getWidth() + "x" + widget.getHeight()
+                    + " (natural box replaced); rotate visible and active again; Change Skin "
+                    + "visible and active; preview skin=" + previewSkin(widget));
+        }
+
+        private String logProgress(String problem) {
+            if (problem != null && (++readinessPolls == 1 || readinessPolls % 100 == 0)) {
+                E2ELog.info("FancyMenu readiness: " + problem);
+            }
+            return problem;
+        }
+
+        private String hiddenTitleProblem() {
+            Screen screen = VanillaShim.currentScreen(minecraft);
+            if (!(screen instanceof TitleScreen)) return "title screen is not open";
+            PlayerWidget widget = singlePlayerWidget(screen);
+            if (widget == null) {
+                return "title screen does not hold exactly one Quick Skin PlayerWidget";
+            }
+            if (!FancyMenuWidgets.isHidden(widget)) {
+                return "FancyMenu layout did not hide the title preview " + FancyMenuWidgets.PREVIEW_ID;
+            }
+            if (widget.active) return "hidden title preview is still active";
+            String controls = controlsProblem(screen, false, true);
+            return controls == null ? null : "title screen: " + controls;
+        }
+
+        private String movedPauseProblem() {
+            Screen screen = VanillaShim.currentScreen(minecraft);
+            if (!(screen instanceof PauseScreen)) return "pause screen is not open";
+            PlayerWidget widget = singlePlayerWidget(screen);
+            if (widget == null) {
+                return "pause screen does not hold exactly one Quick Skin PlayerWidget";
+            }
+            if (FancyMenuWidgets.isHidden(widget) || !widget.visible || !widget.active) {
+                return "pause preview is hidden or inactive";
+            }
+            if (widget.getX() != PAUSE_BOX_X || widget.getY() != PAUSE_BOX_Y
+                    || widget.getWidth() != PAUSE_BOX_WIDTH || widget.getHeight() != PAUSE_BOX_HEIGHT) {
+                return "pause preview box is " + widget.getX() + "," + widget.getY() + " "
+                        + widget.getWidth() + "x" + widget.getHeight() + ", expected FancyMenu's "
+                        + PAUSE_BOX_X + "," + PAUSE_BOX_Y + " " + PAUSE_BOX_WIDTH + "x"
+                        + PAUSE_BOX_HEIGHT;
+            }
+            Object skin = previewSkin(widget);
+            Object assetSkin = skinHash == null ? null
+                    : LocalAssetManager.getInstance().getTextureLocation(skinHash, TextureQuality.FULL);
+            Object rendererSkin = appearances.getSkinLocation(playerId);
+            if (skin == null || !(skin.equals(assetSkin) || skin.equals(rendererSkin))) {
+                return "pause preview skin=" + skin + " expected " + assetSkin + " or " + rendererSkin;
+            }
+            String controls = controlsProblem(screen, true, false);
+            return controls == null ? null : "pause screen: " + controls;
+        }
+
+        /**
+         * Checks Quick Skin's own preview controls: rotate (always injected) and the animation
+         * toggle (title screen only) follow {@code previewShown}; Change Skin is always visible.
+         */
+        private String controlsProblem(Screen screen, boolean previewShown, boolean expectToggle) {
+            Button changeSkin = changeSkinButton(screen);
+            if (changeSkin == null) return "Change Skin button is missing";
+            if (!changeSkin.visible || !changeSkin.active || FancyMenuWidgets.isHidden(changeSkin)) {
+                return "Change Skin button is not visible and active";
+            }
+            Object rotate = menuControl("rotateButton");
+            if (!(rotate instanceof AbstractWidget rotateButton) || !screen.children().contains(rotate)) {
+                return "rotate button is missing";
+            }
+            if (rotateButton.visible != previewShown || rotateButton.active != previewShown) {
+                return "rotate button visible=" + rotateButton.visible + " active="
+                        + rotateButton.active + ", expected " + previewShown;
+            }
+            if (!expectToggle) return null;
+            Object toggle = menuControl("animationToggleButton");
+            if (!(toggle instanceof AbstractWidget toggleButton) || !screen.children().contains(toggle)) {
+                return "animation toggle is missing";
+            }
+            if (toggleButton.visible != previewShown || toggleButton.active != previewShown) {
+                return "animation toggle visible=" + toggleButton.visible + " active="
+                        + toggleButton.active + ", expected " + previewShown;
+            }
+            return null;
+        }
+
+        private static PlayerWidget singlePlayerWidget(Screen screen) {
+            if (screen == null) return null;
+            PlayerWidget found = null;
+            for (GuiEventListener child : screen.children()) {
+                if (child instanceof PlayerWidget widget) {
+                    if (found != null) return null;
+                    found = widget;
+                }
+            }
+            return found;
+        }
+
+        private static Button changeSkinButton(Screen screen) {
+            String label = Component.translatable(CHANGE_SKIN_KEY).getString();
+            for (GuiEventListener child : screen.children()) {
+                if (child instanceof Button button && !label.isEmpty()
+                        && label.equals(button.getMessage().getString())) {
+                    return button;
+                }
+            }
+            return null;
+        }
+
+        /** One of MenuIntegration's private control fields; a mod-owned name, never remapped. */
+        private Object menuControl(String name) {
+            try {
+                Field field = MenuIntegration.class.getDeclaredField(name);
+                field.setAccessible(true);
+                return field.get(null);
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "could not inspect MenuIntegration." + name + ": " + concise(exception);
+                return null;
+            }
+        }
+
+        private Object previewSkin(PlayerWidget widget) {
+            try {
+                Field field = PlayerWidget.class.getDeclaredField("previewData");
+                field.setAccessible(true);
+                return field.get(widget) instanceof PreviewPlayerData data ? data.getSkinLocation() : null;
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "could not inspect the preview skin: " + concise(exception);
+                return null;
+            }
         }
     }
 
