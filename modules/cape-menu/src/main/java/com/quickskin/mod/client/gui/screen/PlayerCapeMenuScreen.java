@@ -28,6 +28,7 @@ import com.quickskin.mod.client.gui.util.FileDialogHelper;
 import com.quickskin.mod.client.gui.util.GuiScalingUtils;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
+import com.quickskin.mod.client.rendering.LocalLookPreview;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.services.LocalAssetFolderWatch;
@@ -290,18 +291,22 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         String modelType = "classic";
 
-        // First priority: Use saved skin from config (works on title screen when player is null)
         ClientConfig config = ClientConfig.getInstance();
-        if (!config.activeSkinHash.isEmpty()) {
+        // The saved skin, unless a CPM model is the latest look choice: then the player's own
+        // skin (the live one in a world, the imported one on the title screen).
+        String previewSkinHash = LocalLookPreview.skinHash(player != null);
+
+        // First priority: Use that skin from the catalog (works on title screen when player is null)
+        if (!previewSkinHash.isEmpty()) {
             LocalAssetManager assetManager = LocalAssetManager.getInstance();
-            AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
+            AssetMetadata metadata = assetManager.getMetadata(previewSkinHash);
 
             if (metadata != null) {
                 // Load the saved skin texture
-                skinLocation = assetManager.getTextureLocation(config.activeSkinHash, TextureQuality.FULL);
+                skinLocation = assetManager.getTextureLocation(previewSkinHash, TextureQuality.FULL);
 
                 // Get saved model type preference for this skin
-                modelType = assetManager.getSkinModelPreference(config.activeSkinHash);
+                modelType = assetManager.getSkinModelPreference(previewSkinHash);
 
                 // If auto mode, use the detected model type from metadata
                 if ("auto".equals(modelType)) {
@@ -321,10 +326,10 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
 
             // Get model type from the active skin if available
-            if (!config.activeSkinHash.isEmpty()) {
+            if (!previewSkinHash.isEmpty()) {
                 LocalAssetManager assetManager = LocalAssetManager.getInstance();
-                modelType = assetManager.getSkinModelPreference(config.activeSkinHash);
-                AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
+                modelType = assetManager.getSkinModelPreference(previewSkinHash);
+                AssetMetadata metadata = assetManager.getMetadata(previewSkinHash);
 
                 // If auto mode, detect from the active custom skin (if any)
                 if ("auto".equals(modelType) && metadata != null) {
@@ -348,8 +353,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                     modelType = player.getSkin().model() == net.minecraft.world.entity.player.PlayerModelType.SLIM ? "slim" : "classic";
 //?}
                 }
-            } else if ("auto".equals(modelType)) {
-                // No custom skin active, use vanilla player's model
+            } else {
+                // No custom skin active, use the player's own model
 //? if <1.21 {
                 modelType = player.getModelName(); // "default" or "slim"
                 // Convert Minecraft model names to our format
