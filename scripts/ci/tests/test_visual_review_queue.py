@@ -167,7 +167,8 @@ class VisualReviewQueueTest(unittest.TestCase):
                             run_id=index + 201, minutes_ago=10) for index, row in enumerate(rows)]
         self.assertEqual(16, len(inputs))
         for status, conclusion in (("completed", "success"), ("completed", "failure"),
-                                   ("in_progress", None), ("completed", "cancelled")):
+                                   ("in_progress", None), ("queued", None), ("pending", None),
+                                   ("completed", "cancelled")):
             with self.subTest(status=status, conclusion=conclusion):
                 runs = {10: owner(10, PREPARE_WORKFLOW)}
                 runs.update({item.run_id: owner(item.run_id, DRAIN_WORKFLOW,

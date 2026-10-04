@@ -12,6 +12,19 @@ public final class SavedAppearanceRestorer {
     }
 
     public static void restore(UUID targetPlayerId) {
+        // A session that shows the look the server saved for this player keeps it on respawn.
+        // When a CPM model was the look meanwhile, the skin was withdrawn and only the skin comes
+        // back: activeSkinHash names the skin now worn (the server's, or one chosen since).
+        if (com.quickskin.mod.config.AccountSkinSession.getInstance().adopted(targetPlayerId,
+                net.minecraft.client.Minecraft.getInstance().getConnection())) {
+            PlayerAppearanceService appearances = PlayerAppearanceService.getInstance();
+            String wornSkinHash = com.quickskin.mod.config.ClientConfig.getInstance().activeSkinHash;
+            if (!appearances.hasActiveSkin(targetPlayerId) && !wornSkinHash.isEmpty()) {
+                appearances.applySkin(targetPlayerId, "local_skin:" + wornSkinHash,
+                        LocalAssetManager.getInstance().getSkinModelPreference(wornSkinHash));
+            }
+            return;
+        }
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
         com.quickskin.mod.client.services.LocalAssetManager assetManager =
                 com.quickskin.mod.client.services.LocalAssetManager.getInstance();
@@ -85,6 +98,17 @@ public final class SavedAppearanceRestorer {
                     //?} else {
                     .applyLook(targetPlayerId, skinId, capeId, modelType);
                     //?}
+        }
+
+        // A CPM model that is the latest look choice replaces the Quick Skin skin. When nothing
+        // above was applied, create the empty appearance the connection bootstrap sends, so the
+        // server stops relaying a skin it saved in an earlier session.
+        if ((com.quickskin.mod.client.compat.CpmLook.owner().withholdsQuickSkinSkin()
+                || (config.activeSkinHash.isEmpty() && !config.activeCpmModelHash.isEmpty()))
+                && com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
+                        .getAppearance(targetPlayerId) == null) {
+            com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
+                    .applyLook(targetPlayerId, null, null, null);
         }
     }
 

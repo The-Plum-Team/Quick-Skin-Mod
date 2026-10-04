@@ -8,6 +8,7 @@ import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.common.event.InternalEventBus;
 import com.quickskin.mod.common.event.ServerConfigSyncEvent;
+import com.quickskin.mod.config.AccountSkinSession;
 import com.quickskin.mod.networking.protocol.ProtocolAcknowledgement;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
@@ -187,11 +188,48 @@ public class ClientNetworkHandler {
             if (ownPlayerUpdate) {
                 NetworkSyncService.getInstance().confirmAppearance(
                         receivedSkinId, receivedCapeId, receivedModel);
-                return;
+                if (!adoptOwnServerAppearance(
+                        receivedPlayerId, sourceConnection, receivedSkinId, receivedCapeId)) return;
             }
             appearanceTarget().applyLookFromNetwork(
                     receivedPlayerId, receivedSkinId, receivedCapeId, receivedModel);
         });
+    }
+
+    /**
+     * An own-player update is only a confirmation, except for the first one of a session whose
+     * launcher account has no skin selection here. A saved Quick Skin skin is then shown and
+     * nothing is uploaded; a record without one releases the upload that was held back. Runs on
+     * the client thread and returns true when the caller must display the server's record: its
+     * skin, cape and model replace the look this instance applied at the join.
+     */
+    private static boolean adoptOwnServerAppearance(
+            UUID playerId, Object connection, String skinId, String capeId) {
+        NetworkSyncService syncService = NetworkSyncService.getInstance();
+        if (!syncService.awaitsOwnServerState(playerId, connection)) return false;
+        if (!AccountSkinSession.getInstance().decide(playerId, connection, skinId)) {
+            releaseHeldAppearance(connection);
+            return false;
+        }
+        // The menu and the renderer hooks read this field: it names the skin now worn. It is
+        // not a selection of the account, so the next join asks the server again.
+        com.quickskin.mod.config.ClientConfig.getInstance().activeSkinHash =
+                skinId.substring("local_skin:".length());
+        syncService.adoptServerAppearance(skinId, capeId);
+        appearanceBootstrapSent = true;
+        return true;
+    }
+
+    /**
+     * Ends a wait that found no server skin to show: the sync requested meanwhile is sent, the
+     * latest one winning as it would have without the wait; otherwise the bootstrap upload runs.
+     */
+    private static void releaseHeldAppearance(Object connection) {
+        if (NetworkSyncService.getInstance().releaseHeldSync(connection)) {
+            appearanceBootstrapSent = true;
+        } else {
+            bootstrapLocalAppearance();
+        }
     }
 
     /**
@@ -574,6 +612,8 @@ public class ClientNetworkHandler {
         Minecraft mc = Minecraft.getInstance();
         if (appearanceBootstrapSent || mc.player == null) return;
         UUID playerId = mc.player.getUUID();
+        // Held back until the server's record of this player is known; see adoptOwnServerAppearance.
+        if (NetworkSyncService.getInstance().awaitsOwnServerState(playerId, mc.getConnection())) return;
         com.quickskin.mod.common.data.PlayerAppearance currentAppearance =
             com.quickskin.mod.common.data.PlayerAppearanceRepository.getInstance().getAppearance(playerId);
         if (currentAppearance == null) return;
@@ -751,6 +791,14 @@ public class ClientNetworkHandler {
             NetworkSyncService.getInstance().confirmAppearanceSnapshot(
                     sourceConnection, payload.requestId());
             //?}
+            // A roster that carried no saved skin for this player ends the wait for one.
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null && NetworkSyncService.getInstance()
+                    .awaitsOwnServerState(minecraft.player.getUUID(), sourceConnection)) {
+                AccountSkinSession.getInstance().decide(
+                        minecraft.player.getUUID(), sourceConnection, "");
+                releaseHeldAppearance(sourceConnection);
+            }
         });
     }
 

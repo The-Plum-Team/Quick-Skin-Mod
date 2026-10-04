@@ -30,6 +30,7 @@ import com.quickskin.mod.client.services.MojangApiService;
 //?} else {
 //?}
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
@@ -84,6 +85,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private PlayerPreviewPanel playerPreviewPanel;
     private ActionButtonsPanel actionButtonsPanel;
 
+    // Controls that stay above the player preview (drawn after it, clicked before it)
+    private final List<AbstractWidget> foregroundControls = new ArrayList<>();
+
     // Panel dimensions
     private int panelX;
     private int panelY;
@@ -130,6 +134,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private Button searchButton;
     private Button sortButton;
     private boolean isSearching = false;
+    private long lastEnterKeyAt;
 
     public PlayerSkinMenuScreen(@Nullable Screen parent) {
 //? if <1.21 {
@@ -242,6 +247,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
         super.init();
         clearWidgets();
+        foregroundControls.clear();
 
         // Save rotation state and model type from existing player preview panel before it's destroyed
         if (playerPreviewPanel != null) {
@@ -466,9 +472,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Check if we're restoring from a resize (savedModelType is not null)
         boolean isResizing = savedModelType != null;
 
-        // Restore active skin selection first
+        // Restore active skin selection first. Opening the menu is no look choice: while CPM's
+        // own model is the look, no Quick Skin entry is selected (selecting one applies it).
+        boolean cpmOwnsLook = com.quickskin.mod.client.compat.CpmLook.owner()
+                == com.quickskin.mod.client.compat.CpmLook.Owner.CPM;
         AssetMetadata selectedSkin = null;
-        if (!config.activeSkinHash.isEmpty() && skinListPanel != null) {
+        if (cpmOwnsLook) {
+            // Keep CPM's model; the saved Quick Skin skin is still listed and can be chosen.
+        } else if (!config.activeSkinHash.isEmpty() && skinListPanel != null) {
             AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(config.activeSkinHash);
             if (metadata != null) {
                 // Don't trigger callback during resize - we'll set model type manually
@@ -737,8 +748,31 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         graphics.pose().popMatrix();
 //?}
 
+        // Foreground controls and error toasts go above the player preview. Up to 1.21.5 the GUI
+        // is depth tested: the model sits at z 50 and reaches forward by its scale (200 at most),
+        // tooltips are at z 400. From 1.21.6 a later stratum is drawn on top.
+//? if <1.21.6 {
+        graphics.pose().pushPose();
+        // Stay flat behind a dialog that draws this screen as its backdrop
+        if (Minecraft.getInstance().screen == this) {
+            graphics.pose().translate(0.0F, 0.0F, 350.0F);
+        }
+//?} else {
+        graphics.nextStratum();
+//?}
+        for (AbstractWidget control : foregroundControls) {
+//? if <26.1 {
+            control.render(graphics, mouseX, mouseY, partialTick);
+//?} else {
+            control.extractRenderState(graphics, mouseX, mouseY, partialTick);
+//?}
+        }
+
         // Render error toasts (on top of everything)
         renderErrorToasts(graphics);
+//? if <1.21.6 {
+        graphics.pose().popPose();
+//?}
     }
 
     /**
@@ -886,6 +920,16 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             this.onClose();
             return true;
         }
+        // Enter in the username field submits the search, like clicking Search. A held key
+        // repeats this event, so only an Enter that follows a pause starts a search.
+        if ((keyCode == InputConstants.KEY_RETURN || keyCode == InputConstants.KEY_NUMPADENTER)
+                && usernameSearchField != null && usernameSearchField.isFocused()) {
+            long now = System.currentTimeMillis();
+            boolean held = now - lastEnterKeyAt < 1000L;
+            lastEnterKeyAt = now;
+            if (!held) searchMojangSkin();
+            return true;
+        }
 //? if <1.21.9 {
         return super.keyPressed(keyCode, scanCode, modifiers);
 //?} else {
@@ -896,8 +940,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
 //? if <1.21 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (clickForegroundControls(button, control -> control.mouseClicked(mouseX, mouseY, button))) return true;
 //?} else if <1.21.9 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (clickForegroundControls(button, control -> control.mouseClicked(mouseX, mouseY, button))) return true;
         // Give PlayerWidget input priority for its customization feature
         if (playerPreviewPanel != null) {
             PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
@@ -915,6 +961,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         double mouseX = event.x();
         double mouseY = event.y();
         int button = event.buttonInfo().button();
+        if (clickForegroundControls(button, control -> control.mouseClicked(event, focused))) return true;
         // Give PlayerWidget input priority for its customization feature
         if (playerPreviewPanel != null) {
             PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
@@ -932,6 +979,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         double mouseX = GuiCompat.mouseX(event);
         double mouseY = GuiCompat.mouseY(event);
         int button = GuiCompat.mouseButton(event);
+        if (clickForegroundControls(button, control -> control.mouseClicked(event, focused))) return true;
         // Give PlayerWidget input priority for its customization feature
         if (playerPreviewPanel != null) {
             PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
@@ -954,6 +1002,22 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
         return super.mouseClicked(event, focused);
 //?}
+    }
+
+    /**
+     * Offer a click to the foreground controls before the player preview can take it
+     */
+    private boolean clickForegroundControls(int button, java.util.function.Predicate<AbstractWidget> click) {
+        for (AbstractWidget control : foregroundControls) {
+            if (click.test(control)) {
+                this.setFocused(control);
+                if (button == InputConstants.MOUSE_BUTTON_LEFT) {
+                    this.setDragging(true);
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -1130,17 +1194,41 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                                 metadata.hash(), TextureQuality.PREVIEW)
 //?}
                 );
-                if (!com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
+                // Re-selecting Quick Skin's model while it is still the look (the menu opening on
+                // it) is no new choice: CPM already has it.
+                boolean modelIsTheLook = metadata.hash().equals(
+                        com.quickskin.mod.config.ClientConfig.getInstance().activeCpmModelHash)
+                        && com.quickskin.mod.client.compat.CpmLook.owner()
+                                == com.quickskin.mod.client.compat.CpmLook.Owner.QUICK_SKIN_MODEL;
+                if (!modelIsTheLook
+                        && !com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
                     showError(Component.literal("Unable to select CPM model."));
+                    return;
+                }
+                // The model replaces the applied Quick Skin skin. Withdraw it here and on the
+                // server (the cape stays), or other players keep drawing the old skin.
+                if (this.minecraft != null && this.minecraft.player != null) {
+//? if <1.21 {
+                    java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
+//?} else {
+                    java.util.UUID targetUUID = this.minecraft.player.getUUID();
+//?}
+                    com.quickskin.mod.client.services.PlayerAppearanceService appearances =
+                            com.quickskin.mod.client.services.PlayerAppearanceService.getInstance();
+                    if (targetUUID != null && appearances.hasActiveSkin(targetUUID)) {
+                        appearances.applySkin(targetUUID, "", null);
+                    }
                 }
                 return;
             }
 
             com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
 
-            // Check if this skin is already the active skin
+            // Check if this skin is already the active skin. While a CPM model is the look, the
+            // saved skin is only remembered, and choosing it applies it.
             boolean isSkinAlreadyActive = metadata.hash().equals(config.activeSkinHash)
-                    && config.activeCpmModelHash.isEmpty();
+                    && config.activeCpmModelHash.isEmpty()
+                    && !com.quickskin.mod.client.compat.CpmLook.owner().withholdsQuickSkinSkin();
             // Get the model type preference for this specific skin
 //? if <1.21 {
             String modelPreference = LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash());
@@ -1210,6 +1298,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
             // Save the model type preference for THIS SPECIFIC SKIN
             LocalAssetManager.getInstance().setSkinModelPreference(metadata.hash(), newModelType);
+            // Like a skin selection, this choice outranks a server record not seen yet.
+            com.quickskin.mod.config.AccountSkinSession.getInstance().selected();
 
             // Apply to the actual player in-game (if in-game)
             if (this.minecraft != null && this.minecraft.player != null) {
@@ -1242,6 +1332,15 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
      */
     public <T extends net.minecraft.client.gui.components.events.GuiEventListener & net.minecraft.client.gui.components.Renderable & net.minecraft.client.gui.narration.NarratableEntry> void registerWidget(T widget) {
         this.addRenderableWidget(widget);
+    }
+
+    /**
+     * Register a control that stays above the player preview. It is not a renderable:
+     * render() draws it in its own pass after the preview.
+     */
+    public void registerForegroundControl(AbstractWidget widget) {
+        foregroundControls.add(widget);
+        this.addWidget(widget);
     }
 
     /**
@@ -1542,25 +1641,55 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 .thenAccept(skinData -> {
                     // Execute on main thread
                     if (this.minecraft != null) {
-                        this.minecraft.execute(() -> {
-                            if (skinData != null) {
-                                handleMojangSkinFetched(skinData);
-                            } else {
-                                showError(Component.translatable("quickskin.error.player_not_found", username));
-                                resetSearchButton();
-                            }
-                        });
+                        this.minecraft.execute(() -> handleMojangSkinFetched(skinData));
                     }
                 })
                 .exceptionally(throwable -> {
+                    logMojangSearchFailure(username, throwable);
                     if (this.minecraft != null) {
                         this.minecraft.execute(() -> {
-                            showError(Component.translatable("quickskin.error.fetch_skin_failed", throwable.getMessage()));
+                            showError(mojangSearchError(throwable, username));
                             resetSearchButton();
                         });
                     }
                     return null;
                 });
+    }
+
+    /** One log line per failed search, so a report can quote the step that failed. */
+    private static void logMojangSearchFailure(String username, Throwable throwable) {
+        MojangApiService.ImportFailure failure = MojangApiService.findFailure(throwable);
+        if (failure == null) {
+            QuickSkinInfo.LOGGER.warn("Username skin search for '{}' failed unexpectedly", username, throwable);
+            return;
+        }
+        switch (failure.reason()) {
+            case INVALID_USERNAME, NOT_FOUND, NO_CUSTOM_SKIN ->
+                    QuickSkinInfo.LOGGER.info("Username skin search for '{}': {}", username, failure.getMessage());
+            // A transport error names the host or timeout. A parse error could quote the response
+            // body, so every other cause is logged by its class only.
+            case NETWORK -> QuickSkinInfo.LOGGER.warn("Username skin search for '{}' failed: {} - {}", username,
+                    failure.getMessage(), String.valueOf(failure.getCause()));
+            default -> QuickSkinInfo.LOGGER.warn("Username skin search for '{}' failed: {}{}", username,
+                    failure.getMessage(), failure.getCause() == null ? ""
+                            : " [" + failure.getCause().getClass().getSimpleName() + "]");
+        }
+    }
+
+    private static Component mojangSearchError(Throwable throwable, String username) {
+        MojangApiService.ImportFailure failure = MojangApiService.findFailure(throwable);
+        if (failure == null) return Component.translatable("quickskin.error.skin_search_failed");
+        return switch (failure.reason()) {
+            case INVALID_USERNAME -> Component.translatable("quickskin.error.invalid_username");
+            case NOT_FOUND -> Component.translatable("quickskin.error.player_not_found", username);
+            case NO_CUSTOM_SKIN -> Component.translatable("quickskin.error.no_custom_skin");
+            case INVALID_RESPONSE, RESPONSE_TOO_LARGE -> Component.translatable("quickskin.error.invalid_skin_response");
+            case HTTP, NETWORK -> Component.translatable(switch (failure.stage()) {
+                case LOOKUP -> "quickskin.error.lookup_unavailable";
+                case PROFILE -> "quickskin.error.profile_unavailable";
+                case DOWNLOAD -> "quickskin.error.download_unavailable";
+            });
+        };
     }
 
     /**

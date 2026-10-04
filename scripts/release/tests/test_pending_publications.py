@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import io
+import os
 import shutil
 import tempfile
 import unittest
@@ -44,6 +46,12 @@ class PendingPublicationsTest(unittest.TestCase):
 
     def tearDown(self):
         self.temporary.cleanup()
+
+    def complete(self):
+        state = copy.deepcopy(self.state)
+        for i, row in enumerate(state["rows"].values(), start=1):
+            row.update(state="verified", remote_id=str(i))
+        return state
 
     def job(self, name, steps=()):
         return {"id": 1, "run_id": 123, "run_attempt": 1, "head_sha": "a" * 40,
@@ -116,10 +124,108 @@ class PendingPublicationsTest(unittest.TestCase):
                     {"id": 2, "draft": True, "body": "legacy draft", "tag_name": "legacy"},
                     {"id": 3, "draft": True, "body": body, "tag_name": self.state["tag"]}]
         with patch.object(self.api, "json", return_value=releases):
-            self.assertEqual(pending.pending_tags(self.api), [self.state["tag"]])
+            self.assertEqual(pending.pending_drafts(self.api), [self.state])
+        # A token without push access is never shown the draft: that listing has nothing pending.
+        with patch.object(self.api, "json", return_value=releases[:1]):
+            self.assertEqual(pending.pending_drafts(self.api), [])
         releases[-1]["tag_name"] = "mc26.2-v3.0.0"
         with patch.object(self.api, "json", return_value=releases), self.assertRaises(ValueError):
-            pending.pending_tags(self.api)
+            pending.pending_drafts(self.api)
+
+    def test_exact_tag_discovery_keeps_the_manual_probe_contract(self):
+        tag = self.state["tag"]
+        release = {"id": 3, "tag_name": tag, "draft": True, "body": ledger.encode("Notes", self.state)}
+        with patch.object(pending, "read_release", return_value=release):
+            self.assertEqual(pending.pending_drafts(self.api, tag), [self.state])
+        with patch.object(pending, "read_release", return_value={**release, "draft": False}), \
+                self.assertRaisesRegex(ValueError, "incomplete ledger"):
+            pending.pending_drafts(self.api, tag)
+        with patch.object(pending, "read_release", return_value={**release, "body": "Notes"}), \
+                self.assertRaisesRegex(ValueError, "no publication ledger"):
+            pending.pending_drafts(self.api, tag)
+        published = {**release, "draft": False, "body": ledger.encode("Notes", self.complete())}
+        with patch.object(pending, "read_release", return_value=published):
+            self.assertEqual(pending.pending_drafts(self.api, tag), [])
+
+    def test_handoff_is_bounded_strict_and_validated_before_use(self):
+        raw = pending.encode_drafts([self.state])
+        self.assertEqual(pending.decode_drafts(raw), [self.state])
+        self.assertEqual(pending.decode_drafts(pending.encode_drafts([])), [])
+        self.assertNotIn("\n", raw)
+        for sample in ("", "{}", "[" + raw[1:-1] + "," + raw[1:-1] + "]", raw.replace('"rows"', '"extra":1,"rows"'),
+                       '[{"tag":"a","tag":"b"}]', "[" + " " * pending.MAX_HANDOFF_BYTES + "]"):
+            with self.subTest(sample=sample[:40]), self.assertRaises(ValueError):
+                pending.decode_drafts(sample)
+        with self.assertRaises(ValueError):
+            pending.encode_drafts([self.state] * 400)
+
+    def test_read_only_probe_reports_a_handed_over_draft_without_any_release_call(self):
+        # The discovery token saw the draft; the probe's reduced token is refused every release endpoint.
+        tag = self.state["tag"]
+        recorded = pending.decode_drafts(pending.encode_drafts([self.state]))[0]
+        self.api.run.return_value = self.run
+        self.api.artifact.return_value = self.artifact
+        jobs = {"total_count": len(self.jobs), "jobs": self.jobs}
+        self.api.json.side_effect = lambda endpoint: jobs if endpoint.startswith("actions/") else self.fail(endpoint)
+        for checked in (self.state, self.complete()):
+            with tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(pending, "read_release", side_effect=AssertionError("draft read")), \
+                    patch.object(pending, "authenticate_tag"), \
+                    patch.object(pending, "snapshot_inputs", return_value=(self.matrix, SimpleNamespace(mod_version=self.version))), \
+                    patch.object(pending, "download_archive"), \
+                    patch.object(pending, "extract_bounded_zip", side_effect=lambda archive, destination, limits:
+                                 shutil.copytree(self.stage, destination)), \
+                    patch.object(pending, "verify_staged_manifest") as staged, \
+                    patch.object(pending, "check_all", return_value=checked), \
+                    patch.object(pending, "save") as save, patch.object(pending, "publish_release") as publish:
+                self.assertEqual(pending.verify(self.api, tag, Path(temporary), "a" * 40, finalize=False,
+                                                recorded=recorded), ledger.ready(checked))
+                staged.assert_called_once()
+                save.assert_not_called()
+                publish.assert_not_called()
+                with self.assertRaisesRegex(ValueError, "reread its own draft"):
+                    pending.verify(self.api, tag, Path(temporary), "a" * 40, finalize=True, recorded=recorded)
+                with self.assertRaisesRegex(ValueError, "another release tag"):
+                    pending.verify(self.api, "mc26.2-v3.0.0", Path(temporary), "a" * 40, finalize=False,
+                                   recorded=recorded)
+
+    def test_discovery_output_is_exactly_what_the_probe_observes(self):
+        output = self.stage / "github-output"
+        environment = {"GITHUB_REF": "refs/heads/master", "GITHUB_EVENT_NAME": "schedule",
+                       "GITHUB_REPOSITORY": "owner/repo", "GITHUB_SHA": "a" * 40}
+        self.api.current_sha.return_value = "a" * 40
+
+        def main(*arguments, **extra):
+            with patch.dict(os.environ, {**environment, **extra}), patch("sys.argv", ["verify", *arguments]), \
+                    patch.object(pending, "Api", return_value=self.api), \
+                    patch.object(pending, "git", return_value="a" * 40):
+                self.assertEqual(pending.main(), 0)
+            return dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines())
+
+        with patch.object(pending, "pending_drafts", return_value=[self.state]) as discover:
+            handoff = main("--discover", "--github-output", str(output))
+        discover.assert_called_once_with(self.api, None)
+        self.assertEqual(handoff["count"], "1")
+        output.unlink()
+        with patch.object(pending, "pending_drafts", side_effect=AssertionError("draft listing")), \
+                patch.object(pending, "verify", return_value=True) as verify:
+            observed = main("--github-output", str(output), PENDING_DRAFTS=handoff["pending"])
+        self.assertEqual(verify.call_args.kwargs, {"finalize": False, "recorded": self.state})
+        self.assertEqual(observed, {"matrix": '{"include":[{"tag":"%s"}]}' % self.state["tag"], "count": "1"})
+        # A bare tag, both modes at once and a probe without a handoff are refused before any release is read.
+        for message, arguments, drafts in (
+                ("an exact tag needs --discover or --finalize", ("--tag", self.state["tag"]), handoff["pending"]),
+                ("discovery never finalizes", ("--discover", "--finalize", "--tag", self.state["tag"]), ""),
+                ("missing or oversized pending release handoff", (), "")):
+            with self.subTest(arguments=arguments), patch.object(pending, "pending_drafts") as discover, \
+                    patch.object(pending, "verify") as verify:
+                with patch("sys.stderr", new_callable=io.StringIO) as stderr, \
+                        self.assertRaises(SystemExit) as refused:
+                    main(*arguments, PENDING_DRAFTS=drafts)
+                self.assertEqual(refused.exception.code, 1)
+                self.assertIn(message, stderr.getvalue())
+                discover.assert_not_called()
+                verify.assert_not_called()
 
     def test_active_source_does_not_download_or_mutate_a_release(self):
         release = {"id": 1, "tag_name": self.state["tag"], "draft": True,
@@ -153,9 +259,7 @@ class PendingPublicationsTest(unittest.TestCase):
                    "body": ledger.encode("", self.state)}
         self.api.run.return_value = self.run
         self.api.artifact.return_value = self.artifact
-        complete = copy.deepcopy(self.state)
-        for i, row in enumerate(complete["rows"].values(), start=1):
-            row.update(state="verified", remote_id=str(i))
+        complete = self.complete()
         for finalize, checked, policy, expected_writes in (
             (False, complete, "a" * 40, 0), (True, self.state, "a" * 40, 0),
             (True, complete, "b" * 40, 0), (True, complete, "a" * 40, 1),

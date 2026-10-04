@@ -35,6 +35,8 @@ public class ClientConfig {
     public int previewScale = 30;
     public int guiScale = 1; // GUI scaling factor (1-4)
     public boolean enablePlayerPreviewCustomization = false; // Enable customization (resize, reposition) of player previews
+    public boolean showTitleScreenPreview = true; // Show the player preview and its controls on the title screen
+    public boolean showPauseMenuPreview = true; // Show the player preview and its controls in the pause menu
     public float hudOverlayRotation = 20.0f;
 
     // Player Preview Slider Percentages (1-100%) for different contexts
@@ -97,6 +99,8 @@ public class ClientConfig {
     public String activeModelType = "auto"; // "auto", "classic", "slim" (deprecated - kept for compatibility)
     public String activeCapeHash = ""; // Active cape hash
     public String playerOwnSkinHash = ""; // Hash of the player's own Mojang skin (protected from deletion)
+    public String playerOwnSkinAccount = ""; // Launcher account that playerOwnSkinHash was downloaded for
+    public AccountSkinPreferences accountSkins = new AccountSkinPreferences(); // Skin selection per launcher account
 
     // Server Config Override (set by server, not saved to file)
     public transient volatile ServerConfig serverOverride = null;
@@ -335,6 +339,9 @@ public class ClientConfig {
         if (activeCapeHash == null || activeCapeHash.length() > 256
                 || activeCapeHash.chars().anyMatch(Character::isISOControl)) activeCapeHash = "";
         playerOwnSkinHash = validHashOrEmpty(playerOwnSkinHash);
+        if (!AccountSkinPreferences.isKey(playerOwnSkinAccount)) playerOwnSkinAccount = "";
+        if (accountSkins == null) accountSkins = new AccountSkinPreferences();
+        accountSkins.normalize();
     }
 
     private static void writeAtomically(Path target, String content) throws IOException {

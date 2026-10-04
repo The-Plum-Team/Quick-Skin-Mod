@@ -6,16 +6,21 @@ import com.quickskin.mod.client.compat.CpmModelWorkflow;
 import com.quickskin.mod.client.compat.CustomNPCsIntegration;
 import com.quickskin.mod.client.compat.EarsCompatIntegration;
 import com.quickskin.mod.client.compat.EssentialCompatIntegration;
+import com.quickskin.mod.client.gui.integration.FancyMenuWidgets;
+import com.quickskin.mod.client.gui.integration.MenuIntegration;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.client.gui.util.GuiScaleManager;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.IconActionButton;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
+import com.quickskin.mod.client.rendering.PreviewPlayerData;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
+import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.PlayerAppearance;
+import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.e2e.DefaultSkinEvidenceView;
 import com.quickskin.mod.e2e.E2ELog;
@@ -26,7 +31,9 @@ import com.quickskin.mod.networking.NetworkSyncService;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.model.geom.ModelPart;
@@ -42,6 +49,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 /**
  * One real optional-mod workflow behind the two stable public compatibility checkpoints.
@@ -87,6 +95,13 @@ interface ModCompatibilityFeature {
         return 600;
     }
 
+    /**
+     * Holds an intermediate phase of {@link #applyQuickSkinFeature()} until {@code gate} holds,
+     * so a remote observer can check it first. Only CPM has such a phase.
+     */
+    default void holdQuickSkinResetUntil(BooleanSupplier gate) {
+    }
+
     static void prepareBeforeWorldJoin(String modId) {
         if ("replaymod".equals(modId)) {
             ReplayModFeature.protectStartupRecordingBeforeWorldJoin();
@@ -101,6 +116,7 @@ interface ModCompatibilityFeature {
             case "customnpcs" -> new CustomNpcsFeature(minecraft);
             case "essential" -> new EssentialFeature(minecraft);
             case "replaymod" -> new ReplayModFeature(minecraft);
+            case "fancymenu" -> new FancyMenuFeature(minecraft);
             default -> new UnsupportedFeature(minecraft, modId);
         };
     }
@@ -148,6 +164,34 @@ interface ModCompatibilityFeature {
 
         final boolean holdFullBody() {
             return DefaultSkinEvidenceView.hold(minecraft, false);
+        }
+
+        /**
+         * Park the native cursor in the window's top-left corner so no hover state of a menu
+         * widget enters a capture. A failure is recorded as {@code owner}'s cursor probe failure.
+         */
+        final void pinCursorToWindowCorner(String owner) {
+            try {
+                Object window = minecraft.getWindow();
+                for (String accessor : new String[] {
+                        "getWindow", "handle", "method_4490", "m_85439_"
+                }) {
+                    try {
+                        Object value = window.getClass().getMethod(accessor).invoke(window);
+                        if (value instanceof Number number) {
+                            String warp = VanillaShim.warpNativeCursor(number.longValue(), 1.0, 1.0);
+                            if (warp != null) {
+                                failure = owner + " cursor probe failed: " + warp;
+                            }
+                            return;
+                        }
+                    } catch (NoSuchMethodException ignored) {
+                    }
+                }
+                failure = owner + " cursor probe found no native window handle";
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = owner + " cursor probe failed: " + concise(exception);
+            }
         }
 
         final Step.Result activeSkinAssertion(String integrationProof) {
@@ -210,6 +254,19 @@ interface ModCompatibilityFeature {
     final class CpmFeature extends BaseFeature {
         private volatile AssetMetadata model;
         private volatile boolean modelActivated;
+        /** CPM's definition object for the protected model, latched by the baseline assertion. */
+        private volatile Object baselineDefinition;
+        private volatile String baselineDefinitionDetail = "baseline assertion did not run";
+        /** Phase E of the apply step: the embedded-model skin, checked without a screenshot. */
+        private volatile boolean embeddedPhase;
+        private volatile String embeddedBytesProof;
+        private volatile String embeddedProof;
+        private volatile BooleanSupplier resetGate = () -> true;
+        private volatile boolean resetGateLogged;
+        private volatile CpmEmbeddedSkinProof.Band band;
+        private int plaidPolls;
+        private final CpmEmbeddedSkinProof.WaitLog embeddedWait =
+                new CpmEmbeddedSkinProof.WaitLog("CPM embedded skin phase");
 //? if <1.21.9 {
         private volatile long firstPersonRenderTypeCheckpoint;
 //?} else {
@@ -253,6 +310,9 @@ interface ModCompatibilityFeature {
             if (!CPMCompatIntegration.isLocalPlayerWearingCpmModel()) {
                 return Step.Result.fail("CPM definition cache does not report the selected model");
             }
+            CpmEmbeddedSkinProof.Definition baseline = CpmEmbeddedSkinProof.definition(playerId);
+            baselineDefinition = baseline.definition();
+            baselineDefinitionDetail = baseline.detail();
             return Step.Result.pass("Quick Skin imported, selected and rendered protected complex "
                     + "CPM fixture " + model.hash());
         }
@@ -315,31 +375,122 @@ interface ModCompatibilityFeature {
             }
         }
 
+        /**
+         * Two phases. Phase E imports Quick Skin's own skin that carries a CPM model through the
+         * ordinary skin import: the stored file must equal the bundled fixture texel for texel
+         * (otherwise the step fails at once), and on the file-backed bridge band CPM must load
+         * that model for the local player. Phase E takes no screenshot; once it holds (and any
+         * remote observer released {@link #holdQuickSkinResetUntil}), the plaid skin is applied
+         * and the step ends exactly as before, in CPM skin mode with the normal skin.
+         */
         @Override
         public void applyQuickSkinFeature() {
-            importAndApply(safeFixture(TestAssets::makeClassicSkin, "normal skin"));
+            embeddedPhase = true;
+            plaidPolls = 0;
+            band = CpmEmbeddedSkinProof.band();
+            if (band.mismatch() != null) {
+                failure = band.mismatch();
+                return;
+            }
+            if (band.bridge() && baselineDefinition == null) {
+                // Without it a rebuilt protected model could not be told apart by identity.
+                failure = "CPM's definition of the protected baseline model was not captured: "
+                        + baselineDefinitionDetail;
+                return;
+            }
+            Path fixture = safeFixture(TestAssets::makeCpmEmbeddedSkin, "CPM embedded-model skin");
+            AssetMetadata embedded = fixture == null ? null : importAndApply(fixture);
+            if (embedded != null) {
+                Step.Result bytes = CpmEmbeddedSkinProof.storedFileExact(
+                        embedded.path(), embedded.hash());
+                if (!bytes.pass()) {
+                    failure = "stored embedded CPM skin " + embedded.hash()
+                            + " differs from the bundled fixture: " + bytes.message();
+                } else {
+                    embeddedBytesProof = bytes.message();
+                }
+            }
             holdFullBody();
         }
 
         @Override
+        public void holdQuickSkinResetUntil(BooleanSupplier gate) {
+            resetGate = gate;
+        }
+
+        @Override
         public boolean quickSkinFeatureReady() {
-            return failure == null
+            if (failure != null) return true;
+            if (embeddedPhase) {
+                holdFullBody();
+                if (!embeddedSkinReady()) return false;
+                if (!resetGate.getAsBoolean()) {
+                    if (!resetGateLogged) {
+                        resetGateLogged = true;
+                        E2ELog.info("CPM embedded skin phase holds until the observer confirms it");
+                    }
+                    return false;
+                }
+                embeddedPhase = false;
+                E2ELog.info("CPM embedded skin phase passed; applying the normal skin");
+                importAndApply(safeFixture(TestAssets::makeClassicSkin, "normal skin"));
+                return failure != null;
+            }
+            plaidPolls++;
+            return plaidPolls >= appliedMinTicks()
                     && activeSkinReady()
                     && ClientConfig.getInstance().activeCpmModelHash.isEmpty()
                     && !CPMCompatIntegration.isLocalPlayerWearingCpmModel()
                     && holdFullBody();
         }
 
+        private boolean embeddedSkinReady() {
+            if (embeddedProof != null) return true;
+            String reason = null;
+            if (!activeSkinReady()) {
+                reason = "the embedded-model skin has not reached the renderer";
+            } else if (!ClientConfig.getInstance().activeCpmModelHash.isEmpty()) {
+                reason = "the CPM model hash is still selected";
+            } else if (ClientConfig.getInstance().pendingCpmSkinModeReset) {
+                reason = "Quick Skin's reset of CPM to skin mode is still pending";
+            } else if (band.bridge()) {
+                reason = CpmEmbeddedSkinProof.modelWaitReason(
+                        CpmEmbeddedSkinProof.definition(playerId), baselineDefinition);
+            }
+            embeddedWait.note(reason);
+            if (reason != null) return false;
+            embeddedProof = "embedded CPM skin " + skinHash + " stored: " + embeddedBytesProof
+                    + "; " + (band.bridge()
+                    ? "CPM loaded its model for the local player ("
+                            + CpmEmbeddedSkinProof.FIXTURE_MODEL + "; renderable, no error; "
+                            + band.describe() + ")"
+                    : "CPM is not asked to read it (" + band.describe() + ")");
+            E2ELog.info(embeddedProof);
+            return true;
+        }
+
+        @Override
+        public int appliedTimeoutTicks() {
+            return 20 * 150;
+        }
+
         @Override
         public Step.Result assertQuickSkinFeature() {
+            if (failure != null) return Step.Result.fail(failure);
+            if (embeddedPhase || embeddedProof == null) {
+                return Step.Result.fail("the embedded CPM skin phase did not complete");
+            }
             if (!ClientConfig.getInstance().activeCpmModelHash.isEmpty()) {
                 return Step.Result.fail("normal skin left the CPM model hash selected");
             }
             if (CPMCompatIntegration.isLocalPlayerWearingCpmModel()) {
                 return Step.Result.fail("CPM kept rendering its model after Quick Skin selected a skin");
             }
-            return activeSkinAssertion(
+            Step.Result reset = activeSkinAssertion(
                     "Quick Skin reset CPM to skin mode and restored its normal skin renderer");
+            return reset.pass()
+                    ? Step.Result.pass(reset.message() + "; first " + embeddedProof)
+                    : reset;
         }
 
         private Path safeFixture(FixtureFactory factory, String label) {
@@ -1136,6 +1287,10 @@ interface ModCompatibilityFeature {
     }
 
     final class EssentialFeature extends BaseFeature {
+        private static final String OFFLINE_EVIDENCE =
+                "; captured after leaving the packaged world: player=null, level=null, "
+                + "connection=null";
+
         EssentialFeature(Minecraft minecraft) {
             super(minecraft);
         }
@@ -1148,7 +1303,8 @@ interface ModCompatibilityFeature {
         @Override
         public boolean baselineReady() {
             pinCursorAwayFromEssentialWidgets();
-            return failure == null && essentialTitleFailure(false) == null;
+            // A recorded failure ends the wait, so the assertion reports it instead of a timeout.
+            return failure != null || essentialTitleFailure(false) == null;
         }
 
         @Override
@@ -1158,7 +1314,7 @@ interface ModCompatibilityFeature {
             return problem == null
                     ? Step.Result.pass("Essential owns the title player model; Quick Skin suppresses "
                     + "its duplicate preview and places exactly one action immediately left of "
-                    + "Essential's bottom right-rail widget")
+                    + "Essential's bottom right-rail widget" + OFFLINE_EVIDENCE)
                     : Step.Result.fail(problem);
         }
 
@@ -1176,7 +1332,7 @@ interface ModCompatibilityFeature {
         @Override
         public boolean quickSkinFeatureReady() {
             pinCursorAwayFromEssentialWidgets();
-            return failure == null && essentialTitleFailure(true) == null;
+            return failure != null || essentialTitleFailure(true) == null;
         }
 
         @Override
@@ -1186,39 +1342,40 @@ interface ModCompatibilityFeature {
             if (problem != null) return Step.Result.fail(problem);
             return Step.Result.pass("Essential's title model owns the layout while Quick Skin "
                     + "registers local_skin:" + skinHash + " and keeps its single action icon "
-                    + "immediately left of Essential's bottom right-rail widget");
+                    + "immediately left of Essential's bottom right-rail widget"
+                    + OFFLINE_EVIDENCE);
         }
 
         private void openTitle() {
-            VanillaShim.setScreen(minecraft, new TitleScreen());
+            // A title screen set over the live packaged world keeps the in-game HUD rendering
+            // under it, a state no player can reach. Leave through the vanilla quit lifecycle
+            // first; once offline, the second checkpoint only needs a fresh title screen.
+            if (!offline()) {
+                String problem = VanillaShim.disconnectToTitle(minecraft);
+                if (problem != null) {
+                    failure = "Essential could not leave the packaged world: " + problem;
+                    return;
+                }
+            } else if (!VanillaShim.setScreen(minecraft, new TitleScreen())) {
+                failure = "Essential could not open the offline title screen";
+                return;
+            }
             pinCursorAwayFromEssentialWidgets();
         }
 
+        private boolean offline() {
+            return minecraft.player == null && minecraft.level == null
+                    && minecraft.getConnection() == null;
+        }
+
         private void pinCursorAwayFromEssentialWidgets() {
-            try {
-                Object window = minecraft.getWindow();
-                for (String accessor : new String[] {
-                        "getWindow", "handle", "method_4490", "m_85439_"
-                }) {
-                    try {
-                        Object value = window.getClass().getMethod(accessor).invoke(window);
-                        if (value instanceof Number number) {
-                            String warp = VanillaShim.warpNativeCursor(number.longValue(), 1.0, 1.0);
-                            if (warp != null) {
-                                failure = "Essential cursor probe failed: " + warp;
-                            }
-                            return;
-                        }
-                    } catch (NoSuchMethodException ignored) {
-                    }
-                }
-                failure = "Essential cursor probe found no native window handle";
-            } catch (ReflectiveOperationException | RuntimeException exception) {
-                failure = "Essential cursor probe failed: " + concise(exception);
-            }
+            pinCursorToWindowCorner("Essential");
         }
 
         private String essentialTitleFailure(boolean requireSkin) {
+            if (!offline()) {
+                return "Essential title checkpoint still has a live player, level or connection";
+            }
             Screen screen = VanillaShim.currentScreen(minecraft);
             if (!(screen instanceof TitleScreen)) return "Essential title screen is not open";
             GuiEventListener essentialAnchor =
@@ -1259,6 +1416,224 @@ interface ModCompatibilityFeature {
             String expected = "local_skin:" + skinHash;
             return appearance != null && expected.equals(appearance.getSkinId())
                     ? null : "Essential menu appearance did not retain " + expected;
+        }
+    }
+
+    /**
+     * FancyMenu layouts drive Quick Skin's title and pause preview through its stable layout
+     * identifier. The packaged runtime seeds two layouts for this scenario only: the title layout
+     * hides the preview, the pause layout moves and enlarges it. The control capture proves that a
+     * hidden preview takes its rotate and animation controls with it while Change Skin stays; the
+     * applied capture proves the preview is drawn in FancyMenu's box wearing the applied skin, with
+     * its rotate control back.
+     */
+    final class FancyMenuFeature extends BaseFeature {
+        /** The pause layout box, equal to {@code packaged_runtime.FANCYMENU_PAUSE_PREVIEW_BOX}. */
+        static final int PAUSE_BOX_X = 24;
+        static final int PAUSE_BOX_Y = 40;
+        static final int PAUSE_BOX_WIDTH = 165;
+        static final int PAUSE_BOX_HEIGHT = 270;
+        private static final String CHANGE_SKIN_KEY = "quickskin.button.change_skin";
+
+        private volatile int readinessPolls;
+
+        FancyMenuFeature(Minecraft minecraft) {
+            super(minecraft);
+        }
+
+        @Override
+        public int baselineTimeoutTicks() {
+            return 600;
+        }
+
+        @Override
+        public void prepareBaseline() {
+            readinessPolls = 0;
+            VanillaShim.setScreen(minecraft, new TitleScreen());
+            pinCursorToWindowCorner("FancyMenu");
+        }
+
+        @Override
+        public boolean baselineReady() {
+            pinCursorToWindowCorner("FancyMenu");
+            return failure == null && logProgress(hiddenTitleProblem()) == null;
+        }
+
+        @Override
+        public Step.Result assertBaseline() {
+            if (failure != null) return Step.Result.fail(failure);
+            String problem = hiddenTitleProblem();
+            if (problem != null) return Step.Result.fail(problem);
+            return Step.Result.pass("FancyMenu layout hides Quick Skin's title preview "
+                    + FancyMenuWidgets.PREVIEW_ID + " (FancyMenuWidgets.isHidden=true, active=false); "
+                    + "rotate and animation toggle hidden and inactive with it; Change Skin "
+                    + "visible and active");
+        }
+
+        @Override
+        public void applyQuickSkinFeature() {
+            readinessPolls = 0;
+            try {
+                importAndApply(TestAssets.makeClassicSkin());
+                if (minecraft.options != null) {
+                    minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+                }
+                if (minecraft.player != null) {
+                    DefaultSkinEvidenceView.pinStandingPose(minecraft.player, 180f);
+                }
+                VanillaShim.setScreen(minecraft, new PauseScreen(true));
+                pinCursorToWindowCorner("FancyMenu");
+            } catch (Exception exception) {
+                failure = "FancyMenu skin fixture failed: " + concise(exception);
+            }
+        }
+
+        @Override
+        public boolean quickSkinFeatureReady() {
+            pinCursorToWindowCorner("FancyMenu");
+            if (minecraft.player != null) {
+                DefaultSkinEvidenceView.pinStandingMotion(minecraft.player);
+            }
+            return failure == null && activeSkinReady() && logProgress(movedPauseProblem()) == null;
+        }
+
+        @Override
+        public Step.Result assertQuickSkinFeature() {
+            if (failure != null) return Step.Result.fail(failure);
+            String problem = movedPauseProblem();
+            if (problem != null) return Step.Result.fail(problem);
+            PlayerWidget widget = singlePlayerWidget(VanillaShim.currentScreen(minecraft));
+            return activeSkinAssertion("FancyMenu layout places Quick Skin's pause preview "
+                    + FancyMenuWidgets.PREVIEW_ID + " at x=" + widget.getX() + " y=" + widget.getY()
+                    + " size=" + widget.getWidth() + "x" + widget.getHeight()
+                    + " (natural box replaced); rotate visible and active again; Change Skin "
+                    + "visible and active; preview skin=" + previewSkin(widget));
+        }
+
+        private String logProgress(String problem) {
+            if (problem != null && (++readinessPolls == 1 || readinessPolls % 100 == 0)) {
+                E2ELog.info("FancyMenu readiness: " + problem);
+            }
+            return problem;
+        }
+
+        private String hiddenTitleProblem() {
+            Screen screen = VanillaShim.currentScreen(minecraft);
+            if (!(screen instanceof TitleScreen)) return "title screen is not open";
+            PlayerWidget widget = singlePlayerWidget(screen);
+            if (widget == null) {
+                return "title screen does not hold exactly one Quick Skin PlayerWidget";
+            }
+            if (!FancyMenuWidgets.isHidden(widget)) {
+                return "FancyMenu layout did not hide the title preview " + FancyMenuWidgets.PREVIEW_ID;
+            }
+            if (widget.active) return "hidden title preview is still active";
+            String controls = controlsProblem(screen, false, true);
+            return controls == null ? null : "title screen: " + controls;
+        }
+
+        private String movedPauseProblem() {
+            Screen screen = VanillaShim.currentScreen(minecraft);
+            if (!(screen instanceof PauseScreen)) return "pause screen is not open";
+            PlayerWidget widget = singlePlayerWidget(screen);
+            if (widget == null) {
+                return "pause screen does not hold exactly one Quick Skin PlayerWidget";
+            }
+            if (FancyMenuWidgets.isHidden(widget) || !widget.visible || !widget.active) {
+                return "pause preview is hidden or inactive";
+            }
+            if (widget.getX() != PAUSE_BOX_X || widget.getY() != PAUSE_BOX_Y
+                    || widget.getWidth() != PAUSE_BOX_WIDTH || widget.getHeight() != PAUSE_BOX_HEIGHT) {
+                return "pause preview box is " + widget.getX() + "," + widget.getY() + " "
+                        + widget.getWidth() + "x" + widget.getHeight() + ", expected FancyMenu's "
+                        + PAUSE_BOX_X + "," + PAUSE_BOX_Y + " " + PAUSE_BOX_WIDTH + "x"
+                        + PAUSE_BOX_HEIGHT;
+            }
+            Object skin = previewSkin(widget);
+            Object assetSkin = skinHash == null ? null
+                    : LocalAssetManager.getInstance().getTextureLocation(skinHash, TextureQuality.FULL);
+            Object rendererSkin = appearances.getSkinLocation(playerId);
+            if (skin == null || !(skin.equals(assetSkin) || skin.equals(rendererSkin))) {
+                return "pause preview skin=" + skin + " expected " + assetSkin + " or " + rendererSkin;
+            }
+            String controls = controlsProblem(screen, true, false);
+            return controls == null ? null : "pause screen: " + controls;
+        }
+
+        /**
+         * Checks Quick Skin's own preview controls: rotate (always injected) and the animation
+         * toggle (title screen only) follow {@code previewShown}; Change Skin is always visible.
+         */
+        private String controlsProblem(Screen screen, boolean previewShown, boolean expectToggle) {
+            Button changeSkin = changeSkinButton(screen);
+            if (changeSkin == null) return "Change Skin button is missing";
+            if (!changeSkin.visible || !changeSkin.active || FancyMenuWidgets.isHidden(changeSkin)) {
+                return "Change Skin button is not visible and active";
+            }
+            Object rotate = menuControl("rotateButton");
+            if (!(rotate instanceof AbstractWidget rotateButton) || !screen.children().contains(rotate)) {
+                return "rotate button is missing";
+            }
+            if (rotateButton.visible != previewShown || rotateButton.active != previewShown) {
+                return "rotate button visible=" + rotateButton.visible + " active="
+                        + rotateButton.active + ", expected " + previewShown;
+            }
+            if (!expectToggle) return null;
+            Object toggle = menuControl("animationToggleButton");
+            if (!(toggle instanceof AbstractWidget toggleButton) || !screen.children().contains(toggle)) {
+                return "animation toggle is missing";
+            }
+            if (toggleButton.visible != previewShown || toggleButton.active != previewShown) {
+                return "animation toggle visible=" + toggleButton.visible + " active="
+                        + toggleButton.active + ", expected " + previewShown;
+            }
+            return null;
+        }
+
+        private static PlayerWidget singlePlayerWidget(Screen screen) {
+            if (screen == null) return null;
+            PlayerWidget found = null;
+            for (GuiEventListener child : screen.children()) {
+                if (child instanceof PlayerWidget widget) {
+                    if (found != null) return null;
+                    found = widget;
+                }
+            }
+            return found;
+        }
+
+        private static Button changeSkinButton(Screen screen) {
+            String label = Component.translatable(CHANGE_SKIN_KEY).getString();
+            for (GuiEventListener child : screen.children()) {
+                if (child instanceof Button button && !label.isEmpty()
+                        && label.equals(button.getMessage().getString())) {
+                    return button;
+                }
+            }
+            return null;
+        }
+
+        /** One of MenuIntegration's private control fields; a mod-owned name, never remapped. */
+        private Object menuControl(String name) {
+            try {
+                Field field = MenuIntegration.class.getDeclaredField(name);
+                field.setAccessible(true);
+                return field.get(null);
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "could not inspect MenuIntegration." + name + ": " + concise(exception);
+                return null;
+            }
+        }
+
+        private Object previewSkin(PlayerWidget widget) {
+            try {
+                Field field = PlayerWidget.class.getDeclaredField("previewData");
+                field.setAccessible(true);
+                return field.get(widget) instanceof PreviewPlayerData data ? data.getSkinLocation() : null;
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                failure = "could not inspect the preview skin: " + concise(exception);
+                return null;
+            }
         }
     }
 

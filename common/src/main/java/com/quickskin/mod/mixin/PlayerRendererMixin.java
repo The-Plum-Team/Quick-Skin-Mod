@@ -96,22 +96,38 @@ public class PlayerRendererMixin {
         if (playerUUID == null) return;
 
 //?}
+        // Cancelling here skips the RETURN callbacks other mods attach to this lookup (Entity
+        // Texture Features builds its skin features there), so only do it when vanilla, which
+        // already reads the Quick Skin texture through getSkin(), would answer differently.
+//? if <1.21.2 {
+        var vanilla = player.getSkin();
+        ResourceLocation vanillaSkin = vanilla == null ? null : vanilla.texture();
+//?} else if <1.21.9 {
+        ResourceLocation vanillaSkin = renderState.skin == null ? null : renderState.skin.texture();
+//?} else if <1.21.11 {
+        ResourceLocation vanillaSkin = renderState.skin == null || renderState.skin.body() == null
+                ? null : renderState.skin.body().texturePath();
+//?} else {
+        Identifier vanillaSkin = renderState.skin == null || renderState.skin.body() == null
+                ? null : renderState.skin.body().texturePath();
+//?}
+
         // Try service-based lookup (covers registered data from Essential compat or server sync)
 //? if <1.21.2 {
         service.markSkinVisible(player.getUUID());
-        if (service.hasActiveSkin(player.getUUID())) {
+        if (service.hasActiveSkin(player.getUUID()) && !CPMCompatIntegration.isWearingCpmModel(player.getUUID())) {
             ResourceLocation customSkin = service.getSkinLocation(player.getUUID());
 //?} else if <1.21.11 {
         service.markSkinVisible(playerUUID);
-        if (service.hasActiveSkin(playerUUID)) {
+        if (service.hasActiveSkin(playerUUID) && !CPMCompatIntegration.isWearingCpmModel(playerUUID)) {
             ResourceLocation customSkin = service.getSkinLocation(playerUUID);
 //?} else {
         service.markSkinVisible(playerUUID);
-        if (service.hasActiveSkin(playerUUID)) {
+        if (service.hasActiveSkin(playerUUID) && !CPMCompatIntegration.isWearingCpmModel(playerUUID)) {
             Identifier customSkin = service.getSkinLocation(playerUUID);
 //?}
             if (customSkin != null) {
-                cir.setReturnValue(customSkin);
+                if (!customSkin.equals(vanillaSkin)) cir.setReturnValue(customSkin);
                 return;
             }
         }
@@ -131,7 +147,7 @@ public class PlayerRendererMixin {
 //?}
                         .getTextureLocation(config.activeSkinHash, TextureQuality.FULL);
                 if (loc != null) {
-                    cir.setReturnValue(loc);
+                    if (!loc.equals(vanillaSkin)) cir.setReturnValue(loc);
                     return;
                 }
             }

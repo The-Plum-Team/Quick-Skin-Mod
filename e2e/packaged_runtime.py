@@ -1278,16 +1278,114 @@ def write_loader_client_config(
     return config_path
 
 
+# The FancyMenu layout the mod-compatibility scenario seeds for the pause screen, in GUI units at
+# the contract's 1920x1080 window and guiScale 3 (a 640x360 GUI): a box left of the pause buttons,
+# larger than the preview's natural model box. FancyMenuFeature asserts the same values.
+FANCYMENU_PAUSE_PREVIEW_BOX = (24, 40, 165, 270)
+FANCYMENU_PREVIEW_ID = "quickskin_player_preview"
+FANCYMENU_TITLE_SCREEN = "net.minecraft.client.gui.screens.TitleScreen"
+FANCYMENU_PAUSE_SCREEN = "net.minecraft.client.gui.screens.PauseScreen"
+
+
+def _write_new_text(path: Path, text: str) -> Path:
+    if path.exists() or path.is_symlink():
+        raise RuntimeFailure(f"compatibility client config must start absent: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _fancymenu_layout(screen: str, element: dict[str, str]) -> str:
+    body = "\n".join(f"  {key} = {value}" for key, value in element.items())
+    return (
+        "type = fancymenu_layout\n\n"
+        "layout-meta {\n"
+        f"  identifier = {screen}\n"
+        "  is_enabled = true\n"
+        "  layout_index = 0\n"
+        "}\n\n"
+        f"vanilla_button {{\n{body}\n}}\n"
+    )
+
+
+def write_fancymenu_client_config(game_dir: Path, scenario: str) -> Path:
+    """Seed FancyMenu so that it never interrupts a scenario, plus the compatibility layouts.
+
+    Every scenario gets only the options that keep FancyMenu's first-start welcome screen and its
+    editor overlays away, and no customizable screen: the ordinary suite proves that installing
+    FancyMenu changes nothing. Only the mod-compatibility scenario adds two layouts for Quick
+    Skin's stable preview identifier: one hides the title preview, one moves and enlarges the pause
+    preview.
+    """
+
+    root = game_dir / "config" / "fancymenu"
+    options = _write_new_text(
+        root / "options.txt",
+        "##[customization]\n\n"
+        "B:show_customization_overlay = 'false';\n\n"
+        "##[debug_overlay]\n\n"
+        "B:show_debug_overlay = 'false';\n\n"
+        "##[tutorial]\n\n"
+        "B:show_welcome_screen = 'false';\n",
+    )
+    if scenario != "mod-compatibility":
+        return options
+    _write_new_text(
+        root / "customizablemenus.txt",
+        "type = customizablemenus\n\n"
+        f"{FANCYMENU_TITLE_SCREEN} {{\n}}\n\n"
+        f"{FANCYMENU_PAUSE_SCREEN} {{\n}}\n",
+    )
+    _write_new_text(
+        root / "customization" / "quickskin_title_hidden.txt",
+        _fancymenu_layout(
+            FANCYMENU_TITLE_SCREEN,
+            {
+                "element_type": "vanilla_button",
+                "instance_identifier": FANCYMENU_PREVIEW_ID,
+                "anchor_point": "vanilla",
+                "x": "0",
+                "y": "0",
+                "width": "0",
+                "height": "0",
+                "is_hidden": "true",
+            },
+        ),
+    )
+    x, y, width, height = FANCYMENU_PAUSE_PREVIEW_BOX
+    _write_new_text(
+        root / "customization" / "quickskin_pause_moved.txt",
+        _fancymenu_layout(
+            FANCYMENU_PAUSE_SCREEN,
+            {
+                "element_type": "vanilla_button",
+                "instance_identifier": FANCYMENU_PREVIEW_ID,
+                "anchor_point": "top-left",
+                "x": str(x),
+                "y": str(y),
+                "width": str(width),
+                "height": str(height),
+                "stay_on_screen": "false",
+                "is_hidden": "false",
+            },
+        ),
+    )
+    return options
+
+
 def write_compatibility_client_config(
-    game_dir: Path, compatibility_mod: str
+    game_dir: Path, compatibility_mod: str, scenario: str
 ) -> Path | None:
     """Seed only the third-party settings needed for a deterministic compatibility probe.
 
     The ReplayMod lane records the actual Quick Skin multiplayer exchange and then opens that
     recording. Pin the supported recording settings so the disposable profile neither depends on
     upstream defaults nor opens an interactive rename/post-processing dialog during playback.
+    FancyMenu's settings are described by ``write_fancymenu_client_config``.
     """
 
+    if compatibility_mod == "fancymenu":
+        return write_fancymenu_client_config(game_dir, scenario)
     if compatibility_mod != "replaymod":
         return None
 
@@ -2559,12 +2657,12 @@ def run_packaged_row(
                 write_e2e_client_config(game_dir)
                 if compatibility_lane is not None:
                     write_compatibility_client_config(
-                        game_dir, compatibility_lane.mod.id
+                        game_dir, compatibility_lane.mod.id, scenario
                     )
                 write_loader_client_config(game_dir, row["loader"], repo / "e2e")
             if compatibility_lane is not None:
                 locked_by_name = {
-                    item.filename: item for item in compatibility_lane.artifact.files
+                    item.filename: item for item in compatibility_lane.install_files
                 }
                 supplied_by_name = {item.name: item for item in compatibility_files}
                 if set(locked_by_name) != set(supplied_by_name):

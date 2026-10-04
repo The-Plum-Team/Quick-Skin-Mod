@@ -1,6 +1,7 @@
 package com.quickskin.mod.client.gui.overlay;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.quickskin.mod.client.rendering.LocalLookPreview;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewPlayerData;
 import dev.architectury.event.EventResult;
@@ -91,7 +92,8 @@ public class SkinPreviewOverlay {
 
         // Update-on-change logic for huge performance gain
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-        String activeSkinHash = config.activeSkinHash;
+        // The saved skin, unless a CPM model is the latest look choice (then the player's own skin).
+        String activeSkinHash = LocalLookPreview.hudSkinHash();
 
         // Use .equals() for string comparison. lastCheckedSkinHash can be null initially.
         boolean needsUpdate = (lastCheckedSkinHash == null) || !lastCheckedSkinHash.equals(activeSkinHash);
@@ -290,6 +292,9 @@ public class SkinPreviewOverlay {
         previewData.setSkinLocation(skinTexture);
         previewData.setCapeLocation(null); // No cape for HUD preview
         previewData.setModelType(modelType);
+        // The HUD mirrors the player in the world. A gun mod poses the arms around the weapon it
+        // finds in the main hand, so hiding that one item leaves a rifle stance holding nothing.
+        previewData.markHeldGunVisible();
 
         //? if <1.21.6 {
         PoseStack poseStack = graphics.pose();

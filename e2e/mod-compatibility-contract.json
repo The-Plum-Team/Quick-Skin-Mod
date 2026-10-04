@@ -1,6 +1,6 @@
 {
-  "schema_version": 7,
-  "lock_revision": "2026-08-30",
+  "schema_version": 8,
+  "lock_revision": "2026-10-04",
   "artifact_source": {
     "kind": "modrinth-v2",
     "api_base": "https://api.modrinth.com/v2",
@@ -23,6 +23,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "locked_dependencies": [],
       "evidence": {
         "baseline_with_mod": "A stable rear third-person view shows the complete local player wearing the protected complex CPM fixture imported through Quick Skin. Its layered red cap, brown hair, blue overalls, white gloves, brown boots, custom proportions, and textured geometry are attached and rendered coherently without missing, detached, or corrupted parts.",
         "apply_local_skin_with_mod": "The paired rear third-person view shows the same complete player wearing Quick Skin's dark charcoal-and-gray plaid skin with brown hands. All fixture-specific cap, hair, overalls, glove, boot, and custom-proportion geometry is gone, visibly confirming that selecting a normal Quick Skin skin reset CPM model mode without corrupting the player renderer."
@@ -71,7 +72,8 @@
               "sha256": "40e998fea033ba6dd250d9fd4697f3c557053b7c99e66cc95154ec863a369c7b",
               "sha512": "ba87ccd347f4a7163718481f8008a1cea47367465d50b721560e60f4e65a0ef335bfa2e7a5876d38fa8dffc9b24230e138f6740022e944bab1891a46f137ba54"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "BZZSHBbA",
@@ -90,7 +92,8 @@
               "sha256": "f4964fb5b008eea1401853c6ba19a623b5fd6f10e3e14c77d686d999a0bb7c42",
               "sha512": "ec0ae724e5cc58180f1203d0c155cecf5f362030bb445083d15abd4c1d09585e2000c68e7e074f78bd8416267e792f98322e551b09cd0e9bd0fbf94eb7cf9331"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "7REwdnKp",
@@ -109,7 +112,8 @@
               "sha256": "d6544dfc5b04809a7cc83e2eb71e463bb7be2846a3207a5f0627b47653046a94",
               "sha512": "6ed6cc86c94fbb22e6e7552219a5bbdb22bfe293fdc0b785baf0286e1e4febd92b96305f5257cdb9e5618cd571ab26f4b08a36b937d7ad6ed87ea3ed26b7b36b"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "m5tTLcdS",
@@ -128,7 +132,8 @@
               "sha256": "ab5e926c48f534fe8ca7098db79b71436c52b6c798356def7f495c6898b0288c",
               "sha512": "d2184d81875c317f799e151a1d913b4ddac4c626fb43297cbb8bb2e8b8e73c44eb7740f666a4f05adcfce70fffed59c1684e1a90309c071dd82146f43a47744a"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "YXfPij2E",
@@ -147,7 +152,8 @@
               "sha256": "b5d3a473998648eefdf646e10a48af95dac57add0df681ca4407e83c716d6c84",
               "sha512": "5af1150d16bfc3adfa942bf606a8e4d829cdcc15d3ec46eb98cdb03bd85db81ceac4b85274b4207a928497d78a4f53afeab1cf5b43ac73219d20147948fea38b"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "SWa0mmPU",
@@ -167,7 +173,8 @@
               "sha256": "b5d128729ad3c8f7f8a44e563208845bea91d5f75f4b11647cf9dff30b3e9953",
               "sha512": "7472e288df3ebdf348471c38fdc9aa896b26969cc78510d5d3d4fa0720789f466ee8f103442b7087176f8bc8a684688877bc0d4961e5f93f3a020943fcb4b97a"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "R6HbPVWM",
@@ -187,7 +194,8 @@
               "sha256": "7d5a685a525bef949dbd3a9816a63310c7a863c4934d154a14a7c89ccb4bd10b",
               "sha512": "bf49b63fd0f5e9d771894ca60e4eed54055700e81934e075c8f872e3c72f0b8c08aff76085c155b4c3d2165ff2653db6906ea40d8e74e2d21d7052fdcd859132"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "miVYmYGL",
@@ -206,7 +214,8 @@
               "sha256": "5d34d0078e0adbc7a0e9d8eec583eeced2ae841e26b71785bbae5aa4bf22355a",
               "sha512": "0fb17065b5afcb14acf339089a5ab3a48601ea5c4ab39fa1465f1f6c36e0339362860d13b766e7fa2531b541a6e81a29be8d7a57b473e53bf41e7151405fbed6"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "MkPemZGx",
@@ -225,7 +234,8 @@
               "sha256": "397f8afdc4a30c1c3f27ec32bc27a379ade744622a3e9ce813c27ba78225254b",
               "sha512": "eb4668fd6823261f4d165aa7cadfdf5767a2ec9e73f253e292b1690a5d0219fd03293d46ffdac9ce2ecaa0786772e65490b420bd6e4b9efc2406aef2bfcae4c7"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "wxYQ2GwQ",
@@ -244,7 +254,8 @@
               "sha256": "917228d6a814dbecdddc23f76c8865bf21727c30a819db9ce92b02d0e2316a1b",
               "sha512": "3354439f2a2d23b7ba2e187451a047b0815c1a4114e7f86d42f6a8b4f3362e717c6a1d660c23da1214483afa1316e046db31b2ddedbf8e8e320a3db890756a18"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "JfClBIfO",
@@ -263,7 +274,8 @@
               "sha256": "fab7bdc9e526383871b2f5025701f0038e72861f2faa2eab3f38c9bd912f9543",
               "sha512": "5465df4d9f8ba659c75784670d48f8a9ceb72aeb6086919090bd7c8d4577fa22463a3a7d229c50d64bfa50309d224aad66e8b6918bcac48e774353fe6353f312"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "cHdHyIHI",
@@ -282,7 +294,8 @@
               "sha256": "200995dcb7966793b19a9f2ec1c6a7230d4ac9cc35485c028bdaacc79cbb5941",
               "sha512": "ea0144e0c929da66f4d5040c85924b9e8fc49eed67e113e030aaac8bead68e8cfa5a58b9f160af9faa71a420d45e7ecaf8fc9b8f163f93904a738e01a4e75ac2"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "xKX29kmH",
@@ -301,7 +314,8 @@
               "sha256": "da8b52aa7ac118d8a7c01b491cf4fcfadcc3439875175568e5d4724d46edfabd",
               "sha512": "9f625a24db6e46fa041e21c6d2f2d0e1cdbbdf2045f62498e2f75fabb5c54672e72a41ef8cd7c002354a4446fefa688116dfca59e2e4839a699d50d15e92a808"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "6qrB1qW7",
@@ -320,7 +334,8 @@
               "sha256": "b020abd87462117735394b94e51c3c2bef104c19f2bd460e4cafd988ab0ce13d",
               "sha512": "2e59f8b9daebfd9ed7bd461d530ca8c6d91e8f3c300dd504f0c80948b2dfc2690d9f76d3a1f805360161de5b05c0f7cefddb9ad31001341a4e59904b7bb47cb1"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "4dfUYcrp",
@@ -339,7 +354,8 @@
               "sha256": "66edc3acb78a4db51b82b157dcbd3464a85590ffe54de62f0b58083a8b52f098",
               "sha512": "4d9d5b45d0fc080a0d97bb7432855a8e0c64ce7db79a7dd60bdf947d5b1c8e36635a2bc88f042975cc170daf5132f39c73832a658726d9487c3a121ba35520b0"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "DQvBqL49",
@@ -360,7 +376,8 @@
               "sha256": "4a2af47d6d537c054caeb2fbfb87ca9a3211efcb4f87b5e2fed927044c267c8e",
               "sha512": "1183e143ab1c3d21e6ae6a9660b92f21ed9ee49a44b4abefe3a99429fa5a08b42671befb3b365ce4bdca36aa4af26cf572b2c4309c3ab8f4edefdd2a5a408df5"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "M5gdScGc",
@@ -379,7 +396,8 @@
               "sha256": "d48bd26199ba95d6236bb4fbc6daac80949951ea1fa43142ae855f50f69e8fd8",
               "sha512": "aeaf0df883ab25424a357a864757f23e09ae257421fbc884fe371f8ba667970408968a09a06bda2de013af4c39764b84ac83f37a47e9d9498d033d9bc08c9dd5"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "E0T7n0xA",
@@ -399,7 +417,8 @@
               "sha256": "c287bd73be3880d0cc5bf58eec58c6119b5281188d47254d56e77ce7d709714f",
               "sha512": "dda238d04582f94ce61c460dddc7e4221e4c5c6b0fca5212d22bf0713be9fb8a64fb7be032612cbc5e5846599e898a9f6b97a2aa7623dda010c7fd2032e124c3"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "H7C3DTGd",
@@ -419,7 +438,8 @@
               "sha256": "eb4f83d61554b5894cd2b97b81f214d635ca9157799df886b75a4ed55e439f56",
               "sha512": "2869e2f8932a59ebe1ff13e750e86bab48afcd1778b4e10f4386df80235add0c33a545793ba6710a80f2f0dc777631d3ca28fa09ac52f389acb7ffb995e5d239"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "ip86L1T7",
@@ -438,7 +458,8 @@
               "sha256": "785e0ea68be60ce478fe6add33a67635db646c40b7adbbfa60a5bac7cb739c4f",
               "sha512": "f5af3933cd9b0c0f1354c5be9add65b8c1cbbb3006baf0097e9158472374dbc0cfae56c91f5a46ccaef60a3259b0e7fad7ebda293338e6264f61cb7820d9313c"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "ufKYI6aZ",
@@ -457,7 +478,8 @@
               "sha256": "1dd1ed323cc0e62c33b05ac4715b245f9c55a3c7f182b36eb2bfbb2aa4bb31dc",
               "sha512": "9b71d8b8a8e32ade11093a67d60d49674306ebbb420670186ea25d68bc62afb1571dda3c5e48cb67d130044bc2b353db6e0eacd07c9c2f821ea5c029269abc79"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "9lgFAOrU",
@@ -476,7 +498,8 @@
               "sha256": "9284a97b6a712c7ef25baecd4fd61b2f5bc893b849ab6697b6fb896b75459132",
               "sha512": "57ce804c3f1de013f926867cf82094754c3a2e1e6a723a0d59debc84f9463f178f869e3d29a0afb5987fdf1999bcf593c25050d4cabc18d56bdd72d7c463868b"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "uHdKq7aj",
@@ -495,7 +518,8 @@
               "sha256": "ccb01c88a46a2ec1253d469261a8c58de7bd6277eec8c40cc680e875c4480b87",
               "sha512": "94ae4187f0b700d8407d32374208ccc53ee0b5e06151a048eca2ed10e7dcb2b9536d6b5b8ae988121972c78d8030e8343f42dfa234d6387a4e49a48afa84bd0e"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "3IujwyKt",
@@ -514,7 +538,8 @@
               "sha256": "6a999af3f6c9ab6cf8c520294cf6e71061f5b95b1f394da34fc8d03457eb384b",
               "sha512": "7437cb01f51b6f205e091709fb843a6dc23fdef5a892b3ca8f49e2123f2ce42d8db4d42eac536039e83f8bbc1da0247210fe4e83e53872c2f62295581146066f"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "oGp97F4J",
@@ -533,7 +558,8 @@
               "sha256": "8f0b177be5a30fd5974d0304eca128625e5c0a1ad5e9d41cfc92fb6b29d03113",
               "sha512": "37c76428b0357390eab252e8b285d08d7a5b0589e06f74f4410516c39ec61f74a16b00875cd666ca7548d108a351e570cb4cea523397a6a8aa7cbe8ac93bc366"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "5TBX9e3S",
@@ -554,7 +580,8 @@
               "sha256": "8434106eced795ca82482574bb7371b7b5fa23f890fd70bc60d53d39dcdddec0",
               "sha512": "b9e0fc4c7dd7799f386150771c6248c3e21f94f0e92d503c3eb159c91c02d643a34eb4be5d8f6a7fc638bb18011eb2e1fc1e63ae98df75b89178f934ffc77945"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "t3yIkfvy",
@@ -575,7 +602,8 @@
               "sha256": "85f53e8ec577ef676469a8566adc72da502d14559d39e4ce6de789c0d347ae82",
               "sha512": "a65626fe9c123f38e142072efd8c99f01bca9ba821921524744749563b6b9f8d91bbc8eebe8b86fb7248417ccec535ac91665d97e1fc09c425d33cd6bf4a33d0"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "wEheoeGX",
@@ -596,7 +624,8 @@
               "sha256": "76bde8c4f920b6473f08d155542b0bb30b63965aff14c66a857f950105edb9c5",
               "sha512": "6340c6dc9b6a7b8af9c9440e2d78d934e4ac7a49d98419301108c75c35b8abb9ca4e7e4c1ce76f4f4bb032f2d2bbf53d825262623544d0e3ac6a68c09c576277"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "OrhGNAuA",
@@ -615,7 +644,8 @@
               "sha256": "d5c9b12d7e06e8d4ec803489c5d0e0de280004aa80277529bc66ef6b21d04dad",
               "sha512": "d1424c17bb49d40ba1fdc9df6ad62c576bf21ea76dd57afd2409df1aaa814fb602379b5488f7b732f18662f2129909361a56fcf9b5e29fc2b486e70f7a2e2eb1"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "rkSBlx1j",
@@ -634,7 +664,8 @@
               "sha256": "65fcbad1e1a350193f8e648df8aa6cf1a1605a06058802e8c72ed2263adfca7f",
               "sha512": "36af81bf8c49220cdcfd7b496438ea397a483fdcd395c0de5cf2d5a0549aa07a1fa26ea73d4e06f78749b1a3ce59636647c42159d5110a94e337d4e860168a85"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "Hh8LeMGi",
@@ -653,7 +684,8 @@
               "sha256": "e89e50795b5f7fee93610cc4605c3d50c5f4e6ca651b4192383f7c329ff7ea3b",
               "sha512": "e0f60f591e1b8dde4dec2f372ee5b82db453a195aeb444497ae3cf0582aa8fa8072f49b1b5f4664d84b840843e3af106f2e6b9e48d15f9a60f9db42595d5cc22"
             }
-          ]
+          ],
+          "dependencies": []
         }
       ]
     },
@@ -674,6 +706,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "locked_dependencies": [],
       "evidence": {
         "baseline_with_mod": "A stable rear third-person control view shows the complete player wearing a Quick Skin imported ordinary skin with no Ears ears, tail, wings, snout, or other added geometry. The body and texture remain intact while the Ears renderer is loaded.",
         "apply_local_skin_with_mod": "The paired rear third-person view shows the complete player wearing the Ears-authored Quick Skin skin with clearly visible tall ear geometry above the head and a rear tail. The saturated cyan, magenta, orange, and green texture landmarks remain coherent on both the player and added Ears geometry."
@@ -714,7 +747,8 @@
               "sha256": "827150d5cf67edaf13f5ff8cd9e749809a1811d55e5a10e24ecf9dcb60f8edb0",
               "sha512": "853617ac0d17f94d8354ac1c2fcb647e504cc5273673c91142860b21601a5eeac3eb7f80bab0f0c43106e4e91d6e994c8970dce481db2ced7690c2d6a92877bf"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "x0gO3b5F",
@@ -733,7 +767,8 @@
               "sha256": "9f2ac20341d6d32bae9e87d416931a2f5ae4ae16635e24be6060da6416eaa6ae",
               "sha512": "3d5ddc09d72e44c9a369ae5e7ffaaff0a6914c36d2df53a55d0428cb68d48431c6c43dc7e6a6828996ecc6bccb0037ae5b89da765ec290e86a3a3ad5793ef676"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "x0gO3b5F",
@@ -752,7 +787,8 @@
               "sha256": "9f2ac20341d6d32bae9e87d416931a2f5ae4ae16635e24be6060da6416eaa6ae",
               "sha512": "3d5ddc09d72e44c9a369ae5e7ffaaff0a6914c36d2df53a55d0428cb68d48431c6c43dc7e6a6828996ecc6bccb0037ae5b89da765ec290e86a3a3ad5793ef676"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "rEnDH8t5",
@@ -771,7 +807,8 @@
               "sha256": "06f66c98a8efeed7bb25288cc83061939fbbec4fdb250b9bca2d768dbfbbd474",
               "sha512": "fd1dacb165536923232b3af4b1e008260a5790ab1d5e05a9bad18c2fa17770896d5c21999d1118d4eb1a5d318f3a5207d0d2bbdc9be5996a08bee83c4a6adc68"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "Dxc2NR3x",
@@ -790,7 +827,8 @@
               "sha256": "33283d5f583e8474b1cb366fb3790b540f113b98287f6ae26e0375046479ab18",
               "sha512": "52fc315373bd014fd388c970c17bbd6873593e169841edb8d346bbf176401a527a65f074f1ddf28ebcb87cd5c469aadf64b3f99700f7112c1e0966b42920c7d8"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "TPdnkxJj",
@@ -809,7 +847,8 @@
               "sha256": "6cd0fe9ca76ca6e11afd09df0d5629b15c59c689817837f8976b822d355997b8",
               "sha512": "2a57cd2d41a2c72198858db670016b0b88b4bdb7bc45ba93facf6934854150f57bc58bf6b1c17e96387c2364d34b2f146e5621f1c93d4f50e96aedbb07a2c675"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "5JGTCity",
@@ -828,7 +867,8 @@
               "sha256": "ec9c4adabd7d49afed0791fb27f6693ea1491867fa11fa84aeb4797c34ea5d6e",
               "sha512": "7e72c3c755f2567e886d85accafb60e898618831d374b475be7941d538739a874f11c96ca8c16d5053a20c08351148ee5334ee703609201524732ff876b985f1"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "oS1LdJxh",
@@ -849,7 +889,8 @@
               "sha256": "7278c1e79e13102817a8beb7a342ca43949902550405b2cd87b00ecfc2eadeda",
               "sha512": "ceefcd6468135dd4a8100c35bb5583f302df9ea4563ae25f2c60126fb9c0b771b4304901f03284b792f339cf5a051188dfba74d9b6feccd47941b403c49f0f23"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "CjjJ4Y5V",
@@ -870,7 +911,8 @@
               "sha256": "fc37629af2726881a4308c1bf2e8be028c806b6610d3d1a868bc05be8ab56825",
               "sha512": "65364b5716dec558128dd3c7c379e8b9884deab59fb981b3bbd3e1a5cf9de77d65836cbcf5d9767bc64970ef1b62749da492984bada5d771cd894431251074f0"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "ssiog3u8",
@@ -889,7 +931,8 @@
               "sha256": "1d0f2ea4857804ea9bdd3f0b284ff4357871c958d2e4e40427211311878894c2",
               "sha512": "16c4a184383a156b1137e6e1ed8f114b90689854e90806d36bd3ba430cc523c880b36bd208534bff152ea051fb151a8b712154ec696a86e9aee28637e0cff979"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "hHwl9j4r",
@@ -908,7 +951,8 @@
               "sha256": "3713ce8838127b7b1719aae951d3500e276b1683098b7820d6fcea5fcc255eef",
               "sha512": "e2b919dee6b8faee6741505953b32e7dd2ae32730555da529aac079149f639279ac05d123d9ceed37d96a2451e86854fe77b9f9cf737e0ffb903f4911ed3b9a4"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "a9IE3zQy",
@@ -927,7 +971,8 @@
               "sha256": "e9fea91fd429119b5916ba1260965c8ac1272bf8664cdf4e333f2191ef7f3f6c",
               "sha512": "3d2906942e15cb8ca1ae3eb08d335aa8fdf837ab1d016385e792cc25d938d3441a38afea711358e689ef7a6b90dce026357afce06921d718cb58f772f3e5d097"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "mgYdVHWn",
@@ -946,7 +991,8 @@
               "sha256": "127a89487ed9d1da7a74476873c9d6d0d58da75adda8c20d8ab46e54543fad0b",
               "sha512": "7c400ec02fcd0d340e0314563ce0dc9a0c030068357ab583e62adfe8b4f097f2c204a59d03ea3f01da48effa7d47a3e7ce3c35e959dac5c0fbe10a7b20b5eb19"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "WiPt3Pqh",
@@ -965,7 +1011,8 @@
               "sha256": "1a54f4bc67d456a7e7522820a53893fa441f517866f91e4f0edbce69babdad9a",
               "sha512": "47e96ce3f67439ab9b1593f1646261449b9d2c8aed32247a4bf72ebb6aee64d82d45e066d3745677a85b7aecd3978ca36756d29be90c508f2312ec47e778f163"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "O4uyNQD2",
@@ -984,7 +1031,8 @@
               "sha256": "f819a9ac7e68325159284640de395590aac9c08b69f6c3675e67815146c5b8f9",
               "sha512": "c76ad10307610a89d6ffab593aa1cc7d317c4594ce5abdc29934f80c902699172148b15dc2221b6a30cf52ae91547c0169cdae26b8c8a623d9a74bdcdabada95"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "l1AXTUdE",
@@ -1006,7 +1054,8 @@
               "sha256": "c6fdbf2a0dda104d77d551bd907f48f9fd1204dcf76123108958661f21b90de0",
               "sha512": "a65f82aa40888da87e8f7c887c1aac307b27b912bfce776214e42e246977c140b70741c06037109b1bf149b5444bbd8a7504723ac2b6ebd3cb0d166f6bb3ea79"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "F77amHhu",
@@ -1027,7 +1076,8 @@
               "sha256": "fd34f29c0d160a37ad740e0611a54c84213581e726174a6072ce616f9b2dbc03",
               "sha512": "dcbe0106d0b32dbb02cc5fcaba451bb4c6587707cc636ad02b573f05d3921a59afab363a834e31018690d16b6c2ccf37ec02d41f5f54ae3d6218e5c68a10041b"
             }
-          ]
+          ],
+          "dependencies": []
         }
       ]
     },
@@ -1047,6 +1097,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "locked_dependencies": [],
       "evidence": {
         "baseline_with_mod": "Quick Skin's skin menu is open and intact. The complete player preview has a blue head, green torso, red right arm, purple left arm, gold right leg, and teal left leg. Each muted raised voxel cluster is rooted on and follows the matching body part; detached, floating, swapped, or splayed geometry is a failure. Transparent gaps keep every base part visible and voxel depth distinguishes the overlay from a flat recolour.",
         "apply_local_skin_with_mod": "The paired Quick Skin menu remains intact with the same blue head, green torso, red right arm, purple left arm, gold right leg, and teal left leg. Bright raised voxels must stay rooted on and aligned with their matching head, torso, arm, or leg and follow the same pose; detached, floating, swapped, or splayed clusters are a failure. Transparent gaps expose the intact base model and visible voxel depth distinguishes the outer layer from a flat recolour."
@@ -1087,7 +1138,8 @@
               "sha256": "9f76e7018eca0a20bb6c4f269d7192e14beba375f7fb9064425804d6fbdaab96",
               "sha512": "d27ba70fccd42bf73ccdc3fe080e9f17751a39afc41479d986e35660677b116393d3709413130541741869aaba77a60638eefe7f9588d37242c083ca1537014f"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "4oWvC9eo",
@@ -1106,7 +1158,8 @@
               "sha256": "2d35eff3e2642e8a6f7fb4cc7461211699ee2e32b9644e0d3b3bd6ba1574551c",
               "sha512": "87f06a52665d5eec7cf7d9dcd73a94ba9aa2d0f1651578d3852afab128e17836cff76e40aa5661915ba106910cef0104a00ef04883977af74de1acc02bcecc1d"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "IrL0IGkV",
@@ -1125,7 +1178,8 @@
               "sha256": "392dd2e967f2ff3c83bd5fe71e528a05dd6a5f01bf4f0027b8fbe88d5f68c95b",
               "sha512": "69b93264704afb767921a2566658b16d13a2ff8e1d1da5cd7a6c78484092e277a1b8a66e8ca542c11e04ca3708fb20e518d35a53964079a49882626ae9da6496"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "54WsU8I9",
@@ -1144,7 +1198,8 @@
               "sha256": "70623fa16307d466c403c89b0a6f0ee535089849db4d4834763605ec53006ab8",
               "sha512": "813b27ef7deb5d4aa9d1e758dc51c98926028169019413825bc13faea85957a3fe16ff33ef2964bfe3fad83c10219d9b3f05459ee98ba4728953826cedfb1a1f"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "xPYbAPfz",
@@ -1163,7 +1218,8 @@
               "sha256": "21724b7f676696f8d3716142406440adba9e63fc6519eeadc2b7ee8aae64c760",
               "sha512": "c017d098874697ba93a03c06cfb4fe8a8bbc619448bff55c3c821089b164677fae2c8c2059e99fc9933af6ff519759c399deae763b1ac9e34593cd6e4f427f3a"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "V0iLGkQC",
@@ -1182,7 +1238,8 @@
               "sha256": "04cb8a37869162f97dd317d019307156f916a5cb9cee7841cbabce20d6c97f50",
               "sha512": "535c6c0ee452d4a9e28c1bc0bd4bb37b20e25214ff3815dc91587b7c0c0c4f0e7e51cccbfda4544909e89978c3f4f8171510bef270b9368c3233ff41636aaa41"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "1dOHrdRl",
@@ -1201,7 +1258,8 @@
               "sha256": "e7a63a43bb0a8ab068595f3d35d4e94f456a6322cb54de710977530043545bb1",
               "sha512": "898bd0861a3cf789520615ddbed34aa73ecbb3a853bd4e20baa9226715c1ef9a48a4d414ce84140a79f22bb28f1a262f1a48c034c61c4a4af64e4dd6550d2ab0"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "y8NG47od",
@@ -1220,7 +1278,8 @@
               "sha256": "e4dfe578143475f5aabb7853c32ae49d4e05adbf0ca0eaf8815c0bd4251b5bc8",
               "sha512": "83c7731ef91318497b7c732d608f6ea723323e09747fac5871d09d44a358ecfa4bdab285c0caccfdd8a9936132e1879be3baa6761c1b8401a41719b04d774d82"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "Ysm7drOz",
@@ -1239,7 +1298,8 @@
               "sha256": "6a47933cd7989f4c1bed2f576f342bc7ef35df2ac4eba0b06e8b1fce23a825a4",
               "sha512": "2a0cc2aafb2e1db1b02b360c044d6fcb4022212faa1f428a47f9b6e37167573d55011f79a939de921c99cf7374e7c300fc779d084e240239b8f871f462b26f61"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "rSKGfWei",
@@ -1258,7 +1318,8 @@
               "sha256": "65a4565587ddf4019984c1486de387a29ef9248e3e31038d3725a36648021a4c",
               "sha512": "c2dc9596114c230bf4a632814eb603722b66143097b1c5299987f91f26fc2d191b6c8f12d4a4ff2c17f7afd37c06a2aaea75f1f3620cc6700172548b8c2f5207"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "BmoThdyv",
@@ -1277,7 +1338,8 @@
               "sha256": "92f60586472d14c1c08e3471a9625e5ea9290192045ae75475ee1aea135e1116",
               "sha512": "95070a0d11349b964b354e98fca8c656a65d525190402b158ab2ca6d47ded6d33fd5b0b6098cdab3288095a2cc01d571ca1de5ffc7a4e931ec9d40c8436f3f65"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "F7gPzIo2",
@@ -1296,7 +1358,8 @@
               "sha256": "65a83e0816da6b6af8cb297a8a2c202b2dda4026d452f63aad193fe490b45f54",
               "sha512": "f299f61aa630c48971c596c152e917219d7d70dd0ae3974c40308603dc5e158e5ed998a1e7bb9f33a1b9fac091b7a12847902c82b56c87a8586e796ba6866867"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "xP8HCRNR",
@@ -1315,7 +1378,8 @@
               "sha256": "275380d0bf44536481b05e65dca7fa5f32df3a254b0333c4d130d8874b48ed89",
               "sha512": "1db32fd713b91159fbd6b3ba91b3bfabade209fbfc5577da92b9953da1d233e4216884c3b719975669c6f76a0b312f9a82ba405fdbe213c9d13ac97b8d2ec91b"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "bOuG6glr",
@@ -1334,7 +1398,8 @@
               "sha256": "3f038cc5dd04155b901505d71439d54e381c9ed1daea1ec601e4cde2604c5ac8",
               "sha512": "d69ba96aa9a38e541f7ad0e2b759065c676e492fd3f257979b79fdef2d651ca8b225b8aa7b1b3be6879fb2cae2d64e14a2c647c05b538be44b42bb0334420671"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "nprDnVnJ",
@@ -1354,7 +1419,8 @@
               "sha256": "0222a76f6e1144344c16f6b77c52a2b6f8793c99aa28553eca5ab9bf14ea97a1",
               "sha512": "17974abddf9ff24e63cbba477dc4d705e941c273cd186def2288e1976402c2cffb3dc8cc766c985dfc48f5482b9b399e0c873aeee7c18367258de90c59adbf83"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "CsFEAQRd",
@@ -1374,7 +1440,8 @@
               "sha256": "2df0f28545e368ad885da5457311b1fc272c10cd338411feb418b574338ecd3f",
               "sha512": "0307b8002eb39edc3776cb403799b8ad64dedc8b680b18452747204f2a25b0463203ec3edb2bda5355f0526b4b259541d05c71295c0d93fe7432c241d7c0c486"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "m69E0MYU",
@@ -1394,7 +1461,8 @@
               "sha256": "fb7567056ee25ab531ca163a77d72869f804778d5771339b4b3e67306ed7af2f",
               "sha512": "2a261a965562ce2da59e539cfb75e2b820cd8da31ffc11690d8c63177512a64c940f75a9edbbc5e76851c3c7f347063f2bf0f4eedbc06d8e571bfe59a15ec094"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "duLoGgJT",
@@ -1413,7 +1481,8 @@
               "sha256": "ca9e54da134bfbe627a0d99e792e728f05e03c0a5ed4e5055e55b6807b630147",
               "sha512": "729cc1027589edaef331cdd13ef9c6567f3b2af8e5e9ea45bd437232bd5f6d065e6dd63c3f21cb818f76080998381e2ae8ccdde86a1fe37f7539eecadfc589f0"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "t2Dv6hrI",
@@ -1432,7 +1501,8 @@
               "sha256": "c9e6fd11dcb8940fde52169d637d43cc8c1dc7314ba6043c76a2b9a599a290c7",
               "sha512": "10a5e06d2a5a2b51db69850c772ba30e65d4307d02f4202367bab1245ba5aa893b3d45e3e1fef336c13e98c558e5dd48f777b83cb62802b1c347670e5f54225b"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "RZCF8mHr",
@@ -1451,7 +1521,8 @@
               "sha256": "04e1ffe164083cd9bf0456b333def1e9689d435b95dcea6d02b25539bb20daa8",
               "sha512": "94c93591e107f65c2e1a24e1585a5318518a1c62a6004830a632a4f54a04326343a5e2a3a615266b26d7ef0b138ced329b5d400aca285de5f0d8bdb6719a19b0"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "Uv7uC5kA",
@@ -1470,7 +1541,8 @@
               "sha256": "5c21e7f2b738742754bde3ef2412ad131e2122dd3c08636f161cf845fbe79238",
               "sha512": "1ee97cf138f9f345ad0c4ae2e336a11203025f6c8cabfa3e573e38a94ea3c3d4880da895cceac77bf52f0846b171644a33008497b8b9e78adf517fd7d2952869"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "DIR22jMD",
@@ -1489,7 +1561,8 @@
               "sha256": "089cd4a3c6aa137b47c21e22a25e6826a5c9699974a35b9b91270159b32c9f17",
               "sha512": "eee6612c35d54d348b08abdf502c686a58d89294cf04396148c66913d9add4ad2f9f9a0a2690f493eceb40dca3e320ed73ba7ae14573bfacd3a4a28e88af9c19"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "Ciqg3o2M",
@@ -1508,7 +1581,8 @@
               "sha256": "46a431519a526e0979a791159d5351ab5863a2e8e2cb510b749ede9ec5f427e3",
               "sha512": "600192826a60e3481441bda0778c774e8841b9fe7a6b968554b1789117600596f4cd434fb7cb1a5e037a31a54772047136549e676c41abec2b1ffc62fd521f9d"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "mCm2VAnN",
@@ -1527,7 +1601,8 @@
               "sha256": "1138b36d7a60ee0427bfab17cf2cd6a71f3ca620b36ec09ec6e7df235569efab",
               "sha512": "4319a1dea4a1e5d99c65ac57f20404e878edd9fbca03a758468fcc32de7c0a5d088e6a0809c17896fbfb2aa40318c6c3b691eba33ce90178a2e32b0d9f1517a5"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "3kCdl1bI",
@@ -1546,7 +1621,8 @@
               "sha256": "31243ee08b76b3dab71d7761963f317125c536f6b8984795e7b02811b4f80e97",
               "sha512": "d8911912a7935e8578c488b35711beaaf28127778a8ce120d77406c3636071b9b16813f4c467ee64fadda3104ae822711af237c1742005fce2d3defbb801f884"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "2utRsDcM",
@@ -1565,7 +1641,8 @@
               "sha256": "4ef77e36904e5be8f6b43a66629e5097f5f2384f93809235c64dbc0ca1b9977e",
               "sha512": "3c0d12ce9e17c024e5c6a7543b20394cfcfd2da601ec24426988290dacfd21523673b4ff621981594d265d9b5bbc3058d9ac6fbbd49308e551c05b3ba92e8304"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "yGhuC8Hx",
@@ -1586,7 +1663,8 @@
               "sha256": "8443efa729b276431052b135b75c5abc418b864b0a547e69d2902e1e0420b9ff",
               "sha512": "e3158aac16887ba643e175af097a1f050be01b245d34da3beecea6a22586794ccfa8e0fe14e4b5760a333f1f524bd29e9cf9cecdfa9f70498d13e561aedc48f5"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "IEzXSo3w",
@@ -1605,7 +1683,8 @@
               "sha256": "da55a664fb6c2b5aae0b7a01bba5de4238e226b7b6603c079b3a3932e2c7b577",
               "sha512": "d9768ed874d9358ce8f5eaba59b2cc5855ee4e496fe569eee653f5e9b1032550299c3b3c112a7b33a08266603619ed4882a3f3aee066102a0db37796214824ec"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "rJYtiDew",
@@ -1624,7 +1703,8 @@
               "sha256": "3b553acd510f3395b00ca1c26b5bb2e990c420a415350aec84d0f4255f3ca0a5",
               "sha512": "ead4a257e5ec2b092db84aebc7f5146dfb667a01f5d1362485f9ea9835e4558172949bcfb40c7a0bfbfb36e6c746b96c580f855af4109c806e0fc3591d48ad80"
             }
-          ]
+          ],
+          "dependencies": []
         }
       ]
     },
@@ -1644,6 +1724,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "locked_dependencies": [],
       "evidence": {
         "baseline_with_mod": "A stable world view shows a real server-owned CustomNPCs entity with its visible mod-owned nameplate and standard Steve display skin standing near the complete local player. Both entities render cleanly, and the local player still has its untouched UUID-selected vanilla default skin.",
         "apply_local_skin_with_mod": "The paired world view retains the same real CustomNPCs entity and visible mod-owned nameplate beside the complete local player. The NPC has visibly changed to CustomNPCs' fire-themed Steve skin through its public display API, while the player now wears Quick Skin's dark charcoal-and-gray plaid skin with brown hands. Neither entity may disappear, inherit the other's texture, or show corrupted geometry."
@@ -1675,7 +1756,8 @@
               "sha256": "47052671cdaf2fdf4d640aae25bb16a0745a222f2b5455b40346a7523627d5db",
               "sha512": "147a902600e9329d2e0fe4d3cce0d8b745e31114b83fff00440c6964e2f6f8a431e53ca87f9a6bdb2a0a5d56adadab64402161be0f07597338adeb188dda70fd"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "CaWlRoYD",
@@ -1694,7 +1776,8 @@
               "sha256": "3756bed8a2b8b2a45fd8ba8aab2be54b0ea3d2e258819426f65e00a5f83ef4d9",
               "sha512": "0b54411d98f903e0d01094634b0e79d6bddec146a70addf40656c254bcf1c7e7aa920bf31012061212d87d23e7ed3e9954623e4992b88b4c35ef18196102c4af"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "5vYVgtPS",
@@ -1713,7 +1796,8 @@
               "sha256": "b40f5a9e88789444d223c715853ae24c379cb7e13f26e84143ba6c6f8667f5a0",
               "sha512": "37da644b61726b1eefa3efb7bf2a57e7fcdae6d633f4e1af6bdb2b914dde0cd126926afa9ba6e3f5b60bf84de684677ff80bac2e8310998ebe80027f696b92a9"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "5gdSEvLv",
@@ -1732,7 +1816,8 @@
               "sha256": "06edf28bb7b1887fa67eef6b3fa5db7a969bbbd4647cfe3db8838c68b11a3211",
               "sha512": "b310a567d938480ed82b285da26e8b5e6925b2450fbcb4fb2ce4bc654465b4f2bee953bfcb32ac0a8e5a0b626bbe2ac13d89c10e59d3d04b8ef996465c78a8bf"
             }
-          ]
+          ],
+          "dependencies": []
         }
       ]
     },
@@ -1752,6 +1837,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "locked_dependencies": [],
       "evidence": {
         "baseline_with_mod": "Essential's title screen is intact and owns its player-model layout. Exactly one Quick Skin multi-skin action icon sits immediately to the left of the bottom Account button in Essential's right-hand action rail, and no duplicate Quick Skin PlayerWidget overlaps the Essential model or menu controls. Essential's own Wardrobe button, the small shirt control below its player model, and any Minecraft-owned center icon row are expected controls, not duplicate Quick Skin actions.",
         "apply_local_skin_with_mod": "The paired Essential-owned title screen remains intact with exactly one Quick Skin multi-skin action icon immediately to the left of the bottom Account button in Essential's right-hand action rail and no duplicate Quick Skin player preview. Essential's own Wardrobe button, model-column shirt control, and any Minecraft-owned center icon row remain separate expected controls. Essential's visible player model now retains Quick Skin's selected dark charcoal-and-gray plaid skin with brown skin details."
@@ -1783,7 +1869,8 @@
               "sha256": "aaff8dd92fffbda794848a9cdd35e1468bebd47ba6a221d22dbc4b53441b951d",
               "sha512": "2ff3248e424dbac255fdf0d458b23bb985b5dbc203a557202138b2ded04b40a4f87222c7605046fae7e0dd4c39c054304cecc89d5a7699cc62a7103c902d12dd"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "QSyGZndT",
@@ -1802,7 +1889,8 @@
               "sha256": "7482310b7e677f34ca8747ddfee0d67428e6036ea258967f296e766cf897e12e",
               "sha512": "0c0dcf4676a715932b4b522eeac0f399321919db2f6f56055e90e6b1cf1dc2254f4c4164b8fb962abc4344ff0e6328a4d6ee7081fccdee29ef380598836a164b"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "ydYSCHsU",
@@ -1821,7 +1909,8 @@
               "sha256": "28f43ee3bf2f66ec4a416fb7104f47e6f307f02e6175eac6dceef6bbaaf01183",
               "sha512": "523fbc7fb04ac8f286449feedaaaa9697dd9eaf2832fb42a9d7eb182b62bf2a33a2c7f9fe20bf20ebfef2ac29d5ed2e4db5c7238cfdabb80da87a21e124bbc50"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "cr5OqtFT",
@@ -1840,7 +1929,8 @@
               "sha256": "9b4715fcff6765d40a75df70c9065a0bd70d60bd995b0d650d903b43666eb336",
               "sha512": "5df321a48a1c76f03dac38d4390bfd7a9546e74cf33f29205565fb955e5767e02042864c1c010dced1af71bbe2ab52c41b97d1adeaf19b4a365f515357f03166"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "NbXyFjGP",
@@ -1859,7 +1949,8 @@
               "sha256": "1f68a3d5050078e440408be21bb968be843e42631dee1d770201ccd435379589",
               "sha512": "bef6c28584632783b204b38bc5d9cb594e5f5b0c59cd3a08c92fc8ebbb5f542cef310717c368149305a29271b4f269eb82dd50ef9ed00cc66f37e6866958fa38"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "C3sjIP14",
@@ -1879,7 +1970,8 @@
               "sha256": "c7bf6c8f7f0b5c83fd207a2172e0af33028f87c12d58f78fc910cbfb859579fb",
               "sha512": "cf388cd1af5381799a3a149373ab1c332a5e31d6899034fb7e4dca05f742405766facdb0953b1daeed479dfc60e8e3b3d9f8cab1762a116ad9988ffcc0ec4ad9"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "vxywePlv",
@@ -1898,7 +1990,8 @@
               "sha256": "ce80507984415a04cda9164a8dbb93786d8b35388ce443e8c74046a2952522e0",
               "sha512": "e7ab5fe9993a9d14f31258c627f27417cd3c186328825c88833ca776ecf518d347951776c64e9ccc82df785bf13d8d1e140ec4346f76774f2220cbfaf20d223b"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "9N2M57az",
@@ -1917,7 +2010,8 @@
               "sha256": "bef9092ed1a01fa5e22171337d6cf9428a6de22c7c6cadbef9ab50d1a370a905",
               "sha512": "656a534b64aa5ea735a9b40579b06b1219ed9d19d9b48cb62b52691dc05590d6d96f3cc98d358d815e015facaf65740105051428d41d9a5993c4eeb07ba986f8"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "RAPMKLqO",
@@ -1936,7 +2030,8 @@
               "sha256": "4fe379a4c4bb0f57e538a38a1eecff6803724a52cc54f2f3f674a3de31afedfa",
               "sha512": "94f4e4e5c1fe79f03fd7127deee1ae7c6219ae899fbd13eed75c6f38b5f831d3a509b90f8d4eec226161653fd4339165f0f2cdf04cb915c23fcfacf8ec0f9190"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "aXNnlCFI",
@@ -1955,7 +2050,8 @@
               "sha256": "b3567a75cfbf25be2d161d326cabbc4bd2cb5acd4673ffd6afa3e079887020c9",
               "sha512": "dae48ae5939cecfd2f79fe514f32419ee69e1546848709e791dba204ad8b637204be1cbbea5def3be75e365ba3f973db7b7e2731ec8be0d8cd781dd2c28cd64f"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "SPYAULE0",
@@ -1974,7 +2070,8 @@
               "sha256": "1f9717766011f3280fd82a57c25416f5971b79ea35232af21c8fdd7ff5243d59",
               "sha512": "c3e9c7134546595576e7ce4eb1305c4547d7e6b68eb6a09210ca27113470e7b60920afb644522da952b7a69b3e9407b9a28dab4dc3549fa1ad5ff5524e7dbe43"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "cY9fpUuv",
@@ -1993,7 +2090,8 @@
               "sha256": "b4c5bd42701936c8a1dabceb5249ac85ec744f2883a809188cb5e4636ed0bbc4",
               "sha512": "bc0621f71f15ad707489a09cec6f5bfce9aab3e6871eb8bb1e4c4fd56bc637f402f3c2456633f21762f58284ae3c2b02fbb85e08720984f8666bead6fcd9187a"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "ok3wXI52",
@@ -2012,7 +2110,8 @@
               "sha256": "7d7f1a2ec8c77bda1d99de87614659f99f9765686f538628177144ae849b37bd",
               "sha512": "39aef7b1334e71f485f3a4bbdd30df4a217c579dab3e18651b921670a899a711916a6dfd37658f5365db68432f23d10800347af029cc36971782682ccf990920"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "JC27FEJa",
@@ -2031,7 +2130,8 @@
               "sha256": "44cecf20b8c392084b1e0ddb4d3e0c1f271af3aa04d4ef22e18c0fe217467a03",
               "sha512": "78124c1b69d9b4dff424bc9031cf1dc866d0d3a32070ba69270dd6b5043758c026f62ff9d051593151fba49655ea3065de0819bf5ecc113c881ffa26ecb9d9b0"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "BhxQYGdJ",
@@ -2050,7 +2150,8 @@
               "sha256": "b3ee2c32d21455a82246d52412e62f84a7d0caabab586b3a3ce1552397997993",
               "sha512": "1dc5ba0e81576ed80b10d6f262f997025a730f53c9c76a754a2edcdb35f21a956ee44bb88132bac6a46448e01ef69db0526331f0459131b8016fd17c83bb14ee"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "EdpHP2QA",
@@ -2070,7 +2171,8 @@
               "sha256": "d80bbfcff23599aa475920ca776ab7d69046fecacb8040b33e361c96c1f6bef7",
               "sha512": "01a46974ce8ca28aac22bdac991c24a6ed8839894de811a0197b14b4f9c58f61f0275a5d2b9e74827d50f779475299fd59480ba25fd7cb807abd1e0f0dc77b64"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "lmxGs4Ph",
@@ -2090,7 +2192,8 @@
               "sha256": "1ee8a0be70314c5c60e66f81ee2b94ff78b7b710d48743cf5b9fc2d604c25148",
               "sha512": "56add71fc994c1239358841f87638c468fd38d436315aedeb4d0a672ca9952f5b6a369ced7f0f14947c1f31712c93d8c4a469d22a45da033da3aee0f46b17493"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "zMMgCyVc",
@@ -2110,7 +2213,8 @@
               "sha256": "5af691b3e03e31b7cc193a4399392655376e2770f8cddfd0d15bdbc871d28f3e",
               "sha512": "e66f3ad70e9e8b0798083f817a276db967ed181a3f156ef9456460c4ff6cd82afbcdadfb86735a53e355082530dda93bf28223bac764527a7639e66d22aa9c67"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "e7YYM7yT",
@@ -2130,7 +2234,8 @@
               "sha256": "34b871b228a97764ecdd9612a036315a74207aa747bee86422a38fc707c2772c",
               "sha512": "02c4d00055ee6e87e8ad86ae52dc01e31bea12dde1461da8e64e177ed63395fded529cb26a84a91c034f325c3a553a845f0e08e252580a4db1b27f8f7312742a"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "x9zzI2c8",
@@ -2149,7 +2254,8 @@
               "sha256": "67995df4f60a5910868ab8e7e057f62659639ca8e1135bfc5d735b28ee6f0364",
               "sha512": "9877af2c9e8844dd709b8652ac1e8572ba473718f2cf9b63138642cc4ba1bb1c3c881486c156f38d46e185701924cd53953c5aa8781cc045dd0293628a669e9c"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "bB2cTcpq",
@@ -2170,7 +2276,8 @@
               "sha256": "36a8263400323d11c5a849fc36617b365a863113672269d653f8cb7293144227",
               "sha512": "68c507561d06f52d10c07560f287a4b0aa49c519fa7db69c67baa9f8fc9052ca5901fcc7755e9f25a60bdda02be30cea10e9c49d1f24f4fe9e602d5ff452f26c"
             }
-          ]
+          ],
+          "dependencies": []
         },
         {
           "version_id": "F6WKM1HY",
@@ -2189,7 +2296,8 @@
               "sha256": "314d97a4dc869667c9260ab900d5302162ebe3f15e0e90ddbfbe46240e13db57",
               "sha512": "65859309671b7c750d90f841477bfcea0e1461bd5b0e0ab280fc90cda0a89b6977b5ad83c479f6145519185a5a9578d0bb10ef97b197209a708c1cfbbade87da"
             }
-          ]
+          ],
+          "dependencies": []
         }
       ]
     },
@@ -2207,6 +2315,7 @@
       "provided_dependencies": [
         "P7dR8mSH"
       ],
+      "locked_dependencies": [],
       "evidence": {
         "baseline_with_mod": "A stable rear third-person multiplayer view shows the complete player wearing Quick Skin's dark charcoal-and-gray plaid skin while ReplayMod's recording indicator is visibly active. The world, player texture, and recording overlay are intact.",
         "apply_local_skin_with_mod": "ReplayMod playback is visibly open with its replay timeline or playback controls and a stable third-person view of the recorded player wearing the same Quick Skin plaid skin. The recorded player renders normally while runtime evidence confirms CameraEntity mode, recorded-player targeting, and interception of a recorded Quick Skin payload."
@@ -2239,6 +2348,1317 @@
               "size": 14739015,
               "sha256": "a46491d73456187ac888d31f6cc1160e42304427a63da88874c84abeb4d14033",
               "sha512": "dc255bf916acca75c4bbf1df0ad45a944bbbf014c0246082c31df56d4fa8425d6ddecf1f6c4cf81c4588c494a6da36436e639b989def9c02d1a80d58a39db66f"
+            }
+          ],
+          "dependencies": []
+        }
+      ]
+    },
+    {
+      "id": "fancymenu",
+      "name": "FancyMenu",
+      "project_id": "Wq5SjeWM",
+      "install_on": "client",
+      "loaders": [
+        "fabric",
+        "forge",
+        "neoforge"
+      ],
+      "allowed_version_types": [
+        "release"
+      ],
+      "provided_dependencies": [
+        "P7dR8mSH"
+      ],
+      "locked_dependencies": [
+        {
+          "project_id": "J81TRJWm",
+          "name": "Konkrete"
+        },
+        {
+          "project_id": "CVT4pFB2",
+          "name": "Melody"
+        }
+      ],
+      "evidence": {
+        "baseline_with_mod": "Minecraft's title screen with FancyMenu installed. A FancyMenu layout hides Quick Skin's player preview: no player model is drawn right of the main menu buttons, and the small rotate button and the > animation toggle that otherwise sit directly above Quick Skin's Change Skin button are gone with it. The Change Skin button itself stays visible right of Quit Game. The rest of the title screen (logo, splash text, menu buttons, panorama) is intact and nothing overlaps.",
+        "apply_local_skin_with_mod": "Minecraft's pause menu over the dimmed world with FancyMenu installed. A FancyMenu layout moves Quick Skin's player preview to the left edge of the screen and enlarges it: one complete player model, clearly taller than the default preview, stands left of the pause buttons wearing Quick Skin's dark charcoal-and-gray plaid skin with brown hands, and it does not cover any pause button. Quick Skin's small rotate button is shown again directly above its Change Skin button right of the pause buttons. The player standing in the dimmed world behind the menu is the in-world third-person view, not a second preview."
+      },
+      "review_regions": {
+        "baseline_with_mod": [[0.68, 0.2, 0.87, 0.68]],
+        "apply_local_skin_with_mod": [[0.03, 0.1, 0.3, 0.87], [0.66, 0.5, 0.83, 0.65]]
+      },
+      "reference_captures": {
+        "baseline_with_mod": "full.client_a.title_screen_splash_order",
+        "apply_local_skin_with_mod": "session.client_a.pause_menu_preview"
+      },
+      "additional_execution_profiles": [],
+      "multiplayer": null,
+      "excluded_lanes": [
+        {
+          "runtime_version": "1.21.1",
+          "loader": "fabric",
+          "reason": "FancyMenu 3.9.14 for Minecraft 1.21.1 on Fabric requires Fabric Loader 0.16.10 or newer - the release matrix pins 0.16.9"
+        },
+        {
+          "runtime_version": "1.21.5",
+          "loader": "fabric",
+          "reason": "FancyMenu 3.5.1 for Minecraft 1.21.5 on Fabric requires Fabric Loader 0.16.13 or newer - the release matrix pins 0.16.10"
+        },
+        {
+          "runtime_version": "1.21.7",
+          "loader": "fabric",
+          "reason": "FancyMenu 3.6.4 for Minecraft 1.21.7 on Fabric requires Fabric API 0.128.2 or newer - the release matrix pins 0.128.1+1.21.7"
+        },
+        {
+          "runtime_version": "1.21.8",
+          "loader": "fabric",
+          "reason": "FancyMenu 3.7.1 for Minecraft 1.21.8 on Fabric requires Fabric Loader 0.17.2 and Fabric API 0.132.0 or newer - the release matrix pins 0.16.14 and 0.129.0+1.21.8"
+        },
+        {
+          "runtime_version": "26.1.2",
+          "loader": "fabric",
+          "reason": "FancyMenu 3.9.14 for Minecraft 26.1.2 on Fabric requires Fabric API 0.155.2 or newer - the release matrix pins 0.151.0+26.1.2"
+        },
+        {
+          "runtime_version": "26.1.2",
+          "loader": "neoforge",
+          "reason": "FancyMenu 3.9.14 for Minecraft 26.1.2 on NeoForge requires NeoForge 26.1.2.78 or newer - the release matrix pins 26.1.2.76"
+        },
+        {
+          "runtime_version": "26.2",
+          "loader": "fabric",
+          "reason": "FancyMenu 3.9.14 for Minecraft 26.2 on Fabric requires Fabric API 0.153.0 or newer - the release matrix pins 0.152.2+26.2"
+        },
+        {
+          "runtime_version": "26.3",
+          "loader": "fabric",
+          "reason": "FancyMenu 3.9.14 for Minecraft 26.3 on Fabric requires Fabric API 0.161.0 or newer - the release matrix pins 0.160.6+26.3"
+        },
+        {
+          "runtime_version": "26.3",
+          "loader": "neoforge",
+          "reason": "FancyMenu 3.9.14 for Minecraft 26.3 on NeoForge requires NeoForge 26.3.0.6-beta or newer and Konkrete and Melody require 26.3.0.4-beta - the release matrix pins 26.3.0.3-beta"
+        }
+      ],
+      "supported_game_versions": null,
+      "artifacts": [
+        {
+          "version_id": "ywyEnvpm",
+          "version_number": "3.9.14-1.20.1-fabric",
+          "version_type": "release",
+          "published_at": "2026-09-28T19:46:35.682442Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_fabric_3.9.14_MC_1.20.1.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/ywyEnvpm/fancymenu_fabric_3.9.14_MC_1.20.1.jar",
+              "size": 26225066,
+              "sha256": "24e6bf2904252ae567419e3d9b83f08276e5be9eee0a48ab0a785ba2d07a5026",
+              "sha512": "202a628c2647c317b2572b862bac7519d87030fdf5d002211ba658cfb01f87b38c0d905befcb198514ee4d0cbe2a7b210f20233d1d18ae86909c726ad36a2a37"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "RlBGFlWp",
+              "version_number": "1.8.1-1.20.1-fabric",
+              "version_type": "release",
+              "published_at": "2024-02-28T06:57:12.187781Z",
+              "files": [
+                {
+                  "filename": "konkrete_fabric_1.8.1_MC_1.20.1.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/RlBGFlWp/konkrete_fabric_1.8.1_MC_1.20.1.jar",
+                  "size": 892067,
+                  "sha256": "f87fc3ab29a8df63a5214fdfa58d2f9fa645255af64d38ba598a9f56fafccdb6",
+                  "sha512": "ca65343bd3b063f3e0f68cc1d40da1969cf07ca038670f22a2bac91c2f34162f2c455ceb309680d57da13267ffc99fc7f8d40bb9451e93ff56ab2a688c0e3a45"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "2o0oW8Yv",
+              "version_number": "1.0.4-1.20.1-1.20.4-fabric",
+              "version_type": "release",
+              "published_at": "2024-02-27T04:49:07.808485Z",
+              "files": [
+                {
+                  "filename": "melody_fabric_1.0.4_MC_1.20.1-1.20.4.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/2o0oW8Yv/melody_fabric_1.0.4_MC_1.20.1-1.20.4.jar",
+                  "size": 39696,
+                  "sha256": "3f7f5bab77a01a26af4702a70af5a7fd0a6f04f4fde51a4180113790e0c9e1e7",
+                  "sha512": "3d3379e07eae001860aa71379abe310cda6642965cd55a8d274dacef1b63d8c85fd0663abeec2d247ac1a631bd08b12dace8758f4a035d344e27db5edfe581c5"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "2mNmkn9s",
+          "version_number": "3.9.14-1.20.1-forge",
+          "version_type": "release",
+          "published_at": "2026-09-28T19:46:48.577050Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_forge_3.9.14_MC_1.20.1.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/2mNmkn9s/fancymenu_forge_3.9.14_MC_1.20.1.jar",
+              "size": 26191988,
+              "sha256": "2d14bc9b0cb32e5e3f2f9661add8a78762f2b29df3fbb6db7412675786e76f16",
+              "sha512": "8adae8debaad30910495b492a447cc7b46e841bda4fe0481ca80609d38ee55b0805227abb088af8c6b180ae42695f96c6633cb2443f322925983462fe2ace6fa"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "skYziQQL",
+              "version_number": "1.8.0-1.20-1.20.1-forge",
+              "version_type": "release",
+              "published_at": "2024-01-13T03:30:28.707265Z",
+              "files": [
+                {
+                  "filename": "konkrete_forge_1.8.0_MC_1.20-1.20.1.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/skYziQQL/konkrete_forge_1.8.0_MC_1.20-1.20.1.jar",
+                  "size": 625185,
+                  "sha256": "e78686b92c3761ec26eb9d3c53efdd3d6ca77981cbd3723995e1163b7103ae0b",
+                  "sha512": "df79a0c64da14ca2b27dc04a72d85ce5c8e7c498e7b72da4d7bfddd592bb4bac165e70afe33fac97446e4996fffd8003350df07ede2a77233dddec77b8ff0ee7"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "lJlW5r8R",
+              "version_number": "1.0.3-1.20.1-1.20.4-forge",
+              "version_type": "release",
+              "published_at": "2024-02-15T10:46:09.435735Z",
+              "files": [
+                {
+                  "filename": "melody_forge_1.0.3_MC_1.20.1-1.20.4.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/lJlW5r8R/melody_forge_1.0.3_MC_1.20.1-1.20.4.jar",
+                  "size": 37178,
+                  "sha256": "933e2a7e79c4594f965f7f7d00b1f28a98ec2a180ad8f9f90310a266fe5cf5d8",
+                  "sha512": "43c60d0cb98b1642d663e3cea68d50c01e9be82361851bf40c5c869e6593499aaf4b410d891d07a083f3c4b2df7fc06b2f8fbaa3c661a5061d46e250c017d30f"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "Qx3MRra0",
+          "version_number": "3.7.0-1.21.1-forge",
+          "version_type": "release",
+          "published_at": "2025-08-23T14:56:56.858220Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_forge_3.7.0_MC_1.21.1.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/Qx3MRra0/fancymenu_forge_3.7.0_MC_1.21.1.jar",
+              "size": 3593137,
+              "sha256": "2b3120e52354e84a0ab8ffa391e5b0c145838039b62b0d72b3c85094fde9b7bb",
+              "sha512": "c8f39ab119b9f1df710fe99f9f873a8eeac6f335711aa602ba3c8fdb022dab2deab48751085c4d031a1db339a5aa502d3592001cf3e221bad52a5799b64d3202"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "7AWKhwaU",
+              "version_number": "1.9.9-1.21-forge",
+              "version_type": "release",
+              "published_at": "2024-06-15T08:10:45.779400Z",
+              "files": [
+                {
+                  "filename": "konkrete_forge_1.9.9_MC_1.21.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/7AWKhwaU/konkrete_forge_1.9.9_MC_1.21.jar",
+                  "size": 772587,
+                  "sha256": "ca993ab4fe189ee93871a18100d5e05ee7d6189ca0b6952f4c50b992b3d6f718",
+                  "sha512": "cd8ee8f7bd12e744aa4fc754d0e58fecd2d0297cdf744a9f458caae830132a416930a2af3248e71063c6d5d51509739900798d70e7b299344b8060bd769b8015"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "dhnytTnF",
+              "version_number": "1.0.10-1.21-forge",
+              "version_type": "release",
+              "published_at": "2024-06-15T08:12:07.484406Z",
+              "files": [
+                {
+                  "filename": "melody_forge_1.0.10_MC_1.21.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/dhnytTnF/melody_forge_1.0.10_MC_1.21.jar",
+                  "size": 189827,
+                  "sha256": "70aaf80d2b3d5432a5111e18c2fef6b1765d0573766565c380b49e2d65457abf",
+                  "sha512": "ba52437f489662a2847b855b4267ce5a2040808e2efeccf58195566b33bbd360de1342dac4153b401c200e4c740f090f7cb8d988a3334b67f10db21f196f866e"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "P9dDosz2",
+          "version_number": "3.9.14-1.21.1-neoforge",
+          "version_type": "release",
+          "published_at": "2026-09-28T19:48:07.442956Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.9.14_MC_1.21.1.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/P9dDosz2/fancymenu_neoforge_3.9.14_MC_1.21.1.jar",
+              "size": 25922080,
+              "sha256": "92f74ef89381ea1f74e1145feab6db4ce4638804b1fb43622302d0a647fc0a66",
+              "sha512": "57ea23ab4424217770025a9447f3990fa39befdb51ac99d7e6bcde4bf7d926b125ceed824f38e7cf504e389bc0d30edb3a7592b47d4763516c9cb0ef4ab2a9c3"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "stJDU839",
+              "version_number": "1.9.9-1.21-neoforge",
+              "version_type": "release",
+              "published_at": "2024-06-21T07:53:31.825561Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.9.9_MC_1.21.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/stJDU839/konkrete_neoforge_1.9.9_MC_1.21.jar",
+                  "size": 618842,
+                  "sha256": "791c5538751dd3015ef3a2ce92d98719e1a28a48ebbd817b78506771256654cd",
+                  "sha512": "378bd12e3c32329abbae5cd514e1d1cc2a3cc3a45979fedb1d4e4c0a6732bdcf4b7d1bf7f7a112074bf288957edf86152c9c090a27d1d5de84a9a7825d3d6511"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "efcdRVZP",
+              "version_number": "1.0.10-1.21-neoforge",
+              "version_type": "release",
+              "published_at": "2024-06-21T07:53:02.575299Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.10_MC_1.21.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/efcdRVZP/melody_neoforge_1.0.10_MC_1.21.jar",
+                  "size": 36096,
+                  "sha256": "6b973a4564703c531fc0eae09db08b07a38091e0a743c687b8d2049457e84871",
+                  "sha512": "3bd96b851a65fa95d92d051851e6a7a415927f718fcb05f0dfb5983eb3ca54edfb842ea85f1497e1b3510b5884181b8f9c6080d2b15642ceadac695011c00ec1"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "rRtRRSD0",
+          "version_number": "3.7.1-1.21.4-fabric",
+          "version_type": "release",
+          "published_at": "2025-08-31T20:19:23.896581Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_fabric_3.7.1_MC_1.21.4.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/rRtRRSD0/fancymenu_fabric_3.7.1_MC_1.21.4.jar",
+              "size": 3890365,
+              "sha256": "ca55be5f4c76fa2cbce8fd511b971e8b4fc46139ac60d8c67be3e61f344ae2fe",
+              "sha512": "3f546c35a257ecc98bcf0be5b16277dc718c580445d2681096fb98bf60fae9f4ece266fe843753ff57f25c5fc18eb60b111a07771c827c93fa3b7b007a9721c8"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "9I475ADm",
+              "version_number": "1.9.9-1.21.4-fabric",
+              "version_type": "release",
+              "published_at": "2024-12-09T16:50:32.510410Z",
+              "files": [
+                {
+                  "filename": "konkrete_fabric_1.9.9_MC_1.21.4.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/9I475ADm/konkrete_fabric_1.9.9_MC_1.21.4.jar",
+                  "size": 787890,
+                  "sha256": "d7fca9ddf8ce46cfffbca3c5d366f67e0f3350d1c5ea00b32a4146548522743d",
+                  "sha512": "56e7ef35274af38ee6f83ffd196a7ebe84d2cf747f3638bbbcf79f28c435ce7ebe4869a345c1352a727c20a4cc336e27b595f549fd850b781d2c22dfffc43934"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "OqxSeb4n",
+              "version_number": "1.0.10-1.21-fabric",
+              "version_type": "release",
+              "published_at": "2024-06-15T08:11:26.157766Z",
+              "files": [
+                {
+                  "filename": "melody_fabric_1.0.10_MC_1.21.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/OqxSeb4n/melody_fabric_1.0.10_MC_1.21.jar",
+                  "size": 188035,
+                  "sha256": "223ab859b9cc246d8d6e5cec5e734f97be3aac545de6cda7743750262428ed83",
+                  "sha512": "a7e13e66d3d406b26ee7e5394ae84653d1b9a4f1e4151a2f925fb07869576d6a3b419ba5702bd1ff5bad91054a66f5071720e17f85e1579e8e4f83664bc3dc5e"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "8Jq0Trp6",
+          "version_number": "3.7.1-1.21.4-forge",
+          "version_type": "release",
+          "published_at": "2025-08-31T20:20:31.056589Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_forge_3.7.1_MC_1.21.4.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/8Jq0Trp6/fancymenu_forge_3.7.1_MC_1.21.4.jar",
+              "size": 3622459,
+              "sha256": "3bf8c0e2ea9b39f7e376180bab804d0c66401d82207ec1edf470004783405a07",
+              "sha512": "b94e820de9a43d9921f0bb080c26f3d2e94d2fc7f4673e878e04080aa823a47fe1704c2bad06e2693a2d66690611d0c759d9334e2487b1b0d8ec405430ad72da"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "c0wZm04t",
+              "version_number": "1.9.10-1.21.4-forge",
+              "version_type": "release",
+              "published_at": "2024-12-15T18:38:51.922956Z",
+              "files": [
+                {
+                  "filename": "konkrete_forge_1.9.10_MC_1.21.4.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/c0wZm04t/konkrete_forge_1.9.10_MC_1.21.4.jar",
+                  "size": 773897,
+                  "sha256": "a7a781478c6762b9e13852c81fb92c13c1395ef39720ff7a79e7d62a011d1fdd",
+                  "sha512": "c3a90afa730bb2ce85275ccdef4a3dd0c143d55cbbb32124ec17cd0de535e3cf8d4012e014aa75e918715d688c79e9d20a1ff48af7119a1c27c3b0bd0247c509"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "dhnytTnF",
+              "version_number": "1.0.10-1.21-forge",
+              "version_type": "release",
+              "published_at": "2024-06-15T08:12:07.484406Z",
+              "files": [
+                {
+                  "filename": "melody_forge_1.0.10_MC_1.21.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/dhnytTnF/melody_forge_1.0.10_MC_1.21.jar",
+                  "size": 189827,
+                  "sha256": "70aaf80d2b3d5432a5111e18c2fef6b1765d0573766565c380b49e2d65457abf",
+                  "sha512": "ba52437f489662a2847b855b4267ce5a2040808e2efeccf58195566b33bbd360de1342dac4153b401c200e4c740f090f7cb8d988a3334b67f10db21f196f866e"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "C84Hz0YM",
+          "version_number": "3.7.1-1.21.4-neoforge",
+          "version_type": "release",
+          "published_at": "2025-08-31T20:21:28.458124Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.7.1_MC_1.21.4.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/C84Hz0YM/fancymenu_neoforge_3.7.1_MC_1.21.4.jar",
+              "size": 3437861,
+              "sha256": "06cf84d7e1f9cadf05c7548ffb225e241b8e1459fc5e8332445ed4a685f61aa1",
+              "sha512": "82c31c52fd26c014e77fc382c546d2b2b5ee0c7804bedcadc7ce89d9613bcbe3caa9e6e74dac8ded2c4ff95aa3d68f7abf0c8e64008db7a865e368b38a4bb8b6"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "1ZCnjysV",
+              "version_number": "1.9.9-1.21.4-neoforge",
+              "version_type": "release",
+              "published_at": "2024-12-09T16:52:55.456231Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.9.9_MC_1.21.4.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/1ZCnjysV/konkrete_neoforge_1.9.9_MC_1.21.4.jar",
+                  "size": 620095,
+                  "sha256": "abaf1e5397b442067450185a76d049b64937b947f2b18b21881370c3235c2ae3",
+                  "sha512": "edb14243127566ca382c7094a9167962885513f31e9713604826ee371a9c4ad010853ffa118bbfaeadc3fc8c366cea30579dd44ca1d034047007655543fa00bf"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "efcdRVZP",
+              "version_number": "1.0.10-1.21-neoforge",
+              "version_type": "release",
+              "published_at": "2024-06-21T07:53:02.575299Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.10_MC_1.21.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/efcdRVZP/melody_neoforge_1.0.10_MC_1.21.jar",
+                  "size": 36096,
+                  "sha256": "6b973a4564703c531fc0eae09db08b07a38091e0a743c687b8d2049457e84871",
+                  "sha512": "3bd96b851a65fa95d92d051851e6a7a415927f718fcb05f0dfb5983eb3ca54edfb842ea85f1497e1b3510b5884181b8f9c6080d2b15642ceadac695011c00ec1"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "cJpfFYAC",
+          "version_number": "3.5.1-1.21.5-forge",
+          "version_type": "release",
+          "published_at": "2025-05-05T05:13:39.183982Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_forge_3.5.1_MC_1.21.5.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/cJpfFYAC/fancymenu_forge_3.5.1_MC_1.21.5.jar",
+              "size": 3308664,
+              "sha256": "88bb3047338acb453962bd7f50b6f7faecba62a610fd572f3fde7bceb6993738",
+              "sha512": "5a3c4ce1e105a261351f0450b3f7b0e01d32a92e820a9dcbfe8a16c4a6f15680f9a67f2f886f5cdf8c85a90394320bc5e0eb3c73b786c383174be5bee9dc88fa"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "n8MthHBl",
+              "version_number": "1.9.11-1.21.5-forge",
+              "version_type": "release",
+              "published_at": "2025-04-25T20:37:46.199161Z",
+              "files": [
+                {
+                  "filename": "konkrete_forge_1.9.11_MC_1.21.5.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/n8MthHBl/konkrete_forge_1.9.11_MC_1.21.5.jar",
+                  "size": 654175,
+                  "sha256": "62b065a34a8c8e3245834c2acd1d3131882bc6e6498c653ad298c59681db5917",
+                  "sha512": "1e2585bd345d0e2eb5735d0d5fff152af7d1107b4618e4386d9d7094ce7401fdd0b0b7680410ccf057b8f96c7d63c79c7e74db0e35283f626c02180e9d003c72"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "BYSPaMzs",
+              "version_number": "1.0.11-1.21.5-forge",
+              "version_type": "release",
+              "published_at": "2025-04-25T21:24:44.566121Z",
+              "files": [
+                {
+                  "filename": "melody_forge_1.0.11_MC_1.21.5.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/BYSPaMzs/melody_forge_1.0.11_MC_1.21.5.jar",
+                  "size": 189825,
+                  "sha256": "9046ba7bf2a357ebf356923fc43cd0e38967a0f7e1f7ba4a97aff7a36f336089",
+                  "sha512": "4ae1597d4c0a621edaa3a9f1a1fb6148d22dac07847212e53cad43db15cb028423fd26a19992b1a7559df7f1ba530e18a30259cf6e3d0a61fe706f06cf36a584"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "ADWxtVRn",
+          "version_number": "3.5.1-1.21.5-neoforge",
+          "version_type": "release",
+          "published_at": "2025-05-05T05:14:19.778462Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.5.1_MC_1.21.5.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/ADWxtVRn/fancymenu_neoforge_3.5.1_MC_1.21.5.jar",
+              "size": 3124361,
+              "sha256": "7ea839c99c245a17da54fdbfe80505e0ba0be8d135ef79f89200c683df587b5a",
+              "sha512": "beaf638eb49be514a23b54cc378145d0f18c2368d4c170fe5af85eceab1f13cefec4cdfcdc4f9ffbd48e7a4cbdd9b989f2e7799f4b8e9cc6dda5775feb1fb171"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "bGlSoHYW",
+              "version_number": "1.9.11-1.21.5-neoforge",
+              "version_type": "release",
+              "published_at": "2025-04-25T20:38:52.097429Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.9.11_MC_1.21.5.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/bGlSoHYW/konkrete_neoforge_1.9.11_MC_1.21.5.jar",
+                  "size": 500409,
+                  "sha256": "280ed2a2ee6576bcbbb7319cc16ce62cf06d08f3670484a93122fa2bbbf0131e",
+                  "sha512": "4867311647276162e24350ae0c9070022712101582d2ae404725b0f716f90ef7f59bf86c20f609582beaa129f7fec7c7b1330ea7e04058f672b9de70eda6b619"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "ifs75r9u",
+              "version_number": "1.0.11-1.21.5-neoforge",
+              "version_type": "release",
+              "published_at": "2025-04-25T21:25:28.198300Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.11_MC_1.21.5.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/ifs75r9u/melody_neoforge_1.0.11_MC_1.21.5.jar",
+                  "size": 36098,
+                  "sha256": "b083ffb2f15a7a7f2910d155d354075c456bc1b53e86ba9cff27997ab06aa024",
+                  "sha512": "82a23aa7d918991eee4d18f4f5b880f0f09981d908b21757b98022313614117d926bfa04942bc4f9792474e8af039208c490601415cd082e78afabd2ac2af1b5"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "FoQsz3XJ",
+          "version_number": "3.6.2-1.21.6-fabric",
+          "version_type": "release",
+          "published_at": "2025-07-02T20:02:01.404727Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.6"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_fabric_3.6.2_MC_1.21.6.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/FoQsz3XJ/fancymenu_fabric_3.6.2_MC_1.21.6.jar",
+              "size": 3645585,
+              "sha256": "4673340ad395e3f93c07eb5f64afdc67ce1b440d3d0126831acb9f0619060c17",
+              "sha512": "00fd7ecffb86b48f974014263d740e0bc2a6ee58b978092e80ea2822f37f5bb5f6c8b6b09c9b3d399d7aeeb84a7a4ce6be011e1d7a3d6fbf3a475f57945fd391"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "ua0GnQ25",
+              "version_number": "1.9.12-1.21.6-fabric",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:15:24.915709Z",
+              "files": [
+                {
+                  "filename": "konkrete_fabric_1.9.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/ua0GnQ25/konkrete_fabric_1.9.12_MC_1.21.6.jar",
+                  "size": 664438,
+                  "sha256": "95a5dc050f39f2fda330554b27683ebaac6687267a80753fb28c38511db5c596",
+                  "sha512": "85caefb91d900997ca472269629498b847cd7a3157045d3a6d2a2e17d2ebdecb6c6af159a1119d1981d24fd9c863309310de30cd2dd8ac27c59199551cb362d7"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "NsXvHOnn",
+              "version_number": "1.0.12-1.21.6-fabric",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:09:56.617481Z",
+              "files": [
+                {
+                  "filename": "melody_fabric_1.0.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/NsXvHOnn/melody_fabric_1.0.12_MC_1.21.6.jar",
+                  "size": 188047,
+                  "sha256": "aabe0a06d2b1a35f51f20c0d5054ec0492bec2a5c8301246333ee767e9c47d22",
+                  "sha512": "5dc426663721bbacb9ea90ea559dba4e5a0acbb361978d6984376147cb66d9c229cdf80cd44d7d0989c804b22ceb5ed51410cadd3fbfdd5cba1eb55c0df613a9"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "ed3thwKo",
+          "version_number": "3.6.2-1.21.6-forge",
+          "version_type": "release",
+          "published_at": "2025-07-02T20:02:49.696121Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.6"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_forge_3.6.2_MC_1.21.6.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/ed3thwKo/fancymenu_forge_3.6.2_MC_1.21.6.jar",
+              "size": 3614721,
+              "sha256": "9c8a4247a45f7f25cc13d0ee7198cde6a1443e3f68541acfb039f3cda29e1e32",
+              "sha512": "7fe8a6649dc861db97301d865bd47b461ce4200f0abd08c2e170cd1946e3ae75c572e318ada53b5b764ffef45f4dbeda5e0e8e7a276a95d9f0a8b57e7e537460"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "AqQgkM2M",
+              "version_number": "1.9.12-1.21.6-forge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:15:53.130184Z",
+              "files": [
+                {
+                  "filename": "konkrete_forge_1.9.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/AqQgkM2M/konkrete_forge_1.9.12_MC_1.21.6.jar",
+                  "size": 653423,
+                  "sha256": "dad830ff4cf8becaf3c5719c2aa275a4b6ed49abf6b02b6423ac03619899d590",
+                  "sha512": "35865e870c92393af3040f0b1c31d099631bc8b33863248f20996dfc8cdfe1585e66257c5fadc967674bfae59d545aabd8c3a5cf6e92b39020c88a76ee2d4c85"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "GdUdtOfw",
+              "version_number": "1.0.12-1.21.6-forge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:10:24.708190Z",
+              "files": [
+                {
+                  "filename": "melody_forge_1.0.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/GdUdtOfw/melody_forge_1.0.12_MC_1.21.6.jar",
+                  "size": 189825,
+                  "sha256": "2782da575c646305747f495fbc99fc1f53a78011209679ed150187ded08885ee",
+                  "sha512": "2ae68b5b9ec68c5504801554f7d2aee80d1fa4b96411e69dc0fd7d13556979ee756af1bbfc246a1a19636cb7864e7a22980176277f535a33484f1940503f0de8"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "N7wU4Drh",
+          "version_number": "3.6.2-1.21.6-neoforge",
+          "version_type": "release",
+          "published_at": "2025-07-02T20:03:43.901222Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.6"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.6.2_MC_1.21.6.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/N7wU4Drh/fancymenu_neoforge_3.6.2_MC_1.21.6.jar",
+              "size": 3429883,
+              "sha256": "ff88c98b0dce1900feb86a9b00743e9f6853e88fb4fce945c740afc3ec9632d9",
+              "sha512": "c49e149ebd553e7eb941fa1ce0dafd243fd501f4cdf252d6e8d5cfadbddd555cae598b663efc5a6cf5e966c6f2c7a3a46e87da4684959a1254d80f8ae49d3d30"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "1UX5k8UJ",
+              "version_number": "1.9.12-1.21.6-neoforge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:16:21.961865Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.9.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/1UX5k8UJ/konkrete_neoforge_1.9.12_MC_1.21.6.jar",
+                  "size": 499655,
+                  "sha256": "86829ea5df465ab75d9277ed1a05d5644aaf6ae45185dce9ed41750b45bef619",
+                  "sha512": "cd99f69623dcff242e7991b735cf08dc50724266fc64498dddc737a479cb41511e7c1a03238e3288259c6aa5b0d2877d410cd34dd4a48680d58961ef0fe95d71"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "DS7coewa",
+              "version_number": "1.0.12-1.21.6-neoforge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:10:48.086514Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/DS7coewa/melody_neoforge_1.0.12_MC_1.21.6.jar",
+                  "size": 36099,
+                  "sha256": "58d04e5ac73f558d6a5207018e4c8e6503b710312bcfe00ddf7b0f2bff27312d",
+                  "sha512": "66d47a484e88367aa9db9370c478fe8b69735c26bd49726bb8f78fed246172a8ef5706ae2131606a976c3b95852e385c6f9a6cc18d4f16e8bc2041706e1d3d10"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "nm8fjUL5",
+          "version_number": "3.6.4-1.21.7-forge",
+          "version_type": "release",
+          "published_at": "2025-07-18T21:19:35.558695Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.7"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_forge_3.6.4_MC_1.21.7.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/nm8fjUL5/fancymenu_forge_3.6.4_MC_1.21.7.jar",
+              "size": 3614655,
+              "sha256": "e2d6984cd62003845daa9072359d166d0b4eed4bc733bb34217a6ac86b749145",
+              "sha512": "04079ba8e5bd8d9dfc5314ed2ddce484dbeaee6960d811f61eaa381a3303c0ee03960f45bc5753b7fbafa799013c195f991f5224903d246084142da9327965f7"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "AqQgkM2M",
+              "version_number": "1.9.12-1.21.6-forge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:15:53.130184Z",
+              "files": [
+                {
+                  "filename": "konkrete_forge_1.9.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/AqQgkM2M/konkrete_forge_1.9.12_MC_1.21.6.jar",
+                  "size": 653423,
+                  "sha256": "dad830ff4cf8becaf3c5719c2aa275a4b6ed49abf6b02b6423ac03619899d590",
+                  "sha512": "35865e870c92393af3040f0b1c31d099631bc8b33863248f20996dfc8cdfe1585e66257c5fadc967674bfae59d545aabd8c3a5cf6e92b39020c88a76ee2d4c85"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "GdUdtOfw",
+              "version_number": "1.0.12-1.21.6-forge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:10:24.708190Z",
+              "files": [
+                {
+                  "filename": "melody_forge_1.0.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/GdUdtOfw/melody_forge_1.0.12_MC_1.21.6.jar",
+                  "size": 189825,
+                  "sha256": "2782da575c646305747f495fbc99fc1f53a78011209679ed150187ded08885ee",
+                  "sha512": "2ae68b5b9ec68c5504801554f7d2aee80d1fa4b96411e69dc0fd7d13556979ee756af1bbfc246a1a19636cb7864e7a22980176277f535a33484f1940503f0de8"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "ZpRNpsuq",
+          "version_number": "3.6.4-1.21.7-neoforge",
+          "version_type": "release",
+          "published_at": "2025-07-18T21:20:15.810034Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.7"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.6.4_MC_1.21.7.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/ZpRNpsuq/fancymenu_neoforge_3.6.4_MC_1.21.7.jar",
+              "size": 3430059,
+              "sha256": "eb14a4b4db03d1aca5b3bc602f1ec940f1b38151012ff5694c6b6de595a8866a",
+              "sha512": "fce4ce690772bae9561ba8bcf6d964d414304500cee7c5a56b0bb3797b6f82e19f627fc43cec0f429b2f844318074712a40d6462e52ec2d64a386073bdfa235b"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "1UX5k8UJ",
+              "version_number": "1.9.12-1.21.6-neoforge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:16:21.961865Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.9.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/1UX5k8UJ/konkrete_neoforge_1.9.12_MC_1.21.6.jar",
+                  "size": 499655,
+                  "sha256": "86829ea5df465ab75d9277ed1a05d5644aaf6ae45185dce9ed41750b45bef619",
+                  "sha512": "cd99f69623dcff242e7991b735cf08dc50724266fc64498dddc737a479cb41511e7c1a03238e3288259c6aa5b0d2877d410cd34dd4a48680d58961ef0fe95d71"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "DS7coewa",
+              "version_number": "1.0.12-1.21.6-neoforge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:10:48.086514Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/DS7coewa/melody_neoforge_1.0.12_MC_1.21.6.jar",
+                  "size": 36099,
+                  "sha256": "58d04e5ac73f558d6a5207018e4c8e6503b710312bcfe00ddf7b0f2bff27312d",
+                  "sha512": "66d47a484e88367aa9db9370c478fe8b69735c26bd49726bb8f78fed246172a8ef5706ae2131606a976c3b95852e385c6f9a6cc18d4f16e8bc2041706e1d3d10"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "JQzNdlxK",
+          "version_number": "3.7.1-1.21.8-forge",
+          "version_type": "release",
+          "published_at": "2025-08-31T20:23:29.638070Z",
+          "loader": "forge",
+          "game_versions": [
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_forge_3.7.1_MC_1.21.8.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/JQzNdlxK/fancymenu_forge_3.7.1_MC_1.21.8.jar",
+              "size": 3627309,
+              "sha256": "e4a2929dd46be5bd4c04ca9843dbba9d5e80d8b8c688b9bef4862dd4a00d31da",
+              "sha512": "fb1bea5fa36a3ec6e585ba5089f44b2cd9eb24ed09ea4312ba5478108f9e2ddba453523ce11085cd0a66ed90abc1e6e81e01b29149aaddd5a6cfc6180be5a014"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "AqQgkM2M",
+              "version_number": "1.9.12-1.21.6-forge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:15:53.130184Z",
+              "files": [
+                {
+                  "filename": "konkrete_forge_1.9.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/AqQgkM2M/konkrete_forge_1.9.12_MC_1.21.6.jar",
+                  "size": 653423,
+                  "sha256": "dad830ff4cf8becaf3c5719c2aa275a4b6ed49abf6b02b6423ac03619899d590",
+                  "sha512": "35865e870c92393af3040f0b1c31d099631bc8b33863248f20996dfc8cdfe1585e66257c5fadc967674bfae59d545aabd8c3a5cf6e92b39020c88a76ee2d4c85"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "GdUdtOfw",
+              "version_number": "1.0.12-1.21.6-forge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:10:24.708190Z",
+              "files": [
+                {
+                  "filename": "melody_forge_1.0.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/GdUdtOfw/melody_forge_1.0.12_MC_1.21.6.jar",
+                  "size": 189825,
+                  "sha256": "2782da575c646305747f495fbc99fc1f53a78011209679ed150187ded08885ee",
+                  "sha512": "2ae68b5b9ec68c5504801554f7d2aee80d1fa4b96411e69dc0fd7d13556979ee756af1bbfc246a1a19636cb7864e7a22980176277f535a33484f1940503f0de8"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "NCRw8ZfI",
+          "version_number": "3.7.1-1.21.8-neoforge",
+          "version_type": "release",
+          "published_at": "2025-08-31T20:24:27.868764Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.7.1_MC_1.21.8.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/NCRw8ZfI/fancymenu_neoforge_3.7.1_MC_1.21.8.jar",
+              "size": 3442923,
+              "sha256": "c48e0aafef857e36ae40961757927cc02b4f5cafef4383d8c18743176a230ee3",
+              "sha512": "2e08d610f4777077ce1809f5f3a49c7e549c2fa9169fa0a68473cccfb6b362017b36062925bcaf6ba46128405b386864d5eac14f1a32b2193c163bc952411a21"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "1UX5k8UJ",
+              "version_number": "1.9.12-1.21.6-neoforge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:16:21.961865Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.9.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/1UX5k8UJ/konkrete_neoforge_1.9.12_MC_1.21.6.jar",
+                  "size": 499655,
+                  "sha256": "86829ea5df465ab75d9277ed1a05d5644aaf6ae45185dce9ed41750b45bef619",
+                  "sha512": "cd99f69623dcff242e7991b735cf08dc50724266fc64498dddc737a479cb41511e7c1a03238e3288259c6aa5b0d2877d410cd34dd4a48680d58961ef0fe95d71"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "DS7coewa",
+              "version_number": "1.0.12-1.21.6-neoforge",
+              "version_type": "release",
+              "published_at": "2025-06-18T23:10:48.086514Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.12_MC_1.21.6.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/DS7coewa/melody_neoforge_1.0.12_MC_1.21.6.jar",
+                  "size": 36099,
+                  "sha256": "58d04e5ac73f558d6a5207018e4c8e6503b710312bcfe00ddf7b0f2bff27312d",
+                  "sha512": "66d47a484e88367aa9db9370c478fe8b69735c26bd49726bb8f78fed246172a8ef5706ae2131606a976c3b95852e385c6f9a6cc18d4f16e8bc2041706e1d3d10"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "wQfYaY3H",
+          "version_number": "3.8.2-1.21.10-fabric",
+          "version_type": "release",
+          "published_at": "2025-12-08T06:11:39.676693Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_fabric_3.8.2_MC_1.21.10.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/wQfYaY3H/fancymenu_fabric_3.8.2_MC_1.21.10.jar",
+              "size": 4476204,
+              "sha256": "2872a73aba232f1ec426f971f9291ba4935e65a0c9acbd7891ef9a7dc8a3ceba",
+              "sha512": "c7e3d8287fbc80b52ee88b137b43bf3d602ddb79bf9437c9373e1f666ccecb7624fc0d8cb5a823036c475899a8898c91fc3f78145234a78b09d7faf592306b79"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "kLTIGlRD",
+              "version_number": "1.9.13-1.21.10-fabric",
+              "version_type": "release",
+              "published_at": "2025-10-15T10:23:51.433365Z",
+              "files": [
+                {
+                  "filename": "konkrete_fabric_1.9.13_MC_1.21.10.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/kLTIGlRD/konkrete_fabric_1.9.13_MC_1.21.10.jar",
+                  "size": 669041,
+                  "sha256": "100b0d0593f213b3018f4f73c04f4f8cd8937d22d053bcbf7ab37bd7fb475f18",
+                  "sha512": "1f7a92030d323de78214347973a966bce6fcef0e043b7eff58539772bf27935a66f19f3ae513f66070b3296b5028c626a7495ce7f7efde70edf19e6923ee3536"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "4nd52KsY",
+              "version_number": "1.0.14-1.21.10-fabric",
+              "version_type": "release",
+              "published_at": "2025-11-01T07:39:33.445546Z",
+              "files": [
+                {
+                  "filename": "melody_fabric_1.0.14_MC_1.21.10.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/4nd52KsY/melody_fabric_1.0.14_MC_1.21.10.jar",
+                  "size": 198661,
+                  "sha256": "088c17858756edf76b46cfaf7293caed780d29c234921620c7cfa51cdc05d0a3",
+                  "sha512": "b252080c840b6e4dfa8335fa2d73fca09701f2e6ea73bf1dc696027d5434887e82999786a32305d7d4a30cf18e58f538db4842be3370fd8ecaa851de73227095"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "A4tRhjof",
+          "version_number": "3.8.2-1.21.10-neoforge",
+          "version_type": "release",
+          "published_at": "2025-12-08T06:12:19.454384Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.8.2_MC_1.21.10.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/A4tRhjof/fancymenu_neoforge_3.8.2_MC_1.21.10.jar",
+              "size": 4262391,
+              "sha256": "68789a1f357352ef4899b0b9b5cb26ad65edf696f418d10a73c3491a131e035f",
+              "sha512": "0af8f82ca3dcdbfb694dbe9767da4b646c8bfefcccbe093b332e94ad8191ca57a66e91aceef3611623040575a6ec0bde277d8aea0ee7a2acf6f03c9ff00047bb"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "Em70hPwG",
+              "version_number": "1.9.13-1.21.10-neoforge",
+              "version_type": "release",
+              "published_at": "2025-10-15T10:24:26.424555Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.9.13_MC_1.21.10.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/Em70hPwG/konkrete_neoforge_1.9.13_MC_1.21.10.jar",
+                  "size": 504239,
+                  "sha256": "e323b164e688a9dc62c1dd174121113303c3dea8ac180daa7ab0feeeb9f97d0e",
+                  "sha512": "533ede264ef52dd70c010674e7e01fb5e9c31d456ccd8a937f1f39cf1d9215d0b1dc6edf76cc1c0bb2b2a22c8cf1a6ea00f995d0b748a3c18b9433c34b85a28c"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "GUxhbP5x",
+              "version_number": "1.0.14-1.21.10-neoforge",
+              "version_type": "release",
+              "published_at": "2025-11-01T07:40:06.559817Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.14_MC_1.21.10.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/GUxhbP5x/melody_neoforge_1.0.14_MC_1.21.10.jar",
+                  "size": 46752,
+                  "sha256": "abac0ec81e240a096406b735fe78c6d461e95a0d2e8c0763a6c4e85b8f432a0e",
+                  "sha512": "3c4408244a44af0cdeb46b61c9a321867a7399374c20daa8d4c5e4202ff485186dc92b092d94f56ae887f7acb31a197ba917b0f7bf7b651da85f9344d4b865fd"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "Xvytpywc",
+          "version_number": "3.9.14-1.21.11-fabric",
+          "version_type": "release",
+          "published_at": "2026-09-28T19:50:01.280603Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_fabric_3.9.14_MC_1.21.11.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/Xvytpywc/fancymenu_fabric_3.9.14_MC_1.21.11.jar",
+              "size": 26234450,
+              "sha256": "6349771db1ec51d9c32b49bb4ebd8c616d30386f744a95e45b5b52f399700d6c",
+              "sha512": "7aa8bb3534594d280ab38d26809b295ecd66aeefa67952077346746b51a824539861c39280c1e17f68357e9dcc78ff98cdbafc978d0c42a0b19db941b9ac8e64"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "6ypTGwlP",
+              "version_number": "1.9.18-1.21.11-fabric",
+              "version_type": "release",
+              "published_at": "2026-02-01T15:01:38.133368Z",
+              "files": [
+                {
+                  "filename": "konkrete_fabric_1.9.18_MC_1.21.11.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/6ypTGwlP/konkrete_fabric_1.9.18_MC_1.21.11.jar",
+                  "size": 771623,
+                  "sha256": "f3b9981af032bfcbee1fe8e1f4e945d87eaebb1077e2b4cd89953516b181e61e",
+                  "sha512": "44d787e88d9e3991df90d8926b93620b7e347a5f30c27bd6bfa58016f38d3e549f2eafe7c66d9654f22c5d5fdc32ad977aec3be7d488efb766f6ce1b89f1f2fd"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "Xo1GAiPu",
+              "version_number": "1.0.15-1.21.11-fabric",
+              "version_type": "release",
+              "published_at": "2025-12-23T09:28:55.314847Z",
+              "files": [
+                {
+                  "filename": "melody_fabric_1.0.15_MC_1.21.11.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/Xo1GAiPu/melody_fabric_1.0.15_MC_1.21.11.jar",
+                  "size": 227886,
+                  "sha256": "43133956147e24742e069cdae7025acbb801882a86b470e26d453c8481809670",
+                  "sha512": "9a9ed54077daec16ea4ac6000cf40264d5bdaf97f0cc7b718d5062d538f0a09373bacedc276f43fe7ee4a9c14b4af7909a32b36c10d1b180d36f35b8a24a2a23"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "KtmQLRWE",
+          "version_number": "3.9.14-1.21.11-neoforge",
+          "version_type": "release",
+          "published_at": "2026-09-28T19:50:13.466178Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.9.14_MC_1.21.11.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/KtmQLRWE/fancymenu_neoforge_3.9.14_MC_1.21.11.jar",
+              "size": 25972904,
+              "sha256": "9a5fde85cfab72615e4b05f01552f1ba09c821b96a6b45049a05834eb2c0ee87",
+              "sha512": "caec2ee9af527a4b311284c84ffd94167b55e503420e37e9b84520281077666b2408694e80a69193d34c225f5c9705490154cd7a9f765e95658da468552f95b4"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "BwyWmTTW",
+              "version_number": "1.9.18-1.21.11-neoforge",
+              "version_type": "release",
+              "published_at": "2026-02-01T15:03:12.755793Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.9.18_MC_1.21.11.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/BwyWmTTW/konkrete_neoforge_1.9.18_MC_1.21.11.jar",
+                  "size": 579885,
+                  "sha256": "0417847478c094d1a4e464dc4b570b8fb8c9ba24d79273d037caec29bdb7affd",
+                  "sha512": "891234d4391fc5a483fb595619dea385fbfd73f3a64b5e0395aa10120d555487dcbbab78ac60d707a49cacf3f011e14b159ad48acc6f14536c4e2fb4f46d510a"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "9Jdm9sDl",
+              "version_number": "1.0.15-1.21.11-neoforge",
+              "version_type": "release",
+              "published_at": "2025-12-23T09:29:26.355115Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.15_MC_1.21.11.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/9Jdm9sDl/melody_neoforge_1.0.15_MC_1.21.11.jar",
+                  "size": 46544,
+                  "sha256": "57591a464e8d8192c2f6dbefbdf386380092a51dc0fd8a4b1ad90406b11edc64",
+                  "sha512": "e524c161059dc7ffef41c6d97fc1459b5de5939e37d8934184f32e5bb392653668997bb1c9e66234cb65b6e6899f706685358dd0eb2fbec0e23b1118bd8aab80"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "M8oCsyp2",
+          "version_number": "3.9.6-26.1.1-fabric",
+          "version_type": "release",
+          "published_at": "2026-06-28T06:15:16.696360Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.1.1"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_fabric_3.9.6_MC_26.1.1.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/M8oCsyp2/fancymenu_fabric_3.9.6_MC_26.1.1.jar",
+              "size": 25695534,
+              "sha256": "5ad9128f588726f7b1bf8d737f9a6a8804dd60d95ad2a29e42114c0b8d5684f1",
+              "sha512": "26de3c50b70ea4a2d9fc941b9efdd8ce6880c35aaef0791e1ad55345605ae9552ed2245f427d49b13041e30f5578abbb817ded3901e4661e6be4daa7e8051a51"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "Y6HGzcl3",
+              "version_number": "1.10.2-26.1.1-fabric",
+              "version_type": "release",
+              "published_at": "2026-05-14T19:44:23.958272Z",
+              "files": [
+                {
+                  "filename": "konkrete_fabric_1.10.2_MC_26.1.1.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/Y6HGzcl3/konkrete_fabric_1.10.2_MC_26.1.1.jar",
+                  "size": 809836,
+                  "sha256": "1fcefb02b04e01a2e40fc1cc966e58ac34e4feadb110874601c573ba77f8ef9c",
+                  "sha512": "03790c7f83e6c6c0dce0dcb0143680972eb93d32f88094b83aedb5d6e99caba61b8c7cf985c7863f23b7df41aa1da3fb453ffc8e3807b90653a827fd02afe7e9"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "V4DQs36M",
+              "version_number": "1.0.16-26.1.1-fabric",
+              "version_type": "release",
+              "published_at": "2026-04-04T19:55:13.991475Z",
+              "files": [
+                {
+                  "filename": "melody_fabric_1.0.16_MC_26.1.1.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/V4DQs36M/melody_fabric_1.0.16_MC_26.1.1.jar",
+                  "size": 228922,
+                  "sha256": "80145686cb3b861fae7e0cffc80ed25275c6d8632c56e5ff28e43f8c5936afe7",
+                  "sha512": "44411ef17c00e88cbd05d389e3ff04e92d17e165897703157a1b0219523befef3ea53ab521e04beb35057274c9d19f1da878cbbdda1c47e483c70a9c1c3e70fb"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "hHjzorcb",
+          "version_number": "3.9.6-26.1.1-neoforge",
+          "version_type": "release",
+          "published_at": "2026-06-28T06:15:28.134851Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "26.1.1"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.9.6_MC_26.1.1.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/hHjzorcb/fancymenu_neoforge_3.9.6_MC_26.1.1.jar",
+              "size": 25495626,
+              "sha256": "17f505f39d4126324319fc3a1045984f087a53981028acaf3235cf9fed4919c9",
+              "sha512": "7260376f527130346b78d6a51b4fe5efd39316da3641464d9938dcf85c2a43b1dc57625da8ecdaad98287b915007451951000eb85f841033e25fcf5ee96fd577"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "S3KyS0Na",
+              "version_number": "1.10.1-26.1.1-neoforge",
+              "version_type": "release",
+              "published_at": "2026-04-07T20:05:21.727077Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.10.1_MC_26.1.1.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/S3KyS0Na/konkrete_neoforge_1.10.1_MC_26.1.1.jar",
+                  "size": 612182,
+                  "sha256": "f06e5919536b38e209af0455ba765e2f9dbbfd9b2e23ff83e62b3c8da07dd0ea",
+                  "sha512": "c03ea1493bb73381d82d0c8bf8c3fd0a78ad1e8d330b884731534aa5b7e2a4d2c24aa27e337ffc7e8b7bd96f772b94fd45dfd94396eb35148eee1d4420c17f4c"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "lKAVENRI",
+              "version_number": "1.0.16-26.1.1-neoforge",
+              "version_type": "release",
+              "published_at": "2026-04-04T19:55:42.396554Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.16_MC_26.1.1.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/lKAVENRI/melody_neoforge_1.0.16_MC_26.1.1.jar",
+                  "size": 47054,
+                  "sha256": "51d408e5e41b81e342a0267ed18297acbc6b3c9abd0df385c83f4655fb0b8c8c",
+                  "sha512": "27c910de06cf61aa82036ec1e9a8fab7efdffe5dc4597fb17868eec9de27766b9912b46c7c9eace1cf4277012bc84ad2cc8b9d789e01afd532ba819306f2fa3e"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "version_id": "cpNN9NGM",
+          "version_number": "3.9.14-26.2-neoforge",
+          "version_type": "release",
+          "published_at": "2026-09-28T19:52:35.032436Z",
+          "loader": "neoforge",
+          "game_versions": [
+            "26.2"
+          ],
+          "files": [
+            {
+              "filename": "fancymenu_neoforge_3.9.14_MC_26.2.jar",
+              "url": "https://cdn.modrinth.com/data/Wq5SjeWM/versions/cpNN9NGM/fancymenu_neoforge_3.9.14_MC_26.2.jar",
+              "size": 26097534,
+              "sha256": "12bb7c70550620f6df7bd57357073b07a531f6de48f6aa9abcc25f8b2671aa22",
+              "sha512": "c0ebe0467897dac0281e06970ff390c31bbb16c69c9be386705d7a5b4e65d36350726460b123d3291677290f67172fce4ca8d58381dee857d4abbdccd1be5a95"
+            }
+          ],
+          "dependencies": [
+            {
+              "project_id": "J81TRJWm",
+              "version_id": "fCKk8Tai",
+              "version_number": "1.11.1-26.2-neoforge",
+              "version_type": "release",
+              "published_at": "2026-06-26T04:03:59.908843Z",
+              "files": [
+                {
+                  "filename": "konkrete_neoforge_1.11.1_MC_26.2.jar",
+                  "url": "https://cdn.modrinth.com/data/J81TRJWm/versions/fCKk8Tai/konkrete_neoforge_1.11.1_MC_26.2.jar",
+                  "size": 580739,
+                  "sha256": "33176a716c866e9118739e8d335088cdfa5f6a85fba247a3d5d323742de16392",
+                  "sha512": "69d20d2ebb94d5c0b82e7724220e9127dcaabe39c61968a0ef3be2a69399d01895b1a1dc3f852d911763b2541b17a9602572a1d76e86fa83ffd95737d75eccc2"
+                }
+              ]
+            },
+            {
+              "project_id": "CVT4pFB2",
+              "version_id": "LMoAqWbb",
+              "version_number": "1.0.17-26.2-neoforge",
+              "version_type": "release",
+              "published_at": "2026-06-25T04:29:33.550348Z",
+              "files": [
+                {
+                  "filename": "melody_neoforge_1.0.17_MC_26.2.jar",
+                  "url": "https://cdn.modrinth.com/data/CVT4pFB2/versions/LMoAqWbb/melody_neoforge_1.0.17_MC_26.2.jar",
+                  "size": 46984,
+                  "sha256": "52cfbab7b1389c9fbb7ed19cfa3e73d28a7ea258c9316759f6298a7313aaf3e5",
+                  "sha512": "1bc87b275b6385381f55c2993918591b36952d3ba09ef63680e12ef2f6628100ee8d23e96439869ef6828bb202694dfa9e3ad9804ca626d2679eb63cb57ca0a0"
+                }
+              ]
             }
           ]
         }

@@ -92,6 +92,8 @@ public class SettingsScreen extends Screen {
     private Checkbox enablePlayerPreviewCustomizationCheckbox;
     private Checkbox hideBuiltInCapesCheckbox;
     private Checkbox menuBackgroundCheckbox;
+    private Checkbox showTitlePreviewCheckbox;
+    private Checkbox showPausePreviewCheckbox;
     private Button keybindButton;
 
     // State for keybind editing
@@ -394,6 +396,48 @@ public class SettingsScreen extends Screen {
                 .build();
         //?}
         clientSettingWidgets.add(disableSkinTransparencyCheckbox);
+        currentRightY += spacing;
+
+        // Show Title Screen Preview
+        //? if <1.21 {
+        showTitlePreviewCheckbox = new Checkbox(
+                rightColumnX, currentRightY,
+                checkboxSize, checkboxSize,
+        //?} else {
+        showTitlePreviewCheckbox = Checkbox.builder(
+        //?}
+                Component.translatable("quickskin.settings.show_title_preview"),
+        //? if <1.21 {
+                config.showTitleScreenPreview
+        );
+        //?} else {
+                this.font)
+                .pos(rightColumnX, currentRightY)
+                .selected(config.showTitleScreenPreview)
+                .build();
+        //?}
+        clientSettingWidgets.add(showTitlePreviewCheckbox);
+        currentRightY += spacing;
+
+        // Show Pause Menu Preview
+        //? if <1.21 {
+        showPausePreviewCheckbox = new Checkbox(
+                rightColumnX, currentRightY,
+                checkboxSize, checkboxSize,
+        //?} else {
+        showPausePreviewCheckbox = Checkbox.builder(
+        //?}
+                Component.translatable("quickskin.settings.show_pause_preview"),
+        //? if <1.21 {
+                config.showPauseMenuPreview
+        );
+        //?} else {
+                this.font)
+                .pos(rightColumnX, currentRightY)
+                .selected(config.showPauseMenuPreview)
+                .build();
+        //?}
+        clientSettingWidgets.add(showPausePreviewCheckbox);
     }
 
     private void createServerSettings() {
@@ -857,6 +901,8 @@ public class SettingsScreen extends Screen {
             config.enablePlayerPreviewCustomization = enablePlayerPreviewCustomizationCheckbox.selected();
             config.enablePlayerOwnSkinSystem = enablePlayerOwnSkinSystemCheckbox.selected();
             config.hideBuiltInCapes = hideBuiltInCapesCheckbox.selected();
+            config.showTitleScreenPreview = showTitlePreviewCheckbox.selected();
+            config.showPauseMenuPreview = showPausePreviewCheckbox.selected();
 
             // Save menu background style
             if (menuBackgroundCheckbox != null) {

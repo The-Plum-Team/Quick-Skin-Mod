@@ -3,6 +3,7 @@ package com.quickskin.mod.mixin;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
+import com.quickskin.mod.client.compat.ReplayModHelper;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.AssetMetadata;
@@ -37,6 +38,20 @@ public class MixinSkinManager {
     @Unique
     private static final Map<String, String> SLIM_MODEL_METADATA = Map.of("model", "slim");
 
+    // In a world the connected player's UUID identifies the local player: an offline-mode
+    // server or proxy may assign one that differs from the launcher session's. The session
+    // UUID still applies while no player exists (title screen, Essential's menu model) and
+    // during ReplayMod playback, where mc.player is the camera entity with a UUID of its own.
+    @Unique
+    private static UUID quickskin$localPlayerUuid() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null) return null;
+        var player = mc.player;
+        if (player != null && !ReplayModHelper.isInReplay()) return player.getUUID();
+        var user = mc.getUser();
+        return user != null ? user.getProfileId() : null;
+    }
+
     @Inject(
             method = "registerSkins",
             at = @At("HEAD"),
@@ -62,10 +77,7 @@ public class MixinSkinManager {
 
         UUID localUuid = null;
         try {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null && mc.getUser() != null) {
-                localUuid = mc.getUser().getProfileId();
-            }
+            localUuid = quickskin$localPlayerUuid();
         } catch (Exception e) {
             // Safety: if anything goes wrong getting UUID, just pass through
         }
@@ -75,7 +87,9 @@ public class MixinSkinManager {
 
         ClientConfig config = ClientConfig.getInstance();
 
-        if (localUuid != null && localUuid.equals(profile.getId()) && !config.activeSkinHash.isEmpty()) {
+        // While a CPM model is the latest look choice, the saved skin is only remembered, not worn.
+        if (localUuid != null && localUuid.equals(profile.getId()) && !config.activeSkinHash.isEmpty()
+                && !com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(localUuid)) {
             LocalAssetManager assetManager = LocalAssetManager.getInstance();
             AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
 
@@ -217,17 +231,15 @@ public class MixinSkinManager {
         // Check local player
         UUID localUuid = null;
         try {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null && mc.getUser() != null) {
-                localUuid = mc.getUser().getProfileId();
-            }
+            localUuid = quickskin$localPlayerUuid();
         } catch (Exception e) {
             return;
         }
 
         if (localUuid != null && localUuid.equals(profile.getId())) {
             ClientConfig config = ClientConfig.getInstance();
-            if (config.activeSkinHash.isEmpty()) return;
+            if (config.activeSkinHash.isEmpty()
+                    || com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(localUuid)) return;
             hash = config.activeSkinHash;
 
             LocalAssetManager assetManager = LocalAssetManager.getInstance();

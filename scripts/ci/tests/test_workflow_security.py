@@ -843,7 +843,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("Retire the consumed exact-policy verdict cache shards", review)
         self.assertIn("--max-entries 1", review)
         self.assertIn("steps.verdict-cache-artifact.outputs.artifact-id", review)
-        self.assertIn("Retire superseded caches for obsolete review policies", review)
+        # Anchor-semantic and reference-comparison caches are both current, so a reviewer must
+        # never delete a cache merely because its exact-policy name differs from its own.
+        self.assertNotIn("Retire superseded caches", review)
         self.assertIn(
             "visual-review-wave-block-$GENERATION_SHA", review
         )
@@ -933,6 +935,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("DEFAULT_MAX_PARALLEL_CALLS = 16", runner)
         self.assertIn("MODEL_IMAGE_SIZE = (1280, 720)", runner)
         self.assertIn("Image.Resampling.LANCZOS", runner)
+        self.assertIn("compress_level=6", runner)
         self.assertIn('f"Read(./{model_images_relative}/**)"', runner)
         self.assertNotIn('"Read(./review-input/images/**)"', runner)
         self.assertIn("ThreadPoolExecutor", runner)
@@ -1368,12 +1371,13 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "customnpcs",
                 "essential",
                 "replaymod",
+                "fancymenu",
             },
             {item["id"] for item in contract["mods"]},
         )
         self.assertNotIn("player-armor-stands", execution_workflow.lower())
         self.assertNotIn("player-armor-stands", review_workflow.lower())
-        self.assertEqual(7, contract["schema_version"])
+        self.assertEqual(8, contract["schema_version"])
         self.assertEqual(
             ["compatibility-cpm"],
             next(
@@ -2977,19 +2981,32 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_pending_verification_is_secretless_and_finalization_remains_protected(self) -> None:
         workflow = (WORKFLOWS / "release-verify.yml").read_text(encoding="utf-8")
+        discovery = job_block("release-verify.yml", "discover")
         probe = job_block("release-verify.yml", "verify")
         final = job_block("release-verify.yml", "finalize")
         self.assertIn("workflow_run:", workflow)
         self.assertIn("schedule:", workflow)
         self.assertNotIn("secrets.", workflow)
         self.assertNotIn("mc-publish", workflow)
+        # GitHub shows drafts only to a token with push access. Discovery holds one without an
+        # approval, so it reads release metadata only; the job that downloads bytes stays read-only.
+        self.assertIn("contents: write", discovery)
+        self.assertNotIn("actions:", discovery)
+        self.assertNotIn("environment:", discovery)
+        self.assertIn("--discover", discovery)
+        self.assertNotIn("--finalize", discovery)
+        self.assertNotIn("-artifact@", discovery)
+        self.assertIn("needs: discover", probe)
+        self.assertIn("PENDING_DRAFTS: ${{ needs.discover.outputs.pending }}", probe)
+        self.assertNotIn("release_tag", probe)
+        self.assertNotIn("--discover", probe)
         self.assertNotIn("contents: write", probe)
         self.assertNotIn("environment:", probe)
         self.assertNotIn("--finalize", probe)
         self.assertIn("environment: release", final)
         self.assertIn("group: release-publish", final)
         self.assertIn("--finalize", final)
-        for block in (probe, final):
+        for block in (discovery, probe, final):
             self.assertIn("ref: ${{ github.sha }}", block)
             self.assertIn("persist-credentials: false", block)
             self.assertIn("verify_pending_publications.py", block)

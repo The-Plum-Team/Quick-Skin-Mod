@@ -95,8 +95,9 @@ public class SkinManagerMixin {
         }
 
         // The saved selection is authoritative for the local profile when no world service state
-        // exists yet (for example, a title-screen preview).
-        if (uuid.equals(Minecraft.getInstance().getUser().getProfileId())) {
+        // exists yet (for example, a title-screen preview), not while a CPM model is the look.
+        if (uuid.equals(Minecraft.getInstance().getUser().getProfileId())
+                && !com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(uuid)) {
             ClientConfig config = ClientConfig.getInstance();
             boolean hasSkin = !config.activeSkinHash.isEmpty();
             boolean hasCape = !config.activeCapeHash.isEmpty();
@@ -196,7 +197,8 @@ public class SkinManagerMixin {
         boolean isLocalPlayer = uuid.equals(Minecraft.getInstance().getUser().getProfileId());
         ClientConfig config = ClientConfig.getInstance();
         boolean hasSavedFallback = isLocalPlayer
-                && (!config.activeSkinHash.isEmpty() || !config.activeCapeHash.isEmpty());
+                && (!config.activeSkinHash.isEmpty() || !config.activeCapeHash.isEmpty())
+                && !com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(uuid);
         if (!hasServiceOverrides && !hasSavedFallback) {
             return;
         }
@@ -409,9 +411,9 @@ public class SkinManagerMixin {
         // Title screen config fallback
         if (Minecraft.getInstance().level == null) {
 //?} else {
-        // Config-based fallback for local player (title screen and in-world)
+        // Config-based fallback for local player (title screen and in-world), not while a CPM model is the look
         boolean isLocalPlayer = uuid.equals(Minecraft.getInstance().getUser().getProfileId());
-        if (isLocalPlayer) {
+        if (isLocalPlayer && !com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(uuid)) {
 //?}
             ClientConfig config = ClientConfig.getInstance();
             boolean hasSkin = !config.activeSkinHash.isEmpty();
@@ -685,7 +687,8 @@ public class SkinManagerMixin {
         if (!hasServiceOverrides && Minecraft.getInstance().level == null) {
 //?} else {
         boolean isLocalPlayer = uuid.equals(Minecraft.getInstance().getUser().getProfileId());
-        if (!hasServiceOverrides && isLocalPlayer) {
+        if (!hasServiceOverrides && isLocalPlayer
+                && !com.quickskin.mod.client.services.CpmLookArbiter.withholdsSkin(uuid)) {
 //?}
             ClientConfig config = ClientConfig.getInstance();
             hasTitleScreenFallback = !config.activeSkinHash.isEmpty() || !config.activeCapeHash.isEmpty();

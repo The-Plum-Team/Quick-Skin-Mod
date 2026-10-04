@@ -25,21 +25,43 @@ import net.minecraft.resources.Identifier;
 //?}
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+//? if <1.21.9 {
+import org.spongepowered.asm.mixin.Mutable;
+//?}
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.function.Supplier;
+
 /**
  * Mixin to intercept PlayerInfo skin lookups and apply custom skins/capes.
  */
 @Mixin(value = PlayerInfo.class, priority = 500)
-public abstract class PlayerInfoMixin {
+public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat.QuickSkinSkinLookupAccess {
 
     @Shadow
     @Final
     private GameProfile profile;
+
+    // Vanilla resolves the skin once and keeps it. SkinManagerMixin bakes an active Quick Skin
+    // skin into that result, so a withdrawn skin needs a new lookup (refreshSkinLookup).
+//? if <1.21.9 {
+    @Shadow
+    @Final
+    @Mutable
+    private Supplier<PlayerSkin> skinLookup;
+
+    @Shadow
+    private static Supplier<PlayerSkin> createSkinLookup(GameProfile profile) {
+        throw new AssertionError();
+    }
+//?} else {
+    @Shadow
+    private Supplier<PlayerSkin> skinLookup;
+//?}
 
     // Cache for the custom PlayerSkin to avoid rebuilding it every frame
     @Unique
@@ -68,6 +90,19 @@ public abstract class PlayerInfoMixin {
 //?}
     @Unique
     private String quickskin$cachedModelName = null;
+
+    /** Replaces the vanilla skin lookup, which still holds a Quick Skin skin that was withdrawn. */
+    @Override
+    public void quickskin$refreshSkinLookup() {
+//? if <1.21.9 {
+        this.skinLookup = createSkinLookup(this.profile);
+//?} else {
+        // getSkin() creates the lookup again when it is missing.
+        this.skinLookup = null;
+//?}
+        quickskin$cachedSkin = null;
+        quickskin$cachedOriginalTexture = null;
+    }
 
     /**
      * Inject at TAIL to override skin data when we have custom skin/cape/model.

@@ -1501,12 +1501,10 @@ public final class FullScenario implements Scenario {
         final AtomicReference<int[]> capeRegion = new AtomicReference<>();
         final AtomicReference<int[]> capeCounts = new AtomicReference<>();
         final AtomicReference<String> capeFailure = new AtomicReference<>();
-        final AtomicInteger capeOriginalGuiScale = new AtomicInteger(0);
         steps.add(Step.of("cape_editor_ignores_elytra")
                 .action(() -> {
                     enterWorldView(mc);
                     setChestSlot(mc, ItemStack.EMPTY);
-                    capeOriginalGuiScale.set(VanillaShim.guiScale(mc));
                     openCapeProbeEditor(mc);
                 })
                 .minTicks(CAPE_PROBE_HOLD_TICKS)
@@ -1521,10 +1519,7 @@ public final class FullScenario implements Scenario {
                         // The editor only builds its 3D preview when the GUI is tall enough, so the
                         // probe shrank the scale to bring it out; put back what the profile chose so
                         // every later step is framed the way the rest of the run is.
-                        int original = capeOriginalGuiScale.get();
-                        if (original > 0 && VanillaShim.guiScale(mc) != original) {
-                            VanillaShim.setGuiScale(mc, original);
-                        }
+                        GuiScaleManager.restoreOriginalGuiScale();
                     }
                 }));
 
@@ -1697,7 +1692,10 @@ public final class FullScenario implements Scenario {
                         + mc.getWindow().getGuiScaledWidth() + "x"
                         + mc.getWindow().getGuiScaledHeight() + " GUI units); nothing to probe";
             }
-            if (!VanillaShim.setGuiScale(mc, scale - 1)) {
+            // Through the option, as the player does. FancyMenu recomputes the window's scale from
+            // that option on every setScreen, so a scale written to the window alone is undone by
+            // the reopen below.
+            if (!GuiScaleManager.setMenuGuiScale(scale - 1)) {
                 return "could not change the GUI scale to bring out the cape editor's 3D preview";
             }
             openCapeProbeEditor(mc); // a screen reads the scaled dimensions once, when it opens

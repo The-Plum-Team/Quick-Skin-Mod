@@ -1,10 +1,7 @@
 package com.quickskin.mod.client.gui.widget;
 
 import com.mojang.blaze3d.platform.InputConstants;
-//? if <26.1 {
-//?} else {
 import com.quickskin.mod.client.gui.GuiCompat;
-//?}
 import com.quickskin.mod.client.rendering.PreviewRenderBackend;
 import com.quickskin.mod.client.rendering.PreviewCompositeOrder;
 import com.quickskin.mod.client.rendering.PreviewPlayerData;
@@ -42,8 +39,8 @@ public class PlayerWidget extends AbstractWidget {
     // Display settings
     private float scale = 87.2f; // 10% smaller than previous (96.9 * 0.9 = 87.21)
     private static final float DEFAULT_SCALE = 87.2f; // Default scale value
-    private static final float MIN_SCALE = 20.0f; // Minimum scale for resize
-    private static final float MAX_SCALE = 200.0f; // Maximum scale for resize
+    // The configured size range and its percentage conversion live in PreviewLayoutBox, so the
+    // scroll-wheel resize and the FancyMenu layout box share one formula.
     private static final float SCALE_STEP = 3.0f; // Scale change per scroll tick (smaller for smoother resizing)
 
     // Pivot point for scaling (at the feet position - where the red crosshair is)
@@ -71,6 +68,24 @@ public class PlayerWidget extends AbstractWidget {
     private int cachedModelCenterX = 0;
     private int cachedModelCenterY = 0;
     private float cachedScale = DEFAULT_SCALE;
+
+    // --- Layout-box mode ---
+    // Off unless reportModelBoundsForLayout() turns it on; MenuIntegration does that for the title and
+    // pause previews only when FancyMenu is present. In this mode the widget's rectangle is the drawn
+    // model box, so a layout editor can select, move and resize it, and the model is fitted into
+    // whatever rectangle the editor reports.
+    private boolean reportsModelBounds = false;
+    // False while the host screen is still being built; see getWidth().
+    private boolean layoutBoundsPublished = false;
+    // The model anchor (centre X, feet Y) without the configured position offsets.
+    private int layoutAnchorX = 0;
+    private int layoutAnchorFeetY = 0;
+    // The natural model box last written to the widget's fields, and its scale.
+    private PreviewLayoutBox.Box naturalBox = null;
+    private float naturalScale = DEFAULT_SCALE;
+    // The screen this preview was injected into; deferral to its overlay pass only applies there.
+    // Weak, because MenuIntegration keeps the last preview after its screen has closed.
+    private java.lang.ref.WeakReference<net.minecraft.client.gui.screens.Screen> deferralHost = null;
 
     // Context type for this widget
     public enum WidgetContext {
@@ -336,6 +351,72 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     /**
+     * Report the drawn model box as this widget's rectangle, for layout editors such as FancyMenu.
+     *
+     * <p>Call once, after {@link #setContext} and before the widget is added to {@code host}. The
+     * model keeps the anchor the widget's constructor rectangle gives it; from here on the widget's
+     * position and size fields hold the model box around that anchor instead of that rectangle.
+     * The size getters still report 0x0 until {@link #publishLayoutBounds()}.
+     */
+    public void reportModelBoundsForLayout(net.minecraft.client.gui.screens.Screen host) {
+        // The same anchor getModelCenterX()/getBaseModelCenterY() derive from the widget rectangle.
+        layoutAnchorX = getX() + this.width / 2;
+        layoutAnchorFeetY = getY() + this.height / 2 + 10;
+        deferralHost = new java.lang.ref.WeakReference<>(host);
+        reportsModelBounds = true;
+        syncNaturalBounds();
+    }
+
+    /**
+     * Start reporting the real size, once the host screen has been built (its first rendered frame).
+     *
+     * <p>Mods that rearrange their own buttons around other widgets measure them while the screen is
+     * being initialised; In-Game Account Switcher does. Reporting 0x0 until then keeps this large
+     * decorative widget from pushing them away, while a layout editor, which reads the size when it
+     * renders, still sees the model box.
+     */
+    public void publishLayoutBounds() {
+        if (reportsModelBounds) {
+            layoutBoundsPublished = true;
+        }
+    }
+
+    /**
+     * Write the natural model box (configured scale and offsets) to the widget's fields.
+     *
+     * <p>Writes only when the box changed, so it does not fight a layout editor that overrides the
+     * size fields while the configuration stays the same.
+     */
+    private void syncNaturalBounds() {
+        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+        float scaleForConfig = PreviewLayoutBox.scaleForPercentage(getSliderPercentageFromConfig(config));
+        PreviewLayoutBox.Box box = PreviewLayoutBox.natural(
+                layoutAnchorX + getPositionOffsetXFromConfig(config),
+                layoutAnchorFeetY + getPositionOffsetYFromConfig(config),
+                scaleForConfig);
+        naturalScale = scaleForConfig;
+        if (!box.equals(naturalBox)) {
+            setX(box.x());
+            setY(box.y());
+            this.width = box.width();
+            this.height = box.height();
+            naturalBox = box;
+        }
+    }
+
+    /** True while a layout editor places this preview somewhere other than its natural box. */
+    private boolean layoutManagesPosition() {
+        return reportsModelBounds && naturalBox != null
+                && (getX() != naturalBox.x() || getY() != naturalBox.y());
+    }
+
+    /** True while a layout editor gives this preview a size other than its natural box. */
+    private boolean layoutManagesSize() {
+        return reportsModelBounds && naturalBox != null
+                && (super.getWidth() != naturalBox.width() || super.getHeight() != naturalBox.height());
+    }
+
+    /**
      * Set the context for this widget (determines slider positioning)
      * @param context The context (TITLE_SCREEN, SKIN_MENU, or OTHER)
      */
@@ -480,6 +561,10 @@ public class PlayerWidget extends AbstractWidget {
      * Save position offsets to config based on current context
      */
     private void savePositionOffsetsToConfig(int offsetX, int offsetY) {
+        // A layout editor owns the position; a saved offset would not move the model.
+        if (layoutManagesPosition()) {
+            return;
+        }
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
         switch (context) {
             case TITLE_SCREEN:
@@ -516,8 +601,7 @@ public class PlayerWidget extends AbstractWidget {
         int savedPercentage = getSliderPercentageFromConfig(config);
 
         // Convert percentage (1-100%) to scale value
-        float percentageAsFloat = (savedPercentage - 1) / 99.0f; // Convert 1-100 to 0.0-1.0
-        scale = MIN_SCALE + percentageAsFloat * (MAX_SCALE - MIN_SCALE);
+        scale = PreviewLayoutBox.scaleForPercentage(savedPercentage);
 
         // Ensure cape animation is registered before rendering
         if (previewData.getCapeId() != null && previewData.getCapeLocation() != null) {
@@ -586,8 +670,22 @@ public class PlayerWidget extends AbstractWidget {
         }
 
         // Get current model center (recalculated each frame for correct rotation pivot)
-        int modelCenterX = getModelCenterX();
-        int modelCenterY = getModelCenterY();
+        int modelCenterX;
+        int modelCenterY;
+        if (reportsModelBounds) {
+            // Fit the model into the rectangle a layout editor may have moved or resized. The size
+            // comes from AbstractWidget's getters, which the editor overrides; an untouched
+            // rectangle gives back exactly the configured anchor and scale.
+            syncNaturalBounds();
+            PreviewLayoutBox.Placement placement = PreviewLayoutBox.place(
+                    naturalBox, naturalScale, getX(), getY(), super.getWidth(), super.getHeight());
+            scale = placement.scale();
+            modelCenterX = placement.centerX();
+            modelCenterY = placement.feetY();
+        } else {
+            modelCenterX = getModelCenterX();
+            modelCenterY = getModelCenterY();
+        }
 
         // Cache these values for mouse interaction
         cachedModelCenterX = modelCenterX;
@@ -606,7 +704,10 @@ public class PlayerWidget extends AbstractWidget {
         // animation tick, the interaction cache and the preview data - so it keeps running exactly
         // as before, and the mouse position is carried over so the deferred submission is the same
         // draw this pass would have made.
-        if (defersToScreenOverlay()) {
+        // In layout-box mode the widget can also be drawn by a layout editor that is the current
+        // screen instead of the host; that draw stays inline so it keeps the editor's paint order.
+        if (defersToScreenOverlay()
+                && (!reportsModelBounds || GuiCompat.currentScreen() == deferralHost.get())) {
             previewSubmissionPending = true;
             pendingMouseX = mouseX;
             pendingMouseY = mouseY;
@@ -820,14 +921,22 @@ public class PlayerWidget extends AbstractWidget {
     // Report 0x0 size to the layout system so other mods' overlap detection
     // (e.g. In-Game Account Switcher) won't be pushed away by this large decorative widget.
     // Internal code uses this.width / this.height directly to bypass these overrides.
+    // In layout-box mode (FancyMenu present) the real model box is reported from the host screen's
+    // first rendered frame on: overlap checks run while the screen is built and still see 0x0, and
+    // the layout editor sees the box. The call goes through super so the editor's own size
+    // overrides on AbstractWidget apply. AbstractWidget.render does not change the cursor, so a
+    // non-zero size has no cursor side effect. Where hover is computed from these getters (1.21
+    // and later, and FancyMenu's own hover hook) the model box becomes hoverable from then on: the
+    // narrator can read the preview's narration, a FancyMenu hover sound can play, and keyboard
+    // navigation sees a real rectangle. This happens only with FancyMenu installed.
     @Override
     public int getWidth() {
-        return 0;
+        return reportsModelBounds && layoutBoundsPublished ? super.getWidth() : 0;
     }
 
     @Override
     public int getHeight() {
-        return 0;
+        return reportsModelBounds && layoutBoundsPublished ? super.getHeight() : 0;
     }
 
     @Override
@@ -1064,6 +1173,11 @@ public class PlayerWidget extends AbstractWidget {
             return false;
         }
 
+        // A layout editor owns the size; let the scroll pass instead of saving a scale it overrides.
+        if (layoutManagesSize()) {
+            return false;
+        }
+
         // Adjust scale based on scroll direction
         float oldScale = scale;
 //? if <1.21 {
@@ -1073,14 +1187,12 @@ public class PlayerWidget extends AbstractWidget {
 //?}
 
         // Clamp to min/max
-        scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+        scale = PreviewLayoutBox.clampToConfiguredRange(scale);
 
         // Only save if scale actually changed
         if (scale != oldScale) {
             // Calculate and save percentage
-            float scaleRange = MAX_SCALE - MIN_SCALE;
-            float currentScaleOffset = scale - MIN_SCALE;
-            int percentage = Math.round((currentScaleOffset / scaleRange) * 99.0f) + 1; // 1-100%
+            int percentage = PreviewLayoutBox.percentageForScale(scale); // 1-100%
 
             // Save to config
             saveSliderPercentageToConfig(percentage);
@@ -1096,6 +1208,11 @@ public class PlayerWidget extends AbstractWidget {
      */
     @Override
     public boolean isMouseOver(double mouseX, double mouseY) {
+        // An inactive preview takes no input. MenuIntegration deactivates the title/pause preview
+        // while it is hidden; every other caller leaves the widget active.
+        if (!this.active) {
+            return false;
+        }
 //? if <1.21 {
         // If we're actively dragging or rotating, we need to receive all mouse events
         // regardless of where the cursor is

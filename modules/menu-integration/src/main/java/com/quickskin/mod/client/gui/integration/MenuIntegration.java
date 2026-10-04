@@ -34,6 +34,9 @@ public final class MenuIntegration {
     private static Button animationToggleButton;
     private static final java.util.List<Button> animationButtons = new java.util.ArrayList<>();
     private static boolean isAnimationDropdownOpen = false;
+    // The rotate control of the current preview, and whether the preview's controls are shown.
+    private static Button rotateButton;
+    private static boolean previewControlsShown = true;
 
     private MenuIntegration() {
     }
@@ -243,11 +246,12 @@ public final class MenuIntegration {
                 ).bounds(buttonX, buttonY, buttonWidth, buttonHeight).build();
             }
 
+            FancyMenuWidgets.setIdentifier(changeSkinButton, FancyMenuWidgets.CHANGE_SKIN_ID);
             screenAccess.addRenderableWidget(changeSkinButton);
 
             // Skip PlayerWidget, rotate button, and animation buttons when Essential is present
-            // (Essential has its own player model rendering)
-            if (!essentialPresent) {
+            // (Essential has its own player model rendering) or the preview is hidden in settings
+            if (!essentialPresent && previewEnabled(screenType)) {
                 // Create and add the PlayerWidget above the button using debug offsets
                 int widgetSize = 144;
                 int offsetX = DebugOffsetManager.getOffsetX(screenType);
@@ -266,19 +270,22 @@ public final class MenuIntegration {
                 LocalPlayer player = Minecraft.getInstance().player;
 
                 com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+                // The saved skin, unless a CPM model is the latest look choice: then the player's
+                // own skin (the live one in a world, the imported one on the title screen).
+                String previewSkinHash = com.quickskin.mod.client.rendering.LocalLookPreview.skinHash(player != null);
 
-                // First priority: Use saved skin from config (works on title screen when player is null)
-                if (!config.activeSkinHash.isEmpty()) {
+                // First priority: Use that skin from the catalog (works on title screen when player is null)
+                if (!previewSkinHash.isEmpty()) {
                     com.quickskin.mod.client.services.LocalAssetManager assetManager =
                             com.quickskin.mod.client.services.LocalAssetManager.getInstance();
-                    com.quickskin.mod.common.data.AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
+                    com.quickskin.mod.common.data.AssetMetadata metadata = assetManager.getMetadata(previewSkinHash);
 
                     if (metadata != null) {
                         // Load the saved skin texture
-                        skinLocation = assetManager.getTextureLocation(config.activeSkinHash, com.quickskin.mod.common.data.TextureQuality.FULL);
+                        skinLocation = assetManager.getTextureLocation(previewSkinHash, com.quickskin.mod.common.data.TextureQuality.FULL);
 
                         // Get saved model type preference for this skin
-                        modelType = assetManager.getSkinModelPreference(config.activeSkinHash);
+                        modelType = assetManager.getSkinModelPreference(previewSkinHash);
 
                         // If auto mode, use the detected model type from metadata
                         if ("auto".equals(modelType)) {
@@ -300,10 +307,10 @@ public final class MenuIntegration {
                     //?}
 
                     // Get model type from the active skin if available
-                    if (!config.activeSkinHash.isEmpty()) {
+                    if (!previewSkinHash.isEmpty()) {
                         LocalAssetManager assetManager = LocalAssetManager.getInstance();
-                        modelType = assetManager.getSkinModelPreference(config.activeSkinHash);
-                        AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
+                        modelType = assetManager.getSkinModelPreference(previewSkinHash);
+                        AssetMetadata metadata = assetManager.getMetadata(previewSkinHash);
 
                         // If auto mode, detect from the active custom skin (if any)
                         if ("auto".equals(modelType) && metadata != null) {
@@ -324,8 +331,8 @@ public final class MenuIntegration {
                             modelType = player.getSkin().model() == net.minecraft.world.entity.player.PlayerModelType.SLIM ? "slim" : "classic";
                             //?}
                         }
-                    } else if ("auto".equals(modelType)) {
-                        // No custom skin active, use vanilla player's model
+                    } else {
+                        // No custom skin active, use the player's own model
                         //? if <1.21.9 {
                             //? if <1.21 {
                         modelType = player.getModelName(); // "default" or "slim"
@@ -385,6 +392,12 @@ public final class MenuIntegration {
                 } else if ("pause".equals(screenType)) {
                     playerWidget.setContext(com.quickskin.mod.client.gui.widget.PlayerWidget.WidgetContext.PAUSE_MENU);
                 }
+                // With FancyMenu, report the model box so its layout editor can select, hide, move
+                // and resize the preview under a stable identifier. Without it nothing changes.
+                if (FancyMenuWidgets.isPresent()) {
+                    playerWidget.reportModelBoundsForLayout(screen);
+                    FancyMenuWidgets.setIdentifier(playerWidget, FancyMenuWidgets.PREVIEW_ID);
+                }
                 screenAccess.addRenderableWidget(playerWidget);
 
                 // Restore saved rotation and animation state
@@ -399,21 +412,24 @@ public final class MenuIntegration {
                 int rotateButtonX = buttonX;
                 int rotateButtonY = buttonY - rotateButtonSize - spacing;
 
-                com.quickskin.mod.client.gui.widget.RotateButton rotateButton =
+                com.quickskin.mod.client.gui.widget.RotateButton newRotateButton =
                         new com.quickskin.mod.client.gui.widget.RotateButton(
                                 rotateButtonX,
                                 rotateButtonY,
                                 rotateButtonSize,
                                 button -> playerWidget.toggleRotation()
                         );
-                screenAccess.addRenderableWidget(rotateButton);
+                FancyMenuWidgets.setIdentifier(newRotateButton, FancyMenuWidgets.ROTATE_ID);
+                screenAccess.addRenderableWidget(newRotateButton);
+                rotateButton = newRotateButton;
 
                 //? if <1.21 {
                 playerWidget.clearPriorityWidgets(); // Clear old priorities
                 playerWidget.addPriorityWidget(changeSkinButton); // Change Skin button
-                playerWidget.addPriorityWidget(rotateButton); // Rotate button
+                playerWidget.addPriorityWidget(newRotateButton); // Rotate button
                 //?}
                 // Clear animation buttons from previous screen
+                animationToggleButton = null;
                 animationButtons.clear();
                 isAnimationDropdownOpen = false;
 
@@ -428,6 +444,7 @@ public final class MenuIntegration {
                             Component.literal(">"),
                             button -> toggleAnimationDropdown()
                     ).bounds(animToggleX, animToggleY, animToggleWidth, rotateButtonSize).build();
+                    FancyMenuWidgets.setIdentifier(animationToggleButton, FancyMenuWidgets.ANIMATION_TOGGLE_ID);
                     screenAccess.addRenderableWidget(animationToggleButton);
                     //? if <1.21 {
                     playerWidget.addPriorityWidget(animationToggleButton);
@@ -454,6 +471,7 @@ public final class MenuIntegration {
 
                         animButton.visible = false;
                         animButton.active = false;
+                        FancyMenuWidgets.setIdentifier(animButton, FancyMenuWidgets.animationButtonId(animName));
                         animationButtons.add(animButton);
                         screenAccess.addRenderableWidget(animButton);
                         //? if <1.21 {
@@ -461,12 +479,46 @@ public final class MenuIntegration {
                         //?}
                     }
                 }
+
+                // A fresh screen starts with the preview and its controls shown.
+                applyPreviewControlVisibility(true);
             } else {
-                // Essential is present - hide our player widget and controls
+                // Essential is present or the preview is hidden - drop our player widget and controls
                 playerWidget = null;
+                rotateButton = null;
+                animationToggleButton = null;
                 animationButtons.clear();
                 isAnimationDropdownOpen = false;
+                previewControlsShown = true;
             }
+        });
+
+        /*
+         * First rendered frame of a screen, and every frame after it.
+         *
+         * The preview's real layout size is published here rather than in INIT_POST: mods that move
+         * their buttons away from overlapping widgets (In-Game Account Switcher) measure only while
+         * the screen is initialised, which is over by now, while FancyMenu's layout editor and its
+         * per-frame size mirror read the size after this point. publishLayoutBounds() does nothing
+         * unless FancyMenu is present.
+         *
+         * The rotate and animation controls belong to the preview: they are hidden while the preview
+         * is hidden (by a FancyMenu layout or by visible = false) and come back with it. The update
+         * runs only when that state changes, so other code that sets these buttons is not overridden
+         * every frame; with a visible preview and no FancyMenu it never runs. It is not limited to
+         * the preview's own screen because FancyMenu's layout editor, a screen of its own, edits
+         * this same widget.
+         */
+        ClientGuiEvent.RENDER_PRE.register((screen, graphics, mouseX, mouseY, delta) -> {
+            PlayerWidget widget = playerWidget;
+            if (widget != null) {
+                widget.publishLayoutBounds();
+                boolean shown = widget.visible && !FancyMenuWidgets.isHidden(widget);
+                if (shown != previewControlsShown) {
+                    applyPreviewControlVisibility(shown);
+                }
+            }
+            return dev.architectury.event.EventResult.pass();
         });
 
         /*
@@ -514,9 +566,46 @@ public final class MenuIntegration {
     public static void resetSessionState() {
         playerWidget = null;
         PreviewAnimationState.set("idle");
+        rotateButton = null;
         animationToggleButton = null;
         animationButtons.clear();
         isAnimationDropdownOpen = false;
+        previewControlsShown = true;
+    }
+
+    /**
+     * Show or hide the preview's own controls together with the preview.
+     *
+     * <p>The rotate button, the animation toggle and the numbered animation buttons are hidden and
+     * disabled while the preview is hidden, and restored when it is shown; the numbered buttons
+     * come back only if their dropdown is open. The Change Skin button is never touched. The
+     * preview itself is deactivated while hidden, so it takes no clicks or scrolls.
+     */
+    private static void applyPreviewControlVisibility(boolean shown) {
+        previewControlsShown = shown;
+        if (playerWidget != null) {
+            playerWidget.active = shown;
+        }
+        setShown(rotateButton, shown);
+        setShown(animationToggleButton, shown);
+        for (Button button : animationButtons) {
+            setShown(button, shown && isAnimationDropdownOpen);
+        }
+    }
+
+    private static void setShown(AbstractWidget widget, boolean shown) {
+        if (widget != null) {
+            widget.visible = shown;
+            widget.active = shown;
+        }
+    }
+
+    /**
+     * Whether the user keeps the preview visible on this screen ("title" or "pause")
+     */
+    private static boolean previewEnabled(String screenType) {
+        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+        return "pause".equals(screenType) ? config.showPauseMenuPreview : config.showTitleScreenPreview;
     }
 
     /**
@@ -579,8 +668,8 @@ public final class MenuIntegration {
             animationToggleButton.setMessage(Component.literal(isAnimationDropdownOpen ? "×" : ">"));
         }
         for (Button button : animationButtons) {
-            button.visible = isAnimationDropdownOpen;
-            button.active = isAnimationDropdownOpen;
+            button.visible = isAnimationDropdownOpen && previewControlsShown;
+            button.active = isAnimationDropdownOpen && previewControlsShown;
         }
     }
 

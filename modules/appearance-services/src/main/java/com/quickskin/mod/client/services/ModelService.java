@@ -111,6 +111,11 @@ public class ModelService implements IModelService {
         return modelOverrides.containsKey(playerId);
     }
 
+    @Override
+    public void clearModelOverride(@Nullable UUID playerId) {
+        if (playerId != null) modelOverrides.remove(playerId);
+    }
+
     /**
      * Clears all model overrides (e.g., when disconnecting)
      */

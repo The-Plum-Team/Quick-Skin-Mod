@@ -259,7 +259,8 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   AI review and by the adapter's `collect` hook.
 - `e2e/mod-compatibility-contract.json` is the reviewed optional-mod artifact lock. It owns the
   supported integration ids, applicability rules, authored loader/version exclusions with reasons,
-  Modrinth project identities, and every immutable
+  Modrinth project identities, the third-party dependencies a mod needs beyond the packaged
+  runtime, and every immutable
   external JAR URL/filename/size/SHA-256/SHA-512 tuple. `e2e/mod_compatibility.py` is its fail-closed
   runtime reader, planner, and materializer. `e2e/update_mod_compatibility_lock.py` is the only code
   allowed to query Modrinth or select a newest upstream release; it is an explicit maintainer tool,

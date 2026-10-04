@@ -26,6 +26,13 @@ import java.util.Set;
  * renderer reads the entity during its inline draw/extraction, so that read is answered as empty.
  * {@link Scope} is that duration.
  *
+ * <p>One draw may name slots it leaves visible, and that is the only way around the rule: the set
+ * above never shrinks, a draw opts out of single slots for its own duration. It exists for the
+ * in-game HUD preview, which mirrors the live player: a gun mod that poses the arms around its
+ * weapon reads the same main hand the preview answers as empty, so the model either held nothing
+ * in a rifle stance or dropped the stance the world shows. The caller decides when that applies;
+ * every other preview, and every other slot, keeps reading empty.
+ *
  * <p>Deliberately free of Minecraft types, so the rule and the scoping stay unit testable in the
  * loader-independent test source set, in the same spirit as {@link PreviewCapeBindings}.
  */
@@ -81,10 +88,12 @@ public final class PreviewEquipmentPolicy {
 
         private static final class Frame<E> {
             private final E subject;
+            private final Set<Slot> visible;
             private int depth = 1;
 
-            private Frame(E subject) {
+            private Frame(E subject, Set<Slot> visible) {
                 this.subject = subject;
+                this.visible = visible;
             }
         }
 
@@ -101,6 +110,17 @@ public final class PreviewEquipmentPolicy {
 
         /** Begin suppressing equipment reads for {@code subject} on the calling thread. */
         public void begin(E subject) {
+            begin(subject, Collections.emptySet());
+        }
+
+        /**
+         * Begin suppressing equipment reads for {@code subject}, except the {@code visible} slots.
+         *
+         * <p>The exception belongs to the draw that opened the scope and ends with it. A nested
+         * {@code begin} for the same subject keeps the outer draw's set, so an inner caller can
+         * neither reveal a slot the outer draw hides nor hide one it shows.
+         */
+        public void begin(E subject, Set<Slot> visible) {
             if (subject == null) {
                 return;
             }
@@ -114,7 +134,9 @@ public final class PreviewEquipmentPolicy {
                 // the mod nests two previews, so refuse rather than silently mis-scope the outer one.
                 return;
             }
-            frame.set(new Frame<>(subject));
+            frame.set(new Frame<>(subject, visible == null || visible.isEmpty()
+                    ? Collections.<Slot>emptySet()
+                    : Collections.unmodifiableSet(EnumSet.copyOf(visible))));
             open++;
         }
 
@@ -133,7 +155,7 @@ public final class PreviewEquipmentPolicy {
             }
         }
 
-        /** Whether {@code subject}'s equipment must read as empty right now, on this thread. */
+        /** Whether a preview of {@code subject} is being drawn right now, on this thread. */
         public boolean isActiveFor(E subject) {
             if (open == 0 || subject == null) {
                 return false;
@@ -142,7 +164,22 @@ public final class PreviewEquipmentPolicy {
             return current != null && current.subject == subject;
         }
 
-        /** Open scopes across all threads, for bounding assertions. */
+        /**
+         * Whether {@code subject}'s {@code slot} must read as empty right now, on this thread: the
+         * scope is open for exactly this subject, the rule suppresses the slot, and the draw that
+         * opened the scope did not leave it visible.
+         */
+        public boolean suppresses(E subject, Slot slot) {
+            if (open == 0 || subject == null) {
+                return false;
+            }
+            Frame<E> current = frame.get();
+            return current != null && current.subject == subject
+                    && PreviewEquipmentPolicy.suppresses(slot)
+                    && !current.visible.contains(slot);
+        }
+
+        /** Open scopes across all threads: a read hook's cheap first question, and a test bound. */
         public int openScopes() {
             return open;
         }

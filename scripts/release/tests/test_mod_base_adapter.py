@@ -803,10 +803,10 @@ class FamilyValidateTest(Scratch):
         self.assert_producer(projection, HEAD)
         self.assertEqual(SUBJECT["commit"], projection["subject"]["commit"])
         counts = {lane["variant"]["id"]: len(lane["pairs"]) for lane in projection["lanes"]}
-        self.assertEqual({"cpm": 7, "ears": 5, "customnpcs": 2, "essential": 2, "replaymod": 2, "skin-layers-3d": 2},
-                         counts)
+        self.assertEqual({"cpm": 7, "ears": 5, "customnpcs": 2, "essential": 2, "fancymenu": 2, "replaymod": 2,
+                          "skin-layers-3d": 2}, counts)
         self.assertEqual({lane["review"]["reviewed_frame_count"] for lane in projection["lanes"]}, {7, 5, 2})
-        self.assertEqual(11, len(projection["lanes"]))
+        self.assertEqual(13, len(projection["lanes"]))
         self.assertEqual([("forge-1.20.1", "replaymod")],
                          [(row["artifact_node"], row["variant_id"]) for row in projection["not_applicable"]])
         self.assertEqual(["Clean reference run", "Compatibility runtime run", "Complete AI review", "Publication run"],
@@ -831,7 +831,7 @@ class FamilyValidateTest(Scratch):
         self.assertEqual("available", result["status"])
         projection = json.loads((output / "paired.json").read_bytes())
         self.assertEqual([], projection["lanes"])
-        self.assertEqual(12, len(projection["not_applicable"]))
+        self.assertEqual(14, len(projection["not_applicable"]))
 
     def test_carry_forward_names_the_envelope_coverage(self) -> None:
         coverage, expected = "c" * 40, HEAD

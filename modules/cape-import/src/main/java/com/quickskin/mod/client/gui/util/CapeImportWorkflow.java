@@ -208,8 +208,13 @@ public final class CapeImportWorkflow {
             CapeImportProcessor.PreparedCape prepared, BufferedImage adjusted) {
         ClientIoExecutor.supplyAsync(() -> {
             try {
-                CapeImportProcessor.saveAdjusted(
+                Path saved = CapeImportProcessor.saveAdjusted(
                         prepared, adjusted, targetDirectory, metadataDirectory, vanillaElytra);
+                try {
+                    CapeEditorSources.retain(metadataDirectory, saved, prepared.source());
+                } catch (IOException | RuntimeException ignored) {
+                    // The cape is imported; it only cannot be reopened in the editor.
+                }
                 return (String) null;
             } catch (IOException | RuntimeException error) {
                 return error.getMessage();

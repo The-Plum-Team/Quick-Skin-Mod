@@ -62,11 +62,16 @@ DEGRADABLE_MIXINS = {
 # the optional-config plugin or are harmless vanilla interception points whose handlers no-op when
 # the integration is absent.
 OPTIONAL_MIXINS = {
+    "main:com/quickskin/mod/mixin/compat/EtfPlayerTextureMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmModelDefinitionLoaderMixin.java",
+    "main:com/quickskin/mod/mixin/compat/TaczPreviewAnimationMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
     "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
+    "main:com/quickskin/mod/mixin/compat/EarsFiveBuzzMixin.java",
+    "main:com/quickskin/mod/mixin/compat/EarsFiveMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
+    "main:com/quickskin/mod/mixin/compat/RealCameraTextureIdMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
     "overlay:com/quickskin/mod/mixin/compat/ReplayModCompatMixin.java",
 }
@@ -93,7 +98,13 @@ ALTERNATIVE_HOOKS = {
 # Audited vanilla bytecode multiplicities. Before 1.21.2 renderHand requests two buffers (arm and
 # sleeve); 1.21.2 through 1.21.8 make one immediate arm draw. The collector used from 1.21.9 onward
 # is deliberately not intercepted. SkinManager 1.20.1 has two RETURN opcodes in its one target method.
+# TaCZ 1.1.8-hotfix asks for the camera type once in each of its four gun-event handlers; the one
+# redirect names all four and takes the first call of each, so four is also the most it can match.
 INJECTION_COUNT_OVERRIDES = {
+    (
+        "main:com/quickskin/mod/mixin/compat/TaczPreviewAnimationMixin.java",
+        "quickskin$firstPersonUnlessPreviewed",
+    ): {4},
     (
         "main:com/quickskin/mod/mixin/ItemInHandRendererMixin.java",
         "quickskin$redirectRenderHandBuffer",
@@ -217,6 +228,7 @@ class MixinPolicyTest(unittest.TestCase):
                 config = json.loads(path.read_text(encoding="utf-8"))
                 self.assertIs(config["required"], False)
                 self.assertEqual(config["injectors"]["defaultRequire"], 0)
+                self.assertIn("RealCameraTextureIdMixin", config["client"])
 
     def test_configured_mixins_exist_and_dynamic_mixins_are_audited(self) -> None:
         configs = self.configs_named("quickskin.mixins.json") + self.configs_named(
@@ -243,6 +255,7 @@ class MixinPolicyTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('"CpmModelDefinitionLoaderMixin"', plugin)
         self.assertIn('"CpmRenderDepthMixin"', plugin)
+        self.assertIn('"RealCameraTextureIdMixin"', plugin)
         configured.add("CpmRenderDepthMixin")
 
         source_classes = {source.stem for source in self.mixin_sources()}
@@ -280,9 +293,39 @@ class MixinPolicyTest(unittest.TestCase):
                 self.assertTrue(compat_mixins.isdisjoint(core_names))
                 self.assertTrue(compat_mixins <= optional_names | dynamic_names)
 
+    def test_ears_five_lookup_selects_every_overload(self) -> None:
+        source = (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/compat/EarsFiveMixin.java"
+        ).read_text(encoding="utf-8")
+        # A bare name selects only the first declared overload, which this handler does not match.
+        self.assertIn('method = "getEarsFeatures*"', source)
+
     def test_packaged_clients_enable_expect_counting(self) -> None:
         runtime = (ROOT / "e2e" / "packaged_runtime.py").read_text(encoding="utf-8")
         self.assertIn('"-Dmixin.debug.countInjections=true"', runtime)
+
+    def test_etf_bridge_is_registered_for_every_target(self) -> None:
+        # An overlay config replaces the canonical one, and the plugin rejects unknown mixins, so
+        # a missing entry in either silently disables the bridge on those targets.
+        for path in self.configs_named("quickskin-ears.mixins.json"):
+            with self.subTest(config=relative(path)):
+                config = json.loads(path.read_text(encoding="utf-8"))
+                self.assertIn("EtfPlayerTextureMixin", config["client"])
+        plugin = (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/compat/EarsMixinPlugin.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"EtfPlayerTextureMixin"', plugin)
+
+    def test_fabric_renderer_hook_cancels_only_when_vanilla_differs(self) -> None:
+        # An unconditional cancel at HEAD skips other mods' RETURN callbacks on this lookup,
+        # which is where Entity Texture Features builds a player's skin features.
+        source = (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/PlayerRendererMixin.java"
+        ).read_text(encoding="utf-8")
+        calls = [line for line in source.splitlines() if "cir.setReturnValue(" in line]
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            self.assertIn(".equals(vanillaSkin)", call)
 
 
 if __name__ == "__main__":

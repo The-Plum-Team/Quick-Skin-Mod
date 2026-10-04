@@ -12,6 +12,22 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   decoding, hashing, chunk assembly, and other bulk work belong on the bounded worker executors.
 - Executors, queues, prepared handoffs, and pending transfers must remain bounded and must release
   leases on success, failure, cancellation, disconnect, and shutdown.
+- A skin selection belongs to the launcher account (profile UUID plus exact name), never to the
+  instance. At every join outside a replay `ClientRuntime` makes `ClientConfig.activeSkinHash`
+  the joining account's selection (`AccountSkinPreferences.project`); the selection that
+  predates per-account storage goes to the first account that joins, once.
+  `CpmModelWorkflow.activateSkin` records one, which includes the skin menu's programmatic
+  selections; the own-skin auto-selection of `PlayerOwnSkinBootstrap` / `SavedAppearanceRestorer`
+  and a skin adopted from the server do not. Capes and CPM models stay instance-wide.
+- A session whose account has no selection uploads nothing until it has seen the server's record
+  of its own player (`AccountSkinSession`), and only on a negotiated connection that completes
+  appearance snapshots; the latest sync requested meanwhile is held, never dropped. A saved
+  `local_skin:` record is then adopted whole: its skin, cape and model replace the look applied
+  at the join and nothing is uploaded, so a cape such an account picked while disconnected is
+  not worn until it is picked again. Any other record, or the snapshot completion, sends the
+  held sync or else the usual bootstrap upload. An account with a selection, a v1 server, a
+  replay and every later own-player update keep the earlier rule: own updates are confirmations
+  only.
 
 ## Networking and texture identity
 
@@ -53,6 +69,13 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   SHA-1 alias, retain every strong entry but refuse to resolve or emit that ambiguous legacy alias.
 - Peer-advertised texture and chunk limits may only reduce local hard caps. Codecs, assemblers,
   pacing, and caches continue to enforce the local bounds even after negotiation.
+- A legacy v1 (Quick Skin 2.x) server persists each uploaded texture and relays it, at the upload
+  and again whenever a player joins or changes dimension, to the other Quick Skin players as one
+  unchunked `quickskin:send_texture` payload. A client in `LEGACY_V1` mode therefore uploads at
+  most `TextureTransferLimits.MAX_LEGACY_UPLOAD_BYTES` (`ProtocolProfile.maximumUploadBytes()`)
+  and sends the appearance with a larger texture's id empty, so that server replaces the copy it
+  stored instead of relaying it again. The bound never applies to the same profile on a 3.x
+  server, which serves 2.x clients in chunks.
 - Keep packet codecs, chunk assemblers, rate limiters, request maps, retry state, and caches bounded.
 - Large texture bytes are demand-driven: advertise appearances/hashes, and send bytes only after a
   missing client requests them. Preserve the global per-tick response and upload pacing.
@@ -99,6 +122,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Use `BoundedFileReader`, `SafeImageReader`, and the established GIF preflight path. Do not add
   production `ImageIO.read`, unbounded `Files.readAllBytes`/`readString`, or decode-before-dimension
   validation.
+- Skin import copies decoded pixels that have alpha exactly and never composites them, except in
+  its intended transforms (resizing to a supported resolution and the 64x32 legacy conversion);
+  images without alpha keep the plain blit, so greyscale skins are not gamma-shifted. Transparency
+  flattening forces opacity only on vanilla's own opaque regions, (0,0)-(32,16), (0,16)-(64,32)
+  and (16,48)-(48,64), so data that other mods store in unused texels, such as a CPM model
+  embedded in the skin, survives import with every alpha and colour byte intact.
 - Resolve content-addressed paths through the containment helpers. Reject invalid content IDs,
   symbolic-link targets, and paths outside the configured root.
 - Persist mutable state using a temporary file plus atomic replace where supported. Keep the
@@ -123,6 +152,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Opaque-fill, import fallback, local/network presentation, and animation processing must share
   the same structural mask; content-addressed source bytes remain immutable when only presentation
   requires normalization.
+- A cape saved through the cape editor keeps its original PNG or GIF in
+  `quickskin_cache/cape_editor_sources/<cape content ID>.<ext>` (`CapeEditorSources`). That file
+  only reopens `CapeAdjustScreen`: it is never scanned, registered as a texture or animation, or
+  substituted for a cape that has none. An edit writes the new metadata and source association
+  first, replaces the catalogued PNG in place, and re-points the active cape and its animation
+  speed to the new content ID; a source is removed only when no catalogued cape carries its ID.
 - An active Quick Skin cape is authoritative for both the renderer's cape and profile-Elytra
   texture inputs. Never retain an unrelated Mojang/profile Elytra beside a custom cape: vanilla
   gives that dedicated field priority and would otherwise replace only the worn wings when the
@@ -131,17 +166,82 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 ## Optional integrations
 
-- CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, and ReplayMod are optional. Guard their entry
-  points and preserve the normal skin/cape path when an optional mod or API is absent.
+- CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, ReplayMod, and FancyMenu are optional. Guard
+  their entry points and preserve the normal skin/cape path when an optional mod or API is absent.
+- Real Camera finds the first-person body by a captured texture id containing `minecraft:skins/`.
+  `RealCameraTextureIdMixin` prefixes Quick Skin skin ids inside Real Camera's own buffer record
+  only; it is a fail-open shim without a compatibility lane. Do not rename the registered
+  `quickskin:` texture locations for another mod.
 - From Minecraft 1.21.2 onward, the vanilla outer skin parts are children of their matching body
   parts. Preserve their baked local poses; copying the parent pose onto a child applies the pivot
   twice and detaches both the flat outer layers and the 3D Skin Layers geometry in offline previews.
   The compatibility harness must authenticate these local poses before visual review.
+- FancyMenu layout support for the title/pause preview lives in `menu-integration` and reaches
+  FancyMenu's per-widget API by reflection only: no dependency, mixin or module edge. Only when
+  that API is present does the preview report its drawn model box as its size, and only from its
+  screen's first rendered frame; while the screen is being built it reports 0x0, so mods that
+  measure overlaps during init (In-Game Account Switcher) never move away from it. A hidden
+  preview hides its rotate and animation controls. FancyMenu's compatibility lane locks its required
+  Konkrete and Melody JARs beside it; every scenario runs with FancyMenu installed and nothing
+  customized, and only the `mod-compatibility` scenario seeds the layouts that hide the title
+  preview and move and enlarge the pause preview.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
+- The latest look choice between Quick Skin and CPM is the local player's look, for every other
+  player as well and across relogs and restarts (`CpmLook`). It is derived from CPM's persisted
+  `selectedModel`, Quick Skin's selection and, per connection, a model the server assigned: a CPM
+  selection equal to Quick Skin's model is Quick Skin's model, any other CPM selection or a server
+  model that arrived without one is CPM's, and otherwise the look is Quick Skin's. Every skin
+  chosen in Quick Skin resets CPM to skin mode and asks CPM's server to drop its model
+  (`CpmModelWorkflow.activateSkin`); CPM keeps a forced one, which then stays the look. While a
+  CPM model is the look, whether CPM's own, a server's or one chosen in Quick Skin, the local
+  player wears no Quick Skin skin, locally or on the server (an empty skin id; the cape stays):
+  `CpmLookArbiter` withdraws it and `PlayerAppearanceService.applyLook` withholds a re-applied
+  local skin. When the look returns to Quick Skin, the saved Quick Skin look is applied again, and
+  the server's skin-change cooldown does not count that return to the skin worn before as a change
+  (`ServerCooldownManager.isSkinChange`). Opening the skin menu is no look choice: it selects no
+  entry while CPM's own model is the look and does not select Quick Skin's model again. Quick
+  Skin's previews of the local look (the HUD overlay, the title and pause menu widgets and the cape
+  screens) follow the same choice (`LocalLookPreview`): in a world they draw the live player, whose
+  model CPM draws; while a CPM model is the look their skin data is never the saved Quick Skin
+  skin, and a title-screen preview that has no player entity to draw, where CPM draws nothing,
+  shows the player's imported own skin. Screens read the choice as it stands when they are built;
+  the HUD overlay reads `CpmLookArbiter`'s latest decision every frame. Re-applying an appearance
+  never resets CPM. Quick Skin never hides a model CPM draws: the renderer-level texture override
+  stands down for every player CPM draws a model for
+  (`CPMCompatIntegration.isWearingCpmModel`, the condition of CPM's own render gate read on the
+  entry CPM already has, kept per player for 100 ms), so CPM's hook at the tail of that lookup
+  binds the model's texture. An empty skin id sets no model override, so the vanilla skin keeps
+  its own model, and from Minecraft 1.21 it rebuilds the vanilla skin lookup PlayerInfo resolved
+  while the skin was active (`QuickSkinSkinLookupAccess`). Where CPM reads Quick Skin skins (the
+  embedded-PNG bridge), a network skin whose file CPM asked for before its bytes arrived makes CPM
+  load its players again once it is stored, so a model embedded in it loads. That one coalesced
+  reload (`CpmMissedSkinFiles`, at most 256 misses, `onMissedNetworkSkinStored`) is the only
+  CPM refresh on a network skin's arrival; a skin CPM never missed needs none.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
+- A preview hides everything the previewed player wears or holds. The one exception is the HUD
+  preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
+  that model as it does in the world. It exists only on the inline draw before 1.21.6; the
+  render-state path keeps blanking both hands, because no TaCZ exists for those versions. TaCZ is
+  not a supported integration and has no compatibility lane: recognise its gun type by name only,
+  never compile against or call TaCZ, and fall back to the hidden hand whenever the mod is absent
+  or changed. Keep the exception to the main hand of the live local player (TaCZ's Player
+  Animator layers shed their fades only when that player ticks), keep every menu preview free of
+  held items, and keep the previewed player's previous-tick rotation pinned for the draw, which
+  TaCZ's layers read.
+- TaCZ starts the local player's third-person reload, recoil and melee animations, and resets
+  the stance on a gun switch, from its gun events and only while the camera is not first person.
+  The optional `TaczPreviewAnimationMixin` is the only hook into TaCZ: it redirects that one
+  camera check in TaCZ's four event handlers and answers "not first person" only while the HUD
+  preview is showing the local player with the gun, which the preview's own draws record. Never
+  start, stop or choose a TaCZ animation from Quick Skin, and never widen the hook beyond that
+  check. It must stay fail-open (`@Pseudo`, targets named by string, gated on TaCZ's class file in
+  `EarsMixinPlugin`, `require = 0`) and listed in every copy of `quickskin-ears.mixins.json`,
+  because the 1.20.1 overlay replaces the canonical file on the only lane official TaCZ exists
+  for. The animation plays on the real local player, so other first-person draws of that
+  player's model show it too; it never reaches the first-person arms.
 
 ## Public E2E evidence
 
@@ -309,6 +409,18 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   and rear vantage, that the observer's renderer has compiled the terrain at and below the
   subject. Vanilla skips entities in uncompiled sections, so appearance state alone can pass on
   a sky-only frame.
+- The CPM apply checkpoints (`mod-compatibility` local apply and the live remote apply/observe
+  pair) first prove, without a capture, Quick Skin's own skin that carries a CPM model in its
+  pixels, imported through the ordinary skin import: on every band the stored file (locally) and
+  the bytes the observer received (remotely) hash to their id and equal the bundled fixture texel
+  for texel; on the file-backed bridge band (1.20.1 to 1.21.3) CPM must also load that very model,
+  recognised by the pose the skin encodes rather than by any new healthy definition, for the
+  local player and for the remote observer, whose acknowledgement the server must confirm before
+  the subject resets.
+  The harness sets the band from the runtime version and fails when `CpmCapabilities` disagrees,
+  so a capability regression cannot silently skip the model check. The phase ends in the same
+  normal-skin state, so frames, captures and checkpoint counts are unchanged; its proof is
+  appended to the bounded `runtime_evidence`.
 - Every orchestrator invocation writes into a fresh owned workspace and promotes only its bounded
   evidence snapshot to `current`. Replacing `current` may remove only a marker-authenticated prior
   snapshot; promotion to one target is serialized across processes and retains the workspace's

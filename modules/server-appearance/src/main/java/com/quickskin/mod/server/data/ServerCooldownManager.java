@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ServerCooldownManager {
     private static final ServerCooldownManager INSTANCE = new ServerCooldownManager();
     private final Map<UUID, Long> lastSkinChangeTimestamps = new ConcurrentHashMap<>();
+    private final Map<UUID, String> lastWornSkins = new ConcurrentHashMap<>();
 
     private ServerCooldownManager() {}
 
@@ -34,6 +35,25 @@ public class ServerCooldownManager {
         long cooldownMillis = cooldownSeconds * 1000L;
 
         return (System.currentTimeMillis() - lastChangeTime) < cooldownMillis;
+    }
+
+    /**
+     * Whether applying {@code newSkinId} changes the player's skin for the cooldown: a skin other
+     * than the current one and other than the last one the player wore. Wearing no skin (a CPM
+     * model replaced it) and then the same skin again is not a change.
+     */
+    public boolean isSkinChange(UUID playerId, String newSkinId, String currentSkinId) {
+        if (newSkinId == null || newSkinId.isEmpty() || newSkinId.equals(currentSkinId)) {
+            return false;
+        }
+        return playerId == null || !newSkinId.equals(lastWornSkins.get(playerId));
+    }
+
+    /** Remembers the skin a player now wears; an empty skin id keeps the previous one. */
+    public void recordWornSkin(UUID playerId, String skinId) {
+        if (playerId != null && skinId != null && !skinId.isEmpty()) {
+            lastWornSkins.put(playerId, skinId);
+        }
     }
 
     /**
@@ -74,10 +94,12 @@ public class ServerCooldownManager {
      */
     public void removePlayer(UUID playerId) {
         lastSkinChangeTimestamps.remove(playerId);
+        lastWornSkins.remove(playerId);
     }
 
     /** Clears every cooldown owned by the current server session. */
     public void clear() {
         lastSkinChangeTimestamps.clear();
+        lastWornSkins.clear();
     }
 }
