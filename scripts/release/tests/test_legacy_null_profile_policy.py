@@ -102,6 +102,31 @@ class LegacyNullProfilePolicyTest(unittest.TestCase):
                         f"{name} must guard the null profile id before {profile_use}",
                     )
 
+    def test_legacy_skin_manager_prefers_the_connected_player_uuid(self) -> None:
+        """An offline-mode server or proxy may assign a UUID that differs from the launcher's.
+
+        Both hooks take the local UUID from one helper (issue #2011): the connected player's,
+        and the session UUID only while no player exists or ReplayMod's camera is the player.
+        """
+        if not LEGACY_SKIN_MANAGER_MIXIN.exists():
+            return  # Retired overlay: the test above ties this file to the matrix.
+
+        source = LEGACY_SKIN_MANAGER_MIXIN.read_text(encoding="utf-8")
+        helper_signature = "private static UUID quickskin$localPlayerUuid() {"
+        method_end = "\n    }\n"
+        self.assertIn(helper_signature, source)
+        helper = _method_body(source, helper_signature, method_end)
+        self.assertIn("!ReplayModHelper.isInReplay()", helper)
+        self.assertLess(helper.index("player.getUUID()"), helper.index("mc.getUser()"))
+        for handler in (
+            "private void quickskin$wrapRegisterSkins(",
+            "private void quickskin$overrideSkinInfo(",
+        ):
+            with self.subTest(handler=handler):
+                body = _method_body(source, handler, method_end)
+                self.assertEqual(1, body.count("localUuid = quickskin$localPlayerUuid();"))
+                self.assertNotIn("getUser()", body)
+
 
 if __name__ == "__main__":
     unittest.main()
