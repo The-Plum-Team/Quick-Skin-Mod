@@ -246,8 +246,8 @@ public final class MenuIntegration {
             screenAccess.addRenderableWidget(changeSkinButton);
 
             // Skip PlayerWidget, rotate button, and animation buttons when Essential is present
-            // (Essential has its own player model rendering)
-            if (!essentialPresent) {
+            // (Essential has its own player model rendering) or the preview is hidden in settings
+            if (!essentialPresent && previewEnabled(screenType)) {
                 // Create and add the PlayerWidget above the button using debug offsets
                 int widgetSize = 144;
                 int offsetX = DebugOffsetManager.getOffsetX(screenType);
@@ -462,8 +462,9 @@ public final class MenuIntegration {
                     }
                 }
             } else {
-                // Essential is present - hide our player widget and controls
+                // Essential is present or the preview is hidden - drop our player widget and controls
                 playerWidget = null;
+                animationToggleButton = null;
                 animationButtons.clear();
                 isAnimationDropdownOpen = false;
             }
@@ -517,6 +518,14 @@ public final class MenuIntegration {
         animationToggleButton = null;
         animationButtons.clear();
         isAnimationDropdownOpen = false;
+    }
+
+    /**
+     * Whether the user keeps the preview visible on this screen ("title" or "pause")
+     */
+    private static boolean previewEnabled(String screenType) {
+        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+        return "pause".equals(screenType) ? config.showPauseMenuPreview : config.showTitleScreenPreview;
     }
 
     /**
