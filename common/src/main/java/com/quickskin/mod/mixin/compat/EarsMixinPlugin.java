@@ -13,6 +13,10 @@ import java.util.Set;
  * mixin transformer has had a chance to process them.
  */
 public class EarsMixinPlugin implements IMixinConfigPlugin {
+    private static final List<String> EARS_FIVE_MIXINS = List.of(
+            "EarsFiveMixin",
+            "EarsFiveBuzzMixin"
+    );
     private static final List<String> CPM_MIXINS = List.of(
             "CpmModelDefinitionLoaderMixin",
             "CpmRenderDepthMixin"
@@ -47,6 +51,12 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         }
         if (mixinClassName.contains("EarsModMixin")) {
             return classFileExists("com/unascribed/ears/EarsMod.class");
+        }
+        // Ears 2.x keeps its lookup in one class per port (Thermite, Ward, Buzz) instead of the
+        // 1.4.x classes gated above. Those targets are @Pseudo and the mixins reference no Ears
+        // types, so they follow the CPM policy below rather than a resource gate.
+        if (EARS_FIVE_MIXINS.stream().anyMatch(name -> mixinNamed(mixinClassName, name))) {
+            return true;
         }
         // CPM targets are @Pseudo and live in this optional, fail-open config. Do not resource-gate
         // them here: on current Fabric the plugin is queried before CPM's collector resource is
