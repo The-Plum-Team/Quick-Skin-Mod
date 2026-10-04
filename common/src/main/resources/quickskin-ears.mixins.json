@@ -10,7 +10,8 @@
     "CpmModelDefinitionLoaderMixin",
     "TaczPreviewAnimationMixin",
     "CpmRenderDepthMixin",
-    "CpmSubmitCollectorMixin"
+    "CpmSubmitCollectorMixin",
+    "RealCameraTextureIdMixin"
   ],
   "injectors": {
     "defaultRequire": 0

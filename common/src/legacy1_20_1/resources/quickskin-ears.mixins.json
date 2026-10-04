@@ -11,6 +11,7 @@
     "TaczPreviewAnimationMixin",
     "CpmRenderDepthMixin",
     "CpmSubmitCollectorMixin",
+    "RealCameraTextureIdMixin",
     "ReplayModCompatMixin"
   ],
   "injectors": {
