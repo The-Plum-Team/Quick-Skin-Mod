@@ -831,7 +831,7 @@ class FamilyValidateTest(Scratch):
         self.assertEqual("available", result["status"])
         projection = json.loads((output / "paired.json").read_bytes())
         self.assertEqual([], projection["lanes"])
-        self.assertEqual(12, len(projection["not_applicable"]))
+        self.assertEqual(14, len(projection["not_applicable"]))
 
     def test_carry_forward_names_the_envelope_coverage(self) -> None:
         coverage, expected = "c" * 40, HEAD
