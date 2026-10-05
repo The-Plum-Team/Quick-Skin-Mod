@@ -40,6 +40,31 @@ class AnimationSlotPolicyTest {
     }
 
     @Test
+    void markingOncePerTickPlansExactlyAsMarkingOnEveryFrame() {
+        // The cape renderer marks a visible cape once per client tick instead of once per frame;
+        // a mark records only the tick, so every admission decision must be identical.
+        AnimationSlotPolicy everyFrame = new AnimationSlotPolicy(1, 8, 2);
+        AnimationSlotPolicy oncePerTick = new AnimationSlotPolicy(1, 8, 2);
+        Set<String> active = Set.of("active");
+
+        for (int tick = 0; tick < 8; tick++) {
+            if (tick < 3) {
+                for (int frame = 0; frame < 5; frame++) everyFrame.markVisible("active");
+                oncePerTick.markVisible("active");
+            }
+            for (int frame = 0; frame < 5; frame++) everyFrame.markVisible("candidate");
+            oncePerTick.markVisible("candidate");
+
+            assertEquals(everyFrame.plan("candidate", active), oncePerTick.plan("candidate", active),
+                    "tick " + tick);
+            everyFrame.advanceTick();
+            oncePerTick.advanceTick();
+        }
+        assertEquals(AnimationSlotPolicy.Kind.REPLACE_STALE,
+                oncePerTick.plan("candidate", active).kind());
+    }
+
+    @Test
     void offscreenSlotBecomesReplaceableAfterTheGraceWindow() {
         AnimationSlotPolicy policy = new AnimationSlotPolicy(2, 8, 2);
         policy.markVisible("stale");

@@ -242,11 +242,21 @@ public final class ServerPolicyScenario implements Scenario {
                         return Step.Result.fail("server never echoed the transparent skin: "
                                 + sync.describe());
                     }
+                    // Stated in full: the reviewer read the former "client setting off" as a client
+                    // that disallows transparency, the opposite of what this capture proves.
+                    ClientConfig config = ClientConfig.getInstance();
+                    if (config.disableSkinTransparency) {
+                        return Step.Result.fail("client disableSkinTransparency flipped to true;"
+                                + " the capture must show the server policy overriding a client"
+                                + " that allows transparency");
+                    }
                     acknowledgedTransparentSync.set(acknowledged);
                     return Step.Result.pass("local_skin:" + hash + " classic at rear FOV "
                             + REAR_EVIDENCE_FOV + "; source window alpha 0 / sleeve alpha "
                             + TestAssets.TRANSLUCENT_SLEEVE_ALPHA + " served as " + served
-                            + " (server policy, client setting off); " + acknowledged
+                            + " (server policy disableSkinTransparency=true overriding a client"
+                            + " that allows transparency: client disableSkinTransparency=false); "
+                            + acknowledged
                             + "; cooldown active " + remaining + "s of "
                             + EXPECTED_COOLDOWN_SECONDS + "s");
                 }));

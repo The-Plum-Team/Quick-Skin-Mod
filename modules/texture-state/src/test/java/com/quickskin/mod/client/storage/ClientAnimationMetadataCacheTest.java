@@ -1,5 +1,7 @@
 package com.quickskin.mod.client.storage;
 
+import com.quickskin.mod.client.services.CapeRenderKey;
+import com.quickskin.mod.client.services.CapeRenderKeys;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -9,6 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,6 +50,43 @@ class ClientAnimationMetadataCacheTest {
         AnimationMetadata reread = cache.getMetadata(HASH);
         assertNotNull(reread);
         assertEquals(1, reread.frames().size());
+    }
+
+    @Test
+    void aCapeKeyFindsMetadataOnlyThroughItsValidatedHash() {
+        CapeRenderKeys keys = new CapeRenderKeys(8);
+        CapeRenderKey network = keys.of("local_cape:" + HASH);
+        CapeRenderKey invalid = keys.of("local_cape:" + HASH.toUpperCase());
+        CapeRenderKey known = keys.of("known:bmo");
+        assertNotNull(network);
+        assertNotNull(invalid);
+        assertNotNull(known);
+
+        assertFalse(cache.hasMetadata(network));
+        cache.storeMetadata(HASH, metadata(50));
+
+        assertTrue(cache.hasMetadata(network));
+        assertFalse(cache.hasMetadata(invalid));
+        assertFalse(cache.hasMetadata(known));
+        cache.remove(HASH);
+        assertFalse(cache.hasMetadata(network));
+    }
+
+    @Test
+    void metadataChangesMakeVisibleCapesMarkAgain() {
+        CapeRenderKeys shared = CapeRenderKeys.shared();
+
+        long beforeStore = shared.visibilityEpoch();
+        cache.storeMetadata(HASH, metadata(50));
+        long afterStore = shared.visibilityEpoch();
+        assertNotEquals(beforeStore, afterStore);
+
+        cache.remove(HASH);
+        long afterRemove = shared.visibilityEpoch();
+        assertNotEquals(afterStore, afterRemove);
+
+        cache.clear();
+        assertNotEquals(afterRemove, shared.visibilityEpoch());
     }
 
     private static AnimationMetadata metadata(int delay) {

@@ -40,6 +40,29 @@ class ClientTextureWorkingSetTest {
     }
 
     @Test
+    void markingOncePerTickProtectsExactlyAsMarkingOnEveryFrame() {
+        // The cape renderer marks a visible cape once per client tick instead of once per frame;
+        // a mark records only the tick, so the protection it buys must be identical.
+        ClientTextureWorkingSet<String> everyFrame = new ClientTextureWorkingSet<>(8, 2);
+        ClientTextureWorkingSet<String> oncePerTick = new ClientTextureWorkingSet<>(8, 2);
+        List<String> lruOrder = List.of("cape", "unused");
+
+        for (int tick = 0; tick < 6; tick++) {
+            boolean rendered = tick < 2;
+            if (rendered) {
+                for (int frame = 0; frame < 7; frame++) everyFrame.markInUse("cape");
+                oncePerTick.markInUse("cape");
+            }
+            assertEquals(everyFrame.selectEviction(lruOrder), oncePerTick.selectEviction(lruOrder),
+                    "tick " + tick);
+            assertEquals(everyFrame.trackedEntries(), oncePerTick.trackedEntries(), "tick " + tick);
+            everyFrame.advanceTick();
+            oncePerTick.advanceTick();
+        }
+        assertEquals("cape", oncePerTick.selectEviction(lruOrder), "protection still expires");
+    }
+
+    @Test
     void trackingItselfRemainsBoundedAndReleasesRemovedKeys() {
         ClientTextureWorkingSet<String> workingSet = new ClientTextureWorkingSet<>(2, 20);
         workingSet.markInUse("a");

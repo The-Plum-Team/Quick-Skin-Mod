@@ -36,10 +36,19 @@ public final class PreviewCapeBindings<K, T> {
 
     private static final int DEFAULT_MAX_ENTRIES = 128;
 
+    private static final Resolution<?> WORN = new Resolution<>(Decision.WORN, null);
+
     private final int maxEntries;
 
     /** Identity-keyed; a present key with a {@code null} value means "previewing no cape". */
     private final Map<K, T> bindings = new IdentityHashMap<>();
+
+    /**
+     * {@code bindings.size()}, published after every change so the cape layer, which consults
+     * this for every player it draws, can skip the lock while no preview is bound at all. A
+     * binding is made on the render thread before the draw that consumes it.
+     */
+    private volatile int liveBindings;
 
     public PreviewCapeBindings() {
         this(DEFAULT_MAX_ENTRIES);
@@ -74,6 +83,7 @@ public final class PreviewCapeBindings<K, T> {
                 }
             }
             bindings.put(key, texture);
+            liveBindings = bindings.size();
         }
     }
 
@@ -84,6 +94,7 @@ public final class PreviewCapeBindings<K, T> {
         }
         synchronized (bindings) {
             bindings.remove(key);
+            liveBindings = bindings.size();
         }
     }
 
@@ -102,20 +113,22 @@ public final class PreviewCapeBindings<K, T> {
      * render key that is minted fresh every frame cannot accumulate.
      */
     public Resolution<T> consume(K key) {
-        if (key == null) {
+        if (key == null || liveBindings == 0) {
             return worn();
         }
         synchronized (bindings) {
             if (!bindings.containsKey(key)) {
                 return worn();
             }
-            return resolve(bindings.remove(key));
+            Resolution<T> resolution = resolve(bindings.remove(key));
+            liveBindings = bindings.size();
+            return resolution;
         }
     }
 
     /** Resolve {@code key} without releasing it. */
     public Resolution<T> peek(K key) {
-        if (key == null) {
+        if (key == null || liveBindings == 0) {
             return worn();
         }
         synchronized (bindings) {
@@ -132,14 +145,26 @@ public final class PreviewCapeBindings<K, T> {
                 : new Resolution<>(Decision.PREVIEW, texture);
     }
 
+    /** Whether no key is bound at all, so every key resolves to {@link Decision#WORN}. */
+    public boolean isEmpty() {
+        return liveBindings == 0;
+    }
+
+    /** The shared {@link Decision#WORN} resolution; it carries no texture. */
+    @SuppressWarnings("unchecked")
+    public static <T> Resolution<T> wornResolution() {
+        return (Resolution<T>) WORN;
+    }
+
     private Resolution<T> worn() {
-        return new Resolution<>(Decision.WORN, null);
+        return wornResolution();
     }
 
     /** Drop every binding. Called when the client session resets. */
     public void clear() {
         synchronized (bindings) {
             bindings.clear();
+            liveBindings = 0;
         }
     }
 
