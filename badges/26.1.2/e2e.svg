@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="210" height="24" viewBox="0 0 210 24" role="img" aria-label="E2E: Pending; covered commit 9de9f29c1a6f9511fcdd17215227b3b8b92eb786; observed 2026-10-05T19:06:33Z">
-  <title>E2E: Pending; covered commit 9de9f29c1a6f9511fcdd17215227b3b8b92eb786; observed 2026-10-05T19:06:33Z</title>
-  <rect width="210" height="24" rx="4" fill="#9a6700"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="210" height="24" viewBox="0 0 210 24" role="img" aria-label="E2E: Running; covered commit 9de9f29c1a6f9511fcdd17215227b3b8b92eb786; observed 2026-10-05T19:07:02Z">
+  <title>E2E: Running; covered commit 9de9f29c1a6f9511fcdd17215227b3b8b92eb786; observed 2026-10-05T19:07:02Z</title>
+  <rect width="210" height="24" rx="4" fill="#0969da"/>
   <path d="M4 0H40V24H4Q0 24 0 20V4Q0 0 4 0" fill="#24292f"/>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11">
     <text x="20" y="16">E2E</text>
-    <text x="125" y="16">Pending · 9de9f29c1a6f</text>
+    <text x="125" y="16">Running · 9de9f29c1a6f</text>
   </g>
 </svg>
