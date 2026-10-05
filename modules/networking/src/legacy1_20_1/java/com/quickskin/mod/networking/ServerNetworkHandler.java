@@ -253,6 +253,21 @@ public class ServerNetworkHandler {
         });
     }
 
+    /** A Quick Skin client reports a user-initiated upload to its own Mojang account. */
+    public static void handleAccountSkinChanged(
+            FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        UUID reportedPlayerId = PacketHelper.readPlayerId(buf);
+        ServerPlayer sender = (ServerPlayer) context.getPlayer();
+        if (!AccountSkinRefreshRequests.admits(sender, reportedPlayerId)
+                || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
+                        sender.getUUID(), sender.connection)) return;
+        MinecraftServer server = sender.server;
+        UUID playerId = sender.getUUID();
+        Object connection = sender.connection;
+        context.queue(() -> AccountSkinRefreshRequests.submit(
+                activePlayer(server, playerId, connection)));
+    }
+
     /**
      * Handles skin/cape upload from client
      * Packet format: UUID (player) + String (textureType) + byte[] (imageData)

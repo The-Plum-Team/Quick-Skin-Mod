@@ -137,10 +137,19 @@ Players who do not run Quick Skin never see a Quick Skin appearance, even on a s
 Quick Skin. An unmodded client only shows a skin that Mojang hosts and signs, so those players see
 your Mojang account skin, or a default skin on an offline-mode server. With a paid account on an
 online-mode server you can change your account skin from Quick Skin: hover a skin in the Quick Skin
-menu, press the ↑ button (Upload to Mojang) and rejoin the server. If you host a LAN world, restart
-the game instead. Mojang accepts only standard 64x64 or legacy 64x32 skins; custom capes, HD skins
-and CPM models stay visible only to players who run Quick Skin. See
-[ADR 0011](docs/architecture/decisions/0011-show-quick-skin-appearances-only-to-quick-skin-clients.md).
+menu and press the ↑ button (Upload to Mojang). Quick Skin never uploads a skin unless you press it.
+Mojang accepts only standard 64x64 or legacy 64x32 skins; custom capes, HD skins and CPM models
+stay visible only to players who run Quick Skin.
+
+Other players without Quick Skin see the new account skin after you rejoin the server (if you host
+a LAN world, restart the game instead). An online-mode server that runs Quick Skin can show it to
+them without a rejoin: set `"shareAccountSkinWithVanillaClients": true` in
+`config/quickskin-server.json` and restart the server. After each upload the server then reads your
+newly signed skin from Mojang's session server, usually within a minute or two, and refreshes you
+for the players without Quick Skin. The option is off by default and has no effect on an
+offline-mode server, including a backend behind a BungeeCord or Velocity proxy. See
+[ADR 0011](docs/architecture/decisions/0011-show-quick-skin-appearances-only-to-quick-skin-clients.md)
+and [ADR 0012](docs/architecture/decisions/0012-share-uploaded-account-skins-with-unmodded-players.md).
 
 ## Using Quick Skin
 

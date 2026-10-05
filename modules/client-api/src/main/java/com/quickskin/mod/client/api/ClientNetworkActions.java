@@ -13,4 +13,13 @@ public interface ClientNetworkActions {
     void flushPendingTransparencyReload();
 
     void updateServerConfig(String key, boolean value);
+
+    /**
+     * Reports a successful, user-initiated upload to the player's own Mojang account to the
+     * connected server, when it negotiated {@code account-skin-refresh}.
+     *
+     * @return {@code true} when the server announced that it shares account skins with players
+     *         who do not run Quick Skin, so they will see the new skin without a rejoin
+     */
+    boolean notifyAccountSkinChanged();
 }

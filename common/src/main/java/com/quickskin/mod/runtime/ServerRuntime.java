@@ -12,6 +12,7 @@ import com.quickskin.mod.server.data.ServerPlayerAppearanceRepository;
 import com.quickskin.mod.server.storage.ServerAnimationCache;
 import com.quickskin.mod.server.storage.ServerAppearanceStorage;
 import com.quickskin.mod.server.storage.ServerTextureCache;
+import com.quickskin.mod.server.vanilla.AccountSkinShareService;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -91,7 +92,20 @@ public final class ServerRuntime implements AutoCloseable {
         animationCache.init(worldPath);
         appearanceStorage.init(worldPath);
         ServerTextureIngressExecutor.getInstance().start();
+        AccountSkinShareService.getInstance().start(new AccountSkinProfileTarget(server));
+        logAccountSkinSharing(server);
         activeServer = server;
+    }
+
+    private static void logAccountSkinSharing(MinecraftServer server) {
+        if (!ServerConfig.getInstance().shareAccountSkinWithVanillaClients) return;
+        if (server.usesAuthentication()) {
+            QuickSkinInfo.LOGGER.info("Sharing the Mojang account skins that Quick Skin players "
+                    + "upload with players who do not run Quick Skin");
+        } else {
+            QuickSkinInfo.LOGGER.info("shareAccountSkinWithVanillaClients has no effect: this "
+                    + "server runs in offline mode, so Mojang never signed its players' skins");
+        }
     }
 
     /** Persists state while the server and its player list are still available. */
@@ -125,12 +139,14 @@ public final class ServerRuntime implements AutoCloseable {
             // Exact-session network state is safe to release even though UUID-scoped gameplay
             // state now belongs to the replacement connection.
             ServerNetworkHandler.onPlayerDisconnected(playerId, connection);
+            AccountSkinShareService.getInstance().playerDisconnected(playerId, connection);
             return false;
         }
         appearanceStorage.savePlayerAppearance(playerId);
         appearanceRepository.removeAppearance(playerId);
         cooldownManager.removePlayer(playerId);
         ServerNetworkHandler.onPlayerDisconnected(playerId, connection);
+        AccountSkinShareService.getInstance().playerDisconnected(playerId, connection);
         return true;
     }
 
@@ -146,6 +162,7 @@ public final class ServerRuntime implements AutoCloseable {
 
     private void resetTransientState() {
         runCleanup("stop server texture ingress", ServerTextureIngressExecutor.getInstance()::close);
+        runCleanup("stop account skin sharing", AccountSkinShareService.getInstance()::close);
         runCleanup("clear server textures", textureCache::clear);
         runCleanup("drain server cache cleanup", ServerCacheIoExecutor.getInstance()::close);
         runCleanup("clear server animation metadata", animationCache::clear);

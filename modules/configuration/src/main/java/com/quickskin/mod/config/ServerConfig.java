@@ -51,6 +51,13 @@ public class ServerConfig {
     /** False when the file could not be read; such a file is never overwritten. */
     private transient boolean persistable = true;
 
+    /**
+     * After a Quick Skin player uploads a skin to their own Mojang account, fetch that account's
+     * freshly signed textures and show them to players who do not run Quick Skin without a rejoin.
+     * Only online-mode servers can do this; capes and HD skins are never shared (ADR 0012).
+     */
+    public boolean shareAccountSkinWithVanillaClients = false;
+
     // Logging Settings
 
     private ServerConfig() {

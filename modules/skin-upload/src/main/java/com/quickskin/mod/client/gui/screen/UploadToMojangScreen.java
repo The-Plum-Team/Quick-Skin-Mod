@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.quickskin.mod.client.api.ClientNetworkApi;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.common.data.AssetMetadata;
@@ -56,6 +57,7 @@ public class UploadToMojangScreen extends Screen {
     private boolean uploadComplete = false;
     private String resultMessage = null;
     private boolean uploadSuccess = false;
+    private Component vanillaPlayersNotice = null;
     private boolean active;
     private long uploadAttempt;
     private CompletableFuture<MojangSkinUploader.UploadResult> uploadTask;
@@ -114,6 +116,7 @@ public class UploadToMojangScreen extends Screen {
         uploadComplete = false;
         resultMessage = null;
         uploadSuccess = false;
+        vanillaPlayersNotice = null;
 
         // Disable buttons during upload
         isUploading = true;
@@ -161,10 +164,29 @@ public class UploadToMojangScreen extends Screen {
         cancelButton.active = true;
         cancelButton.setMessage(Component.translatable("quickskin.button.close"));
 
-        if (!result.success) {
+        if (result.success) {
+            vanillaPlayersNotice = reportAccountSkinChange();
+        } else {
             uploadButton.active = true;
             uploadButton.setMessage(Component.translatable("quickskin.button.retry"));
         }
+    }
+
+    /**
+     * The account skin changed, so tell a connected server that may share it with players who
+     * do not run Quick Skin, and say what those players will see.
+     */
+    private Component reportAccountSkinChange() {
+        if (minecraft == null || minecraft.getConnection() == null) return null;
+        boolean shared;
+        try {
+            shared = ClientNetworkApi.actions().notifyAccountSkinChanged();
+        } catch (RuntimeException | LinkageError error) {
+            shared = false;
+        }
+        return Component.translatable(shared
+                ? "quickskin.upload.vanilla_players_shared"
+                : "quickskin.upload.vanilla_players_rejoin");
     }
 
     @Override
@@ -294,6 +316,19 @@ public class UploadToMojangScreen extends Screen {
                 //?}
                                            this.width / 2, currentY,
                                            MESSAGE_COLOR);
+                if (vanillaPlayersNotice != null) {
+                    currentY += lineHeight;
+                    for (String line : wrapText(vanillaPlayersNotice.getString(), this.panelWidth - 40)) {
+                        currentY += lineHeight;
+                        //? if <26.1 {
+                        graphics.drawCenteredString(this.font, line,
+                        //?} else {
+                        graphics.centeredText(this.font, line,
+                        //?}
+                                                   this.width / 2, currentY,
+                                                   INFO_COLOR);
+                    }
+                }
             }
         } else {
             // Show initial instructions
