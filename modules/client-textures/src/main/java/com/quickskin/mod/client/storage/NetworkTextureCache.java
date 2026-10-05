@@ -4,6 +4,8 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.common.data.ContentId;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
+import com.quickskin.mod.client.services.CapeRenderKey;
+import com.quickskin.mod.client.services.CapeRenderKeys;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.PngAnimationIdentity;
@@ -443,7 +445,19 @@ public class NetworkTextureCache {
     public synchronized boolean markTextureInUse(String hash, String textureType) {
         if (!NetworkSecurity.isValidContentId(hash)
                 || !NetworkSecurity.isValidTextureType(textureType)) return false;
-        TextureKey key = new TextureKey(hash, textureType);
+        return markInUse(new TextureKey(hash, textureType));
+    }
+
+    /**
+     * {@link #markTextureInUse(String, String)} for a cape whose network content ID its render key
+     * already validated; a key without one is never cached.
+     */
+    public synchronized boolean markCapeInUse(CapeRenderKey cape) {
+        String hash = cape.networkHash();
+        return hash != null && markInUse(new TextureKey(hash, "cape"));
+    }
+
+    private boolean markInUse(TextureKey key) {
         if (!textureDataCache.containsKey(key)) return false;
         accessOrder.put(key, Boolean.TRUE);
         workingSet.markInUse(key);
@@ -453,6 +467,8 @@ public class NetworkTextureCache {
     /** Advances the short render-use lease; called once per client tick. */
     public synchronized void tickWorkingSet() {
         workingSet.advanceTick();
+        // Working-set marks are per tick, so every visible cape is marked again in the new one.
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
     }
 
     public synchronized long generation() {
@@ -513,6 +529,19 @@ public class NetworkTextureCache {
         boolean present = NetworkSecurity.isValidContentId(hash)
                 && NetworkSecurity.isValidTextureType(textureType)
                 && textureDataCache.containsKey(key);
+        if (present) accessOrder.put(key, Boolean.TRUE);
+        return present;
+    }
+
+    /**
+     * {@link #containsTexture(String, String)} for a cape whose network content ID its render key
+     * already validated; a key without one is never cached.
+     */
+    public synchronized boolean containsCape(CapeRenderKey cape) {
+        String hash = cape.networkHash();
+        if (hash == null) return false;
+        TextureKey key = new TextureKey(hash, "cape");
+        boolean present = textureDataCache.containsKey(key);
         if (present) accessOrder.put(key, Boolean.TRUE);
         return present;
     }
@@ -587,6 +616,7 @@ public class NetworkTextureCache {
         textureRegistry.clear();
         accessOrder.clear();
         workingSet.clear();
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
         cachedBytes = 0;
         cachedPixels = 0;
         TextureRequestCoordinator.getInstance().clear();
@@ -728,6 +758,8 @@ public class NetworkTextureCache {
         String removedTextureType = key.textureType();
         accessOrder.remove(key);
         workingSet.forget(key);
+        // A cape marked visible earlier in this tick has lost its working-set mark.
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
         byte[] original = originalTextureData.remove(key);
         byte[] processed = textureDataCache.remove(key);
         NativeImage preparedImage = preparedNativeImages.remove(key);

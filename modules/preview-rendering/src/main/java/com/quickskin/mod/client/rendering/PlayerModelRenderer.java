@@ -328,6 +328,11 @@ public class PlayerModelRenderer {
     /** Resolve and release the preview cape bound to {@code renderKey}, for the cape layer. */
     public static PreviewCapeBindings.Resolution<ResourceLocation> consumePreviewCape(Object renderKey) {
 //? if <1.21.6 {
+        if (PREVIEW_CAPE_BINDINGS.isEmpty()) {
+            // Nothing is bound, so neither this key nor the thread's active preview key can
+            // resolve to anything but the worn cape, and consuming either would change nothing.
+            return PreviewCapeBindings.wornResolution();
+        }
         PreviewCapeBindings.Resolution<ResourceLocation> resolution =
                 PREVIEW_CAPE_BINDINGS.consume(renderKey);
         if (resolution.decision() == PreviewCapeBindings.Decision.WORN) {
