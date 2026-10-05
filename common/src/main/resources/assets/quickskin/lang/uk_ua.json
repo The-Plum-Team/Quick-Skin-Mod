@@ -129,10 +129,10 @@
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "Налаштування зображення плаща",
-  "quickskin.cape.adjust_hint": "Перетягніть: зсув · Прокрутка: масштаб",
+  "quickskin.cape.adjust_hint": "Перетягування: зсув · Прокрутка: масштаб",
   "quickskin.cape.adjust_reset": "Скинути позицію",
   "quickskin.cape.adjust_apply": "Застосувати плащ",
-  "quickskin.cape.adjust_resolution": "Роздільність:",
+  "quickskin.cape.adjust_resolution": "Роздільна здатність:",
   "quickskin.cape.adjust_source_dimensions": "Джерело: %s",
   "quickskin.cape.adjust_output_resolution": "Вихід: %s",
   "quickskin.cape.adjust_preview": "Перегляд:",

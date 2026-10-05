@@ -129,7 +129,7 @@
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "Настройка изображения плаща",
-  "quickskin.cape.adjust_hint": "Перетащите: сдвиг · Прокрутка: масштаб",
+  "quickskin.cape.adjust_hint": "Перетаскивание: сдвиг · Колесо: масштаб",
   "quickskin.cape.adjust_reset": "Сбросить позицию",
   "quickskin.cape.adjust_apply": "Применить плащ",
   "quickskin.cape.adjust_resolution": "Разрешение:",

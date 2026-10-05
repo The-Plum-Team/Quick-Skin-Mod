@@ -127,7 +127,7 @@
   "quickskin.cape.animation_speed": "動畫速度：%s%%",
   "quickskin.cape.animation_speed_tooltip": "調整披風動畫播放速度 (10%% - 300%%)",
 
-  "_comment_cape_adjust": "=== Cape Adjust Screen ===",
+  "_comment_cape_adjust": "=== 披風調整畫面 ===",
   "quickskin.cape.adjust_title": "調整披風圖片",
   "quickskin.cape.adjust_hint": "拖曳以移動 · 滾輪縮放",
   "quickskin.cape.adjust_reset": "重設位置",

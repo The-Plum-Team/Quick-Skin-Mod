@@ -128,7 +128,7 @@
   "quickskin.cape.animation_speed_tooltip": "Steuert die Animationsgeschwindigkeit für diesen Umhang (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
-  "quickskin.cape.adjust_title": "Umhang-Bild anpassen",
+  "quickskin.cape.adjust_title": "Umhangbild anpassen",
   "quickskin.cape.adjust_hint": "Ziehen zum Bewegen · Scrollen zum Zoomen",
   "quickskin.cape.adjust_reset": "Zurücksetzen",
   "quickskin.cape.adjust_apply": "Umhang anwenden",
