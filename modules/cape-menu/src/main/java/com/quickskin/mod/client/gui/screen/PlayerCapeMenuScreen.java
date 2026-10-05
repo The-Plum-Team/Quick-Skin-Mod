@@ -149,6 +149,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private double scrollbarClickOffset = 0.0;
     private int totalContentHeight = 0;
     private int gridX, gridY, gridWidth, gridHeight;
+    private int bottomButtonY;
+    private static final int STATUS_BAND_FRAME = 5;
+    private static final int STATUS_BAND_MARGIN = 2;
 
     // Player widget positioning
     private int playerWidgetX, playerWidgetY;
@@ -203,7 +206,11 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         int gridTopY = scaleValue(40);
         int bottomButtonY = this.height - scaleValue(60);
-        int availableHeight = bottomButtonY - gridTopY - scaleValue(10);
+        // Keep a band between the grid's frame (5 px below the grid) and the buttons for the
+        // import/delete status line, so the message never covers the button labels.
+        int statusBand = Math.max(scaleValue(10), STATUS_BAND_FRAME + this.font.lineHeight + STATUS_BAND_MARGIN * 2);
+        int availableHeight = bottomButtonY - gridTopY - statusBand;
+        this.bottomButtonY = bottomButtonY;
 
         this.gridHeight = Mth.clamp(
                 availableHeight,
@@ -1107,7 +1114,10 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // Render import message
         if (importMessageTimer > 0 && !importMessage.isEmpty()) {
-            int messageY = this.gridY + this.gridHeight + 10;
+            // Centred in the band between the grid's frame and the buttons.
+            int frameBottom = this.gridY + this.gridHeight + STATUS_BAND_FRAME;
+            int messageY = frameBottom + Math.max(STATUS_BAND_MARGIN,
+                    (this.bottomButtonY - frameBottom - this.font.lineHeight) / 2);
 //? if <26.1 {
             graphics.drawCenteredString(this.font, importMessage, this.width / 2, messageY, importMessageColor);
 //?} else {
