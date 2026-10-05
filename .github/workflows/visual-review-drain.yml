@@ -662,12 +662,42 @@ jobs:
             --arg repository "$GITHUB_REPOSITORY" \
             --arg sha "$source_sha" \
             --argjson run_id "$SOURCE_RUN_ID" \
-            '.id == $run_id and .status == "completed" and .conclusion == "success" and
+            '.id == $run_id and .status == "completed" and
+             (.conclusion == "success" or
+              (.event == "workflow_dispatch" and .head_branch == "master" and
+               (.conclusion == "failure" or .conclusion == "cancelled" or
+                .conclusion == "timed_out"))) and
              (.event == "pull_request" or .event == "schedule" or
               .event == "workflow_dispatch") and .head_sha == $sha and
              .path == ".github/workflows/on-demand-e2e.yml" and
              .head_repository.full_name == $repository' \
             <<< "$source_run" > /dev/null
+          gate_settled_source=false
+          if [[ "$(jq -r .conclusion <<< "$source_run")" != success ]]; then
+            # A canonical master generation whose advisory tail failed after its required gate
+            # passed (visual-review.yml admits it the same way). Prove that exact attempt's gate
+            # here; feature_review.py below revalidates the complete required job graph.
+            source_run_attempt="$(jq -er '
+              .run_attempt |
+              select(type == "number" and . == floor and . >= 1 and . <= 100)
+            ' <<< "$source_run")"
+            gate_jobs="$(github_api_retry --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/attempts/$source_run_attempt/jobs?per_page=100")"
+            jq -e \
+              --arg sha "$source_sha" \
+              --argjson attempt "$source_run_attempt" \
+              --argjson run_id "$SOURCE_RUN_ID" \
+              '(type == "array") and
+               ([.[] | (.jobs | type == "array")] | all) and
+               ([.[].jobs[]] | length <= 1000) and
+               ([.[].jobs[] | .run_id == $run_id and .run_attempt == $attempt and
+                 .head_sha == $sha] | all) and
+               ([.[].jobs[] | select(.name == "Packaged E2E gate")] |
+                 length == 1 and .[0].status == "completed" and
+                 .[0].conclusion == "success")' \
+              <<< "$gate_jobs" > /dev/null
+            gate_settled_source=true
+          fi
 
           review_mode="$(jq -er \
             '.review_mode | select(. == "anchor-semantic" or
@@ -742,6 +772,10 @@ jobs:
             "$proof" > /dev/null
 
           proof_schema="$(jq -r .schema_version "$proof")"
+          if [[ "$gate_settled_source" == true && "$proof_schema" != 7 && "$proof_schema" != 8 ]]; then
+            printf 'Only a shared-source capsule may be admitted through its required gate.\n' >&2
+            exit 1
+          fi
           if [[ "$proof_schema" == 7 || "$proof_schema" == 8 ]]; then
             python3 scripts/ci/feature_review.py \
               --github-repository "$GITHUB_REPOSITORY" --repository . \

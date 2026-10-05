@@ -192,6 +192,43 @@ class FeatureCoverageTest(unittest.TestCase):
                 with self.assertRaises(ValueError): validate(active)
                 with self.assertRaises(ValueError): validate(active, partial, allow_in_progress=True)
 
+    def test_a_lost_advisory_wake_admits_a_master_dispatch_only_through_its_required_job_graph(self):
+        run = {"id": self.run_id, "head_branch": "master", "head_sha": self.source,
+               "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"},
+               "path": ".github/workflows/on-demand-e2e.yml", "event": "workflow_dispatch",
+               "status": "completed", "conclusion": "failure"}
+        jobs = [{"jobs": [{"name": name, "status": "completed", "conclusion": "success"}
+                          for name in (POLICY_JOB, BUILD_JOB, GATE_JOB,
+                                       *(row["id"] + SCENARIO_SUFFIX for row in self.rows))]
+                 + [{"name": "Wake shared-source visual review (advisory)", "status": "completed",
+                     "conclusion": "cancelled"}]}]
+        def validate(candidate, candidate_jobs=jobs, *, gate_settled=True):
+            return coverage.validate_source_run(candidate, candidate_jobs,
+                github_repository="The-Plum-Team/Quick-Skin-Mod", source_sha=self.source,
+                source_run_id=self.run_id, gate_settled=gate_settled)
+        for conclusion in ("failure", "cancelled", "timed_out"):
+            with self.subTest(conclusion=conclusion):
+                candidate = {**run, "conclusion": conclusion}
+                self.assertEqual("full", validate(candidate)["runtime_policy"])
+                # Every consumer outside the review chain keeps the strict run conclusion.
+                with self.assertRaises(ValueError): validate(candidate, gate_settled=False)
+                self.assertFalse(coverage.settled_source_run(candidate))
+                self.assertTrue(coverage.settled_source_run(candidate, gate_settled=True))
+        for field, value in (("conclusion", "startup_failure"), ("conclusion", "action_required"),
+                             ("conclusion", None), ("status", "in_progress"), ("event", "schedule"),
+                             ("event", "pull_request"), ("head_branch", "feature/example")):
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                validate({**run, field: value})
+        for name in (GATE_JOB, POLICY_JOB, BUILD_JOB, self.rows[0]["id"] + SCENARIO_SUFFIX):
+            for conclusion in ("failure", "cancelled", "skipped"):
+                with self.subTest(job=name, conclusion=conclusion):
+                    broken = copy.deepcopy(jobs)
+                    next(job for job in broken[0]["jobs"] if job["name"] == name)["conclusion"] = conclusion
+                    with self.assertRaises(ValueError): validate(run, broken)
+        missing_gate = copy.deepcopy(jobs)
+        missing_gate[0]["jobs"] = [job for job in missing_gate[0]["jobs"] if job["name"] != GATE_JOB]
+        with self.assertRaises(ValueError): validate(run, missing_gate)
+
     def test_complete_same_run_review_can_seed_coverage_but_foreign_reference_cannot(self):
         target = self.targets[1]
         files = self.files(target)

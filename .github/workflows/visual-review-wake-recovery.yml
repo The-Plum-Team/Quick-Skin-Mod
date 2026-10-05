@@ -1,0 +1,110 @@
+name: Recover lost visual review wakes
+
+# Packaged E2E's advisory notify-shared-review job is the only explicit visual-review wake for a
+# canonical master generation, and visual-review.yml's workflow_run path is its second chance.
+# Both can be lost while GitHub cannot assign runners (2026-10-05, master 9de9f29c). This sweep
+# re-sends the identical wake for the current master generation only when it has a successful
+# required gate, no review run is queued or running, no review capsule or report exists and the
+# bounded retry budget remains; otherwise it is a no-op. It never curates, reviews or reads an
+# artifact's bytes, and visual-review.yml still authenticates everything from scratch.
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: quick-skin-visual-review-wake-recovery
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Find a current generation without visual review
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      dispatch: ${{ steps.decision.outputs.dispatch }}
+      source_run_id: ${{ steps.decision.outputs.source_run_id }}
+      source_sha: ${{ steps.decision.outputs.source_sha }}
+    steps:
+      - name: Check out the exact protected recovery policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Decide whether the current generation lost its review wake
+        id: decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf 'dispatch=false\n' >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" != refs/heads/master || ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ||
+                "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
+            printf 'Wake recovery requires the exact protected master checkout.\n' >&2
+            exit 1
+          fi
+          if [[ "$(python3 scripts/release/release_sources.py --kind mode)" != shared ]]; then
+            printf 'This checkout does not own the protected shared source.\n'
+            exit 0
+          fi
+          python3 scripts/ci/visual_review_wake.py \
+            --github-repository "$GITHUB_REPOSITORY" --source-sha "$GITHUB_SHA" \
+            --github-output "$GITHUB_OUTPUT"
+
+  wake:
+    name: Re-send the shared-source visual review wake
+    needs: inspect
+    if: needs.inspect.outputs.dispatch == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the exact protected notification policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      # The payload is byte-for-byte the one on-demand-e2e.yml's notify-shared-review job sends.
+      - name: Wake visual review for the recovered shared generation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ needs.inspect.outputs.source_run_id }}
+          SOURCE_SHA: ${{ needs.inspect.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/master || ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ||
+                ! "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ || "$SOURCE_SHA" != "$GITHUB_SHA" ||
+                "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
+            printf 'Wake recovery requires the inspected canonical master generation.\n' >&2
+            exit 1
+          fi
+          source scripts/ci/github_api_retry.sh
+          current_sha="$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)"
+          if [[ "$current_sha" != "$SOURCE_SHA" ]]; then
+            printf 'Shared source advanced before its recovered visual-review wake.\n'
+            exit 0
+          fi
+          payload="$RUNNER_TEMP/shared-visual-review-request.json"
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg run_id "$SOURCE_RUN_ID" \
+            --arg sha "$SOURCE_SHA" \
+            '{event_type:"visual-review-requested",client_payload:{source_repository:$repository,
+              source_run_id:$run_id,source_sha:$sha,source_branch:"master"}}' > "$payload"
+          github_api_retry --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input "$payload" > /dev/null
+          printf 'Re-sent the visual-review wake for source run %s.\n' "$SOURCE_RUN_ID" \
+            | tee -a "$GITHUB_STEP_SUMMARY"

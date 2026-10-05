@@ -27,9 +27,18 @@ concurrency:
 jobs:
   authenticate:
     name: Authenticate successful packaged evidence
+    # A canonical master dispatch is admitted by its required gate, not by the run conclusion: an
+    # advisory job that never received a runner (the producer's own review wake during a GitHub
+    # Actions outage) concludes the run as failure or cancelled after the gate passed. The step
+    # below proves that exact attempt's gate before any other evidence is read.
     if: >-
       github.event_name == 'repository_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success' ||
+      (github.event.workflow_run.event == 'workflow_dispatch' &&
+       github.event.workflow_run.head_branch == 'master' &&
+       (github.event.workflow_run.conclusion == 'failure' ||
+        github.event.workflow_run.conclusion == 'cancelled' ||
+        github.event.workflow_run.conclusion == 'timed_out'))
     runs-on: ubuntu-24.04
     # A source wake can coincide with a wide release fan-out that exhausts the installation API
     # quota. Authentication waits for the declared reset without repeatedly probing the closed
@@ -104,24 +113,32 @@ jobs:
             fi
             sleep 2
           done
-          # The review is advisory: a source run that never settled successfully inside the poll
-          # budget is skipped loudly instead of surfacing as a red advisory run.
+          # The review is advisory: a source run that never settled inside the poll budget is
+          # skipped loudly instead of surfacing as a red advisory run.
           if [[ -z "$source_run" ]] \
-            || [[ "$(jq -r .status <<< "$source_run")" != completed ]] \
-            || [[ "$(jq -r .conclusion <<< "$source_run")" != success ]]; then
+            || [[ "$(jq -r .status <<< "$source_run")" != completed ]]; then
             printf 'source run not settled within budget; skipping advisory review\n'
+            exit 0
+          fi
+          source_conclusion="$(jq -r .conclusion <<< "$source_run")"
+          if [[ "$source_conclusion" != success \
+              && ! ( "$source_conclusion" =~ ^(failure|cancelled|timed_out)$ \
+                && "$(jq -r .event <<< "$source_run")" == workflow_dispatch \
+                && "$source_branch" == master ) ]]; then
+            printf 'source run did not settle successfully; skipping advisory review\n'
             exit 0
           fi
           workflow_id="$(github_api_retry \
             "repos/$GITHUB_REPOSITORY/actions/workflows/on-demand-e2e.yml" --jq .id)"
           jq -e \
             --arg branch "$source_branch" \
+            --arg conclusion "$source_conclusion" \
             --arg repository "$GITHUB_REPOSITORY" \
             --arg sha "$source_sha" \
             --argjson run_id "$source_run_id" \
             --argjson workflow_id "$workflow_id" \
             '.id == $run_id and .workflow_id == $workflow_id and
-             .status == "completed" and .conclusion == "success" and
+             .status == "completed" and .conclusion == $conclusion and
              (.event == "pull_request" or .event == "schedule" or
               .event == "workflow_dispatch") and
              .head_branch == $branch and .head_sha == $sha and
@@ -132,6 +149,32 @@ jobs:
             .run_attempt |
             select(type == "number" and . == floor and . >= 1 and . <= 100)
           ' <<< "$source_run")"
+          if [[ "$source_conclusion" != success ]]; then
+            # Only the required gate of this exact attempt can stand in for the run conclusion. A
+            # failed, cancelled or missing gate, or a foreign job record, skips the review; the
+            # protected curator below still validates the complete required job graph.
+            gate_jobs="$(github_api_retry --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id/attempts/$source_run_attempt/jobs?per_page=100")"
+            if ! jq -e \
+                --arg sha "$source_sha" \
+                --argjson attempt "$source_run_attempt" \
+                --argjson run_id "$source_run_id" \
+                '(type == "array") and
+                 ([.[] | (.jobs | type == "array")] | all) and
+                 ([.[].jobs[]] | length <= 1000) and
+                 ([.[].jobs[] | .run_id == $run_id and .run_attempt == $attempt and
+                   .head_sha == $sha] | all) and
+                 ([.[].jobs[] | select(.name == "Packaged E2E gate")] |
+                   length == 1 and .[0].status == "completed" and
+                   .[0].conclusion == "success")' \
+                <<< "$gate_jobs" > /dev/null; then
+              printf 'Required gate of source run %s attempt %s did not succeed; skipping advisory review\n' \
+                "$source_run_id" "$source_run_attempt"
+              exit 0
+            fi
+            printf 'Source run %s concluded %s after its required gate succeeded\n' \
+              "$source_run_id" "$source_conclusion"
+          fi
 
           if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then
             if [[ "$(jq -r .event <<< "$source_run")" != workflow_dispatch ]]; then
