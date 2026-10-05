@@ -1,8 +1,14 @@
 package com.quickskin.mod.networking;
 
 import com.quickskin.mod.client.api.ClientNetworkActions;
+import com.quickskin.mod.config.ClientConfig;
+import com.quickskin.mod.config.ServerConfig;
+import com.quickskin.mod.networking.protocol.ProtocolCapability;
+import com.quickskin.mod.networking.protocol.ProtocolProfile;
+import com.quickskin.mod.networking.protocol.ProtocolSessions;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.Minecraft;
 
 import java.util.UUID;
 
@@ -37,5 +43,27 @@ public final class NetworkClientActions implements ClientNetworkActions {
         NetworkTransport.INSTANCE.sendToServer(
                 new com.quickskin.mod.networking.payloads.UpdateServerConfigPayload(key, value));
         //?}
+    }
+
+    @Override
+    public boolean notifyAccountSkinChanged() {
+        Minecraft minecraft = Minecraft.getInstance();
+        Object connection = minecraft.getConnection();
+        if (connection == null || minecraft.player == null) return false;
+        ProtocolProfile profile = ProtocolSessions.getInstance().clientProfile(connection);
+        if (!profile.negotiated() || !profile.supports(ProtocolCapability.ACCOUNT_SKIN_REFRESH)) {
+            return false;
+        }
+        UUID playerId = minecraft.player.getUUID();
+        //? if <1.21 {
+        NetworkTransport.INSTANCE.sendAccountSkinChangedToServer(playerId);
+        //?} else {
+        if (!NetworkTransport.INSTANCE.canServerReceive(
+                com.quickskin.mod.networking.payloads.AccountSkinChangedPayload.TYPE)) return false;
+        NetworkTransport.INSTANCE.sendToServer(
+                new com.quickskin.mod.networking.payloads.AccountSkinChangedPayload(playerId));
+        //?}
+        ServerConfig serverConfig = ClientConfig.getInstance().getServerOverride();
+        return serverConfig != null && serverConfig.shareAccountSkinWithVanillaClients;
     }
 }

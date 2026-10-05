@@ -15,6 +15,9 @@
     "PreviewEquipmentMixin"
   ],
   "mixins": [
+    "ChunkMapAccessor",
+    "PlayerGameProfileAccessor",
+    "TrackedEntityAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -76,7 +76,13 @@ OPTIONAL_MIXINS = {
     "overlay:com/quickskin/mod/mixin/compat/ReplayModCompatMixin.java",
 }
 
-ACCESSOR_ONLY_MIXINS: set[str] = set()
+# Server-side accessors used to refresh a player's signed account skin for unmodded observers.
+# They inject nothing; every field they name was checked in each matrix target's mapped JAR.
+ACCESSOR_ONLY_MIXINS: set[str] = {
+    "main:com/quickskin/mod/mixin/ChunkMapAccessor.java",
+    "main:com/quickskin/mod/mixin/PlayerGameProfileAccessor.java",
+    "main:com/quickskin/mod/mixin/TrackedEntityAccessor.java",
+}
 
 # CPM changed the call made by playerRenderPre. Both optional injection points are kept so one
 # source supports both eras, which means neither alternative can truthfully declare expect=1.

@@ -604,6 +604,7 @@
       "api": [],
       "implementation": [
         "appearance-data",
+        "client-api",
         "client-foundation",
         "content-core",
         "image-core",
@@ -816,7 +817,8 @@
       ],
       "consumers": [
         "appearance-services",
-        "settings-ui"
+        "settings-ui",
+        "skin-upload"
       ],
       "composition": "common",
       "impact": "propagate"

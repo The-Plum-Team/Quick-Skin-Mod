@@ -111,4 +111,27 @@ class ProtocolNegotiatorTest {
                 profile,
                 ProtocolNegotiator.verifyAcknowledgement(LOCAL, acknowledgement));
     }
+
+    @Test
+    void accountSkinRefreshIsAnOptionalCapabilityThatOlderPeersDrop() {
+        assertTrue((QuickSkinProtocol.CAPABILITIES
+                & ProtocolCapability.ACCOUNT_SKIN_REFRESH.mask()) != 0L);
+        assertEquals(0L, QuickSkinProtocol.REQUIRED_CAPABILITIES
+                & ProtocolCapability.ACCOUNT_SKIN_REFRESH.mask());
+
+        long olderPeer = ProtocolCapability.SHA256_CONTENT_IDS.mask()
+                | ProtocolCapability.CHUNKED_TEXTURE_TRANSFER.mask()
+                | ProtocolCapability.ANIMATION_METADATA.mask()
+                | ProtocolCapability.APPEARANCE_SNAPSHOT_ACK.mask();
+        ProtocolProfile withOlderPeer = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY,
+                new ProtocolOffer(2, 2, olderPeer, 1024 * 1024, 30 * 1024));
+        ProtocolProfile withCurrentPeer = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY,
+                new ProtocolOffer(2, 2, QuickSkinProtocol.CAPABILITIES, 1024 * 1024, 30 * 1024));
+
+        assertTrue(withOlderPeer.negotiated());
+        assertFalse(withOlderPeer.supports(ProtocolCapability.ACCOUNT_SKIN_REFRESH));
+        assertTrue(withCurrentPeer.supports(ProtocolCapability.ACCOUNT_SKIN_REFRESH));
+    }
 }

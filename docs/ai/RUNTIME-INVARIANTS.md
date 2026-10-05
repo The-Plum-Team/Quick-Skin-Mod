@@ -138,6 +138,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   texture deletion must remove metadata, authority, and identity together.
 - Appearance and animation convergence depends on exact acknowledgements and bounded retry. Do not
   replace it with optimistic send-once synchronization.
+- Quick Skin appearances reach only Quick Skin clients. The one exception is the opt-in
+  `shareAccountSkinWithVanillaClients` server option (ADR 0012): after an explicit, successful
+  Upload to Mojang, a client whose v2 session negotiated `account-skin-refresh` reports
+  `account_skin_changed`; nothing ever uploads a skin automatically. The server does nothing while
+  the option is off or the server is in offline mode (logging the latter). Otherwise
+  `AccountSkinShareService` reads the signed profile anonymously from Mojang's session server on
+  its own bounded daemon worker, never the server thread, paced by its server-wide bucket,
+  per-player round interval, re-arm-once coalescing and bounded backoff, and accepts only a
+  bounded strict response naming the exact profile with exactly one signed `textures` property.
+  It replaces the property only for the exact session that reported, only after Mojang shows a
+  different appearance, and releases that session's state on disconnect and shutdown. The refresh
+  (player-info removal and re-addition plus a new entity pairing) goes only to observers without
+  Quick Skin; the uploader and Quick Skin observers keep their own path. Capes, HD skins and CPM
+  models are never shared, and no third-party signing service is called.
 
 ## Files, images, and persistence
 

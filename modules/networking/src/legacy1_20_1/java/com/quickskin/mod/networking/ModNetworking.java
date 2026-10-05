@@ -56,6 +56,8 @@ public class ModNetworking implements NetworkTransport {
         new ResourceLocation(QuickSkinInfo.MOD_ID, "texture_chunk_v2");
     public static final ResourceLocation UPLOAD_ANIMATION_METADATA_V2 =
         new ResourceLocation(QuickSkinInfo.MOD_ID, "upload_animation_metadata_v2");
+    public static final ResourceLocation ACCOUNT_SKIN_CHANGED =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "account_skin_changed");
 
     // Server to Client packets (S2C)
     public static final ResourceLocation SYNC_APPEARANCE =
@@ -159,6 +161,9 @@ public class ModNetworking implements NetworkTransport {
         NetworkManager.registerReceiver(
             NetworkManager.c2s(), UPLOAD_ANIMATION_METADATA_V2,
             ServerNetworkHandler::handleUploadAnimationMetadataV2);
+        NetworkManager.registerReceiver(
+            NetworkManager.c2s(), ACCOUNT_SKIN_CHANGED,
+            ServerNetworkHandler::handleAccountSkinChanged);
 
     }
 
@@ -380,6 +385,13 @@ public class ModNetworking implements NetworkTransport {
         buffer.writeUtf(textureType, TextureTransferLimits.MAX_TEXTURE_TYPE_BYTES);
         buffer.writeUtf(contentId, TextureTransferLimits.MAX_CONTENT_ID_BYTES);
         NetworkManager.sendToServer(REQUEST_TEXTURE_V2, buffer);
+    }
+
+    @Override
+    public void sendAccountSkinChangedToServer(UUID playerId) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeUUID(playerId);
+        NetworkManager.sendToServer(ACCOUNT_SKIN_CHANGED, buffer);
     }
 
     @Override
