@@ -1,6 +1,6 @@
 {
   "coverage_sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-  "observed_at": "2026-10-05T19:08:25Z",
+  "observed_at": "2026-10-05T22:34:10Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -96,12 +96,12 @@
           "neoforge-26_3--26_3--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -246,12 +246,12 @@
           "neoforge-26_2--26_2--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -396,12 +396,12 @@
           "neoforge-26_1_2--26_1_2--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -546,12 +546,12 @@
           "neoforge-26_1_1--26_1_1--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -696,12 +696,12 @@
           "neoforge-26_1--26_1--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -846,12 +846,12 @@
           "neoforge-1_21_11--1_21_11--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -996,12 +996,12 @@
           "neoforge-1_21_10--1_21_10--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -1146,12 +1146,12 @@
           "neoforge-1_21_9--1_21_9--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -1296,12 +1296,12 @@
           "neoforge-1_21_8--1_21_8--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -1446,12 +1446,12 @@
           "neoforge-1_21_7--1_21_7--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -1596,12 +1596,12 @@
           "neoforge-1_21_6--1_21_6--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -1746,12 +1746,12 @@
           "neoforge-1_21_5--1_21_5--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -1896,12 +1896,12 @@
           "neoforge-1_21_4--1_21_4--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -2046,12 +2046,12 @@
           "neoforge-1_21_3--1_21_3--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -2196,12 +2196,12 @@
           "neoforge-1_21_2--1_21_2--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -2346,12 +2346,12 @@
           "neoforge-1_21_1--1_21_1--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
@@ -2496,12 +2496,12 @@
           "forge-1_20_1--1_20_1--pr-behavior - contract scenarios"
         ],
         "generation": {
-          "attempt": 1,
-          "conclusion": null,
+          "attempt": 2,
+          "conclusion": "success",
           "id": 37361031586,
           "sha": "9de9f29c1a6f9511fcdd17215227b3b8b92eb786",
-          "status": "queued",
-          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/1"
+          "status": "completed",
+          "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/37361031586/attempts/2"
         },
         "jobs": [
           {
