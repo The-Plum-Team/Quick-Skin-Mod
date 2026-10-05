@@ -183,6 +183,59 @@ class PreviewCapeBindingsTest {
     }
 
     @Test
+    void isEmptyTracksEveryWayABindingComesAndGoes() {
+        PreviewCapeBindings<RenderKey, String> bindings = new PreviewCapeBindings<>();
+        RenderKey shown = new RenderKey("shown");
+        RenderKey hidden = new RenderKey("hidden");
+        assertTrue(bindings.isEmpty());
+
+        bindings.bind(shown, "quickskin:cape/selected");
+        bindings.bind(hidden, null);
+        assertFalse(bindings.isEmpty());
+
+        assertEquals(PreviewCapeBindings.Decision.PREVIEW, bindings.consume(shown).decision());
+        assertFalse(bindings.isEmpty(), "a hidden-cape binding still counts");
+        bindings.unbind(hidden);
+        assertTrue(bindings.isEmpty());
+
+        bindings.bind(shown, "quickskin:cape/selected");
+        bindings.clear();
+        assertTrue(bindings.isEmpty());
+    }
+
+    @Test
+    void anEmptyBindingSetStillResolvesEveryKeyToTheWornCape() {
+        PreviewCapeBindings<RenderKey, String> bindings = new PreviewCapeBindings<>();
+        RenderKey unbound = new RenderKey("unbound");
+
+        PreviewCapeBindings.Resolution<String> consumed = bindings.consume(unbound);
+        PreviewCapeBindings.Resolution<String> peeked = bindings.peek(unbound);
+
+        assertEquals(PreviewCapeBindings.Decision.WORN, consumed.decision());
+        assertNull(consumed.texture());
+        assertFalse(consumed.overridesWornCape());
+        assertEquals(PreviewCapeBindings.Decision.WORN, peeked.decision());
+        assertNull(peeked.texture());
+    }
+
+    @Test
+    void aKeyBoundAfterTheSetEmptiedIsStillConsumed() {
+        PreviewCapeBindings<RenderKey, String> bindings = new PreviewCapeBindings<>();
+        RenderKey first = new RenderKey("first");
+        RenderKey second = new RenderKey("second");
+
+        bindings.bind(first, "quickskin:cape/a");
+        bindings.consume(first);
+        assertTrue(bindings.isEmpty());
+        bindings.bind(second, "quickskin:cape/b");
+
+        PreviewCapeBindings.Resolution<String> resolution = bindings.consume(second);
+        assertEquals(PreviewCapeBindings.Decision.PREVIEW, resolution.decision());
+        assertEquals("quickskin:cape/b", resolution.texture());
+        assertTrue(bindings.isEmpty());
+    }
+
+    @Test
     void aNonPositiveBoundIsRejected() {
         assertThrows(IllegalArgumentException.class, () -> new PreviewCapeBindings<>(0));
     }

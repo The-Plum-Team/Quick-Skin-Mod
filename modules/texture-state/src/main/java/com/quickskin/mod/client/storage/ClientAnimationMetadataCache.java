@@ -1,5 +1,7 @@
 package com.quickskin.mod.client.storage;
 
+import com.quickskin.mod.client.services.CapeRenderKey;
+import com.quickskin.mod.client.services.CapeRenderKeys;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.networking.NetworkSecurity;
 import com.quickskin.mod.networking.TextureTransferLimits;
@@ -47,6 +49,8 @@ public class ClientAnimationMetadataCache {
             String eldest = metadataCache.keySet().iterator().next();
             metadataCache.remove(eldest);
         }
+        // A cape that just gained metadata may now need its network animation activated.
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
     }
 
     /**
@@ -66,6 +70,7 @@ public class ClientAnimationMetadataCache {
      */
     public synchronized void clear() {
         metadataCache.clear();
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
     }
 
     /**
@@ -74,11 +79,21 @@ public class ClientAnimationMetadataCache {
      */
     public synchronized void remove(String hash) {
         metadataCache.remove(hash);
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
     }
 
     /** Fast replay guard used before parsing an already-known metadata payload. */
     public synchronized boolean hasMetadata(String hash) {
         return NetworkSecurity.isValidContentId(hash) && metadataCache.containsKey(hash);
+    }
+
+    /**
+     * {@link #hasMetadata(String)} for a cape's network content ID, which its render key already
+     * validated; a key without one has no metadata.
+     */
+    public synchronized boolean hasMetadata(CapeRenderKey cape) {
+        String hash = cape.networkHash();
+        return hash != null && metadataCache.containsKey(hash);
     }
 
     /** Returns whether the cached value is the same validated metadata version. */

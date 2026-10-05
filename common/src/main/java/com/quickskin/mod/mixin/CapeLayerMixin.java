@@ -107,6 +107,9 @@ public class CapeLayerMixin {
             CapeAnimationHelper.markCapeVisible(capeId);
         }
 
+        // The appearance lookup below already resolves the current frame; remember it so the
+        // frame is not resolved a second time for the draw.
+        CapeAnimationHelper.beginCapeLookup();
         ResourceLocation capeTexture = previewing ? preview.texture() : null;
         if (!previewing && hasServiceCape) {
             capeTexture = service.getCapeLocation(playerId);
@@ -120,7 +123,7 @@ public class CapeLayerMixin {
         }
 
         ResourceLocation finalTexture =
-                CapeAnimationHelper.resolveCurrentFrame(capeTexture, capeId);
+                CapeAnimationHelper.resolveCurrentFrameOnce(capeTexture, capeId);
         if (finalTexture == null) {
             // Network animations deliberately render nothing until their bounded first frame exists.
             ci.cancel();
@@ -324,6 +327,9 @@ public class CapeLayerMixin {
             CapeAnimationHelper.markCapeVisible(capeId);
         }
 
+        // The appearance lookup below already resolves the current frame; remember it so the
+        // frame is not resolved a second time for the draw.
+        CapeAnimationHelper.beginCapeLookup();
 //? if <1.21 {
         // A bound preview replaces the worn cape outright; otherwise resolve the applied one.
         ResourceLocation capeTexture = quickskin$previewing
@@ -394,10 +400,10 @@ public class CapeLayerMixin {
         // Check if this cape is animated. If so, get the current frame texture.
 //? if <1.21.11 {
         ResourceLocation finalTexture =
-                CapeAnimationHelper.resolveCurrentFrame(capeTexture, capeId);
+                CapeAnimationHelper.resolveCurrentFrameOnce(capeTexture, capeId);
 //?} else {
         Identifier finalTexture =
-                CapeAnimationHelper.resolveCurrentFrame(capeTexture, capeId);
+                CapeAnimationHelper.resolveCurrentFrameOnce(capeTexture, capeId);
 //?}
 
         if (finalTexture == null) {

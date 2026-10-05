@@ -771,6 +771,8 @@ public class AnimatedTextureManager {
         if (animationId == null) return;
         AnimationState removed = animations.remove(animationId);
         if (removed == null) return;
+        // A freed slot can change which visible cape may request activation.
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
         retainedAtlasBytes = Math.max(0L, retainedAtlasBytes
                 - (long) removed.atlasPixels.getWidth() * removed.atlasPixels.getHeight() * 4L);
         if (!staticFirstFrames.containsKey(animationId)) {
@@ -786,6 +788,7 @@ public class AnimatedTextureManager {
     private void removeStaticFirstFrame(String animationId) {
         StaticFrameState removed = staticFirstFrames.remove(animationId);
         if (removed == null) return;
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
         retainedStaticFramePixels = Math.max(0L,
                 retainedStaticFramePixels - removed.pixels);
         if (!animations.containsKey(animationId)) {
@@ -825,6 +828,7 @@ public class AnimatedTextureManager {
         retainedStaticFramePixels = 0;
         activationAttempts.clear();
         slotPolicy.clear();
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
     }
 
     /**
@@ -836,6 +840,7 @@ public class AnimatedTextureManager {
         removeStaticFirstFrame(animationId);
         activationAttempts.remove(animationId);
         slotPolicy.forget(animationId);
+        CapeRenderKeys.shared().invalidateVisibilityMarks();
     }
 
     /**
@@ -984,6 +989,8 @@ public class AnimatedTextureManager {
         List<AnimationState> snapshot;
         synchronized (this) {
             slotPolicy.advanceTick();
+            // Slot visibility is recorded per tick, so every visible cape is marked again.
+            CapeRenderKeys.shared().invalidateVisibilityMarks();
             snapshot = List.copyOf(animations.values());
         }
         if (snapshot.isEmpty()) {

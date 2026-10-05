@@ -75,6 +75,9 @@ public class CapeLayerMixin {
             CapeAnimationHelper.markCapeVisible(capeId);
         }
 
+        // The appearance lookup below already resolves the current frame; remember it so the
+        // frame is not resolved a second time for the draw.
+        CapeAnimationHelper.beginCapeLookup();
         // A bound preview replaces the worn cape outright.
         ResourceLocation capeTexture = quickskin$previewing ? quickskin$preview.texture() : null;
         if (!quickskin$previewing) {
@@ -103,7 +106,7 @@ public class CapeLayerMixin {
             return;
         }
 
-        ResourceLocation finalTexture = CapeAnimationHelper.resolveCurrentFrame(capeTexture, capeId);
+        ResourceLocation finalTexture = CapeAnimationHelper.resolveCurrentFrameOnce(capeTexture, capeId);
         if (finalTexture == null) {
             // A network animation deliberately renders nothing until its bounded first-frame
             // texture is ready; never expose the stacked atlas as a cape.
@@ -266,6 +269,9 @@ public class CapeLayerMixin {
             CapeAnimationHelper.markCapeVisible(capeId);
         }
 
+        // The appearance lookup below already resolves the current frame; remember it so the
+        // frame is not resolved a second time for the draw.
+        CapeAnimationHelper.beginCapeLookup();
         ResourceLocation capeTexture = previewing ? preview.texture() : null;
         if (!previewing && hasServiceCape) {
             capeTexture = service.getCapeLocation(playerId);
@@ -279,7 +285,7 @@ public class CapeLayerMixin {
         }
 
         ResourceLocation finalTexture =
-                CapeAnimationHelper.resolveCurrentFrame(capeTexture, capeId);
+                CapeAnimationHelper.resolveCurrentFrameOnce(capeTexture, capeId);
         if (finalTexture == null) {
             ci.cancel();
             return;
@@ -439,6 +445,9 @@ public class CapeLayerMixin {
             CapeAnimationHelper.markCapeVisible(capeId);
         }
 
+        // The appearance lookup below already resolves the current frame; remember it so the
+        // frame is not resolved a second time for the draw.
+        CapeAnimationHelper.beginCapeLookup();
         // A bound preview replaces the worn cape outright.
 //? if <1.21.11 {
         ResourceLocation capeTexture = quickskin$previewing ? quickskin$preview.texture() : null;
@@ -476,9 +485,9 @@ public class CapeLayerMixin {
         }
 
 //? if <1.21.11 {
-        ResourceLocation finalTexture = CapeAnimationHelper.resolveCurrentFrame(capeTexture, capeId);
+        ResourceLocation finalTexture = CapeAnimationHelper.resolveCurrentFrameOnce(capeTexture, capeId);
 //?} else {
-        Identifier finalTexture = CapeAnimationHelper.resolveCurrentFrame(capeTexture, capeId);
+        Identifier finalTexture = CapeAnimationHelper.resolveCurrentFrameOnce(capeTexture, capeId);
 //?}
         if (finalTexture == null) {
             // A network animation deliberately renders nothing until its bounded first-frame
