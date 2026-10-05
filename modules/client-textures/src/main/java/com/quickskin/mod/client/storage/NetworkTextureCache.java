@@ -193,6 +193,11 @@ public class NetworkTextureCache {
             cachedPixels += prepared.pixelCount();
         }
         textureDataCache.put(key, prepared.processed());
+        if ("cape".equals(textureType)) {
+            // A catalogued cape marked visible this tick from the local catalogue is now drawn
+            // from this cache and needs its working-set mark.
+            CapeRenderKeys.shared().invalidateVisibilityMarks();
+        }
         NativeImage oldPreparedImage = preparedNativeImages.put(key, nativeImage);
         if (oldPreparedImage != null) oldPreparedImage.close();
         BufferedImage earsImage = prepared.takeEarsImage();

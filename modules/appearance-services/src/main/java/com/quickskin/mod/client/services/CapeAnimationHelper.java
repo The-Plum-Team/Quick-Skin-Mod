@@ -3,14 +3,13 @@ package com.quickskin.mod.client.services;
 import com.quickskin.mod.client.storage.ClientAnimationMetadataCache;
 import com.quickskin.mod.client.storage.NetworkTextureCache;
 import com.quickskin.mod.client.api.ClientNetworkApi;
+import com.quickskin.mod.common.data.AssetMetadata;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
 import net.minecraft.resources.Identifier;
 //?}
 import org.jetbrains.annotations.Nullable;
-
-import java.util.Objects;
 
 /**
  * Utility class for cape animation ID derivation and frame resolution.
@@ -41,9 +40,13 @@ public final class CapeAnimationHelper {
      *
      * <p>Marking stamps the cape's animation slot and its network-cache working-set entry with the
      * current client tick, so it is done at most once per {@link CapeRenderKeys#visibilityEpoch()
-     * visibility epoch}: the epoch moves on every tick and whenever that state is removed. A
-     * network cape whose texture is not cached yet is not recorded as marked, so every frame keeps
-     * checking for its arrival exactly as before.</p>
+     * visibility epoch}: the epoch moves on every tick, whenever that state is removed and whenever
+     * a cape texture enters the network cache. That covers every cape the renderer draws: a
+     * {@code known:} cape, a network cape in the cache, and a {@code local_cape:} cape the cache
+     * does not hold but the local catalogue does (the player's own cape, which
+     * {@code CapeService} then draws from the catalogue). Only a {@code local_cape:} cape held by
+     * neither, a network cape still pending or already evicted, is not recorded as marked, so
+     * every frame keeps checking for its arrival exactly as before.</p>
      */
     public static void markCapeVisible(@Nullable String capeId) {
         CapeRenderKey cape = CapeRenderKeys.shared().of(capeId);
@@ -59,13 +62,29 @@ public final class CapeAnimationHelper {
         manager.markAnimationVisible(cape.animationId());
         String hash = cape.networkHash();
         if (hash != null) {
-            if (!NetworkTextureCache.getInstance().markCapeInUse(cape)) return;
-            boolean networkAnimation = ClientAnimationMetadataCache.getInstance().hasMetadata(cape);
-            if (networkAnimation && manager.shouldRequestActivation(cape.animationId())) {
-                ClientNetworkApi.actions().activateStoredTexture("cape", hash);
+            if (NetworkTextureCache.getInstance().markCapeInUse(cape)) {
+                boolean networkAnimation =
+                        ClientAnimationMetadataCache.getInstance().hasMetadata(cape);
+                if (networkAnimation && manager.shouldRequestActivation(cape.animationId())) {
+                    ClientNetworkApi.actions().activateStoredTexture("cape", hash);
+                }
+            } else if (!isCataloguedCape(hash)) {
+                // A network cape still pending or already evicted: check it again next frame.
+                return;
             }
         }
         cape.recordVisibilityMark(epoch);
+    }
+
+    /**
+     * Whether {@code CapeService.loadLocalCape} draws this content ID from the local catalogue
+     * when the network cache does not hold it, which is how the player's own catalogued cape
+     * renders. Such a cape has no working-set entry, so its slot mark is all there is to repeat,
+     * and the cache's arrival of the same texture moves the epoch on.
+     */
+    private static boolean isCataloguedCape(String hash) {
+        AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(hash);
+        return metadata != null && metadata.isCape();
     }
 
     /**
@@ -104,7 +123,7 @@ public final class CapeAnimationHelper {
      * lookup and pass the result to {@link #resolveCurrentFrameOnce}.
      */
     public static void beginCapeLookup() {
-        lastResolvedFrame = null;
+        LOOKUP_FRAMES.beginLookup();
     }
 
     /**
@@ -126,10 +145,7 @@ public final class CapeAnimationHelper {
     //?} else {
     public static Identifier resolveCurrentFrameOnce(Identifier texture, @Nullable String capeId) {
     //?}
-        ResolvedFrame last = lastResolvedFrame;
-        if (texture != null && last != null && last.frame() == texture
-                && last.thread() == Thread.currentThread()
-                && Objects.equals(last.capeId(), capeId)) {
+        if (LOOKUP_FRAMES.wasResolved(texture, capeId)) {
             return texture;
         }
         return resolveCurrentFrame(texture, capeId);
@@ -153,7 +169,7 @@ public final class CapeAnimationHelper {
         //?}
                 resolveFrame(atlasLocation, CapeRenderKeys.shared().of(capeId), visible);
         if (frame != null) {
-            lastResolvedFrame = new ResolvedFrame(Thread.currentThread(), capeId, frame);
+            LOOKUP_FRAMES.recordResolved(capeId, frame);
         }
         return frame;
     }
@@ -197,9 +213,6 @@ public final class CapeAnimationHelper {
         return atm.getAnimationFrame(atlasLocation).orElse(atlasLocation);
     }
 
-    /** The last frame {@link #resolveFrame} returned, and the thread and cape ID it was for. */
-    private record ResolvedFrame(Thread thread, @Nullable String capeId, Object frame) {
-    }
-
-    private static volatile ResolvedFrame lastResolvedFrame;
+    /** The last frame {@link #resolveFrame} returned since the cape layer began its lookup. */
+    private static final CapeLookupFrames LOOKUP_FRAMES = new CapeLookupFrames();
 }

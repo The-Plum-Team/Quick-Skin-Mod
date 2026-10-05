@@ -19,8 +19,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p><b>Visibility epoch.</b> Marking a cape visible stamps its texture-cache working-set entry
  * and its animation slot with the current client tick, so repeating it within the same tick
  * changes nothing. The epoch therefore advances on every client tick, and also whenever the state
- * a mark depends on is removed or replaced mid-tick: a texture leaving the network cache, an
- * animation being unregistered, either structure being cleared, or animation metadata changing.
+ * a mark depends on is removed or replaced mid-tick: a texture leaving the network cache, a cape
+ * texture entering it, an animation being unregistered, either structure being cleared, or
+ * animation metadata changing.
  * A cape whose key is already marked in the current epoch needs no further marking until the
  * epoch moves on.</p>
  */
