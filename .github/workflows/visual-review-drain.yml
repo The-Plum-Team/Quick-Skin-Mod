@@ -2335,6 +2335,22 @@ jobs:
               printf 'Shared compatibility source is no longer current master.\n' >&2
               exit 1
             fi
+            # The optional-mod wave stays strict: its review owner and Pages collector require a
+            # successful source run, so a generation the visual review admitted only through its
+            # required gate (a lost advisory wake) gets no wave and spends no compatibility runner.
+            source_run="$(github_api_retry "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")" || exit 1
+            jq -e --arg repository "$GITHUB_REPOSITORY" --arg sha "$SOURCE_SHA" \
+              --argjson run_id "$SOURCE_RUN_ID" \
+              '.id == $run_id and .head_sha == $sha and .head_branch == "master" and
+               .path == ".github/workflows/on-demand-e2e.yml" and
+               .head_repository.full_name == $repository' \
+              <<< "$source_run" > /dev/null || exit 1
+            if ! jq -e '.status == "completed" and .conclusion == "success"' \
+                <<< "$source_run" > /dev/null; then
+              printf 'Source run %s did not conclude successfully; its optional-mod wave was skipped.\n' \
+                "$SOURCE_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             report_metadata="$(github_api_retry "repos/$GITHUB_REPOSITORY/actions/artifacts/$REVIEW_ARTIFACT_ID")" || exit 1
             jq -e --arg sha "$SOURCE_SHA" --argjson run_id "$GITHUB_RUN_ID" \
               --argjson id "$REVIEW_ARTIFACT_ID" --arg prefix "visual-review-$SOURCE_RUN_ID--mc" \

@@ -16,8 +16,11 @@ The answer is ``dispatch`` only when all of these hold, and the decision is othe
 * a completed one is canonical: its exact attempt's required gate succeeded and its own wake
   job's condition held (a ``workflow_dispatch`` on ``refs/heads/master`` without
   ``attest_run_id`` after a successful gate), whatever advisory tail failed afterwards;
-* it completed recently enough for its one-day runtime evidence to still be curated;
-* no AI visual review run for the commit is queued or running;
+* it completed less than ``MAX_AGE`` ago, well inside the seven-day retention of its packaged
+  runtime evidence and the one-day retention of its feature selection and prepared capsules;
+* no AI visual review run of this master generation is queued or running (a ``repository_dispatch``
+  wake, or a ``workflow_run`` review whose run name names one of its source runs; a review that
+  a pull request's Packaged E2E started also reports this commit and never defers the wake);
 * no review capsule or report owned by the protected review workflows exists for any canonical
   generation of the commit (the same names the curator's coalescing checks); and
 * fewer than ``MAX_WAKES`` review dispatches were already delivered for the commit, so a review
@@ -50,7 +53,8 @@ ACTIVE = frozenset({"requested", "waiting", "pending", "queued", "in_progress"})
 WAKE_EVALUATED = frozenset({"success", "failure", "cancelled", "timed_out"})
 REVIEW_EVENTS = frozenset({"repository_dispatch", "workflow_run"})
 OWNER_CONCLUSIONS = frozenset({"success", "failure"})
-# Raw packaged evidence is retained for one day; leave room for curation after the last wake.
+# Packaged runtime evidence is kept seven days, but the generation's e2e-feature-selection and the
+# drain's prepared capsules only one; leave room for curation and review after the last wake.
 MAX_AGE = timedelta(hours=20)
 MAX_WAKES = 3
 MAX_RUNS_PER_PAGE = 100
@@ -110,6 +114,28 @@ def validate_run(run: Any, *, repository: str, source_sha: str, workflow: str) -
             or run["head_repository"].get("full_name") != repository
             or run.get("status") not in ACTIVE | {"completed"}):
         raise coverage.CoverageError("wake recovery read a foreign or malformed workflow run")
+
+
+def review_title(source_run_id: int) -> str:
+    """visual-review.yml's run name: the only run field that names a workflow_run review's source.
+
+    GitHub reports every workflow_run review on the default branch head whatever its source, so a
+    review that a pull request's Packaged E2E started carries the current master commit as well.
+    """
+    return f"AI visual review for source run {source_run_id}"
+
+
+def generation_reviews(reviews: list[dict[str, Any]], sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The review runs of this master generation only.
+
+    Every ``repository_dispatch`` review is a master generation wake (the producer's, or this
+    recovery's); a ``workflow_run`` review counts only when its run name names one of the
+    generation's own source runs, so a busy pull-request stream cannot defer the recovery.
+    """
+    titles = {review_title(run["id"]) for run in sources}
+    return [run for run in reviews if run["head_branch"] == "master"
+            and (run["event"] == "repository_dispatch"
+                 or run["event"] == "workflow_run" and run.get("display_title") in titles)]
 
 
 def _named(jobs: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
@@ -198,7 +224,7 @@ def decide(api: Api, *, source_sha: str, now: datetime) -> Decision:
     newest = canonical[0]
     if now - _timestamp(newest.get("updated_at")) > MAX_AGE:
         return Decision("generation-expired")
-    reviews = [run for run in api.runs(REVIEW_WORKFLOW, source_sha) if run["head_branch"] == "master"]
+    reviews = generation_reviews(api.runs(REVIEW_WORKFLOW, source_sha), sources)
     if any(run["status"] != "completed" for run in reviews):
         # Never race a review that may already own this generation; the next sweep rechecks.
         return Decision("review-active")

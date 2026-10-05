@@ -229,6 +229,35 @@ class FeatureCoverageTest(unittest.TestCase):
         missing_gate[0]["jobs"] = [job for job in missing_gate[0]["jobs"] if job["name"] != GATE_JOB]
         with self.assertRaises(ValueError): validate(run, missing_gate)
 
+    def test_only_a_master_dispatch_is_ever_settled_by_its_required_gate(self):
+        # The predicate itself must hold the branch and event: several callers check them only
+        # for one matrix kind (a scheduled native-anchor run is a master run with another event).
+        dispatch = {"head_branch": "master", "event": "workflow_dispatch", "status": "completed"}
+        for conclusion in sorted(coverage.GATE_SETTLED_CONCLUSIONS):
+            candidate = {**dispatch, "conclusion": conclusion}
+            self.assertTrue(coverage.settled_source_run(candidate, gate_settled=True))
+            for field, value in (("head_branch", "feature/example"), ("head_branch", None),
+                                 ("event", "schedule"), ("event", "pull_request"), ("event", None)):
+                with self.subTest(conclusion=conclusion, field=field, value=value):
+                    self.assertFalse(coverage.settled_source_run({**candidate, field: value},
+                                                                 gate_settled=True))
+        native = coverage.expected_scenario_jobs_for(coverage.DEFAULT_MATRIX, "native-anchors")
+        jobs = [{"jobs": [{"name": name, "status": "completed", "conclusion": "success"}
+                          for name in (POLICY_JOB, BUILD_JOB, GATE_JOB, *native)]}]
+        scheduled = {"id": self.run_id, "head_branch": "master", "head_sha": self.source,
+                     "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"},
+                     "path": ".github/workflows/on-demand-e2e.yml", "event": "schedule",
+                     "status": "completed", "conclusion": "success"}
+        def validate(candidate):
+            return coverage.validate_source_run(candidate, jobs,
+                github_repository="The-Plum-Team/Quick-Skin-Mod", source_sha=self.source,
+                source_run_id=self.run_id, matrix_kind="native-anchors", gate_settled=True)
+        self.assertEqual("full", validate(scheduled)["runtime_policy"])
+        for conclusion in ("failure", "cancelled", "timed_out"):
+            with self.subTest(scheduled=conclusion), self.assertRaises(ValueError):
+                # A failed schedule run keeps the strict conclusion although its gate succeeded.
+                validate({**scheduled, "conclusion": conclusion})
+
     def test_complete_same_run_review_can_seed_coverage_but_foreign_reference_cannot(self):
         target = self.targets[1]
         files = self.files(target)

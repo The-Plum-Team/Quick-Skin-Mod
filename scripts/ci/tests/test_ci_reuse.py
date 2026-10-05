@@ -343,14 +343,18 @@ class CiReuseTest(unittest.TestCase):
             reuse.runtime_source(self.api, 30, self.api.covered, gate_settled=True)
 
     def test_review_admission_is_the_only_gate_settled_runtime_consumer(self):
-        # Coverage certificates and Pages keep the strict run conclusion; only the review chain
-        # (curation, model admission and the optional-mod wave) is admitted through the gate.
+        # Coverage certificates, Pages and the optional-mod wave keep the strict run conclusion;
+        # only the review chain (curation and model admission) is admitted through the gate.
+        # test_shared_compatibility proves the split behaviourally; this pins the call sites.
         reuse_text = (ROOT / "scripts/ci/ci_reuse.py").read_text(encoding="utf-8")
         consumers = {path.name: path.read_text(encoding="utf-8")
                      for path in (ROOT / "scripts").rglob("*.py") if "tests" not in path.parts}
-        settled = sorted(name for name, text in consumers.items() if "gate_settled=True" in text)
-        self.assertEqual(["feature_review.py", "visual_review_wake.py"], settled)
+        relaxed = sorted(name for name, text in consumers.items()
+                         if "gate_settled=True" in text or "gate_settled: bool = True" in text)
+        self.assertEqual(["feature_review.py", "visual_review_wake.py"], relaxed)
         self.assertIn("gate_settled: bool = False", reuse_text)
+        self.assertIn("gate_settled=False)", consumers["shared_compatibility.py"])
+        self.assertNotIn("gate_settled", consumers["collect_compatibility.py"])
 
     def test_source_references_never_chain(self):
         self.api.add_artifact(20, 999, "reused-source-e2e")

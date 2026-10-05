@@ -1,4 +1,7 @@
 name: AI visual review
+# The API reports every workflow_run review on the default branch head, whatever its source; the
+# run name is the only field that names the source run (visual_review_wake.py reads it).
+run-name: AI visual review for source run ${{ github.event.client_payload.source_run_id || github.event.workflow_run.id }}
 
 # This workflow authenticates and curates immutable review capsules from protected code. Ordinary
 # trusted runs arrive through workflow_run; GITHUB_TOKEN-driven version ports use the explicit

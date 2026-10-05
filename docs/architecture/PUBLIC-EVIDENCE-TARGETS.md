@@ -87,10 +87,13 @@ workflow path without relying only on a recursive completion event.
 That wake is an advisory job, so a runner outage can cancel it after the required gate passed and
 leave the run concluded as failed (master `9de9f29c`, 2026-10-05). The review therefore admits a
 canonical `master` dispatch by its exact attempt's required gate and complete required job graph,
-not by the run conclusion; Pages and baseline certificates keep the strict conclusion. The hourly
-`visual-review-wake-recovery.yml` decides read-only whether the current generation still lacks a
-review run, capsule and report, then lets a separate `contents: write` job recheck the live head
-and resend the identical wake, at most three review dispatches per generation.
+not by the run conclusion. The optional-mod wave, Pages and baseline certificates keep the strict
+conclusion: the drain requests no optional-mod wave for such a generation, and its admission
+refuses one before any lane starts. The hourly `visual-review-wake-recovery.yml` decides read-only
+whether the current generation still lacks a review run, capsule and report, then lets a separate
+`contents: write` job recheck the live head and resend the identical wake, at most three review
+dispatches per generation. A `workflow_run` review reports the default-branch head whatever its
+source, so the sweep counts one only when its run name names a source run of that generation.
 
 `scripts/ci/feature_coverage.py` validates a potential complete baseline against the authored
 PR-profile captures of every target and loader. It requires successful packaged jobs, exact

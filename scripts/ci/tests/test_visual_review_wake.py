@@ -28,10 +28,10 @@ def job_names(workflow: str) -> dict[str, str]:
 
 
 def make_run(identifier, *, path=wake.SOURCE_WORKFLOW, event="workflow_dispatch", branch="master",
-             status="completed", conclusion="success", updated="2026-10-05T19:45:08Z"):
+             status="completed", conclusion="success", updated="2026-10-05T19:45:08Z", title=None):
     return {"id": identifier, "run_attempt": 1, "path": path, "event": event, "head_sha": SHA,
             "head_branch": branch, "head_repository": {"full_name": REPOSITORY}, "status": status,
-            "conclusion": conclusion, "updated_at": updated}
+            "conclusion": conclusion, "updated_at": updated, "display_title": title}
 
 
 class FixtureApi:
@@ -151,12 +151,43 @@ class WakeRecoveryTest(unittest.TestCase):
             for status in ("queued", "in_progress", "requested", "pending"):
                 with self.subTest(event=event, status=status):
                     self.api.reviews = [make_run(600, path=wake.REVIEW_WORKFLOW, event=event,
-                                                 status=status, conclusion=None)]
+                                                 status=status, conclusion=None,
+                                                 title=wake.review_title(37361031586))]
                     self.assertEqual("review-active", self.decide().reason)
         # Reviews of another branch cannot own a protected master generation.
         self.api.reviews = [make_run(600, path=wake.REVIEW_WORKFLOW, event="repository_dispatch",
                                      branch="topic", status="queued", conclusion=None)]
         self.assertEqual("dispatch", self.decide().reason)
+
+    def test_only_reviews_of_this_master_generation_defer_the_wake(self):
+        # GitHub reports every workflow_run review on the default branch head, so the reviews a
+        # busy pull-request stream starts carry this master commit too (observed 2026-10-05).
+        pull_requests = [make_run(610 + index, path=wake.REVIEW_WORKFLOW, event="workflow_run",
+                                  status="in_progress", conclusion=None,
+                                  title=wake.review_title(37384755327 + index)) for index in range(5)]
+        untitled = make_run(620, path=wake.REVIEW_WORKFLOW, event="workflow_run", status="queued",
+                            conclusion=None, title="AI visual review")
+        other_event = make_run(621, path=wake.REVIEW_WORKFLOW, event="workflow_dispatch",
+                               status="queued", conclusion=None, title=wake.review_title(37361031586))
+        self.api.reviews = [*pull_requests, untitled, other_event]
+        self.assertEqual(("dispatch", 37361031586), (self.decide().reason, self.decide().source_run_id))
+        # A review of any master dispatch of this commit, canonical or not, still defers it.
+        self.api.sources.append(self.api.source(37361030000, conclusion="failure", gate="failure",
+                                                wake_job="skipped"))
+        for source in (37361031586, 37361030000):
+            with self.subTest(source=source):
+                self.api.reviews = [*pull_requests, make_run(630, path=wake.REVIEW_WORKFLOW,
+                    event="workflow_run", status="in_progress", conclusion=None,
+                    title=wake.review_title(source))]
+                self.assertEqual("review-active", self.decide().reason)
+        # Every repository_dispatch review on master is a generation wake, titled or not.
+        self.api.reviews = [*pull_requests, make_run(640, path=wake.REVIEW_WORKFLOW,
+            event="repository_dispatch", status="queued", conclusion=None)]
+        self.assertEqual("review-active", self.decide().reason)
+        # The run name the sweep matches is visual-review.yml's own.
+        header = (WORKFLOWS / "visual-review.yml").read_text(encoding="utf-8").split("\non:\n", 1)[0]
+        self.assertIn("\nrun-name: " + wake.review_title(
+            "${{ github.event.client_payload.source_run_id || github.event.workflow_run.id }}") + "\n", header)
 
     def test_an_authenticated_capsule_or_report_of_any_canonical_generation_suppresses_the_wake(self):
         for report in (False, True):

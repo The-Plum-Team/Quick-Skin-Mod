@@ -323,17 +323,22 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         self.binary("github_api_retry", "import json,os,sys\n"
             "open(os.environ['RECORD'],'a').write(json.dumps(sys.argv[1:])+'\\n')\n"
             "if '/branches/master' in sys.argv[1]: print(os.environ['LIVE_SHA'])\n"
+            "elif '/actions/runs/' in sys.argv[1]: print(os.environ['SOURCE_RUN'])\n"
             "elif '/artifacts/' in sys.argv[1]: print(os.environ['REPORT_METADATA'])\n"
             "else: print('{}')\n")
         record = {"id": 8000, "name": "visual-review-55--mc1.21.1", "expired": False,
             "size_in_bytes": 1024, "digest": "sha256:" + "a" * 64,
             "workflow_run": {"id": 66, "head_branch": "master", "head_sha": "b" * 40}}
+        source = {"id": 55, "head_sha": "b" * 40, "head_branch": "master", "event": "workflow_dispatch",
+            "path": ".github/workflows/on-demand-e2e.yml", "status": "completed", "conclusion": "success",
+            "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"}}
         environment = {"SOURCE_BRANCH": "master", "SOURCE_RUN_ID": "55", "SOURCE_SHA": "b" * 40,
             "GITHUB_SHA": "b" * 40, "LIVE_SHA": "b" * 40, "REVIEW_ARTIFACT_ID": "8000",
-            "REPORT_METADATA": json.dumps(record)}
+            "REPORT_METADATA": json.dumps(record), "SOURCE_RUN": json.dumps(source)}
         result, _, calls = self.run_script(route, environment)
         self.assertEqual(0, result.returncode, result.stderr[:500])
-        self.assertEqual(3, len(calls))
+        self.assertEqual(4, len(calls))
+        self.assertEqual(["repos/The-Plum-Team/Quick-Skin-Mod/actions/runs/55"], calls[1])
         payload = json.loads((self.root / "shared-mod-compatibility-dispatch.json").read_text())
         self.assertEqual("mod-compatibility-requested", payload["event_type"])
         self.assertEqual(10, len(payload["client_payload"]))
@@ -346,8 +351,27 @@ class FeatureRuntimeWorkflowTest(unittest.TestCase):
         result, _, calls = self.run_script(route, {**environment,
             "REPORT_METADATA": json.dumps({**record, "size_in_bytes": 4194305})})
         self.assertNotEqual(0, result.returncode)
-        self.assertEqual(2, len(calls))
+        self.assertEqual(3, len(calls))
         self.assertFalse(any("--method" in call for call in calls))
+        # A generation the visual review admitted only through its required gate (a lost advisory
+        # wake) keeps the strict optional-mod wave: no dispatch, no compatibility runner.
+        for conclusion in ("failure", "cancelled", "timed_out", None):
+            with self.subTest(conclusion=conclusion):
+                (self.root / "summary").write_text("")
+                result, _, calls = self.run_script(route, {**environment,
+                    "SOURCE_RUN": json.dumps({**source, "conclusion": conclusion})})
+                self.assertEqual(0, result.returncode, result.stderr[:500])
+                self.assertEqual(2, len(calls))
+                self.assertFalse(any("--method" in call for call in calls))
+                self.assertIn("optional-mod wave was skipped", (self.root / "summary").read_text())
+        for field, value in (("id", 56), ("head_sha", "c" * 40), ("head_branch", "topic"),
+                             ("path", ".github/workflows/pages.yml"),
+                             ("head_repository", {"full_name": "fork/Quick-Skin-Mod"})):
+            with self.subTest(field=field):
+                result, _, calls = self.run_script(route, {**environment,
+                    "SOURCE_RUN": json.dumps({**source, field: value})})
+                self.assertNotEqual(0, result.returncode)
+                self.assertFalse(any("--method" in call for call in calls))
 
     def test_shared_optional_wave_enters_protected_admission_and_recomputes_the_target_plan(self):
         script = step_script("mod-compatibility-e2e.yml", "admit",
