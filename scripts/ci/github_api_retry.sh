@@ -21,6 +21,21 @@ github_api_budget_snapshot() {
   fi
 }
 
+# Opt-in typed retention signal for protected callers. When GITHUB_API_RETRY_UNAVAILABLE_SIGNAL
+# names a file, it describes only the most recent wrapper call: the empty file exists after that
+# call stopped on a response classified below as transient (rate limit, HTTP 408/429/5xx or a
+# transport failure) and is removed after success or any other failure. It never records the
+# response text, an HTTP status or quota details; callers decide what the signal permits.
+_github_retry_signal() {
+  local signal="${GITHUB_API_RETRY_UNAVAILABLE_SIGNAL:-}"
+  [[ -n "$signal" ]] || return 0
+  if [[ "$1" == unavailable ]]; then
+    : > "$signal" || printf 'GitHub API unavailability signal could not be recorded.\n' >&2
+  else
+    rm -f -- "$signal"
+  fi
+}
+
 _github_retry_bounds_valid() {
   local max_attempts="$1" max_delay="$2" max_wait="$3"
   [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]] \
@@ -79,6 +94,7 @@ _github_retry_wait() {
 
 github_cli_retry() {
   if (( $# == 0 )); then
+    _github_retry_signal clear
     printf 'github_cli_retry requires a command\n' >&2
     return 2
   fi
@@ -87,6 +103,7 @@ github_cli_retry() {
   local max_delay="${GITHUB_API_RETRY_MAX_DELAY_SECONDS:-60}"
   local max_wait="${GITHUB_API_RETRY_MAX_WAIT_SECONDS:-300}"
   if ! _github_retry_bounds_valid "$max_attempts" "$max_delay" "$max_wait"; then
+    _github_retry_signal clear
     printf 'invalid GitHub API retry bounds\n' >&2
     return 2
   fi
@@ -97,6 +114,7 @@ github_cli_retry() {
     output=''
     api_status=0
     if output="$("$@" 2>&1)"; then
+      _github_retry_signal clear
       printf '%s\n' "$output"
       return 0
     else
@@ -106,16 +124,19 @@ github_cli_retry() {
     if ! grep -Eqi \
         'API rate limit exceeded|secondary rate limit|HTTP (408|429|5[0-9][0-9])|connection (reset|refused)|timed out|timeout|temporary failure|TLS handshake|unexpected EOF' \
         <<< "$output"; then
+      _github_retry_signal clear
       printf '%s\n' "$output" >&2
       return "$api_status"
     fi
     if (( attempt == max_attempts )); then
+      _github_retry_signal unavailable
       printf '%s\n' "$output" >&2
       return "$api_status"
     fi
 
     if ! _github_retry_wait \
         "$output" "$attempt" "$max_attempts" "$delay" "$max_delay" "$max_wait"; then
+      _github_retry_signal unavailable
       printf '%s\n' "$output" >&2
       return "$api_status"
     fi
@@ -139,6 +160,7 @@ github_api_retry() {
 # after `gh api` succeeds, leaving an existing destination untouched on failure.
 github_api_retry_to_file() {
   if (( $# < 2 )) || [[ -z "$1" ]]; then
+    _github_retry_signal clear
     printf 'github_api_retry_to_file requires a destination and gh api arguments\n' >&2
     return 2
   fi
@@ -149,13 +171,18 @@ github_api_retry_to_file() {
   local max_delay="${GITHUB_API_RETRY_MAX_DELAY_SECONDS:-60}"
   local max_wait="${GITHUB_API_RETRY_MAX_WAIT_SECONDS:-300}"
   if ! _github_retry_bounds_valid "$max_attempts" "$max_delay" "$max_wait"; then
+    _github_retry_signal clear
     printf 'invalid GitHub API retry bounds\n' >&2
     return 2
   fi
 
   local attempt api_status delay diagnostic error_file partial_file
-  partial_file="$(mktemp "${destination}.partial.XXXXXX")" || return 1
+  partial_file="$(mktemp "${destination}.partial.XXXXXX")" || {
+    _github_retry_signal clear
+    return 1
+  }
   error_file="$(mktemp "${destination}.error.XXXXXX")" || {
+    _github_retry_signal clear
     rm -f -- "$partial_file"
     return 1
   }
@@ -170,6 +197,7 @@ github_api_retry_to_file() {
       fi
       mv -f -- "$partial_file" "$destination"
       rm -f -- "$error_file"
+      _github_retry_signal clear
       return 0
     else
       api_status=$?
@@ -178,7 +206,14 @@ github_api_retry_to_file() {
 
     if ! grep -Eqi \
         'API rate limit exceeded|secondary rate limit|HTTP (408|429|5[0-9][0-9])|connection (reset|refused)|timed out|timeout|temporary failure|TLS handshake|unexpected EOF' \
-        <<< "$diagnostic" || (( attempt == max_attempts )); then
+        <<< "$diagnostic"; then
+      _github_retry_signal clear
+      printf '%s\n' "$diagnostic" >&2
+      rm -f -- "$partial_file" "$error_file"
+      return "$api_status"
+    fi
+    if (( attempt == max_attempts )); then
+      _github_retry_signal unavailable
       printf '%s\n' "$diagnostic" >&2
       rm -f -- "$partial_file" "$error_file"
       return "$api_status"
@@ -186,6 +221,7 @@ github_api_retry_to_file() {
 
     if ! _github_retry_wait \
         "$diagnostic" "$attempt" "$max_attempts" "$delay" "$max_delay" "$max_wait"; then
+      _github_retry_signal unavailable
       printf '%s\n' "$diagnostic" >&2
       rm -f -- "$partial_file" "$error_file"
       return "$api_status"
