@@ -301,7 +301,9 @@ class RuntimeSource:
 
 
 def runtime_source(api: Any, run_id: int, coverage_sha: str, *, matrix_kind: str = "pr-anchors",
-                   allow_in_progress: bool = False) -> RuntimeSource:
+                   allow_in_progress: bool = False, gate_settled: bool = False) -> RuntimeSource:
+    """``gate_settled`` admits a completed master generation by its required gate instead of its
+    run conclusion (see ``feature_coverage.settled_source_run``); the job checks stay exact."""
     import feature_coverage as coverage
     run = api.run(run_id)
     inventory = api.artifacts(run_id=run_id)
@@ -309,12 +311,12 @@ def runtime_source(api: Any, run_id: int, coverage_sha: str, *, matrix_kind: str
     if not references:
         graph = coverage.validate_source_run(run, api.jobs(run), github_repository=api.repository,
             source_sha=coverage_sha, source_run_id=run_id, matrix_kind=matrix_kind,
-            allow_in_progress=allow_in_progress)
+            allow_in_progress=allow_in_progress, gate_settled=gate_settled)
         return RuntimeSource(run, run, inventory, graph)
     require(len(references) == 1 and matrix_kind == "pr-anchors", "ambiguous reused runtime profile")
     require(run.get("event") == "workflow_dispatch" and run.get("head_branch") == "master"
             and run.get("head_sha") == coverage_sha and run.get("path") == WORKFLOWS["e2e"]
-            and (run.get("status") == "completed" and run.get("conclusion") == "success"
+            and (coverage.settled_source_run(run, gate_settled=gate_settled)
                  or allow_in_progress and run.get("status") in {"queued", "in_progress"}
                     and run.get("conclusion") is None)
             and run.get("head_repository", {}).get("full_name") == api.repository,

@@ -173,19 +173,28 @@ def _artifact_record(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def authenticate_full(api: publisher.Api, repository: Path, *, source_sha: str,
-                      source_run_id: int, matrix_kind: str) -> ci_reuse.RuntimeSource:
-    """Admit the current protected policy and every runtime job before fetching any image."""
+                      source_run_id: int, matrix_kind: str,
+                      gate_settled: bool = True) -> ci_reuse.RuntimeSource:
+    """Admit the current protected policy and every runtime job before fetching any image.
+
+    Review is admitted by the generation's required gate rather than its run conclusion, so a
+    lost advisory wake (a job that never received a runner) cannot drop the review; every
+    required job of the exact attempt must still have succeeded. The optional-mod wave passes
+    ``gate_settled=False``: its review owner and its Pages collector require a successful source
+    run, so a generation admitted only through its gate is refused before any lane starts.
+    """
     if api.current_sha() != source_sha:
         raise coverage.CoverageError("review source is no longer current master")
     coverage.policy_fingerprint(repository, source_sha, verify_executing=True)
-    return ci_reuse.runtime_source(api, source_run_id, source_sha, matrix_kind=matrix_kind)
+    return ci_reuse.runtime_source(api, source_run_id, source_sha, matrix_kind=matrix_kind,
+                                   gate_settled=gate_settled)
 
 
 def verify_selection(api: publisher.Api, paths: tuple[Path, Path], source: ci_reuse.RuntimeSource,
                      *, repository: Path, directory: Path) -> tuple[Any, dict]:
     arguments = {"repository": repository, "directory": directory,
         "head": source.generation["head_sha"], "policy": source.generation["head_sha"],
-        "run_id": source.generation["id"]}
+        "run_id": source.generation["id"], "gate_settled": True}
     if source.reference is not None:
         original = source.reference["source"]
         ci_reuse.fetch_source_objects(repository, source.reference)

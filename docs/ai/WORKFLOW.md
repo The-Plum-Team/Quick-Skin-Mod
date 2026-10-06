@@ -89,6 +89,15 @@ deltas.
   the protected merge is a separate coverage generation. Missing or expired evidence permits
   fresh execution; an API failure, pending original execution or malformed proof stops admission.
   Repeated producer wakes must skip targets with an authenticated existing capsule or report.
+- Visual review admits a canonical `master` dispatch by its exact attempt's required gate and
+  complete required job graph, never by an advisory job: a wake that never received a runner
+  can conclude the run as failed after the gate passed. Only the review chain relaxes the run
+  conclusion this way; the optional-mod wave, Pages and baseline certificates keep it strict, and
+  the drain requests no wave for such a generation. The hourly
+  `visual-review-wake-recovery.yml` re-sends the producer's identical wake for the current
+  generation only while no review run of that generation is active, no protected capsule or
+  report exists and its bounded retry budget remains; its read-only decision job holds no write
+  scope.
 - Target Build/E2E badges are advisory snapshots, not live acceptance or baseline certificates.
   `.github/workflows/target-ci-status.yml` refreshes the complete matrix on `master` pushes and
   gate transitions, with explicit E2E advisory wakes for token-created runs plus manual and hourly
