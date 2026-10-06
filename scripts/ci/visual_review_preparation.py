@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from bounded_zip import ExtractionLimits, extract_bounded_zip
-from feature_coverage_github import Api, _get
+from feature_coverage_github import Api, GitHubGetUnavailable, _get
 
 MAX_CAPSULE_BYTES = 512 * 1024 * 1024
 MAX_PREPARED_BYTES = MAX_CAPSULE_BYTES + 1024 * 1024
@@ -101,9 +101,19 @@ def main() -> int:
     for name in ("workflow-sha", "artifact-digest", "capsule-digest"):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--github-output", type=Path)
     args = vars(parser.parse_args())
     repository = args.pop("repository")
-    restore(PreparationApi(repository), **args)
+    github_output = args.pop("github_output")
+    try:
+        restore(PreparationApi(repository), **args)
+    except GitHubGetUnavailable:
+        # A failed bounded GET cannot show that the original capsule is terminally invalid.
+        # Emit only the fixed typed retention signal; integrity failures keep their own errors.
+        if github_output is not None:
+            with github_output.open("a", encoding="utf-8") as stream:
+                stream.write("github_transport_unavailable=true\n")
+        parser.exit(2, "Prepared capsule restore unavailable: bounded GitHub GET failed or timed out\n")
     return 0
 
 

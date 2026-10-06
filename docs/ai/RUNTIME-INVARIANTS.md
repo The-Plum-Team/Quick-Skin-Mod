@@ -616,9 +616,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   cleanup job must succeed without deletion for both branches: its own or another in-progress
   report owner can still cancel during later tails, requiring the original input for recovery.
   Only missing/terminally invalid inputs enter exact-ID cleanup. A transient failure retains the
-  entry for cooldown and retry; a bounded GitHub GET that fails in transport while the drain
-  reauthenticates the source proof is transient (`github_transport_unavailable`), while size, JSON,
-  digest and identity failures stay terminal. Each exact artifact ID locks its complete protected drain, from
+  entry for cooldown and retry; a bounded GitHub GET or retry-helper call that stops on
+  unavailability, timeout or rate limiting while the drain guards, restores, reauthenticates or
+  recovers a capsule is transient (`github_transport_unavailable`) through a typed signal from
+  the failed step, while size, JSON, digest and identity failures stay terminal. Each exact artifact ID locks its complete protected drain, from
   exact selection through cleanup, so duplicate wakes cannot overlap. The model/cache job admits
   one ordinary capsule globally at a time, with at most 32 concurrent calls and up to 100 pending
   jobs through `queue: max`, so the next target can reuse the latest verdicts. Two secretless
