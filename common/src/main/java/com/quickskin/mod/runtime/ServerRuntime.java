@@ -3,6 +3,8 @@ package com.quickskin.mod.runtime;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.ServerNetworkHandler;
+import com.quickskin.mod.networking.TextureTransferLimits;
+import com.quickskin.mod.networking.protocol.ProtocolSessions;
 import com.quickskin.mod.server.concurrent.ServerTextureIngressExecutor;
 import com.quickskin.mod.server.concurrent.ServerCacheIoExecutor;
 import com.quickskin.mod.server.data.ServerCooldownManager;
@@ -10,6 +12,7 @@ import com.quickskin.mod.server.data.ServerPlayerAppearanceRepository;
 import com.quickskin.mod.server.storage.ServerAnimationCache;
 import com.quickskin.mod.server.storage.ServerAppearanceStorage;
 import com.quickskin.mod.server.storage.ServerTextureCache;
+import com.quickskin.mod.server.vanilla.AccountSkinShareService;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -70,6 +73,18 @@ public final class ServerRuntime implements AutoCloseable {
 
         resetTransientState();
         ServerConfig.reload();
+        // Before the texture cache loads: a stored texture over the limit is not served.
+        int uploadLimit = ProtocolSessions.getInstance().configureServerUploadLimit(
+                ServerConfig.getInstance().maxTextureUploadBytes());
+        textureCache.configureUploadLimit(uploadLimit);
+        QuickSkinInfo.LOGGER.info("Quick Skin accepts skins and capes up to {} KiB per texture"
+                + " (maxTextureUploadKilobytes in quickskin-server.json)", uploadLimit / 1024);
+        if (uploadLimit < TextureTransferLimits.DEFAULT_SERVER_UPLOAD_BYTES) {
+            // Released clients refuse the whole sync, not just the texture; no server can fix it.
+            QuickSkinInfo.LOGGER.warn("Players on Quick Skin 3.1.0 or older with a skin or cape"
+                    + " over this {} KiB limit will not sync their appearance (skin, cape and"
+                    + " model) until they update or choose a smaller texture", uploadLimit / 1024);
+        }
         ServerCacheIoExecutor.getInstance().start();
         java.nio.file.Path worldPath = server.getWorldPath(
                 net.minecraft.world.level.storage.LevelResource.ROOT);
@@ -77,7 +92,25 @@ public final class ServerRuntime implements AutoCloseable {
         animationCache.init(worldPath);
         appearanceStorage.init(worldPath);
         ServerTextureIngressExecutor.getInstance().start();
+        AccountSkinProfileTarget accountSkinTarget = new AccountSkinProfileTarget(server);
+        AccountSkinShareService.getInstance().start(accountSkinTarget);
+        logAccountSkinSharing(server, accountSkinTarget);
         activeServer = server;
+    }
+
+    private static void logAccountSkinSharing(MinecraftServer server, AccountSkinProfileTarget target) {
+        if (!ServerConfig.getInstance().shareAccountSkinWithVanillaClients) return;
+        if (!server.usesAuthentication()) {
+            QuickSkinInfo.LOGGER.info("shareAccountSkinWithVanillaClients has no effect: this "
+                    + "server runs in offline mode, so Mojang never signed its players' skins");
+        } else if (target.nonMojangReason().isPresent()) {
+            QuickSkinInfo.LOGGER.info("shareAccountSkinWithVanillaClients has no effect: this "
+                    + "server does not authenticate players with Mojang ({}), so a profile id need "
+                    + "not be the Mojang account with that id", target.nonMojangReason().get());
+        } else {
+            QuickSkinInfo.LOGGER.info("Sharing the Mojang account skins that Quick Skin players "
+                    + "upload with players who do not run Quick Skin");
+        }
     }
 
     /** Persists state while the server and its player list are still available. */
@@ -111,12 +144,14 @@ public final class ServerRuntime implements AutoCloseable {
             // Exact-session network state is safe to release even though UUID-scoped gameplay
             // state now belongs to the replacement connection.
             ServerNetworkHandler.onPlayerDisconnected(playerId, connection);
+            AccountSkinShareService.getInstance().playerDisconnected(playerId, connection);
             return false;
         }
         appearanceStorage.savePlayerAppearance(playerId);
         appearanceRepository.removeAppearance(playerId);
         cooldownManager.removePlayer(playerId);
         ServerNetworkHandler.onPlayerDisconnected(playerId, connection);
+        AccountSkinShareService.getInstance().playerDisconnected(playerId, connection);
         return true;
     }
 
@@ -132,6 +167,7 @@ public final class ServerRuntime implements AutoCloseable {
 
     private void resetTransientState() {
         runCleanup("stop server texture ingress", ServerTextureIngressExecutor.getInstance()::close);
+        runCleanup("stop account skin sharing", AccountSkinShareService.getInstance()::close);
         runCleanup("clear server textures", textureCache::clear);
         runCleanup("drain server cache cleanup", ServerCacheIoExecutor.getInstance()::close);
         runCleanup("clear server animation metadata", animationCache::clear);

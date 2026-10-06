@@ -253,6 +253,21 @@ public class ServerNetworkHandler {
         });
     }
 
+    /** A Quick Skin client reports a user-initiated upload to its own Mojang account. */
+    public static void handleAccountSkinChanged(
+            FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        UUID reportedPlayerId = PacketHelper.readPlayerId(buf);
+        ServerPlayer sender = (ServerPlayer) context.getPlayer();
+        if (!AccountSkinRefreshRequests.admits(sender, reportedPlayerId)
+                || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
+                        sender.getUUID(), sender.connection)) return;
+        MinecraftServer server = sender.server;
+        UUID playerId = sender.getUUID();
+        Object connection = sender.connection;
+        context.queue(() -> AccountSkinRefreshRequests.submit(
+                activePlayer(server, playerId, connection)));
+    }
+
     /**
      * Handles skin/cape upload from client
      * Packet format: UUID (player) + String (textureType) + byte[] (imageData)
@@ -368,9 +383,12 @@ public class ServerNetworkHandler {
 
         // The assembler is synchronized and bounded. Keeping its final large array copy off the
         // server thread prevents a completed maximum-size upload from stalling a tick.
+        // The legacy profile carries this server's upload limit as well.
+        ProtocolProfile profile = ProtocolNetwork.profile(sender);
         byte[] completeTexture = TextureChunkAssembler.getInstance().addChunk(
                 sender.getUUID(), sender.connection, textureType, hash,
-                chunkIndex, totalChunks, chunkData);
+                chunkIndex, totalChunks, chunkData,
+                profile.maximumTextureBytes(), profile.maximumChunkBytes());
         if (completeTexture == null
                 || !reserveDecodedPixels(sender, textureType, completeTexture)
                 || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
@@ -1164,7 +1182,8 @@ public class ServerNetworkHandler {
             return;
         }
         com.quickskin.mod.config.ServerConfig serverConfig = com.quickskin.mod.config.ServerConfig.getInstance();
-        String configJson = serverConfig.toJson();
+        String configJson = serverConfig.toJson(
+                com.quickskin.mod.server.vanilla.AccountSkinShareService.getInstance().accountSkinVisibility());
 
         NetworkTransport.INSTANCE.sendServerConfigToPlayer(player, configJson);
     }
@@ -1176,7 +1195,8 @@ public class ServerNetworkHandler {
      */
     private static void broadcastServerConfigToAllPlayers(net.minecraft.server.MinecraftServer server) {
         com.quickskin.mod.config.ServerConfig serverConfig = com.quickskin.mod.config.ServerConfig.getInstance();
-        String configJson = serverConfig.toJson();
+        String configJson = serverConfig.toJson(
+                com.quickskin.mod.server.vanilla.AccountSkinShareService.getInstance().accountSkinVisibility());
 
         // Send to all players that have QuickSkin (including the admin who made the change)
         // IMPORTANT: Create a fresh packet buffer for each player to avoid buffer exhaustion

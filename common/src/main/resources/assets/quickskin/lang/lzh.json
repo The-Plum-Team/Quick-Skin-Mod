@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "呈於 Mojang 中...",
   "quickskin.upload.please_wait": "請候...",
   "quickskin.upload.success": "膚已更！",
+  "quickskin.upload.vanilla_players_shared": "此伺服器共享帳膚：無速易膚之玩家，數分之內可見之。",
+  "quickskin.upload.vanilla_players_rejoin": "此伺服器中無速易膚之玩家，待汝重入後可見之。",
+  "quickskin.upload.vanilla_players_unavailable": "此伺服器不經 Mojang 驗玩家，故無速易膚之玩家不得見帳膚。",
+  "quickskin.upload.vanilla_players_unknown": "於正版驗證之伺服器，無速易膚之玩家，待汝重入後可見之。",
 
   "_comment_upload_errors": "=== 呈遞謬誤 ===",
   "quickskin.error.no_access_token": "未得存取符，請確以 Microsoft 帳登",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== 冷卻訊 ===",
   "quickskin.cooldown.button": "冷卻中 (%s秒)",
-  "quickskin.cooldown.tooltip": "請候冷卻時後再換膚"
+  "quickskin.cooldown.tooltip": "請候冷卻時後再換膚",
+
+  "_comment_upload_limit": "=== 呈遞之限 ===",
+  "quickskin.network.upload_too_large.skin": "[速易膚] 汝之膚（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見",
+  "quickskin.network.upload_too_large.cape": "[速易膚] 汝之披風（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見"
 }

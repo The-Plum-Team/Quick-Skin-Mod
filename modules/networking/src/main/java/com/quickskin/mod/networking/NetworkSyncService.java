@@ -22,6 +22,7 @@ import net.minecraft.client.Minecraft;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -76,8 +77,13 @@ public class NetworkSyncService {
     private long protocolHelloRetryAtMillis;
     private boolean helloExhaustionReported;
     private boolean handshakeEvidenceReported;
-    /** Written by the upload preparation worker, cleared with the session on the client thread. */
-    private volatile boolean legacyUploadCapReported;
+    /**
+     * Oversized textures already reported this session (type, size and limit). Read by the upload
+     * preparation worker; written when the message is shown and cleared with the session, both on
+     * the client thread.
+     */
+    private final Set<String> reportedOversizedUploads = ConcurrentHashMap.newKeySet();
+    private static final int MAX_REPORTED_OVERSIZED_UPLOADS = 64;
     /** Non-null while the exact session still waits for the server to advertise its channels. */
     private ClientChannelDiscovery channelDiscovery;
     private volatile String adoptedSkinId;
@@ -327,18 +333,22 @@ public class NetworkSyncService {
         // the PNG identity and can change while the local source hash remains stable.
         byte[] textureData = LocalAssetManager.getInstance()
                 .loadCanonicalTexture(localHash, textureType);
-        if (textureData == null) return null;
-        if (textureData.length > protocolProfile.maximumUploadBytes()) {
-            if (protocolProfile.negotiated()) return null;
-            if (!legacyUploadCapReported) {
-                legacyUploadCapReported = true;
-                QuickSkinInfo.LOGGER.warn("This legacy v1 (Quick Skin 2.x) server relays textures"
-                        + " unchunked; the {} byte {} is over the {} byte limit for such a server"
-                        + " and is withdrawn from the synced appearance", textureData.length,
-                        textureType, protocolProfile.maximumUploadBytes());
-            }
-            // No network hash: the appearance is sent with this id empty, which also replaces a
-            // copy that server stored earlier and would relay again at every join.
+        int uploadLimit = protocolProfile.maximumUploadBytes();
+        if (textureData == null) {
+            // Canonical bytes above the 16 MiB transfer cap are never produced; without this the
+            // sync would retry them forever and hold back the rest of the appearance as well.
+            long sizeHint = LocalAssetManager.getInstance()
+                    .canonicalTextureSizeHint(localHash, textureType);
+            if (sizeHint <= uploadLimit) return null;
+            reportOversizedUpload(textureType, sizeHint, uploadLimit, protocolProfile);
+            return new PreparedUpload(
+                    key, null, textureType, new byte[0][], true, protocolProfile);
+        }
+        if (textureData.length > uploadLimit) {
+            reportOversizedUpload(textureType, textureData.length, uploadLimit, protocolProfile);
+            // Kept local, never sent: no network hash, so the appearance goes out with this id
+            // empty and the rest of it still syncs. On a legacy server the empty id also replaces
+            // a copy it stored earlier and would relay again at every join.
             return new PreparedUpload(
                     key, null, textureType, new byte[0][], true, protocolProfile);
         }
@@ -373,6 +383,49 @@ public class NetworkSyncService {
         }
         return new PreparedUpload(
                 key, networkHash, textureType, chunks, false, protocolProfile);
+    }
+
+    /**
+     * Logs and shows, once per texture size and limit in a session, why a texture stays local.
+     * The limit is what the server advertised in its protocol acknowledgement (its configured
+     * upload limit) or, on a Quick Skin 2.x server, the bound for its unchunked relay. A report
+     * counts as made only once the message is shown, on the client thread with a player present;
+     * until then a later preparation of the same texture tries again.
+     */
+    private void reportOversizedUpload(
+            String textureType, long size, int limit, ProtocolProfile protocolProfile) {
+        String reportKey = textureType + ':' + size + ':' + limit;
+        if (reportedOversizedUploads.contains(reportKey)) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null) return;
+        String translationKey = "cape".equals(textureType)
+                ? "quickskin.network.upload_too_large.cape"
+                : "quickskin.network.upload_too_large.skin";
+        String sizeText = TextureTransferLimits.describeBytes(size);
+        String limitText = TextureTransferLimits.describeBytes(limit);
+        boolean legacyServer = protocolProfile.mode() == ProtocolProfile.Mode.LEGACY_V1;
+        minecraft.execute(() -> {
+            if (minecraft.player == null
+                    || reportedOversizedUploads.size() >= MAX_REPORTED_OVERSIZED_UPLOADS
+                    || !reportedOversizedUploads.add(reportKey)) return;
+            if (legacyServer) {
+                QuickSkinInfo.LOGGER.warn("This legacy v1 (Quick Skin 2.x) server relays textures"
+                        + " unchunked; the {} byte {} is over the {} byte limit for such a server"
+                        + " and is withdrawn from the synced appearance", size, textureType, limit);
+            } else {
+                QuickSkinInfo.LOGGER.warn("The {} byte {} is over this server's {} byte upload"
+                        + " limit; it stays local and other players do not see it",
+                        size, textureType, limit);
+            }
+            net.minecraft.network.chat.Component message =
+                    net.minecraft.network.chat.Component.translatable(
+                            translationKey, sizeText, limitText);
+            //? if <26.1 {
+            minecraft.player.displayClientMessage(message, false);
+            //?} else {
+            minecraft.player.sendSystemMessage(message);
+            //?}
+        });
     }
 
     private synchronized void enqueuePreparedSync(PreparedSync prepared) {
@@ -906,7 +959,7 @@ public class NetworkSyncService {
         protocolHelloRetryAtMillis = 0L;
         helloExhaustionReported = false;
         handshakeEvidenceReported = false;
-        legacyUploadCapReported = false;
+        reportedOversizedUploads.clear();
         channelDiscovery = null;
         adoptedSkinId = null;
         adoptedCapeId = null;

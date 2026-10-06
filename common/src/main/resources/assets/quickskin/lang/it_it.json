@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Caricamento skin su Mojang...",
   "quickskin.upload.please_wait": "Attendere prego...",
   "quickskin.upload.success": "La tua skin è stata aggiornata!",
+  "quickskin.upload.vanilla_players_shared": "Questo server condivide le skin degli account: i giocatori senza QuickSkin la vedranno entro pochi minuti.",
+  "quickskin.upload.vanilla_players_rejoin": "I giocatori senza QuickSkin su questo server la vedranno dopo che sarai rientrato.",
+  "quickskin.upload.vanilla_players_unavailable": "I giocatori senza QuickSkin non possono vedere le skin degli account su questo server: non autentica i giocatori tramite Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "Sui server in modalità online, i giocatori senza QuickSkin la vedranno dopo che sarai rientrato.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Nessun token di accesso trovato. Hai effettuato l'accesso con un account Microsoft?",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "In recupero (%ss)",
-  "quickskin.cooldown.tooltip": "Devi attendere prima di cambiare nuovamente la tua skin."
+  "quickskin.cooldown.tooltip": "Devi attendere prima di cambiare nuovamente la tua skin.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Skin Veloce] La tua skin (%s) supera il limite di caricamento di questo server, %s. È visibile solo sul tuo schermo; gli altri giocatori non la vedono.",
+  "quickskin.network.upload_too_large.cape": "[Skin Veloce] Il tuo mantello (%s) supera il limite di caricamento di questo server, %s. È visibile solo sul tuo schermo; gli altri giocatori non lo vedono."
 }

@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Mojangにスキンをアップロード中...",
   "quickskin.upload.please_wait": "お待ちください...",
   "quickskin.upload.success": "スキンが更新されました!",
+  "quickskin.upload.vanilla_players_shared": "このサーバーはアカウントのスキンを共有しています: QuickSkinを使っていないプレイヤーにも数分以内に表示されます。",
+  "quickskin.upload.vanilla_players_rejoin": "このサーバーでQuickSkinを使っていないプレイヤーには、再参加した後に表示されます。",
+  "quickskin.upload.vanilla_players_unavailable": "このサーバーはMojangでプレイヤーを認証していないため、QuickSkinを使っていないプレイヤーにはアカウントのスキンが表示されません。",
+  "quickskin.upload.vanilla_players_unknown": "オンラインモードのサーバーでは、QuickSkinを使っていないプレイヤーには再参加した後に表示されます。",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "アクセストークンが見つかりません。Microsoftアカウントでログインしていますか?",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "クールダウン中(%ss)",
-  "quickskin.cooldown.tooltip": "スキンを再度変更する前に待つ必要があります。"
+  "quickskin.cooldown.tooltip": "スキンを再度変更する前に待つ必要があります。",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[クイックスキン] スキン(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。",
+  "quickskin.network.upload_too_large.cape": "[クイックスキン] マント(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。"
 }

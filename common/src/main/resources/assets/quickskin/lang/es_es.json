@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Subiendo aspecto a Mojang...",
   "quickskin.upload.please_wait": "Por favor, espera...",
   "quickskin.upload.success": "¡Tu aspecto ha sido actualizado!",
+  "quickskin.upload.vanilla_players_shared": "Este servidor comparte los aspectos de las cuentas: los jugadores sin QuickSkin lo verán en unos minutos.",
+  "quickskin.upload.vanilla_players_rejoin": "Los jugadores sin QuickSkin de este servidor lo verán cuando vuelvas a entrar.",
+  "quickskin.upload.vanilla_players_unavailable": "Los jugadores sin QuickSkin no pueden ver los aspectos de las cuentas en este servidor: no inicia la sesión de los jugadores a través de Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "En los servidores en modo online, los jugadores sin QuickSkin lo verán cuando vuelvas a entrar.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "No se encontró token de acceso. ¿Has iniciado sesión con una cuenta de Microsoft?",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "En espera (%ss)",
-  "quickskin.cooldown.tooltip": "Debes esperar antes de cambiar tu aspecto de nuevo."
+  "quickskin.cooldown.tooltip": "Debes esperar antes de cambiar tu aspecto de nuevo.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Aspecto rápido] Tu aspecto (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no lo ven.",
+  "quickskin.network.upload_too_large.cape": "[Aspecto rápido] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven."
 }

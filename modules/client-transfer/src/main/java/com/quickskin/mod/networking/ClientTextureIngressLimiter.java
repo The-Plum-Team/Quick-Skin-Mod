@@ -44,6 +44,21 @@ public final class ClientTextureIngressLimiter {
         return true;
     }
 
+    /**
+     * Admits one unchunked texture relayed by a legacy (Quick Skin 2.x) server, which sends each
+     * stored texture whole. It counts against the same packet and byte window as chunks.
+     */
+    public synchronized boolean allowLegacyDirectTextureBytes(int byteCount) {
+        resetWindowIfNeeded(System.currentTimeMillis());
+        if (byteCount <= 0 || byteCount > TextureTransferLimits.MAX_LEGACY_DIRECT_TEXTURE_BYTES
+                || packets >= MAX_PACKETS || wireBytes + byteCount > MAX_WIRE_BYTES) {
+            return false;
+        }
+        packets++;
+        wireBytes += byteCount;
+        return true;
+    }
+
     public synchronized boolean allowDecode(byte[] data, String textureType) {
         resetWindowIfNeeded(System.currentTimeMillis());
         long pixels = NetworkSecurity.getTexturePixelCount(data, textureType);

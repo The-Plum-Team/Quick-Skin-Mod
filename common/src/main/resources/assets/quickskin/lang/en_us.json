@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Uploading skin to Mojang...",
   "quickskin.upload.please_wait": "Please wait...",
   "quickskin.upload.success": "Your skin has been updated!",
+  "quickskin.upload.vanilla_players_shared": "This server shares account skins: players without Quick Skin will see it within a few minutes.",
+  "quickskin.upload.vanilla_players_rejoin": "Players without Quick Skin on this server will see it after you rejoin.",
+  "quickskin.upload.vanilla_players_unavailable": "Players without Quick Skin cannot see account skins on this server: it does not log players in through Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "On online-mode servers, players without Quick Skin will see it after you rejoin.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "No access token found. Are you logged in with a Microsoft account?",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "On Cooldown (%ss)",
-  "quickskin.cooldown.tooltip": "You must wait before changing your skin again."
+  "quickskin.cooldown.tooltip": "You must wait before changing your skin again.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Quick Skin] Your skin (%s) is over this server's %s upload limit. It stays on your screen only; other players do not see it.",
+  "quickskin.network.upload_too_large.cape": "[Quick Skin] Your cape (%s) is over this server's %s upload limit. It stays on your screen only; other players do not see it."
 }

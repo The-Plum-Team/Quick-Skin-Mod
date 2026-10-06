@@ -95,6 +95,9 @@ public class ModNetworking implements NetworkTransport {
                 NetworkManager.c2s(), UploadAnimationMetadataV2Payload.TYPE,
                 UploadAnimationMetadataV2Payload.CODEC,
                 ServerNetworkHandler::handleUploadAnimationMetadataV2);
+        NetworkManager.registerReceiver(
+                NetworkManager.c2s(), AccountSkinChangedPayload.TYPE,
+                AccountSkinChangedPayload.CODEC, ServerNetworkHandler::handleAccountSkinChanged);
 
         // Register S2C (Server to Client) payload types ONLY on servers (not clients)
         // On clients, ClientNetworking.registerReceiver() handles both type and handler registration

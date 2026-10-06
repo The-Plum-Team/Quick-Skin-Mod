@@ -239,7 +239,9 @@ public class ClientNetworkHandler {
     public static void handleSendTexture(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         String textureType = PacketHelper.readString(buf, TextureTransferLimits.MAX_TEXTURE_TYPE_BYTES);
         String hash = PacketHelper.readString(buf, TextureTransferLimits.CONTENT_ID_LENGTH);
-        byte[] imageData = PacketHelper.readByteArray(buf, TextureTransferLimits.MAX_DIRECT_TEXTURE_BYTES);
+        // A 2.x server relays each stored texture whole; decoding it must not end the session.
+        byte[] imageData = PacketHelper.readByteArray(
+                buf, TextureTransferLimits.MAX_LEGACY_DIRECT_TEXTURE_BYTES);
         org.slf4j.LoggerFactory.getLogger("QuickSkin-CPM").info(
                 "handleSendTexture: type={} hash={} size={}", textureType, hash, imageData.length);
     //?} else {
@@ -251,7 +253,8 @@ public class ClientNetworkHandler {
         //? if <1.21 {
         if (!NetworkSecurity.isValidTextureType(textureType)
                 || !NetworkSecurity.isValidLegacyContentId(hash)
-                || !ClientTextureIngressLimiter.getInstance().allowWireBytes(imageData.length)) return;
+                || !ClientTextureIngressLimiter.getInstance()
+                        .allowLegacyDirectTextureBytes(imageData.length)) return;
         String receivedTextureType = textureType;
         String receivedHash = hash;
         byte[] receivedImageData = imageData;
@@ -259,7 +262,7 @@ public class ClientNetworkHandler {
         if (!NetworkSecurity.isValidTextureType(payload.textureType())
                 || !NetworkSecurity.isValidLegacyContentId(payload.hash())
                 || !ClientTextureIngressLimiter.getInstance()
-                        .allowWireBytes(payload.imageData().length)) return;
+                        .allowLegacyDirectTextureBytes(payload.imageData().length)) return;
         String receivedTextureType = payload.textureType();
         String receivedHash = payload.hash();
         byte[] receivedImageData = payload.imageData();
@@ -584,7 +587,9 @@ public class ClientNetworkHandler {
             long now = System.currentTimeMillis();
             boolean configChanged = firstConfig || policyChanged
                     || oldServerConfig.skinChangeCooldownSeconds
-                            != serverConfig.skinChangeCooldownSeconds;
+                            != serverConfig.skinChangeCooldownSeconds
+                    || !java.util.Objects.equals(oldServerConfig.accountSkinVisibility,
+                            serverConfig.accountSkinVisibility);
             if (configChanged) {
                 clientConfig.applyServerOverride(serverConfig);
             }

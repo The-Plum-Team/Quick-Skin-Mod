@@ -2,11 +2,16 @@ package com.quickskin.mod.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.platform.PlatformHelper;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -19,12 +24,56 @@ import java.nio.file.StandardCopyOption;
  */
 public class ServerConfig {
     private static final int MAX_CONFIG_BYTES = 1024 * 1024;
+    /** Bounds of {@link #maxTextureUploadKilobytes}; the upper one is the protocol's hard cap. */
+    public static final int MIN_TEXTURE_UPLOAD_KILOBYTES = 64;
+    public static final int MAX_TEXTURE_UPLOAD_KILOBYTES = 16 * 1024;
     private static volatile ServerConfig instance;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    /** {@link #accountSkinVisibility}: unmodded players see an uploaded account skin within minutes. */
+    public static final String ACCOUNT_SKIN_SHARED = "shared";
+    /** {@link #accountSkinVisibility}: unmodded players see it after the uploader rejoins. */
+    public static final String ACCOUNT_SKIN_AFTER_REJOIN = "after_rejoin";
+    /**
+     * {@link #accountSkinVisibility}: unmodded players never see Mojang account skins here (an
+     * offline-mode server or one that authenticates players with another service).
+     */
+    public static final String ACCOUNT_SKIN_UNAVAILABLE = "unavailable";
 
     // Skin Settings
     public boolean disableSkinTransparency = false; // Disable transparency in player skins
     public int skinChangeCooldownSeconds = 0; // Cooldown in seconds for changing skin (0 = disabled)
+    /**
+     * Largest skin or cape (the final PNG a client transmits, animation metadata included) this
+     * server accepts, stores and serves, in KiB. 64 to 16384 (the default); a value outside that
+     * range is clamped, and one that is not a number is ignored. It is read when the server
+     * starts and the server writes its settings back when it stops, so edit the file while the
+     * server is stopped.
+     *
+     * <p>Clients that include this change learn the limit when they connect, keep a larger
+     * texture on their own screen and sync the rest of their appearance. Released Quick Skin
+     * 3.0.x and 3.1.0 clients learn it too, but while one of their textures is over it they
+     * withhold their whole appearance (skin, cape and model) and retry until they update or pick
+     * a smaller texture. The server cannot change that; lower the limit only when those players
+     * can update.</p>
+     */
+    public int maxTextureUploadKilobytes = MAX_TEXTURE_UPLOAD_KILOBYTES;
+    /** False when the file could not be read; such a file is never overwritten. */
+    private transient boolean persistable = true;
+
+    /**
+     * After a Quick Skin player uploads a skin to their own Mojang account, fetch that account's
+     * freshly signed textures and show them to players who do not run Quick Skin without a rejoin.
+     * Only online-mode servers can do this; capes and HD skins are never shared (ADR 0012).
+     */
+    public boolean shareAccountSkinWithVanillaClients = false;
+
+    /**
+     * Runtime fact the server sends to Quick Skin clients, never read from or written to the
+     * file: what players without Quick Skin on this server see after an upload to Mojang. One of
+     * the {@code ACCOUNT_SKIN_*} values, or {@code null} when unknown (an older server).
+     */
+    public String accountSkinVisibility = null;
 
     // Logging Settings
 
@@ -43,34 +92,100 @@ public class ServerConfig {
      * Load configuration from file
      */
     private static ServerConfig load() {
-        Path configPath = getConfigPath();
+        return load(getConfigPath());
+    }
 
+    /**
+     * Reads the file, or writes the defaults when there is none. A file that cannot be read is
+     * left untouched: the defaults used instead are never saved over it.
+     */
+    static ServerConfig load(Path configPath) {
         if (Files.exists(configPath)) {
             try {
                 String json = BoundedFileReader.readUtf8(configPath, MAX_CONFIG_BYTES);
-                ServerConfig config = GSON.fromJson(json, ServerConfig.class);
+                ServerConfig config = parse(json);
                 if (config != null) {
                     config.normalize();
+                    // A runtime fact, not a setting: the running server computes it per sync.
+                    config.accountSkinVisibility = null;
                     return config;
                 }
-                QuickSkinInfo.LOGGER.warn("Server config {} contained JSON null; using defaults", configPath);
+                QuickSkinInfo.LOGGER.error("Server config {} is not a JSON object; using defaults"
+                        + " and leaving the file untouched until it is fixed", configPath);
             } catch (Exception e) {
-                QuickSkinInfo.LOGGER.warn("Could not load server config {}; using defaults", configPath, e);
+                QuickSkinInfo.LOGGER.error("Could not read server config {}; using defaults and"
+                        + " leaving the file untouched until it is fixed", configPath, e);
             }
+            ServerConfig fallback = new ServerConfig();
+            fallback.persistable = false;
+            return fallback;
         }
 
         // Return default config and save it
         ServerConfig config = new ServerConfig();
-        config.save();
+        config.save(configPath);
         return config;
+    }
+
+    /**
+     * Parses a configuration document. An invalid number in one setting is repaired or dropped
+     * (see {@link #sanitizeInteger}) instead of discarding the whole document.
+     *
+     * @return null when the document is not a JSON object
+     */
+    private static ServerConfig parse(String json) {
+        JsonElement root = JsonParser.parseString(json);
+        if (root == null || !root.isJsonObject()) return null;
+        JsonObject object = root.getAsJsonObject();
+        sanitizeInteger(object, "skinChangeCooldownSeconds");
+        sanitizeInteger(object, "maxTextureUploadKilobytes");
+        return GSON.fromJson(object, ServerConfig.class);
+    }
+
+    /**
+     * Gson refuses a number outside the int range or with a fraction, which used to discard the
+     * whole file. Such a number is clamped to the int range and truncated, and a value that is
+     * not a number at all is dropped so the default applies. {@link #normalize()} then clamps
+     * the result to the range of the setting.
+     */
+    private static void sanitizeInteger(JsonObject object, String name) {
+        JsonElement value = object.get(name);
+        if (value == null) return;
+        BigDecimal number = null;
+        if (value.isJsonPrimitive()) {
+            JsonPrimitive primitive = value.getAsJsonPrimitive();
+            if (primitive.isNumber() || primitive.isString()) {
+                try {
+                    number = new BigDecimal(primitive.getAsString().trim());
+                } catch (NumberFormatException ignored) {
+                    number = null;
+                }
+            }
+        }
+        if (number == null) {
+            QuickSkinInfo.LOGGER.warn("Ignoring the invalid server config value {} = {}; using"
+                    + " its default", name, value);
+            object.remove(name);
+            return;
+        }
+        BigDecimal clamped = number.max(BigDecimal.valueOf(Integer.MIN_VALUE))
+                .min(BigDecimal.valueOf(Integer.MAX_VALUE));
+        object.addProperty(name, clamped.intValue());
     }
 
     /**
      * Save configuration to file
      */
     public synchronized void save() {
-        Path configPath = getConfigPath();
+        save(getConfigPath());
+    }
 
+    synchronized void save(Path configPath) {
+        if (!persistable) {
+            QuickSkinInfo.LOGGER.warn("Not saving server config {}: it could not be read when the"
+                    + " server started, so it is left as it is", configPath);
+            return;
+        }
         try {
             // Ensure config directory exists
             Files.createDirectories(configPath.getParent());
@@ -106,6 +221,22 @@ public class ServerConfig {
     }
 
     /**
+     * Convert to JSON for network transmission, together with what players without Quick Skin
+     * see after an upload to Mojang on this server ({@code ACCOUNT_SKIN_*}, or {@code null}).
+     */
+    public synchronized String toJson(String accountSkinVisibility) {
+        normalize();
+        JsonObject json = GSON.toJsonTree(this).getAsJsonObject();
+        String visibility = knownVisibility(accountSkinVisibility);
+        if (visibility == null) {
+            json.remove("accountSkinVisibility");
+        } else {
+            json.addProperty("accountSkinVisibility", visibility);
+        }
+        return GSON.toJson(json);
+    }
+
+    /**
      * Create from JSON (for network reception)
      */
     public static ServerConfig fromJson(String json) {
@@ -114,7 +245,7 @@ public class ServerConfig {
                 QuickSkinInfo.LOGGER.warn("Received an oversized QuickSkin server configuration; using defaults");
                 return new ServerConfig();
             }
-            ServerConfig config = GSON.fromJson(json, ServerConfig.class);
+            ServerConfig config = parse(json);
             if (config == null) {
                 QuickSkinInfo.LOGGER.warn("Received a null QuickSkin server configuration; using defaults");
                 return new ServerConfig();
@@ -129,6 +260,22 @@ public class ServerConfig {
 
     private void normalize() {
         skinChangeCooldownSeconds = Math.max(0, Math.min(skinChangeCooldownSeconds, 86_400));
+        maxTextureUploadKilobytes = Math.max(MIN_TEXTURE_UPLOAD_KILOBYTES,
+                Math.min(maxTextureUploadKilobytes, MAX_TEXTURE_UPLOAD_KILOBYTES));
+        accountSkinVisibility = knownVisibility(accountSkinVisibility);
+    }
+
+    /** The configured per-texture upload limit in bytes. */
+    public synchronized int maxTextureUploadBytes() {
+        normalize();
+        return maxTextureUploadKilobytes * 1024;
+    }
+
+    private static String knownVisibility(String value) {
+        if (ACCOUNT_SKIN_SHARED.equals(value)) return ACCOUNT_SKIN_SHARED;
+        if (ACCOUNT_SKIN_AFTER_REJOIN.equals(value)) return ACCOUNT_SKIN_AFTER_REJOIN;
+        if (ACCOUNT_SKIN_UNAVAILABLE.equals(value)) return ACCOUNT_SKIN_UNAVAILABLE;
+        return null;
     }
 
     private static void writeAtomically(Path target, String content) throws IOException {

@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "A carregar pele para Mojang...",
   "quickskin.upload.please_wait": "Por favor, aguarda...",
   "quickskin.upload.success": "A tua pele foi atualizada!",
+  "quickskin.upload.vanilla_players_shared": "Este servidor partilha as peles das contas: os jogadores sem o QuickSkin vão vê-la dentro de poucos minutos.",
+  "quickskin.upload.vanilla_players_rejoin": "Os jogadores sem o QuickSkin neste servidor vão vê-la depois de voltares a entrar.",
+  "quickskin.upload.vanilla_players_unavailable": "Os jogadores sem o QuickSkin não podem ver as peles das contas neste servidor: não autentica os jogadores através da Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "Em servidores no modo online, os jogadores sem o QuickSkin vão vê-la depois de voltares a entrar.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Nenhum token de acesso encontrado. Estás autenticado com uma conta Microsoft?",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Em Espera (%ss)",
-  "quickskin.cooldown.tooltip": "Deves aguardar antes de mudar a tua pele novamente."
+  "quickskin.cooldown.tooltip": "Deves aguardar antes de mudar a tua pele novamente.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Pele Rápida] A tua pele (%s) excede o limite de carregamento deste servidor, %s. Aparece apenas no teu ecrã; os outros jogadores não a veem.",
+  "quickskin.network.upload_too_large.cape": "[Pele Rápida] A tua capa (%s) excede o limite de carregamento deste servidor, %s. Aparece apenas no teu ecrã; os outros jogadores não a veem."
 }

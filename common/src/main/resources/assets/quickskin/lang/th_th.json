@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "กำลังอัปโหลดสกินไปยัง Mojang...",
   "quickskin.upload.please_wait": "โปรดรอสักครู่...",
   "quickskin.upload.success": "สกินของคุณได้รับการอัปเดตแล้ว!",
+  "quickskin.upload.vanilla_players_shared": "เซิร์ฟเวอร์นี้แชร์สกินของบัญชี: ผู้เล่นที่ไม่มี QuickSkin จะเห็นภายในไม่กี่นาที",
+  "quickskin.upload.vanilla_players_rejoin": "ผู้เล่นที่ไม่มี QuickSkin ในเซิร์ฟเวอร์นี้จะเห็นหลังจากคุณเข้าร่วมใหม่",
+  "quickskin.upload.vanilla_players_unavailable": "ผู้เล่นที่ไม่มี QuickSkin จะไม่เห็นสกินของบัญชีในเซิร์ฟเวอร์นี้ เพราะเซิร์ฟเวอร์ไม่ได้ยืนยันตัวตนผู้เล่นผ่าน Mojang",
+  "quickskin.upload.vanilla_players_unknown": "ในเซิร์ฟเวอร์โหมดออนไลน์ ผู้เล่นที่ไม่มี QuickSkin จะเห็นหลังจากคุณเข้าร่วมใหม่",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "ไม่พบโทเค็นการเข้าถึง คุณเข้าสู่ระบบด้วยบัญชี Microsoft หรือไม่?",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "คูลดาวน์ (%ss)",
-  "quickskin.cooldown.tooltip": "คุณต้องรอก่อนเปลี่ยนสกินอีกครั้ง"
+  "quickskin.cooldown.tooltip": "คุณต้องรอก่อนเปลี่ยนสกินอีกครั้ง",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[สกินด่วน] สกินของคุณ (%s) เกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์นี้ (%s) จะแสดงบนหน้าจอของคุณเท่านั้น ผู้เล่นคนอื่นจะมองไม่เห็น",
+  "quickskin.network.upload_too_large.cape": "[สกินด่วน] ผ้าคลุมของคุณ (%s) เกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์นี้ (%s) จะแสดงบนหน้าจอของคุณเท่านั้น ผู้เล่นคนอื่นจะมองไม่เห็น"
 }

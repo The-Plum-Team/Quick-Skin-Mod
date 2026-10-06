@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Skin Mojang'a yükleniyor...",
   "quickskin.upload.please_wait": "Lütfen bekle...",
   "quickskin.upload.success": "Skinin güncellendi!",
+  "quickskin.upload.vanilla_players_shared": "Bu sunucu hesap skinlerini paylaşıyor: QuickSkin kullanmayan oyuncular birkaç dakika içinde görecek.",
+  "quickskin.upload.vanilla_players_rejoin": "Bu sunucuda QuickSkin kullanmayan oyuncular, sen yeniden katıldıktan sonra görecek.",
+  "quickskin.upload.vanilla_players_unavailable": "QuickSkin kullanmayan oyuncular bu sunucuda hesap skinlerini göremez: sunucu oyuncuları Mojang üzerinden doğrulamıyor.",
+  "quickskin.upload.vanilla_players_unknown": "Çevrimiçi moddaki sunucularda QuickSkin kullanmayan oyuncular, sen yeniden katıldıktan sonra görecek.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Erişim belirteci bulunamadı. Microsoft hesabıyla giriş yaptın mı?",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Bekleme Süresinde (%ss)",
-  "quickskin.cooldown.tooltip": "Skinini tekrar değiştirmeden önce beklemelisin."
+  "quickskin.cooldown.tooltip": "Skinini tekrar değiştirmeden önce beklemelisin.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Hızlı Skin] Skinin (%s) bu sunucunun yükleme sınırını (%s) aşıyor. Yalnızca senin ekranında görünür; diğer oyuncular onu görmez.",
+  "quickskin.network.upload_too_large.cape": "[Hızlı Skin] Pelerinin (%s) bu sunucunun yükleme sınırını (%s) aşıyor. Yalnızca senin ekranında görünür; diğer oyuncular onu görmez."
 }

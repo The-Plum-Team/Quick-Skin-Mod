@@ -4,7 +4,9 @@ Date: 2026-10-01
 
 ## Status
 
-Accepted.
+Accepted. Amended by
+[ADR 0012](0012-share-uploaded-account-skins-with-unmodded-players.md), which adds the optional
+server-side refresh after a Mojang upload described below.
 
 ## Context
 

@@ -5,7 +5,12 @@ public enum ProtocolCapability {
     SHA256_CONTENT_IDS("sha256-content-ids", 1L << 0),
     CHUNKED_TEXTURE_TRANSFER("chunked-texture-transfer", 1L << 1),
     ANIMATION_METADATA("animation-metadata", 1L << 2),
-    APPEARANCE_SNAPSHOT_ACK("appearance-snapshot-ack", 1L << 3);
+    APPEARANCE_SNAPSHOT_ACK("appearance-snapshot-ack", 1L << 3),
+    /**
+     * The client may report that it changed its own Mojang account skin, so a server that shares
+     * account skins with players without Quick Skin can refresh the signed vanilla profile.
+     */
+    ACCOUNT_SKIN_REFRESH("account-skin-refresh", 1L << 4);
 
     private final String id;
     private final long mask;

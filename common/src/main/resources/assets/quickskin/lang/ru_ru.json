@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Загрузка скина в Mojang...",
   "quickskin.upload.please_wait": "Пожалуйста, подождите...",
   "quickskin.upload.success": "Ваш скин был обновлён!",
+  "quickskin.upload.vanilla_players_shared": "Этот сервер делится скинами аккаунтов: игроки без QuickSkin увидят его в течение нескольких минут.",
+  "quickskin.upload.vanilla_players_rejoin": "Игроки без QuickSkin на этом сервере увидят его после того, как вы перезайдёте.",
+  "quickskin.upload.vanilla_players_unavailable": "Игроки без QuickSkin не видят скины аккаунтов на этом сервере: он не авторизует игроков через Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "На серверах в онлайн-режиме игроки без QuickSkin увидят его после того, как вы перезайдёте.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Токен доступа не найден. Вы вошли через учётную запись Microsoft?",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Задержка (%ss)",
-  "quickskin.cooldown.tooltip": "Вы должны подождать, прежде чем снова сменить скин."
+  "quickskin.cooldown.tooltip": "Вы должны подождать, прежде чем снова сменить скин.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Быстрый скин] Ваш скин (%s) превышает лимит загрузки этого сервера (%s). Он виден только на вашем экране; другие игроки его не видят.",
+  "quickskin.network.upload_too_large.cape": "[Быстрый скин] Ваш плащ (%s) превышает лимит загрузки этого сервера (%s). Он виден только на вашем экране; другие игроки его не видят."
 }

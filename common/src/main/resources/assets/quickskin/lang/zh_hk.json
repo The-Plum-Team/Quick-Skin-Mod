@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "正在上載至 Mojang...",
   "quickskin.upload.please_wait": "請稍候...",
   "quickskin.upload.success": "皮膚已更新！",
+  "quickskin.upload.vanilla_players_shared": "此伺服器會共享帳戶皮膚：未安裝快速皮膚的玩家將在幾分鐘內看到。",
+  "quickskin.upload.vanilla_players_rejoin": "此伺服器上未安裝快速皮膚的玩家將在你重新加入後看到。",
+  "quickskin.upload.vanilla_players_unavailable": "此伺服器沒有透過 Mojang 驗證玩家，因此未安裝快速皮膚的玩家無法看到帳戶皮膚。",
+  "quickskin.upload.vanilla_players_unknown": "在正版驗證（線上模式）的伺服器上，未安裝快速皮膚的玩家將在你重新加入後看到。",
 
   "_comment_upload_errors": "=== 上載 API 錯誤 ===",
   "quickskin.error.no_access_token": "找不到存取權杖，請確認已使用 Microsoft 帳戶登入",
@@ -181,5 +185,9 @@
 
   "_comment_cooldown": "=== 冷卻訊息 ===",
   "quickskin.cooldown.button": "冷卻中 (%s秒)",
-  "quickskin.cooldown.tooltip": "請等待冷卻時間後再更換皮膚"
+  "quickskin.cooldown.tooltip": "請等待冷卻時間後再更換皮膚",
+
+  "_comment_upload_limit": "=== 上載大小限制 ===",
+  "quickskin.network.upload_too_large.skin": "[快速皮膚] 你的皮膚（%s）超過此伺服器的上載限制（%s）。它只會顯示在你自己的畫面上，其他玩家看不到。",
+  "quickskin.network.upload_too_large.cape": "[快速皮膚] 你的披風（%s）超過此伺服器的上載限制（%s）。它只會顯示在你自己的畫面上，其他玩家看不到。"
 }

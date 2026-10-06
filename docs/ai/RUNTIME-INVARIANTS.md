@@ -75,7 +75,29 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   most `TextureTransferLimits.MAX_LEGACY_UPLOAD_BYTES` (`ProtocolProfile.maximumUploadBytes()`)
   and sends the appearance with a larger texture's id empty, so that server replaces the copy it
   stored instead of relaying it again. The bound never applies to the same profile on a 3.x
-  server, which serves 2.x clients in chunks.
+  server, which serves 2.x clients in chunks. A client in that mode decodes such a relayed
+  `send_texture` up to `MAX_LEGACY_DIRECT_TEXTURE_BYTES`, the vanilla 1 MiB clientbound payload
+  limit, so another player's texture never ends its session through Quick Skin's own decoder.
+- `ServerConfig.maxTextureUploadKilobytes` (64 KiB to the 16 MiB hard cap, default the hard cap) is
+  the per-texture limit of a server. `ServerRuntime` applies it before the texture cache loads: the
+  server's protocol policy advertises it in the acknowledgement (narrowing only, so older 3.x
+  clients accept it) and in the legacy profile of 2.x clients, chunk assembly refuses and logs an
+  upload over it once, and `ServerTextureCache` neither stages, loads nor serves a larger texture.
+  A client keeps a texture over its session's `maximumUploadBytes()` local: it is never sent, the
+  appearance carries that id empty so the rest still syncs, and the player sees the size and limit.
+  Released 3.0.x and 3.1.0 clients accept the narrowed limit but withhold their whole appearance
+  (skin, cape and model) while one texture is over it and retry until the player updates or picks
+  a smaller texture; no server change can fix them, so `ServerRuntime` warns at startup whenever
+  the limit is below the default. A saved appearance whose texture is no longer held (over a
+  lowered limit or removed) is restored without that texture; a held texture owned by another
+  player or pins over budget still refuse it whole. The limit is read at server start and the
+  server writes its settings back at stop, so it is edited while the server is stopped. A setting
+  with an invalid number is clamped or ignored on its own, and a file that cannot be parsed is
+  left untouched (defaults apply until it is fixed), never overwritten.
+- Every packet must fit the vanilla custom-payload limits of every supported version (32767 bytes
+  serverbound, 1 MiB clientbound) without XL Packets or similar mods: anything that can grow with an
+  asset travels in bounded chunks, and `WirePayloadBudget` with its test bounds each packet from the
+  codec constants.
 - Keep packet codecs, chunk assemblers, rate limiters, request maps, retry state, and caches bounded.
 - Large texture bytes are demand-driven: advertise appearances/hashes, and send bytes only after a
   missing client requests them. Preserve the global per-tick response and upload pacing.
@@ -116,6 +138,28 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   texture deletion must remove metadata, authority, and identity together.
 - Appearance and animation convergence depends on exact acknowledgements and bounded retry. Do not
   replace it with optimistic send-once synchronization.
+- Quick Skin appearances reach only Quick Skin clients. The one exception is the opt-in
+  `shareAccountSkinWithVanillaClients` server option (ADR 0012): after an explicit, successful
+  Upload to Mojang, a client whose v2 session negotiated `account-skin-refresh` reports
+  `account_skin_changed` from the upload's own success path (closing the dialog must not lose
+  it); nothing ever uploads a skin automatically. The server does nothing while the option is
+  off, in offline mode (proxy backends included), or when it does not authenticate with Mojang's
+  own session server (`minecraft.api.*` properties, authlib's environment parser, authlib-injector,
+  a rewritten session-server URL), logging the latter two; it then never sends a profile id to
+  Mojang. Otherwise `AccountSkinShareService` reads the signed profile anonymously from Mojang's
+  session server on its own bounded daemon worker, never the server thread, paced by its
+  server-wide bucket, per-player round interval, re-arm-once coalescing and bounded backoff, and
+  accepts only a bounded strict response naming the exact profile and the connected player's name
+  with exactly one `textures` property signed by Mojang's own published keys
+  (`TexturesSignatureVerifier`, never the running authlib's key set). A player whose current
+  textures another key signed is refused. It installs a new profile for the exact session that
+  reported (never editing the old one, which a network thread may be encoding), only after Mojang
+  shows a different appearance, and releases that session's state on disconnect and shutdown. The
+  refresh (player-info removal and re-addition plus a new entity pairing, and a camera packet for
+  a spectator viewing through the player) goes only to observers without Quick Skin; the uploader
+  and Quick Skin observers keep their own path. The synchronized server configuration carries the
+  computed `accountSkinVisibility`, which is never persisted. Capes, HD skins and CPM models are
+  never shared, and no third-party signing service is called.
 
 ## Files, images, and persistence
 

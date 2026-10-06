@@ -15,6 +15,9 @@
     "GuiSkinRendererMixin"
   ],
   "mixins": [
+    "ChunkMapAccessor",
+    "PlayerGameProfileAccessor",
+    "TrackedEntityAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

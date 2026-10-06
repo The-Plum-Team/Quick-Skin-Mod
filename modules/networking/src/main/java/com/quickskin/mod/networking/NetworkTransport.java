@@ -66,6 +66,7 @@ public interface NetworkTransport {
             String contentId, String textureType, int chunkIndex, int totalChunks, byte[] chunkData);
     void sendAnimationMetadataV2ToServer(String contentId, String metadataJson);
     void requestTextureV2FromServer(UUID playerId, String textureType, String contentId);
+    void sendAccountSkinChangedToServer(UUID playerId);
     //?} else {
     boolean canServerReceive(CustomPacketPayload.Type<?> type);
     //?}

@@ -18,6 +18,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -101,18 +102,53 @@ public class ServerAppearanceStorage {
             }
 
             // Update the repository with loaded data
-            if (!ServerPlayerAppearanceRepository.getInstance().trySetAppearance(appearance)) {
+            PlayerAppearance restored = restore(appearance);
+            if (restored == null) {
                 QuickSkinInfo.LOGGER.warn(
                         "Refusing saved appearance for {} because its active texture pins are unavailable or over budget",
                         playerId);
                 return null;
             }
 
-            return appearance;
+            return restored;
         } catch (IOException | RuntimeException e) {
             QuickSkinInfo.LOGGER.warn("Unable to load player appearance {}", file, e);
             return null;
         }
+    }
+
+    /**
+     * Applies a saved appearance. When its pins are refused and one of its textures is no longer
+     * held by the texture cache (stored above a lowered {@code maxTextureUploadKilobytes}, which
+     * the cache does not load, or no longer stored at all), the rest is kept: that texture's id
+     * is cleared, exactly as if the client had sent it empty, and the other texture and the model
+     * are applied when their own pins are accepted. A texture that is held but owned by someone
+     * else, or pins over the budget, still refuse the whole appearance.
+     */
+    @Nullable
+    private static PlayerAppearance restore(PlayerAppearance saved) {
+        ServerPlayerAppearanceRepository repository = ServerPlayerAppearanceRepository.getInstance();
+        if (repository.trySetAppearance(saved)) return saved;
+        String skinId = heldTextureOrEmpty(saved.getSkinId(), "local_skin:");
+        String capeId = heldTextureOrEmpty(saved.getCapeId(), "local_cape:");
+        boolean skinKept = Objects.equals(skinId, saved.getSkinId());
+        boolean capeKept = Objects.equals(capeId, saved.getCapeId());
+        if (skinKept && capeKept) return null;
+        PlayerAppearance partial = new PlayerAppearance(
+                saved.getPlayerId(), skinId, capeId, saved.getModel());
+        if (!repository.trySetAppearance(partial)) return null;
+        QuickSkinInfo.LOGGER.info("Restored the saved appearance of {} without its {}: this server"
+                        + " no longer holds that texture (over maxTextureUploadKilobytes or removed)",
+                saved.getPlayerId(), skinKept ? "cape" : capeKept ? "skin" : "skin and cape");
+        return partial;
+    }
+
+    /** The id unchanged, or empty when it names a local texture the cache does not hold. */
+    private static String heldTextureOrEmpty(String appearanceId, String prefix) {
+        if (appearanceId == null || !appearanceId.startsWith(prefix)) return appearanceId;
+        String contentId = appearanceId.substring(prefix.length());
+        return ServerTextureCache.getInstance().resolveContentId(contentId) == null
+                ? "" : appearanceId;
     }
 
     /**

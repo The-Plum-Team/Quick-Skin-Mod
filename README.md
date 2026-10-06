@@ -123,14 +123,41 @@ Choose the jar whose Minecraft version and loader match your instance. Quick Ski
 
 Install Quick Skin on the client for local appearance management. Install it on the server as well when you want Quick Skin appearance synchronization, shared texture transfer, or server-enforced cooldowns.
 
+Server administrators can limit the size of each synchronized skin or cape with
+`maxTextureUploadKilobytes` in `config/quickskin-server.json`: 64 to 16384 KiB, default 16384.
+Edit the file while the server is stopped, because the server reads it at startup and writes its
+settings back when it stops. A value outside that range is clamped, and a file that cannot be
+parsed is left as it is while the defaults apply. Players with a skin or cape over the limit keep
+it on their own screen and see a chat message; the rest of their appearance still syncs. Players
+on Quick Skin 3.1.0 or older are the exception: while one of their textures is over the limit,
+their whole appearance (skin, cape and model) does not sync until they update or choose a smaller
+texture, and the server cannot change that. Lower the limit only when those players can update.
+
 Players who do not run Quick Skin never see a Quick Skin appearance, even on a server that has
 Quick Skin. An unmodded client only shows a skin that Mojang hosts and signs, so those players see
 your Mojang account skin, or a default skin on an offline-mode server. With a paid account on an
 online-mode server you can change your account skin from Quick Skin: hover a skin in the Quick Skin
-menu, press the ↑ button (Upload to Mojang) and rejoin the server. If you host a LAN world, restart
-the game instead. Mojang accepts only standard 64x64 or legacy 64x32 skins; custom capes, HD skins
-and CPM models stay visible only to players who run Quick Skin. See
-[ADR 0011](docs/architecture/decisions/0011-show-quick-skin-appearances-only-to-quick-skin-clients.md).
+menu and press the ↑ button (Upload to Mojang). Quick Skin never uploads a skin unless you press it.
+Mojang accepts only standard 64x64 or legacy 64x32 skins; custom capes, HD skins and CPM models
+stay visible only to players who run Quick Skin.
+
+Other players without Quick Skin see the new account skin after you rejoin the server (if you host
+a LAN world, restart the game instead). An online-mode server that runs Quick Skin can show it to
+them without a rejoin: set `"shareAccountSkinWithVanillaClients": true` in
+`config/quickskin-server.json` and restart the server. After each upload the server then reads your
+newly signed skin from Mojang's session server, usually within a minute or two, and refreshes you
+for the players without Quick Skin. The option is off by default. It has no effect on an
+offline-mode server, including a backend behind a BungeeCord or Velocity proxy (the backend runs
+in offline mode), or on a server that logs players in through another service than Mojang's
+(authlib-injector, Ely.by, LittleSkin, Drasl or custom `minecraft.api.*` hosts); the server log
+says so. The upload dialog tells you which case applies to the server you are on.
+
+With the option on, a skin plugin such as SkinsRestorer is overridden for players without Quick
+Skin after each upload, until it applies its own skin again. The refresh briefly removes and
+re-adds you in those players' tab list; a vanish mod that filters player-list packets keeps you
+hidden, but one that does not could reveal you, so leave the option off on such servers. See
+[ADR 0011](docs/architecture/decisions/0011-show-quick-skin-appearances-only-to-quick-skin-clients.md)
+and [ADR 0012](docs/architecture/decisions/0012-share-uploaded-account-skins-with-unmodded-players.md).
 
 ## Using Quick Skin
 
