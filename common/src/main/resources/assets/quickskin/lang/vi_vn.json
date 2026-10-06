@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Đang chờ (%ss)",
-  "quickskin.cooldown.tooltip": "Bạn phải đợi trước khi đổi skin lại."
+  "quickskin.cooldown.tooltip": "Bạn phải đợi trước khi đổi skin lại.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Skin Nhanh] Skin của bạn (%s) vượt quá giới hạn tải lên của máy chủ này (%s). Nó chỉ hiển thị trên màn hình của bạn; người chơi khác không nhìn thấy.",
+  "quickskin.network.upload_too_large.cape": "[Skin Nhanh] Áo choàng của bạn (%s) vượt quá giới hạn tải lên của máy chủ này (%s). Nó chỉ hiển thị trên màn hình của bạn; người chơi khác không nhìn thấy."
 }

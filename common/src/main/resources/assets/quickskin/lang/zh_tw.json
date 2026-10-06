@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== 冷卻訊息 ===",
   "quickskin.cooldown.button": "冷卻中 (%s秒)",
-  "quickskin.cooldown.tooltip": "請等待冷卻時間後再更換皮膚"
+  "quickskin.cooldown.tooltip": "請等待冷卻時間後再更換皮膚",
+
+  "_comment_upload_limit": "=== 上傳大小限制 ===",
+  "quickskin.network.upload_too_large.skin": "[快速皮膚] 你的皮膚（%s）超過此伺服器的上傳限制（%s）。它只會顯示在你自己的畫面上，其他玩家看不到。",
+  "quickskin.network.upload_too_large.cape": "[快速皮膚] 你的披風（%s）超過此伺服器的上傳限制（%s）。它只會顯示在你自己的畫面上，其他玩家看不到。"
 }

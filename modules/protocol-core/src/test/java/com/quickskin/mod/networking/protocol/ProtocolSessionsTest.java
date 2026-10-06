@@ -1,5 +1,6 @@
 package com.quickskin.mod.networking.protocol;
 
+import com.quickskin.mod.networking.TextureTransferLimits;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,7 @@ class ProtocolSessionsTest {
     @AfterEach
     void clearSessions() {
         sessions.clearServerSessions();
+        sessions.configureServerUploadLimit(TextureTransferLimits.MAX_TEXTURE_BYTES);
         // Client cleanup uses the exact values supplied by each test.
     }
 
@@ -119,6 +121,70 @@ class ProtocolSessionsTest {
         assertEquals(1, sessions.serverSessionCount());
         sessions.removeServerSession(playerId, connection);
         assertEquals(0, sessions.serverSessionCount());
+    }
+
+    @Test
+    void serverUploadLimitIsAdvertisedAndAcceptedByAnUnchangedClient() {
+        int limit = 2 * 1024 * 1024;
+        assertEquals(limit, sessions.configureServerUploadLimit(limit));
+        UUID playerId = UUID.randomUUID();
+        Object connection = new Object();
+
+        ProtocolSessions.ServerHelloResult result = sessions.acceptServerHello(
+                playerId, connection, 41L, QuickSkinProtocol.POLICY.offer());
+
+        assertTrue(result.profile().negotiated());
+        assertEquals(limit, result.profile().maximumTextureBytes());
+        assertEquals(limit, result.acknowledgement().maximumTextureBytes());
+        // A client verifies the acknowledgement against its own unchanged local policy; a
+        // narrower server limit is accepted and becomes its upload limit.
+        ProtocolProfile client = ProtocolNegotiator.verifyAcknowledgement(
+                QuickSkinProtocol.POLICY, result.acknowledgement());
+        assertTrue(client.negotiated());
+        assertEquals(limit, client.maximumUploadBytes());
+    }
+
+    @Test
+    void serverUploadLimitAlsoBoundsLegacyClients() {
+        sessions.configureServerUploadLimit(256 * 1024);
+        UUID playerId = UUID.randomUUID();
+        Object connection = new Object();
+
+        assertTrue(sessions.acceptLegacyClient(playerId, connection).accepted());
+        ProtocolProfile legacy = sessions.serverProfile(playerId, connection);
+        assertEquals(ProtocolProfile.Mode.LEGACY_V1, legacy.mode());
+        assertEquals(256 * 1024, legacy.maximumTextureBytes());
+        assertEquals(TextureTransferLimits.MAX_WIRE_CHUNK_BYTES, legacy.maximumChunkBytes());
+
+        UUID passiveId = UUID.randomUUID();
+        Object passiveConnection = new Object();
+        assertTrue(sessions.classifyLegacyClient(passiveId, passiveConnection));
+        assertEquals(256 * 1024,
+                sessions.serverProfile(passiveId, passiveConnection).maximumTextureBytes());
+    }
+
+    @Test
+    void serverUploadLimitIsClampedToTheProtocolRange() {
+        assertEquals(TextureTransferLimits.MIN_SERVER_UPLOAD_BYTES,
+                sessions.configureServerUploadLimit(0));
+        assertEquals(TextureTransferLimits.MIN_SERVER_UPLOAD_BYTES,
+                sessions.configureServerUploadLimit(-1));
+        assertEquals(TextureTransferLimits.MAX_TEXTURE_BYTES,
+                sessions.configureServerUploadLimit(Long.MAX_VALUE));
+        assertEquals(TextureTransferLimits.MAX_TEXTURE_BYTES, sessions.serverUploadLimit());
+    }
+
+    @Test
+    void theSmallestServerLimitStillNegotiates() {
+        sessions.configureServerUploadLimit(TextureTransferLimits.MIN_SERVER_UPLOAD_BYTES);
+        ProtocolSessions.ServerHelloResult result = sessions.acceptServerHello(
+                UUID.randomUUID(), new Object(), 43L, QuickSkinProtocol.POLICY.offer());
+
+        assertTrue(result.profile().negotiated());
+        assertEquals(TextureTransferLimits.MIN_SERVER_UPLOAD_BYTES,
+                result.profile().maximumTextureBytes());
+        assertTrue(ProtocolNegotiator.verifyAcknowledgement(
+                QuickSkinProtocol.POLICY, result.acknowledgement()).negotiated());
     }
 
     @Test

@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "En espera (%ss)",
-  "quickskin.cooldown.tooltip": "Debes esperar antes de cambiar tu skin de nuevo."
+  "quickskin.cooldown.tooltip": "Debes esperar antes de cambiar tu skin de nuevo.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Skin rápida] Tu skin (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven.",
+  "quickskin.network.upload_too_large.cape": "[Skin rápida] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven."
 }

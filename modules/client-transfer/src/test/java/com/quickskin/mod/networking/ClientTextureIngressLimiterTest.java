@@ -25,6 +25,28 @@ class ClientTextureIngressLimiterTest {
     }
 
     @Test
+    void aLegacyServerRelayUpToTheLegacyUploadBoundIsAdmitted() {
+        // A 2.x server relays a 3.x client's texture whole; refusing it used to end the session.
+        assertTrue(limiter.allowLegacyDirectTextureBytes(TextureTransferLimits.MAX_LEGACY_UPLOAD_BYTES));
+        assertTrue(limiter.allowLegacyDirectTextureBytes(100 * 1024));
+        assertFalse(limiter.allowLegacyDirectTextureBytes(
+                TextureTransferLimits.MAX_LEGACY_DIRECT_TEXTURE_BYTES + 1));
+        assertFalse(limiter.allowLegacyDirectTextureBytes(0));
+        // Chunks keep their own, smaller bound.
+        assertFalse(limiter.allowWireBytes(100 * 1024));
+    }
+
+    @Test
+    void legacyRelaysShareTheWireByteWindow() {
+        int admitted = 0;
+        while (limiter.allowLegacyDirectTextureBytes(TextureTransferLimits.MAX_LEGACY_UPLOAD_BYTES)) {
+            admitted++;
+            assertTrue(admitted < 1000, "the window must be bounded");
+        }
+        assertTrue((long) admitted * TextureTransferLimits.MAX_LEGACY_UPLOAD_BYTES <= 64L * 1024 * 1024);
+    }
+
+    @Test
     void rejectsInvalidImagePreflightWithoutSpendingAFullDecode() {
         assertFalse(limiter.allowDecode(new byte[33], "cape"));
         assertTrue(limiter.allowDecode(pngHeader(64, 32), "cape"));

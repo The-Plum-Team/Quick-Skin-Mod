@@ -368,9 +368,12 @@ public class ServerNetworkHandler {
 
         // The assembler is synchronized and bounded. Keeping its final large array copy off the
         // server thread prevents a completed maximum-size upload from stalling a tick.
+        // The legacy profile carries this server's upload limit as well.
+        ProtocolProfile profile = ProtocolNetwork.profile(sender);
         byte[] completeTexture = TextureChunkAssembler.getInstance().addChunk(
                 sender.getUUID(), sender.connection, textureType, hash,
-                chunkIndex, totalChunks, chunkData);
+                chunkIndex, totalChunks, chunkData,
+                profile.maximumTextureBytes(), profile.maximumChunkBytes());
         if (completeTexture == null
                 || !reserveDecodedPixels(sender, textureType, completeTexture)
                 || !TextureTransferRateLimiter.getInstance().allowStorageMutation(

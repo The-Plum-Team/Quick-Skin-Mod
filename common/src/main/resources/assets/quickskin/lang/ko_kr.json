@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "대기시간 중 (%ss)",
-  "quickskin.cooldown.tooltip": "스킨을 다시 변경하려면 기다려야 합니다."
+  "quickskin.cooldown.tooltip": "스킨을 다시 변경하려면 기다려야 합니다.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[빠른 스킨] 스킨(%s)이 이 서버의 업로드 제한(%s)을 넘습니다. 내 화면에만 표시되며 다른 플레이어에게는 보이지 않습니다.",
+  "quickskin.network.upload_too_large.cape": "[빠른 스킨] 망토(%s)가 이 서버의 업로드 제한(%s)을 넘습니다. 내 화면에만 표시되며 다른 플레이어에게는 보이지 않습니다."
 }

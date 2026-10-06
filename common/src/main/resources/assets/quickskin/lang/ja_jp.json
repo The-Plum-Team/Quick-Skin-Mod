@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "クールダウン中(%ss)",
-  "quickskin.cooldown.tooltip": "スキンを再度変更する前に待つ必要があります。"
+  "quickskin.cooldown.tooltip": "スキンを再度変更する前に待つ必要があります。",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[クイックスキン] スキン(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。",
+  "quickskin.network.upload_too_large.cape": "[クイックスキン] マント(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。"
 }

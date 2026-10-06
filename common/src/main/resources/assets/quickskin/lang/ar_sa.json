@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "في الانتظار (%ss)",
-  "quickskin.cooldown.tooltip": "يجب الانتظار قبل تغيير مظهرك مرة أخرى."
+  "quickskin.cooldown.tooltip": "يجب الانتظار قبل تغيير مظهرك مرة أخرى.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[المظهر السريع] مظهرك (%s) يتجاوز حد الرفع لهذا الخادم البالغ %s. يظهر على شاشتك فقط؛ ولا يراه اللاعبون الآخرون.",
+  "quickskin.network.upload_too_large.cape": "[المظهر السريع] عباءتك (%s) تتجاوز حد الرفع لهذا الخادم البالغ %s. تظهر على شاشتك فقط؛ ولا يراها اللاعبون الآخرون."
 }

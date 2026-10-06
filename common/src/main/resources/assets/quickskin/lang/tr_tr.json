@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Bekleme Süresinde (%ss)",
-  "quickskin.cooldown.tooltip": "Skinini tekrar değiştirmeden önce beklemelisin."
+  "quickskin.cooldown.tooltip": "Skinini tekrar değiştirmeden önce beklemelisin.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Hızlı Skin] Skinin (%s) bu sunucunun yükleme sınırını (%s) aşıyor. Yalnızca senin ekranında görünür; diğer oyuncular onu görmez.",
+  "quickskin.network.upload_too_large.cape": "[Hızlı Skin] Pelerinin (%s) bu sunucunun yükleme sınırını (%s) aşıyor. Yalnızca senin ekranında görünür; diğer oyuncular onu görmez."
 }

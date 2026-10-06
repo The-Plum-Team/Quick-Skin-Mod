@@ -123,6 +123,16 @@ Choose the jar whose Minecraft version and loader match your instance. Quick Ski
 
 Install Quick Skin on the client for local appearance management. Install it on the server as well when you want Quick Skin appearance synchronization, shared texture transfer, or server-enforced cooldowns.
 
+Server administrators can limit the size of each synchronized skin or cape with
+`maxTextureUploadKilobytes` in `config/quickskin-server.json`: 64 to 16384 KiB, default 16384.
+Edit the file while the server is stopped, because the server reads it at startup and writes its
+settings back when it stops. A value outside that range is clamped, and a file that cannot be
+parsed is left as it is while the defaults apply. Players with a skin or cape over the limit keep
+it on their own screen and see a chat message; the rest of their appearance still syncs. Players
+on Quick Skin 3.1.0 or older are the exception: while one of their textures is over the limit,
+their whole appearance (skin, cape and model) does not sync until they update or choose a smaller
+texture, and the server cannot change that. Lower the limit only when those players can update.
+
 Players who do not run Quick Skin never see a Quick Skin appearance, even on a server that has
 Quick Skin. An unmodded client only shows a skin that Mojang hosts and signs, so those players see
 your Mojang account skin, or a default skin on an offline-mode server. With a paid account on an

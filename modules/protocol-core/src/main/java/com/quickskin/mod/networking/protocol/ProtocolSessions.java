@@ -1,5 +1,7 @@
 package com.quickskin.mod.networking.protocol;
 
+import com.quickskin.mod.networking.TextureTransferLimits;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -17,12 +19,38 @@ public final class ProtocolSessions {
     private final AtomicLong nonces = new AtomicLong();
     private final Map<SessionKey, ServerSession> serverProfiles = new LinkedHashMap<>();
     private ClientSession clientSession;
+    /** The server's local policy; its texture limit is the administrator's upload limit. */
+    private ProtocolNegotiator.Policy serverPolicy = QuickSkinProtocol.POLICY;
 
     private ProtocolSessions() {
     }
 
     public static ProtocolSessions getInstance() {
         return INSTANCE;
+    }
+
+    /**
+     * Sets the per-texture limit this server accepts, stores and serves. It is advertised to each
+     * client in the protocol acknowledgement, which can only narrow that client's own limits, and
+     * bounds the legacy profile of 2.x clients. Applies to sessions admitted afterwards.
+     *
+     * @return the clamped limit in effect
+     */
+    public synchronized int configureServerUploadLimit(long requestedBytes) {
+        int limit = TextureTransferLimits.clampServerUploadBytes(requestedBytes);
+        ProtocolNegotiator.Policy base = QuickSkinProtocol.POLICY;
+        serverPolicy = new ProtocolNegotiator.Policy(
+                base.minimumVersion(),
+                base.maximumVersion(),
+                base.capabilityMask(),
+                base.requiredCapabilityMask(),
+                limit,
+                Math.min(base.maximumChunkBytes(), limit));
+        return limit;
+    }
+
+    public synchronized int serverUploadLimit() {
+        return serverPolicy.maximumTextureBytes();
     }
 
     public synchronized ClientHello beginClientSession(
@@ -170,7 +198,7 @@ public final class ProtocolSessions {
                     nonce, ProtocolAcknowledgement.rejected(),
                     ProtocolProfile.incompatible("session-capacity"), false, false);
         }
-        ProtocolProfile profile = ProtocolNegotiator.negotiate(QuickSkinProtocol.POLICY, offer);
+        ProtocolProfile profile = ProtocolNegotiator.negotiate(serverPolicy, offer);
         ProtocolAcknowledgement acknowledgement = profile.negotiated()
                 ? ProtocolAcknowledgement.accepted(profile)
                 : ProtocolAcknowledgement.rejected();
@@ -218,7 +246,7 @@ public final class ProtocolSessions {
         if (serverProfiles.size() >= MAX_SERVER_SESSIONS) {
             return new LegacyAdmission(false, false);
         }
-        ProtocolProfile legacy = ProtocolProfile.legacy("legacy-packet-received");
+        ProtocolProfile legacy = ProtocolProfile.legacy("legacy-packet-received", serverPolicy);
         serverProfiles.put(
                 key, new ServerSession(
                         0L, ProtocolAcknowledgement.rejected(), legacy, false, 0));
@@ -232,7 +260,7 @@ public final class ProtocolSessions {
         ServerSession existing = serverProfiles.get(key);
         if (existing != null) return existing.profile.mode() == ProtocolProfile.Mode.LEGACY_V1;
         if (serverProfiles.size() >= MAX_SERVER_SESSIONS) return false;
-        ProtocolProfile legacy = ProtocolProfile.legacy("legacy-channel-confirmed");
+        ProtocolProfile legacy = ProtocolProfile.legacy("legacy-channel-confirmed", serverPolicy);
         serverProfiles.put(
                 key, new ServerSession(
                         0L, ProtocolAcknowledgement.rejected(), legacy, true, 0));

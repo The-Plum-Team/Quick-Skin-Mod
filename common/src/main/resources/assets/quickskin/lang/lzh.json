@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== 冷卻訊 ===",
   "quickskin.cooldown.button": "冷卻中 (%s秒)",
-  "quickskin.cooldown.tooltip": "請候冷卻時後再換膚"
+  "quickskin.cooldown.tooltip": "請候冷卻時後再換膚",
+
+  "_comment_upload_limit": "=== 呈遞之限 ===",
+  "quickskin.network.upload_too_large.skin": "[速易膚] 汝之膚（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見",
+  "quickskin.network.upload_too_large.cape": "[速易膚] 汝之披風（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見"
 }

@@ -8,7 +8,12 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+
+import com.quickskin.mod.common.data.AnimationMetadata;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,6 +27,28 @@ class NetworkSecurityTest {
 
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void theLargestValidAnimationFitsTheMetadataBound() {
+        List<AnimationMetadata.FrameData> frames = new ArrayList<>();
+        for (int index = 0; index < 256; index++) {
+            frames.add(new AnimationMetadata.FrameData(60_000, index));
+        }
+        String json = new AnimationMetadata(frames, 256).toJson();
+
+        assertTrue(json.getBytes(StandardCharsets.UTF_8).length
+                <= TextureTransferLimits.MAX_ANIMATION_METADATA_JSON_BYTES);
+        assertTrue(NetworkSecurity.isValidAnimationMetadata(json));
+    }
+
+    @Test
+    void metadataAboveTheBoundIsRejectedBeforeParsing() {
+        String padded = "{\"frameCount\":1,\"frames\":[{\"delay\":100,\"index\":0}]}"
+                + " ".repeat(TextureTransferLimits.MAX_ANIMATION_METADATA_JSON_BYTES);
+
+        assertFalse(NetworkSecurity.isValidAnimationMetadata(padded));
+        assertTrue(NetworkSecurity.isValidAnimationMetadata(padded.strip()));
+    }
 
     @Test
     void validatesCanonicalBoundaryIdentifiers() {
