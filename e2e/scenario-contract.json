@@ -1459,7 +1459,7 @@
               "capture": {
                 "title": "Live observer animated frame B",
                 "review_tier": "key",
-                "expectation": "From the same fixed rear view, Alice's animated cape keeps its light gray face and dark trim in its second frozen frame: the complete motif has changed from red to blue and moved horizontally while remaining fully inside the cape surface received over the network.",
+                "expectation": "From the same fixed rear view, Alice's animated cape shows its second frozen frame: the light gray face with dark trim now carries a complete blue vertical motif in the right half of the cape face, fully inside the cape surface received over the network; the observer's crosshair may overlap the cape. That this frame replaced the earlier red one is proven by the runtime evidence (network animation frame 0 -> 1), not by comparing frames.",
                 "probes": []
               },
               "requires": [
@@ -1906,7 +1906,7 @@
               "capture": {
                 "title": "Slim auto-detected",
                 "review_tier": "key",
-                "expectation": "A stable FOV-50 rear view shows the same plaid palette on a skin whose 3-pixel arm layout was auto-detected as slim with no manual model override: each arm has the narrow Alex silhouette, visibly thinner than the classic Steve arms of the preceding checkpoint.",
+                "expectation": "A stable FOV-50 rear view shows the plaid palette (dark charcoal-and-gray plaid jacket, blue trousers) on a skin whose 3-pixel arm layout was auto-detected as slim with no manual model override: each arm has the narrow Alex silhouette. The auto-detected slim model and the renderer's slim selector are proven by the runtime evidence; this frame is not compared with any other checkpoint.",
                 "probes": []
               },
               "requires": [
@@ -2080,7 +2080,7 @@
               "capture": {
                 "title": "Transparent skin layers",
                 "review_tier": "key",
-                "expectation": "A stable third-person view from behind shows the complete local player wearing a solid green skin. The top of the head is plain green and the rest of it carries a broad magenta band running down to the shoulders. That plain green upper head is the proof: the hat layer is transparent there, whereas a flattened one would enclose the whole head in an opaque black or solid block. The head keeps its normal cube shape. The camera is behind the player, so no face is visible and none is expected. The arms show the narrower slim silhouette that the empty outer arm columns select.",
+                "expectation": "A stable third-person view from behind shows the complete local player wearing a solid green skin. A magenta hat-brim band crosses the back of the head, with plain green head visible above and below it; the body, arms and legs are plain green with no magenta. Those plain green head areas around the brim are the proof: the hat layer is transparent there, whereas a flattened one would enclose the whole head in an opaque black or solid block. The head keeps its normal cube shape. The camera is behind the player, so no face is visible and none is expected. The arms show the narrower slim silhouette that the empty outer arm columns select.",
                 "probes": []
               },
               "requires": [
@@ -2119,7 +2119,7 @@
               "capture": {
                 "title": "Cape menu",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape menu is open with a readable title and drop-zone instructions alongside its custom panels and controls.",
+                "expectation": "The Quick Skin cape menu is open with readable My Capes and Default Capes section headings, the drop-zone instructions Drop cape files here or click 'Import Cape' beside the My Capes tiles, the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
@@ -2187,7 +2187,7 @@
               "capture": {
                 "title": "Cape editor",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape-adjustment editor is open with a readable title and drag/zoom instructions alongside its cape image, grid and editing controls.",
+                "expectation": "The Quick Skin cape-adjustment editor is open with its readable Adjust Cape Image title and Drag to move \u00b7 Scroll to zoom instructions. Its cyan-framed canvas shows the 64x32 test cape: a flat navy base with an orange, green-striped Front panel and labelled Front, Cape Back and Elytra region outlines; there are no grid lines. Beside it are the Output resolution buttons, the Reset Position, Snap and Mirror buttons and the Front and Cape Back preview thumbnails, with the Opaque, Fill and Zoom controls below the canvas and Cancel and Apply Cape buttons at the bottom.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
@@ -2234,7 +2234,7 @@
               "capture": {
                 "title": "Cape preview A",
                 "review_tier": "all",
-                "expectation": "The cape editor previews the first selected cape while keeping the currently worn cape state distinct.",
+                "expectation": "The cape menu is open and its rear 3D player preview wears the first selected local cape: an orange cape crossed by a green horizontal stripe, matching the orange-and-green tile in My Capes. The player's worn cape stays the bundled test cape; that the preview follows the selection rather than the worn cape is proven by the runtime evidence (preview and worn cape ids differ).",
                 "probes": []
               },
               "requires": [
@@ -2256,7 +2256,7 @@
               "capture": {
                 "title": "Cape preview B",
                 "review_tier": "all",
-                "expectation": "The cape editor visibly previews the second selected cape, different from preview A.",
+                "expectation": "The cape menu is open and its rear 3D player preview wears the second selected local cape: a red cape crossed by black horizontal bands, matching the red-and-black striped tile in My Capes. The player's worn cape stays the bundled test cape, as the runtime evidence proves.",
                 "probes": []
               },
               "requires": [
@@ -2301,7 +2301,7 @@
               "capture": {
                 "title": "Cape forced opaque",
                 "review_tier": "all",
-                "expectation": "The cape editor displays the opaque form of the test cape with the opaque toggle enabled.",
+                "expectation": "The cape editor shows the opaque form of the test cape: the toggle reads Opaque: ON, the fill button reads Fill: #FF00FF beside a magenta swatch, and the Front preview thumbnail shows the cape's transparent window filled with opaque magenta inside its yellow border. The canvas above still shows the unmodified source image, whose window remains a checkerboard; the fill is applied to the composed cape, which the runtime evidence proves opaque.",
                 "probes": []
               },
               "requires": [
@@ -2324,7 +2324,7 @@
               "capture": {
                 "title": "Fill colour picker",
                 "review_tier": "all",
-                "expectation": "The cape editor shows its fill-colour popover open beside the enabled opaque toggle: red, green and blue channel sliders, a hex field reading FF00FF and a magenta swatch.",
+                "expectation": "The cape editor shows its fill-colour popover open over the lower-left of the canvas, directly above the Opaque: ON toggle and the Fill: #FF00FF button: R: 255, G: 0 and B: 255 channel sliders, a hex field reading #FF00FF and a magenta swatch.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
@@ -2358,7 +2358,7 @@
               "capture": {
                 "title": "Cape zoomed out",
                 "review_tier": "all",
-                "expectation": "The cape editor preview shows the cape at the low zoom position.",
+                "expectation": "At the low zoom position (the Zoom slider reads 32%) the cape editor canvas shows the whole 320x180 night-sky source image small, in a cyan frame over the checkerboard. At this size it covers none of the Front and Cape Back regions, so those preview thumbnails are empty dark tiles.",
                 "probes": []
               },
               "requires": [
@@ -2381,7 +2381,7 @@
               "capture": {
                 "title": "Cape zoomed in",
                 "review_tier": "all",
-                "expectation": "The cape editor preview shows a visibly different crop at the high zoom position.",
+                "expectation": "At the high zoom position (the Zoom slider reads 391%) the cape editor canvas is filled by a magnified crop of the night-sky source: dark sky with scattered stars and one dark mountain peak, which also fills the Front and Cape Back preview thumbnails. That this crop differs from the zoomed-out one is proven by the runtime evidence (580 atlas pixels changed).",
                 "probes": []
               },
               "requires": [
@@ -2404,7 +2404,7 @@
               "capture": {
                 "title": "Editor snap and mirror",
                 "review_tier": "all",
-                "expectation": "The cape editor shows the night-sky source shifted off-centre by a snapped drag, the Snap button reading a non-default grid size and the Mirror button reading ON, so the cape back art is copied onto the front thumbnail.",
+                "expectation": "The cape editor shows the night-sky source shifted off-centre by a snapped drag, leaving a checkerboard strip at the right of the canvas, with the Snap button reading Snap: 4px and the Mirror button reading Mirror: ON. With mirroring on, the canvas hides the Cape Back outline and the Cape Back preview thumbnail repeats the Front thumbnail's night-sky art.",
                 "probes": []
               },
               "requires": [
@@ -2476,7 +2476,7 @@
               "capture": {
                 "title": "Imported cape elytra fallback",
                 "review_tier": "key",
-                "expectation": "The crouching player wears two separated elytra wings using Minecraft's ordinary gray-brown vanilla elytra texture that the import composited into the cape's transparent elytra area; no teal cape surface is visible on the wings.",
+                "expectation": "The crouching player wears two separated elytra wings using Minecraft's ordinary pale gray vanilla elytra texture that the import composited into the cape's transparent elytra area; no teal cape surface is visible on the wings.",
                 "probes": []
               },
               "requires": [
@@ -2630,7 +2630,7 @@
               "capture": {
                 "title": "Adjusted BMO cape",
                 "review_tier": "key",
-                "expectation": "The player wears the BMO cape saved through the editor, and it looks the same as the bundled BMO cape reference without black padding leaking into the visible surface.",
+                "expectation": "The player is seen from behind wearing the BMO cape saved through the editor: a teal BMO face with a pale screen showing a smile, a yellow plus and a red button, and no black padding leaking into the visible surface. That the saved atlas is identical to the bundled BMO cape is proven by the runtime evidence (local atlas pixel-identical to bundled BMO), not by comparing frames.",
                 "probes": []
               },
               "requires": [
@@ -2652,7 +2652,7 @@
               "capture": {
                 "title": "Adjusted BMO elytra",
                 "review_tier": "key",
-                "expectation": "The crouching player wears elytra from the BMO cape saved through the editor; the pose must visibly separate both wings, which look the same as the bundled BMO elytra reference without broken UV placement.",
+                "expectation": "The crouching player wears elytra from the BMO cape saved through the editor; the pose visibly separates both teal wings, each carrying the pale BMO face marks, without broken UV placement. That the saved atlas is identical to the bundled BMO atlas is proven by the runtime evidence, not by comparing frames.",
                 "probes": []
               },
               "requires": [
@@ -2690,7 +2690,7 @@
               "capture": {
                 "title": "Vanilla elytra after cape removal",
                 "review_tier": "key",
-                "expectation": "After the active BMO cape is removed through the cape menu, the same crouching player still wears two clearly separated elytra wings, now using Minecraft's ordinary gray-brown vanilla elytra texture. No cyan BMO artwork, custom cape texture, flat cape panel or missing wing is visible.",
+                "expectation": "After the active BMO cape is removed through the cape menu, the same crouching player still wears two clearly separated elytra wings, now using Minecraft's ordinary pale gray vanilla elytra texture. No teal BMO artwork, custom cape texture, flat cape panel or missing wing is visible.",
                 "probes": []
               },
               "requires": [
@@ -2759,7 +2759,7 @@
               "capture": {
                 "title": "Animated cape frame B",
                 "review_tier": "key",
-                "expectation": "A later frozen frame of the same cape is visible, with its light gray face and dark trim unchanged; the complete motif has changed from red to blue and moved horizontally while remaining fully inside the cape surface.",
+                "expectation": "A later frozen frame of the animated cape is visible from behind: its light gray face and dark trim now carry a complete blue vertical motif in the right half of the cape face, fully inside the cape surface. That the frame advanced from the earlier red one is proven by the runtime evidence (frame 0 -> 1), not by comparing frames.",
                 "probes": []
               },
               "requires": [
@@ -2828,7 +2828,7 @@
               "capture": {
                 "title": "Editor preview ignores equipped elytra",
                 "review_tier": "all",
-                "expectation": "The cape editor continues to render its cape preview even while the player has an elytra equipped.",
+                "expectation": "The cape editor, drawn at a small GUI scale, shows the flat magenta probe cape in its canvas and preview thumbnails, and its 3D player preview wears that magenta cape as an ordinary flat cape with no elytra wings drawn. That the player has an elytra equipped at this moment, and that the preview kept the same cape pixels, is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -2850,7 +2850,7 @@
               "capture": {
                 "title": "Cape menu with local capes",
                 "review_tier": "key",
-                "expectation": "The cape menu's My Capes section lists the imported local capes with purple custom markers: the animated GIF tile carries a cyan GIF badge and the yellow selection outline after being clicked, the HD cape tile sits beside it, the Animation Speed slider is visible below the grid, and a scrollbar runs along the overflowing built-in cape section.",
+                "expectation": "The cape menu's My Capes section lists the imported local capes, each with a small blue-violet marker square in its lower-right corner: the animated GIF tile carries a cyan GIF badge and the yellow selection outline after being clicked, the magenta-and-yellow HD cape tile sits beside it, the Animation Speed slider is visible below the buttons, and a scrollbar thumb at the right edge of the list shows that the built-in Default Capes section overflows. The teal imported tile's own yellow border is cape art, not a selection outline, and a hover tooltip for the GIF tile may be shown.",
                 "probes": []
               },
               "requires": [
@@ -2870,7 +2870,7 @@
               "capture": {
                 "title": "Cape animation speed",
                 "review_tier": "all",
-                "expectation": "The cape menu's Animation Speed slider reads 200% for the selected animated GIF cape while the rest of the menu is unchanged.",
+                "expectation": "The cape menu's Animation Speed slider reads 200% while the animated GIF tile keeps its yellow selection outline; a hover tooltip describing the slider may be shown beside it.",
                 "probes": []
               },
               "requires": [
@@ -2939,7 +2939,7 @@
               "capture": {
                 "title": "Local cape deleted",
                 "review_tier": "key",
-                "expectation": "The cape menu shows the green \u2713 Deleted cape message after the real delete confirmation removed the red-and-white contrast cape tile from My Capes.",
+                "expectation": "The cape menu shows the green \u2713 Deleted cape message above its buttons, and My Capes no longer contains a red-and-black striped contrast cape tile: the real delete confirmation removed it, as the runtime evidence proves. The animated GIF tile keeps its yellow selection outline.",
                 "probes": []
               },
               "requires": [
@@ -2959,7 +2959,7 @@
               "capture": {
                 "title": "None tile selected",
                 "review_tier": "all",
-                "expectation": "The cape menu's None tile carries the yellow selection outline after being clicked, the 3D preview wears no cape, and the Animation Speed slider is hidden.",
+                "expectation": "The cape menu's None tile carries the yellow selection outline after being clicked, the rear 3D preview wears no cape, and the Animation Speed slider is hidden. The teal imported tile's own yellow border is cape art, not a selection outline, and a hover tooltip for the None tile may be shown.",
                 "probes": []
               },
               "requires": [
@@ -3022,7 +3022,7 @@
               "capture": {
                 "title": "Settings screen",
                 "review_tier": "all",
-                "expectation": "The Quick Skin settings screen is open with a readable Open Skin Menu label, toggles and checkboxes.",
+                "expectation": "The Quick Skin settings screen is open on its Client tab (tabs Client, GUI Edit, Modpack and Server): a key-binding button reading Not Bound beside the readable Open Skin Menu label, and three checkboxes, Disable Skin Transparency clear and Show Title Screen Preview and Show Pause Menu Preview checked, above a Done button.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
@@ -3120,7 +3120,7 @@
               "capture": {
                 "title": "Server tab as non-admin",
                 "review_tier": "all",
-                "expectation": "The settings Server tab shows a greyed-out Disable Skin Transparency (Server) checkbox and cooldown text box, plus the yellow notice Only server admins can change these settings near the bottom of the dialog.",
+                "expectation": "The settings Server tab shows the Disable Skin Transparency (Server) checkbox (clear) and the Skin Change Cooldown (seconds) box reading 0, plus the yellow notice Only server admins can change these settings near the bottom of the dialog. That both controls are inactive for this non-admin player is proven by the runtime evidence.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
@@ -3166,7 +3166,7 @@
               "capture": {
                 "title": "Styled buttons over vanilla background",
                 "review_tier": "key",
-                "expectation": "The skin menu is open with frosted-glass styled buttons and Minecraft's translucent in-world overlay instead of the starred background: the daytime world is dimly visible behind the panel and no star pattern is drawn.",
+                "expectation": "The skin menu is open with Quick Skin's styled buttons (dark translucent fills with light outlines and a green Done bar) over Minecraft's translucent in-world overlay instead of the starred background: the daytime world is dimly visible behind the panel and no star pattern is drawn.",
                 "probes": []
               },
               "requires": [
@@ -3230,7 +3230,7 @@
               "capture": {
                 "title": "Stale skin falls back",
                 "review_tier": "all",
-                "expectation": "A centered third-person view shows the intact UUID-selected vanilla default skin again because the saved active skin id pointed at a file that no longer exists; no custom plaid texture and no cape are worn.",
+                "expectation": "A centered third-person rear view shows the intact UUID-selected vanilla default skin again because the saved active skin id pointed at a file that no longer exists; no custom plaid texture and no cape are worn. The in-game mini player preview enabled earlier in the run shows the same default skin from the front: on 1.20.1 its legacy anchor above the hotbar places it over the lower half of the centred model, on later versions it stands near the right edge of the screen.",
                 "probes": []
               },
               "requires": [
@@ -3255,7 +3255,7 @@
               "capture": {
                 "title": "HUD preview disabled control",
                 "review_tier": "all",
-                "expectation": "The reference skin is worn in the same stable world view as the enabled HUD checkpoint, with no player-preview thumbnail in the lower-right corner.",
+                "expectation": "A stable third-person rear view shows the local player wearing the custom plaid skin (brown hair, dark charcoal-and-gray plaid jacket, blue trousers) with no player-preview thumbnail in the lower-right corner; this is the disabled control for the HUD preview checkpoint that follows.",
                 "probes": []
               },
               "requires": [
@@ -3297,7 +3297,7 @@
               "capture": {
                 "title": "Title-screen layer order",
                 "review_tier": "key",
-                "expectation": "On the Minecraft title screen, the enlarged 3D player preview occludes the yellow splash text instead of the text crossing the model.",
+                "expectation": "On the Minecraft title screen, the enlarged 3D player preview occludes the yellow splash text instead of the text crossing the model. The preview is deliberately enlarged so its plaid torso covers the splash: its head extends past the top edge of the screen, it overlaps the right end of the logo and the main buttons, and only the end of the splash text (ending in probe) shows beside it.",
                 "probes": []
               },
               "requires": [
@@ -3655,7 +3655,7 @@
               "capture": {
                 "title": "Cape change during cooldown",
                 "review_tier": "key",
-                "expectation": "The player is seen from behind wearing the bundled gold-and-orange test cape over the black-windowed plaid skin: the cape change was accepted by the server while the second skin change stayed on cooldown.",
+                "expectation": "The player is seen from behind wearing the bundled gold-and-orange test cape over the plaid skin, so the cape covers the torso back where that skin's black-filled window is; the skin identity is proven by the runtime evidence. The cape change was accepted by the server while the second skin change stayed on cooldown.",
                 "probes": []
               },
               "requires": [
@@ -4597,7 +4597,7 @@
               "capture": {
                 "title": "Skin menu opened through its key binding",
                 "review_tier": "key",
-                "expectation": "The registered key opens the settled skin menu, with its catalog, controls and player preview visible.",
+                "expectation": "The registered key opens the settled skin menu: its catalog is empty apart from the Drop skin files here or click 'Import Skin' drop zone, its search field and buttons are visible, and its player preview wears the UUID-selected vanilla default skin.",
                 "probes": []
               }
             },
@@ -4618,7 +4618,7 @@
               "capture": {
                 "title": "Skin menu opened through the vanilla-menu button",
                 "review_tier": "key",
-                "expectation": "The injected Quick Skin button opens the settled skin menu with its catalog, controls and player preview, retaining the vanilla menu as its parent.",
+                "expectation": "The injected Quick Skin button opens the settled skin menu: its catalog is empty apart from the Drop skin files here or click 'Import Skin' drop zone, its search field and buttons are visible, and its player preview wears the UUID-selected vanilla default skin. That the vanilla title screen stays the menu's parent is proven by the runtime evidence.",
                 "probes": []
               }
             },
