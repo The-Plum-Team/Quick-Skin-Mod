@@ -19,12 +19,21 @@ import java.nio.file.StandardCopyOption;
  */
 public class ServerConfig {
     private static final int MAX_CONFIG_BYTES = 1024 * 1024;
+    /** Bounds of {@link #maxTextureUploadKilobytes}; the upper one is the protocol's hard cap. */
+    public static final int MIN_TEXTURE_UPLOAD_KILOBYTES = 64;
+    public static final int MAX_TEXTURE_UPLOAD_KILOBYTES = 16 * 1024;
     private static volatile ServerConfig instance;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     // Skin Settings
     public boolean disableSkinTransparency = false; // Disable transparency in player skins
     public int skinChangeCooldownSeconds = 0; // Cooldown in seconds for changing skin (0 = disabled)
+    /**
+     * Largest skin or cape (the final PNG a client transmits, animation metadata included) this
+     * server accepts, stores and serves, in KiB. Clients learn it when they connect and refuse a
+     * larger texture before sending it. 64 to 16384; textures always travel in bounded chunks.
+     */
+    public int maxTextureUploadKilobytes = MAX_TEXTURE_UPLOAD_KILOBYTES;
 
     // Logging Settings
 
@@ -129,6 +138,14 @@ public class ServerConfig {
 
     private void normalize() {
         skinChangeCooldownSeconds = Math.max(0, Math.min(skinChangeCooldownSeconds, 86_400));
+        maxTextureUploadKilobytes = Math.max(MIN_TEXTURE_UPLOAD_KILOBYTES,
+                Math.min(maxTextureUploadKilobytes, MAX_TEXTURE_UPLOAD_KILOBYTES));
+    }
+
+    /** The configured per-texture upload limit in bytes. */
+    public synchronized int maxTextureUploadBytes() {
+        normalize();
+        return maxTextureUploadKilobytes * 1024;
     }
 
     private static void writeAtomically(Path target, String content) throws IOException {

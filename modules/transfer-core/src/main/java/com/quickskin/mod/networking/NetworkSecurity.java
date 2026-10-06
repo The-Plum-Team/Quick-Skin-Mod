@@ -149,7 +149,8 @@ public final class NetworkSecurity {
     /** Parses and validates once so packet handlers do not repeat bounded JSON work. */
     public static AnimationMetadata parseAnimationMetadata(String metadataJson) {
         if (metadataJson == null || metadataJson.isEmpty()
-                || metadataJson.getBytes(StandardCharsets.UTF_8).length > TextureTransferLimits.MAX_JSON_BYTES) {
+                || metadataJson.getBytes(StandardCharsets.UTF_8).length
+                        > TextureTransferLimits.MAX_ANIMATION_METADATA_JSON_BYTES) {
             return null;
         }
         try {

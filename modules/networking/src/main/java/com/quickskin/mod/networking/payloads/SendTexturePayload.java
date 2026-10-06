@@ -35,7 +35,10 @@ public record SendTexturePayload(String textureType, String hash, byte[] imageDa
         buf -> {
             String textureType = PayloadCodecs.readString(buf, TextureTransferLimits.MAX_TEXTURE_TYPE_BYTES);
             String hash = PayloadCodecs.readString(buf, TextureTransferLimits.CONTENT_ID_LENGTH);
-            byte[] imageData = PayloadCodecs.readByteArray(buf, TextureTransferLimits.MAX_DIRECT_TEXTURE_BYTES);
+            // A 2.x server relays each stored texture whole (up to its 1 MiB payload budget);
+            // this server's own direct responses stay within MAX_DIRECT_TEXTURE_BYTES.
+            byte[] imageData = PayloadCodecs.readByteArray(
+                    buf, TextureTransferLimits.MAX_LEGACY_DIRECT_TEXTURE_BYTES);
             return new SendTexturePayload(textureType, hash, imageData);
         }
     );

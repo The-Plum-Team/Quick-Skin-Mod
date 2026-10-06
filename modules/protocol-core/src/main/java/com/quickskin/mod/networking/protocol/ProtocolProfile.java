@@ -16,12 +16,17 @@ public record ProtocolProfile(
     }
 
     public static ProtocolProfile legacy(String reason) {
+        return legacy(reason, QuickSkinProtocol.POLICY);
+    }
+
+    /** A legacy session bounded by the given local policy (a server's configured upload limit). */
+    public static ProtocolProfile legacy(String reason, ProtocolNegotiator.Policy policy) {
         return new ProtocolProfile(
                 Mode.LEGACY_V1,
                 1,
                 0L,
-                QuickSkinProtocol.POLICY.maximumTextureBytes(),
-                QuickSkinProtocol.POLICY.maximumChunkBytes(),
+                policy.maximumTextureBytes(),
+                Math.min(policy.maximumChunkBytes(), policy.maximumTextureBytes()),
                 reason);
     }
 

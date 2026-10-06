@@ -3,6 +3,7 @@ package com.quickskin.mod.runtime;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.ServerNetworkHandler;
+import com.quickskin.mod.networking.protocol.ProtocolSessions;
 import com.quickskin.mod.server.concurrent.ServerTextureIngressExecutor;
 import com.quickskin.mod.server.concurrent.ServerCacheIoExecutor;
 import com.quickskin.mod.server.data.ServerCooldownManager;
@@ -70,6 +71,12 @@ public final class ServerRuntime implements AutoCloseable {
 
         resetTransientState();
         ServerConfig.reload();
+        // Before the texture cache loads: a stored texture over the limit is not served.
+        int uploadLimit = ProtocolSessions.getInstance().configureServerUploadLimit(
+                ServerConfig.getInstance().maxTextureUploadBytes());
+        textureCache.configureUploadLimit(uploadLimit);
+        QuickSkinInfo.LOGGER.info("Quick Skin accepts skins and capes up to {} KiB per texture"
+                + " (maxTextureUploadKilobytes in quickskin-server.json)", uploadLimit / 1024);
         ServerCacheIoExecutor.getInstance().start();
         java.nio.file.Path worldPath = server.getWorldPath(
                 net.minecraft.world.level.storage.LevelResource.ROOT);

@@ -50,6 +50,8 @@ public class ServerTextureCache {
     private final LinkedHashMap<String, EntryDeletion> pendingDeletions =
             new LinkedHashMap<>();
     private long cachedBytes;
+    /** The administrator's per-texture limit; nothing larger is staged, loaded or served. */
+    private int uploadLimitBytes = TextureTransferLimits.DEFAULT_SERVER_UPLOAD_BYTES;
     private Path storageDirectory;
     private long generation;
 
@@ -61,6 +63,22 @@ public class ServerTextureCache {
             instance = new ServerTextureCache();
         }
         return instance;
+    }
+
+    /**
+     * Sets the per-texture limit this cache accepts and serves. Call before {@link #init(Path)}:
+     * a stored texture above it is then left on disk unloaded, so it is neither served nor
+     * referenced by a restored appearance.
+     *
+     * @return the clamped limit in effect
+     */
+    public synchronized int configureUploadLimit(long requestedBytes) {
+        uploadLimitBytes = TextureTransferLimits.clampServerUploadBytes(requestedBytes);
+        return uploadLimitBytes;
+    }
+
+    public synchronized int uploadLimitBytes() {
+        return uploadLimitBytes;
     }
 
     public synchronized void init(Path worldPath) {
@@ -115,10 +133,18 @@ public class ServerTextureCache {
 
         final long preparedGeneration;
         final Path preparedDirectory;
+        final int limit;
         synchronized (this) {
             if (storageDirectory == null) return null;
             preparedGeneration = generation;
             preparedDirectory = storageDirectory;
+            limit = uploadLimitBytes;
+        }
+        if (textureData.length > limit) {
+            LOGGER.warn("Rejected a {} upload from {}: {} bytes is over this server's {} byte"
+                            + " upload limit (maxTextureUploadKilobytes)",
+                    textureType, ownerId, textureData.length, limit);
+            return null;
         }
 
         // Own a private immutable byte snapshot before hashing or decoding it.
@@ -507,6 +533,12 @@ public class ServerTextureCache {
                 long size = Files.size(path);
                 if (size <= 0 || size > TextureTransferLimits.MAX_TEXTURE_BYTES) {
                     scheduleEntryDeletion(hash);
+                    continue;
+                }
+                if (size > uploadLimitBytes) {
+                    // Kept on disk for a later, larger limit, but never served or referenced.
+                    LOGGER.info("Not loading stored texture {} ({} bytes): it is over this"
+                            + " server's {} byte upload limit", hash, size, uploadLimitBytes);
                     continue;
                 }
                 Ownership ownership = readOwnership(hash);

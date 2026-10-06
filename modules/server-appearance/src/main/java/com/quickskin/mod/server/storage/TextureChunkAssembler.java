@@ -3,6 +3,8 @@ package com.quickskin.mod.server.storage;
 import com.quickskin.mod.networking.NetworkSecurity;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -16,9 +18,16 @@ import java.util.UUID;
  * Assemblies are isolated by authenticated player and connection session.
  */
 public class TextureChunkAssembler {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TextureChunkAssembler.class);
+    private static final int MAX_REJECTED_UPLOADS = 2 * TextureTransferLimits.MAX_SERVER_ASSEMBLIES;
     private static TextureChunkAssembler instance;
 
     private final Map<AssemblyKey, ChunkAssembly> assemblies = new LinkedHashMap<>();
+    /**
+     * Uploads refused for exceeding the texture limit, so their remaining chunks are dropped at
+     * once instead of being accumulated again and the refusal is logged once.
+     */
+    private final LinkedHashMap<AssemblyKey, Long> rejectedUploads = new LinkedHashMap<>();
     private long retainedBytes;
 
     private TextureChunkAssembler() {
@@ -77,6 +86,10 @@ public class TextureChunkAssembler {
         }
 
         AssemblyKey key = new AssemblyKey(playerId, session, textureType, hash);
+        if (rejectedUploads.containsKey(key)) {
+            rejectedUploads.put(key, now);
+            return null;
+        }
         ChunkAssembly assembly = assemblies.get(key);
         if (assembly == null) {
             if (assemblies.size() >= TextureTransferLimits.MAX_SERVER_ASSEMBLIES
@@ -94,8 +107,12 @@ public class TextureChunkAssembler {
             return null;
         }
         long playerBytes = retainedBytesFor(playerId);
-        if ((long) assembly.sizeBytes + chunkData.length > maximumTextureBytes
-                || retainedBytes + chunkData.length > TextureTransferLimits.MAX_SERVER_ASSEMBLY_BYTES
+        if ((long) assembly.sizeBytes + chunkData.length > maximumTextureBytes) {
+            removeAssembly(key, assembly);
+            rejectOversizedUpload(key, now, totalChunks, chunkData.length, maximumTextureBytes);
+            return null;
+        }
+        if (retainedBytes + chunkData.length > TextureTransferLimits.MAX_SERVER_ASSEMBLY_BYTES
                 || playerBytes + chunkData.length > TextureTransferLimits.MAX_ASSEMBLY_BYTES_PER_PLAYER) {
             removeAssembly(key, assembly);
             return null;
@@ -113,13 +130,38 @@ public class TextureChunkAssembler {
         return result;
     }
 
+    /** True while chunks of this exact upload are refused because it exceeded the limit. */
+    public synchronized boolean isRejected(
+            UUID playerId, Object session, String textureType, String hash) {
+        if (playerId == null || session == null || textureType == null || hash == null) return false;
+        purgeExpired(System.currentTimeMillis());
+        return rejectedUploads.containsKey(new AssemblyKey(playerId, session, textureType, hash));
+    }
+
+    private void rejectOversizedUpload(
+            AssemblyKey key, long now, int totalChunks, int chunkBytes, int maximumTextureBytes) {
+        rejectedUploads.remove(key);
+        rejectedUploads.put(key, now);
+        while (rejectedUploads.size() > MAX_REJECTED_UPLOADS) {
+            Iterator<AssemblyKey> eldest = rejectedUploads.keySet().iterator();
+            eldest.next();
+            eldest.remove();
+        }
+        LOGGER.warn("Rejected a {} upload ({}) from {}: its {} chunks of up to {} bytes exceed"
+                        + " this server's {} byte texture limit (maxTextureUploadKilobytes)",
+                key.textureType, key.hash, key.playerId, totalChunks, chunkBytes,
+                maximumTextureBytes);
+    }
+
     public synchronized void clear() {
+        rejectedUploads.clear();
         assemblies.clear();
         retainedBytes = 0;
     }
 
     public synchronized void discardPlayer(UUID playerId) {
         if (playerId == null) return;
+        rejectedUploads.keySet().removeIf(key -> key.playerId.equals(playerId));
         Iterator<Map.Entry<AssemblyKey, ChunkAssembly>> iterator = assemblies.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<AssemblyKey, ChunkAssembly> entry = iterator.next();
@@ -133,6 +175,8 @@ public class TextureChunkAssembler {
     /** Discards only assemblies owned by the disconnecting connection identity. */
     public synchronized void discardSession(UUID playerId, Object session) {
         if (playerId == null || session == null) return;
+        rejectedUploads.keySet().removeIf(
+                key -> key.playerId.equals(playerId) && key.session == session);
         Iterator<Map.Entry<AssemblyKey, ChunkAssembly>> iterator = assemblies.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<AssemblyKey, ChunkAssembly> entry = iterator.next();
@@ -145,6 +189,8 @@ public class TextureChunkAssembler {
     }
 
     private void purgeExpired(long now) {
+        rejectedUploads.values().removeIf(
+                rejectedAt -> now - rejectedAt > TextureTransferLimits.ASSEMBLY_TTL_MILLIS);
         Iterator<Map.Entry<AssemblyKey, ChunkAssembly>> iterator = assemblies.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<AssemblyKey, ChunkAssembly> entry = iterator.next();

@@ -1335,6 +1335,46 @@ public class LocalAssetManager {
         }
     }
 
+    /**
+     * Lower bound, without decoding, of the canonical bytes {@link #loadCanonicalTexture} would
+     * produce: the stored PNG plus an animated cape's identity chunk. Lets the sync path explain a
+     * texture too large to transmit (for which that method returns null) instead of retrying it.
+     *
+     * @return the size in bytes, or -1 when the asset or its file is unknown
+     */
+    public long canonicalTextureSizeHint(String hash, String textureType) {
+        if (!NetworkSecurity.isValidContentId(hash)
+                || !NetworkSecurity.isValidTextureType(textureType)) return -1L;
+        CatalogSnapshot snapshot = catalog;
+        String primary = snapshot.resolve(hash);
+        if (primary == null) return -1L;
+        AssetMetadata metadata = snapshot.metadata().get(primary);
+        if (metadata == null || !textureType.equals(metadata.type())) return -1L;
+        Path readPath = snapshot.sourcePaths().get(primary);
+        if (readPath == null) return -1L;
+//? if <1.21.11 {
+        if (metadata.isAnimated()
+                && readPath.toString().toLowerCase(Locale.ROOT).endsWith(".gif")) {
+            readPath = NetworkSecurity.resolveContained(
+                    cacheDirectory.resolve("animated_capes"), primary, ".png");
+        }
+//?}
+        if (readPath == null || Files.isSymbolicLink(readPath)) return -1L;
+        try {
+            long size = Files.size(readPath);
+            if ("cape".equals(textureType) && metadata.isAnimated()) {
+                AnimationMetadata animation = getAnimationMetadata(primary);
+                if (animation != null) {
+                    size += animation.toJson().getBytes(
+                            java.nio.charset.StandardCharsets.UTF_8).length + 12L;
+                }
+            }
+            return size;
+        } catch (IOException | RuntimeException error) {
+            return -1L;
+        }
+    }
+
 //? if <1.21.11 {
 //?} else {
     private Path getCpmIconPath(String hash) {

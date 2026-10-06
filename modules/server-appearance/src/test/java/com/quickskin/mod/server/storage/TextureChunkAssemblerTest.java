@@ -8,7 +8,9 @@ import org.junit.jupiter.api.Test;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TextureChunkAssemblerTest {
     private static final String HASH = "0123456789abcdef0123456789abcdef01234567";
@@ -143,5 +145,41 @@ class TextureChunkAssemblerTest {
         assertArrayEquals(
                 new byte[] {5},
                 assembler.addChunk(player, session, "skin", HASH, 0, 1, new byte[] {5}));
+    }
+
+    @Test
+    void anUploadOverTheLimitIsRefusedOnceAndItsLaterChunksAreDropped() {
+        UUID player = UUID.randomUUID();
+        Object session = new Object();
+        int limit = 4;
+        int chunk = 2;
+
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 0, 3,
+                new byte[] {1, 2}, limit, chunk));
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 1, 3,
+                new byte[] {3, 4}, limit, chunk));
+        assertFalse(assembler.isRejected(player, session, "cape", HASH));
+        // The third chunk would make 6 bytes: the whole upload is refused.
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 2, 3,
+                new byte[] {5, 6}, limit, chunk));
+        assertTrue(assembler.isRejected(player, session, "cape", HASH));
+        // A resend of the same upload cannot accumulate and complete again.
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 0, 3,
+                new byte[] {1, 2}, limit, chunk));
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 1, 3,
+                new byte[] {3, 4}, limit, chunk));
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 2, 3,
+                new byte[] {5}, limit, chunk));
+
+        // Another session of the same player, or a texture within the limit, is unaffected.
+        Object reconnect = new Object();
+        assertFalse(assembler.isRejected(player, reconnect, "cape", HASH));
+        assertNull(assembler.addChunk(player, reconnect, "cape", HASH, 0, 2,
+                new byte[] {1, 2}, limit, chunk));
+        assertArrayEquals(new byte[] {1, 2, 3, 4}, assembler.addChunk(
+                player, reconnect, "cape", HASH, 1, 2, new byte[] {3, 4}, limit, chunk));
+
+        assembler.discardSession(player, session);
+        assertFalse(assembler.isRejected(player, session, "cape", HASH));
     }
 }
