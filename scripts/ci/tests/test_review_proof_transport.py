@@ -158,14 +158,19 @@ class ProofFailureBridgeTest(unittest.TestCase):
             failure.write_text(json.dumps(existing))
         output = self.folder / "classifier-output"
         script = step_script("visual-review-drain.yml", "review", "Classify a failed attempt without provider text")
+        # The other typed retention signals belong to steps that succeeded in these cases.
         for expression, value in (("steps.check.outputs.review_complete", ""), ("steps.capsule.outcome", outcome),
-                                  ("steps.capsule.outputs.proof_transport_unavailable", signal)):
+                                  ("steps.capsule.outputs.proof_transport_unavailable", signal),
+                                  ("steps.capsule.outputs.github_transport_unavailable", ""),
+                                  ("steps.guard.outcome", "success"), ("steps.recovered.outcome", "success"),
+                                  ("steps.recovered.outputs.github_transport_unavailable", "")):
             script = script.replace("${{ " + expression + " }}", value)
         self.assertNotIn("${{", script)
-        jq = shutil.which("jq")
+        jq, bash = shutil.which("jq"), shutil.which("bash")
         self.assertIsNotNone(jq)
-        result = subprocess.run(["bash", "-c", "gh() { return 97; }\n" + script], cwd=self.folder,
-            env={"PATH": os.pathsep.join((str(Path(jq).parent), os.defpath)),
+        self.assertIsNotNone(bash)
+        result = subprocess.run([bash, "-c", "gh() { return 97; }\n" + script], cwd=self.folder,
+            env={"PATH": os.pathsep.join((str(Path(jq).parent), str(Path(bash).parent), os.defpath)),
                  "RUNNER_TEMP": str(self.folder), "GITHUB_OUTPUT": str(output)}, capture_output=True, text=True, timeout=10)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout)

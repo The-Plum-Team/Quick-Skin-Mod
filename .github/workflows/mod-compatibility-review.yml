@@ -977,11 +977,13 @@ jobs:
           persist-credentials: false
 
       - name: Revalidate current master before batch or model admission
+        id: admission
         shell: bash
         env:
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GITHUB_API_RETRY_MAX_WAIT_SECONDS: "3700"
+          GITHUB_API_RETRY_UNAVAILABLE_SIGNAL: ${{ runner.temp }}/github-api-unavailable-admission
           GH_TOKEN: ${{ github.token }}
           SOURCE_IMPLEMENTATION_SHA: ${{ needs.enumerate.outputs.implementation_sha }}
         run: |
@@ -1490,10 +1492,20 @@ jobs:
           mkdir -p "$batch"
           failure="$batch/visual-review-failure.json"
           if [[ ! -f "$failure" ]]; then
-            jq -n \
-              '{schema_version:1,category:"protected_validation",
-                stage:"compatibility",transient:false}' \
-              > "$failure"
+            # Only the failed admission step's typed signal is retryable GitHub unavailability.
+            # It is never a Claude quota rejection and never opens the shared Claude circuit.
+            if [[ "${{ steps.admission.outcome }}" == failure &&
+                  -f "$RUNNER_TEMP/github-api-unavailable-admission" ]]; then
+              jq -n \
+                '{schema_version:1,category:"github_transport_unavailable",
+                  stage:"compatibility_admission",transient:true}' \
+                > "$failure"
+            else
+              jq -n \
+                '{schema_version:1,category:"protected_validation",
+                  stage:"compatibility",transient:false}' \
+                > "$failure"
+            fi
           fi
           jq -e \
             '(keys | sort) == (["category", "schema_version", "stage",

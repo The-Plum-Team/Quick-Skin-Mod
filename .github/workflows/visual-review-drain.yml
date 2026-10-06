@@ -877,12 +877,25 @@ jobs:
           BUNDLE_KEY: ${{ needs.select.outputs.bundle_key }}
           GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
           GH_TOKEN: ${{ github.token }}
+          GITHUB_API_RETRY_UNAVAILABLE_SIGNAL: ${{ runner.temp }}/github-api-unavailable-guard
           IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
           REVIEW_KEY: ${{ needs.select.outputs.review_key }}
           SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
           PREPARED_MISSING: ${{ needs.prepare.outputs.missing }}
         run: |
           set -euo pipefail
+          # Typed retention signal for the classifier. It describes only the latest guarded call:
+          # present after that call exhausted its bounded retry on a rate-limit, 408/429/5xx or
+          # transport response, removed after success or any other failure. No response text.
+          guard_api_signal() {
+            [[ -n "${GITHUB_API_RETRY_UNAVAILABLE_SIGNAL:-}" ]] || return 0
+            if [[ "$1" == unavailable ]]; then
+              : > "$GITHUB_API_RETRY_UNAVAILABLE_SIGNAL"
+            else
+              rm -f -- "$GITHUB_API_RETRY_UNAVAILABLE_SIGNAL"
+            fi
+          }
+          guard_api_signal clear
           protected_gh_api_retry() {
             local api_status attempt delay now output reset_at skew wait_seconds
             delay=5
@@ -890,6 +903,7 @@ jobs:
               output=''
               api_status=0
               if output="$(gh api "$@" 2>&1)"; then
+                guard_api_signal clear
                 printf '%s\n' "$output"
                 return 0
               else
@@ -897,7 +911,13 @@ jobs:
               fi
               if ! grep -Eqi \
                   'API rate limit exceeded|secondary rate limit|HTTP (408|429|5[0-9][0-9])|connection (reset|refused)|timed out|timeout|temporary failure|TLS handshake|unexpected EOF' \
-                  <<< "$output" || (( attempt == 4 )); then
+                  <<< "$output"; then
+                guard_api_signal clear
+                printf '%s\n' "$output" >&2
+                return "$api_status"
+              fi
+              if (( attempt == 4 )); then
+                guard_api_signal unavailable
                 printf '%s\n' "$output" >&2
                 return "$api_status"
               fi
@@ -911,6 +931,7 @@ jobs:
                   wait_seconds=$(( reset_at - now + 2 + skew ))
                   (( wait_seconds > 0 )) || wait_seconds=1
                   if (( wait_seconds > 3700 )); then
+                    guard_api_signal unavailable
                     printf '%s\n' "$output" >&2
                     return "$api_status"
                   fi
@@ -1178,6 +1199,7 @@ jobs:
           GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
           SOURCE_RUN_ID: ${{ needs.select.outputs.source_run_id }}
           BUNDLE_KEY: ${{ needs.select.outputs.bundle_key }}
+          GITHUB_API_RETRY_UNAVAILABLE_SIGNAL: ${{ runner.temp }}/github-api-unavailable-capsule
         run: |
           set -euo pipefail
           if [[ "$PREPARED_MISSING" == true ]]; then
@@ -1190,14 +1212,17 @@ jobs:
             --run-attempt "$GITHUB_RUN_ATTEMPT" --workflow-sha "$GITHUB_SHA" \
             --artifact-id "$PREPARED_ARTIFACT_ID" --artifact-digest "$PREPARED_ARTIFACT_DIGEST" \
             --capsule-id "$ARTIFACT_ID" --capsule-digest "$ARTIFACT_DIGEST" \
-            --capsule-size "$ARTIFACT_SIZE" --output "$RUNNER_TEMP/visual-review-capsule"
+            --capsule-size "$ARTIFACT_SIZE" --output "$RUNNER_TEMP/visual-review-capsule" \
+            --github-output "$GITHUB_OUTPUT"
           printf 'missing=false\n' >> "$GITHUB_OUTPUT"
           capsule="$RUNNER_TEMP/visual-review-capsule"
           manifest="$capsule/review-input/visual-review-manifest.json"
           proof="$capsule/curation-proof.json"
           # Preparation does not reserve freshness. Reauthenticate the exact runtime source
           # and its attempt under the model slot, then bracket model admission with live master.
-          source scripts/ci/github_api_retry.sh
+          # This workflow's retained helper emits the typed unavailability signal even when the
+          # reviewer checkout is an older implementation.
+          source "$RUNNER_TEMP/protected-drain-control/scripts/ci/github_api_retry.sh"
           [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)" == "$GENERATION_SHA" ]]
           proof_schema="$(jq -er .schema_version "$proof")"
           if [[ "$proof_schema" == 7 || "$proof_schema" == 8 ]]; then
@@ -1498,6 +1523,7 @@ jobs:
           steps.capsule.outputs.missing != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_API_RETRY_UNAVAILABLE_SIGNAL: ${{ runner.temp }}/github-api-unavailable-recovered
           IMPLEMENTATION_SHA: ${{ needs.select.outputs.implementation_sha }}
           GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
           REVIEW_KEY: ${{ needs.select.outputs.review_key }}
@@ -1508,7 +1534,7 @@ jobs:
             --implementation-sha "$IMPLEMENTATION_SHA" --workflow-sha "$GITHUB_SHA" \
             --review-key "$REVIEW_KEY" \
             --github-output "$GITHUB_OUTPUT"
-          source scripts/ci/github_api_retry.sh
+          source "$RUNNER_TEMP/protected-drain-control/scripts/ci/github_api_retry.sh"
           [[ "$(github_api_retry "repos/$GITHUB_REPOSITORY/branches/master" --jq .commit.sha)" == "$GENERATION_SHA" ]]
 
       - name: Review bounded chunks with selective escalation
@@ -2033,12 +2059,29 @@ jobs:
           mkdir -p "$capsule"
           failure="$capsule/visual-review-failure.json"
           if [[ ! -f "$failure" ]]; then
-            if [[ "${{ steps.capsule.outcome }}" == failure &&
-                  "${{ steps.capsule.outputs.proof_transport_unavailable }}" == true ]]; then
-              # Retryable retention is not a claim about an HTTP status or provider quota.
-              jq -n \
+            # Only a typed signal from the protected step that actually failed retains the
+            # capsule. Retryable retention is not a claim about an HTTP status or provider quota;
+            # integrity, identity and source-freshness failures keep the terminal fallback.
+            unavailable_stage=''
+            if [[ "${{ steps.guard.outcome }}" == failure &&
+                  -f "$RUNNER_TEMP/github-api-unavailable-guard" ]]; then
+              unavailable_stage=queue_guard
+            elif [[ "${{ steps.capsule.outcome }}" == failure &&
+                    "${{ steps.capsule.outputs.proof_transport_unavailable }}" == true ]]; then
+              unavailable_stage=proof_reauthentication
+            elif [[ "${{ steps.capsule.outcome }}" == failure &&
+                    ( "${{ steps.capsule.outputs.github_transport_unavailable }}" == true ||
+                      -f "$RUNNER_TEMP/github-api-unavailable-capsule" ) ]]; then
+              unavailable_stage=capsule_restore
+            elif [[ "${{ steps.recovered.outcome }}" == failure &&
+                    ( "${{ steps.recovered.outputs.github_transport_unavailable }}" == true ||
+                      -f "$RUNNER_TEMP/github-api-unavailable-recovered" ) ]]; then
+              unavailable_stage=report_recovery
+            fi
+            if [[ -n "$unavailable_stage" ]]; then
+              jq -n --arg stage "$unavailable_stage" \
                 '{schema_version:1,category:"github_transport_unavailable",
-                  stage:"proof_reauthentication",transient:true}' \
+                  stage:$stage,transient:true}' \
                 > "$failure"
             else
               jq -n \

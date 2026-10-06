@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import tempfile
 
-from feature_coverage_github import Api, _review_files, coverage
+from feature_coverage_github import Api, GitHubGetUnavailable, _review_files, coverage
 from visual_review_preparation import SHA, WORKFLOW
 from visual_review_queue import ACTIVE_RUN_STATUSES, REPORT_NAME, parse_artifact, valid_owner
 from check_visual_review import load, validate
@@ -169,9 +169,16 @@ def main() -> int:
     if any(value is None for value in (args.capsule, args.implementation_sha, args.workflow_sha,
                                        args.review_key, args.github_output)):
         parser.error("report recovery requires capsule, implementation, workflow, review key and output")
-    recovered = recover(Api(args.repository), capsule=args.capsule,
-                        implementation_sha=args.implementation_sha, workflow_sha=args.workflow_sha,
-                        review_key=args.review_key)
+    try:
+        recovered = recover(Api(args.repository), capsule=args.capsule,
+                            implementation_sha=args.implementation_sha, workflow_sha=args.workflow_sha,
+                            review_key=args.review_key)
+    except GitHubGetUnavailable:
+        # A failed bounded GET proves nothing about the queued capsule. Emit only the fixed typed
+        # retention signal, never response text, so the drain retains the input for retry.
+        with args.github_output.open("a") as stream:
+            stream.write("github_transport_unavailable=true\n")
+        parser.exit(2, "Cancelled report recovery unavailable: bounded GitHub GET failed or timed out\n")
     with args.github_output.open("a") as stream:
         stream.write(f"recovered={str(recovered).lower()}\n")
     return 0

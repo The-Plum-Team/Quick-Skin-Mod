@@ -134,6 +134,27 @@ digest, source, attempt and capsule validation failures remain nontransient. No 
 matching, new retry loop or extra dispatch is added. Historical implementation checkouts
 without this typed signal retain their original classification behavior.
 
+The same retention applies to every other protected GitHub read that can stop the reviewer
+before a verdict. Run 37411958425 attempt 1 (`mc1.21.6`, 2026-10-06) raised
+`GitHubGetUnavailable` in cancelled-report recovery during an installation quota exhaustion,
+before any model call. It had no typed signal, so the fallback wrote `protected_validation`
+with `transient: false` and the cleanup job tried to delete the unreviewed input; only the
+same quota exhaustion deferred that deletion. Now `visual_review_completed.py` and
+`visual_review_preparation.py` write the fixed `github_transport_unavailable=true` output for
+that exception. The shell retry helpers accept an opt-in `GITHUB_API_RETRY_UNAVAILABLE_SIGNAL`
+file that describes only their most recent call: it exists after the bounded retry stopped
+on a response that the helper already classifies as retryable (rate limit, HTTP 408/429/5xx
+or transport failure), and success or any other failure removes it. The queue guard's own
+bounded retry does the same. The classifier maps a signal only from the step that actually
+failed (queue guard, preparation restore and source reauthentication, or report recovery) to a
+`github_transport_unavailable` marker with `transient: true`. The marker still starts the
+target-scoped cooldown, so a later sweep retries the retained capsule; it never opens the
+Claude capacity circuit. The reviewer's restore and recovery steps source the helper from
+this workflow's retained protected copy, so an older implementation checkout cannot lose the
+signal. Identity, digest, owner, freshness and other validation failures still classify as
+`protected_validation`. The optional-mod review classifies its live-`master` admission read
+the same way; it has no input cleanup, so the marker only records the cause.
+
 Both generic and exact queue selectors suppress retained inputs while their authenticated
 reports have successful, failed or unfinished owners, and reopen them after cancellation.
 Fresh reports start their own seven-day retention after their reviewed input's upload,
