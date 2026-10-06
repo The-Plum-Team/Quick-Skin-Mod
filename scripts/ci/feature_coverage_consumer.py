@@ -255,12 +255,17 @@ def _from_artifact(api: publisher.Api, artifact: Any, *, repository: Path, head:
 
 def verify(api: publisher.Api, selection_path: Path, coverage_path: Path, *, repository: Path,
            head: str, policy: str, run_id: int, directory: Path,
-           pull_number: int | None = None, merged_reference: dict | None = None) -> tuple[Any, dict[str, Any]]:
-    """Reauthenticate exact published evidence; supplied identities never choose the tested source."""
+           pull_number: int | None = None, merged_reference: dict | None = None,
+           gate_settled: bool = False) -> tuple[Any, dict[str, Any]]:
+    """Reauthenticate exact published evidence; supplied identities never choose the tested source.
+
+    ``gate_settled`` admits a completed master generation by its required gate instead of its
+    run conclusion (``coverage.settled_source_run``); the complete job graph below stays exact.
+    """
     authenticate_execution(api, repository, run_id=run_id, tested_sha=head,
                            policy_sha=policy, pull_number=pull_number, merged_reference=merged_reference)
     source = api.run(run_id)
-    if source.get("status") != "completed" or source.get("conclusion") != "success":
+    if not coverage.settled_source_run(source, gate_settled=gate_settled):
         raise coverage.CoverageError("selected evidence requires a successful completed source run")
     coverage.validate_job_graph(api.jobs(source), policy="full", expected_scenarios=
                                 coverage.expected_scenario_jobs_for(coverage.DEFAULT_MATRIX, "pr-anchors"))

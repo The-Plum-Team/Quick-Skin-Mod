@@ -49,8 +49,11 @@ def admit(api: publisher.Api, payload: Any, *, repository: Path, policy_sha: str
     request = request_identity(payload, policy_sha)
     source = api.run(request["source_run_id"])
     kind = "native-anchors" if source.get("event") == "schedule" else "pr-anchors"
+    # Strict on purpose: the wave's review owner (mod-compatibility-review.yml) and its Pages
+    # collector require a successful source run, so a generation the visual review admitted only
+    # through its required gate must be refused here, before any Minecraft lane starts.
     runtime = review.authenticate_full(api, repository, source_sha=policy_sha,
-        source_run_id=request["source_run_id"], matrix_kind=kind)
+        source_run_id=request["source_run_id"], matrix_kind=kind, gate_settled=False)
     artifact = api.artifact(request["review_artifact_id"])
     if any(artifact.get(key) != request["review_artifact_" + field] for key, field in (
             ("id", "id"), ("name", "name"), ("digest", "digest"), ("size_in_bytes", "size"))):

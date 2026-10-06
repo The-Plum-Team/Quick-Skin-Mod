@@ -102,6 +102,22 @@ class SharedCompatibilityTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "complete base runtime"): self.admit()
         self.assertEqual([], self.api.downloaded)
 
+    def test_a_gate_admitted_generation_is_reviewed_but_never_starts_an_optional_mod_wave(self):
+        # A lost advisory wake concludes the master dispatch as failed after its required gate
+        # passed. Visual review admits it through that gate; the optional-mod wave stays strict
+        # because its review owner and Pages collector require a successful source run.
+        for conclusion in ("failure", "cancelled", "timed_out"):
+            with self.subTest(conclusion=conclusion):
+                self.api.runs[55].update(status="completed", conclusion=conclusion)
+                runtime = shared.review.authenticate_full(self.api, ROOT, source_sha=self.fixture.source,
+                    source_run_id=55, matrix_kind="pr-anchors")
+                self.assertEqual((55, self.fixture.source), (runtime.execution["id"], runtime.tested_sha))
+                with self.assertRaisesRegex(ValueError, "exact successful shared-source profile run"):
+                    self.admit()
+                self.assertEqual([], self.api.downloaded)
+        self.api.runs[55]["conclusion"] = "success"
+        self.assertEqual(self.target["bundle_key"], self.admit()["bundle_key"])
+
     def test_in_progress_reviewer_defers_without_reading_report_bytes(self):
         self.api.runs[self.record["workflow_run"]["id"]]["status"] = "in_progress"
         self.assertIsNone(self.admit())

@@ -322,6 +322,40 @@ class CiReuseTest(unittest.TestCase):
         with self.assertRaisesRegex(reuse.ReuseError, "required source job did not pass"):
             reuse.runtime_source(self.api, 30, self.api.covered, allow_in_progress=True)
 
+    def test_lost_advisory_wake_admits_a_reused_generation_only_through_its_required_gate(self):
+        reference, _ = self.find()
+        self.api.wrapper(reference)
+        for conclusion in ("failure", "cancelled", "timed_out"):
+            with self.subTest(conclusion=conclusion):
+                self.api.runs[30].update(status="completed", conclusion=conclusion)
+                with self.assertRaisesRegex(reuse.ReuseError, "unsuccessful generation"):
+                    reuse.runtime_source(self.api, 30, self.api.covered)
+                source = reuse.runtime_source(self.api, 30, self.api.covered, gate_settled=True)
+                self.assertEqual(20, source.execution["id"])
+        for conclusion in ("startup_failure", "action_required", "neutral", None):
+            with self.subTest(unsettled=conclusion):
+                self.api.runs[30].update(status="completed", conclusion=conclusion)
+                with self.assertRaisesRegex(reuse.ReuseError, "unsuccessful generation"):
+                    reuse.runtime_source(self.api, 30, self.api.covered, gate_settled=True)
+        self.api.runs[30].update(conclusion="failure")
+        self.api.job_lists[30][0]["jobs"][1]["conclusion"] = "failure"
+        with self.assertRaisesRegex(reuse.ReuseError, "required source job did not pass"):
+            reuse.runtime_source(self.api, 30, self.api.covered, gate_settled=True)
+
+    def test_review_admission_is_the_only_gate_settled_runtime_consumer(self):
+        # Coverage certificates, Pages and the optional-mod wave keep the strict run conclusion;
+        # only the review chain (curation and model admission) is admitted through the gate.
+        # test_shared_compatibility proves the split behaviourally; this pins the call sites.
+        reuse_text = (ROOT / "scripts/ci/ci_reuse.py").read_text(encoding="utf-8")
+        consumers = {path.name: path.read_text(encoding="utf-8")
+                     for path in (ROOT / "scripts").rglob("*.py") if "tests" not in path.parts}
+        relaxed = sorted(name for name, text in consumers.items()
+                         if "gate_settled=True" in text or "gate_settled: bool = True" in text)
+        self.assertEqual(["feature_review.py", "visual_review_wake.py"], relaxed)
+        self.assertIn("gate_settled: bool = False", reuse_text)
+        self.assertIn("gate_settled=False)", consumers["shared_compatibility.py"])
+        self.assertNotIn("gate_settled", consumers["collect_compatibility.py"])
+
     def test_source_references_never_chain(self):
         self.api.add_artifact(20, 999, "reused-source-e2e")
         with self.assertRaisesRegex(reuse.ReuseError, "chain"): self.find()
