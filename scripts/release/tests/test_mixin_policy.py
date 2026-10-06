@@ -101,6 +101,12 @@ ALTERNATIVE_HOOKS = {
 # TaCZ 1.1.8-hotfix asks for the camera type once in each of its four gun-event handlers; the one
 # redirect names all four and takes the first call of each, so four is also the most it can match.
 INJECTION_COUNT_OVERRIDES = {
+    # Audited mapped Minecraft JARs of every matrix target: the panorama's render method (from 26.1
+    # extractRenderState) reads its spin field exactly twice, to advance it and to draw it.
+    (
+        "main:com/quickskin/mod/mixin/PanoramaRendererMixin.java",
+        "quickskin$sharedPanoramaSpin",
+    ): {2},
     (
         "main:com/quickskin/mod/mixin/compat/TaczPreviewAnimationMixin.java",
         "quickskin$firstPersonUnlessPreviewed",

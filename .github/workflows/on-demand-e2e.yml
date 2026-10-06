@@ -896,7 +896,10 @@ jobs:
       github.ref == 'refs/heads/master'
     continue-on-error: true
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # The job sends one dispatch. Its budget leaves room for a delayed runner assignment; a wake
+    # that is still lost is recovered by visual-review-wake-recovery.yml, and the review's
+    # workflow_run path admits the generation through its required gate rather than this job.
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:

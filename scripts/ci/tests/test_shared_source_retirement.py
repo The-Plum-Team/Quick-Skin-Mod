@@ -13,6 +13,7 @@ from pathlib import Path
 from test_workflow_security import job_block, step_script
 
 ROOT = Path(__file__).resolve().parents[3]
+BASH = "/bin/bash"
 sys.path.insert(0, str(ROOT / "scripts/pages"))
 
 from evidence_target import DEFAULT_MATRIX, inventory  # noqa: E402
@@ -82,6 +83,123 @@ else: raise SystemExit("Unexpected API endpoint")
                                         cwd=ROOT, env=env, text=True, capture_output=True, timeout=10)
                 self.assertEqual(branch == "master" and source == sha and event == "workflow_dispatch",
                                  result.returncode == 0, result.stderr[:1000])
+
+    def test_review_admits_a_failed_master_run_only_through_its_exact_attempt_gate(self):
+        # 2026-10-05: the advisory wake never received a runner, its timeout concluded the run as
+        # failure, and the review skipped although the required gate had passed.
+        script = step_script("visual-review.yml", "authenticate", "Resolve the exact trusted source run")
+        start = script.index('source_conclusion="$(jq -r .conclusion')
+        stop = script.index('if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then', start)
+        excerpt = ('set -euo pipefail\n'
+                   'github_api_retry() {\n'
+                   '  case "$*" in\n'
+                   '    *actions/workflows/on-demand-e2e.yml*) printf "%s\\n" 9001 ;;\n'
+                   '    *"actions/runs/$source_run_id/attempts/2/jobs?per_page=100"*) cat "$FIXTURE_JOBS" ;;\n'
+                   '    *) printf "unexpected API call: %s\\n" "$*" >&2; return 1 ;;\n'
+                   '  esac\n'
+                   '}\n' + script[start:stop] + "\nprintf 'admitted\\n'\n")
+        sha = "a" * 40
+        run = {"id": 55, "workflow_id": 9001, "status": "completed", "conclusion": "failure",
+               "event": "workflow_dispatch", "head_branch": "master", "head_sha": sha, "run_attempt": 2,
+               "path": ".github/workflows/on-demand-e2e.yml",
+               "head_repository": {"full_name": "The-Plum-Team/Quick-Skin-Mod"}}
+
+        def job(name, conclusion="success", **fields):
+            return {"name": name, "status": "completed", "conclusion": conclusion, "run_id": 55,
+                    "run_attempt": 2, "head_sha": sha, **fields}
+        gate = [job("Classify packaged runtime impact"), job("Packaged E2E gate"),
+                job("Wake shared-source visual review (advisory)", "cancelled")]
+        cases = {
+            "success": ({"conclusion": "success"}, None, True),
+            "failure": ({}, gate, True),
+            "cancelled": ({"conclusion": "cancelled"}, gate, True),
+            "timed-out": ({"conclusion": "timed_out"}, gate, True),
+            "failed-gate": ({}, [job("Packaged E2E gate", "failure")], False),
+            "cancelled-gate": ({}, [job("Packaged E2E gate", "cancelled")], False),
+            "queued-gate": ({}, [{**job("Packaged E2E gate"), "status": "queued", "conclusion": None}], False),
+            "missing-gate": ({}, gate[:1], False),
+            "duplicate-gate": ({}, gate + [job("Packaged E2E gate")], False),
+            "foreign-attempt": ({}, [job("Packaged E2E gate", run_attempt=1)], False),
+            "foreign-run": ({}, [job("Packaged E2E gate", run_id=56)], False),
+            "foreign-commit": ({}, [job("Packaged E2E gate", head_sha="b" * 40)], False),
+            "pull-request": ({"event": "pull_request"}, gate, False),
+            "schedule": ({"event": "schedule"}, gate, False),
+            "startup-failure": ({"conclusion": "startup_failure"}, gate, False),
+            "action-required": ({"conclusion": "action_required"}, gate, False),
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            jobs_path = Path(temporary) / "jobs.json"
+            for case, (fields, jobs, admitted) in cases.items():
+                with self.subTest(case=case):
+                    jobs_path.unlink(missing_ok=True)
+                    if jobs is not None:
+                        jobs_path.write_text(json.dumps([{"total_count": len(jobs), "jobs": jobs}]))
+                    env = {"PATH": "/opt/homebrew/bin" + os.pathsep + os.defpath,
+                           "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod", "FIXTURE_JOBS": str(jobs_path),
+                           "source_run": json.dumps({**run, **fields}), "source_run_id": "55",
+                           "source_branch": "master", "source_sha": sha}
+                    result = subprocess.run([BASH, "--noprofile", "--norc", "-c", excerpt], cwd=ROOT,
+                                            env=env, text=True, capture_output=True, timeout=20)
+                    self.assertEqual(0, result.returncode, result.stderr[:1000])
+                    self.assertEqual(admitted, "admitted" in result.stdout, result.stdout + result.stderr)
+            # A run admitted by conclusion still needs its exact identity; the gate cannot replace it.
+            for field, value in (("path", ".github/workflows/build-gate.yml"), ("head_sha", "b" * 40),
+                                 ("workflow_id", 1), ("head_repository", {"full_name": "fork/Quick-Skin-Mod"})):
+                with self.subTest(identity=field):
+                    jobs_path.write_text(json.dumps([{"total_count": len(gate), "jobs": gate}]))
+                    env.update(source_run=json.dumps({**run, field: value}))
+                    result = subprocess.run([BASH, "--noprofile", "--norc", "-c", excerpt], cwd=ROOT,
+                                            env=env, text=True, capture_output=True, timeout=20)
+                    self.assertNotEqual(0, result.returncode)
+                    self.assertNotIn("admitted", result.stdout)
+            env.update(source_run=json.dumps(run), source_branch="automation/sync/fabric-1.21.1/1-1")
+            result = subprocess.run([BASH, "--noprofile", "--norc", "-c", excerpt], cwd=ROOT,
+                                    env=env, text=True, capture_output=True, timeout=20)
+            self.assertEqual((0, ""), (result.returncode, result.stdout.replace(
+                "source run did not settle successfully; skipping advisory review\n", "")))
+
+    def test_recovered_wake_rechecks_the_live_head_and_sends_the_producer_payload(self):
+        script = step_script("visual-review-wake-recovery.yml", "wake",
+                             "Wake visual review for the recovered shared generation")
+        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            fixture = folder / "api.py"
+            fixture.write_text('''import os,sys
+from pathlib import Path
+args=sys.argv[1:]
+endpoint=next((arg for arg in args if arg.startswith("repos/")), "")
+if args[0] != "api": raise SystemExit("Unexpected command")
+if endpoint.endswith("/branches/master"):
+ print(os.environ["FIXTURE_LIVE_SHA"])
+elif endpoint.endswith("/dispatches") and "POST" in args:
+ Path(os.environ["FIXTURE_SENT"]).write_text(Path(args[args.index("--input")+1]).read_text())
+else: raise SystemExit("Unexpected API endpoint")
+''')
+            gh = folder / "gh"
+            gh.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + " " + shlex.quote(str(fixture)) + ' "$@"\n')
+            gh.chmod(0o755)
+            summary = folder / "summary.md"
+            for case in ("current", "advanced", "foreign-source", "wrong-ref", "wrong-id"):
+                with self.subTest(case=case):
+                    sent = folder / "sent.json"
+                    sent.unlink(missing_ok=True)
+                    env = {"PATH": str(folder) + os.pathsep + "/opt/homebrew/bin" + os.pathsep + os.defpath,
+                           "GITHUB_REF": "refs/heads/topic" if case == "wrong-ref" else "refs/heads/master",
+                           "GITHUB_SHA": sha, "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
+                           "GITHUB_STEP_SUMMARY": str(summary), "RUNNER_TEMP": str(folder),
+                           "SOURCE_RUN_ID": "1e3" if case == "wrong-id" else "37361031586",
+                           "SOURCE_SHA": "b" * 40 if case == "foreign-source" else sha,
+                           "FIXTURE_LIVE_SHA": "b" * 40 if case == "advanced" else sha,
+                           "FIXTURE_SENT": str(sent), "GH_TOKEN": "local-fixture"}
+                    result = subprocess.run([BASH, "--noprofile", "--norc", "-c", script],
+                                            cwd=ROOT, env=env, text=True, capture_output=True, timeout=20)
+                    self.assertEqual(case == "current", sent.exists(), result.stderr[:1000])
+                    self.assertEqual(case in {"current", "advanced"}, result.returncode == 0)
+                    if sent.exists():
+                        self.assertEqual({"event_type": "visual-review-requested", "client_payload": {
+                            "source_repository": "The-Plum-Team/Quick-Skin-Mod", "source_run_id": "37361031586",
+                            "source_sha": sha, "source_branch": "master"}}, json.loads(sent.read_bytes()))
 
     def test_large_shared_pr_defers_before_the_bounded_release_diff_reader(self):
         authenticate = step_script("visual-review.yml", "authenticate", "Resolve the exact trusted source run")

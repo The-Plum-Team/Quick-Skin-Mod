@@ -3728,7 +3728,7 @@
               "capture": {
                 "title": "Pause menu preview",
                 "review_tier": "key",
-                "expectation": "The vanilla pause menu is open over the world with the Quick Skin Change Skin button beside the widest vanilla button and a 3D player preview above it wearing the custom plaid skin and the bundled gold test cape.",
+                "expectation": "The vanilla pause menu is open over the world with the Quick Skin Change Skin button beside the widest vanilla button and a front-facing 3D player preview above it wearing the custom plaid skin. The bundled gold test cape hangs behind the front-facing preview, so at most its blue edge shows beside a leg; the gold face is not expected to be visible here, and the cape is identified by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -3797,7 +3797,7 @@
               "capture": {
                 "title": "Title preview after disconnect",
                 "review_tier": "key",
-                "expectation": "After disconnecting from the server, the Minecraft title screen shows the Quick Skin 3D preview next to the Change Skin button still wearing the saved plaid skin and gold test cape restored from configuration with no world loaded.",
+                "expectation": "After disconnecting from the server, the Minecraft title screen shows the front-facing Quick Skin 3D preview next to the Change Skin button still wearing the saved plaid skin with no world loaded. The gold test cape restored from configuration hangs behind the front-facing preview, so at most its blue edge shows beside a leg; the gold face is not expected to be visible here, and the cape is identified by the runtime evidence.",
                 "probes": []
               },
               "requires": [

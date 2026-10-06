@@ -637,6 +637,48 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("for attempt in {1..180}", release_compatibility)
 
         self.assertIn('name == "Packaged E2E gate"', authenticate)
+        # A canonical master dispatch is admitted by its exact attempt's required gate, so a lost
+        # advisory wake (2026-10-05) cannot drop its review; nothing else relaxes the conclusion.
+        authenticate_if = authenticate.split("    if: >-\n", 1)[1].split("    runs-on:", 1)[0]
+        self.assertEqual(
+            "      github.event_name == 'repository_dispatch' ||\n"
+            "      github.event.workflow_run.conclusion == 'success' ||\n"
+            "      (github.event.workflow_run.event == 'workflow_dispatch' &&\n"
+            "       github.event.workflow_run.head_branch == 'master' &&\n"
+            "       (github.event.workflow_run.conclusion == 'failure' ||\n"
+            "        github.event.workflow_run.conclusion == 'cancelled' ||\n"
+            "        github.event.workflow_run.conclusion == 'timed_out'))\n",
+            authenticate_if,
+        )
+        gate_query = (
+            "actions/runs/$source_run_id/attempts/$source_run_attempt/jobs?per_page=100"
+        )
+        self.assertIn(gate_query, authenticate)
+        self.assertIn("--arg conclusion \"$source_conclusion\"", authenticate)
+        self.assertIn(".conclusion == $conclusion and", authenticate)
+        self.assertLess(authenticate.index('source_run_attempt="$(jq -er'),
+                        authenticate.index(gate_query))
+        self.assertLess(authenticate.index(gate_query),
+                        authenticate.index('if [[ "$GITHUB_EVENT_NAME" == repository_dispatch ]]; then\n'
+                                           '            if [[ "$(jq -r .event <<< "$source_run")"'))
+        self.assertLess(authenticate.index(gate_query), authenticate.index("feature_review.py --plan"))
+        gate_filter = re.compile(
+            r"\(\[\.\[\]\.jobs\[\] \| select\(\.name == \"Packaged E2E gate\"\)\] \|\s+"
+            r"length == 1 and \.\[0\]\.status == \"completed\" and\s+"
+            r"\.\[0\]\.conclusion == \"success\"\)"
+        )
+        self.assertRegex(authenticate, gate_filter)
+        self.assertRegex(preparation, gate_filter)
+        self.assertIn(
+            "actions/runs/$SOURCE_RUN_ID/attempts/$source_run_attempt/jobs?per_page=100",
+            preparation,
+        )
+        self.assertIn(
+            '[[ "$gate_settled_source" == true && "$proof_schema" != 7 && "$proof_schema" != 8 ]]',
+            preparation,
+        )
+        self.assertLess(preparation.index("gate_settled_source=true"),
+                        preparation.index("scripts/ci/feature_review.py"))
         self.assertIn('endswith(" - contract scenarios")', authenticate)
         self.assertIn("timeout-minutes: 75", authenticate)
         self.assertIn("source scripts/ci/github_api_retry.sh", authenticate)

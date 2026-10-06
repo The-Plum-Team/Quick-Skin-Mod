@@ -74,9 +74,31 @@ class ReviewFiles:
     report: Path
 
 
+GATE_SETTLED_CONCLUSIONS = frozenset({"failure", "cancelled", "timed_out"})
+
+
+def settled_source_run(run: Any, *, gate_settled: bool = False) -> bool:
+    """Whether a completed source run may be admitted before its job graph is validated.
+
+    A successful conclusion always qualifies. With ``gate_settled`` a canonical master dispatch
+    also qualifies when it concluded failure, cancelled or timed out: an advisory job that never
+    received a runner (the producer's own visual-review wake during a GitHub Actions outage) sets
+    that conclusion after the required gate passed. This is never sufficient on its own; every
+    caller must still require the policy, build, every scenario and the required gate to have
+    succeeded in the exact attempt's job graph.
+    """
+    if not isinstance(run, dict) or run.get("status") != "completed":
+        return False
+    if run.get("conclusion") == "success":
+        return True
+    return bool(gate_settled and run.get("conclusion") in GATE_SETTLED_CONCLUSIONS
+                and run.get("event") == "workflow_dispatch" and run.get("head_branch") == "master")
+
+
 def validate_source_run(run: Any, jobs: Any, *, github_repository: str, source_sha: str,
                         source_run_id: int, matrix_path: Path = DEFAULT_MATRIX,
-                        matrix_kind: str = "pr-anchors", allow_in_progress: bool = False) -> dict[str, Any]:
+                        matrix_kind: str = "pr-anchors", allow_in_progress: bool = False,
+                        gate_settled: bool = False) -> dict[str, Any]:
     """Validate API records fetched independently for the requested complete source run."""
     if (matrix_kind not in {"pr-anchors", "native-anchors"}
             or not isinstance(github_repository, str) or REPOSITORY.fullmatch(github_repository) is None
@@ -86,7 +108,7 @@ def validate_source_run(run: Any, jobs: Any, *, github_repository: str, source_s
             or run.get("head_sha") != source_sha or run.get("head_branch") != "master"
             or run.get("path") != ".github/workflows/on-demand-e2e.yml"
             or run.get("event") != ("schedule" if matrix_kind == "native-anchors" else "workflow_dispatch")
-            or not (run.get("status") == "completed" and run.get("conclusion") == "success"
+            or not (settled_source_run(run, gate_settled=gate_settled)
                     or allow_in_progress and run.get("status") in {"queued", "in_progress"}
                        and run.get("conclusion") is None)
             or not isinstance(run.get("head_repository"), dict)
