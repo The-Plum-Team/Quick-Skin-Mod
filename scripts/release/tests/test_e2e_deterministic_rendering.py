@@ -97,13 +97,61 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         self.assertIn(": (tickCount + partialTick) / 20.0", source)
         self.assertIn("DETERMINISTIC_E2E_RENDER ? 0.0F : partialTick", source)
 
-    def test_panorama_freezes_every_motion_field_only_for_e2e(self) -> None:
+    def test_panorama_angle_is_shared_and_frozen_only_for_e2e(self) -> None:
         source = PANORAMA.read_text(encoding="utf-8")
+        code = re.sub(r"//[^\n]*|/\*.*?\*/", "", source, flags=re.DOTALL)
 
-        self.assertIn('Boolean.getBoolean("quickskin.e2e.enabled")', source)
-        self.assertIn("panoramaMotionFields", source)
-        self.assertIn("field.setFloat(renderer, E2E_FIXED_PANORAMA_TIME)", source)
-        self.assertIn("Util.getMillis() / 1000.0f", source)
+        self.assertIn('Boolean.getBoolean("quickskin.e2e.enabled")', code)
+        self.assertIn("E2E_FIXED_PANORAMA_SPIN = 0.0F;", code)
+        self.assertEqual(
+            1,
+            len(
+                re.findall(
+                    r"if \(DETERMINISTIC_E2E_RENDER\) \{\s*return E2E_FIXED_PANORAMA_SPIN;\s*\}\s*"
+                    r"return spinAt\(Util\.getMillis\(\)\);",
+                    code,
+                )
+            ),
+        )
+        # The live clock is reduced to one whole turn in long arithmetic before it becomes a float:
+        # a boot-relative clock (Very Many Players installs System::nanoTime) otherwise rounds to
+        # 64 ms after six days of uptime, and the panorama moves at 15 Hz (issue #2050).
+        self.assertIn("MILLIS_PER_TURN = 360L * MILLIS_PER_DEGREE;", code)
+        self.assertIn(
+            "return Math.floorMod(millis, MILLIS_PER_TURN) / (float) MILLIS_PER_DEGREE;", code
+        )
+        self.assertNotRegex(code, r"getMillis\(\)\s*/")
+        # No reflective field guess: the renderer mixin names the angle through the mappings.
+        self.assertNotIn("getDeclaredFields", code)
+        self.assertNotIn("setFloat", code)
+
+        mixin = re.sub(
+            r"//[^\n]*|/\*.*?\*/",
+            "",
+            (ROOT / "common/src/main/java/com/quickskin/mod/mixin/PanoramaRendererMixin.java")
+            .read_text(encoding="utf-8"),
+            flags=re.DOTALL,
+        )
+        # Both API families (render before 26.1, extractRenderState after) take every read of the
+        # renderer's spin from the shared clock, which carries the E2E freeze.
+        for method, owner in (("render", "PanoramaRenderer"), ("extractRenderState", "Panorama")):
+            with self.subTest(method=method):
+                self.assertEqual(
+                    1,
+                    len(
+                        re.findall(
+                            r"@Redirect\(\s*method = \"" + method + r"\",\s*at = @At\(\s*"
+                            r"value = \"FIELD\",\s*target = \"Lnet/minecraft/client/renderer/"
+                            + owner
+                            + r";spin:F\",\s*opcode = Opcodes\.GETFIELD\s*\),",
+                            mixin,
+                        )
+                    ),
+                )
+        self.assertEqual(2, mixin.count("private float quickskin$sharedPanoramaSpin("))
+        self.assertEqual(1, mixin.count("return PanoramaTimeSync.panoramaSpin();"))
+        # Quick Skin's own panorama goes through the same redirected render call.
+        self.assertNotIn("syncPanoramaRenderer", BACKGROUND.read_text(encoding="utf-8"))
         options = OPTIONS.read_text(encoding="utf-8")
         self.assertIn("panoramaScrollSpeed:0.0", options)
         self.assertNotIn("panoramaSpeed:0.0", options)

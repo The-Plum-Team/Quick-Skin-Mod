@@ -263,8 +263,8 @@ public class BackgroundRenderer {
                 //?}
             }
 
-            // Sync panorama time with global time source (same as TitleScreen via mixin)
-            PanoramaTimeSync.syncPanoramaRenderer(panoramaRenderer);
+            // The renderer mixin turns this panorama with PanoramaTimeSync's shared clock, the
+            // same one the title screen's panorama uses, so switching screens does not jump.
             float panoramaPartialTick = DETERMINISTIC_E2E_RENDER ? 0.0F : partialTick;
 
             //? if <1.21 {
