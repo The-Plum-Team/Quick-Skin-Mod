@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.quickskin.mod.client.api.ClientNetworkActions;
 import com.quickskin.mod.client.api.ClientNetworkApi;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.gui.GuiCompat;
@@ -9,6 +10,7 @@ import com.quickskin.mod.client.gui.util.ButtonFactory;
 import com.quickskin.mod.client.util.MojangSkinUploader;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.Minecraft;
 //? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
@@ -128,7 +130,17 @@ public class UploadToMojangScreen extends Screen {
         long attempt = ++uploadAttempt;
         var client = minecraft;
         CompletableFuture<MojangSkinUploader.UploadResult> task =
-                ClientIoExecutor.supplyAsync(() -> MojangSkinUploader.uploadSkin(metadata));
+                ClientIoExecutor.supplyAsync(() -> {
+                    MojangSkinUploader.UploadResult result = MojangSkinUploader.uploadSkin(metadata);
+                    if (result != null && result.success && client != null) {
+                        // The account skin changed even if the dialog was closed meanwhile (which
+                        // cancels only this future, not the upload), so report it from here. The
+                        // report runs on the client thread before completeUpload below.
+                        client.execute(() -> showVanillaPlayersNotice(
+                                attempt, reportAccountSkinChange(client)));
+                    }
+                    return result;
+                });
         uploadTask = task;
         task.whenComplete((result, error) -> {
             if (client != null) {
@@ -164,29 +176,35 @@ public class UploadToMojangScreen extends Screen {
         cancelButton.active = true;
         cancelButton.setMessage(Component.translatable("quickskin.button.close"));
 
-        if (result.success) {
-            vanillaPlayersNotice = reportAccountSkinChange();
-        } else {
+        if (!result.success) {
             uploadButton.active = true;
             uploadButton.setMessage(Component.translatable("quickskin.button.retry"));
         }
     }
 
+    private void showVanillaPlayersNotice(long attempt, Component notice) {
+        if (active && attempt == uploadAttempt) vanillaPlayersNotice = notice;
+    }
+
     /**
-     * The account skin changed, so tell a connected server that may share it with players who
-     * do not run Quick Skin, and say what those players will see.
+     * Client thread, after a successful upload: tells a connected server that may share the new
+     * account skin with players who do not run Quick Skin, and says what those players will see.
      */
-    private Component reportAccountSkinChange() {
-        if (minecraft == null || minecraft.getConnection() == null) return null;
-        boolean shared;
+    private static Component reportAccountSkinChange(Minecraft client) {
+        if (client.getConnection() == null) return null;
+        ClientNetworkActions.AccountSkinVisibility visibility;
         try {
-            shared = ClientNetworkApi.actions().notifyAccountSkinChanged();
+            visibility = ClientNetworkApi.actions().notifyAccountSkinChanged();
         } catch (RuntimeException | LinkageError error) {
-            shared = false;
+            visibility = ClientNetworkActions.AccountSkinVisibility.UNKNOWN;
         }
-        return Component.translatable(shared
-                ? "quickskin.upload.vanilla_players_shared"
-                : "quickskin.upload.vanilla_players_rejoin");
+        if (visibility == null) visibility = ClientNetworkActions.AccountSkinVisibility.UNKNOWN;
+        return Component.translatable(switch (visibility) {
+            case SHARED -> "quickskin.upload.vanilla_players_shared";
+            case AFTER_REJOIN -> "quickskin.upload.vanilla_players_rejoin";
+            case UNAVAILABLE -> "quickskin.upload.vanilla_players_unavailable";
+            case UNKNOWN -> "quickskin.upload.vanilla_players_unknown";
+        });
     }
 
     @Override

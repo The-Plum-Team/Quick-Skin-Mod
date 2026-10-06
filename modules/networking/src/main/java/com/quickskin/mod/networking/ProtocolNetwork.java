@@ -26,7 +26,10 @@ public final class ProtocolNetwork {
     }
 
     public static boolean acceptsV2(ServerPlayer player) {
-        ProtocolProfile profile = profile(player);
+        return acceptsV2(profile(player));
+    }
+
+    public static boolean acceptsV2(ProtocolProfile profile) {
         return profile.negotiated() && profile.version() == 2
                 && profile.supports(ProtocolCapability.SHA256_CONTENT_IDS)
                 && profile.supports(ProtocolCapability.CHUNKED_TEXTURE_TRANSFER);

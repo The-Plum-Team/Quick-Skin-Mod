@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "正在上传到 Mojang...",
   "quickskin.upload.please_wait": "请稍候...",
   "quickskin.upload.success": "皮肤已更新！",
+  "quickskin.upload.vanilla_players_shared": "此服务器会共享账号皮肤：未安装快速皮肤的玩家将在几分钟内看到。",
+  "quickskin.upload.vanilla_players_rejoin": "此服务器上未安装快速皮肤的玩家将在你重新加入后看到。",
+  "quickskin.upload.vanilla_players_unavailable": "此服务器未通过 Mojang 验证玩家，因此未安装快速皮肤的玩家无法看到账号皮肤。",
+  "quickskin.upload.vanilla_players_unknown": "在正版验证（在线模式）的服务器上，未安装快速皮肤的玩家将在你重新加入后看到。",
 
   "_comment_upload_errors": "=== 上传 API 错误 ===",
   "quickskin.error.no_access_token": "未找到访问令牌，请确认已使用 Microsoft 账号登录",

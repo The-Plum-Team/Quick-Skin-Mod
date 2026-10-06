@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Загрузка скина в Mojang...",
   "quickskin.upload.please_wait": "Пожалуйста, подождите...",
   "quickskin.upload.success": "Ваш скин был обновлён!",
+  "quickskin.upload.vanilla_players_shared": "Этот сервер делится скинами аккаунтов: игроки без QuickSkin увидят его в течение нескольких минут.",
+  "quickskin.upload.vanilla_players_rejoin": "Игроки без QuickSkin на этом сервере увидят его после того, как вы перезайдёте.",
+  "quickskin.upload.vanilla_players_unavailable": "Игроки без QuickSkin не видят скины аккаунтов на этом сервере: он не авторизует игроков через Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "На серверах в онлайн-режиме игроки без QuickSkin увидят его после того, как вы перезайдёте.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Токен доступа не найден. Вы вошли через учётную запись Microsoft?",

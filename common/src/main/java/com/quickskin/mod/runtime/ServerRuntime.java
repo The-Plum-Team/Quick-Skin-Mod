@@ -92,19 +92,24 @@ public final class ServerRuntime implements AutoCloseable {
         animationCache.init(worldPath);
         appearanceStorage.init(worldPath);
         ServerTextureIngressExecutor.getInstance().start();
-        AccountSkinShareService.getInstance().start(new AccountSkinProfileTarget(server));
-        logAccountSkinSharing(server);
+        AccountSkinProfileTarget accountSkinTarget = new AccountSkinProfileTarget(server);
+        AccountSkinShareService.getInstance().start(accountSkinTarget);
+        logAccountSkinSharing(server, accountSkinTarget);
         activeServer = server;
     }
 
-    private static void logAccountSkinSharing(MinecraftServer server) {
+    private static void logAccountSkinSharing(MinecraftServer server, AccountSkinProfileTarget target) {
         if (!ServerConfig.getInstance().shareAccountSkinWithVanillaClients) return;
-        if (server.usesAuthentication()) {
-            QuickSkinInfo.LOGGER.info("Sharing the Mojang account skins that Quick Skin players "
-                    + "upload with players who do not run Quick Skin");
-        } else {
+        if (!server.usesAuthentication()) {
             QuickSkinInfo.LOGGER.info("shareAccountSkinWithVanillaClients has no effect: this "
                     + "server runs in offline mode, so Mojang never signed its players' skins");
+        } else if (target.nonMojangReason().isPresent()) {
+            QuickSkinInfo.LOGGER.info("shareAccountSkinWithVanillaClients has no effect: this "
+                    + "server does not authenticate players with Mojang ({}), so a profile id need "
+                    + "not be the Mojang account with that id", target.nonMojangReason().get());
+        } else {
+            QuickSkinInfo.LOGGER.info("Sharing the Mojang account skins that Quick Skin players "
+                    + "upload with players who do not run Quick Skin");
         }
     }
 

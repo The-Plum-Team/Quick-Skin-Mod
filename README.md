@@ -146,8 +146,16 @@ a LAN world, restart the game instead). An online-mode server that runs Quick Sk
 them without a rejoin: set `"shareAccountSkinWithVanillaClients": true` in
 `config/quickskin-server.json` and restart the server. After each upload the server then reads your
 newly signed skin from Mojang's session server, usually within a minute or two, and refreshes you
-for the players without Quick Skin. The option is off by default and has no effect on an
-offline-mode server, including a backend behind a BungeeCord or Velocity proxy. See
+for the players without Quick Skin. The option is off by default. It has no effect on an
+offline-mode server, including a backend behind a BungeeCord or Velocity proxy (the backend runs
+in offline mode), or on a server that logs players in through another service than Mojang's
+(authlib-injector, Ely.by, LittleSkin, Drasl or custom `minecraft.api.*` hosts); the server log
+says so. The upload dialog tells you which case applies to the server you are on.
+
+With the option on, a skin plugin such as SkinsRestorer is overridden for players without Quick
+Skin after each upload, until it applies its own skin again. The refresh briefly removes and
+re-adds you in those players' tab list; a vanish mod that filters player-list packets keeps you
+hidden, but one that does not could reveal you, so leave the option off on such servers. See
 [ADR 0011](docs/architecture/decisions/0011-show-quick-skin-appearances-only-to-quick-skin-clients.md)
 and [ADR 0012](docs/architecture/decisions/0012-share-uploaded-account-skins-with-unmodded-players.md).
 

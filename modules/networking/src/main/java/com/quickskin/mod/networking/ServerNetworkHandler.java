@@ -1101,7 +1101,8 @@ public class ServerNetworkHandler {
             return;
         }
         com.quickskin.mod.config.ServerConfig serverConfig = com.quickskin.mod.config.ServerConfig.getInstance();
-        String configJson = serverConfig.toJson();
+        String configJson = serverConfig.toJson(
+                com.quickskin.mod.server.vanilla.AccountSkinShareService.getInstance().accountSkinVisibility());
 
         SyncServerConfigPayload payload = new SyncServerConfigPayload(configJson);
         NetworkTransport.INSTANCE.sendToPlayer(player, payload);
@@ -1114,7 +1115,8 @@ public class ServerNetworkHandler {
      */
     private static void broadcastServerConfigToAllPlayers(net.minecraft.server.MinecraftServer server) {
         com.quickskin.mod.config.ServerConfig serverConfig = com.quickskin.mod.config.ServerConfig.getInstance();
-        String configJson = serverConfig.toJson();
+        String configJson = serverConfig.toJson(
+                com.quickskin.mod.server.vanilla.AccountSkinShareService.getInstance().accountSkinVisibility());
 
         SyncServerConfigPayload payload = new SyncServerConfigPayload(configJson);
 

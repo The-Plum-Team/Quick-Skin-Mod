@@ -141,17 +141,25 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Quick Skin appearances reach only Quick Skin clients. The one exception is the opt-in
   `shareAccountSkinWithVanillaClients` server option (ADR 0012): after an explicit, successful
   Upload to Mojang, a client whose v2 session negotiated `account-skin-refresh` reports
-  `account_skin_changed`; nothing ever uploads a skin automatically. The server does nothing while
-  the option is off or the server is in offline mode (logging the latter). Otherwise
-  `AccountSkinShareService` reads the signed profile anonymously from Mojang's session server on
-  its own bounded daemon worker, never the server thread, paced by its server-wide bucket,
-  per-player round interval, re-arm-once coalescing and bounded backoff, and accepts only a
-  bounded strict response naming the exact profile with exactly one signed `textures` property.
-  It replaces the property only for the exact session that reported, only after Mojang shows a
-  different appearance, and releases that session's state on disconnect and shutdown. The refresh
-  (player-info removal and re-addition plus a new entity pairing) goes only to observers without
-  Quick Skin; the uploader and Quick Skin observers keep their own path. Capes, HD skins and CPM
-  models are never shared, and no third-party signing service is called.
+  `account_skin_changed` from the upload's own success path (closing the dialog must not lose
+  it); nothing ever uploads a skin automatically. The server does nothing while the option is
+  off, in offline mode (proxy backends included), or when it does not authenticate with Mojang's
+  own session server (`minecraft.api.*` properties, authlib's environment parser, authlib-injector,
+  a rewritten session-server URL), logging the latter two; it then never sends a profile id to
+  Mojang. Otherwise `AccountSkinShareService` reads the signed profile anonymously from Mojang's
+  session server on its own bounded daemon worker, never the server thread, paced by its
+  server-wide bucket, per-player round interval, re-arm-once coalescing and bounded backoff, and
+  accepts only a bounded strict response naming the exact profile and the connected player's name
+  with exactly one `textures` property signed by Mojang's own published keys
+  (`TexturesSignatureVerifier`, never the running authlib's key set). A player whose current
+  textures another key signed is refused. It installs a new profile for the exact session that
+  reported (never editing the old one, which a network thread may be encoding), only after Mojang
+  shows a different appearance, and releases that session's state on disconnect and shutdown. The
+  refresh (player-info removal and re-addition plus a new entity pairing, and a camera packet for
+  a spectator viewing through the player) goes only to observers without Quick Skin; the uploader
+  and Quick Skin observers keep their own path. The synchronized server configuration carries the
+  computed `accountSkinVisibility`, which is never persisted. Capes, HD skins and CPM models are
+  never shared, and no third-party signing service is called.
 
 ## Files, images, and persistence
 

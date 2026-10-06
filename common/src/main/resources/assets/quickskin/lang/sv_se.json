@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Laddar upp skin till Mojang...",
   "quickskin.upload.please_wait": "Vänligen vänta...",
   "quickskin.upload.success": "Ditt skin har uppdaterats!",
+  "quickskin.upload.vanilla_players_shared": "Den här servern delar kontoskins: spelare utan QuickSkin ser det inom några minuter.",
+  "quickskin.upload.vanilla_players_rejoin": "Spelare utan QuickSkin på den här servern ser det när du har anslutit igen.",
+  "quickskin.upload.vanilla_players_unavailable": "Spelare utan QuickSkin kan inte se kontoskins på den här servern: den loggar inte in spelare via Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "På servrar i onlineläge ser spelare utan QuickSkin det när du har anslutit igen.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Ingen åtkomsttoken hittades. Har du loggat in med ett Microsoft-konto?",

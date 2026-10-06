@@ -65,6 +65,21 @@ class SessionProfileTest {
     }
 
     @Test
+    void readsThePlayerNameAndRequiresOne() {
+        String valid = response(PLAYER, SKIN, null, 1L);
+
+        assertEquals("Tester", SessionProfile.parse(valid, PLAYER).name());
+        assertThrows(IllegalArgumentException.class,
+                () -> SessionProfile.parse(valid.replace("\"name\":\"Tester\",", ""), PLAYER));
+        assertThrows(IllegalArgumentException.class,
+                () -> SessionProfile.parse(valid.replace("\"name\":\"Tester\"", "\"name\":\"\""), PLAYER));
+        assertThrows(IllegalArgumentException.class,
+                () -> SessionProfile.parse(valid.replace("\"name\":\"Tester\"", "\"name\":7"), PLAYER));
+        assertThrows(IllegalArgumentException.class, () -> SessionProfile.parse(
+                valid.replace("\"name\":\"Tester\"", "\"name\":\"" + "n".repeat(65) + "\""), PLAYER));
+    }
+
+    @Test
     void rejectsMissingOrDuplicateTextures() {
         String noTextures = "{\"id\":\"" + AccountTextures.undashed(PLAYER) + "\",\"properties\":[]}";
         String value = texturesValue(PLAYER, SKIN, null, 1L);

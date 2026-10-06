@@ -30,6 +30,16 @@ public class ServerConfig {
     private static volatile ServerConfig instance;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
+    /** {@link #accountSkinVisibility}: unmodded players see an uploaded account skin within minutes. */
+    public static final String ACCOUNT_SKIN_SHARED = "shared";
+    /** {@link #accountSkinVisibility}: unmodded players see it after the uploader rejoins. */
+    public static final String ACCOUNT_SKIN_AFTER_REJOIN = "after_rejoin";
+    /**
+     * {@link #accountSkinVisibility}: unmodded players never see Mojang account skins here (an
+     * offline-mode server or one that authenticates players with another service).
+     */
+    public static final String ACCOUNT_SKIN_UNAVAILABLE = "unavailable";
+
     // Skin Settings
     public boolean disableSkinTransparency = false; // Disable transparency in player skins
     public int skinChangeCooldownSeconds = 0; // Cooldown in seconds for changing skin (0 = disabled)
@@ -57,6 +67,13 @@ public class ServerConfig {
      * Only online-mode servers can do this; capes and HD skins are never shared (ADR 0012).
      */
     public boolean shareAccountSkinWithVanillaClients = false;
+
+    /**
+     * Runtime fact the server sends to Quick Skin clients, never read from or written to the
+     * file: what players without Quick Skin on this server see after an upload to Mojang. One of
+     * the {@code ACCOUNT_SKIN_*} values, or {@code null} when unknown (an older server).
+     */
+    public String accountSkinVisibility = null;
 
     // Logging Settings
 
@@ -89,6 +106,8 @@ public class ServerConfig {
                 ServerConfig config = parse(json);
                 if (config != null) {
                     config.normalize();
+                    // A runtime fact, not a setting: the running server computes it per sync.
+                    config.accountSkinVisibility = null;
                     return config;
                 }
                 QuickSkinInfo.LOGGER.error("Server config {} is not a JSON object; using defaults"
@@ -202,6 +221,22 @@ public class ServerConfig {
     }
 
     /**
+     * Convert to JSON for network transmission, together with what players without Quick Skin
+     * see after an upload to Mojang on this server ({@code ACCOUNT_SKIN_*}, or {@code null}).
+     */
+    public synchronized String toJson(String accountSkinVisibility) {
+        normalize();
+        JsonObject json = GSON.toJsonTree(this).getAsJsonObject();
+        String visibility = knownVisibility(accountSkinVisibility);
+        if (visibility == null) {
+            json.remove("accountSkinVisibility");
+        } else {
+            json.addProperty("accountSkinVisibility", visibility);
+        }
+        return GSON.toJson(json);
+    }
+
+    /**
      * Create from JSON (for network reception)
      */
     public static ServerConfig fromJson(String json) {
@@ -227,12 +262,20 @@ public class ServerConfig {
         skinChangeCooldownSeconds = Math.max(0, Math.min(skinChangeCooldownSeconds, 86_400));
         maxTextureUploadKilobytes = Math.max(MIN_TEXTURE_UPLOAD_KILOBYTES,
                 Math.min(maxTextureUploadKilobytes, MAX_TEXTURE_UPLOAD_KILOBYTES));
+        accountSkinVisibility = knownVisibility(accountSkinVisibility);
     }
 
     /** The configured per-texture upload limit in bytes. */
     public synchronized int maxTextureUploadBytes() {
         normalize();
         return maxTextureUploadKilobytes * 1024;
+    }
+
+    private static String knownVisibility(String value) {
+        if (ACCOUNT_SKIN_SHARED.equals(value)) return ACCOUNT_SKIN_SHARED;
+        if (ACCOUNT_SKIN_AFTER_REJOIN.equals(value)) return ACCOUNT_SKIN_AFTER_REJOIN;
+        if (ACCOUNT_SKIN_UNAVAILABLE.equals(value)) return ACCOUNT_SKIN_UNAVAILABLE;
+        return null;
     }
 
     private static void writeAtomically(Path target, String content) throws IOException {

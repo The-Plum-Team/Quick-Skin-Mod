@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "جارٍ رفع المظهر إلى Mojang...",
   "quickskin.upload.please_wait": "يرجى الانتظار...",
   "quickskin.upload.success": "تم تحديث مظهرك!",
+  "quickskin.upload.vanilla_players_shared": "يشارك هذا الخادم مظاهر الحسابات: سيراه اللاعبون الذين لا يستخدمون QuickSkin خلال بضع دقائق.",
+  "quickskin.upload.vanilla_players_rejoin": "سيراه اللاعبون الذين لا يستخدمون QuickSkin على هذا الخادم بعد أن تعيد الانضمام.",
+  "quickskin.upload.vanilla_players_unavailable": "لا يمكن للاعبين الذين لا يستخدمون QuickSkin رؤية مظاهر الحسابات على هذا الخادم: فهو لا يسجّل دخول اللاعبين عبر Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "على الخوادم في الوضع المتصل، سيراه اللاعبون الذين لا يستخدمون QuickSkin بعد أن تعيد الانضمام.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "لم يتم العثور على رمز الوصول. هل قمت بتسجيل الدخول باستخدام حساب Microsoft؟",

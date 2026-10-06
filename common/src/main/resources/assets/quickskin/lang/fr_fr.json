@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Téléversement du skin vers Mojang...",
   "quickskin.upload.please_wait": "Veuillez patienter...",
   "quickskin.upload.success": "Ton skin a été mis à jour !",
+  "quickskin.upload.vanilla_players_shared": "Ce serveur partage les skins des comptes : les joueurs sans QuickSkin le verront d'ici quelques minutes.",
+  "quickskin.upload.vanilla_players_rejoin": "Les joueurs sans QuickSkin sur ce serveur le verront quand tu te seras reconnecté.",
+  "quickskin.upload.vanilla_players_unavailable": "Les joueurs sans QuickSkin ne peuvent pas voir les skins des comptes sur ce serveur : il ne connecte pas les joueurs via Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "Sur les serveurs en mode en ligne, les joueurs sans QuickSkin le verront quand tu te seras reconnecté.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Aucun jeton d'accès trouvé. Es-tu connecté avec un compte Microsoft ?",

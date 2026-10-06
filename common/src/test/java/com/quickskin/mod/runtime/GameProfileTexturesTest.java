@@ -14,12 +14,13 @@ import java.util.Base64;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Runs against every matrix target's authlib (4 for 1.20.1, 6 for 1.21.1 to 1.21.8, 7 and later
- * from 1.21.9, where profiles are immutable records). This source is not preprocessed, so the
+ * from 1.21.9, where profiles are immutable records); every version returns a new profile. This source is not preprocessed, so the
  * version-specific profile API is reached by reflection here.
  */
 class GameProfileTexturesTest {
@@ -39,6 +40,20 @@ class GameProfileTexturesTest {
         assertEquals(1, properties(updated).get("custom").size());
         assertEquals(PLAYER, id(updated));
         assertEquals("Tester", name(updated));
+    }
+
+    @Test
+    void neverModifiesTheProfileItWasGiven() throws Exception {
+        Property old = new Property("textures", value("old"), SIGNATURE);
+        GameProfile original = profile(old, new Property("custom", "kept"));
+
+        GameProfile updated = GameProfileTextures.withTextures(
+                original, new SignedTextures(value("new"), SIGNATURE));
+
+        assertNotSame(original, updated, "a queued packet may still be encoding the original");
+        assertEquals(new SignedTextures(value("old"), SIGNATURE), GameProfileTextures.read(original));
+        assertEquals(2, properties(original).size());
+        assertEquals("Tester", GameProfileTextures.name(updated));
     }
 
     @Test

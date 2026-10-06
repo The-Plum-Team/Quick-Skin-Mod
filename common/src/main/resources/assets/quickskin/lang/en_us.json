@@ -64,7 +64,9 @@
   "quickskin.upload.please_wait": "Please wait...",
   "quickskin.upload.success": "Your skin has been updated!",
   "quickskin.upload.vanilla_players_shared": "This server shares account skins: players without Quick Skin will see it within a few minutes.",
-  "quickskin.upload.vanilla_players_rejoin": "Players without Quick Skin will see it after you rejoin this server.",
+  "quickskin.upload.vanilla_players_rejoin": "Players without Quick Skin on this server will see it after you rejoin.",
+  "quickskin.upload.vanilla_players_unavailable": "Players without Quick Skin cannot see account skins on this server: it does not log players in through Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "On online-mode servers, players without Quick Skin will see it after you rejoin.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "No access token found. Are you logged in with a Microsoft account?",

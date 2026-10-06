@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Đang tải skin lên Mojang...",
   "quickskin.upload.please_wait": "Vui lòng đợi...",
   "quickskin.upload.success": "Skin của bạn đã được cập nhật!",
+  "quickskin.upload.vanilla_players_shared": "Máy chủ này chia sẻ skin tài khoản: người chơi không có QuickSkin sẽ thấy nó trong vài phút.",
+  "quickskin.upload.vanilla_players_rejoin": "Người chơi không có QuickSkin trên máy chủ này sẽ thấy nó sau khi bạn vào lại.",
+  "quickskin.upload.vanilla_players_unavailable": "Người chơi không có QuickSkin không thể thấy skin tài khoản trên máy chủ này: máy chủ không xác thực người chơi qua Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "Trên các máy chủ ở chế độ trực tuyến, người chơi không có QuickSkin sẽ thấy nó sau khi bạn vào lại.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Không tìm thấy mã truy cập. Bạn đã đăng nhập bằng tài khoản Microsoft chưa?",

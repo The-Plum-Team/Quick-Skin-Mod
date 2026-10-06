@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Przesyłanie skórki do Mojang...",
   "quickskin.upload.please_wait": "Proszę czekać...",
   "quickskin.upload.success": "Twoja skórka została zaktualizowana!",
+  "quickskin.upload.vanilla_players_shared": "Ten serwer udostępnia skórki kont: gracze bez QuickSkin zobaczą ją w ciągu kilku minut.",
+  "quickskin.upload.vanilla_players_rejoin": "Gracze bez QuickSkin na tym serwerze zobaczą ją po Twoim ponownym dołączeniu.",
+  "quickskin.upload.vanilla_players_unavailable": "Gracze bez QuickSkin nie widzą skórek kont na tym serwerze: serwer nie loguje graczy przez Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "Na serwerach w trybie online gracze bez QuickSkin zobaczą ją po Twoim ponownym dołączeniu.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Nie znaleziono tokenu dostępu. Czy jesteś zalogowany na konto Microsoft?",
