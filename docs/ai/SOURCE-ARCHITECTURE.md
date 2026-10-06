@@ -97,9 +97,11 @@ closed-state guard, and persisted own-skin selection. `SavedAppearanceRestorer` 
 features; it owns event registration and teardown wiring. The existing catalog E2E checks inspect
 the actual import owner and exercise the same composed saved-appearance path.
 
-`AccountSkinShareService` and its session-server parsing belong to `server-appearance` (package
-`com.quickskin.mod.server.vanilla`); networking only admits the `account_skin_changed` report and
-hands it over. `ServerRuntime` binds the service to the running server through
+`AccountSkinShareService`, its session-server parsing, the Mojang signature check
+(`TexturesSignatureVerifier`) and the authentication-environment detection
+(`MojangAuthenticationEnvironment`) belong to `server-appearance` (package
+`com.quickskin.mod.server.vanilla`); networking only admits the `account_skin_changed` report,
+hands it over and sends the service's `accountSkinVisibility` with the server configuration. `ServerRuntime` binds the service to the running server through
 `AccountSkinProfileTarget`, the `common` bridge that owns the `ChunkMap`, tracked-entity and
 `Player.gameProfile` accessors and the player-info and entity-pairing packets (ADR 0012).
 `skin-upload` reports a successful upload through `ClientNetworkActions`.

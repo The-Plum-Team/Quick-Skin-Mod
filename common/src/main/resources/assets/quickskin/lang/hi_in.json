@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Mojang पर स्किन अपलोड हो रही है...",
   "quickskin.upload.please_wait": "कृपया प्रतीक्षा करें...",
   "quickskin.upload.success": "आपकी स्किन अपडेट हो गई है!",
+  "quickskin.upload.vanilla_players_shared": "यह सर्वर अकाउंट स्किन साझा करता है: QuickSkin के बिना खिलाड़ी इसे कुछ ही मिनटों में देखेंगे।",
+  "quickskin.upload.vanilla_players_rejoin": "इस सर्वर पर QuickSkin के बिना खिलाड़ी इसे आपके दोबारा जुड़ने के बाद देखेंगे।",
+  "quickskin.upload.vanilla_players_unavailable": "इस सर्वर पर QuickSkin के बिना खिलाड़ी अकाउंट स्किन नहीं देख सकते: यह खिलाड़ियों को Mojang के ज़रिए लॉग इन नहीं करता।",
+  "quickskin.upload.vanilla_players_unknown": "ऑनलाइन मोड वाले सर्वरों पर, QuickSkin के बिना खिलाड़ी इसे आपके दोबारा जुड़ने के बाद देखेंगे।",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "एक्सेस टोकन नहीं मिला। क्या आपने Microsoft खाते से लॉग इन किया है?",

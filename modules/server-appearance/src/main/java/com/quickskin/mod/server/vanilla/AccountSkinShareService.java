@@ -31,7 +31,11 @@ import java.util.function.LongSupplier;
  * paced by a server-wide token bucket, a player starts at most one round per interval, a report
  * that arrives during a round re-arms one more round, and a round polls with backoff until the
  * session server reports a different appearance or its attempts are spent. The option is off by
- * default and does nothing on an offline-mode server, where Mojang never signed the profile.</p>
+ * default and does nothing on an offline-mode server, where Mojang never signed the profile, or on
+ * a server that authenticates players with another Yggdrasil service, where a profile id need not
+ * be the Mojang account with that id. A profile is only touched when its current textures (if
+ * any) and the fetched ones carry Mojang's own signature and Mojang reports the connected
+ * player's name for that id.</p>
  */
 public final class AccountSkinShareService implements AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(AccountSkinShareService.class);
@@ -41,6 +45,7 @@ public final class AccountSkinShareService implements AutoCloseable {
             () -> System.nanoTime() / 1_000_000L,
             () -> ServerConfig.getInstance().shareAccountSkinWithVanillaClients,
             AccountSkinShareService::daemonScheduler,
+            TexturesSignatureVerifier.mojang(),
             (playerId, outcome) -> { });
 
     private final Policy policy;
@@ -48,6 +53,7 @@ public final class AccountSkinShareService implements AutoCloseable {
     private final LongSupplier clockMillis;
     private final BooleanSupplier enabled;
     private final SchedulerFactory schedulerFactory;
+    private final TexturesSignatureVerifier signatures;
     private final BiConsumer<UUID, Outcome> outcomeListener;
     private final Map<UUID, Job> jobs = new HashMap<>();
 
@@ -62,12 +68,14 @@ public final class AccountSkinShareService implements AutoCloseable {
             LongSupplier clockMillis,
             BooleanSupplier enabled,
             SchedulerFactory schedulerFactory,
+            TexturesSignatureVerifier signatures,
             BiConsumer<UUID, Outcome> outcomeListener) {
         this.policy = Objects.requireNonNull(policy, "policy");
         this.fetcher = Objects.requireNonNull(fetcher, "fetcher");
         this.clockMillis = Objects.requireNonNull(clockMillis, "clockMillis");
         this.enabled = Objects.requireNonNull(enabled, "enabled");
         this.schedulerFactory = Objects.requireNonNull(schedulerFactory, "schedulerFactory");
+        this.signatures = Objects.requireNonNull(signatures, "signatures");
         this.outcomeListener = Objects.requireNonNull(outcomeListener, "outcomeListener");
     }
 
@@ -86,14 +94,36 @@ public final class AccountSkinShareService implements AutoCloseable {
     }
 
     /**
+     * What players without Quick Skin on this server see after a Quick Skin player uploads an
+     * account skin: one of the {@code ServerConfig.ACCOUNT_SKIN_*} values, or {@code null} while
+     * no server is running. Server thread.
+     */
+    public synchronized String accountSkinVisibility() {
+        if (scheduler == null || target == null) return null;
+        if (target.authentication() != Authentication.MOJANG) return ServerConfig.ACCOUNT_SKIN_UNAVAILABLE;
+        return enabled.getAsBoolean()
+                ? ServerConfig.ACCOUNT_SKIN_SHARED
+                : ServerConfig.ACCOUNT_SKIN_AFTER_REJOIN;
+    }
+
+    /**
      * Records that the player of this exact session changed its Mojang account skin.
-     * Cheap and non-blocking; the lookup itself happens later on the worker.
+     * Server thread; cheap and non-blocking: the lookup itself happens later on the worker.
      */
     public synchronized Admission request(UUID playerId, Object session) {
         if (playerId == null || session == null) return Admission.INVALID;
         if (scheduler == null || target == null) return Admission.NOT_RUNNING;
         if (!enabled.getAsBoolean()) return Admission.DISABLED;
-        if (!target.usesAuthentication()) return Admission.OFFLINE_MODE;
+        Authentication authentication = target.authentication();
+        if (authentication == Authentication.OFFLINE) return Admission.OFFLINE_MODE;
+        if (authentication != Authentication.MOJANG) return Admission.NOT_MOJANG;
+        CurrentProfile current = target.current(playerId, session);
+        if (current == null) return Admission.INVALID;
+        if (current.textures() != null && !signatures.isTrusted(current.textures())) {
+            // Mojang always signs the textures of the profiles it authenticates; another signer
+            // means another authentication service vouched for this player.
+            return Admission.UNVERIFIED_PROFILE;
+        }
 
         long now = clockMillis.getAsLong();
         Job job = jobs.get(playerId);
@@ -207,6 +237,12 @@ public final class AccountSkinShareService implements AutoCloseable {
                 finish(job, Outcome.REJECTED);
                 return;
             }
+            if (!signatures.isTrusted(profile.textures())) {
+                LOGGER.warn("Ignoring a session server profile for {} that Mojang did not sign",
+                        job.playerId);
+                finish(job, Outcome.REJECTED);
+                return;
+            }
             Target activeTarget;
             synchronized (this) {
                 if (!isCurrentLocked(job)) return;
@@ -247,6 +283,18 @@ public final class AccountSkinShareService implements AutoCloseable {
         }
         if (current == null) {
             finish(job, Outcome.SESSION_GONE);
+            return;
+        }
+        if (!profile.name().equals(current.name())) {
+            LOGGER.warn("Not sharing the account skin of {}: Mojang names that profile {}, but the "
+                    + "connected player is {}", job.playerId, profile.name(), current.name());
+            finish(job, Outcome.REJECTED);
+            return;
+        }
+        if (current.textures() != null && !signatures.isTrusted(current.textures())) {
+            LOGGER.warn("Not sharing the account skin of {}: its current skin was not signed by Mojang",
+                    job.playerId);
+            finish(job, Outcome.REJECTED);
             return;
         }
         if (profile.appearance().equals(appearanceOf(current.textures(), job.playerId))) {
@@ -374,6 +422,10 @@ public final class AccountSkinShareService implements AutoCloseable {
         COALESCED,
         DISABLED,
         OFFLINE_MODE,
+        /** Online mode, but players are authenticated by another Yggdrasil service. */
+        NOT_MOJANG,
+        /** The player's current textures carry another signer's signature. */
+        UNVERIFIED_PROFILE,
         NOT_RUNNING,
         CAPACITY,
         INVALID
@@ -389,10 +441,20 @@ public final class AccountSkinShareService implements AutoCloseable {
         SESSION_GONE
     }
 
+    /** How the running server authenticates its players. */
+    public enum Authentication {
+        /** Offline mode, including a backend behind a proxy: nobody verified the profiles. */
+        OFFLINE,
+        /** Online mode against Mojang's own session server. */
+        MOJANG,
+        /** Online mode against another Yggdrasil service (authlib-injector, minecraft.api.*). */
+        OTHER
+    }
+
     /** The running server, implemented by the composition root. */
     public interface Target {
-        /** Whether the server authenticates players with Mojang (online mode). */
-        boolean usesAuthentication();
+        /** How the server authenticates its players. */
+        Authentication authentication();
 
         /** Runs the task on the server thread. */
         void execute(Runnable task);
@@ -409,8 +471,11 @@ public final class AccountSkinShareService implements AutoCloseable {
         int apply(UUID playerId, Object session, SignedTextures textures);
     }
 
-    /** The textures a session currently carries; {@code textures} is null when it has none. */
-    public record CurrentProfile(SignedTextures textures) {
+    /**
+     * The name and textures a session currently carries; {@code textures} is null when it has
+     * none or only unsigned ones.
+     */
+    public record CurrentProfile(String name, SignedTextures textures) {
     }
 
     /** Delayed execution on the sharing worker. */

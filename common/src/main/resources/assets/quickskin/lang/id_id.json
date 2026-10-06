@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Mengunggah skin ke Mojang...",
   "quickskin.upload.please_wait": "Harap tunggu...",
   "quickskin.upload.success": "Skin Anda telah diperbarui!",
+  "quickskin.upload.vanilla_players_shared": "Server ini membagikan skin akun: pemain tanpa QuickSkin akan melihatnya dalam beberapa menit.",
+  "quickskin.upload.vanilla_players_rejoin": "Pemain tanpa QuickSkin di server ini akan melihatnya setelah Anda bergabung kembali.",
+  "quickskin.upload.vanilla_players_unavailable": "Pemain tanpa QuickSkin tidak dapat melihat skin akun di server ini: server ini tidak memverifikasi pemain melalui Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "Di server mode online, pemain tanpa QuickSkin akan melihatnya setelah Anda bergabung kembali.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Token akses tidak ditemukan. Apakah Anda masuk dengan akun Microsoft?",

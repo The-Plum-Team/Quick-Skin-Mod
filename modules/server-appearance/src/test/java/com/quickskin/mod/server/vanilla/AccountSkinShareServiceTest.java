@@ -1,5 +1,6 @@
 package com.quickskin.mod.server.vanilla;
 
+import com.quickskin.mod.config.ServerConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.quickskin.mod.server.vanilla.AccountSkinShareService.Admission;
 import static com.quickskin.mod.server.vanilla.AccountSkinShareService.Outcome;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -35,6 +37,7 @@ class AccountSkinShareServiceTest {
     private final Object session = new Object();
     private final AccountSkinShareService service = new AccountSkinShareService(
             POLICY, fetcher, clock::now, enabled::get, () -> scheduler,
+            SessionProfileFixtures.VERIFIER,
             (player, outcome) -> outcomes.add(player + ":" + outcome));
 
     @AfterEach
@@ -141,7 +144,7 @@ class AccountSkinShareServiceTest {
         assertEquals(Admission.DISABLED, service.request(PLAYER, session));
 
         enabled.set(true);
-        target.online = false;
+        target.authentication = AccountSkinShareService.Authentication.OFFLINE;
         assertEquals(Admission.OFFLINE_MODE, service.request(PLAYER, session));
         scheduler.advance(120_000L);
 
@@ -198,7 +201,8 @@ class AccountSkinShareServiceTest {
         AccountSkinShareService.Policy burstOfOne = new AccountSkinShareService.Policy(
                 0L, List.of(), 0L, 1, 5_000L, 8);
         AccountSkinShareService paced = new AccountSkinShareService(
-                burstOfOne, fetcher, clock::now, enabled::get, () -> scheduler, (p, o) -> { });
+                burstOfOne, fetcher, clock::now, enabled::get, () -> scheduler,
+                SessionProfileFixtures.VERIFIER, (p, o) -> { });
         try {
             paced.start(target);
             for (int i = 0; i < 3; i++) fetcher.respond(404, "", 0L);
@@ -254,13 +258,102 @@ class AccountSkinShareServiceTest {
     void aSessionThatLeftBeforeTheAnswerIsNotTouched() {
         service.start(target);
         fetcher.respond(200, SessionProfileFixtures.response(PLAYER, NEW_SKIN, null, 2L));
-        target.gone = true;
 
-        service.request(PLAYER, session);
+        assertEquals(Admission.ACCEPTED, service.request(PLAYER, session));
+        target.gone = true;
         scheduler.advance(1_000L);
 
         assertTrue(target.applied.isEmpty());
         assertEquals(List.of(PLAYER + ":SESSION_GONE"), outcomes);
+    }
+
+    @Test
+    void aSessionThatAlreadyLeftIsNotAdmitted() {
+        service.start(target);
+        target.gone = true;
+
+        assertEquals(Admission.INVALID, service.request(PLAYER, session));
+        scheduler.advance(60_000L);
+        assertEquals(0, fetcher.calls);
+    }
+
+    @Test
+    void anotherAuthenticationServiceIsANoOpWithoutAnyLookup() {
+        service.start(target);
+        target.authentication = AccountSkinShareService.Authentication.OTHER;
+
+        assertEquals(Admission.NOT_MOJANG, service.request(PLAYER, session));
+        scheduler.advance(120_000L);
+
+        assertEquals(0, fetcher.calls, "a non-Mojang profile id is never sent to Mojang");
+        assertEquals(0, service.trackedPlayers());
+        assertEquals(ServerConfig.ACCOUNT_SKIN_UNAVAILABLE, service.accountSkinVisibility());
+    }
+
+    @Test
+    void aPlayerWhoseJoinSkinAnotherServiceSignedIsNotAdmitted() {
+        service.start(target);
+        target.textures = new SignedTextures(
+                SessionProfileFixtures.texturesValue(PLAYER, OLD_SKIN, null, 1L),
+                SessionProfileFixtures.FOREIGN_SIGNATURE);
+
+        assertEquals(Admission.UNVERIFIED_PROFILE, service.request(PLAYER, session));
+        scheduler.advance(120_000L);
+        assertEquals(0, fetcher.calls);
+    }
+
+    @Test
+    void aPlayerWithoutTexturesIsAdmittedOnAMojangServer() {
+        service.start(target);
+        target.textures = null;
+        fetcher.respond(200, SessionProfileFixtures.response(PLAYER, NEW_SKIN, null, 2L));
+
+        assertEquals(Admission.ACCEPTED, service.request(PLAYER, session));
+        scheduler.advance(1_000L);
+        assertEquals(1, target.applied.size());
+    }
+
+    @Test
+    void aResponseThatMojangDidNotSignNeverReachesTheProfile() {
+        service.start(target);
+        target.textures = SessionProfileFixtures.signed(PLAYER, OLD_SKIN, null, 1L);
+        fetcher.respond(200, SessionProfileFixtures.response(PLAYER,
+                SessionProfileFixtures.texturesValue(PLAYER, NEW_SKIN, null, 2L),
+                SessionProfileFixtures.FOREIGN_SIGNATURE));
+
+        service.request(PLAYER, session);
+        scheduler.advance(60_000L);
+
+        assertEquals(1, fetcher.calls);
+        assertTrue(target.applied.isEmpty());
+        assertEquals(List.of(PLAYER + ":REJECTED"), outcomes);
+    }
+
+    @Test
+    void aProfileThatMojangNamesDifferentlyIsNotApplied() {
+        service.start(target);
+        target.textures = SessionProfileFixtures.signed(PLAYER, OLD_SKIN, null, 1L);
+        target.name = "SomeoneElse";
+        fetcher.respond(200, SessionProfileFixtures.response(PLAYER, NEW_SKIN, null, 2L));
+
+        service.request(PLAYER, session);
+        scheduler.advance(60_000L);
+
+        assertTrue(target.applied.isEmpty());
+        assertEquals(List.of(PLAYER + ":REJECTED"), outcomes);
+    }
+
+    @Test
+    void announcesWhatPlayersWithoutQuickSkinWillSee() {
+        assertNull(service.accountSkinVisibility(), "unknown while no server runs");
+        service.start(target);
+        assertEquals(ServerConfig.ACCOUNT_SKIN_SHARED, service.accountSkinVisibility());
+        enabled.set(false);
+        assertEquals(ServerConfig.ACCOUNT_SKIN_AFTER_REJOIN, service.accountSkinVisibility());
+        target.authentication = AccountSkinShareService.Authentication.OFFLINE;
+        assertEquals(ServerConfig.ACCOUNT_SKIN_UNAVAILABLE, service.accountSkinVisibility());
+        enabled.set(true);
+        assertEquals(ServerConfig.ACCOUNT_SKIN_UNAVAILABLE, service.accountSkinVisibility());
     }
 
     @Test
@@ -362,15 +455,17 @@ class AccountSkinShareServiceTest {
     }
 
     private static final class FakeTarget implements AccountSkinShareService.Target {
-        boolean online = true;
+        AccountSkinShareService.Authentication authentication =
+                AccountSkinShareService.Authentication.MOJANG;
         boolean gone;
+        String name = "Tester";
         SignedTextures textures;
         final List<SignedTextures> applied = new ArrayList<>();
         final List<Object> appliedSessions = new ArrayList<>();
 
         @Override
-        public boolean usesAuthentication() {
-            return online;
+        public AccountSkinShareService.Authentication authentication() {
+            return authentication;
         }
 
         @Override
@@ -380,7 +475,7 @@ class AccountSkinShareServiceTest {
 
         @Override
         public AccountSkinShareService.CurrentProfile current(UUID playerId, Object session) {
-            return gone ? null : new AccountSkinShareService.CurrentProfile(textures);
+            return gone ? null : new AccountSkinShareService.CurrentProfile(name, textures);
         }
 
         @Override

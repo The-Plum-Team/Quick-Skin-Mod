@@ -10,17 +10,21 @@ import java.util.UUID;
 /**
  * A validated answer of Mojang's session server for one profile.
  *
- * <p>The response must name exactly the requested profile and carry exactly one {@code textures}
- * property with a signature, and the signed payload must describe that same profile. Anything else
- * is rejected before it can reach a player's profile.</p>
+ * <p>The response must name exactly the requested profile, carry its non-empty player name and
+ * exactly one {@code textures} property with a signature, and the signed payload must describe
+ * that same profile. Anything else is rejected before it can reach a player's profile. Whether
+ * Mojang made the signature is checked separately by {@link TexturesSignatureVerifier}.</p>
  */
-public record SessionProfile(SignedTextures textures, AccountTextures appearance) {
+public record SessionProfile(String name, SignedTextures textures, AccountTextures appearance) {
     /** Mojang's profile responses are well below a kilobyte; the cap only bounds a hostile one. */
     public static final int MAX_RESPONSE_BYTES = 64 * 1024;
     private static final int MAX_PROPERTIES = 16;
+    /** Mojang names have at most 16 characters; the cap only bounds a hostile response. */
+    private static final int MAX_NAME_CHARS = 64;
     private static final String TEXTURES = "textures";
 
     public SessionProfile {
+        Objects.requireNonNull(name, "name");
         Objects.requireNonNull(textures, "textures");
         Objects.requireNonNull(appearance, "appearance");
     }
@@ -40,6 +44,10 @@ public record SessionProfile(SignedTextures textures, AccountTextures appearance
         String id = StrictJson.string(root, "id");
         if (id == null || !id.equalsIgnoreCase(AccountTextures.undashed(expectedProfileId))) {
             throw new IllegalArgumentException("The session profile response names another profile");
+        }
+        String name = StrictJson.string(root, "name");
+        if (name == null || name.isEmpty() || name.length() > MAX_NAME_CHARS) {
+            throw new IllegalArgumentException("The session profile response has no usable name");
         }
         JsonElement propertiesElement = root.get("properties");
         if (propertiesElement == null || !propertiesElement.isJsonArray()) {
@@ -68,6 +76,6 @@ public record SessionProfile(SignedTextures textures, AccountTextures appearance
         if (textures == null) {
             throw new IllegalArgumentException("The session profile response has no textures");
         }
-        return new SessionProfile(textures, AccountTextures.decode(textures.value(), expectedProfileId));
+        return new SessionProfile(name, textures, AccountTextures.decode(textures.value(), expectedProfileId));
     }
 }

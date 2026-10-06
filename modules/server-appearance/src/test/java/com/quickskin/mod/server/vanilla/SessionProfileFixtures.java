@@ -7,6 +7,10 @@ import java.util.UUID;
 /** Builds session-server documents shaped like Mojang's, without any real account data. */
 final class SessionProfileFixtures {
     static final String SIGNATURE = Base64.getEncoder().encodeToString(new byte[512]);
+    /** A signature the test verifier treats as another service's, not Mojang's. */
+    static final String FOREIGN_SIGNATURE = Base64.getEncoder().encodeToString(new byte[256]);
+    /** Trusts {@link #SIGNATURE} and nothing else, standing in for Mojang's keys. */
+    static final TexturesSignatureVerifier VERIFIER = textures -> SIGNATURE.equals(textures.signature());
 
     private SessionProfileFixtures() {
     }

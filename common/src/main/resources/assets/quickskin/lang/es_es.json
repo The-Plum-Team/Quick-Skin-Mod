@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Subiendo aspecto a Mojang...",
   "quickskin.upload.please_wait": "Por favor, espera...",
   "quickskin.upload.success": "¡Tu aspecto ha sido actualizado!",
+  "quickskin.upload.vanilla_players_shared": "Este servidor comparte los aspectos de las cuentas: los jugadores sin QuickSkin lo verán en unos minutos.",
+  "quickskin.upload.vanilla_players_rejoin": "Los jugadores sin QuickSkin de este servidor lo verán cuando vuelvas a entrar.",
+  "quickskin.upload.vanilla_players_unavailable": "Los jugadores sin QuickSkin no pueden ver los aspectos de las cuentas en este servidor: no inicia la sesión de los jugadores a través de Mojang.",
+  "quickskin.upload.vanilla_players_unknown": "En los servidores en modo online, los jugadores sin QuickSkin lo verán cuando vuelvas a entrar.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "No se encontró token de acceso. ¿Has iniciado sesión con una cuenta de Microsoft?",

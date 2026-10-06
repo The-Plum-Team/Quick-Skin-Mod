@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "Skin Mojang'a yükleniyor...",
   "quickskin.upload.please_wait": "Lütfen bekle...",
   "quickskin.upload.success": "Skinin güncellendi!",
+  "quickskin.upload.vanilla_players_shared": "Bu sunucu hesap skinlerini paylaşıyor: QuickSkin kullanmayan oyuncular birkaç dakika içinde görecek.",
+  "quickskin.upload.vanilla_players_rejoin": "Bu sunucuda QuickSkin kullanmayan oyuncular, sen yeniden katıldıktan sonra görecek.",
+  "quickskin.upload.vanilla_players_unavailable": "QuickSkin kullanmayan oyuncular bu sunucuda hesap skinlerini göremez: sunucu oyuncuları Mojang üzerinden doğrulamıyor.",
+  "quickskin.upload.vanilla_players_unknown": "Çevrimiçi moddaki sunucularda QuickSkin kullanmayan oyuncular, sen yeniden katıldıktan sonra görecek.",
 
   "_comment_upload_errors": "=== Upload API Errors ===",
   "quickskin.error.no_access_token": "Erişim belirteci bulunamadı. Microsoft hesabıyla giriş yaptın mı?",

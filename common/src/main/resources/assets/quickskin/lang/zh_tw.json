@@ -63,6 +63,10 @@
   "quickskin.upload.uploading": "正在上傳至 Mojang...",
   "quickskin.upload.please_wait": "請稍候...",
   "quickskin.upload.success": "皮膚已更新！",
+  "quickskin.upload.vanilla_players_shared": "此伺服器會共享帳號皮膚：未安裝快速皮膚的玩家將在幾分鐘內看到。",
+  "quickskin.upload.vanilla_players_rejoin": "此伺服器上未安裝快速皮膚的玩家將在你重新加入後看到。",
+  "quickskin.upload.vanilla_players_unavailable": "此伺服器沒有透過 Mojang 驗證玩家，因此未安裝快速皮膚的玩家無法看到帳號皮膚。",
+  "quickskin.upload.vanilla_players_unknown": "在正版驗證（線上模式）的伺服器上，未安裝快速皮膚的玩家將在你重新加入後看到。",
 
   "_comment_upload_errors": "=== 上傳 API 錯誤 ===",
   "quickskin.error.no_access_token": "找不到存取權杖，請確認已使用 Microsoft 帳號登入",

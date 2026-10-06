@@ -1182,7 +1182,8 @@ public class ServerNetworkHandler {
             return;
         }
         com.quickskin.mod.config.ServerConfig serverConfig = com.quickskin.mod.config.ServerConfig.getInstance();
-        String configJson = serverConfig.toJson();
+        String configJson = serverConfig.toJson(
+                com.quickskin.mod.server.vanilla.AccountSkinShareService.getInstance().accountSkinVisibility());
 
         NetworkTransport.INSTANCE.sendServerConfigToPlayer(player, configJson);
     }
@@ -1194,7 +1195,8 @@ public class ServerNetworkHandler {
      */
     private static void broadcastServerConfigToAllPlayers(net.minecraft.server.MinecraftServer server) {
         com.quickskin.mod.config.ServerConfig serverConfig = com.quickskin.mod.config.ServerConfig.getInstance();
-        String configJson = serverConfig.toJson();
+        String configJson = serverConfig.toJson(
+                com.quickskin.mod.server.vanilla.AccountSkinShareService.getInstance().accountSkinVisibility());
 
         // Send to all players that have QuickSkin (including the admin who made the change)
         // IMPORTANT: Create a fresh packet buffer for each player to avoid buffer exhaustion

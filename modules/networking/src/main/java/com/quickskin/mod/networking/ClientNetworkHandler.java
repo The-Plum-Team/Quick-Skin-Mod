@@ -587,7 +587,9 @@ public class ClientNetworkHandler {
             long now = System.currentTimeMillis();
             boolean configChanged = firstConfig || policyChanged
                     || oldServerConfig.skinChangeCooldownSeconds
-                            != serverConfig.skinChangeCooldownSeconds;
+                            != serverConfig.skinChangeCooldownSeconds
+                    || !java.util.Objects.equals(oldServerConfig.accountSkinVisibility,
+                            serverConfig.accountSkinVisibility);
             if (configChanged) {
                 clientConfig.applyServerOverride(serverConfig);
             }

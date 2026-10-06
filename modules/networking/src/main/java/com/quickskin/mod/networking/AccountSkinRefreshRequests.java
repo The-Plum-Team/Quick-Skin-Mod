@@ -1,6 +1,7 @@
 package com.quickskin.mod.networking;
 
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
+import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.server.vanilla.AccountSkinShareService;
 import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.Logger;
@@ -18,9 +19,19 @@ final class AccountSkinRefreshRequests {
     /** Network thread: whether this exact negotiated session may report its own account skin. */
     static boolean admits(ServerPlayer sender, UUID reportedPlayerId) {
         return sender != null
-                && ProtocolNetwork.acceptsV2(sender)
-                && ProtocolNetwork.profile(sender).supports(ProtocolCapability.ACCOUNT_SKIN_REFRESH)
-                && sender.getUUID().equals(reportedPlayerId);
+                && admits(ProtocolNetwork.profile(sender), sender.getUUID(), reportedPlayerId);
+    }
+
+    /**
+     * A report is admitted only from a negotiated v2 session with {@code account-skin-refresh},
+     * and only about the sender itself: a client can never ask for another player's refresh.
+     */
+    static boolean admits(ProtocolProfile senderProfile, UUID senderId, UUID reportedPlayerId) {
+        return senderProfile != null
+                && ProtocolNetwork.acceptsV2(senderProfile)
+                && senderProfile.supports(ProtocolCapability.ACCOUNT_SKIN_REFRESH)
+                && senderId != null
+                && senderId.equals(reportedPlayerId);
     }
 
     /** Server thread: hands the report to the sharing service and logs what it decided. */
@@ -36,6 +47,13 @@ final class AccountSkinRefreshRequests {
             case OFFLINE_MODE -> LOGGER.info(
                     "Not sharing the Mojang account skin of {}: this server runs in offline mode, "
                             + "so Mojang never signed its profiles", name);
+            case NOT_MOJANG -> LOGGER.info(
+                    "Not sharing the Mojang account skin of {}: this server authenticates players "
+                            + "with another service than Mojang's, so its profile ids are not "
+                            + "necessarily Mojang accounts", name);
+            case UNVERIFIED_PROFILE -> LOGGER.warn(
+                    "Not sharing the Mojang account skin of {}: the skin this player joined with "
+                            + "was not signed by Mojang", name);
             case DISABLED -> LOGGER.debug(
                     "Not sharing the Mojang account skin of {}: shareAccountSkinWithVanillaClients "
                             + "is off", name);
