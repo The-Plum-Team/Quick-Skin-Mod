@@ -105,8 +105,9 @@ class VisualReviewTargetsTest(unittest.TestCase):
                  "frame_count": 180, "image_count": 2, "image_bytes": 512, "visual_reference": None,
                  "compatibility_impact": {"schema_version": 1, "compatibility_required": True,
                                            "paths": [], "impact_paths": []}}
+        # The excerpt starts after the step sets gate_settled_source; an ordinary successful source.
         arguments = {"IMPLEMENTATION_SHA": SOURCE_SHA, "BUNDLE_KEY": target["bundle_key"],
-                     "SOURCE_RUN_ID": str(RUN_ID), **{key: str(proof[key]) for key in
+                     "SOURCE_RUN_ID": str(RUN_ID), "gate_settled_source": "false", **{key: str(proof[key]) for key in
                         ("source_branch", "source_sha", "manifest_sha256", "review_mode",
                          "scenario_contract_sha256", "frame_count", "image_count", "image_bytes")}}
         with tempfile.TemporaryDirectory() as temporary:
