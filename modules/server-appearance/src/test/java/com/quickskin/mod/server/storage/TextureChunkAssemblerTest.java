@@ -182,4 +182,27 @@ class TextureChunkAssemblerTest {
         assembler.discardSession(player, session);
         assertFalse(assembler.isRejected(player, session, "cape", HASH));
     }
+
+    @Test
+    void aWithinLimitPrefixOfARejectedUploadCannotCompleteInItsPlace() {
+        UUID player = UUID.randomUUID();
+        Object session = new Object();
+        int limit = 4;
+        int chunk = 2;
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 0, 3,
+                new byte[] {1, 2}, limit, chunk));
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 1, 3,
+                new byte[] {3, 4}, limit, chunk));
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 2, 3,
+                new byte[] {5, 6}, limit, chunk));
+        assertTrue(assembler.isRejected(player, session, "cape", HASH));
+
+        // The first four bytes, resent as a complete two-chunk upload, are within the limit and
+        // would assemble on their own; the refusal of this upload still drops them.
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 0, 2,
+                new byte[] {1, 2}, limit, chunk));
+        assertNull(assembler.addChunk(player, session, "cape", HASH, 1, 2,
+                new byte[] {3, 4}, limit, chunk));
+        assertTrue(assembler.isRejected(player, session, "cape", HASH));
+    }
 }

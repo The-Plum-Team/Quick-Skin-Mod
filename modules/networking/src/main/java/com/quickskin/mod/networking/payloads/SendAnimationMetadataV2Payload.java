@@ -24,7 +24,9 @@ public record SendAnimationMetadataV2Payload(String contentId, String metadataJs
     public static final StreamCodec<ByteBuf, SendAnimationMetadataV2Payload> CODEC = StreamCodec.of(
             (buf, payload) -> {
                 PayloadCodecs.writeString(buf, payload.contentId(), TextureTransferLimits.MAX_CONTENT_ID_BYTES);
-                PayloadCodecs.writeString(buf, payload.metadataJson(), TextureTransferLimits.MAX_JSON_BYTES);
+                // Written within the validated metadata bound; read tolerantly up to MAX_JSON_BYTES.
+                PayloadCodecs.writeString(buf, payload.metadataJson(),
+                        TextureTransferLimits.MAX_ANIMATION_METADATA_JSON_BYTES);
             },
             buf -> new SendAnimationMetadataV2Payload(
                     PayloadCodecs.readString(buf, TextureTransferLimits.MAX_CONTENT_ID_BYTES),

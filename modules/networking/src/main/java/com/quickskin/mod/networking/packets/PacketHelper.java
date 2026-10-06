@@ -1,12 +1,15 @@
 package com.quickskin.mod.networking.packets;
 
+import com.quickskin.mod.networking.TextureTransferLimits;
 import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.EncoderException;
 import net.minecraft.network.FriendlyByteBuf;
 //? if >=1.21 {
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.core.RegistryAccess;
 //?}
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 /**
@@ -148,8 +151,22 @@ public class PacketHelper {
         RegistryFriendlyByteBuf buf = new RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY);
     //?}
         buf.writeUtf(hash);
-        buf.writeUtf(metadataJson);
+        writeAnimationMetadata(buf, metadataJson);
         return buf;
+    }
+
+    /**
+     * Writes one animation metadata document within its validated UTF-8 byte bound, the size
+     * {@code WirePayloadBudget} assumes for the metadata packets. Readers stay tolerant and accept
+     * up to {@link TextureTransferLimits#MAX_JSON_BYTES}.
+     */
+    public static void writeAnimationMetadata(FriendlyByteBuf buf, String metadataJson) {
+        int maximumBytes = TextureTransferLimits.MAX_ANIMATION_METADATA_JSON_BYTES;
+        if (metadataJson == null
+                || metadataJson.getBytes(StandardCharsets.UTF_8).length > maximumBytes) {
+            throw new EncoderException("Animation metadata is over its " + maximumBytes + " byte bound");
+        }
+        buf.writeUtf(metadataJson, maximumBytes);
     }
 
     /**

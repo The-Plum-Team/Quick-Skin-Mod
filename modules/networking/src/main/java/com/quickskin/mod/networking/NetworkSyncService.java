@@ -78,8 +78,9 @@ public class NetworkSyncService {
     private boolean helloExhaustionReported;
     private boolean handshakeEvidenceReported;
     /**
-     * Oversized textures already reported this session (type, size and limit). Written by the
-     * upload preparation worker, cleared with the session on the client thread.
+     * Oversized textures already reported this session (type, size and limit). Read by the upload
+     * preparation worker; written when the message is shown and cleared with the session, both on
+     * the client thread.
      */
     private final Set<String> reportedOversizedUploads = ConcurrentHashMap.newKeySet();
     private static final int MAX_REPORTED_OVERSIZED_UPLOADS = 64;
@@ -387,20 +388,14 @@ public class NetworkSyncService {
     /**
      * Logs and shows, once per texture size and limit in a session, why a texture stays local.
      * The limit is what the server advertised in its protocol acknowledgement (its configured
-     * upload limit) or, on a Quick Skin 2.x server, the bound for its unchunked relay.
+     * upload limit) or, on a Quick Skin 2.x server, the bound for its unchunked relay. A report
+     * counts as made only once the message is shown, on the client thread with a player present;
+     * until then a later preparation of the same texture tries again.
      */
     private void reportOversizedUpload(
             String textureType, long size, int limit, ProtocolProfile protocolProfile) {
-        if (reportedOversizedUploads.size() >= MAX_REPORTED_OVERSIZED_UPLOADS
-                || !reportedOversizedUploads.add(textureType + ':' + size + ':' + limit)) return;
-        if (protocolProfile.mode() == ProtocolProfile.Mode.LEGACY_V1) {
-            QuickSkinInfo.LOGGER.warn("This legacy v1 (Quick Skin 2.x) server relays textures"
-                    + " unchunked; the {} byte {} is over the {} byte limit for such a server"
-                    + " and is withdrawn from the synced appearance", size, textureType, limit);
-        } else {
-            QuickSkinInfo.LOGGER.warn("The {} byte {} is over this server's {} byte upload limit;"
-                    + " it stays local and other players do not see it", size, textureType, limit);
-        }
+        String reportKey = textureType + ':' + size + ':' + limit;
+        if (reportedOversizedUploads.contains(reportKey)) return;
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null) return;
         String translationKey = "cape".equals(textureType)
@@ -408,8 +403,20 @@ public class NetworkSyncService {
                 : "quickskin.network.upload_too_large.skin";
         String sizeText = TextureTransferLimits.describeBytes(size);
         String limitText = TextureTransferLimits.describeBytes(limit);
+        boolean legacyServer = protocolProfile.mode() == ProtocolProfile.Mode.LEGACY_V1;
         minecraft.execute(() -> {
-            if (minecraft.player == null) return;
+            if (minecraft.player == null
+                    || reportedOversizedUploads.size() >= MAX_REPORTED_OVERSIZED_UPLOADS
+                    || !reportedOversizedUploads.add(reportKey)) return;
+            if (legacyServer) {
+                QuickSkinInfo.LOGGER.warn("This legacy v1 (Quick Skin 2.x) server relays textures"
+                        + " unchunked; the {} byte {} is over the {} byte limit for such a server"
+                        + " and is withdrawn from the synced appearance", size, textureType, limit);
+            } else {
+                QuickSkinInfo.LOGGER.warn("The {} byte {} is over this server's {} byte upload"
+                        + " limit; it stays local and other players do not see it",
+                        size, textureType, limit);
+            }
             net.minecraft.network.chat.Component message =
                     net.minecraft.network.chat.Component.translatable(
                             translationKey, sizeText, limitText);

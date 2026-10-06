@@ -85,6 +85,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   upload over it once, and `ServerTextureCache` neither stages, loads nor serves a larger texture.
   A client keeps a texture over its session's `maximumUploadBytes()` local: it is never sent, the
   appearance carries that id empty so the rest still syncs, and the player sees the size and limit.
+  Released 3.0.x and 3.1.0 clients accept the narrowed limit but withhold their whole appearance
+  (skin, cape and model) while one texture is over it and retry until the player updates or picks
+  a smaller texture; no server change can fix them, so `ServerRuntime` warns at startup whenever
+  the limit is below the default. A saved appearance whose texture is no longer held (over a
+  lowered limit or removed) is restored without that texture; a held texture owned by another
+  player or pins over budget still refuse it whole. The limit is read at server start and the
+  server writes its settings back at stop, so it is edited while the server is stopped. A setting
+  with an invalid number is clamped or ignored on its own, and a file that cannot be parsed is
+  left untouched (defaults apply until it is fixed), never overwritten.
 - Every packet must fit the vanilla custom-payload limits of every supported version (32767 bytes
   serverbound, 1 MiB clientbound) without XL Packets or similar mods: anything that can grow with an
   asset travels in bounded chunks, and `WirePayloadBudget` with its test bounds each packet from the

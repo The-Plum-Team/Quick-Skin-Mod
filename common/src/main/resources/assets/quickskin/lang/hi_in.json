@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "प्रतीक्षा में (%ss)",
-  "quickskin.cooldown.tooltip": "अपनी स्किन फिर से बदलने से पहले आपको प्रतीक्षा करनी होगी।"
+  "quickskin.cooldown.tooltip": "अपनी स्किन फिर से बदलने से पहले आपको प्रतीक्षा करनी होगी।",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[त्वरित स्किन] आपकी स्किन (%s) इस सर्वर की %s अपलोड सीमा से बड़ी है। यह केवल आपकी स्क्रीन पर दिखती है; अन्य खिलाड़ी इसे नहीं देखते।",
+  "quickskin.network.upload_too_large.cape": "[त्वरित स्किन] आपका केप (%s) इस सर्वर की %s अपलोड सीमा से बड़ा है। यह केवल आपकी स्क्रीन पर दिखता है; अन्य खिलाड़ी इसे नहीं देखते।"
 }

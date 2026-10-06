@@ -2,11 +2,16 @@ package com.quickskin.mod.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.platform.PlatformHelper;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,10 +35,21 @@ public class ServerConfig {
     public int skinChangeCooldownSeconds = 0; // Cooldown in seconds for changing skin (0 = disabled)
     /**
      * Largest skin or cape (the final PNG a client transmits, animation metadata included) this
-     * server accepts, stores and serves, in KiB. Clients learn it when they connect and refuse a
-     * larger texture before sending it. 64 to 16384; textures always travel in bounded chunks.
+     * server accepts, stores and serves, in KiB. 64 to 16384 (the default); a value outside that
+     * range is clamped, and one that is not a number is ignored. It is read when the server
+     * starts and the server writes its settings back when it stops, so edit the file while the
+     * server is stopped.
+     *
+     * <p>Clients that include this change learn the limit when they connect, keep a larger
+     * texture on their own screen and sync the rest of their appearance. Released Quick Skin
+     * 3.0.x and 3.1.0 clients learn it too, but while one of their textures is over it they
+     * withhold their whole appearance (skin, cape and model) and retry until they update or pick
+     * a smaller texture. The server cannot change that; lower the limit only when those players
+     * can update.</p>
      */
     public int maxTextureUploadKilobytes = MAX_TEXTURE_UPLOAD_KILOBYTES;
+    /** False when the file could not be read; such a file is never overwritten. */
+    private transient boolean persistable = true;
 
     // Logging Settings
 
@@ -52,34 +68,98 @@ public class ServerConfig {
      * Load configuration from file
      */
     private static ServerConfig load() {
-        Path configPath = getConfigPath();
+        return load(getConfigPath());
+    }
 
+    /**
+     * Reads the file, or writes the defaults when there is none. A file that cannot be read is
+     * left untouched: the defaults used instead are never saved over it.
+     */
+    static ServerConfig load(Path configPath) {
         if (Files.exists(configPath)) {
             try {
                 String json = BoundedFileReader.readUtf8(configPath, MAX_CONFIG_BYTES);
-                ServerConfig config = GSON.fromJson(json, ServerConfig.class);
+                ServerConfig config = parse(json);
                 if (config != null) {
                     config.normalize();
                     return config;
                 }
-                QuickSkinInfo.LOGGER.warn("Server config {} contained JSON null; using defaults", configPath);
+                QuickSkinInfo.LOGGER.error("Server config {} is not a JSON object; using defaults"
+                        + " and leaving the file untouched until it is fixed", configPath);
             } catch (Exception e) {
-                QuickSkinInfo.LOGGER.warn("Could not load server config {}; using defaults", configPath, e);
+                QuickSkinInfo.LOGGER.error("Could not read server config {}; using defaults and"
+                        + " leaving the file untouched until it is fixed", configPath, e);
             }
+            ServerConfig fallback = new ServerConfig();
+            fallback.persistable = false;
+            return fallback;
         }
 
         // Return default config and save it
         ServerConfig config = new ServerConfig();
-        config.save();
+        config.save(configPath);
         return config;
+    }
+
+    /**
+     * Parses a configuration document. An invalid number in one setting is repaired or dropped
+     * (see {@link #sanitizeInteger}) instead of discarding the whole document.
+     *
+     * @return null when the document is not a JSON object
+     */
+    private static ServerConfig parse(String json) {
+        JsonElement root = JsonParser.parseString(json);
+        if (root == null || !root.isJsonObject()) return null;
+        JsonObject object = root.getAsJsonObject();
+        sanitizeInteger(object, "skinChangeCooldownSeconds");
+        sanitizeInteger(object, "maxTextureUploadKilobytes");
+        return GSON.fromJson(object, ServerConfig.class);
+    }
+
+    /**
+     * Gson refuses a number outside the int range or with a fraction, which used to discard the
+     * whole file. Such a number is clamped to the int range and truncated, and a value that is
+     * not a number at all is dropped so the default applies. {@link #normalize()} then clamps
+     * the result to the range of the setting.
+     */
+    private static void sanitizeInteger(JsonObject object, String name) {
+        JsonElement value = object.get(name);
+        if (value == null) return;
+        BigDecimal number = null;
+        if (value.isJsonPrimitive()) {
+            JsonPrimitive primitive = value.getAsJsonPrimitive();
+            if (primitive.isNumber() || primitive.isString()) {
+                try {
+                    number = new BigDecimal(primitive.getAsString().trim());
+                } catch (NumberFormatException ignored) {
+                    number = null;
+                }
+            }
+        }
+        if (number == null) {
+            QuickSkinInfo.LOGGER.warn("Ignoring the invalid server config value {} = {}; using"
+                    + " its default", name, value);
+            object.remove(name);
+            return;
+        }
+        BigDecimal clamped = number.max(BigDecimal.valueOf(Integer.MIN_VALUE))
+                .min(BigDecimal.valueOf(Integer.MAX_VALUE));
+        object.addProperty(name, clamped.intValue());
     }
 
     /**
      * Save configuration to file
      */
     public synchronized void save() {
-        Path configPath = getConfigPath();
+        save(getConfigPath());
+    }
 
+    synchronized void save(Path configPath) {
+        if (!persistable) {
+            QuickSkinInfo.LOGGER.warn("Not saving server config {}: it could not be read when the"
+                    + " server started, so it is left as it is", configPath);
+            return;
+        }
         try {
             // Ensure config directory exists
             Files.createDirectories(configPath.getParent());
@@ -123,7 +203,7 @@ public class ServerConfig {
                 QuickSkinInfo.LOGGER.warn("Received an oversized QuickSkin server configuration; using defaults");
                 return new ServerConfig();
             }
-            ServerConfig config = GSON.fromJson(json, ServerConfig.class);
+            ServerConfig config = parse(json);
             if (config == null) {
                 QuickSkinInfo.LOGGER.warn("Received a null QuickSkin server configuration; using defaults");
                 return new ServerConfig();

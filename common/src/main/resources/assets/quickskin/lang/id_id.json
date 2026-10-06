@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Cooldown (%ss)",
-  "quickskin.cooldown.tooltip": "Anda harus menunggu sebelum mengganti skin lagi."
+  "quickskin.cooldown.tooltip": "Anda harus menunggu sebelum mengganti skin lagi.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Skin Cepat] Skin Anda (%s) melebihi batas unggah server ini, yaitu %s. Skin ini hanya terlihat di layar Anda; pemain lain tidak melihatnya.",
+  "quickskin.network.upload_too_large.cape": "[Skin Cepat] Jubah Anda (%s) melebihi batas unggah server ini, yaitu %s. Jubah ini hanya terlihat di layar Anda; pemain lain tidak melihatnya."
 }

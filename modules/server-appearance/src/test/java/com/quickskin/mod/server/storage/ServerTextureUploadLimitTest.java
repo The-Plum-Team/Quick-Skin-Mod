@@ -1,6 +1,8 @@
 package com.quickskin.mod.server.storage;
 
 import com.quickskin.mod.common.data.ContentAliases;
+import com.quickskin.mod.common.data.PlayerAppearance;
+import com.quickskin.mod.server.data.ServerPlayerAppearanceRepository;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -28,9 +30,14 @@ class ServerTextureUploadLimitTest {
     Path directory;
 
     private final ServerTextureCache textures = ServerTextureCache.getInstance();
+    private final ServerAppearanceStorage appearances = ServerAppearanceStorage.getInstance();
+    private final ServerPlayerAppearanceRepository players =
+            ServerPlayerAppearanceRepository.getInstance();
 
     @AfterEach
     void release() {
+        players.clear();
+        appearances.clear();
         textures.clear();
         textures.configureUploadLimit(TextureTransferLimits.DEFAULT_SERVER_UPLOAD_BYTES);
     }
@@ -87,11 +94,101 @@ class ServerTextureUploadLimitTest {
         assertTrue(textures.isRequestable(aliases.sha256(), "skin"));
     }
 
+    @Test
+    void aSavedAppearanceKeepsItsSkinWhenOnlyItsCapeIsOverALoweredLimit() throws IOException {
+        byte[] skin = noise(64, 64);
+        byte[] cape = noise(512, 256);
+        assertTrue(skin.length <= LIMIT && cape.length > LIMIT, "fixtures must straddle the limit");
+        UUID player = UUID.randomUUID();
+        String skinId = "local_skin:" + ContentAliases.forBytes(skin).sha256();
+        String capeId = "local_cape:" + ContentAliases.forBytes(cape).sha256();
+        Path world = saveAppearance(player, skin, cape, skinId, capeId);
+
+        reopenWithLimit(world);
+        PlayerAppearance loaded = appearances.loadPlayerAppearance(player);
+
+        assertEquals(skinId, loaded.getSkinId());
+        assertEquals("", loaded.getCapeId());
+        assertEquals("slim", loaded.getModel());
+        assertEquals("", players.getAppearance(player).getCapeId());
+        assertEquals(skinId, players.getAppearance(player).getSkinId());
+    }
+
+    @Test
+    void aSavedAppearanceKeepsItsCapeWhenOnlyItsSkinIsOverALoweredLimit() throws IOException {
+        byte[] skin = noise(256, 256);
+        byte[] cape = noise(64, 32);
+        assertTrue(skin.length > LIMIT && cape.length <= LIMIT, "fixtures must straddle the limit");
+        UUID player = UUID.randomUUID();
+        String skinId = "local_skin:" + ContentAliases.forBytes(skin).sha256();
+        String capeId = "local_cape:" + ContentAliases.forBytes(cape).sha256();
+        Path world = saveAppearance(player, skin, cape, skinId, capeId);
+
+        reopenWithLimit(world);
+        PlayerAppearance loaded = appearances.loadPlayerAppearance(player);
+
+        assertEquals("", loaded.getSkinId());
+        assertEquals(capeId, loaded.getCapeId());
+        assertEquals("slim", loaded.getModel());
+    }
+
+    @Test
+    void aHeldTextureOwnedBySomeoneElseStillRefusesTheWholeSavedAppearance() throws IOException {
+        byte[] skin = noise(64, 64);
+        byte[] cape = noise(512, 256);
+        UUID player = UUID.randomUUID();
+        String skinId = "local_skin:" + ContentAliases.forBytes(skin).sha256();
+        String capeId = "local_cape:" + ContentAliases.forBytes(cape).sha256();
+        Path world = directory.resolve("world");
+        textures.init(world);
+        appearances.init(world);
+        // The skin belongs to another player; the cape is this player's own.
+        assertTrue(textures.storeTexture(
+                ContentAliases.forBytes(skin).sha1(), UUID.randomUUID(), "skin", skin));
+        assertTrue(textures.storeTexture(ContentAliases.forBytes(cape).sha1(), player, "cape", cape));
+        Files.createDirectories(world.resolve("quickskin/appearances"));
+        Files.writeString(world.resolve("quickskin/appearances/" + player + ".json"),
+                "{\"playerId\": \"" + player + "\", \"skinId\": \"" + skinId
+                        + "\", \"capeId\": \"" + capeId + "\", \"model\": \"slim\"}");
+
+        reopenWithLimit(world);
+
+        assertNull(appearances.loadPlayerAppearance(player));
+        assertNull(players.getAppearance(player));
+    }
+
+    /** Stores both textures for the player under the default limit and saves the appearance. */
+    private Path saveAppearance(
+            UUID player, byte[] skin, byte[] cape, String skinId, String capeId) {
+        Path world = directory.resolve("world");
+        textures.init(world);
+        appearances.init(world);
+        assertTrue(textures.storeTexture(ContentAliases.forBytes(skin).sha1(), player, "skin", skin));
+        assertTrue(textures.storeTexture(ContentAliases.forBytes(cape).sha1(), player, "cape", cape));
+        assertTrue(players.trySetAppearance(new PlayerAppearance(player, skinId, capeId, "slim")));
+        appearances.savePlayerAppearance(player);
+        return world;
+    }
+
+    /** A restart of the same world with the minimum upload limit. */
+    private void reopenWithLimit(Path world) {
+        players.clear();
+        appearances.clear();
+        textures.clear();
+        textures.configureUploadLimit(LIMIT);
+        textures.init(world);
+        appearances.init(world);
+    }
+
     private static byte[] noiseSkin(int size) throws IOException {
-        BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
-        Random random = new Random(size);
-        for (int y = 0; y < size; y++) {
-            for (int x = 0; x < size; x++) {
+        return noise(size, size);
+    }
+
+    private static byte[] noise(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Random random = new Random(31L * width + height);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
                 image.setRGB(x, y, 0xFF000000 | random.nextInt(0x1000000));
             }
         }

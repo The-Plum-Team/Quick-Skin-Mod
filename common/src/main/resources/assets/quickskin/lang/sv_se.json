@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Nedkylning (%ss)",
-  "quickskin.cooldown.tooltip": "Du måste vänta innan du byter skin igen."
+  "quickskin.cooldown.tooltip": "Du måste vänta innan du byter skin igen.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Snabbt Skin] Ditt skin (%s) är större än den här serverns uppladdningsgräns (%s). Det syns bara på din skärm; andra spelare ser det inte.",
+  "quickskin.network.upload_too_large.cape": "[Snabbt Skin] Din mantel (%s) är större än den här serverns uppladdningsgräns (%s). Den syns bara på din skärm; andra spelare ser den inte."
 }

@@ -3,6 +3,7 @@ package com.quickskin.mod.runtime;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.ServerNetworkHandler;
+import com.quickskin.mod.networking.TextureTransferLimits;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
 import com.quickskin.mod.server.concurrent.ServerTextureIngressExecutor;
 import com.quickskin.mod.server.concurrent.ServerCacheIoExecutor;
@@ -77,6 +78,12 @@ public final class ServerRuntime implements AutoCloseable {
         textureCache.configureUploadLimit(uploadLimit);
         QuickSkinInfo.LOGGER.info("Quick Skin accepts skins and capes up to {} KiB per texture"
                 + " (maxTextureUploadKilobytes in quickskin-server.json)", uploadLimit / 1024);
+        if (uploadLimit < TextureTransferLimits.DEFAULT_SERVER_UPLOAD_BYTES) {
+            // Released clients refuse the whole sync, not just the texture; no server can fix it.
+            QuickSkinInfo.LOGGER.warn("Players on Quick Skin 3.1.0 or older with a skin or cape"
+                    + " over this {} KiB limit will not sync their appearance (skin, cape and"
+                    + " model) until they update or choose a smaller texture", uploadLimit / 1024);
+        }
         ServerCacheIoExecutor.getInstance().start();
         java.nio.file.Path worldPath = server.getWorldPath(
                 net.minecraft.world.level.storage.LevelResource.ROOT);

@@ -305,7 +305,7 @@ public class ModNetworking implements NetworkTransport {
     public void sendAnimationMetadataToServer(String hash, String metadataJson) {
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         buffer.writeUtf(hash);
-        buffer.writeUtf(metadataJson);
+        PacketHelper.writeAnimationMetadata(buffer, metadataJson);
         NetworkManager.sendToServer(UPLOAD_ANIMATION_METADATA, buffer);
     }
 
@@ -368,7 +368,7 @@ public class ModNetworking implements NetworkTransport {
     public void sendAnimationMetadataV2ToServer(String contentId, String metadataJson) {
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         buffer.writeUtf(contentId, TextureTransferLimits.MAX_CONTENT_ID_BYTES);
-        buffer.writeUtf(metadataJson, TextureTransferLimits.MAX_JSON_BYTES);
+        PacketHelper.writeAnimationMetadata(buffer, metadataJson);
         NetworkManager.sendToServer(UPLOAD_ANIMATION_METADATA_V2, buffer);
     }
 
@@ -490,7 +490,7 @@ public class ModNetworking implements NetworkTransport {
             ServerPlayer player, String contentId, String metadataJson) {
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         buffer.writeUtf(contentId, TextureTransferLimits.MAX_CONTENT_ID_BYTES);
-        buffer.writeUtf(metadataJson, TextureTransferLimits.MAX_JSON_BYTES);
+        PacketHelper.writeAnimationMetadata(buffer, metadataJson);
         NetworkManager.sendToPlayer(player, SEND_ANIMATION_METADATA_V2, buffer);
     }
 }

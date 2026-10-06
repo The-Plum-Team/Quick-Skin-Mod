@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Afkoelen (%ss)",
-  "quickskin.cooldown.tooltip": "Je moet wachten voordat je je skin opnieuw kunt wijzigen."
+  "quickskin.cooldown.tooltip": "Je moet wachten voordat je je skin opnieuw kunt wijzigen.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Snelle Skin] Je skin (%s) is groter dan de uploadlimiet van deze server (%s). Die is alleen op je eigen scherm te zien; andere spelers zien hem niet.",
+  "quickskin.network.upload_too_large.cape": "[Snelle Skin] Je cape (%s) is groter dan de uploadlimiet van deze server (%s). Die is alleen op je eigen scherm te zien; andere spelers zien hem niet."
 }

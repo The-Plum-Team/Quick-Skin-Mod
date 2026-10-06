@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Abklingzeit (%ss)",
-  "quickskin.cooldown.tooltip": "Du musst warten, bevor du deinen Skin erneut ändern kannst."
+  "quickskin.cooldown.tooltip": "Du musst warten, bevor du deinen Skin erneut ändern kannst.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Schneller Skin] Dein Skin (%s) überschreitet das Upload-Limit dieses Servers von %s. Er ist nur auf deinem Bildschirm zu sehen; andere Spieler sehen ihn nicht.",
+  "quickskin.network.upload_too_large.cape": "[Schneller Skin] Dein Umhang (%s) überschreitet das Upload-Limit dieses Servers von %s. Er ist nur auf deinem Bildschirm zu sehen; andere Spieler sehen ihn nicht."
 }

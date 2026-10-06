@@ -62,7 +62,10 @@ public final class WirePayloadBudget {
                 + string(TextureTransferLimits.MAX_CONTENT_ID_BYTES) + byteArray(textureBytes);
     }
 
-    /** {@code [upload|send]_animation_metadata[_v2]}: content id and one metadata document. */
+    /**
+     * {@code [upload|send]_animation_metadata[_v2]}: content id and one metadata document, which
+     * every codec writes within {@link TextureTransferLimits#MAX_ANIMATION_METADATA_JSON_BYTES}.
+     */
     public static int animationMetadata() {
         return ENVELOPE_BYTES + string(TextureTransferLimits.MAX_CONTENT_ID_BYTES)
                 + string(TextureTransferLimits.MAX_ANIMATION_METADATA_JSON_BYTES);

@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Odnowienie (%ss)",
-  "quickskin.cooldown.tooltip": "Musisz poczekać, zanim ponownie zmienisz skórkę."
+  "quickskin.cooldown.tooltip": "Musisz poczekać, zanim ponownie zmienisz skórkę.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Szybka Skórka] Twoja skórka (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą.",
+  "quickskin.network.upload_too_large.cape": "[Szybka Skórka] Twoja peleryna (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą."
 }

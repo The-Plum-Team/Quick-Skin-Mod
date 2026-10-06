@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Em Espera (%ss)",
-  "quickskin.cooldown.tooltip": "Deves aguardar antes de mudar a tua pele novamente."
+  "quickskin.cooldown.tooltip": "Deves aguardar antes de mudar a tua pele novamente.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Pele Rápida] A tua pele (%s) excede o limite de carregamento deste servidor, %s. Aparece apenas no teu ecrã; os outros jogadores não a veem.",
+  "quickskin.network.upload_too_large.cape": "[Pele Rápida] A tua capa (%s) excede o limite de carregamento deste servidor, %s. Aparece apenas no teu ecrã; os outros jogadores não a veem."
 }

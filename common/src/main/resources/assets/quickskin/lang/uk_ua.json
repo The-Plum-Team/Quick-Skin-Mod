@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "Затримка (%ss)",
-  "quickskin.cooldown.tooltip": "Ви повинні почекати, перш ніж знову змінити скін."
+  "quickskin.cooldown.tooltip": "Ви повинні почекати, перш ніж знову змінити скін.",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[Швидкий скін] Ваш скін (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать.",
+  "quickskin.network.upload_too_large.cape": "[Швидкий скін] Ваш плащ (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать."
 }

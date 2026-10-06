@@ -181,5 +181,9 @@
 
   "_comment_cooldown": "=== Cooldown Messages ===",
   "quickskin.cooldown.button": "คูลดาวน์ (%ss)",
-  "quickskin.cooldown.tooltip": "คุณต้องรอก่อนเปลี่ยนสกินอีกครั้ง"
+  "quickskin.cooldown.tooltip": "คุณต้องรอก่อนเปลี่ยนสกินอีกครั้ง",
+
+  "_comment_upload_limit": "=== Upload Size Limit ===",
+  "quickskin.network.upload_too_large.skin": "[สกินด่วน] สกินของคุณ (%s) เกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์นี้ (%s) จะแสดงบนหน้าจอของคุณเท่านั้น ผู้เล่นคนอื่นจะมองไม่เห็น",
+  "quickskin.network.upload_too_large.cape": "[สกินด่วน] ผ้าคลุมของคุณ (%s) เกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์นี้ (%s) จะแสดงบนหน้าจอของคุณเท่านั้น ผู้เล่นคนอื่นจะมองไม่เห็น"
 }
