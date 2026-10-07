@@ -189,5 +189,16 @@
 
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Aspecto rápido] Tu aspecto (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no lo ven.",
-  "quickskin.network.upload_too_large.cape": "[Aspecto rápido] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven."
+  "quickskin.network.upload_too_large.cape": "[Aspecto rápido] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven.",
+
+  "quickskin.file_picker.downloads": "Descargas",
+  "quickskin.file_picker.storage": "Teléfono",
+  "quickskin.file_picker.game": "Juego",
+  "quickskin.file_picker.up": "Subir",
+  "quickskin.file_picker.loading": "Cargando archivos...",
+  "quickskin.file_picker.empty": "No hay archivos compatibles en esta carpeta.",
+  "quickskin.file_picker.unreadable": "No se puede leer la carpeta. Comprueba los permisos o elige otra.",
+  "quickskin.file_picker.limit": "Selecciona como máximo %s archivos.",
+  "quickskin.file_picker.import": "Importar (%s)",
+  "quickskin.file_picker.access_hint": "¿Falta un archivo? Cópialo a la carpeta del juego."
 }
