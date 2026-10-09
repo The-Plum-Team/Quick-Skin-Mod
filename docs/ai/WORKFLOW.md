@@ -159,6 +159,17 @@ deltas.
   ([ADR 0010](../architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)). Never edit
   a managed file by hand, and close any Dependabot pull request that touches a kit reference or
   the managed part of `pages.yml` (Dependabot ignores the kit and `actions/deploy-pages`).
+- The shared mod-base Build and packaged E2E adapter is protected policy, adopted beside the legacy
+  gates: `scripts/ci/mod-base-build.json` names the dispatcher, the adapter, the policy runner and
+  every module a protected hook imports (the `scripts/ci/mod_base_build_*.py` files,
+  `scripts/release/{matrix,verify_release,artifact_manifest,generate_sbom,release_identity}.py` and
+  `e2e/scenario_contract.py`), each with the SHA-256 of its LF bytes. The kit runs protected hooks
+  from the default branch's copy of exactly those files, so an edit to one of them updates its hash
+  in the same commit and changes the policy digest. `site/mod-base-build-activation.json` alone
+  decides which kit callers exist; every mode change is its own pull request, never combined with a
+  kit bump, and `build-gate.yml` and `on-demand-e2e.yml` stay the required gates until an
+  owner-approved cutover. `scripts/ci/tests/test_mod_base_build_adapter.py` holds the plan to the
+  native targets, lanes and staged names.
 
 ## Verification
 
