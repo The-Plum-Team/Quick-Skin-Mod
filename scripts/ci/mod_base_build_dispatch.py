@@ -143,6 +143,7 @@ def _verify_runtime(root: Path, output: Output, lane: str) -> None:
     results = runtime / "lanes" / lane
     summary = adapter.verify_run(mod, lane, entry["obligations"],
                                  production=_read(root / "sealed-build", production[0]),
+                                 production_name=production[0].rsplit("/", 1)[1],
                                  files={path[len(prefix):] for path in present},
                                  read=lambda path: _read(results, path))
     output.write(f"{lane}.json", adapter.encode({"schema_version": 1, "hook": "verify_runtime", "unit": lane,

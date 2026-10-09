@@ -511,21 +511,25 @@ def _verify_sbom(mod: Mod, target: str, *, tested_sha: str, raw: bytes, jars: di
 #: these names (``client_a/screenshots/``, ``logs/``, ``server/crash-reports/``, ...).
 PROFILE_TREES = ("logs", "e2e-report", "screenshots", "crash-reports")
 LANE_FILES = ("summary.json", "resolved-matrix.json", "runtime-store.json")
-_RESULT_REQUIRED = ("artifact_node", "runtime_version", "loader", "scenario", "contract_sha256", "jar_sha256", "port",
-                    "status", "profile", "elapsed_s")
+#: The fields of a passing PR result (``e2e/visual_evidence.py`` ``RESULT_FIELDS``): no compatibility
+#: lane, no feature selection and no error.
+RESULT_FIELDS = ("artifact_node", "runtime_version", "loader", "scenario", "contract_sha256", "jar_sha256",
+                 "installed_quickskin", "port", "status", "profile", "elapsed_s", "reports")
 _RESOLVED_KEYS = ("artifact_node", "runtime_version", "loader", "scenario", "jar_sha256", "port")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
-def verify_run(mod: Mod, lane: str, obligations: list[str], *, production: bytes, files: set[str],
-               read: Callable[[str], bytes]) -> dict[str, Any]:
+def verify_run(mod: Mod, lane: str, obligations: list[str], *, production: bytes, production_name: str,
+               files: set[str], read: Callable[[str], bytes]) -> dict[str, Any]:
     """Verify the sealed native results of one lane (``read(path below lanes/<lane>/) -> bytes``,
     ``files`` every path there) and return what the report records.
 
     Every planned scenario must have exactly one passing result, in plan order, for this lane's
-    row, this scenario contract and the sealed production JAR; each result's ``result.json`` must
-    repeat it, no crash report may exist, every screenshot must be a PNG, and every file must
-    belong to the lane's summary or to one of its scenario profiles."""
+    row, this scenario contract and the sealed production JAR (``production_name`` is its staged
+    file name), installed on the server and on every client the scenario has, each of which
+    reported a pass; each result's ``result.json`` must repeat it, no crash report may exist,
+    every screenshot must be a PNG, and every file must belong to the lane's summary or to one of
+    its scenario profiles."""
 
     row = runtime_rows(mod).get(lane)
     if row is None:
@@ -544,18 +548,32 @@ def verify_run(mod: Mod, lane: str, obligations: list[str], *, production: bytes
     production_sha256 = sha256(production)
     profiles: dict[str, str] = {}
     for result in results:
-        if not set(_RESULT_REQUIRED) <= set(result) or not set(result) <= {*_RESULT_REQUIRED, "reports", "error"}:
-            raise AdapterError(f"a result of {lane} has an unknown shape")
         scenario = result["scenario"]
+        if result.get("status") != "pass" or "error" in result:
+            raise AdapterError(f"{scenario} of {lane} did not pass: {str(result.get('error'))[:400]}")
+        _object(result, RESULT_FIELDS, f"result {scenario} of {lane}")
         identity = (result["artifact_node"], result["runtime_version"], result["loader"])
         if identity != (row["artifact_node"], row["runtime_version"], row["loader"]):
             raise AdapterError(f"{scenario} of {lane} ran another runtime row")
-        if result["status"] != "pass" or "error" in result or type(result.get("reports")) is not dict:
-            raise AdapterError(f"{scenario} of {lane} did not pass: {str(result.get('error'))[:400]}")
         if result["contract_sha256"] != mod.contract.sha256:
             raise AdapterError(f"{scenario} of {lane} ran another scenario contract")
         if result["jar_sha256"] != production_sha256:
             raise AdapterError(f"{scenario} of {lane} did not run the sealed production JAR")
+        roles = list(mod.contract.expected_roles(scenario))
+        installed = result["installed_quickskin"]
+        expected_installed = sorted(f"{root}/mods/{production_name}" for root in ("server", *roles))
+        if (type(installed) is not list or sorted(
+                _object(item, ("path", "sha256"), f"installed JAR of {scenario}")["path"] for item in installed)
+                != expected_installed or {item["sha256"] for item in installed} != {production_sha256}):
+            raise AdapterError(f"{scenario} of {lane} did not install exactly the sealed JAR on the server and "
+                               "its clients")
+        reports = result["reports"]
+        if type(reports) is not dict or sorted(reports) != sorted(roles):
+            raise AdapterError(f"{scenario} of {lane} did not report exactly its roles {roles}")
+        for role, report in reports.items():
+            if (type(report) is not dict or report.get("status") != "pass" or report.get("scenario") != scenario
+                    or report.get("role") != role or report.get("contract_sha256") != mod.contract.sha256):
+                raise AdapterError(f"the {role} report of {scenario} of {lane} is not a passing report of it")
         profile = result["profile"]
         if (type(profile) is not str or not profile.startswith("profiles/") or "/" in profile[len("profiles/"):]
                 or profile in profiles.values()):

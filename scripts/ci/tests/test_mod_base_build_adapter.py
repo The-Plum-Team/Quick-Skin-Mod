@@ -330,17 +330,25 @@ class PlanTests(unittest.TestCase):
         self.assertIn(b"duplicate JSON key", process.stdout)
 
 
+PRODUCTION_NAME = "Quick Skin - Fabric - 1.20.1-3.1.0.jar"
+
+
 def _evidence(mod: adapter.Mod, lane: str, production: bytes) -> dict[str, bytes]:
     """A lane's results in the native layout ``orchestrator.py`` writes, every scenario passing."""
 
     row = adapter.runtime_rows(mod)[lane]
+    digest = hashlib.sha256(production).hexdigest()
     results, files = [], {}
     for scenario in adapter.scenarios(mod):
         profile = f"profiles/{lane}--{row['runtime_version']}--{scenario}"
+        roles = mod.contract.expected_roles(scenario)
         result = {"artifact_node": lane, "runtime_version": row["runtime_version"], "loader": row["loader"],
-                  "scenario": scenario, "contract_sha256": mod.contract.sha256,
-                  "jar_sha256": hashlib.sha256(production).hexdigest(), "port": 25565, "status": "pass",
-                  "profile": profile, "elapsed_s": 12.5, "reports": {"client_a": {"steps": 3}}}
+                  "scenario": scenario, "contract_sha256": mod.contract.sha256, "jar_sha256": digest,
+                  "installed_quickskin": [{"path": f"{root}/mods/{PRODUCTION_NAME}", "sha256": digest}
+                                          for root in ("server", *roles)],
+                  "port": 25565, "status": "pass", "profile": profile, "elapsed_s": 12.5,
+                  "reports": {role: {"role": role, "scenario": scenario, "status": "pass",
+                                     "contract_sha256": mod.contract.sha256, "steps": []} for role in roles}}
         results.append(result)
         files[f"{profile}/result.json"] = (json.dumps(result, indent=2) + "\n").encode()
         files[f"{profile}/logs/server.log"] = b"[Server thread/INFO]: Done\n"
@@ -364,8 +372,8 @@ class RuntimeVerificationTests(unittest.TestCase):
         cls.obligations = [adapter.obligation(scenario) for scenario in adapter.scenarios(cls.mod)]
 
     def verify(self, files: dict[str, bytes], *, production: bytes = PRODUCTION) -> dict[str, Any]:
-        return adapter.verify_run(self.mod, self.LANE, self.obligations, production=production, files=set(files),
-                                  read=lambda path: files[path])
+        return adapter.verify_run(self.mod, self.LANE, self.obligations, production=production,
+                                  production_name=PRODUCTION_NAME, files=set(files), read=lambda path: files[path])
 
     def test_native_passing_results_are_accepted(self) -> None:
         files = _evidence(self.mod, self.LANE, self.PRODUCTION)
@@ -397,6 +405,16 @@ class RuntimeVerificationTests(unittest.TestCase):
 
     def test_another_production_jar_is_refused(self) -> None:
         self.refuse(_evidence(self.mod, self.LANE, self.PRODUCTION), "sealed production JAR", production=b"other")
+
+    def test_a_client_without_the_sealed_jar_is_refused(self) -> None:
+        files = _evidence(self.mod, self.LANE, self.PRODUCTION)
+        self.refuse(self._summary(files, lambda summary: summary["results"][1]["installed_quickskin"].pop()),
+                    "did not install exactly the sealed JAR")
+
+    def test_a_failed_client_report_is_refused(self) -> None:
+        files = _evidence(self.mod, self.LANE, self.PRODUCTION)
+        self.refuse(self._summary(files, lambda summary: summary["results"][0]["reports"]["client_a"].update(
+            status="fail")), "not a passing report")
 
     def test_a_crash_report_is_refused(self) -> None:
         files = _evidence(self.mod, self.LANE, self.PRODUCTION)

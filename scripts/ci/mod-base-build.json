@@ -8,7 +8,7 @@
       },
       {
         "path": "scripts/ci/mod_base_build_adapter.py",
-        "sha256": "1b0b74a06388009d947ffaeeaf3144693a6a63b1a7a3965ccb853f7efa40fb9f"
+        "sha256": "a733f8953bdf245b607f7665a7960df749a0c3b089b2270e57f22b498fdfeb9d"
       },
       {
         "path": "scripts/ci/mod_base_build_candidate.py",
@@ -16,7 +16,7 @@
       },
       {
         "path": "scripts/ci/mod_base_build_dispatch.py",
-        "sha256": "f9b86d2b6b432afffc1906abe927accec4dde5d869efab3ae93dbf34769d3c36"
+        "sha256": "200b92a5ccbcd7f9829e8e38fc53c98227e45d0f18a52823754f1bcda8ed05ec"
       },
       {
         "path": "scripts/ci/mod_base_build_policy.py",
