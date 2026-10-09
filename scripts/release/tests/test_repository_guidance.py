@@ -236,10 +236,16 @@ class RepositoryGuidanceTest(unittest.TestCase):
         updates = dependabot.split("\n  - package-ecosystem: ")[1:]
         actions = [update for update in updates if update.startswith("github-actions\n")]
         self.assertEqual(len(actions), 1)
-        # Every other action pinned inside the managed region of pages.yml is kit-owned too: a
+        # Every other action pinned inside the managed region of pages.yml, or by a shared
+        # Build/E2E caller the activation mode manages (rendered whole), is kit-owned too: a
         # Dependabot bump of it would be byte drift that `template check` rejects.
         caller = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
         managed = caller.split("# <<< mod-base managed\n", 1)[0]
+        for name in ("mod-base-guard.yml", "mod-base-build.yml", "mod-base-packaged-e2e.yml",
+                     "mod-base-gate-status.yml"):
+            shared_caller = ROOT / ".github" / "workflows" / name
+            if shared_caller.is_file():
+                managed += shared_caller.read_text(encoding="utf-8")
         managed_actions = sorted(
             set(re.findall(r"^\s*(?:-\s+)?uses:\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/[^@\s]*)?@",
                            managed, re.MULTILINE))
