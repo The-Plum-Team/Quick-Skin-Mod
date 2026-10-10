@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Skintransparantie uitschakelen",
   "quickskin.settings.show_title_preview": "Voorbeeld op titelscherm tonen",
   "quickskin.settings.show_pause_preview": "Voorbeeld in pauzemenu tonen",
+  "quickskin.settings.compact_change_skin_button": "Compacte Skin wijzigen-knop",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Toont de knop Skin wijzigen op het titelscherm en in het pauzemenu als een klein pictogram.",
   "quickskin.settings.disable_transparency_server": "Skintransparantie uitschakelen (Server)",
   "quickskin.settings.cooldown_label": "Afkoelperiode voor skinwisseling",
   "quickskin.settings.cooldown_seconds": "Afkoelperiode voor skinwisseling (seconden)",

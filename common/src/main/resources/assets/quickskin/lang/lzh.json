@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "止膚透明",
   "quickskin.settings.show_title_preview": "示標題畫面觀",
   "quickskin.settings.show_pause_preview": "示暫停選單觀",
+  "quickskin.settings.compact_change_skin_button": "易膚鈕作小徽",
+  "quickskin.settings.compact_change_skin_button.tooltip": "以小徽示首頁與暫停選單之易膚鈕。",
   "quickskin.settings.disable_transparency_server": "止膚透明（伺服器）",
   "quickskin.settings.cooldown_label": "膚換冷卻",
   "quickskin.settings.cooldown_seconds": "膚換冷卻時（秒）",

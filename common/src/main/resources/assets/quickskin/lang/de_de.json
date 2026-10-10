@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Skin-Transparenz deaktivieren",
   "quickskin.settings.show_title_preview": "Vorschau im Hauptmenü anzeigen",
   "quickskin.settings.show_pause_preview": "Vorschau im Pausenmenü anzeigen",
+  "quickskin.settings.compact_change_skin_button": "„Skin ändern“ als Symbol",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Zeigt die Schaltfläche „Skin ändern“ im Hauptmenü und im Pausenmenü als kleines Symbol an.",
   "quickskin.settings.disable_transparency_server": "Skin-Transparenz deaktivieren (Server)",
   "quickskin.settings.cooldown_label": "Abklingzeit für Skin-Wechsel",
   "quickskin.settings.cooldown_seconds": "Abklingzeit für Skin-Wechsel (Sekunden)",
