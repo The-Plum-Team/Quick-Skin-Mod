@@ -18,8 +18,8 @@ updates:
     # a kit bump as well.
     ignore:
       - dependency-name: "The-Plum-Team/mod-base*"
-      - dependency-name: "actions/deploy-pages"
       - dependency-name: "actions/create-github-app-token"
+      - dependency-name: "actions/deploy-pages"
     groups:
       github-actions:
         patterns:

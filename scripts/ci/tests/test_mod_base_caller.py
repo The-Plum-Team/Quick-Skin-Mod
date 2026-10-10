@@ -72,6 +72,15 @@ PIN_REFERENCES = {
     ".github/workflows/on-demand-e2e.yml": 2,
     ".github/workflows/pages.yml": 3,
 }
+#: The shared Build/E2E callers the activation mode manages. The kit renders each whole and
+#: `template check` holds it to the pinned template byte for byte, so its pin lines are the kit's
+#: to count; they still carry the single pin.
+SHARED_CALLERS = (
+    ".github/workflows/mod-base-guard.yml",
+    ".github/workflows/mod-base-build.yml",
+    ".github/workflows/mod-base-packaged-e2e.yml",
+    ".github/workflows/mod-base-gate-status.yml",
+)
 
 
 def caller_text() -> str:
@@ -191,7 +200,8 @@ class ModBaseCallerTest(unittest.TestCase):
         for reference in references:
             path, _line = reference.rsplit("@", 1)
             counted[path] = counted.get(path, 0) + 1
-        self.assertEqual(PIN_REFERENCES, counted)
+        self.assertEqual(PIN_REFERENCES, {path: count for path, count in counted.items()
+                                          if path not in SHARED_CALLERS})
         for path in sorted(WORKFLOWS.glob("*.y*ml")):
             text = path.read_text(encoding="utf-8")
             pins = set((match.group(2), match.group(3)) for match in PIN_LINE.finditer(text))
