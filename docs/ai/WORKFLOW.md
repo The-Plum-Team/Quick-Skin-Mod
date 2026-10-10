@@ -159,6 +159,28 @@ deltas.
   ([ADR 0010](../architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)). Never edit
   a managed file by hand, and close any Dependabot pull request that touches a kit reference or
   the managed part of `pages.yml` (Dependabot ignores the kit and `actions/deploy-pages`).
+- The shared mod-base Build and packaged E2E adapter is protected policy, adopted beside the legacy
+  gates: `scripts/ci/mod-base-build.json` names the dispatcher, the adapter, the policy runner and
+  every module a protected hook imports (the `scripts/ci/mod_base_build_*.py` files,
+  `scripts/release/{matrix,verify_release,artifact_manifest,generate_sbom,release_identity}.py` and
+  `e2e/scenario_contract.py`), each with the SHA-256 of its LF bytes. The kit runs protected hooks
+  from the default branch's copy of exactly those files, so an edit to one of them updates its hash
+  in the same commit and changes the policy digest. `site/mod-base-build-activation.json` alone
+  decides which kit callers exist. Every mode change is its own pull request, never combined with a
+  kit bump: with a detached worktree of `origin/master` at `<base>`, run
+  `python scripts/ci/mod_base_kit.py run template activation --repo .`, edit the mode, run
+  `python scripts/ci/mod_base_kit.py run template sync --repo . --write`, `git rm` every caller the
+  new mode no longer manages, then `python scripts/ci/mod_base_kit.py run template check --repo .`
+  and `python scripts/ci/mod_base_kit.py run template transition --repo . --base <base>`, which must
+  pass before review. The managed callers run on `pull_request_target` and `workflow_run` from
+  `master`'s copy, never from the candidate. A mode that manages `mod-base-gate-status.yml`
+  (`shadow` and later) publishes its statuses through a statuses-only GitHub App whose
+  `MOD_BASE_GATE_APP_CLIENT_ID` and `MOD_BASE_GATE_APP_PRIVATE_KEY` exist only in the `mod-base-gate`
+  environment (deployment branch `master` alone, no reviewers, no wait timer); the owner creates
+  them, and only that caller's `publish` job reads them. `build-gate.yml` and `on-demand-e2e.yml`
+  stay the required gates until an owner-approved cutover, and no ruleset requires a ` (shadow)`
+  context. `scripts/ci/tests/test_mod_base_build_adapter.py` holds the plan to the native targets,
+  lanes and staged names.
 
 ## Verification
 
