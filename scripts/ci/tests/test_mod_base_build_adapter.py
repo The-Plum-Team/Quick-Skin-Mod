@@ -252,6 +252,16 @@ class BuildConfigTests(unittest.TestCase):
         for key, native in NATIVE_SECONDS.items():
             self.assertGreaterEqual(timeouts[key], 2 * native, key)
 
+    def test_the_workflow_guide_holds_the_mode_change_procedure(self) -> None:
+        """mod-base OPERATIONS.md: the reviewed transition check is the mod's own procedure."""
+
+        guide = " ".join((ROOT / "docs" / "ai" / "WORKFLOW.md").read_text(encoding="utf-8").split())
+        for command in ("template activation --repo .", "template sync --repo . --write", "template check --repo .",
+                        "template transition --repo . --base <base>"):
+            self.assertIn(f"`python scripts/ci/mod_base_kit.py run {command}`", guide)
+        for name in ("mod-base-gate", "MOD_BASE_GATE_APP_PRIVATE_KEY", "pull_request_target"):
+            self.assertIn(f"`{name}`", guide)
+
     def test_the_activation_manifest_names_this_config(self) -> None:
         activation = self.kit.parse_activation(ACTIVATION_PATH.read_bytes())
         self.assertEqual((activation["repository"], activation["profile"]), (REPOSITORY, "quick-skin"))
