@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "تعطيل شفافية المظهر",
   "quickskin.settings.show_title_preview": "إظهار معاينة شاشة العنوان",
   "quickskin.settings.show_pause_preview": "إظهار معاينة قائمة اللعبة",
+  "quickskin.settings.compact_change_skin_button": "زر تغيير المظهر المصغّر",
+  "quickskin.settings.compact_change_skin_button.tooltip": "عرض زر تغيير المظهر في شاشة العنوان وقائمة اللعبة كأيقونة صغيرة.",
   "quickskin.settings.disable_transparency_server": "تعطيل شفافية المظهر (الخادم)",
   "quickskin.settings.cooldown_label": "فترة انتظار تغيير المظهر",
   "quickskin.settings.cooldown_seconds": "فترة انتظار تغيير المظهر (ثوانٍ)",

@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Desativar Transparência da Pele",
   "quickskin.settings.show_title_preview": "Pré-visualização no Ecrã Inicial",
   "quickskin.settings.show_pause_preview": "Pré-visualização no Menu de Pausa",
+  "quickskin.settings.compact_change_skin_button": "Botão Mudar Pele Compacto",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Mostra o botão Mudar Pele do ecrã inicial e do menu de pausa como um ícone pequeno.",
   "quickskin.settings.disable_transparency_server": "Desativar Transparência da Pele (Servidor)",
   "quickskin.settings.cooldown_label": "Tempo de Espera para Mudar Pele",
   "quickskin.settings.cooldown_seconds": "Tempo de Espera para Mudar Pele (segundos)",

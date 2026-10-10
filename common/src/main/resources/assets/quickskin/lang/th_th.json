@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "ปิดใช้งานความโปร่งใสของสกิน",
   "quickskin.settings.show_title_preview": "แสดงตัวอย่างที่หน้าจอหลัก",
   "quickskin.settings.show_pause_preview": "แสดงตัวอย่างที่เมนูหยุดชั่วคราว",
+  "quickskin.settings.compact_change_skin_button": "ปุ่มเปลี่ยนสกินแบบย่อ",
+  "quickskin.settings.compact_change_skin_button.tooltip": "แสดงปุ่มเปลี่ยนสกินบนหน้าจอหลักและเมนูหยุดชั่วคราวเป็นไอคอนขนาดเล็ก",
   "quickskin.settings.disable_transparency_server": "ปิดใช้งานความโปร่งใสของสกิน (เซิร์ฟเวอร์)",
   "quickskin.settings.cooldown_label": "เวลาคูลดาวน์การเปลี่ยนสกิน",
   "quickskin.settings.cooldown_seconds": "เวลาคูลดาวน์การเปลี่ยนสกิน (วินาที)",

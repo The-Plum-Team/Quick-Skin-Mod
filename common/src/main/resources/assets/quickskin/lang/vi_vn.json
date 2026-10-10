@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Tắt độ trong suốt của skin",
   "quickskin.settings.show_title_preview": "Hiện xem trước ở màn hình chính",
   "quickskin.settings.show_pause_preview": "Hiện xem trước ở menu tạm dừng",
+  "quickskin.settings.compact_change_skin_button": "Nút Đổi Skin thu gọn",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Hiển thị nút Đổi Skin ở màn hình chính và menu tạm dừng dưới dạng biểu tượng nhỏ.",
   "quickskin.settings.disable_transparency_server": "Tắt độ trong suốt của skin (Máy chủ)",
   "quickskin.settings.cooldown_label": "Thời gian chờ đổi skin",
   "quickskin.settings.cooldown_seconds": "Thời gian chờ đổi skin (giây)",

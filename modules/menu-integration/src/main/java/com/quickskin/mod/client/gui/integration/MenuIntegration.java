@@ -223,10 +223,14 @@ public final class MenuIntegration {
 
             // Create and add the "Change Skin" button
             final Button changeSkinButton;
-            if (essentialPresent) {
-                // Use icon button when Essential is present
+            boolean compactButton = !essentialPresent
+                    && com.quickskin.mod.config.ClientConfig.getInstance().compactChangeSkinButton;
+            if (essentialPresent || compactButton) {
+                // An icon the size of vanilla's language and accessibility buttons, beside Essential's
+                // rail or, when chosen in settings, at the start of the full button's slot. A compact
+                // button stacks the preview's controls above it and moves the preview beside them.
                 changeSkinButton = new com.quickskin.mod.client.gui.widget.IconActionButton(
-                        buttonX, buttonY, buttonWidth, buttonHeight,
+                        buttonX, buttonY, buttonHeight, buttonHeight,
                         //? if <1.21.11 {
                             //? if <1.21 {
                         new ResourceLocation("quickskin", "textures/gui/quickskin_icon.png"),
@@ -259,6 +263,12 @@ public final class MenuIntegration {
 
                 int widgetX = buttonX + offsetX;
                 int widgetY = buttonY + offsetY;
+                if (compactButton) {
+                    // Stand the model on the icon's row, centred in the slot right of the control column
+                    int column = buttonHeight + spacing;
+                    widgetX += column / 2;
+                    widgetY += column;
+                }
 
                 // Get player skin and model type from saved config or player
                 //? if <1.21.11 {
@@ -435,10 +445,10 @@ public final class MenuIntegration {
 
                 // Only add animation buttons on title screen, not in-game (pause menu)
                 if ("title".equals(screenType)) {
-                    // Create animation toggle button (right of rotate button)
+                    // Create animation toggle button (right of rotate button, or above it beside a compact button)
                     int animToggleWidth = 20;
-                    int animToggleX = buttonX + buttonWidth - animToggleWidth;
-                    int animToggleY = rotateButtonY;
+                    int animToggleX = compactButton ? rotateButtonX : buttonX + buttonWidth - animToggleWidth;
+                    int animToggleY = compactButton ? rotateButtonY - rotateButtonSize - spacing : rotateButtonY;
 
                     animationToggleButton = Button.builder(
                             Component.literal(">"),

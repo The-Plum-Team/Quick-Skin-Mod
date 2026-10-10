@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "停用皮膚透明度",
   "quickskin.settings.show_title_preview": "顯示標題畫面預覽",
   "quickskin.settings.show_pause_preview": "顯示暫停選單預覽",
+  "quickskin.settings.compact_change_skin_button": "精簡更換皮膚按鈕",
+  "quickskin.settings.compact_change_skin_button.tooltip": "在標題畫面及暫停選單中以小圖示顯示「更換皮膚」按鈕。",
   "quickskin.settings.disable_transparency_server": "停用皮膚透明度（伺服器）",
   "quickskin.settings.cooldown_label": "皮膚更換冷卻",
   "quickskin.settings.cooldown_seconds": "皮膚更換冷卻時間（秒）",

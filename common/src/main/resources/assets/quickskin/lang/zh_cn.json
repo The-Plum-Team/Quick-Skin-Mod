@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "禁用皮肤透明度",
   "quickskin.settings.show_title_preview": "显示标题界面预览",
   "quickskin.settings.show_pause_preview": "显示暂停菜单预览",
+  "quickskin.settings.compact_change_skin_button": "紧凑的更换皮肤按钮",
+  "quickskin.settings.compact_change_skin_button.tooltip": "在标题界面和暂停菜单中将“更换皮肤”按钮显示为小图标。",
   "quickskin.settings.disable_transparency_server": "禁用皮肤透明度（服务器）",
   "quickskin.settings.cooldown_label": "皮肤更换冷却",
   "quickskin.settings.cooldown_seconds": "皮肤更换冷却时间（秒）",

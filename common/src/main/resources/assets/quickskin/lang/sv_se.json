@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Inaktivera skintransparens",
   "quickskin.settings.show_title_preview": "Visa förhandsgranskning i huvudmenyn",
   "quickskin.settings.show_pause_preview": "Visa förhandsgranskning i pausmenyn",
+  "quickskin.settings.compact_change_skin_button": "Kompakt Byt skin-knapp",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Visar knappen Byt skin på titelskärmen och i pausmenyn som en liten ikon.",
   "quickskin.settings.disable_transparency_server": "Inaktivera skintransparens (Server)",
   "quickskin.settings.cooldown_label": "Nedkylning för skinbyte",
   "quickskin.settings.cooldown_seconds": "Nedkylning för skinbyte (sekunder)",

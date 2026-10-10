@@ -164,6 +164,8 @@
   "quickskin.settings.disable_transparency": "Disable Skin Transparency",
   "quickskin.settings.show_title_preview": "Show Title Screen Preview",
   "quickskin.settings.show_pause_preview": "Show Pause Menu Preview",
+  "quickskin.settings.compact_change_skin_button": "Compact Change Skin Button",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Show the Change Skin button on the title screen and pause menu as a small icon.",
   "quickskin.settings.hide_builtin_capes": "Hide Built-in Capes",
   "quickskin.settings.hide_builtin_capes.tooltip": "Hide official Minecraft capes from the cape menu. Only custom/local capes will be shown.",
   "quickskin.settings.menu_background": "Use Vanilla Background",
