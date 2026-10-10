@@ -49,12 +49,13 @@ def _matches_trust(
 class DependencySecurityPolicyTest(unittest.TestCase):
     def test_wrapper_and_global_mode_are_strictly_pinned(self) -> None:
         properties = (ROOT / "gradle.properties").read_text(encoding="utf-8")
-        # Dependency verification is deliberately not enforced: upstream publishers replace
-        # artifacts under an existing version coordinate, which halted every build on the
-        # affected branch. The recorded inventory and the Gradle wrapper pins below stay
-        # strict, so this asserts the accepted mode rather than leaving it unpinned.
-        self.assertIn("org.gradle.dependency.verification=off", properties)
-        self.assertNotIn("org.gradle.dependency.verification=strict", properties)
+        # The shared Build gate treats every external executable dependency as hash-enforced, so
+        # exactly one mode line selects strict and no other mode survives beside it. An upstream
+        # republication is a reviewed also-trust entry, never a relaxed mode.
+        modes = re.findall(
+            r"^org[.]gradle[.]dependency[.]verification=(.*)$", properties, re.MULTILINE
+        )
+        self.assertEqual(modes, ["strict"])
         self.assertIn("org.gradle.dependency.verification.console=verbose", properties)
 
         wrapper_properties = (
@@ -326,6 +327,11 @@ class DependencySecurityPolicyTest(unittest.TestCase):
                 r"--dependency-verification(?:=|\s+)(?:off|lenient)\b",
                 workflows_and_build_logic,
             )
+        )
+        # Checksums and locks are reviewed maintainer changes. Automation that wrote them would
+        # accept whatever an upstream repository served on that run.
+        self.assertIsNone(
+            re.search(r"--write-verification-metadata|--write-locks\b", workflows_and_build_logic)
         )
 
     def test_only_active_shadow_bundles_are_locked_outside_generated_trees(self) -> None:

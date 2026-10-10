@@ -1,15 +1,16 @@
 # Dependency security policy
 
 Quick Skin treats build plugins and dependencies as executable supply-chain inputs.
+`gradle.properties` explicitly selects Gradle's strict verification mode for every matrix target;
+do not pass `--dependency-verification lenient` or `off` in development, CI, or release automation.
+CI never writes verification metadata or locks: a missing or changed checksum fails the build and
+is fixed by a reviewed pull request.
 
-**Gradle's artifact verification is recorded but not enforced.** `gradle.properties` selects
-`org.gradle.dependency.verification=off` deliberately. Upstream publishers occasionally replace an
-artifact under an existing version coordinate: on 2026-09-02 Fabric API republished its complete
-1.21.1 module set, and every build and packaged run on that branch failed until the lock was
-rewritten. Because that recurs on each upstream republication, the maintainer accepted the trade
-and turned enforcement off. `gradle/verification-metadata.xml` remains the recorded hash inventory
-and is still consumed by the SBOM and by the packaged-runtime store; it simply no longer fails a
-build. Every other layer below stays in force.
+Upstream publishers occasionally replace an artifact under an existing version coordinate. On
+2026-09-02 Fabric API republished its complete 1.21.1 module set, and enforcement was turned off
+until the shared Build gate required it again. A republication is now handled as a reviewed
+checksum change, never by relaxing the mode: see
+[Upstream republication](#upstream-republication).
 
 ## Enforcement layers
 
@@ -21,11 +22,11 @@ build. Every other layer below stays in force.
 - `gradle/repository-policy.gradle.kts` applies to every buildable common/loader node. It limits
   each remote repository to its owned groups, rejects unknown remote hosts, and prevents generated
   Loom namespaces from ever resolving over the network.
-- `gradle/verification-metadata.xml` records SHA-256 for both artifacts and Maven/Gradle metadata.
-  It covers settings and build plugins plus the resolvable common, test, Fabric, Forge,
-  Minecraft, mappings, transform, runtime, native, and E2E classpaths for the active 1.20.1 graph.
-  Gradle no longer rejects a mismatch, but `e2e/packaged_runtime.py` still resolves the exact
-  SHA-256 it pins for each packaged-runtime download from this file, so keep it accurate.
+- `gradle/verification-metadata.xml` verifies both artifacts and Maven/Gradle metadata with
+  SHA-256. It covers settings and build plugins plus the resolvable common, test, Fabric, Forge,
+  NeoForge, Minecraft, mappings, transform, runtime, native, and E2E classpaths of every target in
+  `release/release-matrix.json`. `e2e/packaged_runtime.py` also resolves from this file the exact
+  primary SHA-256 it pins for each packaged-runtime download.
 - `gradle/dependency-locks/` strictly locks only `shadowBundle`, the external graph physically
   embedded in each release JAR. Fabric merges it into the mod JAR; Forge and NeoForge nest each
   library unmodified under `META-INF/jarjar/`, because FML loads the mod JAR as one Java module
@@ -58,7 +59,7 @@ result disagrees; fetching a newer schema at runtime is not an acceptable fallba
 Loom exposes some generated outputs through file-backed Maven repositories. Their JAR byte layout
 is not portable across clean worktrees, even when their external inputs and coordinates are the
 same, so recording their generated SHA-256 values would make a clean build fail for the wrong
-reason. Exactly four trusted-artifact rules cover those local outputs:
+reason. Exactly five trusted-artifact rules cover those local outputs:
 
 | Group rule | Name rule | Owner |
 |---|---|---|
@@ -66,12 +67,14 @@ reason. Exactly four trusted-artifact rules cover those local outputs:
 | `^loom$` | `^mappings$` | Loom layered mappings |
 | `^net[.]minecraft$` | exact Loom merged Minecraft, Forge, or NeoForge name shapes, optionally ending in `-deobf` | Loom merged game modules |
 | `^net[.]minecraftforge[.][0-9a-f]{64}$` | `^fmlloader$` | Loom transformed Forge loader |
+| `^net[.]neoforged[.]fancymodloader[.][0-9a-f]{64}$` | `^loader$` | Loom transformed NeoForge loader |
 
 This is not permission to trust similarly named downloads. The project repository policy excludes
-all four namespaces from Maven Central and excludes the transformed Forge namespace from Forge's
-remote repository; other approved remote repositories have positive group allowlists that cannot
-match them. Only Loom's local file repositories can supply these coordinates. The original Loom,
-Minecraft, loader, API, mappings source, and transform-tool inputs remain SHA-256 verified.
+these namespaces from Maven Central, the transformed Forge namespace from Forge's remote
+repository and the transformed NeoForge namespace from NeoForge's remote repository; other
+approved remote repositories have positive group allowlists that cannot match them. Only Loom's
+local file repositories can supply these coordinates. The original Loom, Minecraft, loader, API,
+mappings source, and transform-tool inputs remain SHA-256 verified.
 The optional `-deobf` suffix is required by Loom's unobfuscated NeoForge path: those merged JARs
 are rebuilt locally and are intentionally nondeterministic, so recording a generated checksum
 would make identical clean CI runs disagree. The trust rule remains confined to the synthetic
@@ -91,16 +94,21 @@ requires an activation probe and explicit applicability or `not_applicable` rows
 
 ## Updating dependencies
 
-Start from a trusted checkout and intentionally change the declared version first. Then regenerate
-the active graph and selective locks in one serialized invocation:
+Start from a trusted checkout and intentionally change the declared version first. Then record the
+graph of every target the change reaches, one serialized invocation per target, using the same
+tasks as `scripts/release/build_matrix.py` so build, test, transform and harness classpaths are
+all resolved (`<minecraft>` is a matrix `artifact_version`):
 
 ```bash
 ./gradlew --no-daemon --no-parallel \
-  --write-verification-metadata sha256 --write-locks \
-  :common:1.20.1:dependencies \
-  :fabric:1.20.1:dependencies \
-  :forge:1.20.1:dependencies
+  --write-verification-metadata sha256 -PquickskinTarget=<minecraft> \
+  clean buildTargetLanes buildTargetE2EHarnesses
 ```
+
+Add `--write-locks` only when a shaded `shadowBundle` dependency changed (see
+[gradle/dependency-locks/README.md](gradle/dependency-locks/README.md)). Writing metadata adds
+entries but never removes them, and it is a maintainer action: CI and release automation never run
+it.
 
 Review every metadata and lockfile diff. Confirm new coordinates are expected, compare critical
 checksums with an independent publisher source when one exists, remove obsolete components, and
@@ -108,6 +116,20 @@ never add a broad trusted group to make a failure disappear. `origin="Generated 
 honest bootstrap marker, not proof of publisher authenticity; repository routing and human review
 remain part of the trust decision.
 
-Run the policy regression tests and then the proportional Gradle build gate in strict mode. A
-dependency-verification failure after an unrelated change is a security review event, not a cache
-problem to bypass.
+Run the policy regression tests and then `python scripts/release/build_matrix.py --clean --target
+<minecraft>` for each affected target in strict mode, from a Gradle user home that did not take part
+in writing the metadata. A dependency-verification failure after an unrelated change is a security
+review event, not a cache problem to bypass.
+
+## Upstream republication
+
+When a publisher replaces bytes under an existing coordinate, strict mode fails every target that
+resolves it. Do not switch the mode to `lenient` or `off`, and do not trust the group. Instead:
+
+1. Download the served artifact outside Gradle and compute its SHA-256.
+2. Compare it with an independent publisher source, such as the repository's own `.sha256` or
+   `.sha512` sidecar, and inspect that the artifact still contains only the expected content.
+3. Record the new value as an `<also-trust>` child of the existing `<sha256>` entry, as the Fabric
+   API 1.21.1 modules already do, in a reviewed pull request that names the evidence. The
+   packaged-runtime store downloads and pins only the primary value, so when the old bytes are no
+   longer served the new value becomes the primary one.
