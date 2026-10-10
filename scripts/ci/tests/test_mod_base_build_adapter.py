@@ -14,6 +14,11 @@ derives with what the legacy workflows derive from the same files:
 * ``derive_runtime`` hands each lane exactly its native runtime row and PR scenarios;
 * ``verify_runtime``'s reader accepts the native evidence shape and refuses failed, missing,
   crashed, foreign or unaccounted results;
+* ``verify_target`` and ``verify_build`` accept what the native producer stages
+  (``verify_release.build_manifest`` over every target) and refuse a changed file or an unknown
+  key, and every native shape the adapter copies (result fields, manifest and record keys, the
+  lane upload set) equals its source, so a native change fails here rather than only in a shared
+  run;
 * the candidate hooks, ``policy`` included, leave nothing untracked in the checkout and export only
   the native upload set.
 
@@ -24,9 +29,11 @@ names every stale entry.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -56,7 +63,14 @@ import build_matrix  # noqa: E402
 import matrix as release_matrix  # noqa: E402
 import mod_base_build_adapter as adapter  # noqa: E402
 import mod_base_build_candidate as candidate  # noqa: E402
+import mod_base_build_dispatch as dispatch  # noqa: E402
 import mod_base_build_policy as policy  # noqa: E402
+import verify_release  # noqa: E402
+import visual_evidence  # noqa: E402
+
+ACTION_PATH = ROOT / ".github" / "actions" / "run-packaged-e2e" / "action.yml"
+#: The tested commit of every test plan (``Worker.subject``).
+TESTED_SHA = "e" * 40
 
 
 def git_bytes(path: Path) -> bytes:
@@ -501,6 +515,189 @@ class CandidateHygieneTests(unittest.TestCase):
         (current / "summary.json").write_bytes(b"")
         with self.assertRaisesRegex(adapter.AdapterError, "outside its role's bounds"):
             candidate.export_evidence(current, self.root / "export", "fabric-1.20.1")
+
+
+def _verified_jar(path: Path, *_arguments: Any) -> dict[str, Any]:
+    data = path.read_bytes()
+    return {"filename": path.name, "bytes": len(data), "sha1": hashlib.sha1(data).hexdigest(),
+            "sha256": hashlib.sha256(data).hexdigest(), "sha512": hashlib.sha512(data).hexdigest()}
+
+
+def _verified_harness(path: Path, *_arguments: Any) -> dict[str, Any]:
+    data = path.read_bytes()
+    return {"filename": path.name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def jar_stand_ins() -> tuple[Any, Any]:
+    """``verify_jar`` and ``verify_harness`` open real Minecraft JARs (class files, loader metadata,
+    access wideners); synthetic bytes take these stand-ins, as the native round-trip test does.
+    ``test_the_jar_verifier_stand_ins_return_the_native_shapes`` ties their results to the native
+    source, and the rig proof ran the real ones over a real target."""
+
+    return (mock.patch.object(verify_release, "verify_jar", side_effect=_verified_jar),
+            mock.patch.object(verify_release, "verify_harness", side_effect=_verified_harness))
+
+
+def native_stage(repository: Path, sealed: Path, targets: list[str]) -> dict[str, dict[str, Any]]:
+    """Stage each target with the native producer, ``verify_release.build_manifest`` (what
+    ``verify_release.py --target T`` runs), from synthetic JARs in a copy of this checkout's
+    matrix, properties, lockfiles and verification metadata, and lay the stages out in ``sealed``
+    as the shared Build seals them. Returns the native manifests by target."""
+
+    for relative in (adapter.INVENTORY_PATH, adapter.PROPERTIES_PATH, "gradle/verification-metadata.xml",
+                     *(path.relative_to(ROOT).as_posix()
+                       for path in (ROOT / "gradle" / "dependency-locks").glob("*.lockfile"))):
+        path = repository / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(git_bytes(ROOT / relative))
+    matrix_path = repository / adapter.INVENTORY_PATH
+    # The checkout's own matrix (the same bytes): loading validates its source roots in place.
+    data = release_matrix.load_matrix(ROOT / adapter.INVENTORY_PATH)
+    mod_version = release_matrix.read_mod_version(matrix_path, data)
+    for row in data["artifacts"]:
+        for key in ("jar", "harness_jar"):
+            path = repository / row[key].replace("{mod_version}", mod_version)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(f"{row['artifact_node']} {key}".encode())
+    manifests = {}
+    stage = repository / "build" / "release"
+    jar, harness = jar_stand_ins()
+    with jar, harness, mock.patch.object(verify_release, "git_commit", return_value=TESTED_SHA):
+        for target in targets:
+            if stage.exists():
+                shutil.rmtree(stage)
+            manifest = verify_release.build_manifest(repository, matrix_path, stage, stage / adapter.MANIFEST_NAME,
+                                                     mod_version, data, target=target)
+            (stage / adapter.MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            for path in sorted(stage.rglob("*")):
+                if not path.is_file():
+                    continue
+                relative = path.relative_to(stage).as_posix()
+                if relative in (adapter.MANIFEST_NAME, adapter.SBOM_NAME):
+                    relative = adapter.target_path(target, relative)
+                destination = sealed / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(path.read_bytes())
+            manifests[target] = manifest
+    return manifests
+
+
+class NativeShapeParityTests(unittest.TestCase):
+    """The adapter copies native shapes it cannot import (the protected copy holds only the listed
+    files): each copy is held to its source here, and the protected verifiers run over what the
+    native producer stages."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.kit = kit()
+        cls.directory = tempfile.TemporaryDirectory()
+        root = Path(cls.directory.name)
+        cls.worker = Worker(root / "worker", cls.kit)
+        cls.plan, _ = cls.worker.plan()
+        cls.mod = native_mod()
+        cls.sealed = cls.worker.root / "sealed-build"
+        cls.manifests = native_stage(root / "repository", cls.sealed, [target["id"] for target in cls.plan["targets"]])
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.directory.cleanup()
+
+    def test_result_fields_are_the_native_result_fields(self) -> None:
+        self.assertEqual(len(set(adapter.RESULT_FIELDS)), len(adapter.RESULT_FIELDS))
+        self.assertEqual(frozenset(adapter.RESULT_FIELDS), visual_evidence.RESULT_FIELDS)
+
+    def test_the_lane_evidence_lists_are_the_native_upload_globs(self) -> None:
+        action = ACTION_PATH.read_text(encoding="utf-8").replace("\r\n", "\n")
+        step = action.split("- name: Upload bounded packaged evidence\n", 1)[1].split("\n    - name:", 1)[0]
+        globs = re.findall(r"^ +e2e-out/current/(\S+)$", step, re.MULTILINE)
+        top = tuple(glob for glob in globs if "/" not in glob)
+        trees = tuple(match.group(1) for match in (re.fullmatch(r"profiles/\*\*/([^/*]+)/\*\*", glob)
+                                                   for glob in globs) if match)
+        self.assertEqual(len(globs), len(top) + len(trees) + 1)
+        self.assertIn("profiles/**/result.json", globs)
+        self.assertEqual(candidate.EVIDENCE_FILES, top)
+        self.assertEqual(candidate.EVIDENCE_TREES, trees)
+        self.assertEqual(adapter.PROFILE_TREES, trees)
+        # A shared lane runs no feature selection, so its export has no selection or coverage file,
+        # and the protected reader refuses one as unaccounted.
+        self.assertLessEqual(set(adapter.LANE_FILES), set(top))
+        self.assertEqual(set(top) - set(adapter.LANE_FILES), {"selection.json", "coverage.json"})
+
+    def test_the_jar_verifier_stand_ins_return_the_native_shapes(self) -> None:
+        tree = ast.parse(git_bytes(ROOT / "scripts" / "release" / "verify_release.py").decode("utf-8"))
+        functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+        with tempfile.TemporaryDirectory() as directory:
+            sample = Path(directory) / "sample.jar"
+            sample.write_bytes(b"jar")
+            for name, stand_in in (("verify_jar", _verified_jar), ("verify_harness", _verified_harness)):
+                returns = [node for node in ast.walk(functions[name]) if isinstance(node, ast.Return)]
+                self.assertEqual(len(returns), 1, name)
+                self.assertIsInstance(returns[0].value, ast.Dict, name)
+                native = {key.value for key in returns[0].value.keys if isinstance(key, ast.Constant)}
+                self.assertEqual(len(native), len(returns[0].value.keys), name)
+                self.assertEqual(set(stand_in(sample)), native, name)
+
+    def test_the_manifest_keys_are_the_native_producers(self) -> None:
+        self.assertEqual(len(self.manifests), len(self.plan["targets"]))
+        for target, manifest in self.manifests.items():
+            with self.subTest(target=target):
+                self.assertEqual(set(manifest), set(adapter._MANIFEST_KEYS))
+                self.assertEqual(set(manifest["release"]), set(adapter._RELEASE_KEYS))
+                self.assertEqual(set(manifest["sbom"]), set(adapter._SBOM_RECORD_KEYS))
+                for record in manifest["artifacts"]:
+                    self.assertEqual(set(record), set(adapter._RECORD_KEYS))
+                    self.assertEqual(set(record["harness"]), set(adapter._HARNESS_KEYS))
+                self.assertEqual(manifest["release"], adapter.release_identity(self.mod, target))
+
+    def run_hook(self, hook: str, unit: str | None) -> dict[str, Any]:
+        with tempfile.TemporaryDirectory() as directory:
+            output = dispatch.Output(Path(directory))
+            jar, harness = jar_stand_ins()
+            with jar, harness:
+                dispatch._hook(hook, unit, self.worker.root, output)
+            return {path.name: json.loads(path.read_bytes()) for path in output.written}
+
+    def test_verify_build_accepts_the_native_stage_of_every_target(self) -> None:
+        reports = self.run_hook("verify_build", None)
+        self.assertEqual(sorted(reports), sorted(f"{target['id']}.json" for target in self.plan["targets"]))
+        for target in self.plan["targets"]:
+            report = reports[f"{target['id']}.json"]
+            self.assertEqual((report["hook"], report["unit"], report["tested_sha"]),
+                             ("verify_build", target["id"], TESTED_SHA))
+            self.assertEqual([item["path"] for item in report["files"]],
+                             sorted(output["path"] for output in target["outputs"]))
+            for item in report["files"]:
+                self.assertEqual(item["sha256"],
+                                 hashlib.sha256((self.sealed / item["path"]).read_bytes()).hexdigest())
+
+    def test_verify_target_refuses_a_partition_with_other_files(self) -> None:
+        # verify_target is handed the sealed partition of one target; the whole Build is not one.
+        with self.assertRaisesRegex(adapter.AdapterError, "exactly the planned outputs"):
+            self.run_hook("verify_target", self.plan["targets"][0]["id"])
+
+    def verify(self, target: str, change: dict[str, bytes]) -> list[dict[str, Any]]:
+        jar, harness = jar_stand_ins()
+        with jar, harness:
+            return adapter.verify_target(self.mod, target, tested_sha=TESTED_SHA, sealed=self.sealed,
+                                         read=lambda path: change.get(path) or (self.sealed / path).read_bytes())
+
+    def test_verify_target_accepts_one_native_partition(self) -> None:
+        target = self.plan["targets"][-1]
+        files = self.verify(target["id"], {})
+        self.assertEqual([item["path"] for item in files], sorted(output["path"] for output in target["outputs"]))
+
+    def test_verify_target_refuses_a_changed_jar_an_unknown_key_and_another_commit(self) -> None:
+        target = self.plan["targets"][0]["id"]
+        production = next(output["path"] for output in self.plan["targets"][0]["outputs"]
+                          if output["role"] == "production")
+        manifest_path = adapter.target_path(target, adapter.MANIFEST_NAME)
+        manifest = json.loads((self.sealed / manifest_path).read_bytes())
+        with self.assertRaisesRegex(adapter.AdapterError, "differs from the manifest"):
+            self.verify(target, {production: b"another production JAR"})
+        with self.assertRaisesRegex(adapter.AdapterError, "must be an object with exactly"):
+            self.verify(target, {manifest_path: json.dumps({**manifest, "provenance": {}}).encode()})
+        with self.assertRaisesRegex(adapter.AdapterError, "another git_commit"):
+            self.verify(target, {manifest_path: json.dumps({**manifest, "git_commit": "d" * 40}).encode()})
 
 
 class PolicyHygieneTests(unittest.TestCase):
