@@ -14,7 +14,8 @@ derives with what the legacy workflows derive from the same files:
 * ``derive_runtime`` hands each lane exactly its native runtime row and PR scenarios;
 * ``verify_runtime``'s reader accepts the native evidence shape and refuses failed, missing,
   crashed, foreign or unaccounted results;
-* the candidate hooks leave nothing untracked in the checkout and export only the native upload set.
+* the candidate hooks, ``policy`` included, leave nothing untracked in the checkout and export only
+  the native upload set.
 
 Regenerating the hashes after an edit of a listed file: recompute the SHA-256 of each file with LF
 line endings (the bytes Git stores) and write it into ``adapter.files``; ``test_listed_hashes_are_the_files``
@@ -33,6 +34,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import mod_base_path
 
@@ -54,6 +56,7 @@ import build_matrix  # noqa: E402
 import matrix as release_matrix  # noqa: E402
 import mod_base_build_adapter as adapter  # noqa: E402
 import mod_base_build_candidate as candidate  # noqa: E402
+import mod_base_build_policy as policy  # noqa: E402
 
 
 def git_bytes(path: Path) -> bytes:
@@ -498,6 +501,91 @@ class CandidateHygieneTests(unittest.TestCase):
         (current / "summary.json").write_bytes(b"")
         with self.assertRaisesRegex(adapter.AdapterError, "outside its role's bounds"):
             candidate.export_evidence(current, self.root / "export", "fabric-1.20.1")
+
+
+class PolicyHygieneTests(unittest.TestCase):
+    """The kit seals the policy checkout like the others (``verify-candidate-source``): nothing
+    untracked outside ``out/mod-base-kit`` and the bundle may remain, though tests start Python
+    children without the hook's bytecode settings."""
+
+    #: A suite whose child process writes bytecode next to the sources, as many Quick Skin tests
+    #: do: they build a child environment of their own, without PYTHONPYCACHEPREFIX or
+    #: PYTHONDONTWRITEBYTECODE.
+    SUITE = (
+        "import os, subprocess, sys, unittest\n"
+        "from pathlib import Path\n"
+        "HERE = Path(__file__).resolve().parent\n"
+        "class ChildTest(unittest.TestCase):\n"
+        "    def test_child_writes_bytecode(self):\n"
+        "        env = {k: v for k, v in os.environ.items()\n"
+        "               if k not in ('PYTHONDONTWRITEBYTECODE', 'PYTHONPYCACHEPREFIX')}\n"
+        "        subprocess.run([sys.executable, '-c', 'import helper'], cwd=HERE, env=env, check=True)\n"
+        "        self.assertTrue((HERE / '__pycache__').is_dir())\n"
+    )
+    #: The kit runner's contract as the hook uses it: the suite is the last argument, and the exit
+    #: status is zero only when every discovered test passed.
+    RUNNER = (
+        "import sys, unittest\n"
+        "suite = sys.argv[-1]\n"
+        "result = unittest.TextTestRunner().run(unittest.defaultTestLoader.discover(suite, top_level_dir=suite))\n"
+        "sys.exit(0 if result.wasSuccessful() and result.testsRun else 1)\n"
+    )
+
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        base = Path(self.directory.name)
+        self.root = base / "checkout"
+        (base / "tmp").mkdir()
+        self.env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                    "TMPDIR": str(base / "tmp")}
+
+    def git(self, *arguments: str) -> str:
+        return subprocess.run(["git", *arguments], cwd=self.root, env=self.env, check=True,
+                              capture_output=True, text=True).stdout
+
+    def checkout(self, extra: str = "") -> None:
+        for relative, text in (("checks/test_child.py", self.SUITE + extra), ("checks/helper.py", "VALUE = 1\n"),
+                               ("README.md", "tracked\n")):
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(text.encode("utf-8"))
+        self.git("init", "-q")
+        self.git("add", ".")
+        self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "t")
+        runner = self.root / policy.KIT_OVERLAY / "tools" / "parallel_unittest.py"
+        runner.parent.mkdir(parents=True)
+        runner.write_bytes(self.RUNNER.encode("utf-8"))
+        (self.root / "build" / "release").mkdir(parents=True)
+        (self.root / "build" / "release" / "staged.jar").write_bytes(b"staged")
+
+    def run_checks(self) -> None:
+        with mock.patch.object(policy, "repository_checks"), mock.patch.object(policy, "SUITES", ("checks",)):
+            policy.run_checks(self.root, self.env, profile_branch="master",
+                              keep=(policy.KIT_OVERLAY.as_posix(), "build/release"))
+
+    def untracked(self) -> list[str]:
+        status = self.git("status", "--porcelain", "--ignored", "--untracked-files=all")
+        return sorted(line[3:] for line in status.splitlines())
+
+    def test_the_policy_hook_leaves_only_the_generated_roots(self) -> None:
+        self.checkout()
+        self.run_checks()
+        self.assertFalse((self.root / "checks" / "__pycache__").exists())
+        self.assertEqual(self.untracked(), ["build/release/staged.jar",
+                                            f"{policy.KIT_OVERLAY.as_posix()}/tools/parallel_unittest.py"])
+
+    def test_a_failed_check_still_leaves_the_checkout_clean(self) -> None:
+        self.checkout("    def test_fails(self):\n        self.fail('policy failure')\n")
+        with self.assertRaisesRegex(policy.PolicyError, "policy suites failed"):
+            self.run_checks()
+        self.assertFalse((self.root / "checks" / "__pycache__").exists())
+        self.assertEqual(len(self.untracked()), 2)
+
+    def test_a_check_that_changes_a_tracked_file_fails(self) -> None:
+        self.checkout("    def test_edits(self):\n        (HERE.parent / 'README.md').write_text('changed')\n")
+        with self.assertRaisesRegex(adapter.AdapterError, "tracked sources unchanged"):
+            self.run_checks()
 
 
 if __name__ == "__main__":

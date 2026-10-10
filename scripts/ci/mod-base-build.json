@@ -20,7 +20,7 @@
       },
       {
         "path": "scripts/ci/mod_base_build_policy.py",
-        "sha256": "b3ecabce6443ad4f153c850cf63c6d6a9a8986baf46c835e79ac0a4bc78dc693"
+        "sha256": "892226d567dc2958ef87e30bf4612f411f3292abd5268086d1b4aa0ec353ec33"
       },
       {
         "path": "scripts/release/artifact_manifest.py",

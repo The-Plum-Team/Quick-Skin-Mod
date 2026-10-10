@@ -15,8 +15,15 @@ kit's disposable candidate account, from the tested checkout, without a token:
   suites run at the same time, as the native jobs do, each with a temporary directory of its own.
 
 The profile branch is the canonical branch: the shared callers only test pull requests to it and
-pushes to it, which is what the native job derives for those events. Bytecode goes to
-``PYTHONPYCACHEPREFIX`` (below ``TMPDIR``), never into the checkout.
+pushes to it, which is what the native job derives for those events.
+
+The kit seals the checkout after the hook (``verify-candidate-source``): any path the tested commit
+does not track, outside ``out/mod-base-kit`` and the Build config's ``bundle.path``, fails the job.
+The hook's own bytecode goes to ``PYTHONPYCACHEPREFIX`` (below ``TMPDIR``), but many tests start
+Python children with an environment of their own, without that variable or
+``PYTHONDONTWRITEBYTECODE``, and those children write ``__pycache__`` next to the sources. So the
+hook removes every untracked path once the checks have run, as ``build_target`` and ``run_lane``
+do, and then requires the tracked sources unchanged.
 """
 
 from __future__ import annotations
@@ -28,6 +35,7 @@ import time
 from pathlib import Path
 
 import mod_base_build_adapter as adapter
+import mod_base_build_candidate as candidate
 
 KIT_OVERLAY = Path("out") / "mod-base-kit"
 SUITES = ("scripts/release/tests", "scripts/ci/tests")
@@ -93,6 +101,23 @@ def run_suites(checkout: Path, env: dict[str, str]) -> None:
         raise PolicyError(f"policy suites failed: {', '.join(failures)}")
 
 
+def run_checks(checkout: Path, env: dict[str, str], *, profile_branch: str, keep: tuple[str, ...]) -> None:
+    """Every check, then the checkout back to the tested tree: whatever the checks left untracked
+    outside ``keep`` is removed (whether they passed or not), and a change of a tracked file fails
+    the hook."""
+
+    started = time.monotonic()
+    try:
+        repository_checks(checkout, env, profile_branch)
+        run_suites(checkout, env)
+    finally:
+        removed = candidate.clean_checkout(checkout, env, keep=keep)
+        _log(f"removed {len(removed)} untracked paths the checks left: {', '.join(removed[:20])}"
+             + (" ..." if len(removed) > 20 else ""))
+    candidate.require_clean_sources(checkout, env)
+    _log(f"every check passed in {time.monotonic() - started:.0f}s")
+
+
 def run(checkout: Path) -> None:
     checkout = checkout.resolve()
     # The native scripts import their siblings from their own directory, which PYTHONSAFEPATH
@@ -104,7 +129,5 @@ def run(checkout: Path) -> None:
     mod = adapter.load_mod(checkout / config["inventory"]["path"], checkout / config["scenario_contract"]["path"],
                            checkout / extra[adapter.PROPERTIES_INPUT])
     adapter.derive_plan(mod)
-    started = time.monotonic()
-    repository_checks(checkout, env, mod.project["release_branch"])
-    run_suites(checkout, env)
-    _log(f"every check passed in {time.monotonic() - started:.0f}s")
+    run_checks(checkout, env, profile_branch=mod.project["release_branch"],
+               keep=(KIT_OVERLAY.as_posix(), config["bundle"]["path"]))
