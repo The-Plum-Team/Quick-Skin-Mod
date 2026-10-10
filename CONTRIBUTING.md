@@ -249,8 +249,10 @@ Kit bumps are their own draft pull request. On a fresh branch run
 `python scripts/ci/mod_base_kit.py bump --to vX.Y.Z`, review the whole diff, commit it as
 `ci: bump mod-base to vX.Y.Z` and open it as a draft to `master`; maintainers land it through a
 batch pull request. A bump runs every Build and Packaged E2E lane. Dependabot is configured to
-ignore the kit and `actions/deploy-pages`, which the managed `pages.yml` pins; close any Dependabot
-pull request that touches a mod-base reference or the managed part of `pages.yml`.
+ignore the kit, `actions/deploy-pages`, which the managed `pages.yml` pins, and
+`actions/create-github-app-token`, which the managed `mod-base-gate-status.yml` caller pins; close
+any Dependabot pull request that touches a mod-base reference, the managed part of `pages.yml` or a
+managed `mod-base-*.yml` caller.
 
 Do not run multiple Gradle commands at the same time on one machine. Architectury's transforms share
 JVM-global state, so local aggregate builds remain serial. GitHub compiles separate targets on
