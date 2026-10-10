@@ -67,6 +67,7 @@ repositories {
         content { includeModule("net.fabricmc", "fabric-loader") }
     }
 }
+apply(from = rootProject.file("gradle/maven-mirror.gradle.kts"))
 apply(from = rootProject.file("gradle/archive-conventions.gradle.kts"))
 
 extensions.configure<JavaPluginExtension> {
