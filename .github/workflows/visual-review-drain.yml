@@ -297,7 +297,7 @@ jobs:
 
       - name: Install Node for the locked capacity probe
         if: steps.circuit.outputs.probe_required == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
 
@@ -338,7 +338,7 @@ jobs:
 
       - name: Publish only the sanitized shared capacity marker
         if: steps.circuit.outputs.probe_required == 'true' && steps.probe.outcome == 'success'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.probe.outputs.marker_name }}
           path: ${{ runner.temp }}/claude-capacity-marker.json
@@ -802,7 +802,7 @@ jobs:
       - name: Retain the authenticated immutable preparation
         id: prepared
         if: steps.capsule.outputs.missing != 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: visual-review-prepared-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.select.outputs.artifact_id }}
           path: ${{ runner.temp }}/prepared-visual-review.zip
@@ -1496,7 +1496,7 @@ jobs:
         if: >-
           steps.guard.outputs.reviewable == 'true' &&
           steps.capsule.outputs.missing != 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
 
@@ -1756,7 +1756,7 @@ jobs:
       - name: Upload the sanitized generation block marker
         id: wave-block-artifact
         if: always() && steps.wave-block.outputs.blocked == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.wave-block.outputs.artifact_name }}
           path: ${{ runner.temp }}/visual-review-capsule/visual-review-wave-block.json
@@ -1816,7 +1816,7 @@ jobs:
       - name: Upload the source-bound normalized report
         id: normalized-report
         if: always() && steps.check.outputs.review_complete == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: visual-review-${{ needs.select.outputs.review_key }}
           path: |
@@ -1862,7 +1862,7 @@ jobs:
         id: verdict-cache-artifact
         if: always() && steps.publish-verdict-cache.outputs.artifact_name != ''
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.publish-verdict-cache.outputs.artifact_name }}
           path: ${{ runner.temp }}/visual-review-capsule/visual-review-verdict-cache.json
@@ -2034,7 +2034,7 @@ jobs:
       - name: Upload the exact semantic anchor certificate
         id: anchor-certificate
         if: steps.certify.outputs.certified == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.certify.outputs.artifact_name }}
           path: ${{ runner.temp }}/visual-review-capsule/visual-anchor-certification.json
@@ -2151,7 +2151,7 @@ jobs:
           always() && steps.guard.outputs.reviewable == 'true' &&
           steps.check.outputs.review_complete != 'true' &&
           steps.classify.outputs.failure_category != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: visual-review-attempt-${{ needs.select.outputs.review_key }}
           path: ${{ runner.temp }}/visual-review-capsule/visual-review-failure.json
@@ -2162,7 +2162,7 @@ jobs:
         if: >-
           always() && steps.classify.outputs.failure_category ==
           'quota_or_rate_limit'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: claude-capacity-pause
           path: ${{ runner.temp }}/visual-review-capsule/visual-review-failure.json

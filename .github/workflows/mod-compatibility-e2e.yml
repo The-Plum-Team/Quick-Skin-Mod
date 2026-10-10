@@ -529,7 +529,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the authenticated compatibility plan
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mod-compatibility-plan
           path: ${{ runner.temp }}/mod-compatibility-plan.json
@@ -538,7 +538,7 @@ jobs:
 
       - name: Re-publish the exact source bundle for parallel consumers
         if: steps.plan.outputs.count != '0'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.plan.outputs.bundle_name }}
           path: build/release/
@@ -724,7 +724,7 @@ jobs:
             --implementation-sha "$GITHUB_SHA"
 
       - name: Upload the bounded credential-free review capsule
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mod-compatibility-review-input-${{ github.run_id }}-${{ matrix.id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/mod-compatibility-capsule/
