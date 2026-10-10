@@ -21,6 +21,14 @@ build. Every other layer below stays in force.
 - `gradle/repository-policy.gradle.kts` applies to every buildable common/loader node. It limits
   each remote repository to its owned groups, rejects unknown remote hosts, and prevents generated
   Loom namespaces from ever resolving over the network.
+- `gradle/maven-mirror.gradle.kts` puts The Plum Team's
+  [Maven mirror](https://github.com/The-Plum-Team/maven-mirror) first in every project that applies
+  the policy or the Java module conventions, and `settings.gradle.kts` does the same for plugins.
+  It is limited to exact Fabric, Architectury, Stonecutter, NeoForge and Forge groups, serves only
+  openly licensed files whose SHA-256 matched the mods' own verification metadata, and answers 404
+  for everything else, so Gradle falls back to the upstream repositories unchanged. With
+  verification off, the mirror's own SHA-256 check is the only hash check on the files it serves;
+  it is safest once strict verification is restored.
 - `gradle/verification-metadata.xml` records SHA-256 for both artifacts and Maven/Gradle metadata.
   It covers settings and build plugins plus the resolvable common, test, Fabric, Forge,
   Minecraft, mappings, transform, runtime, native, and E2E classpaths for the active 1.20.1 graph.
