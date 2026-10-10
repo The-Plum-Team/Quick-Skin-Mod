@@ -157,8 +157,9 @@ deltas.
   `.github/workflows/*`, so it runs the complete Build, every Packaged E2E lane and the optional-mod
   wave its impact classifiers select; there is no selection-policy exception
   ([ADR 0010](../architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)). Never edit
-  a managed file by hand, and close any Dependabot pull request that touches a kit reference or
-  the managed part of `pages.yml` (Dependabot ignores the kit and `actions/deploy-pages`).
+  a managed file by hand, and close any Dependabot pull request that touches a kit reference, the
+  managed part of `pages.yml` or a managed `mod-base-*.yml` caller (Dependabot ignores the kit,
+  `actions/create-github-app-token` and `actions/deploy-pages`).
 - The shared mod-base Build and packaged E2E adapter is protected policy, adopted beside the legacy
   gates: `scripts/ci/mod-base-build.json` names the dispatcher, the adapter, the policy runner and
   every module a protected hook imports (the `scripts/ci/mod_base_build_*.py` files,
