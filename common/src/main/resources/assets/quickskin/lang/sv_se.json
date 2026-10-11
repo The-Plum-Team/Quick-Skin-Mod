@@ -189,6 +189,18 @@
   "quickskin.cooldown.button": "Nedkylning (%ss)",
   "quickskin.cooldown.tooltip": "Du måste vänta innan du byter skin igen.",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "Nedladdningar",
+  "quickskin.file_picker.storage": "Lagring",
+  "quickskin.file_picker.game": "Spelmapp",
+  "quickskin.file_picker.up": "Upp",
+  "quickskin.file_picker.loading": "Läser in filer...",
+  "quickskin.file_picker.empty": "Inga filer som stöds i den här mappen.",
+  "quickskin.file_picker.unreadable": "Kan inte läsa den här mappen. Kontrollera lagringsbehörigheterna eller välj en annan mapp.",
+  "quickskin.file_picker.limit": "Välj högst %s filer.",
+  "quickskin.file_picker.import": "Importera (%s)",
+  "quickskin.file_picker.access_hint": "Saknas en fil? Kopiera den till spelmappen.",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Snabbt Skin] Ditt skin (%s) är större än den här serverns uppladdningsgräns (%s). Det syns bara på din skärm; andra spelare ser det inte.",
   "quickskin.network.upload_too_large.cape": "[Snabbt Skin] Din mantel (%s) är större än den här serverns uppladdningsgräns (%s). Den syns bara på din skärm; andra spelare ser den inte."

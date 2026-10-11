@@ -189,6 +189,18 @@
   "quickskin.cooldown.button": "En délai (%ss)",
   "quickskin.cooldown.tooltip": "Tu dois attendre avant de changer de skin à nouveau.",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "Téléchargements",
+  "quickskin.file_picker.storage": "Stockage",
+  "quickskin.file_picker.game": "Jeu",
+  "quickskin.file_picker.up": "Remonter",
+  "quickskin.file_picker.loading": "Chargement des fichiers...",
+  "quickskin.file_picker.empty": "Aucun fichier compatible dans ce dossier.",
+  "quickskin.file_picker.unreadable": "Impossible de lire ce dossier. Vérifie les autorisations de stockage ou choisis un autre dossier.",
+  "quickskin.file_picker.limit": "Sélectionne au maximum %s fichiers.",
+  "quickskin.file_picker.import": "Importer (%s)",
+  "quickskin.file_picker.access_hint": "Fichier introuvable ? Copie-le dans le dossier du jeu.",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Skin rapide] Ton skin (%s) dépasse la limite de téléversement de ce serveur (%s). Il n'est visible que sur ton écran ; les autres joueurs ne le voient pas.",
   "quickskin.network.upload_too_large.cape": "[Skin rapide] Ta cape (%s) dépasse la limite de téléversement de ce serveur (%s). Elle n'est visible que sur ton écran ; les autres joueurs ne la voient pas."

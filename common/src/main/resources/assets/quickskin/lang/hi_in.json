@@ -189,6 +189,18 @@
   "quickskin.cooldown.button": "प्रतीक्षा में (%ss)",
   "quickskin.cooldown.tooltip": "अपनी स्किन फिर से बदलने से पहले आपको प्रतीक्षा करनी होगी।",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "डाउनलोड",
+  "quickskin.file_picker.storage": "फ़ोन स्टोरेज",
+  "quickskin.file_picker.game": "गेम फ़ोल्डर",
+  "quickskin.file_picker.up": "ऊपर",
+  "quickskin.file_picker.loading": "फ़ाइलें लोड हो रही हैं...",
+  "quickskin.file_picker.empty": "इस फ़ोल्डर में कोई समर्थित फ़ाइल नहीं है।",
+  "quickskin.file_picker.unreadable": "यह फ़ोल्डर पढ़ा नहीं जा सका। स्टोरेज अनुमतियाँ जांचें या कोई दूसरा फ़ोल्डर चुनें।",
+  "quickskin.file_picker.limit": "अधिकतम %s फ़ाइलें चुनें।",
+  "quickskin.file_picker.import": "इम्पोर्ट करें (%s)",
+  "quickskin.file_picker.access_hint": "फ़ाइल नहीं दिख रही? उसे गेम फ़ोल्डर में कॉपी करें।",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[त्वरित स्किन] आपकी स्किन (%s) इस सर्वर की %s अपलोड सीमा से बड़ी है। यह केवल आपकी स्क्रीन पर दिखती है; अन्य खिलाड़ी इसे नहीं देखते।",
   "quickskin.network.upload_too_large.cape": "[त्वरित स्किन] आपका केप (%s) इस सर्वर की %s अपलोड सीमा से बड़ा है। यह केवल आपकी स्क्रीन पर दिखता है; अन्य खिलाड़ी इसे नहीं देखते।"
