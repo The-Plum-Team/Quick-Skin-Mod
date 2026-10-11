@@ -30,6 +30,11 @@ from matrix import (  # noqa: E402
 POLICY_JOB = "Classify packaged runtime impact"
 BUILD_JOB = "Build immutable E2E input bundle"
 GATE_JOB = "Packaged E2E gate"
+# The same native gate on a ready pull request to master once the mod-base gate App publishes
+# GATE_JOB there (shared-build-and-e2e). Every other run, and every run before that change, keeps
+# GATE_JOB; a graph holds exactly one of the two.
+NATIVE_GATE_JOB = "Native Packaged E2E gate"
+GATE_JOBS = (GATE_JOB, NATIVE_GATE_JOB)
 SCENARIO_SUFFIX = " - contract scenarios"
 # A matrix job whose matrix never expanded is reported once under its literal template
 # name, so a non-runtime port observes this instead of zero scenario jobs.
@@ -604,6 +609,13 @@ def _unique_named_job(jobs: list[dict[str, Any]], name: str) -> dict[str, Any]:
     return selected[0]
 
 
+def _unique_gate_job(jobs: list[dict[str, Any]], names: tuple[str, ...]) -> dict[str, Any]:
+    selected = [job for job in jobs if job.get("name") in names]
+    if len(selected) != 1:
+        raise JobGraphError(f"expected exactly one {' or '.join(map(repr, names))} job, found {len(selected)}")
+    return selected[0]
+
+
 def _require_conclusion(job: dict[str, Any], name: str, conclusion: str) -> None:
     if job.get("status") != "completed" or job.get("conclusion") != conclusion:
         raise JobGraphError(
@@ -626,9 +638,9 @@ def validate_job_graph(
     jobs = _jobs(payload)
     policy_job = _unique_named_job(jobs, POLICY_JOB)
     build_job = _unique_named_job(jobs, BUILD_JOB)
-    gate_job = _unique_named_job(jobs, GATE_JOB)
+    gate_job = _unique_gate_job(jobs, GATE_JOBS)
     _require_conclusion(policy_job, POLICY_JOB, "success")
-    _require_conclusion(gate_job, GATE_JOB, "success")
+    _require_conclusion(gate_job, str(gate_job["name"]), "success")
 
     scenario_jobs = [
         job

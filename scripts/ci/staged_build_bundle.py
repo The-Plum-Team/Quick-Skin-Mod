@@ -17,6 +17,10 @@ from feature_coverage_github import Api
 
 WORKFLOW = ".github/workflows/build-gate.yml"
 GATE_JOB = "Build and verify"
+# The same native gate on a ready pull request to master once the mod-base gate App publishes
+# GATE_JOB there (shared-build-and-e2e); a Build run holds exactly one of the two.
+NATIVE_GATE_JOB = "Native Build and verify"
+GATE_JOBS = (GATE_JOB, NATIVE_GATE_JOB)
 DRAFT_JOB = "Build deferred for draft"
 ARTIFACT = "staged-release-bundle"
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -70,7 +74,7 @@ def current_pull_request(api: Api, source: Source) -> None:
 
 
 def staged_bundle(api: Api, source: Source, run: dict, jobs: list[dict]) -> dict | None:
-    gates = [job for job in jobs if job.get("name") == GATE_JOB]
+    gates = [job for job in jobs if job.get("name") in GATE_JOBS]
     require(len(gates) == 1 and gates[0].get("status") == "completed"
             and gates[0].get("conclusion") == "success", "Build has no successful complete required gate")
     artifacts = [item for item in api.artifacts(run_id=run["id"]) if item["name"] == ARTIFACT]
@@ -117,7 +121,8 @@ def find_bundle(api: Api, source: Source, *, wait_seconds: int,
             require(run.get("conclusion") == "success", "the latest exact-source Build did not succeed")
             jobs = [job for page in api.jobs(run) for job in page["jobs"]]
             names = [job.get("name") for job in jobs]
-            if source.pull_request is not None and GATE_JOB not in names and names.count(DRAFT_JOB) == 1:
+            if (source.pull_request is not None and not any(name in GATE_JOBS for name in names)
+                    and names.count(DRAFT_JOB) == 1):
                 # The head's deferred draft run can precede the Build started when it became ready.
                 pending = True
             else:

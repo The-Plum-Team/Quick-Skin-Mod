@@ -178,10 +178,23 @@ deltas.
   (`shadow` and later) publishes its statuses through a statuses-only GitHub App whose
   `MOD_BASE_GATE_APP_CLIENT_ID` and `MOD_BASE_GATE_APP_PRIVATE_KEY` exist only in the `mod-base-gate`
   environment (deployment branch `master` alone, no reviewers, no wait timer); the owner creates
-  them, and only that caller's `publish` job reads them. `build-gate.yml` and `on-demand-e2e.yml`
-  stay the required gates until an owner-approved cutover, and no ruleset requires a ` (shadow)`
-  context. `scripts/ci/tests/test_mod_base_build_adapter.py` holds the plan to the native targets,
-  lanes and staged names.
+  them, and only that caller's `publish` job reads them. In `shadow` the App appends ` (shadow)`
+  to the `contexts` of `scripts/ci/mod-base-build.json`, and no ruleset requires them.
+  In `shared-build-and-e2e` its `contexts` are the required names `Build and verify` and
+  `Packaged E2E gate`, and the default-branch ruleset requires them from the gate App
+  (`required_check_integration_id` of `release/github-governance.json`, so a governance update
+  never drops that source, and `github_governance.py apply` refuses to switch or drop the live
+  source of a required check: switching it and restoring it are the owner's operations on the
+  ruleset): the App's commit statuses on the head of a pull request to `master` are its required
+  gates. `build-gate.yml` and `on-demand-e2e.yml` still run for their downstream evidence, but on
+  a pull request to `master` their gate jobs are `Native Build and verify` and `Native Packaged
+  E2E gate` and never report a required name; pushes, dispatches and other bases keep the
+  historical names. A reader of a native run accepts exactly one of the two names. A pull request
+  that `GITHUB_TOKEN` opens (the release status refresh) starts no `pull_request_target` run, so
+  it gets the App's statuses only after a maintainer closes and reopens it or pushes to it; its
+  dispatched native gates no longer count.
+  `scripts/ci/tests/test_mod_base_build_adapter.py` holds the plan to the native targets, lanes
+  and staged names.
 
 ## Verification
 

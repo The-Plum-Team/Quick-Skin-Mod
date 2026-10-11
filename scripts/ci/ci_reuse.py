@@ -26,6 +26,9 @@ from e2e_job_graph import (BUILD_JOB, GATE_JOB, POLICY_JOB, SCENARIO_SUFFIX,
 
 WORKFLOWS = {"build": ".github/workflows/build-gate.yml",
              "e2e": ".github/workflows/on-demand-e2e.yml"}
+# The Build gate, renamed on a ready pull request to master once the mod-base gate App publishes
+# "Build and verify" there (staged_build_bundle.GATE_JOBS); a run holds exactly one of the two.
+BUILD_GATE_JOBS = ("Build and verify", "Native Build and verify")
 BUILD_POLICY_JOBS = frozenset({"Validate repository policy", "Validate release policy", "Validate CI policy"})
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
@@ -159,7 +162,10 @@ def one_artifact(inventory: list[dict[str, Any]], name: str) -> dict[str, Any]:
     return matches[0]
 
 
-def successful_jobs(pages: Any, names: set[str]) -> list[dict[str, Any]]:
+def successful_jobs(pages: Any, names: set[str], *, one_of: tuple[str, ...] = ()) -> list[dict[str, Any]]:
+    """Require each of ``names`` exactly once and successful; with ``one_of``, also exactly one
+    successful job named by one of those alternatives (a gate renamed on some runs)."""
+
     require(isinstance(pages, list) and all(isinstance(page, dict) and isinstance(page.get("jobs"), list)
                                          for page in pages), "incomplete source job inventory")
     jobs = [job for page in pages for job in page["jobs"]]
@@ -167,6 +173,11 @@ def successful_jobs(pages: Any, names: set[str]) -> list[dict[str, Any]]:
         matches = [job for job in jobs if isinstance(job, dict) and job.get("name") == name]
         require(len(matches) == 1 and matches[0].get("status") == "completed"
                 and matches[0].get("conclusion") == "success", "required source job did not pass: " + name)
+    if one_of:
+        matches = [job for job in jobs if isinstance(job, dict) and job.get("name") in one_of]
+        require(len(matches) == 1 and matches[0].get("status") == "completed"
+                and matches[0].get("conclusion") == "success",
+                "required source job did not pass: " + " or ".join(one_of))
     return jobs
 
 
@@ -212,9 +223,9 @@ def verify_reference(api: Any, value: Any, kind: str, *, matrix_path: Path = DEF
     if kind == "build":
         from matrix import load_matrix
         versions = {item["artifact_version"] for item in load_matrix(matrix_path)["artifacts"]}
-        successful_jobs(pages, {"Build and verify", *BUILD_POLICY_JOBS,
+        successful_jobs(pages, {*BUILD_POLICY_JOBS,
             "compile / Plan every supported build target", "compile / Reverify the complete compiled matrix",
-            *(f"compile / Compile Minecraft {version}" for version in versions)})
+            *(f"compile / Compile Minecraft {version}" for version in versions)}, one_of=BUILD_GATE_JOBS)
         validate_artifact(one_artifact(inventory, "staged-release-bundle"), name="staged-release-bundle",
                           run=run, maximum=MAX_BUNDLE_BYTES)
     else:

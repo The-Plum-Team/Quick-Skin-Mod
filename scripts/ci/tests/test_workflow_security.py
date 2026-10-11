@@ -1973,7 +1973,8 @@ class WorkflowSecurityTest(unittest.TestCase):
 
     def test_packaged_e2e_exposes_one_stable_required_context(self) -> None:
         required = job_block("on-demand-e2e.yml", "required-gate")
-        self.assertIn("&& 'Packaged E2E deferred for draft' || 'Packaged E2E gate' }}", required)
+        self.assertIn("&& 'Packaged E2E deferred for draft' || 'Native Packaged E2E gate') || 'Packaged E2E gate' }}",
+                      required)
         self.assertIn("always()", required)
         self.assertIn("needs.runtime-policy.result", required)
         self.assertIn("needs.runtime-policy.outputs.effective", required)
@@ -1985,11 +1986,12 @@ class WorkflowSecurityTest(unittest.TestCase):
         draft = "github.event.pull_request.draft && github.event.pull_request.base.ref == 'master'"
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        for workflow, root, gate, step, context, deferred in (
+        to_master = "github.event.pull_request.base.ref == 'master'"
+        for workflow, root, gate, step, context, deferred, native in (
             ("build-gate.yml", "source", "build", "Require the complete compilation and policy jobs",
-             "Build and verify", "Build deferred for draft"),
+             "Build and verify", "Build deferred for draft", "Native Build and verify"),
             ("on-demand-e2e.yml", "runtime-policy", "required-gate", "Require build and packaged behavior",
-             "Packaged E2E gate", "Packaged E2E deferred for draft"),
+             "Packaged E2E gate", "Packaged E2E deferred for draft", "Native Packaged E2E gate"),
         ):
             with self.subTest(workflow=workflow):
                 text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
@@ -2000,7 +2002,10 @@ class WorkflowSecurityTest(unittest.TestCase):
                 block = job_block(workflow, gate)
                 # A skipped job still reports its name, and GitHub leaves a skipped job's name
                 # expression unevaluated; the running draft job therefore uses another context.
-                self.assertIn(f"    name: ${{{{ {draft} && '{deferred}' || '{context}' }}}}\n", block)
+                # On a pull request to master the gate App alone reports the required context
+                # (mod-base shared-build-and-e2e), so the ready native job takes its native name.
+                self.assertIn(f"    name: ${{{{ {to_master} && (github.event.pull_request.draft && "
+                              f"'{deferred}' || '{native}') || '{context}' }}}}\n", block)
                 self.assertIn(f"      DRAFT_DEFERRED: ${{{{ {draft} }}}}\n", block)
                 self.assertNotIn("if: github.event_name == 'pull_request'\n", block)
                 self.assertEqual(2, block.count(

@@ -188,6 +188,27 @@ class CiReuseTest(unittest.TestCase):
         page["jobs"] = original
         self.assertEqual("identical-tested-tree", self.find("build")[1])
 
+    def test_build_reuse_accepts_the_native_gate_name_of_a_pull_request_alone(self):
+        # Q7: a ready pull request to master runs its native Build gate as "Native Build and
+        # verify"; exactly one of the two names must have passed.
+        page = self.api.job_lists[10][0]
+        original = copy.deepcopy(page["jobs"])
+        gate = next(job for job in page["jobs"] if job["name"] == "Build and verify")
+        gate["name"] = "Native Build and verify"
+        self.assertEqual("identical-tested-tree", self.find("build")[1])
+        for case in ("both", "failed"):
+            with self.subTest(case=case):
+                page["jobs"] = copy.deepcopy(original)
+                renamed = next(job for job in page["jobs"] if job["name"] == "Build and verify")
+                if case == "both":
+                    page["jobs"].append({**renamed, "name": "Native Build and verify"})
+                else:
+                    renamed.update(name="Native Build and verify", conclusion="failure")
+                with self.assertRaisesRegex(reuse.ReuseError, "Native Build and verify"):
+                    self.find("build")
+        page["jobs"] = original
+        self.assertEqual("identical-tested-tree", self.find("build")[1])
+
     def test_failed_latest_run_cannot_reuse_prior_success(self):
         for result in ("failure", "cancelled", "skipped"):
             with self.subTest(result=result):

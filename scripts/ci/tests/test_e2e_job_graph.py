@@ -179,6 +179,35 @@ class E2EJobGraphTest(unittest.TestCase):
                 duplicated, policy="full", expected_scenarios=self.expected
             )
 
+    def test_the_native_gate_name_of_a_pull_request_stands_alone(self) -> None:
+        """Q7: a ready pull request to master runs the native gate as "Native Packaged E2E gate",
+        because the gate App alone reports "Packaged E2E gate" there. Either name is the gate;
+        both together, a failed renamed gate or neither are not."""
+
+        renamed = self.payload()
+        renamed["jobs"] = [  # type: ignore[index]
+            self.job(graph.NATIVE_GATE_JOB) if job["name"] == graph.GATE_JOB else job
+            for job in renamed["jobs"]  # type: ignore[index]
+        ]
+        validated = graph.validate_job_graph(renamed, policy="full", expected_scenarios=self.expected)
+        self.assertEqual(list(self.expected), validated["observed_scenario_jobs"])
+
+        both = self.payload()
+        both["jobs"].append(self.job(graph.NATIVE_GATE_JOB))  # type: ignore[union-attr]
+        failed = self.payload()
+        failed["jobs"] = [  # type: ignore[index]
+            self.job(graph.NATIVE_GATE_JOB, "failure") if job["name"] == graph.GATE_JOB else job
+            for job in failed["jobs"]  # type: ignore[index]
+        ]
+        lookalike = self.payload()
+        lookalike["jobs"] = [  # type: ignore[index]
+            self.job("Native " + graph.GATE_JOB.lower()) if job["name"] == graph.GATE_JOB else job
+            for job in lookalike["jobs"]  # type: ignore[index]
+        ]
+        for name, payload in (("both", both), ("failed", failed), ("lookalike", lookalike)):
+            with self.subTest(name), self.assertRaises(graph.JobGraphError):
+                graph.validate_job_graph(payload, policy="full", expected_scenarios=self.expected)
+
     def test_snapshot_matrix_cli_does_not_require_a_source_checkout(self) -> None:
         checked_out_matrix_path = ROOT / "release/release-matrix.json"
         checked_out_matrix = graph.load_matrix(checked_out_matrix_path)
