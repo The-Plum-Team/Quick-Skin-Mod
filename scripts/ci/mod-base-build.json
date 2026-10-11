@@ -51,8 +51,8 @@
     "path": "build/release"
   },
   "contexts": {
-    "build": "Shared Build and verify",
-    "packaged": "Shared Packaged E2E gate"
+    "build": "Build and verify",
+    "packaged": "Packaged E2E gate"
   },
   "inventory": {
     "path": "release/release-matrix.json"

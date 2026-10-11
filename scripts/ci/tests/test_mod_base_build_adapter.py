@@ -49,8 +49,12 @@ ROOT = Path(__file__).resolve().parents[3]
 CONFIG_PATH = ROOT / "scripts" / "ci" / "mod-base-build.json"
 ACTIVATION_PATH = ROOT / "site" / "mod-base-build-activation.json"
 REPOSITORY = "The-Plum-Team/Quick-Skin-Mod"
-#: The legacy required checks; a shared context must never equal one, in any case.
+#: The required checks of the default branch (release/github-governance.json). In ``shadow`` a
+#: shared context must never equal one, in any case; from the bridge on it is one.
 LEGACY_CONTEXTS = ("Build and verify", "Packaged E2E gate")
+GOVERNANCE_PATH = ROOT / "release" / "github-governance.json"
+#: The modes in which the gate App publishes the required names themselves (no ` (shadow)`).
+REQUIRED_NAME_MODES = ("shared-build-and-e2e",)
 #: The slowest native durations (Build 37435530842, E2E 37435530757): a 6m02s target, an 18m33s
 #: policy job and a 13m07s lane. The shared hooks must allow at least twice as much.
 NATIVE_SECONDS = {"target_seconds": 362, "policy_seconds": 1113, "runtime_seconds": 787}
@@ -240,8 +244,18 @@ class BuildConfigTests(unittest.TestCase):
         self.assertLessEqual(loaded, listed)
         self.assertIn("scripts/release/matrix.py", loaded)
 
-    def test_shared_contexts_never_equal_the_legacy_required_checks(self) -> None:
+    def test_the_contexts_follow_the_activation_mode(self) -> None:
+        """Q4 shadow publishes distinct names, so no required check can be met by them. The Q5
+        bridge (``shared-build-and-e2e`` while the native gates keep their names) publishes the
+        required names exactly, in the governance order, so the owner can switch their source."""
+
         contexts = config_document()["contexts"]
+        required = json.loads(GOVERNANCE_PATH.read_text(encoding="utf-8"))["required_checks"]
+        self.assertEqual(tuple(required), LEGACY_CONTEXTS)
+        mode = self.kit.parse_activation(ACTIVATION_PATH.read_bytes())["mode"]
+        if mode in REQUIRED_NAME_MODES:
+            self.assertEqual([contexts["build"], contexts["packaged"]], required)
+            return
         legacy = {name.casefold() for name in LEGACY_CONTEXTS}
         for context in contexts.values():
             self.assertNotIn(context.casefold(), legacy)
@@ -265,7 +279,7 @@ class BuildConfigTests(unittest.TestCase):
     def test_the_activation_manifest_names_this_config(self) -> None:
         activation = self.kit.parse_activation(ACTIVATION_PATH.read_bytes())
         self.assertEqual((activation["repository"], activation["profile"]), (REPOSITORY, "quick-skin"))
-        self.assertIn(activation["mode"], ("disabled", "shadow"))
+        self.assertIn(activation["mode"], ("disabled", "shadow", *REQUIRED_NAME_MODES))
 
 
 class PlanTests(unittest.TestCase):
