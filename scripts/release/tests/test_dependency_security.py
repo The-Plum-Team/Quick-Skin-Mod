@@ -49,12 +49,13 @@ def _matches_trust(
 class DependencySecurityPolicyTest(unittest.TestCase):
     def test_wrapper_and_global_mode_are_strictly_pinned(self) -> None:
         properties = (ROOT / "gradle.properties").read_text(encoding="utf-8")
-        # Dependency verification is deliberately not enforced: upstream publishers replace
-        # artifacts under an existing version coordinate, which halted every build on the
-        # affected branch. The recorded inventory and the Gradle wrapper pins below stay
-        # strict, so this asserts the accepted mode rather than leaving it unpinned.
-        self.assertIn("org.gradle.dependency.verification=off", properties)
-        self.assertNotIn("org.gradle.dependency.verification=strict", properties)
+        # The shared Build gate treats every external executable dependency as hash-enforced, so
+        # exactly one mode line selects strict and no other mode survives beside it. An upstream
+        # republication is a reviewed also-trust entry, never a relaxed mode.
+        modes = re.findall(
+            r"^org[.]gradle[.]dependency[.]verification=(.*)$", properties, re.MULTILINE
+        )
+        self.assertEqual(modes, ["strict"])
         self.assertIn("org.gradle.dependency.verification.console=verbose", properties)
 
         wrapper_properties = (
@@ -302,13 +303,14 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             'excludeGroup("loom")',
             'excludeGroup("net.minecraft")',
             'excludeGroupByRegex("net\\\\.minecraftforge\\\\.[0-9a-f]{64}")',
+            'excludeGroupByRegex("net\\\\.neoforged\\\\.fancymodloader\\\\.[0-9a-f]{64}")',
             "Unapproved remote dependency repository",
             'repositoryScheme != "https"',
         ):
             with self.subTest(required=required):
                 self.assertIn(required, policy)
 
-        for module in ("common", "fabric", "forge"):
+        for module in ("common", "fabric", "forge", "neoforge"):
             script = (ROOT / module / "build.gradle.kts").read_text(encoding="utf-8")
             self.assertIn(
                 'apply(from = rootProject.file("gradle/repository-policy.gradle.kts"))',
@@ -321,11 +323,62 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             for path in ROOT.rglob(pattern)
             if ".gradle" not in path.parts and "build" not in path.parts
         )
+        # Every CI and release Gradle run starts from a tracked script (build_matrix.py and the
+        # mod-base candidate), so those launchers are held to the same rules as the workflows.
+        launchers = subprocess.run(
+            ("git", "ls-files", "-z", "--", "*.py", "*.sh", "*.ps1"),
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        ).stdout.decode("utf-8")
+        automation = "\n".join(
+            [workflows_and_build_logic]
+            + [
+                (ROOT / name).read_text(encoding="utf-8")
+                for name in launchers.split("\0")
+                if name and "tests" not in Path(name).parts
+            ]
+        )
+        self.assertIsNone(
+            re.search(r"--dependency-verification(?:=|\s+)(?:off|lenient)\b", automation)
+        )
+        # Only the root gradle.properties selects the mode. A launcher that wrote the property
+        # into a Gradle user home or GRADLE_OPTS would override it for that run.
+        self.assertIsNone(re.search(r"org[.]gradle[.]dependency[.]verification", automation))
+        # Checksums and locks are reviewed maintainer changes. Automation that wrote them would
+        # accept whatever an upstream repository served on that run.
         self.assertIsNone(
             re.search(
-                r"--dependency-verification(?:=|\s+)(?:off|lenient)\b",
-                workflows_and_build_logic,
+                r"--write-verification-metadata|--write-locks\b"
+                r"|(?<![\w-])-M(?:\s+|[\"']\s*,\s*[\"']|=)(?:sha|md5|pgp)",
+                automation,
             )
+        )
+
+    def test_maven_mirror_has_an_emergency_switch(self) -> None:
+        mirror_url = 'maven("https://the-plum-team.github.io/maven-mirror/")'
+        guard = 'if (plumMirrorSwitch != "false") {'
+        for relative in ("settings.gradle.kts", "gradle/maven-mirror.gradle.kts"):
+            with self.subTest(script=relative):
+                script = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn(
+                    'val plumMirrorSwitch = providers.gradleProperty("plum.mavenMirror").orNull',
+                    script,
+                )
+                self.assertIn('"plum.mavenMirror must be true or false', script)
+                # The mirror is declared exactly once, inside the switch's block.
+                self.assertEqual(script.count("the-plum-team.github.io/maven-mirror/"), 1)
+                start = script.index(guard)
+                self.assertGreater(script.index(mirror_url), start)
+                depth = 0
+                for position in range(start + len(guard) - 1, len(script)):
+                    depth += {"{": 1, "}": -1}.get(script[position], 0)
+                    if depth == 0:
+                        break
+                self.assertLess(script.index(mirror_url), position)
+        self.assertIn(
+            "-Pplum.mavenMirror=false",
+            (ROOT / "DEPENDENCY-SECURITY.md").read_text(encoding="utf-8"),
         )
 
     def test_only_active_shadow_bundles_are_locked_outside_generated_trees(self) -> None:
