@@ -35,6 +35,17 @@ repositories.withType<MavenArtifactRepository>().configureEach {
             includeGroupByRegex("cpw\\.mods(\\..*)?")
             excludeGroupByRegex("net\\.neoforged\\.fancymodloader\\.[0-9a-f]{64}")
         }
+        // The Plum Team's mirror, added first by gradle/maven-mirror.gradle.kts. Exact groups only, so
+        // Loom's generated hash-named namespaces can never match it.
+        repositoryHost == "the-plum-team.github.io" && url.path == "/maven-mirror/" -> content {
+            listOf(
+                "net.fabricmc", "net.fabricmc.fabric-api", "net.fabricmc.unpick",
+                "dev.architectury", "dev.architectury.loom", "dev.architectury.loom-no-remap",
+                "architectury-plugin", "dev.kikugie", "dev.kikugie.stonecutter",
+                "net.neoforged", "net.neoforged.fancymodloader", "net.neoforged.installertools",
+                "net.neoforged.accesstransformers", "cpw.mods", "net.minecraftforge",
+            ).forEach { includeGroup(it) }
+        }
         repositoryHost == "repo.maven.apache.org" -> content {
             excludeGroupByRegex("dev\\.architectury(\\..*)?")
             excludeGroupByRegex("net\\.fabricmc(\\..*)?")
@@ -53,3 +64,5 @@ repositories.withType<MavenArtifactRepository>().configureEach {
         )
     }
 }
+
+apply(from = rootProject.file("gradle/maven-mirror.gradle.kts"))

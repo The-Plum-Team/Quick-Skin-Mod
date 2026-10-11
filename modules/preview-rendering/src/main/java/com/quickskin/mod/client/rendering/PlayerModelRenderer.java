@@ -231,33 +231,51 @@ public class PlayerModelRenderer {
 //?}
 
     /**
-     * Initialize models (lazy initialization)
+     * Initialize models (lazy initialization).
+     *
+     * <p>The entity model set is filled by the first resource reload. Mods that remove the loading
+     * screen (Remove Reloading Screen) show the title screen while that reload is still running, and
+     * baking a layer the set does not hold yet throws. The preview then draws nothing and the next
+     * frame tries again; the models are published together, only once every layer has baked.
+     *
+     * @return {@code false} while the entity model set does not hold the player layers yet
      */
-    private static void ensureModelsLoaded() {
-        if (classicModel == null) {
-            Minecraft mc = Minecraft.getInstance();
-            ModelPart classicRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER);
-//? if <1.21.2 {
-            classicModel = new PlayerModel<>(classicRoot, false);
-//?} else {
-            classicModel = new PlayerModel(classicRoot, false);
-//?}
-
-            ModelPart slimRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM);
-//? if <1.21.2 {
-            slimModel = new PlayerModel<>(slimRoot, true);
-//?} else {
-            slimModel = new PlayerModel(slimRoot, true);
-
-            // In MC 1.21.2+, the cape is a separate model (PlayerCapeModel).
-            ModelPart capeRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_CAPE);
-//? if <1.21.6 {
-            capeModel = new PlayerCapeModel<>(capeRoot);
-//?} else {
-            capeModel = new PlayerCapeModel(capeRoot);
-//?}
-//?}
+    private static boolean ensureModelsLoaded() {
+        if (classicModel != null) {
+            return true;
         }
+        Minecraft mc = Minecraft.getInstance();
+        ModelPart classicRoot;
+        ModelPart slimRoot;
+//? if <1.21.2 {
+//?} else {
+        ModelPart capeRoot;
+//?}
+        try {
+            classicRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER);
+            slimRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM);
+//? if <1.21.2 {
+//?} else {
+            // In MC 1.21.2+, the cape is a separate model (PlayerCapeModel).
+            capeRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_CAPE);
+//?}
+        } catch (IllegalArgumentException layerNotLoadedYet) {
+            return false;
+        }
+
+//? if <1.21.2 {
+        slimModel = new PlayerModel<>(slimRoot, true);
+        classicModel = new PlayerModel<>(classicRoot, false);
+//?} else {
+//? if <1.21.6 {
+        capeModel = new PlayerCapeModel<>(capeRoot);
+//?} else {
+        capeModel = new PlayerCapeModel(capeRoot);
+//?}
+        slimModel = new PlayerModel(slimRoot, true);
+        classicModel = new PlayerModel(classicRoot, false);
+//?}
+        return true;
 //? if <1.21.6 {
 //?} else if <26.2 {
     }
@@ -661,6 +679,9 @@ public class PlayerModelRenderer {
         if (playerData.getSkinLocation() == null) {
             return; // No skin to render
         }
+        if (!ensureModelsLoaded()) {
+            return; // The first resource reload has not filled the entity model set yet
+        }
 
         // Get Minecraft instance
         Minecraft mc = Minecraft.getInstance();
@@ -1045,7 +1066,9 @@ public class PlayerModelRenderer {
             int mouseY,
             boolean followMouse
     ) {
-        ensureModelsLoaded();
+        if (!ensureModelsLoaded()) {
+            return;
+        }
 
         // Select model based on type
 //? if <1.21.11 {

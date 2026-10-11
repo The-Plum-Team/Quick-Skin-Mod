@@ -94,6 +94,7 @@ public class SettingsScreen extends Screen {
     private Checkbox menuBackgroundCheckbox;
     private Checkbox showTitlePreviewCheckbox;
     private Checkbox showPausePreviewCheckbox;
+    private Checkbox compactChangeSkinButtonCheckbox;
     private Button keybindButton;
 
     // State for keybind editing
@@ -438,6 +439,31 @@ public class SettingsScreen extends Screen {
                 .build();
         //?}
         clientSettingWidgets.add(showPausePreviewCheckbox);
+        currentRightY += spacing;
+
+        // Compact Change Skin Button
+        //? if <1.21 {
+        compactChangeSkinButtonCheckbox = new Checkbox(
+                rightColumnX, currentRightY,
+                checkboxSize, checkboxSize,
+        //?} else {
+        compactChangeSkinButtonCheckbox = Checkbox.builder(
+        //?}
+                Component.translatable("quickskin.settings.compact_change_skin_button"),
+        //? if <1.21 {
+                config.compactChangeSkinButton
+        );
+        compactChangeSkinButtonCheckbox.setTooltip(Tooltip.create(
+                Component.translatable("quickskin.settings.compact_change_skin_button.tooltip")
+        ));
+        //?} else {
+                this.font)
+                .pos(rightColumnX, currentRightY)
+                .selected(config.compactChangeSkinButton)
+                .tooltip(Tooltip.create(Component.translatable("quickskin.settings.compact_change_skin_button.tooltip")))
+                .build();
+        //?}
+        clientSettingWidgets.add(compactChangeSkinButtonCheckbox);
     }
 
     private void createServerSettings() {
@@ -903,6 +929,7 @@ public class SettingsScreen extends Screen {
             config.hideBuiltInCapes = hideBuiltInCapesCheckbox.selected();
             config.showTitleScreenPreview = showTitlePreviewCheckbox.selected();
             config.showPauseMenuPreview = showPausePreviewCheckbox.selected();
+            config.compactChangeSkinButton = compactChangeSkinButtonCheckbox.selected();
 
             // Save menu background style
             if (menuBackgroundCheckbox != null) {

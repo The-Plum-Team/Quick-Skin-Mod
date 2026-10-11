@@ -3022,7 +3022,7 @@
               "capture": {
                 "title": "Settings screen",
                 "review_tier": "all",
-                "expectation": "The Quick Skin settings screen is open on its Client tab (tabs Client, GUI Edit, Modpack and Server): a key-binding button reading Not Bound beside the readable Open Skin Menu label, and three checkboxes, Disable Skin Transparency clear and Show Title Screen Preview and Show Pause Menu Preview checked, above a Done button.",
+                "expectation": "The Quick Skin settings screen is open on its Client tab (tabs Client, GUI Edit, Modpack and Server): a key-binding button reading Not Bound beside the readable Open Skin Menu label, and four checkboxes, Disable Skin Transparency clear, Show Title Screen Preview and Show Pause Menu Preview checked, and Compact Change Skin Button clear, above a Done button.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
