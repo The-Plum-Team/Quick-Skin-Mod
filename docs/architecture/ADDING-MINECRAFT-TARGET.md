@@ -59,3 +59,5 @@ the matrix. During this migration, routine image E2E runs on GitHub after the im
 Compilation and packaging do not stand in for that runtime evidence. Selective CI admission and
 reuse of unaffected feature evidence remain part of the migration, so existing protected gates
 continue to require their complete profiles.
+
+<!-- shadow test q6-check: trivial change, closed unmerged -->
