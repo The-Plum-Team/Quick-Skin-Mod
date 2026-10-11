@@ -133,3 +133,5 @@ These producer, consumer, rotation, review and scheduling paths pass local API/s
 Optional-mod wave admission and selective healthy-baseline reuse still require migration. No
 successful GitHub deployment, model review or new Minecraft visual acceptance is claimed by
 these fixtures.
+
+<!-- shadow test (temporary, never merged): draft, ready, draft again, for the mod-base Q4 shadow evaluation. -->
