@@ -11,16 +11,25 @@ val plumMirrorGroups = listOf(
     "net.neoforged", "net.neoforged.fancymodloader", "net.neoforged.installertools",
     "net.neoforged.accesstransformers", "cpw.mods", "net.minecraftforge",
 )
-val plumMirror = repositories.findByName("PlumMavenMirror")
-    ?: repositories.maven("https://the-plum-team.github.io/maven-mirror/") {
-        name = "PlumMavenMirror"
-        // The mirror holds exactly the files in the verification metadata: a module's .module
-        // file, without the .pom that only points to it.
-        metadataSources { gradleMetadata(); mavenPom() }
-        mavenContent { releasesOnly() }
-        content { plumMirrorGroups.forEach { includeGroup(it) } }
-    }
-// Repositories added before this script (Loom's and the build script's own) stay in their order
-// behind the mirror; later additions are appended after them.
-repositories.remove(plumMirror)
-repositories.addFirst(plumMirror)
+// Emergency switch: -Pplum.mavenMirror=false leaves the mirror out, so every group resolves from
+// its upstream repositories only (for example while GitHub Pages is down or serves a bad file).
+// settings.gradle.kts reads the same property for plugins.
+val plumMirrorSwitch = providers.gradleProperty("plum.mavenMirror").orNull
+require(plumMirrorSwitch == null || plumMirrorSwitch == "true" || plumMirrorSwitch == "false") {
+    "plum.mavenMirror must be true or false, not '$plumMirrorSwitch'"
+}
+if (plumMirrorSwitch != "false") {
+    val plumMirror = repositories.findByName("PlumMavenMirror")
+        ?: repositories.maven("https://the-plum-team.github.io/maven-mirror/") {
+            name = "PlumMavenMirror"
+            // The mirror holds exactly the files in the verification metadata: a module's .module
+            // file, without the .pom that only points to it.
+            metadataSources { gradleMetadata(); mavenPom() }
+            mavenContent { releasesOnly() }
+            content { plumMirrorGroups.forEach { includeGroup(it) } }
+        }
+    // Repositories added before this script (Loom's and the build script's own) stay in their
+    // order behind the mirror; later additions are appended after them.
+    repositories.remove(plumMirror)
+    repositories.addFirst(plumMirror)
+}

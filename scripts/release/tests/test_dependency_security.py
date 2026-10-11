@@ -355,6 +355,32 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             )
         )
 
+    def test_maven_mirror_has_an_emergency_switch(self) -> None:
+        mirror_url = 'maven("https://the-plum-team.github.io/maven-mirror/")'
+        guard = 'if (plumMirrorSwitch != "false") {'
+        for relative in ("settings.gradle.kts", "gradle/maven-mirror.gradle.kts"):
+            with self.subTest(script=relative):
+                script = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn(
+                    'val plumMirrorSwitch = providers.gradleProperty("plum.mavenMirror").orNull',
+                    script,
+                )
+                self.assertIn('"plum.mavenMirror must be true or false', script)
+                # The mirror is declared exactly once, inside the switch's block.
+                self.assertEqual(script.count("the-plum-team.github.io/maven-mirror/"), 1)
+                start = script.index(guard)
+                self.assertGreater(script.index(mirror_url), start)
+                depth = 0
+                for position in range(start + len(guard) - 1, len(script)):
+                    depth += {"{": 1, "}": -1}.get(script[position], 0)
+                    if depth == 0:
+                        break
+                self.assertLess(script.index(mirror_url), position)
+        self.assertIn(
+            "-Pplum.mavenMirror=false",
+            (ROOT / "DEPENDENCY-SECURITY.md").read_text(encoding="utf-8"),
+        )
+
     def test_only_active_shadow_bundles_are_locked_outside_generated_trees(self) -> None:
         matrix = json.loads((ROOT / "release" / "release-matrix.json").read_text())
         expected_files = {

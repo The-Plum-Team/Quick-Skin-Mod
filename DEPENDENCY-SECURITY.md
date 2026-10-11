@@ -29,7 +29,9 @@ checksum change, never by relaxing the mode: see
   openly licensed files whose SHA-256 matched the mods' own verification metadata, and answers 404
   for everything else, so Gradle falls back to the upstream repositories unchanged. Strict
   verification checks every file the mirror serves against `gradle/verification-metadata.xml`,
-  exactly as it checks files from the upstream repositories.
+  exactly as it checks files from the upstream repositories. `-Pplum.mavenMirror=false` (or
+  `ORG_GRADLE_PROJECT_plum.mavenMirror=false` in the environment) is the emergency switch: it
+  leaves the mirror out of both places, so every group resolves from its upstream repositories.
 - `gradle/verification-metadata.xml` verifies both artifacts and Maven/Gradle metadata with
   SHA-256. It covers settings and build plugins plus the resolvable common, test, Fabric, Forge,
   NeoForge, Minecraft, mappings, transform, runtime, native, and E2E classpaths of every target in
