@@ -1,6 +1,6 @@
 {
   "kind": "mod-base.ci.activation",
-  "mode": "shadow",
+  "mode": "shared-build-and-e2e",
   "profile": "quick-skin",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "rollback_from": null,
