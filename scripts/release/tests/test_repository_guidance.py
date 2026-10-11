@@ -236,10 +236,16 @@ class RepositoryGuidanceTest(unittest.TestCase):
         updates = dependabot.split("\n  - package-ecosystem: ")[1:]
         actions = [update for update in updates if update.startswith("github-actions\n")]
         self.assertEqual(len(actions), 1)
-        # Every other action pinned inside the managed region of pages.yml is kit-owned too: a
+        # Every other action pinned inside the managed region of pages.yml, or by a shared
+        # Build/E2E caller the activation mode manages (rendered whole), is kit-owned too: a
         # Dependabot bump of it would be byte drift that `template check` rejects.
         caller = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
         managed = caller.split("# <<< mod-base managed\n", 1)[0]
+        for name in ("mod-base-guard.yml", "mod-base-build.yml", "mod-base-packaged-e2e.yml",
+                     "mod-base-gate-status.yml"):
+            shared_caller = ROOT / ".github" / "workflows" / name
+            if shared_caller.is_file():
+                managed += shared_caller.read_text(encoding="utf-8")
         managed_actions = sorted(
             set(re.findall(r"^\s*(?:-\s+)?uses:\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/[^@\s]*)?@",
                            managed, re.MULTILINE))
@@ -254,6 +260,24 @@ class RepositoryGuidanceTest(unittest.TestCase):
             actions[0],
         )
         self.assertEqual(dependabot.count(MOD_BASE_DEPENDENCY), 1)
+
+    def test_the_guides_name_every_action_left_to_the_kit_bump(self) -> None:
+        # A contributor closes the Dependabot pull requests the kit bump owns; both guides must
+        # name every action the github-actions update ignores, and the managed callers.
+        dependabot = (ROOT / ".github" / "dependabot.yml").read_text(
+            encoding="utf-8"
+        )
+        updates = dependabot.split("\n  - package-ecosystem: ")[1:]
+        actions = [update for update in updates if update.startswith("github-actions\n")]
+        ignored = re.findall(r'^      - dependency-name: "([^"*]+)"$', actions[0], re.MULTILINE)
+        self.assertIn("actions/deploy-pages", ignored)
+        for guide in (ROOT / "docs" / "ai" / "WORKFLOW.md", ROOT / "CONTRIBUTING.md"):
+            text = " ".join(guide.read_text(encoding="utf-8").split())
+            for name in ignored:
+                with self.subTest(guide=str(guide.relative_to(ROOT)), action=name):
+                    self.assertIn(f"`{name}`", text)
+            with self.subTest(guide=str(guide.relative_to(ROOT)), route="callers"):
+                self.assertIn("a managed `mod-base-*.yml` caller", text)
 
     def test_protected_paths_keep_a_code_owner(self) -> None:
         rules: dict[str, list[str]] = {}
