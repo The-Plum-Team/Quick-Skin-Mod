@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Nonaktifkan Transparansi Skin",
   "quickskin.settings.show_title_preview": "Tampilkan Pratinjau Layar Judul",
   "quickskin.settings.show_pause_preview": "Tampilkan Pratinjau Menu Jeda",
+  "quickskin.settings.compact_change_skin_button": "Tombol Ganti Skin Ringkas",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Tampilkan tombol Ganti Skin di layar judul dan menu jeda sebagai ikon kecil.",
   "quickskin.settings.disable_transparency_server": "Nonaktifkan Transparansi Skin (Server)",
   "quickskin.settings.cooldown_label": "Cooldown Ganti Skin",
   "quickskin.settings.cooldown_seconds": "Cooldown Ganti Skin (detik)",

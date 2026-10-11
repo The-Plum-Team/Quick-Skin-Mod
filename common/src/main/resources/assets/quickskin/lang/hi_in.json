@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "स्किन पारदर्शिता अक्षम करें",
   "quickskin.settings.show_title_preview": "टाइटल स्क्रीन पूर्वावलोकन दिखाएँ",
   "quickskin.settings.show_pause_preview": "पॉज़ मेनू पूर्वावलोकन दिखाएँ",
+  "quickskin.settings.compact_change_skin_button": "स्किन बदलें बटन को छोटा करें",
+  "quickskin.settings.compact_change_skin_button.tooltip": "टाइटल स्क्रीन और पॉज़ मेनू में स्किन बदलें बटन को एक छोटे आइकन के रूप में दिखाएँ।",
   "quickskin.settings.disable_transparency_server": "स्किन पारदर्शिता अक्षम करें (सर्वर)",
   "quickskin.settings.cooldown_label": "स्किन बदलने की प्रतीक्षा अवधि",
   "quickskin.settings.cooldown_seconds": "स्किन बदलने की प्रतीक्षा अवधि (सेकंड)",

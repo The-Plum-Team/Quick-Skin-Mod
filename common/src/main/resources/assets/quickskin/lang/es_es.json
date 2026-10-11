@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Desactivar transparencia del aspecto",
   "quickskin.settings.show_title_preview": "Vista previa en pantalla de título",
   "quickskin.settings.show_pause_preview": "Vista previa en menú de pausa",
+  "quickskin.settings.compact_change_skin_button": "Botón compacto de cambiar aspecto",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Muestra el botón Cambiar aspecto de la pantalla de título y del menú de pausa como un icono pequeño.",
   "quickskin.settings.disable_transparency_server": "Desactivar transparencia del aspecto (Servidor)",
   "quickskin.settings.cooldown_label": "Tiempo de espera para cambiar aspecto",
   "quickskin.settings.cooldown_seconds": "Tiempo de espera para cambiar aspecto (segundos)",

@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Desativar Transparência da Skin",
   "quickskin.settings.show_title_preview": "Pré-visualização na Tela Inicial",
   "quickskin.settings.show_pause_preview": "Pré-visualização no Menu de Pausa",
+  "quickskin.settings.compact_change_skin_button": "Botão Trocar Skin Compacto",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Mostra o botão Trocar Skin da tela inicial e do menu de pausa como um ícone pequeno.",
   "quickskin.settings.disable_transparency_server": "Desativar Transparência da Skin (Servidor)",
   "quickskin.settings.cooldown_label": "Tempo de Recarga para Trocar Skin",
   "quickskin.settings.cooldown_seconds": "Tempo de Recarga para Trocar Skin (segundos)",
