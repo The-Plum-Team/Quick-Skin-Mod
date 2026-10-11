@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Вимкнути прозорість скіна",
   "quickskin.settings.show_title_preview": "Перегляд у головному меню",
   "quickskin.settings.show_pause_preview": "Перегляд у меню паузи",
+  "quickskin.settings.compact_change_skin_button": "Компактна кнопка зміни скіна",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Показувати кнопку «Змінити скін» на титульному екрані та в меню паузи маленькою іконкою.",
   "quickskin.settings.disable_transparency_server": "Вимкнути прозорість скіна (Сервер)",
   "quickskin.settings.cooldown_label": "Затримка зміни скіна",
   "quickskin.settings.cooldown_seconds": "Затримка зміни скіна (секунди)",

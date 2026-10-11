@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Skin Şeffaflığını Devre Dışı Bırak",
   "quickskin.settings.show_title_preview": "Ana Menü Önizlemesini Göster",
   "quickskin.settings.show_pause_preview": "Oyun Menüsü Önizlemesini Göster",
+  "quickskin.settings.compact_change_skin_button": "Kompakt Skin Değiştir Düğmesi",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Başlık ekranındaki ve oyun menüsündeki Skin Değiştir düğmesini küçük bir simge olarak gösterir.",
   "quickskin.settings.disable_transparency_server": "Skin Şeffaflığını Devre Dışı Bırak (Sunucu)",
   "quickskin.settings.cooldown_label": "Skin Değiştirme Bekleme Süresi",
   "quickskin.settings.cooldown_seconds": "Skin Değiştirme Bekleme Süresi (saniye)",

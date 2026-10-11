@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Desactivar transparencia de la skin",
   "quickskin.settings.show_title_preview": "Vista previa en pantalla de título",
   "quickskin.settings.show_pause_preview": "Vista previa en menú de pausa",
+  "quickskin.settings.compact_change_skin_button": "Botón compacto de cambiar skin",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Muestra el botón Cambiar skin de la pantalla de título y del menú de pausa como un ícono pequeño.",
   "quickskin.settings.disable_transparency_server": "Desactivar transparencia de la skin (Servidor)",
   "quickskin.settings.cooldown_label": "Tiempo de espera para cambiar skin",
   "quickskin.settings.cooldown_seconds": "Tiempo de espera para cambiar skin (segundos)",

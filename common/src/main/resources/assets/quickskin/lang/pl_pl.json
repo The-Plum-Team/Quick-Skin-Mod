@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "Wyłącz przezroczystość skórki",
   "quickskin.settings.show_title_preview": "Pokaż podgląd w menu głównym",
   "quickskin.settings.show_pause_preview": "Pokaż podgląd w menu pauzy",
+  "quickskin.settings.compact_change_skin_button": "Kompaktowy przycisk Zmień skórkę",
+  "quickskin.settings.compact_change_skin_button.tooltip": "Wyświetla przycisk Zmień skórkę na ekranie tytułowym i w menu pauzy jako małą ikonę.",
   "quickskin.settings.disable_transparency_server": "Wyłącz przezroczystość skórki (Serwer)",
   "quickskin.settings.cooldown_label": "Czas odnowienia zmiany skórki",
   "quickskin.settings.cooldown_seconds": "Czas odnowienia zmiany skórki (sekundy)",

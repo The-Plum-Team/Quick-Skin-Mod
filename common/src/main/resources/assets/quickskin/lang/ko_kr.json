@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "스킨 투명도 비활성화",
   "quickskin.settings.show_title_preview": "타이틀 화면 미리보기 표시",
   "quickskin.settings.show_pause_preview": "일시정지 메뉴 미리보기 표시",
+  "quickskin.settings.compact_change_skin_button": "스킨 변경 버튼 간소화",
+  "quickskin.settings.compact_change_skin_button.tooltip": "타이틀 화면과 일시정지 메뉴의 스킨 변경 버튼을 작은 아이콘으로 표시합니다.",
   "quickskin.settings.disable_transparency_server": "스킨 투명도 비활성화 (서버)",
   "quickskin.settings.cooldown_label": "스킨 변경 대기시간",
   "quickskin.settings.cooldown_seconds": "스킨 변경 대기시간 (초)",

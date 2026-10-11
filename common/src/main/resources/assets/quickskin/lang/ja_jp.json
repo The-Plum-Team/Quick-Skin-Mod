@@ -170,6 +170,8 @@
   "quickskin.settings.disable_transparency": "スキンの透明度を無効化",
   "quickskin.settings.show_title_preview": "タイトル画面のプレビューを表示",
   "quickskin.settings.show_pause_preview": "ポーズメニューのプレビューを表示",
+  "quickskin.settings.compact_change_skin_button": "スキン変更ボタンをアイコン化",
+  "quickskin.settings.compact_change_skin_button.tooltip": "タイトル画面とポーズメニューのスキン変更ボタンを小さなアイコンで表示します。",
   "quickskin.settings.disable_transparency_server": "スキンの透明度を無効化(サーバー)",
   "quickskin.settings.cooldown_label": "スキン変更のクールダウン",
   "quickskin.settings.cooldown_seconds": "スキン変更のクールダウン(秒)",
