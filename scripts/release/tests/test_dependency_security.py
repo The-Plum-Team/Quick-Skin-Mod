@@ -17,7 +17,7 @@ EXPECTED_LOCAL_TRUST = {
     (r"^loom$", r"^mappings$"),
     (
         r"^net[.]minecraft$",
-        r"^(minecraft-merged-[0-9a-f]{10}|(?:forge|neoforge)-[0-9A-Za-z.+_-]+-minecraft-merged(?:-deobf)?)$",
+        r"^(minecraft-merged-[0-9a-f]{10}|(?:forge|neoforge)-[0-9A-Za-z.+_-]+-minecraft-merged(?:-deobf|-[0-9a-f]{10})?)$",
     ),
     (r"^net[.]minecraftforge[.][0-9a-f]{64}$", r"^fmlloader$"),
     (r"^net[.]neoforged[.]fancymodloader[.][0-9a-f]{64}$", r"^loader$"),
@@ -156,6 +156,10 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ("net.minecraft", "forge-1.20.1-47.4.9-minecraft-merged"),
             ("net.minecraft", "neoforge-21.11.38-beta-minecraft-merged"),
             ("net.minecraft", "neoforge-26.2.0.6-beta-minecraft-merged-deobf"),
+            # Rebuild of a target whose overlay ships META-INF/accesstransformer.cfg: Loom writes the
+            # project-AT-processed game JAR to the project's loom-cache/minecraftMaven repository.
+            ("net.minecraft", "neoforge-26.1.0.19-beta-minecraft-merged-df325f964f"),
+            ("net.minecraft", "neoforge-26.1.1.15-beta-minecraft-merged-df325f964f"),
             ("net.minecraftforge." + "a" * 64, "fmlloader"),
             ("net.neoforged.fancymodloader." + "a" * 64, "loader"),
         )
@@ -168,6 +172,14 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ("net.minecraft", "minecraft"),
             ("net.minecraft", "forge-1.20.1-47.4.9-minecraft-merged-deobf-extra"),
             ("net.minecraft", "neoforged-26.2.0.6-beta-minecraft-merged-deobf"),
+            ("net.minecraft", "neoforge-26.1.1.15-beta-minecraft-merged-df325f964"),
+            ("net.minecraft", "neoforge-26.1.1.15-beta-minecraft-merged-df325f964f0"),
+            ("net.minecraft", "neoforge-26.1.1.15-beta-minecraft-merged-DF325F964F"),
+            ("net.minecraft", "neoforge-26.1.1.15-beta-minecraft-merged-df325f964g"),
+            ("net.minecraft", "neoforge-26.1.1.15-beta-minecraft-merged-df325f964f-extra"),
+            ("net.minecraft", "neoforge-26.1.1.15-beta-minecraft-merged-deobf-df325f964f"),
+            ("net.minecraft", "neoforge-26.1.1.15-beta-minecraft-merged-df325f964f-deobf"),
+            ("net.minecraft.evil", "neoforge-26.1.1.15-beta-minecraft-merged-df325f964f"),
             ("net.minecraftforge." + "a" * 63, "fmlloader"),
             ("net.minecraftforge." + "g" * 64, "fmlloader"),
             ("net.minecraftforge." + "a" * 64, "forge"),
@@ -181,6 +193,35 @@ class DependencySecurityPolicyTest(unittest.TestCase):
         for coordinate in rejected:
             with self.subTest(rejected=coordinate):
                 self.assertFalse(any(_matches_trust(rule, *coordinate) for rule in rules))
+
+    def test_every_forge_like_target_trusts_each_loom_merged_output_shape(self) -> None:
+        # The release workflow builds each target twice. A clean first build may resolve only the
+        # shared merged JAR, while the rebuild sees generated overlay resources and resolves Loom's
+        # project-processed JAR, so every shape must be trusted for every real loader version.
+        root, namespace = _verification_tree()
+        rules = root.findall("v:configuration/v:trusted-artifacts/v:trust", namespace)
+        properties = dict(
+            line.split("=", 1)
+            for line in (ROOT / "gradle.properties").read_text(encoding="utf-8").splitlines()
+            if "=" in line and not line.lstrip().startswith("#")
+        )
+        matrix = json.loads((ROOT / "release" / "release-matrix.json").read_text(encoding="utf-8"))
+        forge_like = [
+            row for row in matrix["artifacts"] if row["loader"] in {"forge", "neoforge"}
+        ]
+        self.assertTrue(any(row["loader"] == "neoforge" for row in forge_like))
+        for row in forge_like:
+            key = f"{row['loader']}_version_{row['artifact_version'].replace('.', '_')}"
+            loader_version = properties[key].strip()
+            base = f"{row['loader']}-{loader_version}-minecraft-merged"
+            for name in (base, f"{base}-deobf", f"{base}-df325f964f"):
+                with self.subTest(target=row["artifact_node"], name=name):
+                    self.assertEqual(
+                        sum(_matches_trust(rule, "net.minecraft", name) for rule in rules), 1
+                    )
+                    self.assertFalse(
+                        any(_matches_trust(rule, "net.minecraft.evil", name) for rule in rules)
+                    )
 
     def test_trusted_local_outputs_are_not_recorded_as_portable_hashes(self) -> None:
         root, namespace = _verification_tree()
