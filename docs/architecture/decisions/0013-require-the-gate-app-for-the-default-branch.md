@@ -53,5 +53,16 @@ App's status, and keeping that name on a native job only makes the two writers e
   the App-gated route restores the old job names and this file's source together (the kit's
   `reviewed-rollback` mode). Nothing weakens on its own when the App or its key is unavailable:
   the statuses stay pending or fail, and nothing merges.
+- `github_governance.py apply` never switches or drops the live source of a required check. The
+  owner switches it on the ruleset (Q6) before this file records it, and restores it the same
+  way, so an apply from `master` in between refuses instead of handing the names back.
+- If the App cannot publish, nothing merges, the rollback pull request included. The owner's
+  restoration of the GitHub Actions source then comes first, and that pull request is gated by
+  `build-gate.yml` and `on-demand-e2e.yml` dispatched on its branch, which keep the historical
+  names.
+- A pull request opened by `GITHUB_TOKEN` (the release status refresh of
+  `refresh-release-status.yml`) starts no `pull_request_target` run, and its dispatched native
+  gates no longer count: a maintainer closes and reopens it, or pushes to it, so that the shared
+  gates run and the App publishes.
 - Each pull-request generation still runs both pipelines until Q10, as in the shadow period:
   roughly 400 GitHub requests for the shared generation on top of the native traffic.

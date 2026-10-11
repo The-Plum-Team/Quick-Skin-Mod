@@ -189,7 +189,10 @@ deltas.
   gates. `build-gate.yml` and `on-demand-e2e.yml` still run for their downstream evidence, but on
   a pull request to `master` their gate jobs are `Native Build and verify` and `Native Packaged
   E2E gate` and never report a required name; pushes, dispatches and other bases keep the
-  historical names. A reader of a native run accepts exactly one of the two names.
+  historical names. A reader of a native run accepts exactly one of the two names. A pull request
+  that `GITHUB_TOKEN` opens (the release status refresh) starts no `pull_request_target` run, so
+  it gets the App's statuses only after a maintainer closes and reopens it or pushes to it; its
+  dispatched native gates no longer count.
   `scripts/ci/tests/test_mod_base_build_adapter.py` holds the plan to the native targets, lanes
   and staged names.
 
