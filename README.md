@@ -1,8 +1,8 @@
 # CI status snapshots
 
 Repository: [The-Plum-Team/Quick-Skin-Mod](https://github.com/The-Plum-Team/Quick-Skin-Mod).
-Covered commit: `18a1937edabd770fa5526087fef6be5b456f99ec`.
-Observed: 2026-10-11T09:48:54Z (UTC).
+Covered commit: `5804e11c7e527daa90993b67aa1bf715080b11a1`.
+Observed: 2026-10-11T11:04:14Z (UTC).
 
 Each row summarizes target jobs and shared prerequisites. Open a target for the separate overall workflow result and original execution provenance. Snapshots update on CI transitions; caching may delay displayed badges. A badge is a status summary, not an acceptance certificate.
 
