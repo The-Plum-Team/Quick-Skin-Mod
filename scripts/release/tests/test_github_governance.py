@@ -194,6 +194,36 @@ class GitHubGovernanceTest(unittest.TestCase):
                     "ruleset:" + self.config["managed_rulesets"]["default_branch"], "update"),
                     github_governance.plan(remote, self.config))
 
+    def test_apply_never_switches_or_drops_the_live_source_of_a_required_check(self) -> None:
+        """Between the owner's source switch (design Q6) and the PR that records it, the config on
+        master still names the old source: an apply must refuse instead of restoring it, and a
+        config without a source must not drop a live one. Adding a source to an unsourced rule
+        only narrows it and stays possible."""
+
+        source = self.config["required_check_integration_id"]
+        for live, wanted in ((source + 1, source), (source, None)):
+            config = copy.deepcopy(self.config)
+            if wanted is None:
+                config.pop("required_check_integration_id")
+            remote = LocalGovernanceRemote(self.config)
+            for ruleset in remote.rulesets.values():
+                for rule in ruleset.get("rules", []):
+                    for item in rule.get("parameters", {}).get("required_status_checks", []):
+                        item["integration_id"] = live
+            before = copy.deepcopy(remote.rulesets)
+            with self.subTest(live=live, wanted=wanted):
+                with self.assertRaisesRegex(github_governance.GovernanceError, "expected source"):
+                    github_governance.apply(remote, config)
+                self.assertTrue(all(method == "GET" for method, _ in remote.calls))
+                self.assertEqual(before, remote.rulesets)
+        unsourced = LocalGovernanceRemote(self.config)
+        for ruleset in unsourced.rulesets.values():
+            for rule in ruleset.get("rules", []):
+                for item in rule.get("parameters", {}).get("required_status_checks", []):
+                    item.pop("integration_id", None)
+        self.assertEqual([], github_governance.source_switches(
+            github_governance.managed_remote_rulesets(unsourced, self.config), self.config))
+
     def test_historical_governance_can_still_be_loaded_without_retiring_its_policies(self):
         legacy = github_governance.load_config(Path(__file__).parent / "fixtures/legacy-governance-schema1.json")
         self.assertEqual(3, len(github_governance.desired_rulesets(legacy)))
