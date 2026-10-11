@@ -2,6 +2,8 @@ package com.quickskin.mod.client.gui.util;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
+import com.quickskin.mod.client.gui.GuiCompat;
+import com.quickskin.mod.client.gui.screen.MobileFilePickerScreen;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -20,6 +22,7 @@ import org.lwjgl.system.Pointer;
 //?}
 
 import java.nio.file.Path;
+import java.util.Set;
 //? if >=26.3 {
 import java.nio.ByteBuffer;
 import java.nio.file.InvalidPathException;
@@ -35,8 +38,8 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 //?}
 
 /**
- * Helper class for opening native file dialogs.
- * Uses TinyFileDialogs before Minecraft 26.3 and SDL's asynchronous dialogs afterwards.
+ * Opens the in-game chooser on Android; desktop runtimes use TinyFileDialogs before
+ * Minecraft 26.3 and SDL's asynchronous dialogs afterwards.
  */
 @Environment(EnvType.CLIENT)
 public class FileDialogHelper {
@@ -49,10 +52,12 @@ public class FileDialogHelper {
     /**
      * Opens a file dialog to select a PNG image or CPM model
      * @param title Dialog title
-     * @param onFileSelected Callback when file is selected (null if cancelled)
+     * @param onFileSelected Callback on selection; cancellation invokes no callback
      */
     public static void openSkinFileDialog(String title, Consumer<Path> onFileSelected) {
         if (!DIALOG_OPEN.compareAndSet(false, true)) return;
+        if (openMobileDialog(title, Set.of("png", "cpmmodel"), false,
+                paths -> onFileSelected.accept(paths.get(0)))) return;
         //? if >=26.3 {
         openSdlDialog(title, "Skin Files (PNG, CPM Model)", "png;cpmmodel", false,
                 paths -> onFileSelected.accept(paths.get(0)));
@@ -91,6 +96,8 @@ public class FileDialogHelper {
      */
     public static void openCapeFileDialog(String title, Consumer<Path> onFileSelected) {
         if (!DIALOG_OPEN.compareAndSet(false, true)) return;
+        if (openMobileDialog(title, Set.of("png", "gif"), false,
+                paths -> onFileSelected.accept(paths.get(0)))) return;
         //? if >=26.3 {
         openSdlDialog(title, "PNG/GIF Images", "png;gif", false,
                 paths -> onFileSelected.accept(paths.get(0)));
@@ -130,6 +137,8 @@ public class FileDialogHelper {
     @SuppressWarnings("unused")
     public static void openMultipleFileDialog(String title, Consumer<Path[]> onFilesSelected) {
         if (!DIALOG_OPEN.compareAndSet(false, true)) return;
+        if (openMobileDialog(title, Set.of("png"), true,
+                paths -> onFilesSelected.accept(paths.toArray(Path[]::new)))) return;
         //? if >=26.3 {
         openSdlDialog(title, "PNG Images", "png", true,
                 paths -> onFilesSelected.accept(paths.toArray(Path[]::new)));
@@ -167,6 +176,22 @@ public class FileDialogHelper {
             }
         }).whenComplete((ignored, error) -> resetAfterSubmissionFailure(error));
         //?}
+    }
+
+    private static boolean openMobileDialog(String title, Set<String> extensions, boolean multiple,
+                                            Consumer<java.util.List<Path>> callback) {
+        if (!FilePickerFiles.isAndroidRuntime()) return false;
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.execute(() -> {
+            try {
+                GuiCompat.openScreen(new MobileFilePickerScreen(GuiCompat.currentScreen(), title,
+                        extensions, multiple, callback, () -> DIALOG_OPEN.set(false)));
+            } catch (RuntimeException error) {
+                DIALOG_OPEN.set(false);
+                QuickSkinInfo.LOGGER.warn("Unable to open the mobile file picker", error);
+            }
+        });
+        return true;
     }
 
     //? if >=26.3 {

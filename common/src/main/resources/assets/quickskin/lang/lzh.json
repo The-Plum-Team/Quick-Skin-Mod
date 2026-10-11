@@ -189,6 +189,18 @@
   "quickskin.cooldown.button": "冷卻中 (%s秒)",
   "quickskin.cooldown.tooltip": "請候冷卻時後再換膚",
 
+  "_comment_file_picker": "=== 擇檔 ===",
+  "quickskin.file_picker.downloads": "所下載",
+  "quickskin.file_picker.storage": "機中藏",
+  "quickskin.file_picker.game": "戲之檔夾",
+  "quickskin.file_picker.up": "上",
+  "quickskin.file_picker.loading": "方載檔…",
+  "quickskin.file_picker.empty": "此夾無可用之檔",
+  "quickskin.file_picker.unreadable": "不能讀此夾，宜察藏取之權，或擇他夾",
+  "quickskin.file_picker.limit": "所擇之檔，毋逾%s",
+  "quickskin.file_picker.import": "入（%s）",
+  "quickskin.file_picker.access_hint": "檔不見乎？移之於戲之檔夾",
+
   "_comment_upload_limit": "=== 呈遞之限 ===",
   "quickskin.network.upload_too_large.skin": "[速易膚] 汝之膚（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見",
   "quickskin.network.upload_too_large.cape": "[速易膚] 汝之披風（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見"

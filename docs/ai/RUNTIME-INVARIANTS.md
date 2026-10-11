@@ -163,6 +163,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 ## Files, images, and persistence
 
+- Android launchers expose Linux/OpenJDK rather than an Android `os.name`. `FilePickerFiles`
+  recognises their Android runtime environment; `FileDialogHelper` routes skins, capes and batch
+  imports to the Minecraft-rendered `MobileFilePickerScreen` before any desktop native dialog.
+  Directory scans run on `ClientIoExecutor`, cap visited entries and do not follow symlink entries.
+  A stale scan never updates a closed picker. The picker releases the shared dialog guard on
+  removal (including cancellation) and restores its parent before invoking an import callback,
+  since cape import can open its own editor. It reads only launcher-accessible files; it does not
+  obtain Android storage permissions or bypass scoped storage. Desktop dialog routes stay native.
+
 - Use `BoundedFileReader`, `SafeImageReader`, and the established GIF preflight path. Do not add
   production `ImageIO.read`, unbounded `Files.readAllBytes`/`readString`, or decode-before-dimension
   validation.

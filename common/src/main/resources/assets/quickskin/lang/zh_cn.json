@@ -189,6 +189,18 @@
   "quickskin.cooldown.button": "冷却中 (「%s」秒)",
   "quickskin.cooldown.tooltip": "请等待冷却时间后再更换皮肤",
 
+  "_comment_file_picker": "=== 文件选择器 ===",
+  "quickskin.file_picker.downloads": "下载",
+  "quickskin.file_picker.storage": "手机存储",
+  "quickskin.file_picker.game": "游戏文件夹",
+  "quickskin.file_picker.up": "上一级",
+  "quickskin.file_picker.loading": "正在加载文件...",
+  "quickskin.file_picker.empty": "此文件夹中没有支持的文件。",
+  "quickskin.file_picker.unreadable": "无法读取此文件夹。请检查存储权限或选择其他文件夹。",
+  "quickskin.file_picker.limit": "最多只能选择 %s 个文件。",
+  "quickskin.file_picker.import": "导入（%s）",
+  "quickskin.file_picker.access_hint": "找不到文件？请将它复制到游戏文件夹。",
+
   "_comment_upload_limit": "=== 上传大小限制 ===",
   "quickskin.network.upload_too_large.skin": "[快速皮肤] 你的皮肤（%s）超过了此服务器的上传限制（%s）。它只显示在你自己的屏幕上，其他玩家看不到。",
   "quickskin.network.upload_too_large.cape": "[快速皮肤] 你的披风（%s）超过了此服务器的上传限制（%s）。它只显示在你自己的屏幕上，其他玩家看不到。"

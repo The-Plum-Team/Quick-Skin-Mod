@@ -189,6 +189,18 @@
   "quickskin.cooldown.button": "Cooldown (%ss)",
   "quickskin.cooldown.tooltip": "Anda harus menunggu sebelum mengganti skin lagi.",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "Unduhan",
+  "quickskin.file_picker.storage": "Penyimpanan",
+  "quickskin.file_picker.game": "Folder game",
+  "quickskin.file_picker.up": "Naik",
+  "quickskin.file_picker.loading": "Memuat file...",
+  "quickskin.file_picker.empty": "Tidak ada file yang didukung di folder ini.",
+  "quickskin.file_picker.unreadable": "Tidak dapat membaca folder ini. Periksa izin penyimpanan atau pilih folder lain.",
+  "quickskin.file_picker.limit": "Pilih paling banyak %s file.",
+  "quickskin.file_picker.import": "Impor (%s)",
+  "quickskin.file_picker.access_hint": "File tidak ada? Salin ke folder game.",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Skin Cepat] Skin Anda (%s) melebihi batas unggah server ini, yaitu %s. Skin ini hanya terlihat di layar Anda; pemain lain tidak melihatnya.",
   "quickskin.network.upload_too_large.cape": "[Skin Cepat] Jubah Anda (%s) melebihi batas unggah server ini, yaitu %s. Jubah ini hanya terlihat di layar Anda; pemain lain tidak melihatnya."
