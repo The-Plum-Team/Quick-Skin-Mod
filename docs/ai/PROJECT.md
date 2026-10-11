@@ -86,7 +86,9 @@ schema-2 snapshots retain their original branch/tag validation contract.
   distinct deferred names so no draft run can satisfy a required context. It lands only after it
   is marked ready or through one `batch/*` PR from `scripts/ci/pr_batch.py`, which runs the
   unchanged complete gate once for the squashed set
-  ([ADR 0009](../architecture/decisions/0009-validate-draft-pull-requests-in-batches.md)).
+  ([ADR 0009](../architecture/decisions/0009-validate-draft-pull-requests-in-batches.md)). A batch
+  carries ordinary paths only
+  ([ADR 0014](../architecture/decisions/0014-batch-ordinary-changes-only.md)).
 - Both full and partial shared visual reviews use their own runtime generation's Fabric anchor.
   Secretless curation and model admission authenticate complete source jobs and immutable
   artifacts independently. Full proof schema 8 and selected proof schema 7 remain distinct;
