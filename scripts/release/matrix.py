@@ -1018,3 +1018,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+# Shadow test (temporary, will be closed unmerged): harmless comment in a protected adapter file.

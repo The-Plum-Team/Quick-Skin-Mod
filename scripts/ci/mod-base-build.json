@@ -32,7 +32,7 @@
       },
       {
         "path": "scripts/release/matrix.py",
-        "sha256": "846996ba34a8dbbd53f9115d7b7806ceebaddec74cc148cda0c2290ef0abec1b"
+        "sha256": "e86b2d22a79a729fc798825e181763b258f1b4699f8853daf49af823107bde3f"
       },
       {
         "path": "scripts/release/release_identity.py",
