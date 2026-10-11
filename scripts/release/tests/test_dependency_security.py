@@ -303,13 +303,14 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             'excludeGroup("loom")',
             'excludeGroup("net.minecraft")',
             'excludeGroupByRegex("net\\\\.minecraftforge\\\\.[0-9a-f]{64}")',
+            'excludeGroupByRegex("net\\\\.neoforged\\\\.fancymodloader\\\\.[0-9a-f]{64}")',
             "Unapproved remote dependency repository",
             'repositoryScheme != "https"',
         ):
             with self.subTest(required=required):
                 self.assertIn(required, policy)
 
-        for module in ("common", "fabric", "forge"):
+        for module in ("common", "fabric", "forge", "neoforge"):
             script = (ROOT / module / "build.gradle.kts").read_text(encoding="utf-8")
             self.assertIn(
                 'apply(from = rootProject.file("gradle/repository-policy.gradle.kts"))',
@@ -322,16 +323,36 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             for path in ROOT.rglob(pattern)
             if ".gradle" not in path.parts and "build" not in path.parts
         )
-        self.assertIsNone(
-            re.search(
-                r"--dependency-verification(?:=|\s+)(?:off|lenient)\b",
-                workflows_and_build_logic,
-            )
+        # Every CI and release Gradle run starts from a tracked script (build_matrix.py and the
+        # mod-base candidate), so those launchers are held to the same rules as the workflows.
+        launchers = subprocess.run(
+            ("git", "ls-files", "-z", "--", "*.py", "*.sh", "*.ps1"),
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        ).stdout.decode("utf-8")
+        automation = "\n".join(
+            [workflows_and_build_logic]
+            + [
+                (ROOT / name).read_text(encoding="utf-8")
+                for name in launchers.split("\0")
+                if name and "tests" not in Path(name).parts
+            ]
         )
+        self.assertIsNone(
+            re.search(r"--dependency-verification(?:=|\s+)(?:off|lenient)\b", automation)
+        )
+        # Only the root gradle.properties selects the mode. A launcher that wrote the property
+        # into a Gradle user home or GRADLE_OPTS would override it for that run.
+        self.assertIsNone(re.search(r"org[.]gradle[.]dependency[.]verification", automation))
         # Checksums and locks are reviewed maintainer changes. Automation that wrote them would
         # accept whatever an upstream repository served on that run.
         self.assertIsNone(
-            re.search(r"--write-verification-metadata|--write-locks\b", workflows_and_build_logic)
+            re.search(
+                r"--write-verification-metadata|--write-locks\b"
+                r"|(?<![\w-])-M(?:\s+|[\"']\s*,\s*[\"']|=)(?:sha|md5|pgp)",
+                automation,
+            )
         )
 
     def test_only_active_shadow_bundles_are_locked_outside_generated_trees(self) -> None:

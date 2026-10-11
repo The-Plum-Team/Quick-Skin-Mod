@@ -108,7 +108,10 @@ all resolved (`<minecraft>` is a matrix `artifact_version`):
 Add `--write-locks` only when a shaded `shadowBundle` dependency changed (see
 [gradle/dependency-locks/README.md](gradle/dependency-locks/README.md)). Writing metadata adds
 entries but never removes them, and it is a maintainer action: CI and release automation never run
-it.
+it. Gradle also rewrites the whole file in its own order and may raise the schema version, which
+buries the new values in a reordering diff. Commit only the added or changed entries in the
+committed file's order and schema, and check that the result trusts exactly the values of the file
+Gradle wrote.
 
 Review every metadata and lockfile diff. Confirm new coordinates are expected, compare critical
 checksums with an independent publisher source when one exists, remove obsolete components, and
@@ -131,5 +134,6 @@ resolves it. Do not switch the mode to `lenient` or `off`, and do not trust the 
    `.sha512` sidecar, and inspect that the artifact still contains only the expected content.
 3. Record the new value as an `<also-trust>` child of the existing `<sha256>` entry, as the Fabric
    API 1.21.1 modules already do, in a reviewed pull request that names the evidence. The
-   packaged-runtime store downloads and pins only the primary value, so when the old bytes are no
-   longer served the new value becomes the primary one.
+   exception is a JAR the packaged-runtime store downloads (the aggregate `fabric-api` JAR and
+   the Architectury JARs of the matrix): the store pins only the primary value, so there the new
+   value becomes the primary one and the old value moves to `<also-trust>`.
