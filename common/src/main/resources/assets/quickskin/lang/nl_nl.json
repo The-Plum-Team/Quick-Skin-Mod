@@ -187,6 +187,18 @@
   "quickskin.cooldown.button": "Afkoelen (%ss)",
   "quickskin.cooldown.tooltip": "Je moet wachten voordat je je skin opnieuw kunt wijzigen.",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "Downloads",
+  "quickskin.file_picker.storage": "Opslag",
+  "quickskin.file_picker.game": "Gamemap",
+  "quickskin.file_picker.up": "Omhoog",
+  "quickskin.file_picker.loading": "Bestanden laden...",
+  "quickskin.file_picker.empty": "Geen ondersteunde bestanden in deze map.",
+  "quickskin.file_picker.unreadable": "Kan deze map niet lezen. Controleer de opslagrechten of kies een andere map.",
+  "quickskin.file_picker.limit": "Selecteer maximaal %s bestanden.",
+  "quickskin.file_picker.import": "Importeren (%s)",
+  "quickskin.file_picker.access_hint": "Bestand niet gevonden? Kopieer het naar de gamemap.",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Snelle Skin] Je skin (%s) is groter dan de uploadlimiet van deze server (%s). Die is alleen op je eigen scherm te zien; andere spelers zien hem niet.",
   "quickskin.network.upload_too_large.cape": "[Snelle Skin] Je cape (%s) is groter dan de uploadlimiet van deze server (%s). Die is alleen op je eigen scherm te zien; andere spelers zien hem niet."

@@ -187,6 +187,18 @@
   "quickskin.cooldown.button": "في الانتظار (%ss)",
   "quickskin.cooldown.tooltip": "يجب الانتظار قبل تغيير مظهرك مرة أخرى.",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "التنزيلات",
+  "quickskin.file_picker.storage": "ذاكرة الهاتف",
+  "quickskin.file_picker.game": "مجلد اللعبة",
+  "quickskin.file_picker.up": "للأعلى",
+  "quickskin.file_picker.loading": "جارٍ تحميل الملفات...",
+  "quickskin.file_picker.empty": "لا توجد ملفات مدعومة في هذا المجلد.",
+  "quickskin.file_picker.unreadable": "تعذّرت قراءة هذا المجلد. تحقق من أذونات التخزين أو اختر مجلدًا آخر.",
+  "quickskin.file_picker.limit": "اختر %s ملفات كحد أقصى.",
+  "quickskin.file_picker.import": "استيراد (%s)",
+  "quickskin.file_picker.access_hint": "ملف مفقود؟ انسخه إلى مجلد اللعبة.",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[المظهر السريع] مظهرك (%s) يتجاوز حد الرفع لهذا الخادم البالغ %s. يظهر على شاشتك فقط؛ ولا يراه اللاعبون الآخرون.",
   "quickskin.network.upload_too_large.cape": "[المظهر السريع] عباءتك (%s) تتجاوز حد الرفع لهذا الخادم البالغ %s. تظهر على شاشتك فقط؛ ولا يراها اللاعبون الآخرون."

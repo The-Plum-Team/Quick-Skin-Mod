@@ -2,6 +2,7 @@ package com.quickskin.mod.client.gui.screen;
 
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.gui.GuiCompat;
+import com.quickskin.mod.client.gui.GuiTextColor;
 import com.quickskin.mod.client.gui.util.ButtonFactory;
 import com.quickskin.mod.client.gui.util.FilePickerFiles;
 import com.quickskin.mod.platform.PlatformHelper;
@@ -31,7 +32,7 @@ public final class MobileFilePickerScreen extends Screen {
     private static final Path STORAGE = Path.of("/storage/emulated/0");
     private static final Path DOWNLOADS = STORAGE.resolve("Download");
     private static final int MAX_SELECTED_FILES = 256;
-    private static final int ACCESS_HINT_COLOR = 0xFFCC66;
+    private static final int ACCESS_HINT_COLOR = GuiTextColor.opaqueRgb(0xFFCC66);
     private final Screen parent;
     private final Set<String> extensions;
     private final boolean multiple;
@@ -86,7 +87,7 @@ public final class MobileFilePickerScreen extends Screen {
         button(x, y, shortcutWidth, label("downloads"), () -> navigate(DOWNLOADS));
         button(x + shortcutWidth + 3, y, shortcutWidth, label("storage"), () -> navigate(STORAGE));
         button(x + 2 * (shortcutWidth + 3), y, shortcutWidth,
-                label("game").copy().withStyle(style -> style.withColor(ACCESS_HINT_COLOR)),
+                label("game").copy().withStyle(style -> style.withColor(ACCESS_HINT_COLOR & 0x00FFFFFF)),
                 () -> navigate(PlatformHelper.getGameDirectory()));
         Button up = button(x + 3 * (shortcutWidth + 3), y, shortcutWidth, label("up"),
                 () -> navigate(directory.getParent()));
@@ -237,7 +238,7 @@ public final class MobileFilePickerScreen extends Screen {
         graphics.drawCenteredString(font, (page + 1) + " / " + Math.max(1, (entries.size() + rows - 1) / rows),
                 width / 2, panelY + panelHeight - 58, 0xFFFFFFFF);
         graphics.drawCenteredString(font, visibleStatus,
-                width / 2, panelY + panelHeight - 39, 0xFF000000 | ACCESS_HINT_COLOR);
+                width / 2, panelY + panelHeight - 39, ACCESS_HINT_COLOR);
         super.render(graphics, mouseX, mouseY, partialTicks);
         //?} else {
         graphics.centeredText(font, title, width / 2, panelY + 8, 0xFFFFFFFF);
@@ -246,7 +247,7 @@ public final class MobileFilePickerScreen extends Screen {
         graphics.centeredText(font, (page + 1) + " / " + Math.max(1, (entries.size() + rows - 1) / rows),
                 width / 2, panelY + panelHeight - 58, 0xFFFFFFFF);
         graphics.centeredText(font, visibleStatus,
-                width / 2, panelY + panelHeight - 39, 0xFF000000 | ACCESS_HINT_COLOR);
+                width / 2, panelY + panelHeight - 39, ACCESS_HINT_COLOR);
         super.extractRenderState(graphics, mouseX, mouseY, partialTicks);
         //?}
     }

@@ -187,6 +187,18 @@
   "quickskin.cooldown.button": "Затримка (%ss)",
   "quickskin.cooldown.tooltip": "Ви повинні почекати, перш ніж знову змінити скін.",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "Завантаження",
+  "quickskin.file_picker.storage": "Пам'ять",
+  "quickskin.file_picker.game": "Тека гри",
+  "quickskin.file_picker.up": "Вгору",
+  "quickskin.file_picker.loading": "Завантаження файлів...",
+  "quickskin.file_picker.empty": "У цій теці немає підтримуваних файлів.",
+  "quickskin.file_picker.unreadable": "Не вдалося прочитати цю теку. Перевірте дозволи на доступ до пам'яті або виберіть іншу теку.",
+  "quickskin.file_picker.limit": "Виберіть не більше %s файлів.",
+  "quickskin.file_picker.import": "Імпорт (%s)",
+  "quickskin.file_picker.access_hint": "Немає потрібного файлу? Скопіюйте його в теку гри.",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Швидкий скін] Ваш скін (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать.",
   "quickskin.network.upload_too_large.cape": "[Швидкий скін] Ваш плащ (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать."

@@ -187,6 +187,18 @@
   "quickskin.cooldown.button": "Odnowienie (%ss)",
   "quickskin.cooldown.tooltip": "Musisz poczekać, zanim ponownie zmienisz skórkę.",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "Pobrane",
+  "quickskin.file_picker.storage": "Pamięć",
+  "quickskin.file_picker.game": "Folder gry",
+  "quickskin.file_picker.up": "W górę",
+  "quickskin.file_picker.loading": "Wczytywanie plików...",
+  "quickskin.file_picker.empty": "Brak obsługiwanych plików w tym folderze.",
+  "quickskin.file_picker.unreadable": "Nie można odczytać tego folderu. Sprawdź uprawnienia do pamięci lub wybierz inny folder.",
+  "quickskin.file_picker.limit": "Wybierz maksymalnie %s plików.",
+  "quickskin.file_picker.import": "Importuj (%s)",
+  "quickskin.file_picker.access_hint": "Brakuje pliku? Skopiuj go do folderu gry.",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Szybka Skórka] Twoja skórka (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą.",
   "quickskin.network.upload_too_large.cape": "[Szybka Skórka] Twoja peleryna (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą."

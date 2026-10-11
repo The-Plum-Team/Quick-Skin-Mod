@@ -187,6 +187,18 @@
   "quickskin.cooldown.button": "Em Espera (%ss)",
   "quickskin.cooldown.tooltip": "Deves aguardar antes de mudar a tua pele novamente.",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "Transferências",
+  "quickskin.file_picker.storage": "Armazenamento",
+  "quickskin.file_picker.game": "Pasta do jogo",
+  "quickskin.file_picker.up": "Subir",
+  "quickskin.file_picker.loading": "A carregar ficheiros...",
+  "quickskin.file_picker.empty": "Nenhum ficheiro compatível nesta pasta.",
+  "quickskin.file_picker.unreadable": "Não é possível ler esta pasta. Verifica as permissões de armazenamento ou escolhe outra pasta.",
+  "quickskin.file_picker.limit": "Seleciona no máximo %s ficheiros.",
+  "quickskin.file_picker.import": "Importar (%s)",
+  "quickskin.file_picker.access_hint": "Falta um ficheiro? Copia-o para a pasta do jogo.",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Pele Rápida] A tua pele (%s) excede o limite de carregamento deste servidor, %s. Aparece apenas no teu ecrã; os outros jogadores não a veem.",
   "quickskin.network.upload_too_large.cape": "[Pele Rápida] A tua capa (%s) excede o limite de carregamento deste servidor, %s. Aparece apenas no teu ecrã; os outros jogadores não a veem."

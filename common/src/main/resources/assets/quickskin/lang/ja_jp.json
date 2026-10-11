@@ -187,6 +187,18 @@
   "quickskin.cooldown.button": "クールダウン中(%ss)",
   "quickskin.cooldown.tooltip": "スキンを再度変更する前に待つ必要があります。",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "ダウンロード",
+  "quickskin.file_picker.storage": "内部ストレージ",
+  "quickskin.file_picker.game": "ゲームフォルダ",
+  "quickskin.file_picker.up": "上へ",
+  "quickskin.file_picker.loading": "ファイルを読み込み中...",
+  "quickskin.file_picker.empty": "このフォルダには対応ファイルがありません。",
+  "quickskin.file_picker.unreadable": "このフォルダを読み込めません。ストレージの権限を確認するか、別のフォルダを選んでください。",
+  "quickskin.file_picker.limit": "選択できるのは最大%s個までです。",
+  "quickskin.file_picker.import": "インポート(%s)",
+  "quickskin.file_picker.access_hint": "ファイルが見つからない場合は、ゲームフォルダにコピーしてください。",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[クイックスキン] スキン(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。",
   "quickskin.network.upload_too_large.cape": "[クイックスキン] マント(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。"

@@ -187,6 +187,18 @@
   "quickskin.cooldown.button": "คูลดาวน์ (%ss)",
   "quickskin.cooldown.tooltip": "คุณต้องรอก่อนเปลี่ยนสกินอีกครั้ง",
 
+  "_comment_file_picker": "=== File Picker ===",
+  "quickskin.file_picker.downloads": "ดาวน์โหลด",
+  "quickskin.file_picker.storage": "พื้นที่จัดเก็บ",
+  "quickskin.file_picker.game": "โฟลเดอร์เกม",
+  "quickskin.file_picker.up": "ขึ้น",
+  "quickskin.file_picker.loading": "กำลังโหลดไฟล์...",
+  "quickskin.file_picker.empty": "ไม่มีไฟล์ที่รองรับในโฟลเดอร์นี้",
+  "quickskin.file_picker.unreadable": "อ่านโฟลเดอร์นี้ไม่ได้ ตรวจสอบสิทธิ์การเข้าถึงพื้นที่จัดเก็บ หรือเลือกโฟลเดอร์อื่น",
+  "quickskin.file_picker.limit": "เลือกได้สูงสุด %s ไฟล์",
+  "quickskin.file_picker.import": "นำเข้า (%s)",
+  "quickskin.file_picker.access_hint": "ไม่เจอไฟล์? คัดลอกไฟล์ไปไว้ในโฟลเดอร์เกม",
+
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[สกินด่วน] สกินของคุณ (%s) เกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์นี้ (%s) จะแสดงบนหน้าจอของคุณเท่านั้น ผู้เล่นคนอื่นจะมองไม่เห็น",
   "quickskin.network.upload_too_large.cape": "[สกินด่วน] ผ้าคลุมของคุณ (%s) เกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์นี้ (%s) จะแสดงบนหน้าจอของคุณเท่านั้น ผู้เล่นคนอื่นจะมองไม่เห็น"
