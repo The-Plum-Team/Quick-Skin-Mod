@@ -545,8 +545,8 @@ jobs:
             <<< "$jobs" > /dev/null
           jobs="$(jq -c '[.[].jobs[]]' <<< "$jobs")"
           gate_count="$(jq '[.[] | select(
-            .name == "Packaged E2E gate" and .status == "completed" and
-            .conclusion == "success")] | length' <<< "$jobs")"
+            (.name == "Packaged E2E gate" or .name == "Native Packaged E2E gate") and
+            .status == "completed" and .conclusion == "success")] | length' <<< "$jobs")"
           if [[ "$gate_count" -eq 0 ]]; then
             # A lightweight attestation run legitimately has no gate job; its reusable-workflow
             # jobs are prefixed with the caller job name. Anything else without a gate job means

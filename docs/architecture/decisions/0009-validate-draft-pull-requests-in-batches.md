@@ -4,7 +4,9 @@ Date: 2026-09-18
 
 ## Status
 
-Accepted.
+Accepted. Amended by [ADR 0013](0013-require-the-gate-app-for-the-default-branch.md), which
+requires both contexts from the mod-base gate App and renames the ready native gate jobs of a
+pull request to `master`.
 
 ## Context
 

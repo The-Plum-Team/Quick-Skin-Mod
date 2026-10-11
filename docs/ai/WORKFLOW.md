@@ -180,17 +180,16 @@ deltas.
   environment (deployment branch `master` alone, no reviewers, no wait timer); the owner creates
   them, and only that caller's `publish` job reads them. In `shadow` the App appends ` (shadow)`
   to the `contexts` of `scripts/ci/mod-base-build.json`, and no ruleset requires them.
-  `shared-build-and-e2e` is the bridge to the cutover: its `contexts` are the required names
-  `Build and verify` and `Packaged E2E gate`, so the App publishes them as commit statuses on the
-  head of every pull request to `master` beside the native check runs of the same names, and a
-  pull request lands only when both pass. `build-gate.yml` and `on-demand-e2e.yml` stay the
-  required gates until the owner switches the expected source of both names in the default-branch
-  ruleset from GitHub Actions to the gate App; `required_check_integration_id` of
-  `release/github-governance.json` names that source, so a governance update never drops it, and
-  `github_governance.py apply` refuses to switch or drop the live source of a required check:
-  that switch, and restoring it, are the owner's operations on the ruleset. The kit has no way
-  from `shared-build-and-e2e` back to `shadow`; the bridge is undone by restoring distinct
-  `contexts` at the same mode, or by `reviewed-rollback` and then `disabled`.
+  In `shared-build-and-e2e` its `contexts` are the required names `Build and verify` and
+  `Packaged E2E gate`, and the default-branch ruleset requires them from the gate App
+  (`required_check_integration_id` of `release/github-governance.json`, so a governance update
+  never drops that source, and `github_governance.py apply` refuses to switch or drop the live
+  source of a required check: switching it and restoring it are the owner's operations on the
+  ruleset): the App's commit statuses on the head of a pull request to `master` are its required
+  gates. `build-gate.yml` and `on-demand-e2e.yml` still run for their downstream evidence, but on
+  a pull request to `master` their gate jobs are `Native Build and verify` and `Native Packaged
+  E2E gate` and never report a required name; pushes, dispatches and other bases keep the
+  historical names. A reader of a native run accepts exactly one of the two names.
   `scripts/ci/tests/test_mod_base_build_adapter.py` holds the plan to the native targets, lanes
   and staged names.
 
