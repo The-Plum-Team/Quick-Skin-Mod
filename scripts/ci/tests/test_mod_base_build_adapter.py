@@ -53,8 +53,32 @@ REPOSITORY = "The-Plum-Team/Quick-Skin-Mod"
 #: shared context must never equal one, in any case; from the bridge on it is one.
 LEGACY_CONTEXTS = ("Build and verify", "Packaged E2E gate")
 GOVERNANCE_PATH = ROOT / "release" / "github-governance.json"
-#: The modes in which the gate App publishes the required names themselves (no ` (shadow)`).
+#: The managed modes (``rollback_from`` for a ``reviewed-rollback``) in which the gate App may
+#: publish the required names themselves (no ` (shadow)`).
 REQUIRED_NAME_MODES = ("shared-build-and-e2e",)
+#: Every state Quick Skin's manifest may hold: the adopted modes and the kit's rollback route out
+#: of them (``shared-build-and-e2e`` -> ``reviewed-rollback`` -> ``disabled``).
+ADOPTED_MODES = ("disabled", "shadow", *REQUIRED_NAME_MODES, "reviewed-rollback")
+
+
+def context_refusal(activation: dict[str, Any], contexts: dict[str, str], required: list[str]) -> str | None:
+    """Why these Build config ``contexts`` do not fit the activation, or ``None``.
+
+    The contexts are either exactly the required names in the governance order, which only the
+    Q5 bridge and later publish, or both distinct from every required name in any case and with
+    or without ` (shadow)`. So restoring the shadow names undoes the bridge in any mode, a
+    ``reviewed-rollback`` may keep or drop them, and no half-switched or lookalike pair exists."""
+
+    if activation["mode"] not in ADOPTED_MODES:
+        return f"Quick Skin never adopts the mode {activation['mode']}"
+    managed = activation["rollback_from"] if activation["mode"] == "reviewed-rollback" else activation["mode"]
+    names = [contexts["build"], contexts["packaged"]]
+    if names == required:
+        return None if managed in REQUIRED_NAME_MODES else f"{managed} may not publish the required names"
+    legacy = {name.casefold() for name in required}
+    clashing = [name for name in names
+                if name.casefold() in legacy or f"{name} (shadow)".casefold() in legacy]
+    return f"contexts clash with a required check: {clashing}" if clashing else None
 #: The slowest native durations (Build 37435530842, E2E 37435530757): a 6m02s target, an 18m33s
 #: policy job and a 13m07s lane. The shared hooks must allow at least twice as much.
 NATIVE_SECONDS = {"target_seconds": 362, "policy_seconds": 1113, "runtime_seconds": 787}
@@ -252,14 +276,40 @@ class BuildConfigTests(unittest.TestCase):
         contexts = config_document()["contexts"]
         required = json.loads(GOVERNANCE_PATH.read_text(encoding="utf-8"))["required_checks"]
         self.assertEqual(tuple(required), LEGACY_CONTEXTS)
-        mode = self.kit.parse_activation(ACTIVATION_PATH.read_bytes())["mode"]
-        if mode in REQUIRED_NAME_MODES:
-            self.assertEqual([contexts["build"], contexts["packaged"]], required)
-            return
-        legacy = {name.casefold() for name in LEGACY_CONTEXTS}
-        for context in contexts.values():
-            self.assertNotIn(context.casefold(), legacy)
-            self.assertNotIn(f"{context} (shadow)".casefold(), legacy)
+        activation = self.kit.parse_activation(ACTIVATION_PATH.read_bytes())
+        self.assertIsNone(context_refusal(activation, contexts, required))
+
+    def test_every_rollback_of_the_bridge_fits_the_context_rule(self) -> None:
+        """The bridge's rollbacks (OPERATIONS.md of the kit; the kit has no
+        ``shared-build-and-e2e -> shadow``) must pass this suite, or the only way back is a
+        transition the kit refuses: restoring the distinct names at the same mode, then
+        ``reviewed-rollback`` and ``disabled``. A half-switched pair, a lookalike or the required
+        names outside the bridge stay refused."""
+
+        required = list(LEGACY_CONTEXTS)
+        shadow = {"build": "Shared Build and verify", "packaged": "Shared Packaged E2E gate"}
+        bridge = {"build": required[0], "packaged": required[1]}
+
+        def state(mode: str, rollback_from: str | None = None) -> dict[str, Any]:
+            return self.kit.parse_activation(json.dumps({
+                "kind": "mod-base.ci.activation", "schema_version": 1, "repository": REPOSITORY,
+                "profile": "quick-skin", "mode": mode, "rollback_from": rollback_from}).encode())
+
+        for activation, contexts in ((state("shadow"), shadow), (state("shared-build-and-e2e"), bridge),
+                                     (state("shared-build-and-e2e"), shadow),
+                                     (state("reviewed-rollback", "shared-build-and-e2e"), bridge),
+                                     (state("reviewed-rollback", "shared-build-and-e2e"), shadow),
+                                     (state("reviewed-rollback", "shadow"), shadow), (state("disabled"), shadow)):
+            with self.subTest(mode=activation["mode"], contexts=contexts):
+                self.assertIsNone(context_refusal(activation, contexts, required))
+        for activation, contexts in ((state("shadow"), bridge), (state("disabled"), bridge),
+                                     (state("reviewed-rollback", "shadow"), bridge),
+                                     (state("shared-build-and-e2e"), {**shadow, "build": required[0]}),
+                                     (state("shared-build-and-e2e"), {**bridge, "packaged": "packaged e2e GATE"}),
+                                     (state("shared-build-and-e2e"), {"build": required[1], "packaged": required[0]}),
+                                     (state("shared-build"), shadow)):
+            with self.subTest(mode=activation["mode"], contexts=contexts):
+                self.assertIsNotNone(context_refusal(activation, contexts, required))
 
     def test_hook_timeouts_leave_room_over_the_native_durations(self) -> None:
         timeouts = config_document()["timeouts"]
@@ -279,7 +329,7 @@ class BuildConfigTests(unittest.TestCase):
     def test_the_activation_manifest_names_this_config(self) -> None:
         activation = self.kit.parse_activation(ACTIVATION_PATH.read_bytes())
         self.assertEqual((activation["repository"], activation["profile"]), (REPOSITORY, "quick-skin"))
-        self.assertIn(activation["mode"], ("disabled", "shadow", *REQUIRED_NAME_MODES))
+        self.assertIn(activation["mode"], ADOPTED_MODES)
 
 
 class PlanTests(unittest.TestCase):

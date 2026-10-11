@@ -186,7 +186,11 @@ deltas.
   pull request lands only when both pass. `build-gate.yml` and `on-demand-e2e.yml` stay the
   required gates until the owner switches the expected source of both names in the default-branch
   ruleset from GitHub Actions to the gate App; `required_check_integration_id` of
-  `release/github-governance.json` names that source, so a governance update never drops it.
+  `release/github-governance.json` names that source, so a governance update never drops it, and
+  `github_governance.py apply` refuses to switch or drop the live source of a required check:
+  that switch, and restoring it, are the owner's operations on the ruleset. The kit has no way
+  from `shared-build-and-e2e` back to `shadow`; the bridge is undone by restoring distinct
+  `contexts` at the same mode, or by `reviewed-rollback` and then `disabled`.
   `scripts/ci/tests/test_mod_base_build_adapter.py` holds the plan to the native targets, lanes
   and staged names.
 
