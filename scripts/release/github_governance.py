@@ -173,6 +173,10 @@ def load_config(path: Path) -> dict[str, Any]:
             raise GovernanceError("only the historical release-branch deployment policy may be retired")
     if not data["required_checks"]:
         raise GovernanceError("at least one required check is mandatory")
+    if "required_check_integration_id" in data:
+        source = data["required_check_integration_id"]
+        if type(source) is not int or source <= 0:
+            raise GovernanceError("the required checks' source must be a positive GitHub App ID")
     return data
 
 
@@ -190,13 +194,16 @@ def pull_request_rule() -> dict[str, Any]:
     }
 
 
-def required_checks_rule(contexts: Iterable[str]) -> dict[str, Any]:
+def required_checks_rule(contexts: Iterable[str], integration_id: int | None = None) -> dict[str, Any]:
+    # With an integration ID only that App's check run or status satisfies a context; without one,
+    # any writer of the same name does, so a config that names the source never loses it on update.
+    source = {} if integration_id is None else {"integration_id": integration_id}
     return {
         "type": "required_status_checks",
         "parameters": {
             "do_not_enforce_on_create": True,
             "required_status_checks": [
-                {"context": context} for context in contexts
+                {"context": context, **source} for context in contexts
             ],
             "strict_required_status_checks_policy": True,
         },
@@ -204,7 +211,8 @@ def required_checks_rule(contexts: Iterable[str]) -> dict[str, Any]:
 
 
 def branch_ruleset(
-    *, name: str, includes: list[str], required_checks: list[str]
+    *, name: str, includes: list[str], required_checks: list[str],
+    integration_id: int | None = None,
 ) -> dict[str, Any]:
     return {
         "name": name,
@@ -216,7 +224,7 @@ def branch_ruleset(
             {"type": "deletion"},
             {"type": "non_fast_forward"},
             pull_request_rule(),
-            required_checks_rule(required_checks),
+            required_checks_rule(required_checks, integration_id),
         ],
     }
 
@@ -229,6 +237,7 @@ def desired_rulesets(config: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
             name=names["default_branch"],
             includes=["~DEFAULT_BRANCH"],
             required_checks=checks,
+            integration_id=config.get("required_check_integration_id"),
         ),
         {
             "name": names["release_tags"],

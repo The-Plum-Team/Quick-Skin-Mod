@@ -157,6 +157,43 @@ class GitHubGovernanceTest(unittest.TestCase):
             path.write_text(json.dumps(original))
             self.assertEqual(github_governance.load_config(path), original)
 
+    def test_required_checks_name_one_exact_source(self) -> None:
+        """A context required without its source is satisfied by any writer of that name, so the
+        config names the App whose checks count, and drift from it is planned as an update."""
+
+        source = self.config["required_check_integration_id"]
+        default = github_governance.desired_rulesets(self.config)[0]
+        checks = next(rule for rule in default["rules"]
+                      if rule["type"] == "required_status_checks")["parameters"]["required_status_checks"]
+        self.assertEqual(checks, [{"context": name, "integration_id": source}
+                                  for name in self.config["required_checks"]])
+        for value in (None, True, 0, -1, "15368", 1.5):
+            invalid = copy.deepcopy(self.config)
+            invalid["required_check_integration_id"] = value
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "governance.json"
+                path.write_text(json.dumps(invalid))
+                with self.assertRaises(github_governance.GovernanceError):
+                    github_governance.load_config(path)
+        unsourced = copy.deepcopy(self.config)
+        unsourced.pop("required_check_integration_id")
+        default = github_governance.desired_rulesets(unsourced)[0]
+        checks = next(rule for rule in default["rules"]
+                      if rule["type"] == "required_status_checks")["parameters"]["required_status_checks"]
+        self.assertEqual(checks, [{"context": name} for name in self.config["required_checks"]])
+        for drift in (None, source + 1):
+            remote = LocalGovernanceRemote(self.config)
+            for ruleset in remote.rulesets.values():
+                for rule in ruleset.get("rules", []):
+                    for item in rule.get("parameters", {}).get("required_status_checks", []):
+                        item.pop("integration_id", None)
+                        if drift is not None:
+                            item["integration_id"] = drift
+            with self.subTest(drift=drift):
+                self.assertIn(github_governance.Operation(
+                    "ruleset:" + self.config["managed_rulesets"]["default_branch"], "update"),
+                    github_governance.plan(remote, self.config))
+
     def test_historical_governance_can_still_be_loaded_without_retiring_its_policies(self):
         legacy = github_governance.load_config(Path(__file__).parent / "fixtures/legacy-governance-schema1.json")
         self.assertEqual(3, len(github_governance.desired_rulesets(legacy)))
