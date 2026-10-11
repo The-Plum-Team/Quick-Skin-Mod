@@ -6,6 +6,8 @@ matrix.  CI can safely assign it to a step output without maintaining a second
 copy of the supported versions.
 """
 
+# Shadow test (temporary, never merged): a harmless change of a protected Build adapter file.
+
 from __future__ import annotations
 
 import argparse
