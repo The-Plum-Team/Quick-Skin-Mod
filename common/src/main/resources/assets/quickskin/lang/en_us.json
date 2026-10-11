@@ -189,5 +189,16 @@
 
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Quick Skin] Your skin (%s) is over this server's %s upload limit. It stays on your screen only; other players do not see it.",
-  "quickskin.network.upload_too_large.cape": "[Quick Skin] Your cape (%s) is over this server's %s upload limit. It stays on your screen only; other players do not see it."
+  "quickskin.network.upload_too_large.cape": "[Quick Skin] Your cape (%s) is over this server's %s upload limit. It stays on your screen only; other players do not see it.",
+
+  "quickskin.file_picker.downloads": "Downloads",
+  "quickskin.file_picker.storage": "Phone storage",
+  "quickskin.file_picker.game": "Game folder",
+  "quickskin.file_picker.up": "Up",
+  "quickskin.file_picker.loading": "Loading files...",
+  "quickskin.file_picker.empty": "No supported files in this folder.",
+  "quickskin.file_picker.unreadable": "Cannot read this folder. Check storage permissions or choose another folder.",
+  "quickskin.file_picker.limit": "Select at most %s files.",
+  "quickskin.file_picker.import": "Import (%s)",
+  "quickskin.file_picker.access_hint": "File missing? Copy it into the game folder."
 }
