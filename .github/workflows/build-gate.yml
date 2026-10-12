@@ -100,7 +100,7 @@ jobs:
           python-version: "3.13"
 
       - name: Verify the pinned mod-base kit tree
-        uses: The-Plum-Team/mod-base/actions/setup@7cb9748a1d3ba6182ce29875aba10518944e9521 # v1.2.1
+        uses: The-Plum-Team/mod-base/actions/setup@b4b3831c78b6dac6705db320d1e0ecfc8054371f # v1.3.1
         with:
           install-imaging: "false"
 
@@ -195,7 +195,7 @@ jobs:
           python-version: "3.13"
       # The kit tree is verified against this checkout's pin and exported to the mod tests.
       - name: Verify the pinned mod-base kit tree
-        uses: The-Plum-Team/mod-base/actions/setup@7cb9748a1d3ba6182ce29875aba10518944e9521 # v1.2.1
+        uses: The-Plum-Team/mod-base/actions/setup@b4b3831c78b6dac6705db320d1e0ecfc8054371f # v1.3.1
       - name: Install hash-locked Pages image dependency
         run: >-
           python -m pip install
@@ -253,7 +253,7 @@ jobs:
           python-version: "3.13"
       # The kit tree is verified against this checkout's pin and exported to the mod tests.
       - name: Verify the pinned mod-base kit tree
-        uses: The-Plum-Team/mod-base/actions/setup@7cb9748a1d3ba6182ce29875aba10518944e9521 # v1.2.1
+        uses: The-Plum-Team/mod-base/actions/setup@b4b3831c78b6dac6705db320d1e0ecfc8054371f # v1.3.1
       - name: Install hash-locked Pages image dependency
         run: >-
           python -m pip install
