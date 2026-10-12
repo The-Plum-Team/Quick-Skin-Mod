@@ -4,6 +4,7 @@ import dataclasses
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 import tomllib
@@ -565,10 +566,26 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
                 "activeCapeHash": "",
                 "activeCpmModelHash": "",
                 "activeSkinHash": "",
+                "configVersion": 1,
                 "enablePlayerOwnSkinSystem": False,
+                "menuBackgroundStyle": "opaque_stars",
                 "playerOwnSkinHash": "",
             },
             json.loads(config_path.read_text(encoding="utf-8")),
+        )
+
+    def test_e2e_client_config_version_matches_the_client(self) -> None:
+        # An older seed version would let the client's one-time migration replace the seeded
+        # starred background before the first menu checkpoint.
+        source = (
+            ROOT
+            / "modules/configuration/src/main/java/com/quickskin/mod/config/ClientConfig.java"
+        ).read_text(encoding="utf-8")
+        match = re.search(r"static final int CURRENT_CONFIG_VERSION = (\d+);", source)
+        self.assertIsNotNone(match)
+        assert match is not None
+        self.assertEqual(
+            int(match.group(1)), packaged_runtime.E2E_CLIENT_CONFIG_VERSION
         )
 
     def test_forge_client_config_preseeds_complete_early_window_defaults(self) -> None:

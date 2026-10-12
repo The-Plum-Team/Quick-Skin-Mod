@@ -1223,6 +1223,10 @@ def write_server_config(server: Path, scenario: str) -> Path | None:
     return config_path
 
 
+# ClientConfig.CURRENT_CONFIG_VERSION of the packaged mod.
+E2E_CLIENT_CONFIG_VERSION = 1
+
+
 def write_e2e_client_config(game_dir: Path) -> Path:
     """Seed a clean Quick Skin profile before client initialization.
 
@@ -1231,6 +1235,10 @@ def write_e2e_client_config(game_dir: Path) -> Path:
     with account data whose arrival time depends on the network.  Each E2E game directory is
     disposable, so disable that importer and start with no persisted selection before Minecraft
     loads the mod.
+
+    The menus keep the starred background that the contract's checkpoints describe; the settings
+    scenario switches to the blurred vanilla background itself. The current ``configVersion``
+    stops the client's one-time migration from replacing that choice.
     """
 
     config_path = game_dir / "config" / "quickskin-client.json"
@@ -1243,6 +1251,8 @@ def write_e2e_client_config(game_dir: Path) -> Path:
                 "activeCpmModelHash": "",
                 "activeCapeHash": "",
                 "playerOwnSkinHash": "",
+                "configVersion": E2E_CLIENT_CONFIG_VERSION,
+                "menuBackgroundStyle": "opaque_stars",
             },
             indent=2,
             sort_keys=True,
