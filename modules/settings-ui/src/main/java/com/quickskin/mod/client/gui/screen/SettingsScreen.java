@@ -108,12 +108,13 @@ public class SettingsScreen extends Screen {
     // --- NEW --- Modpack setting widgets
     private Checkbox enablePlayerOwnSkinSystemCheckbox;
 
-    // Track if texture reload is needed
-    private boolean needsTextureReload = false;
+    // Styled-button setting when the dialog opened; a change restyles the parent on close
+    private final boolean openedWithStyledButtons;
 
     public SettingsScreen(@Nullable Screen parent) {
         super(Component.translatable("quickskin.screen.settings.title"));
         this.parent = parent;
+        this.openedWithStyledButtons = ClientConfig.getInstance().enableStyledButtons;
     }
 
     @Override
@@ -192,131 +193,79 @@ public class SettingsScreen extends Screen {
         switchTab(activeTab);
     }
 
+    /**
+     * Builds a settings checkbox that runs {@code onChange} every time the user toggles it, so the
+     * setting takes effect immediately instead of waiting for the dialog to close.
+     */
+    private Checkbox checkbox(int x, int y, String translationKey, boolean selected,
+                              @Nullable String tooltipKey, Runnable onChange) {
+        Component label = Component.translatable(translationKey);
+        //? if <1.21 {
+        Checkbox checkbox = new Checkbox(x, y, 20, 20, label, selected) {
+            @Override
+            public void onPress() {
+                super.onPress();
+                onChange.run();
+            }
+        };
+        if (tooltipKey != null) {
+            checkbox.setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
+        }
+        return checkbox;
+        //?} else {
+        Checkbox.Builder builder = Checkbox.builder(label, this.font)
+                .pos(x, y)
+                .selected(selected)
+                .onValueChange((box, value) -> onChange.run());
+        if (tooltipKey != null) {
+            builder.tooltip(Tooltip.create(Component.translatable(tooltipKey)));
+        }
+        return builder.build();
+        //?}
+    }
+
     private void createGuiEditSettings() {
         ClientConfig config = ClientConfig.getInstance();
-        int checkboxSize = 20;
         int spacing = 30;
         // Settings content area starts below tabs
         int startY = dialogY + TAB_HEIGHT + 20;
         int leftColumnX = dialogX + 20;
         int currentY = startY;
 
-        // Show HUD Overlay
-        //? if <1.21 {
-        showOverlayCheckbox = new Checkbox(
-                leftColumnX, currentY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        showOverlayCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.enable_preview"),
-        //? if <1.21 {
-                config.showSkinPreviewOverlay
-        );
-        //?} else {
-                this.font)
-                .pos(leftColumnX, currentY)
-                .selected(config.showSkinPreviewOverlay)
-                .build();
-        //?}
+        showOverlayCheckbox = checkbox(leftColumnX, currentY,
+                "quickskin.settings.enable_preview",
+                config.showSkinPreviewOverlay, null, this::applyClientSettings);
         guiEditSettingWidgets.add(showOverlayCheckbox);
         currentY += spacing;
 
-        // Enable Styled Buttons
-        //? if <1.21 {
-        enableStyledButtonsCheckbox = new Checkbox(
-                leftColumnX, currentY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        enableStyledButtonsCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.enable_styled_buttons"),
-        //? if <1.21 {
-                config.enableStyledButtons
-        );
-        //?} else {
-                this.font)
-                .pos(leftColumnX, currentY)
-                .selected(config.enableStyledButtons)
-                .build();
-        //?}
+        enableStyledButtonsCheckbox = checkbox(leftColumnX, currentY,
+                "quickskin.settings.enable_styled_buttons",
+                config.enableStyledButtons, null, this::applyClientSettings);
         guiEditSettingWidgets.add(enableStyledButtonsCheckbox);
         currentY += spacing;
 
-        // Enable Preview Customization
-        //? if <1.21 {
-        enablePlayerPreviewCustomizationCheckbox = new Checkbox(
-                leftColumnX, currentY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        enablePlayerPreviewCustomizationCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.enable_preview_custom"),
-        //? if <1.21 {
-                config.enablePlayerPreviewCustomization
-        );
-        //?} else {
-                this.font)
-                .pos(leftColumnX, currentY)
-                .selected(config.enablePlayerPreviewCustomization)
-                .build();
-        //?}
+        enablePlayerPreviewCustomizationCheckbox = checkbox(leftColumnX, currentY,
+                "quickskin.settings.enable_preview_custom",
+                config.enablePlayerPreviewCustomization, null, this::applyClientSettings);
         guiEditSettingWidgets.add(enablePlayerPreviewCustomizationCheckbox);
         currentY += spacing;
 
-        // Hide Built-in Capes
-        //? if <1.21 {
-        hideBuiltInCapesCheckbox = new Checkbox(
-                leftColumnX, currentY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        hideBuiltInCapesCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.hide_builtin_capes"),
-        //? if <1.21 {
-                config.hideBuiltInCapes
-        );
-        hideBuiltInCapesCheckbox.setTooltip(Tooltip.create(
-                Component.translatable("quickskin.settings.hide_builtin_capes.tooltip")
-        ));
-        //?} else {
-                this.font)
-                .pos(leftColumnX, currentY)
-                .selected(config.hideBuiltInCapes)
-                .tooltip(Tooltip.create(Component.translatable("quickskin.settings.hide_builtin_capes.tooltip")))
-                .build();
-        //?}
+        hideBuiltInCapesCheckbox = checkbox(leftColumnX, currentY,
+                "quickskin.settings.hide_builtin_capes",
+                config.hideBuiltInCapes,
+                "quickskin.settings.hide_builtin_capes.tooltip", this::applyClientSettings);
         guiEditSettingWidgets.add(hideBuiltInCapesCheckbox);
         currentY += spacing;
 
-        // Menu Background Style
-        //? if <1.21 {
-        menuBackgroundCheckbox = new Checkbox(
-                leftColumnX, currentY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        menuBackgroundCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.menu_background"),
-        //? if <1.21 {
-                config.getMenuBackgroundStyle() == BackgroundStyle.VANILLA_BLUR
-        );
-        menuBackgroundCheckbox.setTooltip(Tooltip.create(
-                Component.translatable("quickskin.settings.menu_background.tooltip")
-        ));
-        //?} else {
-                this.font)
-                .pos(leftColumnX, currentY)
-                .selected(config.getMenuBackgroundStyle() == BackgroundStyle.VANILLA_BLUR)
-                .tooltip(Tooltip.create(Component.translatable("quickskin.settings.menu_background.tooltip")))
-                .build();
-        //?}
+        menuBackgroundCheckbox = checkbox(leftColumnX, currentY,
+                "quickskin.settings.menu_background",
+                config.getMenuBackgroundStyle() == BackgroundStyle.VANILLA_BLUR,
+                "quickskin.settings.menu_background.tooltip", this::applyClientSettings);
         guiEditSettingWidgets.add(menuBackgroundCheckbox);
     }
 
     private void createClientSettings() {
         ClientConfig config = ClientConfig.getInstance();
-        int checkboxSize = 20;
         int spacing = 30;
         // Settings content area starts below tabs
         int startY = dialogY + TAB_HEIGHT + 20;
@@ -378,97 +327,33 @@ public class SettingsScreen extends Screen {
         });
 
         // Right Column
-        // Skin Transparency Settings
-        //? if <1.21 {
-        disableSkinTransparencyCheckbox = new Checkbox(
-                rightColumnX, currentRightY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        disableSkinTransparencyCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.disable_transparency"),
-        //? if <1.21 {
-                config.disableSkinTransparency
-        );
-        //?} else {
-                this.font)
-                .pos(rightColumnX, currentRightY)
-                .selected(config.disableSkinTransparency)
-                .build();
-        //?}
+        disableSkinTransparencyCheckbox = checkbox(rightColumnX, currentRightY,
+                "quickskin.settings.disable_transparency",
+                config.disableSkinTransparency, null, this::applyClientSettings);
         clientSettingWidgets.add(disableSkinTransparencyCheckbox);
         currentRightY += spacing;
 
-        // Show Title Screen Preview
-        //? if <1.21 {
-        showTitlePreviewCheckbox = new Checkbox(
-                rightColumnX, currentRightY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        showTitlePreviewCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.show_title_preview"),
-        //? if <1.21 {
-                config.showTitleScreenPreview
-        );
-        //?} else {
-                this.font)
-                .pos(rightColumnX, currentRightY)
-                .selected(config.showTitleScreenPreview)
-                .build();
-        //?}
+        showTitlePreviewCheckbox = checkbox(rightColumnX, currentRightY,
+                "quickskin.settings.show_title_preview",
+                config.showTitleScreenPreview, null, this::applyClientSettings);
         clientSettingWidgets.add(showTitlePreviewCheckbox);
         currentRightY += spacing;
 
-        // Show Pause Menu Preview
-        //? if <1.21 {
-        showPausePreviewCheckbox = new Checkbox(
-                rightColumnX, currentRightY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        showPausePreviewCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.show_pause_preview"),
-        //? if <1.21 {
-                config.showPauseMenuPreview
-        );
-        //?} else {
-                this.font)
-                .pos(rightColumnX, currentRightY)
-                .selected(config.showPauseMenuPreview)
-                .build();
-        //?}
+        showPausePreviewCheckbox = checkbox(rightColumnX, currentRightY,
+                "quickskin.settings.show_pause_preview",
+                config.showPauseMenuPreview, null, this::applyClientSettings);
         clientSettingWidgets.add(showPausePreviewCheckbox);
         currentRightY += spacing;
 
-        // Compact Change Skin Button
-        //? if <1.21 {
-        compactChangeSkinButtonCheckbox = new Checkbox(
-                rightColumnX, currentRightY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        compactChangeSkinButtonCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.compact_change_skin_button"),
-        //? if <1.21 {
-                config.compactChangeSkinButton
-        );
-        compactChangeSkinButtonCheckbox.setTooltip(Tooltip.create(
-                Component.translatable("quickskin.settings.compact_change_skin_button.tooltip")
-        ));
-        //?} else {
-                this.font)
-                .pos(rightColumnX, currentRightY)
-                .selected(config.compactChangeSkinButton)
-                .tooltip(Tooltip.create(Component.translatable("quickskin.settings.compact_change_skin_button.tooltip")))
-                .build();
-        //?}
+        compactChangeSkinButtonCheckbox = checkbox(rightColumnX, currentRightY,
+                "quickskin.settings.compact_change_skin_button",
+                config.compactChangeSkinButton,
+                "quickskin.settings.compact_change_skin_button.tooltip", this::applyClientSettings);
         clientSettingWidgets.add(compactChangeSkinButtonCheckbox);
     }
 
     private void createServerSettings() {
         ServerConfig config = ServerConfig.getInstance();
-        int checkboxSize = 20;
         int spacing = 30;
         // Settings content area starts below tabs
         int startY = dialogY + TAB_HEIGHT + 20;
@@ -487,24 +372,9 @@ public class SettingsScreen extends Screen {
         ServerConfig serverOverride = ClientConfig.getInstance().getServerOverride();
         boolean currentTransparencySetting = serverOverride != null ? serverOverride.disableSkinTransparency : false;
 
-        // Transparency Settings
-        //? if <1.21 {
-        serverDisableSkinTransparencyCheckbox = new Checkbox(
-                leftColumnX, currentY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        serverDisableSkinTransparencyCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.disable_transparency_server"),
-        //? if <1.21 {
-                currentTransparencySetting
-        );
-        //?} else {
-                this.font)
-                .pos(leftColumnX, currentY)
-                .selected(currentTransparencySetting)
-                .build();
-        //?}
+        serverDisableSkinTransparencyCheckbox = checkbox(leftColumnX, currentY,
+                "quickskin.settings.disable_transparency_server",
+                currentTransparencySetting, null, this::applyServerTransparency);
         // Only allow admins to change this setting
         serverDisableSkinTransparencyCheckbox.active = isAdmin;
         serverSettingWidgets.add(serverDisableSkinTransparencyCheckbox);
@@ -568,40 +438,14 @@ public class SettingsScreen extends Screen {
 
     private void createModpackSettings() {
         ClientConfig config = ClientConfig.getInstance();
-        //? if <1.21 {
-        int checkboxSize = 20;
-        //?} else if >=1.21.11 {
-            //? if <26.1 {
-        int checkboxSize = 20;
-            //?}
-        //?}
         // Settings content area starts below tabs
         int startY = dialogY + TAB_HEIGHT + 20;
         int leftColumnX = dialogX + 20;
 
-        //? if <1.21 {
-        enablePlayerOwnSkinSystemCheckbox = new Checkbox(
-                leftColumnX, startY,
-                checkboxSize, checkboxSize,
-        //?} else {
-        enablePlayerOwnSkinSystemCheckbox = Checkbox.builder(
-        //?}
-                Component.translatable("quickskin.settings.enable_own_skin"),
-        //? if <1.21 {
-                config.enablePlayerOwnSkinSystem
-        );
-        enablePlayerOwnSkinSystemCheckbox.setTooltip(Tooltip.create(
-                Component.translatable("quickskin.settings.own_skin_tooltip")
-        ));
-        //?} else {
-                this.font)
-                .pos(leftColumnX, startY)
-                .selected(config.enablePlayerOwnSkinSystem)
-                .tooltip(Tooltip.create(
-                        Component.translatable("quickskin.settings.own_skin_tooltip")
-                ))
-                .build();
-        //?}
+        enablePlayerOwnSkinSystemCheckbox = checkbox(leftColumnX, startY,
+                "quickskin.settings.enable_own_skin",
+                config.enablePlayerOwnSkinSystem,
+                "quickskin.settings.own_skin_tooltip", this::applyClientSettings);
         modpackSettingWidgets.add(enablePlayerOwnSkinSystemCheckbox);
     }
 
@@ -895,10 +739,70 @@ public class SettingsScreen extends Screen {
         super.removed();
         // Cleanup blur resources
         BlurHandler.cleanup();
+    }
 
-        // If a reload was flagged, execute it now that the screen is closed.
-        if (this.needsTextureReload) {
+    private boolean isAdmin() {
+        //? if <1.21.11 {
+        return minecraft != null && minecraft.player != null && minecraft.player.hasPermissions(2);
+        //?} else {
+        return minecraft != null && minecraft.player != null && minecraft.player.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER);
+        //?}
+    }
+
+    /**
+     * Copies every client checkbox into {@link ClientConfig} and saves it. Runs on each toggle, so
+     * a setting takes effect without closing the dialog, and once more on close.
+     */
+    private void applyClientSettings() {
+        if (showOverlayCheckbox == null) {
+            return;
+        }
+        ClientConfig config = ClientConfig.getInstance();
+        boolean oldTransparencySetting = config.disableSkinTransparency;
+
+        config.showSkinPreviewOverlay = showOverlayCheckbox.selected();
+        config.disableSkinTransparency = disableSkinTransparencyCheckbox.selected();
+        config.enableStyledButtons = enableStyledButtonsCheckbox.selected();
+        config.enablePlayerPreviewCustomization = enablePlayerPreviewCustomizationCheckbox.selected();
+        config.enablePlayerOwnSkinSystem = enablePlayerOwnSkinSystemCheckbox.selected();
+        config.hideBuiltInCapes = hideBuiltInCapesCheckbox.selected();
+        config.showTitleScreenPreview = showTitlePreviewCheckbox.selected();
+        config.showPauseMenuPreview = showPausePreviewCheckbox.selected();
+        config.compactChangeSkinButton = compactChangeSkinButtonCheckbox.selected();
+        config.setMenuBackgroundStyle(menuBackgroundCheckbox.selected()
+                ? BackgroundStyle.VANILLA_BLUR : BackgroundStyle.OPAQUE_STARS);
+        config.save();
+
+        if (oldTransparencySetting != config.disableSkinTransparency) {
             com.quickskin.mod.client.services.PlayerAppearanceService.getInstance().reloadSkinsForTransparencyChange();
+        }
+    }
+
+    /**
+     * Sends the server transparency checkbox to the server as soon as an admin toggles it. The
+     * server broadcasts the change to every client, including this one, which then reloads.
+     */
+    private void applyServerTransparency() {
+        if (!isAdmin()) {
+            return;
+        }
+        com.quickskin.mod.client.api.ClientNetworkApi.actions().updateServerConfig(
+                "disableSkinTransparency", serverDisableSkinTransparencyCheckbox.selected());
+    }
+
+    private void applyCooldownSetting() {
+        if (!isAdmin() || skinChangeCooldownEditBox == null || skinChangeCooldownEditBox.getValue().isEmpty()) {
+            return;
+        }
+        try {
+            int cooldownSeconds = Integer.parseInt(skinChangeCooldownEditBox.getValue());
+            if (cooldownSeconds >= 0 && cooldownSeconds <= 86400) { // Max 24 hours
+                ServerConfig config = ServerConfig.getInstance();
+                config.skinChangeCooldownSeconds = cooldownSeconds;
+                config.save();
+            }
+        } catch (NumberFormatException e) {
+            // Invalid input, keep existing value
         }
     }
 
@@ -913,97 +817,23 @@ public class SettingsScreen extends Screen {
         // Execute any pending transparency reload from server config changes
         com.quickskin.mod.client.api.ClientNetworkApi.actions().flushPendingTransparencyReload();
 
-        // Save client settings
-        if (showOverlayCheckbox != null) {
-            ClientConfig config = ClientConfig.getInstance();
+        // Checkboxes already applied themselves when toggled; this catches any state set without a
+        // press. The cooldown field is still applied on close.
+        applyClientSettings();
+        applyCooldownSetting();
 
-            // Check if transparency setting changed
-            boolean oldTransparencySetting = config.disableSkinTransparency;
-            boolean oldStyledButtonsSetting = config.enableStyledButtons;
-
-            config.showSkinPreviewOverlay = showOverlayCheckbox.selected();
-            config.disableSkinTransparency = disableSkinTransparencyCheckbox.selected();
-            config.enableStyledButtons = enableStyledButtonsCheckbox.selected();
-            config.enablePlayerPreviewCustomization = enablePlayerPreviewCustomizationCheckbox.selected();
-            config.enablePlayerOwnSkinSystem = enablePlayerOwnSkinSystemCheckbox.selected();
-            config.hideBuiltInCapes = hideBuiltInCapesCheckbox.selected();
-            config.showTitleScreenPreview = showTitlePreviewCheckbox.selected();
-            config.showPauseMenuPreview = showPausePreviewCheckbox.selected();
-            config.compactChangeSkinButton = compactChangeSkinButtonCheckbox.selected();
-
-            // Save menu background style
-            if (menuBackgroundCheckbox != null) {
-                BackgroundStyle newStyle = menuBackgroundCheckbox.selected() ?
-                    BackgroundStyle.VANILLA_BLUR : BackgroundStyle.OPAQUE_STARS;
-                config.setMenuBackgroundStyle(newStyle);
-            }
-
-            // If transparency setting changed, flag for a reload
-            if (oldTransparencySetting != config.disableSkinTransparency) {
-                this.needsTextureReload = true;
-            }
-
-            config.save();
-
-            // If styled buttons setting changed, refresh parent screen
-            if (oldStyledButtonsSetting != config.enableStyledButtons && parent != null && minecraft != null) {
-                // Recreate parent screen to apply new button style
-                Screen newParent = recreateScreen(parent);
-                //? if <26.2 {
-                minecraft.setScreen(newParent);
-                //?} else {
-                minecraft.gui.setScreen(newParent);
-                //?}
-                return; // Don't set screen to parent again below
-            }
+        if (minecraft == null) {
+            return;
         }
-
-        // Save server settings (only if player is admin)
-        if (serverDisableSkinTransparencyCheckbox != null) {
-            //? if <1.21.11 {
-            boolean isAdmin = minecraft != null && minecraft.player != null && minecraft.player.hasPermissions(2);
-            //?} else {
-            boolean isAdmin = minecraft != null && minecraft.player != null && minecraft.player.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER);
-            //?}
-
-            if (isAdmin) {
-                boolean newValue = serverDisableSkinTransparencyCheckbox.selected();
-
-                // Get old value from server override (synced from server)
-                ServerConfig serverOverride = ClientConfig.getInstance().getServerOverride();
-                boolean oldValue = serverOverride != null ? serverOverride.disableSkinTransparency : false;
-
-                if (newValue != oldValue) {
-                    // Send packet to server to update the server-side config
-                    com.quickskin.mod.client.api.ClientNetworkApi.actions().updateServerConfig(
-                            "disableSkinTransparency", newValue);
-
-                    // The server will broadcast the change to all clients, including this one
-                    // No need to save locally or reload textures here - it will happen when we receive the broadcast
-                }
-            }
-
-            // Save cooldown setting (if admin)
-            if (isAdmin && skinChangeCooldownEditBox != null && !skinChangeCooldownEditBox.getValue().isEmpty()) {
-                try {
-                    int cooldownSeconds = Integer.parseInt(skinChangeCooldownEditBox.getValue());
-                    if (cooldownSeconds >= 0 && cooldownSeconds <= 86400) { // Max 24 hours
-                        ServerConfig config = ServerConfig.getInstance();
-                        config.skinChangeCooldownSeconds = cooldownSeconds;
-                        config.save();
-                    }
-                } catch (NumberFormatException e) {
-                    // Invalid input, keep existing value
-                }
-            }
+        // Restyling the parent needs a new screen, so a styled-button change is applied on close.
+        Screen target = parent;
+        if (parent != null && ClientConfig.getInstance().enableStyledButtons != openedWithStyledButtons) {
+            target = recreateScreen(parent);
         }
-
-        if (minecraft != null) {
-            //? if <26.2 {
-            minecraft.setScreen(parent);
-            //?} else {
-            minecraft.gui.setScreen(parent);
-            //?}
-        }
+        //? if <26.2 {
+        minecraft.setScreen(target);
+        //?} else {
+        minecraft.gui.setScreen(target);
+        //?}
     }
 }
