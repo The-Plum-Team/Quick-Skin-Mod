@@ -396,6 +396,98 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             )
         )
 
+    def test_architectury_transformer_fabric_loader_is_pinned_and_verified(self) -> None:
+        """Architectury declares `fabric-loader:+` on its transformer classpath.
+
+        With strict verification a dynamic selector there resolves each new Fabric Loader release
+        the day it is published and fails every build on the missing checksum (#1438). The policy
+        pins it to one reviewed version, and Gradle itself refuses any dynamic or changing selector
+        left in that classpath.
+        """
+        policy = (ROOT / "gradle" / "repository-policy.gradle.kts").read_text(
+            encoding="utf-8"
+        )
+        declaration = re.search(
+            r'^val architecturyTransformerFabricLoaderVersion = "([^"]+)"$',
+            policy,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(declaration)
+        assert declaration is not None
+        version = declaration.group(1)
+        self.assertRegex(version, r"^[0-9]+(?:[.][0-9]+)+$")
+
+        rule = re.search(
+            r'configurations[.]matching \{ it[.]name == "architecturyTransformerClasspath" \}'
+            r"[.]configureEach \{\n(?P<body>.*?)\n\}\n",
+            policy,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(rule)
+        assert rule is not None
+        body = rule.group("body")
+        for required in (
+            'requested.group == "net.fabricmc"',
+            'requested.name == "fabric-loader"',
+            'requested.version == "+"',
+            "useVersion(architecturyTransformerFabricLoaderVersion)",
+            "failOnDynamicVersions()",
+            "failOnChangingVersions()",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, body)
+
+        root, namespace = _verification_tree()
+        component = root.find(
+            "v:components/v:component[@group='net.fabricmc'][@name='fabric-loader']"
+            f"[@version='{version}']",
+            namespace,
+        )
+        self.assertIsNotNone(component)
+        assert component is not None
+        for extension in ("jar", "pom"):
+            with self.subTest(artifact=extension):
+                checksum = component.find(
+                    f"v:artifact[@name='fabric-loader-{version}.{extension}']/v:sha256",
+                    namespace,
+                )
+                self.assertIsNotNone(checksum)
+                assert checksum is not None
+                self.assertRegex(checksum.get("value", ""), SHA256)
+
+    def test_build_logic_declares_no_dynamic_versions(self) -> None:
+        """Every version the build declares is exact; strict verification needs fixed inputs.
+
+        `+` inside a version (Fabric API's `0.92.6+1.20.1`) is build metadata, not a selector;
+        only a trailing `+` (Gradle's prefix selector), a `latest.*` selector or a range is dynamic.
+        """
+        dynamic = re.compile(r"\+$|^latest[.]|^[\[\]\(][^\]\)]*[\]\)\[]$")
+        for line in (ROOT / "gradle.properties").read_text(encoding="utf-8").splitlines():
+            if line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            if "version" in key:
+                with self.subTest(property=key):
+                    self.assertIsNone(dynamic.search(value.strip()), value)
+
+        scripts = subprocess.run(
+            ("git", "ls-files", "-z", "--", "*.gradle.kts", "*.gradle"),
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        ).stdout.decode("utf-8")
+        notation = re.compile(
+            r'"[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:(?:[^"$]*\+|latest[.][a-z]+|[\[\(][^"]*)"'
+            r'|version\s*\(?\s*"(?:[^"]*\+|latest[.][a-z]+)"'
+        )
+        for name in scripts.split("\0"):
+            if not name:
+                continue
+            with self.subTest(script=name):
+                self.assertEqual(
+                    notation.findall((ROOT / name).read_text(encoding="utf-8")), []
+                )
+
     def test_maven_mirror_has_an_emergency_switch(self) -> None:
         mirror_url = 'maven("https://the-plum-team.github.io/maven-mirror/")'
         guard = 'if (plumMirrorSwitch != "false") {'

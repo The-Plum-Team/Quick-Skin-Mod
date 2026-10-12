@@ -21,7 +21,10 @@ checksum change, never by relaxing the mode: see
   Plugin Portal explicitly reject ecosystem groups owned by the specialist repositories.
 - `gradle/repository-policy.gradle.kts` applies to every buildable common/loader node. It limits
   each remote repository to its owned groups, rejects unknown remote hosts, and prevents generated
-  Loom namespaces from ever resolving over the network.
+  Loom namespaces from ever resolving over the network. It also pins the `fabric-loader:+` that
+  Architectury Plugin adds to `architecturyTransformerClasspath` to one reviewed version and makes
+  Gradle refuse any dynamic or changing selector in that classpath, so a new Fabric Loader release
+  cannot break strict verification. The build declares no dynamic versions anywhere else either.
 - `gradle/maven-mirror.gradle.kts` puts The Plum Team's
   [Maven mirror](https://github.com/The-Plum-Team/maven-mirror) first in every project that applies
   the policy or the Java module conventions, and `settings.gradle.kts` does the same for plugins.

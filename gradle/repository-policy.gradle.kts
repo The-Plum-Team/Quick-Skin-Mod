@@ -65,4 +65,31 @@ repositories.withType<MavenArtifactRepository>().configureEach {
     }
 }
 
+// Architectury Plugin 3.5.170 adds `net.fabricmc:fabric-loader:+` to its transformer classpath
+// (ArchitectPluginExtension.common and the default envAnnotationProvider of each Transform).
+// Under strict verification that selector turns every new Fabric Loader release into a
+// missing-checksum failure in every build (#1438 restored 0.19.5 the day it was published). Pin
+// that selector to the reviewed version and refuse any other dynamic or changing selector in that
+// classpath. The classpath also carries the target's own fabric-loader, which keeps winning
+// conflict resolution only when it is newer than the pin, exactly as before.
+// Change the pin only together with that version's JAR and POM checksums in
+// gradle/verification-metadata.xml.
+val architecturyTransformerFabricLoaderVersion = "0.19.5"
+configurations.matching { it.name == "architecturyTransformerClasspath" }.configureEach {
+    resolutionStrategy {
+        eachDependency {
+            if (
+                requested.group == "net.fabricmc" &&
+                requested.name == "fabric-loader" &&
+                requested.version == "+"
+            ) {
+                useVersion(architecturyTransformerFabricLoaderVersion)
+                because("Architectury declares fabric-loader:+; strict verification needs a reviewed one")
+            }
+        }
+        failOnDynamicVersions()
+        failOnChangingVersions()
+    }
+}
+
 apply(from = rootProject.file("gradle/maven-mirror.gradle.kts"))
