@@ -491,9 +491,11 @@ jobs:
           evidence-retention-days: '7'
 
   required-gate:
-    # A draft must never report the required context: a skipped or deferred "Packaged E2E gate"
-    # would still satisfy the ruleset after the same head is marked ready, before Minecraft runs.
-    name: ${{ github.event.pull_request.draft && github.event.pull_request.base.ref == 'master' && 'Packaged E2E deferred for draft' || 'Packaged E2E gate' }}
+    # A pull request to master gets "Packaged E2E gate" from the gate App alone (mod-base
+    # shared-build-and-e2e), so this native job never reports that name there: "Native Packaged
+    # E2E gate" when ready, "Packaged E2E deferred for draft" as a draft. Pushes, dispatches and
+    # other bases keep the historical name their readers and rulesets expect.
+    name: ${{ github.event.pull_request.base.ref == 'master' && (github.event.pull_request.draft && 'Packaged E2E deferred for draft' || 'Native Packaged E2E gate') || 'Packaged E2E gate' }}
     needs:
       - runtime-policy
       - build

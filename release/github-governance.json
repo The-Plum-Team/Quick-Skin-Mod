@@ -11,7 +11,7 @@
     "Build and verify",
     "Packaged E2E gate"
   ],
-  "required_check_integration_id": 15368,
+  "required_check_integration_id": 5256389,
   "release_environment": {
     "name": "release",
     "reviewer": {
