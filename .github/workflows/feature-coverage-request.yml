@@ -8,7 +8,7 @@ on:
     types:
       - completed
   schedule:
-    - cron: "17 * * * *"
+    - cron: "34 * * * *"
   workflow_dispatch:
     inputs:
       source_run_id:

@@ -5,7 +5,7 @@ name: AI visual review drain
 # The protected workflow may also certify a clean synchronized 1.20.1 anchor.
 on:
   schedule:
-    - cron: "17,47 * * * *"
+    - cron: "21,51 * * * *"
   repository_dispatch:
     types:
       - visual-review-drain-requested
