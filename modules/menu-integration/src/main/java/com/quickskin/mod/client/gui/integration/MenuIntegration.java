@@ -88,66 +88,39 @@ public final class MenuIntegration {
                 }
 
                 if (!positioned) {
-                    //? if >=26.2 {
-                    // Minecraft 26.2 moved accessibility into a new icon row. Anchor to the
-                    // stable Quit Game action so the whole Quick Skin cluster follows it.
+                    // Anchor to the Quit Game button so the whole Quick Skin cluster follows its
+                    // row wherever the loader put it (NeoForge moves it below its Mods button).
                     Button quitGameButton = null;
+                    java.util.List<TitleMenuRow.Box> widgets = new java.util.ArrayList<>();
                     for (net.minecraft.client.gui.components.events.GuiEventListener listener : screen.children()) {
-                        if (listener instanceof Button button &&
+                        if (listener instanceof AbstractWidget widget) {
+                            widgets.add(new TitleMenuRow.Box(
+                                    widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()));
+                        }
+                        if (quitGameButton == null && listener instanceof Button button &&
                                 button.getMessage().getContents() instanceof
                                         net.minecraft.network.chat.contents.TranslatableContents contents &&
                                 "menu.quit".equals(contents.getKey())) {
                             quitGameButton = button;
-                            break;
                         }
                     }
 
                     if (quitGameButton != null) {
-                        buttonX = quitGameButton.getX() + quitGameButton.getWidth() + spacing;
+                        TitleMenuRow.Box quit = new TitleMenuRow.Box(
+                                quitGameButton.getX(), quitGameButton.getY(),
+                                quitGameButton.getWidth(), quitGameButton.getHeight());
+                        buttonX = TitleMenuRow.buttonX(quit, widgets, spacing);
                         buttonY = quitGameButton.getY();
                     } else {
                         // Match the right-hand side of the vanilla Options/Quit Game row.
+                        //? if >=26.2 {
                         buttonX = titleScreen.width / 2 + 104;
                         buttonY = titleScreen.height / 4 + 48 + 96;
-                    }
-                    //?} else {
-                    // Position next to accessibility button on title screen
-                    // The Y coordinate for the row with the vanilla language and accessibility buttons
-                    final int vanillaButtonsY = titleScreen.height / 4 + 48 + 72;
-
-                    net.minecraft.client.gui.components.ImageButton accessibilityButton = null;
-
-                    // Find the right-most ImageButton on the right half of the screen in that specific row
-                    // This specifically targets vanilla buttons and avoids other mods' buttons
-                    for (net.minecraft.client.gui.components.events.GuiEventListener listener : screen.children()) {
-                        if (listener instanceof net.minecraft.client.gui.components.ImageButton imgButton) {
-                            if (imgButton.getY() == vanillaButtonsY &&
-                                    //? if <1.21 {
-                                    imgButton.getX() > titleScreen.width / 2 &&
-                                    imgButton.getWidth() == 20 &&
-                                    imgButton.getHeight() == 20) {
-                                    //?} else {
-                                imgButton.getX() > titleScreen.width / 2 &&
-                                imgButton.getWidth() == 20 &&
-                                imgButton.getHeight() == 20) {
-                                    //?}
-                                if (accessibilityButton == null || imgButton.getX() > accessibilityButton.getX()) {
-                                    accessibilityButton = imgButton;
-                                }
-                            }
-                        }
-                    }
-
-                    // Position next to the found accessibility button
-                    if (accessibilityButton != null) {
-                        buttonX = accessibilityButton.getX() + accessibilityButton.getWidth() + spacing;
-                        buttonY = accessibilityButton.getY();
-                    } else {
-                        // Fallback if we couldn't find the accessibility button
+                        //?} else {
                         buttonX = titleScreen.width / 2 + 128;
                         buttonY = titleScreen.height / 4 + 48 + 84;
+                        //?}
                     }
-                    //?}
                 }
 
             } else if (screen instanceof PauseScreen pauseScreen) {
@@ -223,10 +196,14 @@ public final class MenuIntegration {
 
             // Create and add the "Change Skin" button
             final Button changeSkinButton;
-            if (essentialPresent) {
-                // Use icon button when Essential is present
+            boolean compactButton = !essentialPresent
+                    && com.quickskin.mod.config.ClientConfig.getInstance().compactChangeSkinButton;
+            if (essentialPresent || compactButton) {
+                // An icon the size of vanilla's language and accessibility buttons, beside Essential's
+                // rail or, when chosen in settings, at the start of the full button's slot. A compact
+                // button stacks the preview's controls above it and moves the preview beside them.
                 changeSkinButton = new com.quickskin.mod.client.gui.widget.IconActionButton(
-                        buttonX, buttonY, buttonWidth, buttonHeight,
+                        buttonX, buttonY, buttonHeight, buttonHeight,
                         //? if <1.21.11 {
                             //? if <1.21 {
                         new ResourceLocation("quickskin", "textures/gui/quickskin_icon.png"),
@@ -259,6 +236,12 @@ public final class MenuIntegration {
 
                 int widgetX = buttonX + offsetX;
                 int widgetY = buttonY + offsetY;
+                if (compactButton) {
+                    // Stand the model on the icon's row, centred in the slot right of the control column
+                    int column = buttonHeight + spacing;
+                    widgetX += column / 2;
+                    widgetY += column;
+                }
 
                 // Get player skin and model type from saved config or player
                 //? if <1.21.11 {
@@ -435,10 +418,10 @@ public final class MenuIntegration {
 
                 // Only add animation buttons on title screen, not in-game (pause menu)
                 if ("title".equals(screenType)) {
-                    // Create animation toggle button (right of rotate button)
+                    // Create animation toggle button (right of rotate button, or above it beside a compact button)
                     int animToggleWidth = 20;
-                    int animToggleX = buttonX + buttonWidth - animToggleWidth;
-                    int animToggleY = rotateButtonY;
+                    int animToggleX = compactButton ? rotateButtonX : buttonX + buttonWidth - animToggleWidth;
+                    int animToggleY = compactButton ? rotateButtonY - rotateButtonSize - spacing : rotateButtonY;
 
                     animationToggleButton = Button.builder(
                             Component.literal(">"),

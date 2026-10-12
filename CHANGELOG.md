@@ -1,5 +1,48 @@
 # Changelog
 
+## 3.1.1 (2026-10-11)
+
+### Added
+
+- **Compact Change Skin button**
+> The new "Compact Change Skin Button" setting, in the Client tab, shows the Change Skin button of the title screen and the pause menu as a small Quick Skin icon, the same size as the language and accessibility buttons. The player preview and its buttons move to stand right above it. It is off by default and changes nothing when Essential is installed.
+> *@Suelvys thx for the idea!*
+
+- **Players without Quick Skin can see your new account skin**
+> Server owners can turn on `shareAccountSkinWithVanillaClients` in `config/quickskin-server.json` (off by default). On an online-mode server, when you upload a skin to your Mojang account with the Upload to Mojang button, players who don't have Quick Skin see the new skin within a minute or two instead of only after you rejoin. Capes, HD skins and CPM models are still only visible to players with Quick Skin.
+
+- **Upload limit for servers**
+> Server owners can choose the biggest skin or cape that is synced to other players with `maxTextureUploadKilobytes` in `config/quickskin-server.json` (64 to 16384 KiB, 16384 by default). A skin or cape over the limit stays on your own screen, a chat message tells you why, and the rest of your appearance still syncs. Players on Quick Skin 3.1.0 or older should update before a server lowers the limit.
+
+### Fixes
+
+- **No more crash at launch with loading-screen mods**
+> The game no longer crashes on startup ("No model for layer minecraft:player#main") when a mod that removes the loading screen, like Remove Reloading Screen, is installed. The title screen's player preview simply shows up once the game has finished loading.
+> *@Llohgun thx for reporting it!*
+
+- **The Change Skin button lines up with Quit Game on NeoForge**
+> On NeoForge, the title screen's Change Skin button, together with the player preview above it, sat a few pixels higher than the Options and Quit Game row. It now sits on that row.
+> *@Suelvys thx for reporting it!*
+
+- **Importing skins on Android**
+> On Android launchers, Import Skin now opens a file browser inside the game instead of doing nothing. If your file isn't listed, copy it into the game folder; the "Game folder" button takes you there.
+> *@GIGTY thx for reporting it!*
+
+- **No more disconnects from big skins on servers with Quick Skin 2.x**
+> On a server that still runs Quick Skin 2.x, another player's large skin or GIF cape no longer disconnects you with "ByteArray with size ... is bigger than allowed 32768".
+
+- **Smooth title-screen panorama with Very Many Players**
+> With Very Many Players installed, the main menu's panorama turned in visible steps once the computer had been on for a few days, and jumped every few hours. It turns smoothly again.
+
+- **Better performance with many capes around**
+> Every visible Quick Skin cape now takes less work per frame, which helps on servers with lots of caped players.
+
+- **The cape menu message no longer covers the buttons**
+> The "Imported cape" and "Cape deleted" messages of the cape menu now show above the buttons instead of on top of Remove Cape.
+
+- **More translations**
+> The newest texts (skin search errors, the cape editor and the preview settings) are now translated into every language instead of showing up in English.
+
 ## 3.1.0 (2026-10-05)
 
 ### Added

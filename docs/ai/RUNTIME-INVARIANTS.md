@@ -163,6 +163,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 ## Files, images, and persistence
 
+- Android launchers expose Linux/OpenJDK rather than an Android `os.name`. `FilePickerFiles`
+  recognises their Android runtime environment; `FileDialogHelper` routes skins, capes and batch
+  imports to the Minecraft-rendered `MobileFilePickerScreen` before any desktop native dialog.
+  Directory scans run on `ClientIoExecutor`, cap visited entries and do not follow symlink entries.
+  A stale scan never updates a closed picker. The picker releases the shared dialog guard on
+  removal (including cancellation) and restores its parent before invoking an import callback,
+  since cape import can open its own editor. It reads only launcher-accessible files; it does not
+  obtain Android storage permissions or bypass scoped storage. Desktop dialog routes stay native.
+
 - Use `BoundedFileReader`, `SafeImageReader`, and the established GIF preflight path. Do not add
   production `ImageIO.read`, unbounded `Files.readAllBytes`/`readString`, or decode-before-dimension
   validation.
@@ -496,10 +505,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   deletion (including read-only files), so a partial delete cannot poison the active namespace.
   Treat stale/unknown/corrupt identity as a miss or fail-closed error. Garbage
   collection is bounded housekeeping, never a correctness mechanism. Dependency hashes come from
-  the recorded Gradle verification metadata; first-download trust is forbidden here. Gradle's own
-  artifact verification is deliberately off (see `DEPENDENCY-SECURITY.md`), so this file is a
-  recorded inventory rather than a build gate, but the packaged-runtime store still pins every
-  download to the exact SHA-256 it reads from that inventory.
+  the strict Gradle verification metadata; first-download trust is forbidden. The packaged-runtime
+  store pins every download to the exact primary SHA-256 it reads from that file, the same file
+  Gradle enforces in strict mode (see `DEPENDENCY-SECURITY.md`).
 - An ingested runtime tree may contain a symbolic link only when it resolves inside that tree and
   to a regular file; real Java runtimes ship such links. Store the target's bytes, refuse escaping,
   dangling, and directory links, and never publish or materialize a link. Compare containment by
