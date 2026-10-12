@@ -613,7 +613,7 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual("Skin menu", skin_menu.title)
         self.assertEqual("key", skin_menu.review_tier)
         self.assertEqual(
-            ((0.34, 0.09, 0.66, 0.91),),
+            ((0.0, 0.0, 1.0, 1.0),),
             self.contract.review_regions_for("full.client_a.skin_menu_screen"),
         )
 
@@ -816,7 +816,7 @@ class ScenarioContractTest(unittest.TestCase):
                     "external_skin_drop",
                     "catalog_delete",
                     0.002,
-                    (0.34, 0.09, 0.66, 0.91),
+                    (0.0, 0.05, 0.09, 0.95),
                 ),
                 (
                     "model_classic",
@@ -900,7 +900,7 @@ class ScenarioContractTest(unittest.TestCase):
                     "skin_menu_screen",
                     "styled_buttons_vanilla_background",
                     0.02,
-                    (0.03, 0.2, 0.2, 0.8),
+                    (0.1, 0.1, 0.26, 0.45),
                 ),
                 (
                     "local_skin_apply",
@@ -985,7 +985,7 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertIsInstance(opaque, scenario_contract.OpaqueStarsProbe)
         assert isinstance(opaque, scenario_contract.OpaqueStarsProbe)
         self.assertEqual("skin_menu_screen", opaque.step)
-        self.assertEqual((0.03, 0.20, 0.20, 0.80), opaque.region)
+        self.assertEqual((0.10, 0.10, 0.26, 0.45), opaque.region)
         self.assertEqual((32.0, 64, 0.10), (
             opaque.maximum_mean_luma,
             opaque.bright_luma,
@@ -1007,17 +1007,17 @@ class ScenarioContractTest(unittest.TestCase):
             [
                 (
                     "skin_menu_screen",
-                    "skin catalog labels",
-                    (480, 195, 850, 300),
+                    "skin column counter",
+                    (12, 64, 98, 90),
                     175,
-                    500,
+                    200,
                 ),
                 (
                     "skin_menu_screen",
-                    "skin drop-zone instructions",
-                    (560, 440, 745, 523),
+                    "player name tag",
+                    (680, 182, 920, 206),
                     175,
-                    300,
+                    100,
                 ),
                 (
                     "cape_menu_screen",

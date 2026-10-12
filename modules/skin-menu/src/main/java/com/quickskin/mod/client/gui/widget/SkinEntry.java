@@ -16,6 +16,7 @@ import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 //? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
@@ -25,6 +26,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.network.chat.Component;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
@@ -37,7 +39,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Individual skin entry in the skin list
+ * One skin in the skin column: a square tile showing its face
  */
 @Environment(EnvType.CLIENT)
 public class SkinEntry extends ContainerObjectSelectionList.Entry<SkinEntry> {
@@ -51,6 +53,8 @@ public class SkinEntry extends ContainerObjectSelectionList.Entry<SkinEntry> {
     //?}
     private final SkinListWidget parentList;
     private final boolean isPremiumAccount;
+
+    private static final int ACTION_BUTTON_SIZE = 11;
 
     private boolean isDeleteHovered;
     private boolean isEditHovered;
@@ -92,47 +96,42 @@ public class SkinEntry extends ContainerObjectSelectionList.Entry<SkinEntry> {
         int height = this.getHeight();
     //?}
 
-        // Selection and hover highlight
-        int highlightPaddingH = 4;
-        int highlightPaddingV = 2;
-        int highlightLeft = left - highlightPaddingH;
-        int highlightRight = left + width - 10;
-        int highlightTop = top - highlightPaddingV;
-        int highlightBottom = top + height + highlightPaddingV;
+        // One square tile per skin: the face, framed by the selection and hover state
+        int tileSize = height;
+        int tileLeft = left;
+        int tileTop = top;
+        int tileRight = tileLeft + tileSize;
+        int tileBottom = tileTop + tileSize;
 
         // Check if this is the player's own skin
         ClientConfig config = ClientConfig.getInstance();
         boolean isPlayerOwnSkin = config.enablePlayerOwnSkinSystem && metadata.hash().equals(config.playerOwnSkinHash);
+        boolean isSelected = parentList.getSelected() == this;
 
-        if (parentList.getSelected() == this) {
-            if (isPlayerOwnSkin) {
-                // Selected state for player's own skin - purple highlight with border
-                graphics.fill(highlightLeft, highlightTop, highlightRight, highlightBottom, 0x80A020F0);
-                //? if <1.21.9 {
-                graphics.renderOutline(highlightLeft, highlightTop, highlightRight - highlightLeft,
-                //?} else {
-                drawOutline(graphics, highlightLeft, highlightTop, highlightRight - highlightLeft,
-                //?}
-                    highlightBottom - highlightTop, 0xFFA020F0);
-            } else {
-                // Selected state - blue highlight with border
-                graphics.fill(highlightLeft, highlightTop, highlightRight, highlightBottom, 0x80308CC0);
-                //? if <1.21.9 {
-                graphics.renderOutline(highlightLeft, highlightTop, highlightRight - highlightLeft,
-                //?} else {
-                drawOutline(graphics, highlightLeft, highlightTop, highlightRight - highlightLeft,
-                //?}
-                    highlightBottom - highlightTop, 0xFF4080FF);
-            }
+        graphics.fill(tileLeft, tileTop, tileRight, tileBottom, 0x80000000);
+        int borderColor;
+        if (isSelected) {
+            // Purple for the player's own skin, blue for any other selection
+            graphics.fill(tileLeft, tileTop, tileRight, tileBottom, isPlayerOwnSkin ? 0x60A020F0 : 0x60308CC0);
+            borderColor = isPlayerOwnSkin ? 0xFFA020F0 : 0xFF4080FF;
         } else if (isHovered) {
-            // Hover state - subtle white highlight
-            graphics.fill(highlightLeft, highlightTop, highlightRight, highlightBottom, 0x30FFFFFF);
+            borderColor = 0xC0FFFFFF;
+        } else {
+            borderColor = isPlayerOwnSkin ? 0x80A020F0 : 0x50FFFFFF;
+        }
+        drawOutline(graphics, tileLeft, tileTop, tileSize, tileSize, borderColor);
+        if (isSelected) {
+            drawOutline(graphics, tileLeft + 1, tileTop + 1, tileSize - 2, tileSize - 2, borderColor);
+        }
+        if (isHovered) {
+            parentList.setHoveredEntry(this);
         }
 
         // Render skin face preview
-        int faceSize = height - 8;
-        int faceX = left + 4;
-        int faceY = top + 4;
+        int facePadding = 4;
+        int faceSize = tileSize - facePadding * 2;
+        int faceX = tileLeft + facePadding;
+        int faceY = tileTop + facePadding;
 
         if (textureLocation != null) {
             //? if <1.21.5 {
@@ -143,24 +142,18 @@ public class SkinEntry extends ContainerObjectSelectionList.Entry<SkinEntry> {
                 GuiCompat.blit(graphics, textureLocation, faceX, faceY, faceSize, faceSize,
                     0, 0, 64, 64, 64, 64);
             } else {
+                // Scale UV coordinates proportionally for HD textures
                 int textureWidth = metadata.resolution().getWidth();
                 int textureHeight = metadata.resolution().getHeight();
-
-                //? if <1.21 {
                 float scaleX = textureWidth / 64.0f;
                 float scaleY = textureHeight / 64.0f;
-                //?} else {
-            // Scale UV coordinates proportionally for HD textures
-            float scaleX = textureWidth / 64.0f;
-            float scaleY = textureHeight / 64.0f;
-                //?}
 
-            GuiCompat.blit(graphics, textureLocation, faceX, faceY, faceSize, faceSize,
-                8.0f * scaleX, 8.0f * scaleY, (int)(8 * scaleX), (int)(8 * scaleY),
-                textureWidth, textureHeight);
-            GuiCompat.blit(graphics, textureLocation, faceX, faceY, faceSize, faceSize,
-                40.0f * scaleX, 8.0f * scaleY, (int)(8 * scaleX), (int)(8 * scaleY),
-                textureWidth, textureHeight);
+                GuiCompat.blit(graphics, textureLocation, faceX, faceY, faceSize, faceSize,
+                    8.0f * scaleX, 8.0f * scaleY, (int)(8 * scaleX), (int)(8 * scaleY),
+                    textureWidth, textureHeight);
+                GuiCompat.blit(graphics, textureLocation, faceX, faceY, faceSize, faceSize,
+                    40.0f * scaleX, 8.0f * scaleY, (int)(8 * scaleX), (int)(8 * scaleY),
+                    textureWidth, textureHeight);
             }
 
             //? if <1.21.5 {
@@ -178,113 +171,75 @@ public class SkinEntry extends ContainerObjectSelectionList.Entry<SkinEntry> {
             //?}
         }
 
-        // Render text info
-        int textX = left + faceSize + 12;
-
-        // Calculate max width for text to avoid overlapping buttons
-        int actionButtonSize = 11;
-        int buttonAreaWidth = actionButtonSize + 8;
-        int textMaxWidth = (highlightRight - buttonAreaWidth) - textX;
-
-        // Display name (truncated if needed)
-        String displayName = getSortName();
-        if (mc.font.width(displayName) > textMaxWidth) {
-            displayName = mc.font.plainSubstrByWidth(displayName, textMaxWidth - mc.font.width("...")) + "...";
-        }
-        //? if <1.21.11 {
-        graphics.drawString(mc.font, displayName, textX, top + 6, 0xFFFFFFFF);
-        //?} else {
-            //? if <26.1 {
-        graphics.drawString(mc.font, displayName, textX, top + 6, 0xFFFFFFFF);
-            //?} else {
-        graphics.text(mc.font, displayName, textX, top + 6, 0xFFFFFFFF);
-            //?}
-        //?}
-
-        // Model type and resolution
-        String modelText;
-        int modelTextColor;
-        if (metadata.isCpmModel()) {
-            modelText = "CPM Model";
-            modelTextColor = 0xFF55AAFF;
-        } else {
-            modelText = "slim".equals(metadata.skinModel() != null ? metadata.skinModel().toLowerCase(Locale.ROOT) : null) ? "Slim" : "Classic";
-            if (metadata.resolution().isHD()) {
-                modelText += " • " + metadata.resolution().name();
-            }
-            modelTextColor = metadata.resolution().isHD() ? 0xFF55FF55 : 0xFFAAAAAA;
-        }
-        //? if <1.21.11 {
-        graphics.drawString(mc.font, modelText, textX, top + 6 + mc.font.lineHeight + 2, modelTextColor);
-        //?} else {
-            //? if <26.1 {
-        graphics.drawString(mc.font, modelText, textX, top + 6 + mc.font.lineHeight + 2,
-            0xFF000000 | modelTextColor);
-            //?} else {
-        graphics.text(mc.font, modelText, textX, top + 6 + mc.font.lineHeight + 2,
-            0xFF000000 | modelTextColor);
-            //?}
-        //?}
-
-        // Render action buttons on hover (but not for player's own skin)
+        // Action buttons beside the tile on hover (but not for player's own skin)
         this.isDeleteHovered = false;
         this.isEditHovered = false;
         this.isUploadHovered = false;
 
         if (isHovered && !isPlayerOwnSkin) {
-            int margin = 4;
-            // Action button state
-            int deleteButtonX = highlightRight - actionButtonSize - margin;
-            int deleteButtonY = highlightTop + margin;
+            int buttonX = tileRight + 3;
+            int deleteButtonY = tileTop;
+            this.isDeleteHovered = drawActionButton(graphics, buttonX, deleteButtonY, "x", 3,
+                0xA0E04040, 0x80C00000, mouseX, mouseY);
 
-            boolean deleteHovered = mouseX >= deleteButtonX && mouseX < deleteButtonX + actionButtonSize &&
-                                   mouseY >= deleteButtonY && mouseY < deleteButtonY + actionButtonSize;
-
-            graphics.fill(deleteButtonX, deleteButtonY,
-                deleteButtonX + actionButtonSize, deleteButtonY + actionButtonSize,
-                deleteHovered ? 0xA0E04040 : 0x80C00000);
-            //? if <26.1 {
-            graphics.drawString(mc.font, "x", deleteButtonX + 3, deleteButtonY + 1, 0xFFFFFFFF);
-            //?} else {
-            graphics.text(mc.font, "x", deleteButtonX + 3, deleteButtonY + 1, 0xFFFFFFFF);
-            //?}
-
-            this.isDeleteHovered = deleteHovered;
-
-            // Render edit/rename button below delete button
-            int editButtonY = deleteButtonY + actionButtonSize + 2;
-
-            boolean editHovered = mouseX >= deleteButtonX && mouseX < deleteButtonX + actionButtonSize &&
-                                 mouseY >= editButtonY && mouseY < editButtonY + actionButtonSize;
-
-            graphics.fill(deleteButtonX, editButtonY,
-                deleteButtonX + actionButtonSize, editButtonY + actionButtonSize,
-                editHovered ? 0xA040C0C0 : 0x80408080);
-            //? if <26.1 {
-            graphics.drawString(mc.font, "✎", deleteButtonX + 2, editButtonY + 1, 0xFFFFFFFF);
-            //?} else {
-            graphics.text(mc.font, "✎", deleteButtonX + 2, editButtonY + 1, 0xFFFFFFFF);
-            //?}
-
-            this.isEditHovered = editHovered;
+            int editButtonY = deleteButtonY + ACTION_BUTTON_SIZE + 2;
+            this.isEditHovered = drawActionButton(graphics, buttonX, editButtonY, "✎", 2,
+                0xA040C0C0, 0x80408080, mouseX, mouseY);
 
             if (isPremiumAccount && !metadata.isCpmModel()) {
-                int uploadButtonY = editButtonY + actionButtonSize + 2;
-                boolean uploadHovered = mouseX >= deleteButtonX && mouseX < deleteButtonX + actionButtonSize &&
-                                       mouseY >= uploadButtonY && mouseY < uploadButtonY + actionButtonSize;
-
-                graphics.fill(deleteButtonX, uploadButtonY,
-                    deleteButtonX + actionButtonSize, uploadButtonY + actionButtonSize,
-                    uploadHovered ? 0xA040A040 : 0x80408040);
-                //? if <26.1 {
-                graphics.drawString(mc.font, "↑", deleteButtonX + 2, uploadButtonY + 1, 0xFFFFFFFF);
-                //?} else {
-                graphics.text(mc.font, "↑", deleteButtonX + 2, uploadButtonY + 1, 0xFFFFFFFF);
-                //?}
-
-                this.isUploadHovered = uploadHovered;
+                int uploadButtonY = editButtonY + ACTION_BUTTON_SIZE + 2;
+                this.isUploadHovered = drawActionButton(graphics, buttonX, uploadButtonY, "↑", 2,
+                    0xA040A040, 0x80408040, mouseX, mouseY);
             }
         }
+    }
+
+    /** Draws one hover action button; returns whether the mouse is over it. */
+    private boolean drawActionButton(
+            //? if <26.1 {
+            GuiGraphics graphics,
+            //?} else {
+            GuiGraphicsExtractor graphics,
+            //?}
+            int x, int y, String glyph, int glyphOffsetX, int hoverColor, int color, int mouseX, int mouseY) {
+        boolean hovered = mouseX >= x && mouseX < x + ACTION_BUTTON_SIZE
+                && mouseY >= y && mouseY < y + ACTION_BUTTON_SIZE;
+        graphics.fill(x, y, x + ACTION_BUTTON_SIZE, y + ACTION_BUTTON_SIZE, hovered ? hoverColor : color);
+        //? if <26.1 {
+        graphics.drawString(mc.font, glyph, x + glyphOffsetX, y + 1, 0xFFFFFFFF);
+        //?} else {
+        graphics.text(mc.font, glyph, x + glyphOffsetX, y + 1, 0xFFFFFFFF);
+        //?}
+        return hovered;
+    }
+
+    /** Width of a tile row: the tile plus the column of hover action buttons beside it. */
+    public static int rowWidth(int tileSize) {
+        return tileSize + 3 + ACTION_BUTTON_SIZE;
+    }
+
+    /**
+     * What a tooltip says about this entry: the action under the mouse, or the skin's name and its
+     * model, resolution or CPM label.
+     */
+    public List<Component> tooltipLines() {
+        if (isDeleteHovered) return List.of(Component.translatable("quickskin.button.delete"));
+        if (isEditHovered) return List.of(Component.translatable("quickskin.screen.rename.title"));
+        if (isUploadHovered) return List.of(Component.translatable("quickskin.button.upload_skin"));
+
+        Component detail;
+        if (metadata.isCpmModel()) {
+            detail = Component.literal("CPM Model").withStyle(ChatFormatting.AQUA);
+        } else {
+            String modelText = "slim".equals(metadata.skinModel() != null ? metadata.skinModel().toLowerCase(Locale.ROOT) : null) ? "Slim" : "Classic";
+            if (metadata.resolution().isHD()) {
+                detail = Component.literal(modelText + " • " + metadata.resolution().name())
+                        .withStyle(ChatFormatting.GREEN);
+            } else {
+                detail = Component.literal(modelText).withStyle(ChatFormatting.GRAY);
+            }
+        }
+        return List.of(Component.literal(getSortName()), detail);
     }
 
     @Override
@@ -335,7 +290,6 @@ public class SkinEntry extends ContainerObjectSelectionList.Entry<SkinEntry> {
     public @NotNull List<? extends NarratableEntry> narratables() {
         return List.of();
     }
-    //? if >=1.21.9 {
 
     /**
      * Draws an outline immediately using fill calls instead of submitOutline,
@@ -353,5 +307,4 @@ public class SkinEntry extends ContainerObjectSelectionList.Entry<SkinEntry> {
         graphics.fill(x, y + 1, x + 1, y + height - 1, color);
         graphics.fill(x + width - 1, y + 1, x + width, y + height - 1, color);
     }
-    //?}
 }

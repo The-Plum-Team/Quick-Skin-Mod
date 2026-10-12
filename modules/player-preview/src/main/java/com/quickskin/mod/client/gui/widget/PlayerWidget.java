@@ -198,6 +198,8 @@ public class PlayerWidget extends AbstractWidget {
     // Custom reference point (alternative to button positioning)
     private Integer customCenterX = null;
     private Integer customCenterY = null;
+    // Largest scale the host's layout leaves room for; null leaves the configured size alone
+    private Float scaleCap = null;
 
 //? if <1.21 {
     // Priority areas (buttons that should take precedence over model interaction)
@@ -351,6 +353,41 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     /**
+     * Caps the model scale at what the host's layout leaves room for, so a large configured size
+     * cannot push the model off a small window. The configured size still applies below the cap.
+     */
+    public void setScaleCap(float maxScale) {
+        this.scaleCap = maxScale;
+    }
+
+    /** The scale the model is drawn at: the configured size, capped by {@link #setScaleCap}. */
+    public float getEffectiveScale() {
+        float configured = PreviewLayoutBox.scaleForPercentage(
+                getSliderPercentageFromConfig(com.quickskin.mod.config.ClientConfig.getInstance()));
+        return scaleCap != null ? Math.min(configured, scaleCap) : configured;
+    }
+
+    /** The model's horizontal centre in GUI coordinates, including the player's saved offset. */
+    public int getLayoutCenterX() {
+        return getModelCenterX();
+    }
+
+    /** The model's feet in GUI coordinates, including the player's saved offset. */
+    public int getLayoutFeetY() {
+        return getModelCenterY();
+    }
+
+    /** Whether a point lies on the model as drawn in the last frame. */
+    public boolean isOverModel(double mouseX, double mouseY) {
+        return !isMouseOutsideModelArea(mouseX, mouseY, cachedModelCenterX, cachedModelCenterY, cachedScale);
+    }
+
+    /** Turns the model toward a yaw; the drawn rotation eases toward it like {@link #toggleRotation}. */
+    public void setTargetYRotation(float targetYRotation) {
+        this.targetYRotation = targetYRotation;
+    }
+
+    /**
      * Report the drawn model box as this widget's rectangle, for layout editors such as FancyMenu.
      *
      * <p>Call once, after {@link #setContext} and before the widget is added to {@code host}. The
@@ -487,7 +524,8 @@ public class PlayerWidget extends AbstractWidget {
                 break;
             case SKIN_MENU:
                 configValue = config.sizeModelPreviewPercentageSkinMenu;
-                defaultValue = 51;
+                // The skin menu has no panel: the model stands in the middle of the screen.
+                defaultValue = 85;
                 break;
             case CAPE_MENU:
                 configValue = config.sizeModelPreviewPercentageCapeMenu;
@@ -602,6 +640,9 @@ public class PlayerWidget extends AbstractWidget {
 
         // Convert percentage (1-100%) to scale value
         scale = PreviewLayoutBox.scaleForPercentage(savedPercentage);
+        if (scaleCap != null) {
+            scale = Math.min(scale, scaleCap);
+        }
 
         // Ensure cape animation is registered before rendering
         if (previewData.getCapeId() != null && previewData.getCapeLocation() != null) {

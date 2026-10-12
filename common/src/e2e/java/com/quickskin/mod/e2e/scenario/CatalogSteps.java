@@ -573,8 +573,15 @@ final class CatalogSteps {
                             return Step.Result.fail("own skin is not the selected row after delete: "
                                     + (selected == null ? "<none>" : selected.getMetadata().hash()));
                         }
-                        if (count > 2) {
-                            return Step.Result.fail("drop zone condition (<= 2 entries) does not hold");
+                        Object tile = FullScenario.screenField(screen, "importTile");
+                        if (!(tile instanceof Button importTile) || !importTile.visible) {
+                            return Step.Result.fail("the skin column's import tile is not built");
+                        }
+                        // The menu re-places the tile every frame, right after the last skin.
+                        if (importTile.getY() != list.contentBottom()) {
+                            return Step.Result.fail("import tile at y=" + importTile.getY()
+                                    + " does not follow the only skin (row ends at y="
+                                    + list.contentBottom() + ")");
                         }
                         if (!toasts(screen).isEmpty()) {
                             return Step.Result.fail("an error toast is still visible: '"
@@ -584,7 +591,7 @@ final class CatalogSteps {
                                 + "' (" + externalPrimary + ", alias " + owner.externalSkinHash
                                 + "): metadata null, no " + RENAMED_NAME + "* file in uploads/skins; "
                                 + "list has exactly 1 entry (protected own skin " + own.hash()
-                                + ", selected) so the drop zone (<= 2 entries) is shown; no toast visible");
+                                + ", selected) with the import tile right after it; no toast visible");
                     } finally {
                         // Later steps expect the defaults: no own-skin protection, LATEST_LAST
                         // sort, and the plaid skin persisted as the active one (primary form, as

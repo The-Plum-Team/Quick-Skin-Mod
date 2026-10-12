@@ -17,6 +17,7 @@ import com.quickskin.mod.client.gui.util.FileDialogHelper;
 import com.quickskin.mod.client.gui.util.GuiScaleManager;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.ErrorToast;
+import com.quickskin.mod.client.gui.widget.ImportTileButton;
 //? if <1.21 {
 //?} else {
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
@@ -84,15 +85,18 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private SkinListPanel skinListPanel;
     private PlayerPreviewPanel playerPreviewPanel;
     private ActionButtonsPanel actionButtonsPanel;
+    private ImportTileButton importTile;
 
     // Controls that stay above the player preview (drawn after it, clicked before it)
     private final List<AbstractWidget> foregroundControls = new ArrayList<>();
 
-    // Panel dimensions
-    private int panelX;
-    private int panelY;
-    private int panelWidth;
-    private int panelHeight;
+    // Layout of the panel-free menu, recomputed by init()
+    private static final int MARGIN = 8;
+    private static final int COLUMN_WIDTH = 72;
+    private static final int CONTROL_HEIGHT = 20;
+    private int skinColumnX;
+    private int skinHeaderY;
+    private int skinListBottom;
 
     // GUI scale management
     private boolean guiScaleForced = false;
@@ -106,25 +110,18 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private float savedBodyYaw = 20.0f;
     private float savedTargetRotation = 20.0f;
 
-    // Current model type (preserved across resizes)
-    private String savedModelType = null;
+    // The look being previewed. Nothing is applied until Confirm; it survives resizes and the
+    // sub-screens that return to this instance.
+    @Nullable
+    private String pendingHash;
+    @Nullable
+    private String pendingModelType;
 
-    // Constants
-    private static final int MIN_PANEL_WIDTH = 340;
-    private static final int MAX_PANEL_WIDTH = 600;
-    private static final int MIN_PANEL_HEIGHT = 280;
-
-    // --- NEW ---: Constants for the background effect
-//? if <1.21 {
-    private static final ResourceLocation STAR_PATTERN_TEXTURE = new ResourceLocation(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern.png");
-    private static final ResourceLocation VIGNETTE_LOCATION = new ResourceLocation("textures/misc/vignette.png");
-//?} else if <1.21.11 {
-    private static final ResourceLocation STAR_PATTERN_TEXTURE = ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern.png");
-    private static final ResourceLocation VIGNETTE_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/vignette.png");
-//?} else {
-    private static final Identifier STAR_PATTERN_TEXTURE = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "textures/gui/background/star_pattern.png");
-    private static final Identifier VIGNETTE_LOCATION = Identifier.withDefaultNamespace("textures/misc/vignette.png");
-//?}
+    // Dragging the model turns it (from 1.21; before, the model widget turns itself)
+    private boolean rotatingModel;
+    private double rotationDragStartX;
+    private float rotationDragStartYaw;
+    private static final float ROTATION_DRAG_SENSITIVITY = 0.8f;
 
     // Error toasts
     private final List<ErrorToast> errorToasts = new ArrayList<>();
@@ -148,7 +145,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
     public void tick() {
         super.tick();
-        updateDoneButtonState();
+        updateConfirmButtonState();
         pollLocalAssetFolder();
     }
 
@@ -200,36 +197,26 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
     }
 
-    private void updateDoneButtonState() {
+    private void updateConfirmButtonState() {
         if (this.actionButtonsPanel == null) return;
-        Button doneButton = this.actionButtonsPanel.getDoneButton();
-        if (doneButton == null) return;
+        Button confirmButton = this.actionButtonsPanel.getConfirmButton();
+        if (confirmButton == null) return;
 
         // Cooldown does not apply in singleplayer
 //? if <26.2 {
-        if (this.minecraft != null && this.minecraft.isSingleplayer()) {
+        boolean singleplayer = this.minecraft != null && this.minecraft.isSingleplayer();
 //?} else {
-        if (this.minecraft != null && this.minecraft.hasSingleplayerServer()) {
+        boolean singleplayer = this.minecraft != null && this.minecraft.hasSingleplayerServer();
 //?}
-            if (!doneButton.active) {
-                doneButton.active = true;
-                doneButton.setMessage(Component.translatable("quickskin.button.done"));
-                doneButton.setTooltip(null);
-            }
-            return;
-        }
-
-        long remainingSeconds = CooldownService.getInstance().getRemainingCooldownSeconds();
+        long remainingSeconds = singleplayer ? 0 : CooldownService.getInstance().getRemainingCooldownSeconds();
         if (remainingSeconds > 0) {
-            doneButton.active = false;
-            doneButton.setMessage(Component.translatable("quickskin.cooldown.button", remainingSeconds));
-            doneButton.setTooltip(Tooltip.create(Component.translatable("quickskin.cooldown.tooltip")));
-        } else {
-            if (!doneButton.active) {
-                doneButton.active = true;
-                doneButton.setMessage(Component.translatable("quickskin.button.done"));
-                doneButton.setTooltip(null);
-            }
+            confirmButton.active = false;
+            confirmButton.setMessage(Component.translatable("quickskin.cooldown.button", remainingSeconds));
+            confirmButton.setTooltip(Tooltip.create(Component.translatable("quickskin.cooldown.tooltip")));
+        } else if (!confirmButton.active) {
+            confirmButton.active = true;
+            confirmButton.setMessage(Component.translatable("quickskin.button.confirm"));
+            confirmButton.setTooltip(null);
         }
     }
 
@@ -248,52 +235,31 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         super.init();
         clearWidgets();
         foregroundControls.clear();
+        rotatingModel = false;
 
-        // Save rotation state and model type from existing player preview panel before it's destroyed
+        // Save rotation state from the existing player preview before it's destroyed
         if (playerPreviewPanel != null) {
             com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
             if (widget != null) {
                 savedBodyYaw = widget.getBodyYaw();
                 savedTargetRotation = widget.getTargetYRotation();
             }
-            // Save the current model type to preserve it across resizes
-            savedModelType = playerPreviewPanel.getCurrentModelType();
         }
 
-        // Calculate panel dimensions based on screen size
-        calculatePanelDimensions();
+        int linkColumnX = this.width - MARGIN - LinkButtonsPanel.buttonSize();
 
-        // Use consistent sizing values
-        int scaledPadding = 6;
-        int scaledSpacing = 4;
-        int scaledComponentHeight = 20;
-
-        // Calculate panel areas
-        int leftPanelWidth = (int) (panelWidth * 0.6f);
-        int rightPanelWidth = (int) (panelWidth * 0.35f);
-
-        int componentX = panelX + scaledPadding;
-        int yPos = panelY + scaledPadding + scaledComponentHeight + scaledPadding;
-
-        // Create Mojang username search field (below title)
-        // Match the width of the skin list panel
+        // Player-name search, top centre
         int searchButtonWidth = 60;
-        int sortButtonSize = 20;
-        // Align with skin entry highlight containers
-        // Entry highlights: left = getRowLeft() (list x + ~4px), highlightLeft = left - 4px
-        int searchFieldX = componentX + 4;
-        int searchFieldWidth = leftPanelWidth - 4;
-
-        // Available width for search field (reserve space for both buttons)
-        int reservedWidth = sortButtonSize + searchButtonWidth + (scaledSpacing * 2);
-        int searchFieldAvailableWidth = searchFieldWidth - reservedWidth;
-
+        int searchFieldWidth = Math.max(80, Math.min(200,
+                linkColumnX - (MARGIN + COLUMN_WIDTH) - 2 * MARGIN - searchButtonWidth - 4));
+        int searchX = (this.width - (searchFieldWidth + 4 + searchButtonWidth)) / 2;
+        int searchY = MARGIN;
         usernameSearchField = new EditBox(
                 this.font,
-                searchFieldX,
-                yPos,
-                searchFieldAvailableWidth,
-                scaledComponentHeight,
+                searchX,
+                searchY,
+                searchFieldWidth,
+                CONTROL_HEIGHT,
                 Component.translatable("quickskin.search.placeholder")
         );
         usernameSearchField.setSuggestion(Component.translatable("quickskin.search.suggestion").getString());
@@ -309,13 +275,25 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         });
         addRenderableWidget(usernameSearchField);
 
-        // Sort button (between search field and search button)
-        int sortButtonX = searchFieldX + searchFieldAvailableWidth + scaledSpacing;
+        searchButton = com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
+                searchX + searchFieldWidth + 4,
+                searchY,
+                searchButtonWidth,
+                CONTROL_HEIGHT,
+                Component.translatable("quickskin.button.search"),
+                button -> searchMojangSkin()
+        );
+        addRenderableWidget(searchButton);
+        searchButton.active = false;
+
+        // Skin column, left: header with the sort button, the skin tiles, then the import tile
+        skinColumnX = MARGIN;
+        skinHeaderY = searchY + CONTROL_HEIGHT + MARGIN;
         sortButton = com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                sortButtonX,
-                yPos,
-                sortButtonSize,
-                scaledComponentHeight,
+                skinColumnX + COLUMN_WIDTH - CONTROL_HEIGHT,
+                skinHeaderY,
+                CONTROL_HEIGHT,
+                CONTROL_HEIGHT,
                 Component.literal(getCurrentSortMode().getIcon()),
                 button -> cycleSortMode()
         );
@@ -324,105 +302,54 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         ));
         addRenderableWidget(sortButton);
 
-        // Search button (at the right edge)
-        int searchButtonX = sortButtonX + sortButtonSize + scaledSpacing;
-        searchButton = com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                searchButtonX,
-                yPos,
-                searchButtonWidth,
-                scaledComponentHeight,
-                Component.translatable("quickskin.button.search"),
-                button -> searchMojangSkin()
-        );
-        addRenderableWidget(searchButton);
-        searchButton.active = false;
-
-        // Adjust the yPos for components below the search field
-        yPos += scaledComponentHeight + scaledSpacing;
-
-        // Calculate list height with proper spacing
-        // Title + padding + search field + spacing + extra spacing for the list
-        int topSectionHeight = scaledPadding + scaledComponentHeight + scaledPadding + scaledComponentHeight + scaledSpacing + scaledSpacing;
-        int bottomSectionHeight = (scaledComponentHeight * 3) + (scaledSpacing * 2) + scaledPadding;
-        int listHeight = panelHeight - topSectionHeight - bottomSectionHeight;
-
-        // Create Skin List Panel (left side)
+        int tileSize = SkinListPanel.ENTRY_HEIGHT - 4;
+        int listTop = skinHeaderY + CONTROL_HEIGHT + 2;
+        skinListBottom = Math.max(listTop + SkinListPanel.ENTRY_HEIGHT, this.height - MARGIN - tileSize - 4);
         skinListPanel = new SkinListPanel(
-                componentX,
-                yPos,
-                leftPanelWidth,
-                listHeight,
+                skinColumnX,
+                listTop,
+                COLUMN_WIDTH,
+                skinListBottom - listTop,
                 this.minecraft,
                 this::onSkinSelected
         );
         skinListPanel.init(this);
 
-        // Calculate bottom section dimensions first (needed for player preview panel)
-        int fullWidthX = panelX + scaledPadding;
-        int fullComponentWidth = panelWidth - (scaledPadding * 2);
-        int fourButtonWidth = (fullComponentWidth - (scaledSpacing * 3)) / 4;
+        importTile = new ImportTileButton(skinColumnX + 4, listTop + 4, tileSize, button -> openImportDialog());
+        importTile.setTooltip(Tooltip.create(Component.translatable("quickskin.tooltip.import_skin")));
+        addRenderableWidget(importTile);
 
-        // Calculate where action buttons will be
-        int actionButtonsBottomY = panelY + panelHeight - scaledPadding;
-        int actionPanelHeight = (scaledComponentHeight * 2) + scaledSpacing;
+        // Confirm and the rotate control, bottom centre; the model stands on the rotate control
+        int centerX = this.width / 2;
+        int confirmY = this.height - MARGIN - CONTROL_HEIGHT;
+        int confirmX = centerX - ActionButtonsPanel.CONFIRM_WIDTH / 2;
+        int rotateY = confirmY - 4 - CONTROL_HEIGHT;
+        int feetY = rotateY - 2;
+        // Room between the search row (plus the name tag) and the feet
+        int modelTop = searchY + CONTROL_HEIGHT + 34;
+        float scaleCap = Math.max(40.0f, (feetY - modelTop) / MODEL_HEIGHT_PER_SCALE);
 
-        // Model buttons row (Row 3: above Import/HD/Skin/Cape buttons)
-        int modelButtonsY = actionButtonsBottomY - actionPanelHeight - scaledComponentHeight - scaledSpacing;
-        int modelButtonsX = fullWidthX + (fourButtonWidth + scaledSpacing) * 3;
+        playerPreviewPanel = new PlayerPreviewPanel(centerX, feetY, 0, 0);
+        playerPreviewPanel.initPlayerWidget(this, centerX, feetY, scaleCap);
+        float modelScale = playerPreviewPanel.getPlayerWidget() != null
+                ? playerPreviewPanel.getPlayerWidget().getEffectiveScale() : scaleCap;
+        playerPreviewPanel.setModelBox(centerX, feetY, modelScale);
+        playerPreviewPanel.initControls(this, centerX - CONTROL_HEIGHT / 2, rotateY);
 
-        // Create Player Preview Panel (right side)
-        int playerWidgetX = panelX + panelWidth - rightPanelWidth - scaledPadding;
-        int playerWidgetY = yPos;
-        int availableHeightForWidget = panelHeight - topSectionHeight - bottomSectionHeight;
-
-        playerPreviewPanel = new PlayerPreviewPanel(
-                playerWidgetX,
-                playerWidgetY,
-                rightPanelWidth,
-                availableHeightForWidget
-        );
-        playerPreviewPanel.initPlayerWidget(this);
-
-        // Set up model type change callback to apply model to actual player
-        playerPreviewPanel.setModelTypeChangeCallback(this::onModelTypeChanged);
-
-        // Create model buttons positioned above the cape button
-        playerPreviewPanel.initModelButtons(
-                this,
-                modelButtonsX,
-                modelButtonsY,
-                fourButtonWidth,
-                scaledComponentHeight,
-                scaledSpacing
-        );
-
-        // Create Action Buttons Panel (bottom)
-        int bottomY = actionButtonsBottomY - (scaledComponentHeight * 2) - scaledSpacing;
-
+        // Floating buttons, left and right of the model at shoulder and waist height
+        int halfBody = (int) (modelScale * 0.55f);
+        int gap = 12;
+        int leftX = Math.max(skinColumnX + COLUMN_WIDTH + 6,
+                centerX - halfBody - gap - ActionButtonsPanel.BUTTON_WIDTH);
+        int rightX = Math.min(linkColumnX - 6 - ActionButtonsPanel.BUTTON_WIDTH, centerX + halfBody + gap);
+        int shoulderY = Math.max(skinHeaderY, feetY - (int) (modelScale * 1.45f));
+        int waistY = Math.max(shoulderY + CONTROL_HEIGHT + 4, feetY - (int) (modelScale * 0.9f));
+        ActionButtonsPanel.Layout layout = new ActionButtonsPanel.Layout(
+                leftX, rightX, shoulderY, waistY, confirmX, confirmY);
         ActionButtonsPanel.ActionCallbacks callbacks = new ActionButtonsPanel.ActionCallbacks(
-                this::openImportDialog,
-                () -> {
-                    // HD Skin Website
-                    if (this.minecraft != null) {
-                        this.minecraft.options.chatLinksPrompt().set(false);
-                        //? if <26.3 {
-                        Util.getPlatform().openUri("https://mcskins.top/128x128/");
-                        //?} else {
-                        com.mojang.blaze3d.Blaze3D.openUri(java.net.URI.create("https://mcskins.top/128x128/"));
-                        //?}
-                    }
-                },
-                () -> {
-                    // Skin Website
-                    if (this.minecraft != null) {
-                        this.minecraft.options.chatLinksPrompt().set(false);
-                        //? if <26.3 {
-                        Util.getPlatform().openUri("https://laby.net/skins?order=trending_30d");
-                        //?} else {
-                        com.mojang.blaze3d.Blaze3D.openUri(java.net.URI.create("https://laby.net/skins?order=trending_30d"));
-                        //?}
-                    }
-                },
+                this::cycleBodyWidth,
+                () -> openWebsite("https://laby.net/skins?order=trending_30d"),
+                () -> openWebsite("https://mcskins.top/128x128/"),
                 () -> {
                     // Open cape selection screen
                     if (minecraft != null) {
@@ -434,33 +361,39 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
                     }
                 },
-                this::onClose
+                this::confirmSelection
         );
+        actionButtonsPanel = new ActionButtonsPanel(layout);
+        actionButtonsPanel.init(this, layout, callbacks);
+        for (Button button : actionButtonsPanel.buttons()) {
+            playerPreviewPanel.addPriorityControl(button);
+        }
 
-        actionButtonsPanel = new ActionButtonsPanel(
-                fullWidthX,
-                bottomY,
-                fullComponentWidth,
-                actionPanelHeight,
-                callbacks
-        );
-        actionButtonsPanel.init(this, callbacks);
-
-        // Create Link Buttons Panel (top-right)
-        int linkButtonY = panelY + scaledPadding;
-        int linkPanelWidth = (scaledComponentHeight + scaledSpacing) * 4;
-        int linkPanelX = panelX + panelWidth - linkPanelWidth - scaledPadding;
-
+        // Link column, right edge, vertically centred
         LinkButtonsPanel linkButtonsPanel = new LinkButtonsPanel(
-                linkPanelX,
-                linkButtonY,
-                linkPanelWidth,
-                scaledComponentHeight
+                linkColumnX,
+                (this.height - LinkButtonsPanel.columnHeight()) / 2
         );
         linkButtonsPanel.init(this);
 
-        // Restore saved model type and active skin from config
+        // Restore the previewed look and the active cape
         restoreSavedState();
+        updateBodyWidthButton();
+        updateConfirmButtonState();
+    }
+
+    /** Height of the drawn player per unit of model scale: a player is 1.8 blocks, plus the hat and a margin. */
+    private static final float MODEL_HEIGHT_PER_SCALE = 2.0f;
+
+    private void openWebsite(String url) {
+        if (this.minecraft != null) {
+            this.minecraft.options.chatLinksPrompt().set(false);
+            //? if <26.3 {
+            Util.getPlatform().openUri(url);
+            //?} else {
+            com.mojang.blaze3d.Blaze3D.openUri(java.net.URI.create(url));
+            //?}
+        }
     }
 
     /**
@@ -469,22 +402,30 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private void restoreSavedState() {
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
 
-        // Check if we're restoring from a resize (savedModelType is not null)
-        boolean isResizing = savedModelType != null;
+        // Back from a resize or a sub-screen: show the look that was pending, as it was.
+        if (pendingHash != null && skinListPanel != null) {
+            AssetMetadata pending = LocalAssetManager.getInstance().getMetadata(pendingHash);
+            if (pending != null) {
+                skinListPanel.setSelected(pending, false);
+                previewLook(pending, pendingModelType);
+            } else {
+                pendingHash = null;
+                pendingModelType = null;
+            }
+        }
 
-        // Restore active skin selection first. Opening the menu is no look choice: while CPM's
-        // own model is the look, no Quick Skin entry is selected (selecting one applies it).
+        // Otherwise preview the saved look. Opening the menu is no look choice: while CPM's own
+        // model is the look, no Quick Skin entry is selected (Confirm would apply it).
         boolean cpmOwnsLook = com.quickskin.mod.client.compat.CpmLook.owner()
                 == com.quickskin.mod.client.compat.CpmLook.Owner.CPM;
-        AssetMetadata selectedSkin = null;
-        if (cpmOwnsLook) {
+        if (pendingHash != null) {
+            // Restored above
+        } else if (cpmOwnsLook) {
             // Keep CPM's model; the saved Quick Skin skin is still listed and can be chosen.
         } else if (!config.activeSkinHash.isEmpty() && skinListPanel != null) {
             AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(config.activeSkinHash);
             if (metadata != null) {
-                // Don't trigger callback during resize - we'll set model type manually
-                skinListPanel.setSelected(metadata, !isResizing);
-                selectedSkin = metadata;
+                skinListPanel.setSelected(metadata, true);
             }
         } else if (!config.activeCpmModelHash.isEmpty() && skinListPanel != null) {
 //? if <1.21.11 {
@@ -495,34 +436,15 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                     .getPersistedActiveModel();
 //?}
             if (cpmModel != null) {
-                skinListPanel.setSelected(cpmModel, !isResizing);
-                selectedSkin = cpmModel;
+                skinListPanel.setSelected(cpmModel, true);
             }
         } else if (config.activeSkinHash.isEmpty() && !config.playerOwnSkinHash.isEmpty() && skinListPanel != null) {
-            // If no active skin is set, auto-select the player's own skin
+            // If no active skin is set, preview the player's own skin
             AssetMetadata playerOwnSkin = LocalAssetManager.getInstance().getMetadata(config.playerOwnSkinHash);
             if (playerOwnSkin != null) {
-                // Don't trigger callback during resize - we'll set model type manually
-                skinListPanel.setSelected(playerOwnSkin, !isResizing);
-                selectedSkin = playerOwnSkin;
+                skinListPanel.setSelected(playerOwnSkin, true);
             }
         }
-
-        // Restore model type preference for the selected skin
-        if (playerPreviewPanel != null && selectedSkin != null && isResizing) {
-            // During resize, use the saved model type
-            playerPreviewPanel.setCurrentModelType(savedModelType);
-
-            // Update the preview with the correct skin
-            playerPreviewPanel.updateSkin(
-                    selectedSkin,
-                    LocalAssetManager.getInstance().getTextureLocation(selectedSkin.hash(), com.quickskin.mod.common.data.TextureQuality.FULL)
-            );
-
-            // Clear saved model type after using it
-            savedModelType = null;
-        }
-        // Note: If not resizing, onSkinSelected callback will handle loading the preference
 
         // Restore active cape selection
         if (!config.activeCapeHash.isEmpty() && playerPreviewPanel != null) {
@@ -618,64 +540,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // but you could add similar logic if needed
     }
 
-    /**
-     * Calculate panel dimensions based on screen size
-     * Uses FIXED sizes since we're forcing GUI scale
-     */
-    private void calculatePanelDimensions() {
-        // Calculate panel dimensions as percentages of screen for flexible sizing
-        int desiredWidth = (int)(this.width * 0.5f);
-        int desiredHeight = (int)(this.height * 0.8f);
-
-        panelWidth = Mth.clamp(
-                desiredWidth,
-                MIN_PANEL_WIDTH,
-                Math.min(MAX_PANEL_WIDTH, this.width - 80)
-        );
-
-        panelHeight = Mth.clamp(
-                desiredHeight,
-                MIN_PANEL_HEIGHT,
-                this.height - 80
-        );
-
-        // Adjust panel size if components don't fit
-        int minRequiredHeight = calculateMinRequiredHeight();
-        if (panelHeight < minRequiredHeight) {
-            panelHeight = Math.min(minRequiredHeight, this.height - 40);
-        }
-
-        int minRequiredWidth = calculateMinRequiredWidth();
-        if (panelWidth < minRequiredWidth) {
-            panelWidth = Math.min(minRequiredWidth, this.width - 40);
-        }
-
-        // Center the panel
-        panelX = (this.width - panelWidth) / 2;
-        panelY = (this.height - panelHeight) / 2;
-    }
-
-    /**
-     * Calculate minimum required height for all components
-     */
-    private int calculateMinRequiredHeight() {
-        int scaledPadding = 6;
-        int scaledComponentHeight = 20;
-        int scaledSpacing = 4;
-        // Title + username row + list (min 3 entries) + 3 button rows
-        return scaledPadding * 4 + scaledComponentHeight * 7 + scaledSpacing * 4 + 120; // 120 for min list height
-    }
-
-    /**
-     * Calculate minimum required width for all components
-     */
-    private int calculateMinRequiredWidth() {
-        int scaledPadding = 6;
-        int scaledSpacing = 4;
-        // Need space for left panel + right panel (player widget) + padding
-        return 220 + 150 + scaledPadding * 3 + scaledSpacing * 2;
-    }
-
     // --- NEW ---: Method to render the animated background
     /**
      * Renders a moving star pattern background similar to the effect on the example website.
@@ -698,25 +562,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Render the animated background
         this.renderBackgroundEffects(graphics, partialTick);
 
-        // Render panel background (frosted glass effect)
-        renderPanel(graphics);
-
-        // Render title
-//? if <26.1 {
-        graphics.drawCenteredString(
-//?} else {
-        graphics.centeredText(
-//?}
-                this.font,
-                this.title,
-                this.width / 2,
-                panelY + 10,
-//? if <1.21.9 {
-                0xFFFFFFFF
-//?} else {
-                0xFFFFFFFF
-//?}
-        );
+        // Keep the import tile right after the last skin, or below the column once it scrolls
+        if (importTile != null && skinListPanel != null && skinListPanel.getSkinListWidget() != null) {
+            int afterLast = skinListPanel.getSkinListWidget().contentBottom();
+            importTile.setY(Math.min(Math.max(afterLast, skinListPanel.getY() + 4), skinListBottom + 2));
+        }
 
 //? if <1.21 {
 //?} else if <1.21.6 {
@@ -748,6 +598,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         graphics.pose().popMatrix();
 //?}
 
+        renderSkinHeader(graphics);
+        renderNameTag(graphics);
+
         // Foreground controls and error toasts go above the player preview. Up to 1.21.5 the GUI
         // is depth tested: the model sits at z 50 and reaches forward by its scale (200 at most),
         // tooltips are at z 400. From 1.21.6 a later stratum is drawn on top.
@@ -768,6 +621,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         }
 
+        renderSkinTooltip(graphics, mouseX, mouseY);
+
         // Render error toasts (on top of everything)
         renderErrorToasts(graphics);
 //? if <1.21.6 {
@@ -775,30 +630,80 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
     }
 
-    /**
-     * Render the main panel with frosted glass effect
-     */
+    /** "Skins 2/4" above the skin column: the selected position and the number of skins. */
 //? if <26.1 {
-    private void renderPanel(GuiGraphics graphics) {
+    private void renderSkinHeader(GuiGraphics graphics) {
 //?} else {
-    private void renderPanel(GuiGraphicsExtractor graphics) {
+    private void renderSkinHeader(GuiGraphicsExtractor graphics) {
 //?}
-        // Panel background (dark semi-transparent)
-        graphics.fill(
-                panelX, panelY,
-                panelX + panelWidth, panelY + panelHeight,
-                0xB0000000
-        );
+        if (skinListPanel == null) {
+            return;
+        }
+        int position = skinListPanel.selectedPosition();
+        Component header = Component.translatable("quickskin.menu.skins_count",
+                position > 0 ? String.valueOf(position) : "-", String.valueOf(skinListPanel.size()));
+        int textY = skinHeaderY + (CONTROL_HEIGHT - 8) / 2;
+//? if <26.1 {
+        graphics.drawString(this.font, header, skinColumnX + 2, textY, 0xFFFFFFFF);
+//?} else {
+        graphics.text(this.font, header, skinColumnX + 2, textY, 0xFFFFFFFF);
+//?}
+    }
 
-        // Panel outline (subtle white)
-        // Top
-        graphics.fill(panelX, panelY, panelX + panelWidth, panelY + 1, 0x60FFFFFF);
-        // Bottom
-        graphics.fill(panelX, panelY + panelHeight - 1, panelX + panelWidth, panelY + panelHeight, 0x60FFFFFF);
-        // Left (shortened by 1px at top and bottom to avoid corner overlap)
-        graphics.fill(panelX, panelY + 1, panelX + 1, panelY + panelHeight - 1, 0x60FFFFFF);
-        // Right (shortened by 1px at top and bottom to avoid corner overlap)
-        graphics.fill(panelX + panelWidth - 1, panelY + 1, panelX + panelWidth, panelY + panelHeight - 1, 0x60FFFFFF);
+    /** The player's name above the model, like a name tag in the world. */
+//? if <26.1 {
+    private void renderNameTag(GuiGraphics graphics) {
+//?} else {
+    private void renderNameTag(GuiGraphicsExtractor graphics) {
+//?}
+        if (playerPreviewPanel == null || playerPreviewPanel.getPlayerWidget() == null
+                || !playerPreviewPanel.getPlayerWidget().visible || this.minecraft == null) {
+            return;
+        }
+        com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
+        String name = this.minecraft.player != null
+                ? this.minecraft.player.getName().getString()
+                : this.minecraft.getUser().getName();
+        int textWidth = this.font.width(name);
+        int centerX = widget.getLayoutCenterX();
+        int top = widget.getLayoutFeetY() - (int) (widget.getEffectiveScale() * MODEL_HEIGHT_PER_SCALE) - 24;
+        graphics.fill(centerX - textWidth / 2 - 2, top - 1, centerX + (textWidth + 1) / 2 + 2, top + 9, 0x40000000);
+//? if <26.1 {
+        graphics.drawString(this.font, name, centerX - textWidth / 2, top, 0xFFFFFFFF, false);
+//?} else {
+        graphics.text(this.font, name, centerX - textWidth / 2, top, 0xFFFFFFFF, false);
+//?}
+
+        // The previewed skin's name, in grey under the name tag
+        AssetMetadata previewed = pendingHash != null ? LocalAssetManager.getInstance().getMetadata(pendingHash) : null;
+        if (previewed != null) {
+            String skinName = previewed.friendlyName();
+            int maxWidth = 160;
+            if (this.font.width(skinName) > maxWidth) {
+                skinName = this.font.plainSubstrByWidth(skinName, maxWidth - this.font.width("...")) + "...";
+            }
+            int skinNameWidth = this.font.width(skinName);
+//? if <26.1 {
+            graphics.drawString(this.font, skinName, centerX - skinNameWidth / 2, top + 11, 0xFFAAAAAA);
+//?} else {
+            graphics.text(this.font, skinName, centerX - skinNameWidth / 2, top + 11, 0xFFAAAAAA);
+//?}
+        }
+    }
+
+    /** The hovered skin's name and model, or what its hover button does. */
+//? if <26.1 {
+    private void renderSkinTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+//?} else {
+    private void renderSkinTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+//?}
+        if (skinListPanel == null || skinListPanel.getSkinListWidget() == null) {
+            return;
+        }
+        SkinEntry hovered = skinListPanel.getSkinListWidget().getHoveredEntry();
+        if (hovered != null) {
+            com.quickskin.mod.client.gui.GuiCompat.tooltip(graphics, this.font, hovered.tooltipLines(), mouseX, mouseY);
+        }
     }
 
     public void setOpeningSubScreen(boolean opening) {
@@ -998,10 +903,31 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             return true;
         }
 //? if <1.21.9 {
-        return super.mouseClicked(mouseX, mouseY, button);
+        boolean handled = super.mouseClicked(mouseX, mouseY, button);
 //?} else {
-        return super.mouseClicked(event, focused);
+        boolean handled = super.mouseClicked(event, focused);
 //?}
+//? if >=1.21 {
+        if (!handled && button == InputConstants.MOUSE_BUTTON_LEFT && startModelRotation(mouseX, mouseY)) {
+            return true;
+        }
+//?}
+        return handled;
+    }
+
+    /** Starts turning the model when a click lands on it; returns whether it did. */
+    private boolean startModelRotation(double mouseX, double mouseY) {
+        if (playerPreviewPanel == null) {
+            return false;
+        }
+        com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
+        if (widget == null || !widget.visible || !playerPreviewPanel.isOverModelBox(mouseX, mouseY)) {
+            return false;
+        }
+        rotatingModel = true;
+        rotationDragStartX = mouseX;
+        rotationDragStartYaw = widget.getTargetYRotation();
+        return true;
     }
 
     /**
@@ -1038,6 +964,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (com.quickskin.mod.client.rendering.PlayerModelRenderer.handleDebugMouseDragged((int)mouseX, (int)mouseY, button)) {
             return true;
         }
+        if (rotatingModel && playerPreviewPanel != null && playerPreviewPanel.getPlayerWidget() != null) {
+            playerPreviewPanel.getPlayerWidget().setTargetYRotation(
+                    rotationDragStartYaw - (float) (mouseX - rotationDragStartX) * ROTATION_DRAG_SENSITIVITY);
+            return true;
+        }
 //? if <1.21.9 {
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
 //?} else {
@@ -1061,6 +992,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         // Handle debug positioning mode
         if (com.quickskin.mod.client.rendering.PlayerModelRenderer.handleDebugMouseReleased((int)mouseX, (int)mouseY, button)) {
+            return true;
+        }
+        if (rotatingModel && button == InputConstants.MOUSE_BUTTON_LEFT) {
+            rotatingModel = false;
             return true;
         }
 //? if <1.21 {
@@ -1176,147 +1111,161 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     /**
-     * Called when a skin is selected from the list
+     * Called when a skin is selected from the list: previews it. Nothing is applied until Confirm.
      */
     public void onSkinSelected(SkinEntry entry) {
-        if (playerPreviewPanel != null && entry != null) {
-            AssetMetadata metadata = entry.getMetadata();
-
-            if (metadata.isCpmModel()) {
-                // CPM model selected - tell CPM to use this model
-                // Update preview with the model icon
-                playerPreviewPanel.updateSkin(
-                        metadata,
-//? if <1.21.11 {
-                        LocalAssetManager.getInstance().getTextureLocation(metadata.hash(), TextureQuality.PREVIEW)
-//?} else {
-                        LocalAssetManager.getInstance().getTextureLocation(
-                                metadata.hash(), TextureQuality.PREVIEW)
-//?}
-                );
-                // Re-selecting Quick Skin's model while it is still the look (the menu opening on
-                // it) is no new choice: CPM already has it.
-                boolean modelIsTheLook = metadata.hash().equals(
-                        com.quickskin.mod.config.ClientConfig.getInstance().activeCpmModelHash)
-                        && com.quickskin.mod.client.compat.CpmLook.owner()
-                                == com.quickskin.mod.client.compat.CpmLook.Owner.QUICK_SKIN_MODEL;
-                if (!modelIsTheLook
-                        && !com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
-                    showError(Component.literal("Unable to select CPM model."));
-                    return;
-                }
-                // The model replaces the applied Quick Skin skin. Withdraw it here and on the
-                // server (the cape stays), or other players keep drawing the old skin.
-                if (this.minecraft != null && this.minecraft.player != null) {
-//? if <1.21 {
-                    java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
-//?} else {
-                    java.util.UUID targetUUID = this.minecraft.player.getUUID();
-//?}
-                    com.quickskin.mod.client.services.PlayerAppearanceService appearances =
-                            com.quickskin.mod.client.services.PlayerAppearanceService.getInstance();
-                    if (targetUUID != null && appearances.hasActiveSkin(targetUUID)) {
-                        appearances.applySkin(targetUUID, "", null);
-                    }
-                }
-                return;
-            }
-
-            com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-
-            // Check if this skin is already the active skin. While a CPM model is the look, the
-            // saved skin is only remembered, and choosing it applies it.
-            boolean isSkinAlreadyActive = metadata.hash().equals(config.activeSkinHash)
-                    && config.activeCpmModelHash.isEmpty()
-                    && !com.quickskin.mod.client.compat.CpmLook.owner().withholdsQuickSkinSkin();
-            // Get the model type preference for this specific skin
-//? if <1.21 {
-            String modelPreference = LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash());
-//?} else {
-            String modelType = LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash());
-//?}
-
-            // Update the model buttons to reflect this skin's preference
-//? if <1.21 {
-            // This ensures the UI correctly shows "Auto" as selected if that is the preference.
-            playerPreviewPanel.setCurrentModelType(modelPreference);
-//?} else {
-            playerPreviewPanel.setCurrentModelType(modelType);
-//?}
-
-            // Update player preview with selected skin
-            playerPreviewPanel.updateSkin(
-                    metadata,
-                    LocalAssetManager.getInstance().getTextureLocation(metadata.hash(), TextureQuality.FULL)
-            );
-
-            // Apply the change if it's a new skin selection.
-            if (!isSkinAlreadyActive) {
-                com.quickskin.mod.client.compat.CpmModelWorkflow.activateSkin(metadata.hash());
-                // Always save the active skin hash to config, regardless of being in-game.
-                // This makes the selection persist on the title screen.
-                // If in-game, apply the skin to the actual player entity.
-                if (this.minecraft != null && this.minecraft.player != null) {
-                    String skinId = "local_skin:" + metadata.hash();
-
-                    // The user's preference for "auto" is passed to the service to be saved correctly.
-//? if <1.21 {
-                    String modelForService = modelPreference;
-//?} else {
-                    String modelForService = modelType;
-//?}
-
-//? if <1.21 {
-                    // Use ReplayModHelper to get the correct player UUID (handles replay mode)
-                    java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
-                    if (targetUUID != null) {
-                        com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
-                                .applySkin(targetUUID, skinId, modelForService);
-                    }
-//?} else {
-                    com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
-                            .applySkin(this.minecraft.player.getUUID(), skinId, modelForService);
-//?}
-                }
-            }
+        if (playerPreviewPanel == null || entry == null) {
+            return;
         }
+        AssetMetadata metadata = entry.getMetadata();
+        // Re-selecting the pending skin (after a rename or refresh) keeps its pending arm width.
+        String modelType = metadata.hash().equals(pendingHash) ? pendingModelType : null;
+        previewLook(metadata, modelType);
+    }
+
+    /** Shows a skin or CPM model on the preview and makes it the pending look. */
+    private void previewLook(AssetMetadata metadata, @Nullable String modelType) {
+        pendingHash = metadata.hash();
+        if (metadata.isCpmModel()) {
+            pendingModelType = null;
+            playerPreviewPanel.previewSkin(
+                    metadata,
+                    LocalAssetManager.getInstance().getTextureLocation(metadata.hash(), TextureQuality.PREVIEW),
+                    null
+            );
+        } else {
+            // The arm width this skin was last confirmed with, unless one is already pending
+            pendingModelType = modelType != null
+                    ? modelType
+                    : LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash());
+            playerPreviewPanel.previewSkin(
+                    metadata,
+                    LocalAssetManager.getInstance().getTextureLocation(metadata.hash(), TextureQuality.FULL),
+                    pendingModelType
+            );
+        }
+        updateBodyWidthButton();
+    }
+
+    /** Body width: Auto, then Wide, then Slim, on the previewed skin only. */
+    private void cycleBodyWidth() {
+        if (pendingHash == null || pendingModelType == null || playerPreviewPanel == null) {
+            return;
+        }
+        pendingModelType = switch (PlayerPreviewPanel.normalizedModelType(pendingModelType)) {
+            case "auto" -> "classic";
+            case "classic" -> "slim";
+            default -> "auto";
+        };
+        playerPreviewPanel.previewModelType(pendingModelType);
+        updateBodyWidthButton();
+    }
+
+    private void updateBodyWidthButton() {
+        if (actionButtonsPanel == null || playerPreviewPanel == null) {
+            return;
+        }
+        String model = pendingModelType != null
+                ? PlayerPreviewPanel.normalizedModelType(pendingModelType)
+                : PlayerPreviewPanel.normalizedModelType(playerPreviewPanel.getCurrentModelType());
+        Component name = Component.translatable(switch (model) {
+            case "auto" -> "quickskin.preview.model.auto";
+            case "slim" -> "quickskin.preview.model.slim";
+            default -> "quickskin.preview.model.wide";
+        });
+        boolean selectable = pendingHash != null && pendingModelType != null && !playerPreviewPanel.isCpmLook();
+        actionButtonsPanel.updateBodyWidth(name, selectable);
+    }
+
+    /** Confirm: applies the previewed look and closes the menu. */
+    private void confirmSelection() {
+        applySelection();
+        onClose();
     }
 
     /**
-     * Called when model type is changed via the model buttons
+     * Applies the pending look exactly as choosing it in the list used to: a CPM model through CPM,
+     * a skin and its arm width to the player and the saved selection.
      */
-    private void onModelTypeChanged(String newModelType) {
-        // Get the currently selected skin entry
-        SkinEntry selectedEntry = skinListPanel != null ? skinListPanel.getSelected() : null;
+    private void applySelection() {
+        if (pendingHash == null) {
+            return;
+        }
+        AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(pendingHash);
+        if (metadata == null) {
+            return;
+        }
 
-        if (selectedEntry != null) {
-            AssetMetadata metadata = selectedEntry.getMetadata();
-            if (metadata.isCpmModel()) {
+        if (metadata.isCpmModel()) {
+            // Re-selecting Quick Skin's model while it is still the look (the menu opening on
+            // it) is no new choice: CPM already has it.
+            boolean modelIsTheLook = metadata.hash().equals(
+                    com.quickskin.mod.config.ClientConfig.getInstance().activeCpmModelHash)
+                    && com.quickskin.mod.client.compat.CpmLook.owner()
+                            == com.quickskin.mod.client.compat.CpmLook.Owner.QUICK_SKIN_MODEL;
+            if (!modelIsTheLook
+                    && !com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
+                showError(Component.literal("Unable to select CPM model."));
                 return;
             }
-            String skinId = "local_skin:" + metadata.hash();
-
-            // Save the model type preference for THIS SPECIFIC SKIN
-            LocalAssetManager.getInstance().setSkinModelPreference(metadata.hash(), newModelType);
-            // Like a skin selection, this choice outranks a server record not seen yet.
-            com.quickskin.mod.config.AccountSkinSession.getInstance().selected();
-
-            // Apply to the actual player in-game (if in-game)
+            // The model replaces the applied Quick Skin skin. Withdraw it here and on the
+            // server (the cape stays), or other players keep drawing the old skin.
             if (this.minecraft != null && this.minecraft.player != null) {
 //? if <1.21 {
-                // Use ReplayModHelper to get the correct player UUID (handles replay mode)
                 java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
-                if (targetUUID != null) {
-                    // Pass the model type directly - ModelService will handle "auto" detection
-                    com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
-                            .applySkin(targetUUID, skinId, newModelType);
-                }
 //?} else {
-                // Pass the model type directly - ModelService will handle "auto" detection
-                com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
-                        .applySkin(this.minecraft.player.getUUID(), skinId, newModelType);
+                java.util.UUID targetUUID = this.minecraft.player.getUUID();
 //?}
+                com.quickskin.mod.client.services.PlayerAppearanceService appearances =
+                        com.quickskin.mod.client.services.PlayerAppearanceService.getInstance();
+                if (targetUUID != null && appearances.hasActiveSkin(targetUUID)) {
+                    appearances.applySkin(targetUUID, "", null);
+                }
             }
+            return;
+        }
+
+        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+
+        // Check if this skin is already the active skin. While a CPM model is the look, the
+        // saved skin is only remembered, and choosing it applies it.
+        boolean isSkinAlreadyActive = metadata.hash().equals(config.activeSkinHash)
+                && config.activeCpmModelHash.isEmpty()
+                && !com.quickskin.mod.client.compat.CpmLook.owner().withholdsQuickSkinSkin();
+
+        // The arm width is saved for this specific skin; "auto" is saved as the user's preference.
+        String modelType = pendingModelType != null
+                ? pendingModelType
+                : LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash());
+        boolean modelChanged = !modelType.equals(
+                LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash()));
+        if (modelChanged) {
+            LocalAssetManager.getInstance().setSkinModelPreference(metadata.hash(), modelType);
+            // Like a skin selection, this choice outranks a server record not seen yet.
+            com.quickskin.mod.config.AccountSkinSession.getInstance().selected();
+        }
+
+        if (isSkinAlreadyActive && !modelChanged) {
+            return;
+        }
+        if (!isSkinAlreadyActive) {
+            com.quickskin.mod.client.compat.CpmModelWorkflow.activateSkin(metadata.hash());
+        }
+        // The skin is saved to config even outside a world, so the selection persists on the
+        // title screen. In a world it is also applied to the player entity.
+        if (this.minecraft != null && this.minecraft.player != null) {
+            String skinId = "local_skin:" + metadata.hash();
+//? if <1.21 {
+            // Use ReplayModHelper to get the correct player UUID (handles replay mode)
+            java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
+            if (targetUUID != null) {
+                com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
+                        .applySkin(targetUUID, skinId, modelType);
+            }
+//?} else {
+            com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
+                    .applySkin(this.minecraft.player.getUUID(), skinId, modelType);
+//?}
         }
     }
 
@@ -1543,15 +1492,25 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 );
             }
 
+            boolean wasApplied = metadata.hash().equals(config.activeSkinHash);
+            if (metadata.hash().equals(pendingHash)) {
+                pendingHash = null;
+                pendingModelType = null;
+            }
+
             // Refresh the asset manager and skin list
             LocalAssetManager.getInstance().discoverLocalAssets();
             refreshSkinList();
 
-            // Auto-select the player's own skin after deletion
+            // Preview the player's own skin after deletion. Deleting the skin that is worn applies
+            // the own skin straight away, so the look never names a file that no longer exists.
             if (!config.playerOwnSkinHash.isEmpty() && skinListPanel != null) {
                 AssetMetadata playerOwnSkin = LocalAssetManager.getInstance().getMetadata(config.playerOwnSkinHash);
                 if (playerOwnSkin != null) {
                     skinListPanel.setSelected(playerOwnSkin, true);
+                    if (wasApplied) {
+                        applySelection();
+                    }
                 }
             }
 

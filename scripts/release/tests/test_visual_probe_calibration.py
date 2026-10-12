@@ -24,11 +24,13 @@ from generate_e2e_cape_fixture import generate as generate_cape_fixture  # noqa:
 # canary for the known 1600x900 Minecraft UI geometry. An intentional oracle change must update
 # both the contract and this independently reviewed reference.
 TEXT_CANARY = {
+    # The menu has no panel: the "Skins N/M" counter heads the left skin column, and the
+    # player's name tag ("Alice") sits above the centred model. A real 1920-wide frame of the
+    # counter keeps about 320 glyph pixels above luma 175 after the 1600x900 resize, and a nine
+    # letter name about 310, so Alice's five letters clear 100 with room to spare.
     ("full", "client_a", "skin_menu_screen"): (
-        ("skin catalog labels", (480, 195, 850, 300), 175, 500),
-        # The E2E import guarantees one entry; the offline Alice skin may add a second. The
-        # drop-zone centers in the remaining list area, so its copy has two legitimate Y offsets.
-        ("skin drop-zone instructions", (560, 440, 745, 523), 175, 300),
+        ("skin column counter", (12, 64, 98, 90), 175, 200),
+        ("player name tag", (680, 182, 920, 206), 175, 100),
     ),
     ("full", "client_a", "cape_menu_screen"): (
         ("cape menu title", (590, 100, 735, 140), 159, 174),
@@ -64,16 +66,17 @@ TEXT_CANARY = {
         ("server transparency setting label", (305, 234, 780, 268), 175, 1300),
         ("non-admin server notice", (495, 655, 1105, 688), 175, 1700),
     ),
-    # The disabled label is dimmer than ordinary GUI text; both lanes retain 342
-    # glyph pixels above luma 127 for the observed three-digit countdown.
+    # The disabled label is dimmer than ordinary GUI text; both lanes retained 342
+    # glyph pixels above luma 127 for the observed three-digit countdown. The label now sits on
+    # the bottom-centre Confirm button.
     ("server-policy", "client_a", "cooldown_skin_menu"): (
-        ("cooldown button label", (712, 770, 889, 798), 127, 240),
+        ("cooldown button label", (700, 856, 900, 884), 127, 240),
     ),
 }
 
 OPAQUE_STARS_CANARY = (
     ("full", "client_a", "skin_menu_screen"),
-    (0.03, 0.20, 0.20, 0.80),
+    (0.10, 0.10, 0.26, 0.45),
     32.0,
     64,
     0.10,

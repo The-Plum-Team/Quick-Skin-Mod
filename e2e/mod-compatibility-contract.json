@@ -1103,8 +1103,8 @@
         "apply_local_skin_with_mod": "The paired Quick Skin menu remains intact with the same blue head, green torso, red right arm, purple left arm, gold right leg, and teal left leg. Bright raised voxels must stay rooted on and aligned with their matching head, torso, arm, or leg and follow the same pose; detached, floating, swapped, or splayed clusters are a failure. Transparent gaps expose the intact base model and visible voxel depth distinguishes the outer layer from a flat recolour."
       },
       "review_regions": {
-        "baseline_with_mod": [[0.55, 0.15, 0.8, 0.9]],
-        "apply_local_skin_with_mod": [[0.55, 0.15, 0.8, 0.9]]
+        "baseline_with_mod": [[0.38, 0.2, 0.62, 0.92]],
+        "apply_local_skin_with_mod": [[0.38, 0.2, 0.62, 0.92]]
       },
       "reference_captures": {
         "baseline_with_mod": "full.client_a.skin_menu_screen",

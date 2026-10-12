@@ -23,6 +23,9 @@ import java.util.function.Consumer;
  */
 public class SkinListPanel extends AbstractWidget {
 
+    /** Row height of the skin column: a 40px tile plus vanilla's 4px row padding. */
+    public static final int ENTRY_HEIGHT = 44;
+
     @Nullable
     private SkinListWidget skinListWidget;
 
@@ -49,7 +52,7 @@ public class SkinListPanel extends AbstractWidget {
             //? if >=1.21 {
             getX(), // X position
             //?}
-            40 // Entry height - matches original
+            ENTRY_HEIGHT // A 40px tile plus vanilla row padding
         );
         //? if <1.21 {
         skinListWidget.setLeftPos(getX());
@@ -141,6 +144,17 @@ public class SkinListPanel extends AbstractWidget {
             return null;
         }
         return skinListWidget.getSelected();
+    }
+
+    /** Number of skins in the column. */
+    public int size() {
+        return skinListWidget == null ? 0 : skinListWidget.children().size();
+    }
+
+    /** One-based position of the selected skin, or 0 when none is selected. */
+    public int selectedPosition() {
+        SkinEntry selected = getSelected();
+        return selected == null || skinListWidget == null ? 0 : skinListWidget.children().indexOf(selected) + 1;
     }
 
     @Override

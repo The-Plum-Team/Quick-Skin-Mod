@@ -201,6 +201,17 @@
   "quickskin.file_picker.import": "Importar (%s)",
   "quickskin.file_picker.access_hint": "¿Falta un archivo? Cópialo a la carpeta del juego.",
 
+  "quickskin.button.confirm": "Confirmar",
+  "quickskin.button.edit_skin": "Editar skin",
+  "quickskin.button.skin_websites": "Webs de skins",
+  "quickskin.button.website_normal": "Normal",
+  "quickskin.button.website_hd": "HD",
+  "quickskin.menu.skins_count": "Skins %s/%s",
+  "quickskin.menu.body_width": "Cuerpo: %s",
+  "quickskin.preview.model.auto": "Auto",
+  "quickskin.tooltip.body_width": "Ancho de brazos de la skin previsualizada",
+  "quickskin.tooltip.coming_soon": "Próximamente",
+  "quickskin.tooltip.import_skin": "Importar una skin (o suelta archivos en cualquier parte)",
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Aspecto rápido] Tu aspecto (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no lo ven.",
   "quickskin.network.upload_too_large.cape": "[Aspecto rápido] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven."

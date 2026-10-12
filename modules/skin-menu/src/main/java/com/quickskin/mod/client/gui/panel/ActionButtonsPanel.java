@@ -8,87 +8,151 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 //?}
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 
 /**
- * Panel that manages the action buttons at the bottom of the screen
- * (Import, HD Skin Website, Skin Website, Cape, Done)
+ * The buttons that float around the player model, and Confirm below it.
+ *
+ * <p>Body width and Edit skin sit at shoulder height, Skin websites and Cape at the waist, left and
+ * right of the model. Skin websites unfolds a Normal and an HD button below itself. This panel
+ * draws nothing; it only places the buttons.
  */
 public class ActionButtonsPanel extends AbstractWidget {
 
-    private static final int SPACING = 4;
-    private static final int COMPONENT_HEIGHT = 20;
+    public static final int BUTTON_WIDTH = 104;
+    public static final int BUTTON_HEIGHT = 20;
+    public static final int CONFIRM_WIDTH = 160;
+    private static final int SPACING = 2;
 
-    private Button doneButton;
+    private Button bodyWidthButton;
+    private Button editSkinButton;
+    private Button websitesButton;
+    private Button normalWebsiteButton;
+    private Button hdWebsiteButton;
+    private Button capeButton;
+    private Button confirmButton;
+    private boolean websitesOpen;
 
     /**
      * Callbacks for button actions
      */
     public record ActionCallbacks(
-        Runnable onImport,
-        Runnable onHdSkinWebsite,
+        Runnable onBodyWidth,
         Runnable onSkinWebsite,
+        Runnable onHdSkinWebsite,
         Runnable onCape,
-        Runnable onDone
+        Runnable onConfirm
     ) {}
 
-    public ActionButtonsPanel(int x, int y, int width, int height, ActionCallbacks callbacks) {
-        super(x, y, width, height, Component.empty());
+    /**
+     * Where the buttons go: the left and right column x, the shoulder and waist rows, and the
+     * top-left corner of Confirm.
+     */
+    public record Layout(int leftX, int rightX, int shoulderY, int waistY, int confirmX, int confirmY) {}
+
+    public ActionButtonsPanel(Layout layout) {
+        super(layout.leftX(), layout.shoulderY(), layout.rightX() + BUTTON_WIDTH - layout.leftX(),
+                layout.confirmY() + BUTTON_HEIGHT - layout.shoulderY(), Component.empty());
     }
 
     /**
      * Initialize the panel and create all child widgets
      */
-    public void init(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen, ActionCallbacks callbacks) {
-        int fullWidthX = getX();
-        int fullComponentWidth = width;
-        int bottomY = getY() + height;
-
-        // Row 1 (Bottom-most): Done Button (full width)
-        bottomY -= COMPONENT_HEIGHT;
-        this.doneButton = ButtonFactory.createPrimary(
-            fullWidthX, bottomY, fullComponentWidth, COMPONENT_HEIGHT,
-            Component.translatable("quickskin.button.done"),
-            button -> callbacks.onDone.run()
+    public void init(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen, Layout layout,
+                     ActionCallbacks callbacks) {
+        bodyWidthButton = ButtonFactory.createStyled(
+            layout.leftX(), layout.shoulderY(), BUTTON_WIDTH, BUTTON_HEIGHT,
+            Component.empty(),
+            button -> callbacks.onBodyWidth().run()
         );
-        screen.registerWidget(this.doneButton);
+        bodyWidthButton.setTooltip(Tooltip.create(Component.translatable("quickskin.tooltip.body_width")));
+        screen.registerWidget(bodyWidthButton);
 
-        // Row 2: Import, HD Skin, Skin, Cape Buttons (4 equal width buttons)
-        bottomY -= (COMPONENT_HEIGHT + SPACING);
-        int fourButtonWidth = (fullComponentWidth - (SPACING * 3)) / 4;
-
-        Button importButton = ButtonFactory.createStyled(
-            fullWidthX, bottomY, fourButtonWidth, COMPONENT_HEIGHT,
-            Component.translatable("quickskin.button.import_skin"),
-            button -> callbacks.onImport.run()
+        // There is no skin editor yet; the button keeps its place in the layout.
+        editSkinButton = ButtonFactory.createStyled(
+            layout.rightX(), layout.shoulderY(), BUTTON_WIDTH, BUTTON_HEIGHT,
+            Component.translatable("quickskin.button.edit_skin"),
+            button -> { }
         );
-        screen.registerWidget(importButton);
+        editSkinButton.active = false;
+        editSkinButton.setTooltip(Tooltip.create(Component.translatable("quickskin.tooltip.coming_soon")));
+        screen.registerWidget(editSkinButton);
 
-        Button hdSkinWebsiteButton = ButtonFactory.createStyled(
-            fullWidthX + fourButtonWidth + SPACING, bottomY, fourButtonWidth, COMPONENT_HEIGHT,
-            Component.translatable("quickskin.button.hd_skin_website"),
-            button -> callbacks.onHdSkinWebsite.run()
+        websitesButton = ButtonFactory.createStyled(
+            layout.leftX(), layout.waistY(), BUTTON_WIDTH, BUTTON_HEIGHT,
+            Component.translatable("quickskin.button.skin_websites"),
+            button -> setWebsitesOpen(!websitesOpen)
         );
-        screen.registerWidget(hdSkinWebsiteButton);
+        screen.registerWidget(websitesButton);
 
-        Button skinWebsiteButton = ButtonFactory.createStyled(
-            fullWidthX + (fourButtonWidth + SPACING) * 2, bottomY, fourButtonWidth, COMPONENT_HEIGHT,
-            Component.translatable("quickskin.button.skin_website"),
-            button -> callbacks.onSkinWebsite.run()
+        int halfWidth = (BUTTON_WIDTH - SPACING) / 2;
+        int choiceY = layout.waistY() + BUTTON_HEIGHT + SPACING;
+        normalWebsiteButton = ButtonFactory.createStyled(
+            layout.leftX(), choiceY, halfWidth, BUTTON_HEIGHT,
+            Component.translatable("quickskin.button.website_normal"),
+            button -> {
+                setWebsitesOpen(false);
+                callbacks.onSkinWebsite().run();
+            }
         );
-        screen.registerWidget(skinWebsiteButton);
+        normalWebsiteButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.skin_website")));
+        screen.registerWidget(normalWebsiteButton);
 
-        Button capeButton = ButtonFactory.createStyled(
-            fullWidthX + (fourButtonWidth + SPACING) * 3, bottomY, fourButtonWidth, COMPONENT_HEIGHT,
+        hdWebsiteButton = ButtonFactory.createStyled(
+            layout.leftX() + BUTTON_WIDTH - halfWidth, choiceY, halfWidth, BUTTON_HEIGHT,
+            Component.translatable("quickskin.button.website_hd"),
+            button -> {
+                setWebsitesOpen(false);
+                callbacks.onHdSkinWebsite().run();
+            }
+        );
+        hdWebsiteButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.hd_skin_website")));
+        screen.registerWidget(hdWebsiteButton);
+
+        capeButton = ButtonFactory.createStyled(
+            layout.rightX(), layout.waistY(), BUTTON_WIDTH, BUTTON_HEIGHT,
             Component.translatable("quickskin.button.cape"),
-            button -> callbacks.onCape.run()
+            button -> callbacks.onCape().run()
         );
         screen.registerWidget(capeButton);
+
+        confirmButton = ButtonFactory.createPrimary(
+            layout.confirmX(), layout.confirmY(), CONFIRM_WIDTH, BUTTON_HEIGHT,
+            Component.translatable("quickskin.button.confirm"),
+            button -> callbacks.onConfirm().run()
+        );
+        screen.registerWidget(confirmButton);
+
+        setWebsitesOpen(false);
     }
 
-    public Button getDoneButton() {
-        return this.doneButton;
+    private void setWebsitesOpen(boolean open) {
+        websitesOpen = open;
+        normalWebsiteButton.visible = open;
+        normalWebsiteButton.active = open;
+        hdWebsiteButton.visible = open;
+        hdWebsiteButton.active = open;
+    }
+
+    /** Shows the previewed arm width on the Body width button; CPM models have none to choose. */
+    public void updateBodyWidth(Component modelName, boolean selectable) {
+        if (bodyWidthButton == null) {
+            return;
+        }
+        bodyWidthButton.setMessage(Component.translatable("quickskin.menu.body_width", modelName));
+        bodyWidthButton.active = selectable;
+    }
+
+    /** Every button this panel places, for keeping the model from taking their clicks. */
+    public java.util.List<Button> buttons() {
+        return java.util.List.of(bodyWidthButton, editSkinButton, websitesButton,
+                normalWebsiteButton, hdWebsiteButton, capeButton, confirmButton);
+    }
+
+    public Button getConfirmButton() {
+        return this.confirmButton;
     }
 
     @Override

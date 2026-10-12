@@ -14,13 +14,15 @@ import net.minecraft.client.gui.components.ContainerObjectSelectionList;
 import net.minecraft.network.chat.Component;
 
 /**
- * Scrollable list widget for displaying available skins
+ * Scrollable column of skin tiles on the left of the skin menu
  */
 @Environment(EnvType.CLIENT)
 public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
 
     private final PlayerSkinMenuScreen parentScreen;
     private final Minecraft mc;
+    @org.jetbrains.annotations.Nullable
+    private SkinEntry hoveredEntry;
     //? if >=1.21 {
     private int xPosition;
     private final int itemHeight;
@@ -78,7 +80,59 @@ public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
 
     @Override
     public int getRowWidth() {
-        return this.width - 8;
+        return SkinEntry.rowWidth(entryTileSize());
+    }
+
+    /** The square tile size of one entry: the row height less vanilla's row padding. */
+    public int entryTileSize() {
+        //? if <1.21 {
+        return this.itemHeight - 4;
+        //?} else {
+        return itemHeight - 4;
+        //?}
+    }
+
+    /** Where a row after the last one would start, scrolled with the list: the import tile's place. */
+    public int contentBottom() {
+        return this.getRowTop(this.getItemCount());
+    }
+
+    //? if <1.21 {
+    @Override
+    public int getRowLeft() {
+        return this.x0 + 4;
+    }
+    //?} else if <26.1 {
+
+    // The column floats over the menu background: no list backdrop or header/footer separators.
+    @Override
+    protected void renderListBackground(GuiGraphics graphics) {
+    }
+
+    @Override
+    protected void renderListSeparators(GuiGraphics graphics) {
+    }
+    //?} else {
+
+    // The column floats over the menu background: no list backdrop or header/footer separators.
+    @Override
+    protected void extractListBackground(GuiGraphicsExtractor graphics) {
+    }
+
+    @Override
+    protected void extractListSeparators(GuiGraphicsExtractor graphics) {
+    }
+    //?}
+
+    /** Records the entry under the mouse this frame, for the screen's tooltip. */
+    void setHoveredEntry(SkinEntry entry) {
+        this.hoveredEntry = entry;
+    }
+
+    /** The entry the mouse was over in the last drawn frame, or {@code null}. */
+    @org.jetbrains.annotations.Nullable
+    public SkinEntry getHoveredEntry() {
+        return hoveredEntry;
     }
 
     @Override
@@ -98,6 +152,7 @@ public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
     @Override
     //? if <1.21 {
     protected void renderList(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        hoveredEntry = null;
         super.renderList(graphics, mouseX, mouseY, partialTicks);
     //?} else {
     public int getX() {
@@ -112,114 +167,16 @@ public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
     @Override
         //? if <26.1 {
     public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        hoveredEntry = null;
         super.renderWidget(graphics, mouseX, mouseY, partialTicks);
         //?} else {
     public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTicks) {
+        hoveredEntry = null;
         // Call parent to render the list entries
         super.extractWidgetRenderState(graphics, mouseX, mouseY, partialTicks);
         //?}
     //?}
 
-        // Show drop zone if list is mostly empty
-        if (this.getItemCount() <= 2) {
-            //? if <1.21 {
-            int rowTop = this.getItemCount() > 0 ? this.getRowTop(this.getItemCount() - 1) + this.itemHeight : this.y0;
-            int areaTop = Math.max(rowTop, this.y0);
-            int areaBottom = this.y1;
-            //?} else {
-            int rowTop = this.getItemCount() > 0 ? this.getRowTop(this.getItemCount() - 1) + this.itemHeight : this.getY();
-            int areaTop = Math.max(rowTop, this.getY());
-            int areaBottom = this.getBottom();
-            //?}
-
-            // Only draw if there's enough empty space
-            if (areaBottom - areaTop > 60) {
-                int areaLeft = this.getRowLeft();
-                int areaWidth = this.getRowWidth();
-                int centerX = areaLeft + areaWidth / 2;
-                int centerY = areaTop + (areaBottom - areaTop) / 2;
-
-                // Calculate drop zone bounds with padding
-                int zoneWidth = Math.min(areaWidth - 40, 300);
-                int zoneHeight = Math.min(areaBottom - areaTop - 40, 140);
-                int zoneX = centerX - zoneWidth / 2;
-                int zoneY = centerY - zoneHeight / 2;
-
-                // Check if mouse is hovering over the drop zone
-                boolean isHovering = mouseX >= zoneX && mouseX <= zoneX + zoneWidth &&
-                                    mouseY >= zoneY && mouseY <= zoneY + zoneHeight;
-
-                // Draw drop zone background with hover effect
-                int bgColor = isHovering ? 0x1AFFFFFF : 0x0FFFFFFF;
-                graphics.fill(zoneX, zoneY, zoneX + zoneWidth, zoneY + zoneHeight, bgColor);
-
-                // Draw dashed border
-                drawDashedBorder(graphics, zoneX, zoneY, zoneWidth, zoneHeight, isHovering);
-
-                // Draw text centered in the zone
-                Component mainMessage = Component.translatable("quickskin.dropzone.skins.main");
-                Component subMessage = Component.translatable("quickskin.dropzone.skins.sub");
-
-                //? if <1.21.11 {
-                int mainColor = isHovering ? 0xFFFFFFFF : 0xFFE0E0E0;
-                int subColor = isHovering ? 0xFFB0B0B0 : 0xFF909090;
-                //?} else {
-                int mainColor = isHovering ? 0xFFFFFFFF : 0xFFE0E0E0;
-                int subColor = isHovering ? 0xFFB0B0B0 : 0xFF909090;
-                //?}
-
-                //? if <26.1 {
-                graphics.drawCenteredString(mc.font, mainMessage,
-                //?} else {
-                graphics.centeredText(mc.font, mainMessage,
-                //?}
-                    centerX, centerY - mc.font.lineHeight - 2, mainColor);
-                //? if <26.1 {
-                graphics.drawCenteredString(mc.font, subMessage,
-                //?} else {
-                graphics.centeredText(mc.font, subMessage,
-                //?}
-                    centerX, centerY + 2, subColor);
-            }
-        }
-    }
-
-    /**
-     * Draws a dashed border around the drop zone
-     */
-    //? if <26.1 {
-    private void drawDashedBorder(GuiGraphics graphics, int x, int y, int width, int height, boolean highlight) {
-    //?} else {
-    private void drawDashedBorder(GuiGraphicsExtractor graphics, int x, int y, int width, int height, boolean highlight) {
-    //?}
-        int color = highlight ? 0xFFFFFFFF : 0x80FFFFFF;
-        int dashLength = 8;
-        int gapLength = 4;
-        int totalLength = dashLength + gapLength;
-
-        // Top border
-        for (int i = 0; i < width; i += totalLength) {
-            int segmentLength = Math.min(dashLength, width - i);
-            graphics.fill(x + i, y, x + i + segmentLength, y + 1, color);
-        }
-
-        // Bottom border
-        for (int i = 0; i < width; i += totalLength) {
-            int segmentLength = Math.min(dashLength, width - i);
-            graphics.fill(x + i, y + height - 1, x + i + segmentLength, y + height, color);
-        }
-
-        // Left border
-        for (int i = 0; i < height; i += totalLength) {
-            int segmentLength = Math.min(dashLength, height - i);
-            graphics.fill(x, y + i, x + 1, y + i + segmentLength, color);
-        }
-
-        // Right border
-        for (int i = 0; i < height; i += totalLength) {
-            int segmentLength = Math.min(dashLength, height - i);
-            graphics.fill(x + width - 1, y + i, x + width, y + i + segmentLength, color);
-        }
     }
 
     /**
