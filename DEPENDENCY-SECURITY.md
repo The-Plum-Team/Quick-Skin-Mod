@@ -75,7 +75,7 @@ reason. Exactly five trusted-artifact rules cover those local outputs:
 |---|---|---|
 | `^remapped[.].+$` | any | Loom-remapped mod/API modules |
 | `^loom$` | `^mappings$` | Loom layered mappings |
-| `^net[.]minecraft$` | exact Loom merged Minecraft, Forge, or NeoForge name shapes, optionally ending in `-deobf` | Loom merged game modules |
+| `^net[.]minecraft$` | exact Loom merged Minecraft, Forge, or NeoForge name shapes, optionally ending in `-deobf` or in Loom's 10-hex project-processing hash | Loom merged game modules |
 | `^net[.]minecraftforge[.][0-9a-f]{64}$` | `^fmlloader$` | Loom transformed Forge loader |
 | `^net[.]neoforged[.]fancymodloader[.][0-9a-f]{64}$` | `^loader$` | Loom transformed NeoForge loader |
 
@@ -89,6 +89,15 @@ The optional `-deobf` suffix is required by Loom's unobfuscated NeoForge path: t
 are rebuilt locally and are intentionally nondeterministic, so recording a generated checksum
 would make identical clean CI runs disagree. The trust rule remains confined to the synthetic
 `net.minecraft` coordinate shape and does not cover any publisher artifact.
+The optional lowercase 10-hex suffix (`-[0-9a-f]{10}`, never combined with `-deobf`) is Loom's
+project-processed Forge/NeoForge game JAR, for example
+`neoforge-26.1.1.15-beta-minecraft-merged-df325f964f`. Loom writes it only into the project's own
+`.gradle/loom-cache/minecraftMaven` file repository (`LoomLocalMinecraft`) when it applies the
+project's `META-INF/accesstransformer.cfg`. The NeoForge 26.1 and 26.1.1 overlay ships that file
+into generated resources, so a clean first build still resolves the shared merged JAR while the
+release workflow's `--rerun-tasks` rebuild of the same checkout resolves the processed one. It is
+the same suffix shape the Fabric `minecraft-merged-<hash>` alternative already accepts, and the
+`-beta` loader versions were already covered by the version part of the rule.
 
 Gradle dependency verification does not cover the wrapper download or arbitrary downloads made
 outside Gradle's dependency engine. The wrapper has its separate checksum. Packaged-E2E installer
