@@ -34,12 +34,13 @@ def job_display_name(workflow: str, job: str) -> str:
     return match.group(1)
 
 
-def ready_display_name(name: str) -> str:
-    """A gate named for draft deferral reports its fallback context in every non-draft run."""
+def ready_display_names(name: str) -> tuple[str, str]:
+    """A gate named for draft deferral and for the gate App's required context: its ready name on
+    a pull request to master, then the name every other run reports."""
     match = re.fullmatch(
-        r"\$\{\{ github\.event\.pull_request\.draft && github\.event\.pull_request\.base\.ref == "
-        r"'master' && '[^']+' \|\| '([^']+)' \}\}", name)
-    return match.group(1) if match else name
+        r"\$\{\{ github\.event\.pull_request\.base\.ref == 'master' && "
+        r"\(github\.event\.pull_request\.draft && '[^']+' \|\| '([^']+)'\) \|\| '([^']+)' \}\}", name)
+    return (match.group(1), match.group(2)) if match else (name, name)
 
 
 class E2EJobNamesTest(unittest.TestCase):
@@ -54,9 +55,10 @@ class E2EJobNamesTest(unittest.TestCase):
         )
         self.assertEqual(graph.BUILD_JOB, job_display_name("on-demand-e2e.yml", "build"))
         self.assertEqual(
-            graph.GATE_JOB,
-            ready_display_name(job_display_name("on-demand-e2e.yml", "required-gate")),
+            (graph.NATIVE_GATE_JOB, graph.GATE_JOB),
+            ready_display_names(job_display_name("on-demand-e2e.yml", "required-gate")),
         )
+        self.assertEqual(graph.GATE_JOBS, (graph.GATE_JOB, graph.NATIVE_GATE_JOB))
         self.assertEqual(
             "${{ matrix.id }}" + graph.SCENARIO_SUFFIX,
             job_display_name("on-demand-e2e.yml", "e2e"),
@@ -77,6 +79,7 @@ class E2EJobNamesTest(unittest.TestCase):
     def test_visual_review_pins_the_exact_evaluator_literals(self) -> None:
         visual = (WORKFLOWS / "visual-review.yml").read_text(encoding="utf-8")
         self.assertIn(f'.name == "{graph.GATE_JOB}"', visual)
+        self.assertIn(f'(.name == "{graph.GATE_JOB}" or .name == "{graph.NATIVE_GATE_JOB}")', visual)
         self.assertIn(f'endswith("{graph.SCENARIO_SUFFIX}")', visual)
         self.assertIn(f'sub("{graph.SCENARIO_SUFFIX}$"; "")', visual)
         # The attestation fallback matches the caller job name prefix because the attest job

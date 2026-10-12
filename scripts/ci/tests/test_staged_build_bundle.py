@@ -54,6 +54,16 @@ class StagedBuildBundleTest(unittest.TestCase):
     def find(self, api=None, source=None, **kwargs):
         return bundle.find_bundle(api or self.api, source or self.source, wait_seconds=0, **kwargs)
 
+    def test_the_native_gate_name_of_a_pull_request_proves_the_same_bundle(self):
+        # Q7: the gate App reports "Build and verify" on a pull request to master, so the native
+        # gate there is "Native Build and verify"; it proves the bundle alone, never beside the other.
+        self.api.job = {**self.api.job, "name": bundle.NATIVE_GATE_JOB}
+        self.assertEqual(20, self.find()["artifact_id"])
+        both = [self.api.job, {**self.api.job, "name": bundle.GATE_JOB}]
+        self.api.jobs = lambda run: [{"jobs": both}]
+        with self.assertRaisesRegex(ValueError, "required gate"):
+            self.find()
+
     def test_pr_authenticates_head_and_bundle_but_keeps_the_distinct_tested_merge(self):
         result = self.find()
         self.assertEqual({"run_id": 10, "artifact_id": 20, "tested_commit": "b" * 40,
@@ -88,7 +98,8 @@ class StagedBuildBundleTest(unittest.TestCase):
 
     def test_job_names_match_the_build_gate_workflow(self):
         workflow = (Path(__file__).resolve().parents[3] / bundle.WORKFLOW).read_text(encoding="utf-8")
-        self.assertIn(f"&& '{bundle.DRAFT_JOB}' || '{bundle.GATE_JOB}' }}}}", workflow)
+        self.assertIn(f"&& '{bundle.DRAFT_JOB}' || '{bundle.NATIVE_GATE_JOB}') || '{bundle.GATE_JOB}' }}}}",
+                      workflow)
 
     def test_a_deferred_draft_build_never_supplies_a_bundle(self):
         deferred = {"name": bundle.DRAFT_JOB, "status": "completed", "conclusion": "success"}
