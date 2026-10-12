@@ -60,6 +60,14 @@ jobs:
             printf 'This checkout does not own the protected shared source.\n'
             exit 0
           fi
+          # Background quota guard: below the reserve the next hourly sweep retries.
+          source scripts/ci/github_api_retry.sh
+          admission_status=0
+          github_api_background_admission "visual review wake recovery" || admission_status=$?
+          if [[ "$admission_status" -eq 75 ]]; then
+            exit 0
+          fi
+          [[ "$admission_status" -eq 0 ]]
           python3 scripts/ci/visual_review_wake.py \
             --github-repository "$GITHUB_REPOSITORY" --source-sha "$GITHUB_SHA" \
             --github-output "$GITHUB_OUTPUT"

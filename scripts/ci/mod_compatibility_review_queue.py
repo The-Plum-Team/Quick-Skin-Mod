@@ -47,6 +47,9 @@ DEFAULT_CALL_SPACING_SECONDS = 2
 MAX_PARALLEL_CALLS = 32
 MAX_CALL_SPACING_SECONDS = 30
 MAX_BATCH_LANES = 64
+# A recovery sweep that finds a stranded backlog (no review run queued or running) requests at
+# most this many oldest pending sources at once, as their own producers would have done.
+MAX_PENDING_FANOUT = 32
 
 
 class AdmissionError(QueueError):
@@ -252,6 +255,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository")
     parser.add_argument("--github-output", type=Path)
+    parser.add_argument("--pending-json", type=Path)
     parser.add_argument("--admit-matrix", type=Path)
     parser.add_argument("--call-budget", type=int, default=DEFAULT_CALL_BUDGET)
     parser.add_argument(
@@ -266,7 +270,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         if args.admit_matrix is not None:
-            if args.repository is not None or args.github_output is not None:
+            if (
+                args.repository is not None
+                or args.github_output is not None
+                or args.pending_json is not None
+            ):
                 raise AdmissionError(
                     "matrix admission cannot select a repository queue"
                 )
@@ -296,6 +304,21 @@ def main(argv: list[str] | None = None) -> int:
             api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
         )
         pending = list_pending(api, repository=repository)
+        if args.pending_json is not None:
+            with args.pending_json.open("x", encoding="utf-8") as output:
+                json.dump(
+                    [
+                        {
+                            "source_run_id": entry.source_run_id,
+                            "source_sha": entry.source_sha,
+                        }
+                        for entry in pending[:MAX_PENDING_FANOUT]
+                    ],
+                    output,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+                output.write("\n")
         with args.github_output.open("a", encoding="utf-8") as output:
             if not pending:
                 output.write("eligible=false\n")

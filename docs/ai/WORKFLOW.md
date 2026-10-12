@@ -133,6 +133,24 @@ deltas.
   otherwise-successful owner converges through hourly/manual recovery, not an immediate echo.
   Report scheduled recovery overhead separately from suppressed collector starts; see
   [baseline request coalescing](../ci/BASELINE-REQUESTS.md).
+- Background work must not starve the required gates of the shared repository API budget. Before
+  spending it, the visual-review drain selection, the visual-review wake recovery, the
+  feature-coverage recovery, the compatibility review recovery and the compatibility E2E's review
+  wake call `github_api_background_admission` from `scripts/ci/github_api_retry.sh`: it reads the
+  free `GET /rate_limit` of the job's own token, logs only the numeric counters, and below 40% of
+  the core limit (`GITHUB_API_BACKGROUND_RESERVE_PERCENT`) the job settles successfully while its
+  durable capsule or pending source stays queued; unreadable counters admit. Never call it from
+  Build, Packaged E2E, mod-base gate status, release workflows or a path without a durable queue:
+  the compatibility publication (a completed source is never queued for publication again and only
+  a successful producer run's handoff is selectable) and the optional-mod wave request (emitted
+  once, after its capsule is retired). A sweep that finds a backlog while no other run of its
+  workflow is queued or running treats it as stranded: the compatibility recovery requests every
+  pending source at once (without a continuation chain), and the drain sweep's exact wake carries
+  `resume_queue` so a capacity-ready review fans the whole queue out; otherwise both keep their
+  single-entry recovery so a live review is never requested twice. QS-owned sweeps keep distinct
+  minutes (drain `:21/:51`, compatibility review `:26/:56`, feature coverage `:34`, wake recovery
+  `:41`, target status `:11`), away from the managed gate-status `:17` and Pages `:43` schedules
+  and the `:03`-step release verifier.
 - Historical schema-2 port/anchor certificates remain available only for historical recovery;
   schema 3 retires automatic version ports. Never reuse a partial feature proof as either a
   complete shared baseline or a historical full-anchor certificate.
