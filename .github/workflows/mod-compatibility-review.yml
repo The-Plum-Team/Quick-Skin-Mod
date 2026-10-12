@@ -2074,7 +2074,7 @@ jobs:
       # upload-window contract (site/mod-base.json families[].producer.step).
       - name: Upload the mod-base family handoff
         id: handoff
-        uses: The-Plum-Team/mod-base/actions/publish-family@b4b3831c78b6dac6705db320d1e0ecfc8054371f # v1.3.1
+        uses: The-Plum-Team/mod-base/actions/publish-family@9f9fddd1a6c40dce13114ff7272e1bcedfc59f65 # v1.4.1
         with:
           family: mod-compatibility
           key: ${{ steps.collect.outputs.bundle_key }}
@@ -2095,7 +2095,7 @@ jobs:
     # family handoff by id and digest before any validation.
     steps:
       - name: Dispatch the exact family handoff to the protected Pages publisher
-        uses: The-Plum-Team/mod-base/actions/notify-pages@b4b3831c78b6dac6705db320d1e0ecfc8054371f # v1.3.1
+        uses: The-Plum-Team/mod-base/actions/notify-pages@9f9fddd1a6c40dce13114ff7272e1bcedfc59f65 # v1.4.1
         with:
           operation: family
           run-id: ${{ github.run_id }}
