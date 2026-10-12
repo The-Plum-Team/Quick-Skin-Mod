@@ -21,6 +21,9 @@ from visual_review_queue import (  # noqa: E402
     GitHubRateLimitError,
     MAX_NAMED_ARTIFACTS,
     MAX_NAMED_PAGES,
+    MAX_PENDING_KEYS,
+    MAX_PRODUCER_RUN_PAGES,
+    MAX_RUN_ARTIFACT_PAGES,
     PREPARE_WORKFLOW,
     Artifact,
     QueueError,
@@ -104,8 +107,10 @@ class FakeApi:
         self.branch_sha = branch_sha
         self.pulls = pulls or {}
 
-    def list_artifacts(self) -> list[Artifact]:
-        return list(self.artifacts)
+    def list_generation_inputs(self, generation: str) -> list[Artifact]:
+        # Mirrors the production listing: only curator runs at that exact SHA are read.
+        return [artifact for artifact in self.artifacts
+                if artifact.head_sha == generation and artifact.name.startswith("visual-review-input-")]
 
     def list_artifacts_named(self, name: str) -> list[Artifact]:
         return [artifact for artifact in self.artifacts if artifact.name == name]
@@ -180,7 +185,7 @@ class VisualReviewQueueTest(unittest.TestCase):
                     self.assertEqual(16 if conclusion == "cancelled" else 0, len(pending))
                     # The production GitHubApi memoizes owners: one curator plus 16 reviewers.
                     self.assertEqual(17, len({call.args[0] for call in get_run.call_args_list}))
-                with patch.object(api, "list_artifacts", side_effect=AssertionError("exact wake must not scan")):
+                with patch.object(api, "list_generation_inputs", side_effect=AssertionError("exact wake must not scan")):
                     for item in inputs:
                         selected = select_requested(api, repository=REPOSITORY,
                                                     requested_artifact_id=item.artifact_id, now=NOW)
@@ -197,13 +202,51 @@ class VisualReviewQueueTest(unittest.TestCase):
             self.assertEqual([(pending, 55)], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
         self.assertEqual([10], [call.args[0] for call in owners.call_args_list])
 
-    def test_aged_legacy_capsules_and_older_current_generation_producers_stay_eligible(self) -> None:
-        for generation, suffix in ((SHA, ""), ("d" * 40, "-" + "d" * 40)):
-            with self.subTest(generation=generation):
+    def test_aged_legacy_and_current_generation_capsules_stay_eligible(self) -> None:
+        for suffix in ("", "-" + SHA, f"-{SHA}--mc1.21.8"):
+            with self.subTest(suffix=suffix):
                 pending = artifact(1, "visual-review-input-55" + suffix, run_id=10,
                                    minutes_ago=60 * 24 * 200)
-                api = FakeApi([pending], {10: owner(10, PREPARE_WORKFLOW)}, branch_sha=generation)
+                api = FakeApi([pending], {10: owner(10, PREPARE_WORKFLOW)})
                 self.assertEqual([(pending, 55)], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+
+    def test_sweep_reads_only_curator_runs_of_the_current_generation(self) -> None:
+        # The protected curator skips any generation other than its own SHA, so a sweep reads only
+        # the curator runs at current master. A capsule whose name and producer SHA disagree is
+        # still admitted by its exact wake, which authenticates the capsule by ID.
+        other = "d" * 40
+        crossed = artifact(1, f"visual-review-input-55-{other}", run_id=10, minutes_ago=15)
+        api = FakeApi([crossed], {10: owner(10, PREPARE_WORKFLOW)}, branch_sha=other)
+        with patch.object(api, "list_generation_inputs", wraps=api.list_generation_inputs) as listed:
+            self.assertEqual([], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
+        self.assertEqual([other], [call.args[0] for call in listed.call_args_list])
+        self.assertEqual((crossed, 55), select_requested(api, repository=REPOSITORY,
+                                                         requested_artifact_id=1, now=NOW))
+
+    def test_sweep_looks_markers_up_by_exact_name_only(self) -> None:
+        capsules = [
+            artifact(1, f"visual-review-input-55-{SHA}--mc1.20.1", run_id=10, minutes_ago=15),
+            artifact(2, f"visual-review-input-56-{SHA}", run_id=11, minutes_ago=15),
+            artifact(3, f"visual-review-input-57-{'c' * 40}--mc1.20.1", run_id=10, minutes_ago=15),
+        ]
+        api = FakeApi(capsules, {10: owner(10, PREPARE_WORKFLOW), 11: owner(11, PREPARE_WORKFLOW)})
+        with patch.object(api, "list_artifacts_named", wraps=api.list_artifacts_named) as named:
+            pending = list_pending_candidates(api, repository=REPOSITORY, now=NOW)
+        self.assertEqual({1, 2}, {item.artifact_id for item, _ in pending})
+        self.assertEqual(
+            sorted({"visual-review-55--mc1.20.1", "visual-review-attempt-55--mc1.20.1",
+                    "visual-review-56", "visual-review-attempt-56",
+                    f"visual-review-wave-block-{SHA}", f"visual-anchor-certification-{SHA}"}),
+            [call.args[0] for call in named.call_args_list])
+
+    def test_sweep_fails_closed_above_the_pending_key_bound(self) -> None:
+        capsules = [artifact(index, f"visual-review-input-{index}-{SHA}", run_id=10, minutes_ago=15)
+                    for index in range(1, MAX_PENDING_KEYS + 2)]
+        api = FakeApi(capsules, {10: owner(10, PREPARE_WORKFLOW)})
+        with patch.object(api, "list_artifacts_named", side_effect=AssertionError("unbounded")):
+            with self.assertRaises(QueueError) as caught:
+                list_pending_candidates(api, repository=REPOSITORY, now=NOW)
+        self.assertIn(str(MAX_PENDING_KEYS), str(caught.exception))
 
     def test_related_markers_still_authenticate_foreign_owners(self) -> None:
         pending = artifact(1, f"visual-review-input-55-{SHA}--mc1.21.8", run_id=10, minutes_ago=15)
@@ -257,7 +300,7 @@ class VisualReviewQueueTest(unittest.TestCase):
                                 20: owner(20, DRAIN_WORKFLOW, conclusion="failure")})
         self.assertEqual({2}, {item.artifact_id for item, _ in
                                list_pending_candidates(api, repository=REPOSITORY, now=NOW)})
-        with patch.object(api, "list_artifacts", side_effect=AssertionError("direct wake scanned the queue")), \
+        with patch.object(api, "list_generation_inputs", side_effect=AssertionError("direct wake scanned the queue")), \
              patch.object(api, "list_artifacts_named", wraps=api.list_artifacts_named) as named:
             self.assertIsNotNone(select_requested(api, repository=REPOSITORY, requested_artifact_id=2, now=NOW))
         self.assertEqual({"visual-review-55--mc1.21.8", "visual-review-attempt-55--mc1.21.8",
@@ -286,23 +329,74 @@ class VisualReviewQueueTest(unittest.TestCase):
         api = FakeApi([item, report], {10: owner(10, PREPARE_WORKFLOW), 20: untrusted})
         self.assertEqual([(item, 55)], list_pending_candidates(api, repository=REPOSITORY, now=NOW))
 
-    def test_recovery_sweep_accepts_a_full_bounded_repository_window(self) -> None:
+    def test_recovery_sweep_lists_curator_runs_then_their_own_artifacts(self) -> None:
         api = GitHubApi(
             repository=REPOSITORY,
             token="test-token",
             api_url="https://api.github.test",
         )
-        api._request = MagicMock(  # type: ignore[method-assign]
-            return_value={
-                "artifacts": [
-                    {"name": f"packaged-e2e-unrelated-{index}"}
-                    for index in range(100)
-                ]
-            }
-        )
+        runs = [
+            {"id": 31, "head_sha": SHA, "status": "completed", "conclusion": "success"},
+            {"id": 32, "head_sha": SHA, "status": "completed", "conclusion": "failure"},
+            {"id": 33, "head_sha": SHA, "status": "completed", "conclusion": "skipped"},
+            {"id": 34, "head_sha": SHA, "status": "completed", "conclusion": "cancelled"},
+            {"id": 35, "head_sha": SHA, "status": "in_progress", "conclusion": None},
+            {"id": 36, "head_sha": "c" * 40, "status": "completed", "conclusion": "success"},
+        ]
+        responses = {
+            f"/repos/{REPOSITORY}/actions/workflows/visual-review.yml/runs?head_sha={SHA}&per_page=100&page=1":
+                {"total_count": len(runs), "workflow_runs": runs},
+            f"/repos/{REPOSITORY}/actions/runs/31/artifacts?per_page=100&page=1":
+                {"artifacts": [raw_artifact(1, f"visual-review-input-55-{SHA}--mc1.20.1", expired=False),
+                               raw_artifact(2, "visual-review-55--mc1.20.1", expired=False),
+                               {"name": "packaged-e2e-unrelated"}]},
+            f"/repos/{REPOSITORY}/actions/runs/32/artifacts?per_page=100&page=1":
+                {"artifacts": [raw_artifact(3, f"visual-review-input-56-{SHA}", expired=True)]},
+        }
+        api._request = MagicMock(side_effect=lambda path: responses[path])  # type: ignore[method-assign]
 
-        self.assertEqual([], api.list_artifacts())
-        self.assertEqual(100, api._request.call_count)
+        listed = api.list_generation_inputs(SHA)
+
+        self.assertEqual([1, 3], [item.artifact_id for item in listed])
+        requested = [call.args[0] for call in api._request.call_args_list]
+        self.assertEqual(list(responses), requested)
+        self.assertFalse(any("/actions/artifacts?" in path for path in requested))
+
+    def test_recovery_sweep_listing_fails_closed_at_its_page_bounds(self) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="test-token",
+            api_url="https://api.github.test",
+        )
+        full_runs = {"workflow_runs": [
+            {"id": 40 + index, "head_sha": SHA, "status": "completed", "conclusion": "skipped"}
+            for index in range(100)]}
+        api._request = MagicMock(return_value=full_runs)  # type: ignore[method-assign]
+        with self.assertRaises(QueueError) as caught:
+            api.list_generation_inputs(SHA)
+        self.assertIn("producer runs", str(caught.exception))
+        self.assertEqual(MAX_PRODUCER_RUN_PAGES, api._request.call_count)
+
+        def full_artifacts(path: str) -> dict[str, Any]:
+            if "/workflows/" in path:
+                return {"workflow_runs": [
+                    {"id": 77, "head_sha": SHA, "status": "completed", "conclusion": "success"}]}
+            return {"artifacts": [{"name": "packaged-e2e-unrelated"} for _ in range(100)]}
+
+        api._request = MagicMock(side_effect=full_artifacts)  # type: ignore[method-assign]
+        with self.assertRaises(QueueError) as caught:
+            api.list_generation_inputs(SHA)
+        self.assertIn("run artifacts", str(caught.exception))
+        self.assertEqual(1 + MAX_RUN_ARTIFACT_PAGES, api._request.call_count)
+
+        for bad in ({}, {"workflow_runs": {}}, {"workflow_runs": ["x"]},
+                    {"workflow_runs": [{"id": 1}] * 101}):
+            with self.subTest(response=bad):
+                api._request = MagicMock(return_value=bad)  # type: ignore[method-assign]
+                with self.assertRaises(QueueError):
+                    api.list_generation_inputs(SHA)
+        with self.assertRaises(QueueError):
+            api.list_generation_inputs("master")
 
     def test_named_listing_returns_live_records_and_ignores_expired_history(self) -> None:
         # GitHub keeps expired records in the listing forever, so mod-compatibility-plan reached

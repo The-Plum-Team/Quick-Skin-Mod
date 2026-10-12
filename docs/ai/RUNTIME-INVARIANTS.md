@@ -620,7 +620,7 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   differ only when all of that reusable identity is exact. It revalidates the
   capsule after the model exits, publishes only a bounded normalized report or sanitized attempt
   marker, never uploads raw provider text, and
-  retains completed and already-reviewed queue artifacts through their seven-day expiry. The
+  retains completed and already-reviewed queue artifacts through their two-day expiry. The
   cleanup job must succeed without deletion for both branches: its own or another in-progress
   report owner can still cancel during later tails, requiring the original input for recovery.
   Only missing/terminally invalid inputs enter exact-ID cleanup. A transient failure retains the

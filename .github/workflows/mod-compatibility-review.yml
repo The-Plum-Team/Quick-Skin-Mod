@@ -564,7 +564,10 @@ jobs:
       actions: write
       contents: read
     concurrency:
+      # Shares the visual-review drain's probe lock; both keep every pending probe (queue: max)
+      # so neither reviewer's waiting wake is cancelled by a newer one.
       group: quick-skin-claude-capacity-probe
+      queue: max
       cancel-in-progress: false
     outputs:
       fresh_ready: ${{ steps.resolve.outputs.fresh_ready }}

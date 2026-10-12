@@ -324,7 +324,7 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "visual-review.yml",
                 "Upload only the curated review input",
                 "${{ steps.identity.outputs.artifact_name }}",
-            ): "7",
+            ): "2",  # transient queue capsule, not evidence
             (
                 "visual-review-drain.yml",
                 "Upload the source-bound normalized report",
@@ -582,6 +582,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_check)
         self.assertIn("quick-skin-claude-capacity-probe", capacity_probe)
         self.assertIn("cancel-in-progress: false", capacity_probe)
+        # The default queue keeps only the newest pending probe and cancelled 15 of 17 wakes.
+        self.assertRegex(capacity_probe, r"(?m)^      queue: max$")
         self.assertIn("scripts/ci/claude_capacity_gate.py", capacity_probe)
         self.assertIn("scripts/ci/claude_capacity_probe.py", capacity_probe)
         self.assertIn("CLAUDE_CODE_OAUTH_TOKEN", capacity_probe)
@@ -809,7 +811,9 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("evidence_kind:\"raw-png\"", curate)
         self.assertIn("schema_version:5", curate)
         self.assertIn("compatibility_impact:$compatibility_impact", curate)
-        self.assertIn("retention-days: 7", curate)
+        # Only the transient queue capsule is shortened; its reports, caches and blocks keep 7 days.
+        self.assertIn("retention-days: 2", curate)
+        self.assertNotIn("retention-days: 7", curate)
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", curate)
         self.assertNotIn("claude-code", curate)
         self.assertIn("ref: ${{ github.sha }}", curate)
@@ -1234,6 +1238,8 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("claude_capacity_gate.py", capacity_probe)
         self.assertIn("claude_capacity_probe.py", capacity_probe)
         self.assertIn("group: quick-skin-claude-capacity-probe", capacity_probe)
+        # Shares the drain's probe lock, so it must keep pending probes the same way.
+        self.assertRegex(capacity_probe, r"(?m)^      queue: max$")
         self.assertIn(
             "fresh_ready: ${{ steps.resolve.outputs.fresh_ready }}", capacity_probe
         )

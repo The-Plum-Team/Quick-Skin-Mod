@@ -503,11 +503,12 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   concurrently with its direct wake. Queue selection also authenticates generation-block artifacts
   from failed/in-progress protected drains and skips only inputs carrying the exact blocked master
   generation; the marker's owner still binds it to its exact protected reviewer implementation.
-  Full recovery parses and bounds the complete artifact inventory, then authenticates only
-  reports, attempts, blocks and certificates relevant to eligible current-generation capsules.
-  Capsule age and an older producer commit cannot exclude otherwise eligible historical work.
+  Full recovery never reads the repository-wide artifact listing: it lists the curator runs at the
+  current `master` SHA (the curator uploads only its own generation) and each run's artifacts, then
+  looks up by exact name and authenticates only the reports, attempts, blocks and certificates of
+  those current-generation capsules. Capsule age cannot exclude otherwise eligible work.
   Completed and already-reviewed inputs survive their own or another report owner's late
-  cancellation until seven-day expiry. Cleanup is a successful no-op for both branches; ordinary
+  cancellation until their two-day expiry. Cleanup is a successful no-op for both branches; ordinary
   report authentication suppresses redispatch, while cancelled owners reopen model-free recovery.
   Only missing/terminally invalid inputs keep exact-ID cleanup. The
   [visual-review pipeline](../ci/VISUAL-REVIEW-PIPELINE.md) records the additional retained storage

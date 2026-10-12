@@ -28,10 +28,15 @@ deltas.
   coherence before it emits the only normalized report eligible for upload. Durable queue state
   must not depend on a pending workflow run: a sanitized marker may cool a failed entry, raw
   provider text must never be uploaded. The final `actions: write` cleanup job must retain fresh
-  and already-reviewed inputs through seven-day expiry, succeeding without deletion so a later
+  and already-reviewed inputs through their two-day expiry, succeeding without deletion so a later
   cancelled report owner can recover the original capsule. Only missing/terminally invalid inputs
   enter exact-ID cleanup; authenticated reports suppress completed-input redispatch. A repository-wide capacity circuit may serialize
-  its tool-free preflight and marker publication independently from the model/cache job. The latter
+  its tool-free preflight and marker publication independently from the model/cache job; its
+  probe lock, shared by both reviewers, also uses `queue: max` so no pending wake is cancelled.
+  Queue sweeps and the capacity fan-out never read the repository-wide artifact listing: they list
+  the curator runs at the current `master` SHA, each run's own artifacts, and every marker by exact
+  name, all bounded and fail-closed. Only the transient queue capsule retains two days; reports,
+  generation blocks, certificates and verdict caches keep their evidence retention. The latter
   serializes ordinary capsules globally so subsequent targets reuse the latest verdicts, with
   at most 32 concurrent calls across ordinary reviewers. Two secretless preparation slots may
   overlap that owner, handing off only the original capsule ZIP by exact run/attempt/id/digest.
