@@ -560,7 +560,7 @@ class WorkflowSecurityTest(unittest.TestCase):
         )
         self.assertIn("visual-review-drain-requested", prepare_workflow)
         self.assertIn("visual-review-drain-requested", drain_workflow)
-        self.assertIn('cron: "17,47 * * * *"', drain_workflow)
+        self.assertIn('cron: "21,51 * * * *"', drain_workflow)
         self.assertIn("quick-skin-visual-review-${{", drain_header)
         self.assertIn("github.event.client_payload.artifact_id", drain_header)
         self.assertIn("'queue-sweep'", drain_header)
@@ -1172,7 +1172,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             "types:\n      - mod-compatibility-review-requested", review_workflow
         )
         self.assertIn("mod-compatibility-review-sweep-requested", review_workflow)
-        self.assertIn('cron: "17,47 * * * *"', review_workflow)
+        self.assertIn('cron: "26,56 * * * *"', review_workflow)
         self.assertIn("workflow_dispatch:", review_workflow)
         self.assertNotIn("workflow_run:", review_workflow)
         self.assertIn("needs.gate.result == 'failure'", request_review)

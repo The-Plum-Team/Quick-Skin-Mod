@@ -1,11 +1,12 @@
 name: AI visual review drain
 
 # Curators enqueue immutable, source-bound capsules in visual-review.yml. Exact artifact wakes run
-# independently, while a scheduled/manual sweep only redispatches one authenticated exact wake.
-# The protected workflow may also certify a clean synchronized 1.20.1 anchor.
+# independently, while a scheduled/manual sweep only redispatches one authenticated exact wake
+# (marked to fan a stranded backlog out once Claude capacity is ready). The protected workflow
+# may also certify a clean synchronized 1.20.1 anchor.
 on:
   schedule:
-    - cron: "17,47 * * * *"
+    - cron: "21,51 * * * *"
   repository_dispatch:
     types:
       - visual-review-drain-requested
@@ -41,6 +42,7 @@ jobs:
       eligible: ${{ steps.queue.outputs.eligible }}
       generation_sha: ${{ steps.queue.outputs.generation_sha }}
       implementation_sha: ${{ steps.queue.outputs.implementation_sha }}
+      resume_queue: ${{ steps.queue.outputs.resume_queue }}
       source_run_id: ${{ steps.queue.outputs.source_run_id }}
       bundle_key: ${{ steps.queue.outputs.bundle_key }}
       review_key: ${{ steps.queue.outputs.review_key }}
@@ -66,6 +68,7 @@ jobs:
           REQUESTED_ARTIFACT_ID: ${{ github.event.client_payload.artifact_id }}
           REQUESTED_ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
           REQUESTED_GENERATION_SHA: ${{ github.event.client_payload.generation_sha }}
+          REQUESTED_RESUME_QUEUE: ${{ github.event.client_payload.resume_queue }}
         run: |
           set -euo pipefail
           attempts=1
@@ -91,6 +94,17 @@ jobs:
           else
             [[ -z "$REQUESTED_ARTIFACT_NAME" ]]
           fi
+          # Background quota guard: below the reserve, exact wakes and sweeps settle without
+          # touching the durable queue; the next sweep or wake recovery reselects the capsule.
+          source scripts/ci/github_api_retry.sh
+          admission_status=0
+          github_api_background_admission "visual review drain" || admission_status=$?
+          if [[ "$admission_status" -eq 75 ]]; then
+            printf 'eligible=false\n' >> "$GITHUB_OUTPUT"
+            printf 'direct=%s\n' "$direct" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$admission_status" -eq 0 ]]
           queue_output="$(mktemp "$RUNNER_TEMP/visual-review-queue.XXXXXX")"
           selector_status=0
           for (( attempt = 1; attempt <= attempts; attempt++ )); do
@@ -136,6 +150,29 @@ jobs:
           fi
           cat "$queue_output" >> "$GITHUB_OUTPUT"
           printf 'direct=%s\n' "$direct" >> "$GITHUB_OUTPUT"
+          # A sweep that finds eligible capsules while no other drain run is queued or running sees
+          # a stranded backlog: wakes deferred by the quota guard or lost. Its exact wake asks the
+          # capacity-ready review to fan the whole queue out, as the producer's wakes would have.
+          resume_queue=false
+          if [[ "$direct" == true ]]; then
+            [[ -z "$REQUESTED_RESUME_QUEUE" || "$REQUESTED_RESUME_QUEUE" == true ||
+               "$REQUESTED_RESUME_QUEUE" == false ]]
+            resume_queue="${REQUESTED_RESUME_QUEUE:-false}"
+          elif grep -qx 'eligible=true' "$queue_output"; then
+            [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+            active=''
+            if ! active="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/visual-review-drain.yml/runs?per_page=50" \
+                --jq "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID and
+                  (.status == \"requested\" or .status == \"waiting\" or .status == \"pending\" or
+                   .status == \"queued\" or .status == \"in_progress\"))] | length")"; then
+              active=''
+            fi
+            if [[ "$active" == 0 ]]; then
+              resume_queue=true
+            fi
+          fi
+          printf 'resume_queue=%s\n' "$resume_queue" >> "$GITHUB_OUTPUT"
 
       - name: Bound secretless preparation to two slots
         id: slot
@@ -167,9 +204,11 @@ jobs:
           ARTIFACT_NAME: ${{ needs.select.outputs.artifact_name }}
           GENERATION_SHA: ${{ needs.select.outputs.generation_sha }}
           GH_TOKEN: ${{ github.token }}
+          RESUME_QUEUE: ${{ needs.select.outputs.resume_queue }}
         run: |
           set -euo pipefail
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$RESUME_QUEUE" == true || "$RESUME_QUEUE" == false ]]
           [[ "$GENERATION_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ \
             || "$ARTIFACT_NAME" =~ \
@@ -179,9 +218,10 @@ jobs:
             --arg artifact_id "$ARTIFACT_ID" \
             --arg artifact_name "$ARTIFACT_NAME" \
             --arg generation_sha "$GENERATION_SHA" \
+            --arg resume_queue "$RESUME_QUEUE" \
             '{event_type:"visual-review-drain-requested",
               client_payload:{artifact_id:$artifact_id,artifact_name:$artifact_name,
-                generation_sha:$generation_sha}}' \
+                generation_sha:$generation_sha,resume_queue:$resume_queue}}' \
             > "$payload"
           dispatch_error="$RUNNER_TEMP/visual-review-selected.error"
           for attempt in 1 2 3; do
@@ -372,14 +412,24 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  # Also fans out a stranded backlog found by a sweep (resume_queue), but only once Claude
+  # capacity is ready, so a subscription pause still drains one capsule per sweep.
   resume-capacity-queue:
     name: Wake every capsule after capacity returns
     needs:
       - select
+      - capacity-check
       - capacity-probe
     if: >-
-      always() && needs.capacity-probe.result == 'success' &&
-      needs.capacity-probe.outputs.fresh_ready == 'true'
+      always() &&
+      ((needs.capacity-probe.result == 'success' &&
+        needs.capacity-probe.outputs.fresh_ready == 'true') ||
+       (needs.select.outputs.resume_queue == 'true' &&
+        needs.select.outputs.direct == 'true' &&
+        needs.capacity-check.result == 'success' &&
+        (needs.capacity-check.outputs.ready == 'true' ||
+         (needs.capacity-probe.result == 'success' &&
+          needs.capacity-probe.outputs.ready == 'true'))))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

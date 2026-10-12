@@ -804,6 +804,14 @@ jobs:
               "$GITHUB_SHA" "$current_master" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          # Background quota guard: below the reserve this settled source stays pending in the
+          # durable review queue, and the scheduled recovery sweep requests its review later.
+          admission_status=0
+          github_api_background_admission "compatibility review wake" || admission_status=$?
+          if [[ "$admission_status" -eq 75 ]]; then
+            exit 0
+          fi
+          [[ "$admission_status" -eq 0 ]]
           payload="$RUNNER_TEMP/mod-compatibility-review-request.json"
           jq -n \
             --arg source_repository "$GITHUB_REPOSITORY" \

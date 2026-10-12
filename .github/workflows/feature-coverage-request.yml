@@ -8,7 +8,7 @@ on:
     types:
       - completed
   schedule:
-    - cron: "17 * * * *"
+    - cron: "34 * * * *"
   workflow_dispatch:
     inputs:
       source_run_id:
@@ -70,6 +70,14 @@ jobs:
           if [[ "$(python3 scripts/release/release_sources.py --kind mode)" != shared ]]; then
             exit 0
           fi
+          # Background quota guard: durable readiness stays recoverable by the next sweep.
+          source scripts/ci/github_api_retry.sh
+          admission_status=0
+          github_api_background_admission "feature coverage request recovery" || admission_status=$?
+          if [[ "$admission_status" -eq 75 ]]; then
+            exit 0
+          fi
+          [[ "$admission_status" -eq 0 ]]
           identity=(--recover)
           if [[ -n "$PRODUCER_RUN_ID" ]]; then
             identity=(--producer-run-id "$PRODUCER_RUN_ID")

@@ -8,7 +8,7 @@ name: AI mod compatibility review
 # uploaded after an Opus-confirmed defect cancels the remaining calls.
 on:
   schedule:
-    - cron: "17,47 * * * *"
+    - cron: "26,56 * * * *"
   repository_dispatch:
     types:
       - mod-compatibility-review-requested
@@ -73,11 +73,20 @@ jobs:
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
+          # Background quota guard: pending sources stay queued for the next scheduled sweep.
+          admission_status=0
+          github_api_background_admission "compatibility review recovery" || admission_status=$?
+          if [[ "$admission_status" -eq 75 ]]; then
+            exit 0
+          fi
+          [[ "$admission_status" -eq 0 ]]
           selected="$(mktemp "$RUNNER_TEMP/mod-compatibility-queue.XXXXXX")"
+          pending="$RUNNER_TEMP/mod-compatibility-pending.json"
           selector_status=0
           if python3 scripts/ci/mod_compatibility_review_queue.py \
               --repository "$GITHUB_REPOSITORY" \
-              --github-output "$selected"; then
+              --github-output "$selected" \
+              --pending-json "$pending"; then
             selector_status=0
           else
             selector_status=$?
@@ -96,17 +105,53 @@ jobs:
           source_sha="$(sed -n 's/^source_sha=//p' "$selected")"
           [[ "$source_run_id" =~ ^[1-9][0-9]*$ ]]
           [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
-          payload="$RUNNER_TEMP/mod-compatibility-review-recovery.json"
-          jq -n \
-            --arg source_repository "$GITHUB_REPOSITORY" \
-            --arg source_run_id "$source_run_id" \
-            --arg source_sha "$source_sha" \
-            '{event_type:"mod-compatibility-review-requested",client_payload:{
-              source_repository:$source_repository,source_run_id:$source_run_id,
-              source_sha:$source_sha,recovery_chain:true}}' > "$payload"
-          github_api_retry --method POST \
-            "repos/$GITHUB_REPOSITORY/dispatches" \
-            --input "$payload" > /dev/null
+          jq -e '
+            type == "array" and length >= 1 and length <= 32 and all(.[];
+              (keys == ["source_run_id", "source_sha"]) and
+              (.source_run_id | type == "number" and . > 0 and floor == .) and
+              (.source_sha | type == "string" and test("^[0-9a-f]{40}$")))
+          ' "$pending" > /dev/null
+          # A backlog while no other run of this workflow is queued or running is stranded: its
+          # producers' review wakes were deferred by the quota guard or lost. Request every
+          # pending source at once, as those producers would have; otherwise keep the one-source
+          # recovery chain so a live review is never requested twice.
+          [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          active=''
+          if ! active="$(github_api_retry \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/mod-compatibility-review.yml/runs?per_page=50" \
+              --jq "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID and
+                (.status == \"requested\" or .status == \"waiting\" or .status == \"pending\" or
+                 .status == \"queued\" or .status == \"in_progress\"))] | length")"; then
+            active=''
+          fi
+          if [[ "$active" == 0 ]]; then
+            entries="$(jq -c '.[]' "$pending")"
+            chain=false
+            printf 'Requested every stranded compatibility review (%s).\n' \
+              "$(jq length "$pending")" >> "$GITHUB_STEP_SUMMARY"
+          else
+            entries="$(jq -cn --argjson source_run_id "$source_run_id" --arg source_sha "$source_sha" \
+              '{source_run_id:$source_run_id,source_sha:$source_sha}')"
+            chain=true
+          fi
+          while IFS= read -r entry; do
+            entry_run_id="$(jq -er '.source_run_id | tostring' <<< "$entry")"
+            entry_sha="$(jq -er .source_sha <<< "$entry")"
+            [[ "$entry_run_id" =~ ^[1-9][0-9]*$ ]]
+            [[ "$entry_sha" =~ ^[0-9a-f]{40}$ ]]
+            payload="$RUNNER_TEMP/mod-compatibility-review-recovery-$entry_run_id.json"
+            jq -n \
+              --arg source_repository "$GITHUB_REPOSITORY" \
+              --arg source_run_id "$entry_run_id" \
+              --arg source_sha "$entry_sha" \
+              --argjson recovery_chain "$chain" \
+              '{event_type:"mod-compatibility-review-requested",client_payload:{
+                source_repository:$source_repository,source_run_id:$source_run_id,
+                source_sha:$source_sha,recovery_chain:$recovery_chain}}' > "$payload"
+            github_api_retry --method POST \
+              "repos/$GITHUB_REPOSITORY/dispatches" \
+              --input "$payload" > /dev/null
+          done <<< "$entries"
 
   enumerate:
     name: Authenticate compatibility capsules

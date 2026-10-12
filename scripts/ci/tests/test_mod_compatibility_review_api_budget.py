@@ -338,28 +338,91 @@ class ModCompatibilityReviewApiBudgetTest(unittest.TestCase):
                                "Dispatch the exact settled compatibility source")
         self.assertNotIn("recovery_chain", producer)
 
-        script = step_script(WORKFLOW, "recover", "Dispatch the oldest authenticated pending source")
-        script = script[script.index('payload="$RUNNER_TEMP/mod-compatibility-review-recovery.json"'):]
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            fake_api = '''
-            set -euo pipefail
-            github_api_retry() {
-              [[ "$1" == --method && "$2" == POST && "$4" == --input ]]
-              cp "$5" "$RUNNER_TEMP/dispatched.json"
-            }
-            '''
-            result = subprocess.run(["bash", "-c", fake_api + script],
-                capture_output=True, text=True, timeout=15,
-                env=os.environ | {"RUNNER_TEMP": temporary, "GITHUB_REPOSITORY": REPOSITORY,
-                    "source_run_id": "10", "source_sha": SHA})
-            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-            payload = json.loads((root / "dispatched.json").read_text())
-            self.assertEqual("mod-compatibility-review-requested", payload["event_type"])
-            self.assertIs(True, payload["client_payload"]["recovery_chain"])
-            self.assertEqual("10", payload["client_payload"]["source_run_id"])
-            self.assertEqual(SHA, payload["client_payload"]["source_sha"])
+        self.assertIn("github_api_background_admission", producer)
+        self.assertLess(producer.index("github_api_background_admission"),
+                        producer.index('payload="$RUNNER_TEMP/mod-compatibility-review-request.json"'))
 
+        script = step_script(WORKFLOW, "recover", "Dispatch the oldest authenticated pending source")
+        older = "b" * 40
+        pending = [{"source_run_id": 10, "source_sha": SHA}, {"source_run_id": 11, "source_sha": older}]
+
+        def recover(*, active: int, admission: int = 0) -> tuple[subprocess.CompletedProcess[str], list]:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                helper = root / "scripts" / "ci" / "github_api_retry.sh"
+                helper.parent.mkdir(parents=True)
+                # The checked-in step sources this relative helper; the fixture replaces only the
+                # GitHub boundary and records every dispatch it would have sent.
+                helper.write_text(r"""
+github_api_background_admission() {
+  [[ "$1" == "compatibility review recovery" ]] || return 95
+  return "$FIXTURE_ADMISSION"
+}
+github_api_retry() {
+  if [[ "$1" == --method ]]; then
+    [[ "$2" == POST && "$3" == "repos/$GITHUB_REPOSITORY/dispatches" && "$4" == --input ]]
+    sent=$(( $(cat "$FIXTURE_COUNTER" 2>/dev/null || printf 0) + 1 ))
+    printf '%s' "$sent" > "$FIXTURE_COUNTER"
+    cp "$5" "$RUNNER_TEMP/dispatched-$sent.json"
+    return 0
+  fi
+  [[ "$1" == "repos/$GITHUB_REPOSITORY/actions/workflows/mod-compatibility-review.yml/runs?per_page=50" &&
+     "$2" == --jq && "$3" == *'.id != 900'* ]] || return 96
+  printf '%s\n' "$FIXTURE_ACTIVE"
+}
+python3() {
+  [[ "$1" == scripts/ci/mod_compatibility_review_queue.py && "$2" == --repository &&
+     "$4" == --github-output && "$6" == --pending-json && $# == 7 ]] || return 97
+  printf 'eligible=true\nsource_run_id=10\nsource_sha=%s\n' "$FIXTURE_SHA" >> "$5"
+  printf '%s\n' "$FIXTURE_PENDING" > "$7"
+}
+""", encoding="utf-8")
+                runner_temp = root / "runner"
+                runner_temp.mkdir()
+                summary = root / "summary.md"
+                result = subprocess.run(["bash", "-c", script], cwd=root,
+                    capture_output=True, text=True, timeout=15,
+                    env={"PATH": os.environ["PATH"], "RUNNER_TEMP": str(runner_temp),
+                         "GITHUB_REPOSITORY": REPOSITORY, "GITHUB_RUN_ID": "900",
+                         "GITHUB_STEP_SUMMARY": str(summary), "FIXTURE_SHA": SHA,
+                         "FIXTURE_COUNTER": str(root / "dispatch-count"),
+                         "FIXTURE_ADMISSION": str(admission), "FIXTURE_ACTIVE": str(active),
+                         "FIXTURE_PENDING": json.dumps(pending)})
+                payloads = [json.loads(path.read_text())
+                            for path in sorted(runner_temp.glob("dispatched-*.json"))]
+                return result, payloads
+
+        # Another run is queued or running: keep the one-source chain so no live review doubles.
+        result, payloads = recover(active=1)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(1, len(payloads))
+        self.assertEqual("mod-compatibility-review-requested", payloads[0]["event_type"])
+        self.assertIs(True, payloads[0]["client_payload"]["recovery_chain"])
+        self.assertEqual("10", payloads[0]["client_payload"]["source_run_id"])
+        self.assertEqual(SHA, payloads[0]["client_payload"]["source_sha"])
+
+        # A stranded backlog (wakes deferred by the quota guard or lost) is requested at once,
+        # oldest first, without starting another chain per source.
+        result, payloads = recover(active=0)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual([("10", SHA), ("11", older)],
+                         [(payload["client_payload"]["source_run_id"], payload["client_payload"]["source_sha"])
+                          for payload in payloads])
+        self.assertTrue(all(payload["client_payload"]["recovery_chain"] is False for payload in payloads))
+
+        # Below the background reserve nothing is selected or dispatched; the source stays pending.
+        result, payloads = recover(active=0, admission=75)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual([], payloads)
+        result, payloads = recover(active=0, admission=2)
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual([], payloads)
+
+        # A malformed pending list never reaches a dispatch.
+        pending = [{"source_run_id": "10; touch pwned", "source_sha": SHA}]
+        result, payloads = recover(active=0)
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual([], payloads)
 
 if __name__ == "__main__":
     unittest.main()
