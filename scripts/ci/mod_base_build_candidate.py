@@ -425,8 +425,13 @@ def run_lane(checkout: Path, lane: str, export: Path) -> None:
     mod = _mod(checkout)
     row = adapter.decode(_environment("E2E_ROW_JSON").encode("utf-8"), "E2E_ROW_JSON")
     expected = adapter.runtime_values(mod, lane)
-    if type(row) is not dict or row.get("artifact_node") != lane or _environment("E2E_SCENARIOS") != expected[
-            "E2E_SCENARIOS"] or row != json.loads(expected["E2E_ROW_JSON"]):
+    # A narrowed lane runs a selection of the PR profile; the protected verify_runtime checks that
+    # its results cover exactly the selection its runtime scope names.
+    try:
+        adapter.profile_subset(mod, _environment("E2E_SCENARIOS").split(","), "E2E_SCENARIOS")
+    except adapter.AdapterError as error:
+        raise CandidateError(f"the runtime values do not describe lane {lane} of this checkout") from error
+    if type(row) is not dict or row.get("artifact_node") != lane or row != json.loads(expected["E2E_ROW_JSON"]):
         raise CandidateError(f"the runtime values do not describe lane {lane} of this checkout")
     target = adapter.lane_target(mod, lane)
     home = Path(_environment("HOME"))

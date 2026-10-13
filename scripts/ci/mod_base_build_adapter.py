@@ -28,6 +28,26 @@ The native shape this reproduces:
 * one lane per ``matrix.py --kind pr-anchors`` row, named by its artifact node (the native row id
   holds ``--``, which a kit unit id may not), with one obligation per scenario of the PR profile.
 
+The protected config names ``runtime_selection``, so a pull request's packaged lanes may run a
+narrowed scope (mod-base ``docs/BUILD-RUNTIME-SELECTION.md``). ``derive_scope`` is the selection
+policy, and it is Quick Skin's reviewed native policy, applied conservatively:
+
+* every changed path that the native E2E impact allowlist (``scripts/ci/e2e_impact.py``) calls
+  non-runtime (documentation, the site, AI review prompts, non-gate workflows) is set aside;
+* nothing left: every lane runs only the smoke scenario ``phase0-smoke``;
+* otherwise every remaining path must be a Java source of a feature module of the module graph
+  (``architecture/modules.json``). A path of a shared module (a ``java-library`` or the ``common``
+  assembly), a path no module owns, a resource, a build or harness file, or any path the native
+  selector (``e2e/selection.py``) cannot prove runs every scenario of every lane. When the native
+  selector proves an ``affected`` subset, every lane runs that subset and the smoke scenario.
+
+A narrowed lane's ``derive_runtime`` gives ``run_lane`` only its scenarios, and its
+``verify_runtime`` requires one passing result for exactly those scenarios, in profile order. A
+pull request that changes the config, any adapter file (this policy, the module graph, the
+selector, the impact allowlist), the matrix, the scenario contract or ``gradle.properties`` never
+reaches ``derive_scope``: the kit runs it in full. Pushes, dispatches and releases always run in
+full, and a narrowed pull request never covers the push of its merge.
+
 Standard library and the protected native modules only, Python 3.11 or newer. Every JSON output is
 canonical: sorted keys, compact separators, UTF-8, one final newline.
 """
@@ -51,8 +71,8 @@ import matrix as release_matrix  # noqa: E402
 import scenario_contract  # noqa: E402
 
 BUILD_ADAPTER_API = 1
-HOOKS = ("derive_plan", "policy", "build_target", "verify_target", "verify_build", "derive_runtime", "run_lane",
-         "verify_runtime")
+HOOKS = ("derive_plan", "policy", "build_target", "verify_target", "verify_build", "derive_scope", "derive_runtime",
+         "run_lane", "verify_runtime")
 #: The name the protected Build config stages ``gradle.properties`` under for the protected hooks.
 PROPERTIES_INPUT = "gradle-properties"
 INVENTORY_PATH = "release/release-matrix.json"
@@ -73,6 +93,15 @@ MAX_NATIVE_REPORT_BYTES = 4 * 1024 * 1024
 MAX_SBOM_BYTES = 16 * 1024 * 1024
 TARGET_CONTRACT = "quick-skin-target-v1"
 LANE_CONTRACT = "quick-skin-lane-v1"
+#: The format of the kit's ``derive_scope`` input that ``runtime_selection`` names.
+SCOPE_INPUT_FORMAT = "changed-paths-v1"
+#: The scenario every lane of a narrowed run keeps (mod-base: a lane nothing affects runs its smoke).
+SMOKE_SCENARIO = "phase0-smoke"
+#: The module graph the selection reads from the protected copy, never from the candidate.
+GRAPH_PATH = "architecture/modules.json"
+MAX_GRAPH_BYTES = 256 * 1024
+#: Module kinds whose change runs every scenario: shared libraries and the assembly.
+SHARED_MODULE_KINDS = frozenset({"java-library", "minecraft-assembly"})
 
 
 class AdapterError(Exception):
@@ -339,17 +368,114 @@ def lane_target(mod: Mod, lane: str) -> str:
     raise AdapterError(f"the release matrix has no lane {lane!r}")
 
 
-def runtime_values(mod: Mod, lane: str) -> dict[str, str]:
+def profile_subset(mod: Mod, wanted: list[str], label: str) -> list[str]:
+    """``wanted`` when it is a non-empty selection of the PR profile's scenarios, in profile order
+    and without a repeat; anything else is a rejection."""
+
+    if (type(wanted) is not list or not wanted or any(type(item) is not str for item in wanted)
+            or wanted != [scenario for scenario in scenarios(mod) if scenario in set(wanted)]
+            or len(set(wanted)) != len(wanted)):
+        raise AdapterError(f"{label} is not a selection of the PR profile's scenarios in profile order")
+    return wanted
+
+
+def runtime_values(mod: Mod, lane: str, obligations: list[str] | None = None) -> dict[str, str]:
     """What ``run_lane`` receives: the native PR row of the lane, as ``matrix.py`` prints a row,
-    and the scenarios that row names."""
+    and the scenarios that row names, or only those of ``obligations`` for a narrowed lane."""
 
     row = runtime_rows(mod).get(lane)
     if row is None:
         raise AdapterError(f"lane {lane!r} has no PR runtime row")
     if row["scenarios"] != ",".join(scenarios(mod)):
         raise AdapterError(f"the runtime row of {lane} names other scenarios than the PR profile")
+    selected = row["scenarios"]
+    if obligations is not None:
+        wanted = [item.removeprefix("scenario/") for item in obligations]
+        if [obligation(item) for item in wanted] != obligations:
+            raise AdapterError(f"the runtime scope of {lane} names an obligation that is not a scenario")
+        selected = ",".join(profile_subset(mod, wanted, f"the runtime scope of {lane}"))
     return {"E2E_ROW_JSON": json.dumps(row, separators=(",", ":"), sort_keys=True, ensure_ascii=True),
-            "E2E_SCENARIOS": row["scenarios"]}
+            "E2E_SCENARIOS": selected}
+
+
+# -- Narrowed runtime scope ------------------------------------------------------------------------------
+
+
+def _native_selection_modules() -> tuple[Any, Any, Any]:
+    """The protected native impact allowlist, module graph and E2E selector, imported only by
+    ``derive_scope``."""
+
+    for directory in (ROOT / "scripts" / "ci", ROOT / "scripts" / "architecture"):
+        if str(directory) not in sys.path:
+            sys.path.insert(0, str(directory))
+    import e2e_impact
+    import module_graph
+    import selection
+    return e2e_impact, module_graph, selection
+
+
+def scope_selection(mod: Mod, changed_paths: Any) -> tuple[list[str] | None, str]:
+    """The PR-profile scenarios a pull request that changes ``changed_paths`` runs, in profile
+    order, or ``None`` for every scenario, with the reason (see the module docstring).
+
+    Every doubt is ``None``: a missing or malformed path list, a path the allowlist cannot classify,
+    a shared module, a path the native selector cannot prove, and any failure of the native
+    modules or of the module graph."""
+
+    every = scenarios(mod)
+    if SMOKE_SCENARIO not in every:
+        return None, "no-smoke-scenario"
+    if type(changed_paths) is not list or not changed_paths or any(type(path) is not str for path in changed_paths):
+        return None, "missing-change-input"
+    try:
+        e2e_impact, module_graph, selection = _native_selection_modules()
+        runtime_paths = list(e2e_impact.classify(changed_paths).runtime_paths)
+        if not runtime_paths:
+            return [SMOKE_SCENARIO], "non-runtime-only"
+        graph = module_graph.parse_graph(read_regular(ROOT / GRAPH_PATH, "module graph", max_bytes=MAX_GRAPH_BYTES))
+        for path in runtime_paths:
+            owners = [module for module in graph.modules if path.startswith(module.path + "/")]
+            if len(owners) != 1:
+                return None, "unowned-path"
+            if owners[0].kind in SHARED_MODULE_KINDS:
+                return None, "shared-module"
+        selected = selection.select(mod.contract, graph, runtime_paths, RUNTIME_PROFILE)
+    except Exception as error:  # noqa: BLE001 - any doubt about the selection runs every scenario
+        return None, f"selection-unavailable: {type(error).__name__}"
+    if selected.mode != "affected" or selected.reason != "affected-module-coverage":
+        return None, selected.reason
+    chosen = {run.scenario for run in selected.runs} | {SMOKE_SCENARIO}
+    return [scenario for scenario in every if scenario in chosen], selected.reason
+
+
+def derive_scope(mod: Mod, plan: dict[str, Any], changed_paths: Any) -> tuple[dict[str, Any], str]:
+    """``scope.json`` for ``plan``: every planned lane in plan order with the obligations it runs
+    (all of them when the selection is ``None``), and the reason of the selection."""
+
+    chosen, reason = scope_selection(mod, changed_paths)
+    lanes = []
+    for lane in plan["lanes"]:
+        names = list(lane["obligations"])
+        if chosen is not None:
+            names = [name for name in names if name.removeprefix("scenario/") in chosen]
+        lanes.append({"id": lane["id"], "scenarios": names})
+    return {"lanes": lanes}, reason
+
+
+def lane_scope(value: str | None, lane: str, obligations: list[str]) -> list[str]:
+    """The obligations ``lane`` runs: all of them without the kit's ``MB_RUNTIME_SCOPE``, else the
+    non-empty selection of them it names for this lane, in plan order."""
+
+    if value is None:
+        return list(obligations)
+    scope = _object(decode(value.encode("utf-8"), "MB_RUNTIME_SCOPE", max_bytes=64 * 1024),
+                    ("lane_id", "scenarios", "scope_sha256"), "MB_RUNTIME_SCOPE")
+    selected = scope["scenarios"]
+    if (scope["lane_id"] != lane or type(selected) is not list or not selected
+            or any(type(name) is not str for name in selected) or len(set(selected)) != len(selected)
+            or selected != [name for name in obligations if name in set(selected)]):
+        raise AdapterError(f"the runtime scope does not narrow lane {lane} to its own obligations in plan order")
+    return list(selected)
 
 
 # -- Build verification --------------------------------------------------------------------------------
@@ -524,19 +650,24 @@ def verify_run(mod: Mod, lane: str, obligations: list[str], *, production: bytes
     """Verify the sealed native results of one lane (``read(path below lanes/<lane>/) -> bytes``,
     ``files`` every path there) and return what the report records.
 
-    Every planned scenario must have exactly one passing result, in plan order, for this lane's
-    row, this scenario contract and the sealed production JAR (``production_name`` is its staged
-    file name), installed on the server and on every client the scenario has, each of which
-    reported a pass; each result's ``result.json`` must repeat it, no crash report may exist,
-    every screenshot must be a PNG, and every file must belong to the lane's summary or to one of
-    its scenario profiles."""
+    Every scenario of ``obligations`` (the lane's planned obligations, or the narrowed selection of
+    them its runtime scope names) must have exactly one passing result, in plan order, for this
+    lane's row, this scenario contract and the sealed production JAR (``production_name`` is its
+    staged file name), installed on the server and on every client the scenario has, each of which
+    reported a pass; no other scenario may have a result. Each result's ``result.json`` must repeat
+    it, no crash report may exist, every screenshot must be a PNG, and every file must belong to the
+    lane's summary or to one of its scenario profiles."""
 
     row = runtime_rows(mod).get(lane)
     if row is None:
         raise AdapterError(f"lane {lane!r} has no PR runtime row")
-    wanted = [item.removeprefix("scenario/") for item in obligations]
-    if [obligation(item) for item in wanted] != obligations or wanted != scenarios(mod):
+    wanted = [item.removeprefix("scenario/") for item in obligations] if type(obligations) is list else None
+    if wanted is None or [obligation(item) for item in wanted] != obligations:
         raise AdapterError(f"the obligations of {lane} are not this contract's PR scenarios")
+    try:
+        profile_subset(mod, wanted, f"the obligations of {lane}")
+    except AdapterError as error:
+        raise AdapterError(f"the obligations of {lane} are not this contract's PR scenarios") from error
     if not set(LANE_FILES) <= files:
         raise AdapterError(f"lane {lane} did not record {sorted(set(LANE_FILES) - files)}")
     summary = _object(decode(read("summary.json"), "summary.json", max_bytes=MAX_NATIVE_REPORT_BYTES),
