@@ -61,7 +61,7 @@ class PackagedRuntimeVisualContractTest(unittest.TestCase):
             # luma threshold.
             for y, right in ((28, 30), (31, 34), (34, 26)):
                 draw.line((6, y, right, y), fill=(255, 255, 255), width=1)
-            for y, right in ((76, 340), (79, 352)):
+            for y, right in ((82, 340), (85, 352)):
                 draw.line((300, y, right, y), fill=(255, 255, 255), width=1)
         image = image.resize(packaged_runtime.SCREENSHOT_SIZE, Image.Resampling.NEAREST)
         path = self.root / name

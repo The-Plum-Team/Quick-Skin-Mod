@@ -1709,9 +1709,9 @@
                     "label": "player name tag",
                     "box": [
                       680,
-                      182,
+                      198,
                       920,
-                      206
+                      226
                     ],
                     "minimum_luma_exclusive": 175,
                     "minimum_pixels": 100
@@ -1756,7 +1756,7 @@
               "capture": {
                 "title": "Catalog rename",
                 "review_tier": "key",
-                "expectation": "After the real rename dialog was confirmed, the renamed external skin is previewed: its tile is selected in the skin column and its new name qs_e2e_renamed is shown in grey under the player's name above the model; both skin tiles keep a face thumbnail and no label still shows the original dropped filename.",
+                "expectation": "After the real rename dialog was confirmed, the renamed external skin is previewed: its tile is selected in the skin column and the centred model wears it; both skin tiles keep a face thumbnail.",
                 "probes": []
               },
               "requires": [

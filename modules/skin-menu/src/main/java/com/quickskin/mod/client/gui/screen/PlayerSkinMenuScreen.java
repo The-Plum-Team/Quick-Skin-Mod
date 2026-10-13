@@ -326,7 +326,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         int rotateY = confirmY - 4 - CONTROL_HEIGHT;
         int feetY = rotateY - 2;
         // Room between the search row (plus the name tag) and the feet
-        int modelTop = searchY + CONTROL_HEIGHT + 34;
+        int modelTop = searchY + CONTROL_HEIGHT + 22;
         float scaleCap = Math.max(40.0f, (feetY - modelTop) / MODEL_HEIGHT_PER_SCALE);
 
         playerPreviewPanel = new PlayerPreviewPanel(centerX, feetY, 0, 0);
@@ -666,29 +666,13 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 : this.minecraft.getUser().getName();
         int textWidth = this.font.width(name);
         int centerX = widget.getLayoutCenterX();
-        int top = widget.getLayoutFeetY() - (int) (widget.getEffectiveScale() * MODEL_HEIGHT_PER_SCALE) - 24;
+        int top = widget.getLayoutFeetY() - (int) (widget.getEffectiveScale() * MODEL_HEIGHT_PER_SCALE) - 14;
         graphics.fill(centerX - textWidth / 2 - 2, top - 1, centerX + (textWidth + 1) / 2 + 2, top + 9, 0x40000000);
 //? if <26.1 {
         graphics.drawString(this.font, name, centerX - textWidth / 2, top, 0xFFFFFFFF, false);
 //?} else {
         graphics.text(this.font, name, centerX - textWidth / 2, top, 0xFFFFFFFF, false);
 //?}
-
-        // The previewed skin's name, in grey under the name tag
-        AssetMetadata previewed = pendingHash != null ? LocalAssetManager.getInstance().getMetadata(pendingHash) : null;
-        if (previewed != null) {
-            String skinName = previewed.friendlyName();
-            int maxWidth = 160;
-            if (this.font.width(skinName) > maxWidth) {
-                skinName = this.font.plainSubstrByWidth(skinName, maxWidth - this.font.width("...")) + "...";
-            }
-            int skinNameWidth = this.font.width(skinName);
-//? if <26.1 {
-            graphics.drawString(this.font, skinName, centerX - skinNameWidth / 2, top + 11, 0xFFAAAAAA);
-//?} else {
-            graphics.text(this.font, skinName, centerX - skinNameWidth / 2, top + 11, 0xFFAAAAAA);
-//?}
-        }
     }
 
     /** The hovered skin's name and model, or what its hover button does. */

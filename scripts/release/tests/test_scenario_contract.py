@@ -1015,7 +1015,7 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "skin_menu_screen",
                     "player name tag",
-                    (680, 182, 920, 206),
+                    (680, 198, 920, 226),
                     175,
                     100,
                 ),

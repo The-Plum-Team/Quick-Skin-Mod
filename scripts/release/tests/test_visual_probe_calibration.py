@@ -30,7 +30,7 @@ TEXT_CANARY = {
     # letter name about 310, so Alice's five letters clear 100 with room to spare.
     ("full", "client_a", "skin_menu_screen"): (
         ("skin column counter", (12, 64, 98, 90), 175, 200),
-        ("player name tag", (680, 182, 920, 206), 175, 100),
+        ("player name tag", (680, 198, 920, 226), 175, 100),
     ),
     ("full", "client_a", "cape_menu_screen"): (
         ("cape menu title", (590, 100, 735, 140), 159, 174),
