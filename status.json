@@ -1,6 +1,6 @@
 {
   "coverage_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3",
-  "observed_at": "2026-10-13T11:08:18Z",
+  "observed_at": "2026-10-13T11:08:50Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -39,10 +39,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -74,9 +74,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766266"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -139,10 +139,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -174,9 +174,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766149"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -239,10 +239,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -274,9 +274,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766255"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -339,10 +339,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -374,9 +374,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766322"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -439,10 +439,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -474,9 +474,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766127"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -539,10 +539,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -574,9 +574,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766099"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -639,10 +639,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -674,9 +674,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766169"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -739,10 +739,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -774,9 +774,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766139"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -839,10 +839,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -874,9 +874,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766087"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -939,10 +939,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -974,9 +974,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766190"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -1039,10 +1039,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -1074,9 +1074,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766230"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -1139,10 +1139,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -1174,9 +1174,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766116"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -1239,10 +1239,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -1274,9 +1274,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766249"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -1339,10 +1339,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -1374,9 +1374,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766062"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -1439,10 +1439,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -1474,9 +1474,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766072"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -1539,10 +1539,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -1574,9 +1574,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766261"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
@@ -1639,10 +1639,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262603518"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 115262704390,
             "name": "Validate CI policy",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262704390"
           },
           {
@@ -1674,9 +1674,9 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38387447902/job/115262766057"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "running",
+        "state": "success",
         "tested_sha": "9ddea001364d7ce7fbf897ba5be2571754a153c3"
       },
       "e2e": {
