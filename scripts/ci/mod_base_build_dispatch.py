@@ -4,10 +4,12 @@
 The kit runs it in a disposable account whose ``HOME`` lies directly below the worker root
 (mod-base ``docs/BUILD-ADAPTER.md``):
 
-* a protected hook (``derive_plan``, ``derive_runtime``, ``verify_target``, ``verify_build``,
-  ``verify_runtime``) runs from the protected copy of the adapter. It reads
+* a protected hook (``derive_plan``, ``derive_scope``, ``derive_runtime``, ``verify_target``,
+  ``verify_build``, ``verify_runtime``) runs from the protected copy of the adapter. It reads
   ``<root>/validation-input/`` and the sealed exports (``<root>/sealed-build/``,
-  ``<root>/sealed-runtime/``) and writes ``$HOME/validation/``;
+  ``<root>/sealed-runtime/``) and writes ``$HOME/validation/``. ``derive_scope`` also reads the
+  kit's ``MB_SCOPE_INPUT``, and a narrowed lane's ``derive_runtime`` and ``verify_runtime`` its
+  ``MB_RUNTIME_SCOPE``;
 * a candidate hook (``policy``, ``build_target``, ``run_lane``) runs from the tested checkout, its
   working directory, and writes ``$HOME/export/`` (``scripts/ci/mod_base_build_candidate.py`` and
   ``scripts/ci/mod_base_build_policy.py`` hold what it does).
@@ -35,6 +37,8 @@ CANDIDATE_HOOKS = ("policy", "build_target", "run_lane")
 KIT_FILES = ("ci-envelope.json", "ci-runtime-envelope.json")
 INPUT_NAMES = ("inventory", "scenario-contract", adapter.PROPERTIES_INPUT)
 MAX_PLAN_BYTES = 4 * 1024 * 1024
+#: The kit's cap on its ``derive_scope`` input line (mod-base ``MAX_CI_SCOPE_BYTES``).
+MAX_SCOPE_INPUT_BYTES = 64 * 1024
 
 
 class Output:
@@ -141,7 +145,8 @@ def _verify_runtime(root: Path, output: Output, lane: str) -> None:
     if not present or any(not path.startswith(prefix) for path in present):
         raise adapter.AdapterError(f"lane {lane} left results outside {prefix}")
     results = runtime / "lanes" / lane
-    summary = adapter.verify_run(mod, lane, entry["obligations"],
+    obligations = adapter.lane_scope(os.environ.get("MB_RUNTIME_SCOPE"), lane, entry["obligations"])
+    summary = adapter.verify_run(mod, lane, obligations,
                                  production=_read(root / "sealed-build", production[0]),
                                  production_name=production[0].rsplit("/", 1)[1],
                                  files={path[len(prefix):] for path in present},
@@ -155,10 +160,24 @@ def _hook(hook: str, unit: str | None, root: Path, output: Output) -> None:
     if hook == "derive_plan":
         mod, _ = _protected_inputs(root)
         output.write("plan.json", adapter.encode(adapter.derive_plan(mod)))
+    elif hook == "derive_scope":
+        mod, _ = _protected_inputs(root)
+        plan = _plan(root, mod)
+        scope_input = adapter.decode(os.environ["MB_SCOPE_INPUT"].encode("utf-8"), "MB_SCOPE_INPUT",
+                                     max_bytes=MAX_SCOPE_INPUT_BYTES)
+        if type(scope_input) is not dict or scope_input.get("format") != adapter.SCOPE_INPUT_FORMAT:
+            raise adapter.AdapterError(f"the scope input is not of the {adapter.SCOPE_INPUT_FORMAT} format")
+        scope, reason = adapter.derive_scope(mod, plan, scope_input.get("changed_paths"))
+        selected = scope["lanes"][0]["scenarios"] if scope["lanes"] else []
+        print(f"quick-skin derive_scope: {reason}: {len(selected)} of "
+              f"{len(plan['lanes'][0]['obligations']) if plan['lanes'] else 0} scenarios per lane "
+              f"({','.join(name.removeprefix('scenario/') for name in selected)})", flush=True)
+        output.write("scope.json", adapter.encode(scope))
     elif hook == "derive_runtime":
         mod, _ = _protected_inputs(root)
-        _unit(_plan(root, mod), "lanes", unit)
-        output.write("runtime.json", adapter.encode({"values": adapter.runtime_values(mod, unit)}))
+        entry = _unit(_plan(root, mod), "lanes", unit)
+        obligations = adapter.lane_scope(os.environ.get("MB_RUNTIME_SCOPE"), unit, entry["obligations"])
+        output.write("runtime.json", adapter.encode({"values": adapter.runtime_values(mod, unit, obligations)}))
     elif hook in ("verify_target", "verify_build"):
         _verify_targets(root, output, hook, unit)
     elif hook == "verify_runtime":
