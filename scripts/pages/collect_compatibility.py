@@ -63,6 +63,10 @@ SOURCE_WORKFLOW = ".github/workflows/mod-compatibility-e2e.yml"
 REVIEW_WORKFLOW = ".github/workflows/mod-compatibility-review.yml"
 SOURCE_EVENTS = frozenset({"repository_dispatch"})
 REVIEW_EVENTS = frozenset({"repository_dispatch", "schedule", "workflow_dispatch"})
+#: The events of a run that may publish (``publish-evidence``): a requested publication or a manual
+#: ``publish`` recovery. A scheduled sweep reviews but never publishes, so it is no family producer
+#: (``site/mod-base.json`` ``families[].producer.events``) and never fills the kit's producer-run window.
+PUBLICATION_EVENTS = frozenset({"repository_dispatch", "workflow_dispatch"})
 MAX_API_PAGES = 4
 MAX_ARTIFACTS = 300
 MAX_PLAN_ARCHIVE_BYTES = 8 * 1024 * 1024
@@ -420,7 +424,7 @@ def _publication_run(
         run.get("id") != publication_run_id
         or run.get("status") != "in_progress"
         or run.get("path") != REVIEW_WORKFLOW
-        or run.get("event") not in REVIEW_EVENTS
+        or run.get("event") not in PUBLICATION_EVENTS
         or run.get("head_branch") != "master"
         or run.get("head_sha") != implementation_sha
         or not isinstance(head_repository, dict)
