@@ -31,6 +31,13 @@ on:
 
 permissions: {}
 
+# One group per source run, never one shared publication group. A publication run hands off exactly
+# one bundle key: mod-base binds a family handoff to the single job and step that site/mod-base.json
+# names (families[].producer), and nothing re-requests the publication of a settled clean source. A
+# shared group whose newest pending run replaced an older one would drop that key's evidence for the
+# head. mod-base v1.5.0 finds each key's handoff by its exact name among the newest 32 successful
+# producer runs of this workflow at the head (site/mod-base.json families[].producer.events), which
+# is what lets the coalesced Pages wakes of the kit's mod-base-pages-publication group take a wave.
 concurrency:
   group: >-
     mod-compatibility-review-${{ github.event.client_payload.source_run_id ||
