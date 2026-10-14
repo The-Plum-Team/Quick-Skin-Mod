@@ -111,7 +111,6 @@
         "workflow": ".github/workflows/mod-compatibility-review.yml",
         "events": [
           "repository_dispatch",
-          "schedule",
           "workflow_dispatch"
         ],
         "job": "Publish compact compatibility evidence",

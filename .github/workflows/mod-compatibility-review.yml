@@ -31,6 +31,13 @@ on:
 
 permissions: {}
 
+# One group per source run, never one shared publication group. A publication run hands off exactly
+# one bundle key: mod-base binds a family handoff to the single job and step that site/mod-base.json
+# names (families[].producer), and nothing re-requests the publication of a settled clean source. A
+# shared group whose newest pending run replaced an older one would drop that key's evidence for the
+# head. mod-base v1.5.0 finds each key's handoff by its exact name among the newest 32 successful
+# producer runs of this workflow at the head (site/mod-base.json families[].producer.events), which
+# is what lets the coalesced Pages wakes of the kit's mod-base-pages-publication group take a wave.
 concurrency:
   group: >-
     mod-compatibility-review-${{ github.event.client_payload.source_run_id ||
@@ -564,7 +571,10 @@ jobs:
       actions: write
       contents: read
     concurrency:
+      # Shares the visual-review drain's probe lock; both keep every pending probe (queue: max)
+      # so neither reviewer's waiting wake is cancelled by a newer one.
       group: quick-skin-claude-capacity-probe
+      queue: max
       cancel-in-progress: false
     outputs:
       fresh_ready: ${{ steps.resolve.outputs.fresh_ready }}
@@ -2074,7 +2084,7 @@ jobs:
       # upload-window contract (site/mod-base.json families[].producer.step).
       - name: Upload the mod-base family handoff
         id: handoff
-        uses: The-Plum-Team/mod-base/actions/publish-family@b4b3831c78b6dac6705db320d1e0ecfc8054371f # v1.3.1
+        uses: The-Plum-Team/mod-base/actions/publish-family@65b541242543a49f6448a7d55d667d4cdd21ae04 # v1.6.0
         with:
           family: mod-compatibility
           key: ${{ steps.collect.outputs.bundle_key }}
@@ -2095,7 +2105,7 @@ jobs:
     # family handoff by id and digest before any validation.
     steps:
       - name: Dispatch the exact family handoff to the protected Pages publisher
-        uses: The-Plum-Team/mod-base/actions/notify-pages@b4b3831c78b6dac6705db320d1e0ecfc8054371f # v1.3.1
+        uses: The-Plum-Team/mod-base/actions/notify-pages@65b541242543a49f6448a7d55d667d4cdd21ae04 # v1.6.0
         with:
           operation: family
           run-id: ${{ github.run_id }}

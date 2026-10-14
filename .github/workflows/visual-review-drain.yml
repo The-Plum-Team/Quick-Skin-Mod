@@ -305,7 +305,11 @@ jobs:
       actions: write
       contents: read
     concurrency:
+      # One probe at a time across both reviewers. GitHub's default queue keeps only the newest
+      # pending job and cancels the others, which cancelled 15 of 17 drain wakes of one wave;
+      # queue: max keeps every pending probe, and each rechecks the shared marker first.
       group: quick-skin-claude-capacity-probe
+      queue: max
       cancel-in-progress: false
     outputs:
       fresh_ready: ${{ steps.resolve.outputs.fresh_ready }}
@@ -2304,7 +2308,7 @@ jobs:
           # report then has a cancelled owner and must be recovered through the original input.
           # An already-reviewed report can also belong to another still-running drain. Neither
           # branch proves terminal publication. Keep this job successful for release dependencies,
-          # but retain both inputs until their existing seven-day expiry. Queue selection suppresses
+          # but retain both inputs until their existing two-day expiry. Queue selection suppresses
           # authenticated reports without retiring their inputs; cancelled owners reopen recovery.
           if [[ "${FRESH_REVIEW_COMPLETE:-false}" == true ||
                 "${ALREADY_REVIEWED:-false}" == true ]]; then

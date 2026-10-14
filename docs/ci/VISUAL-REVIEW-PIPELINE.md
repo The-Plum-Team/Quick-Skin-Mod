@@ -40,7 +40,7 @@ parity. They use read-only permissions, the exact protected checkout, bounded ex
 and complete pre-secret capsule/provenance/image validation. The artifact handoff contains
 the **original ZIP bytes**, not a rewritten manifest or image set. Its name includes the
 current drain run, attempt and original capsule ID; retention is one day. The original
-seven-day queued capsule remains the durable retry source.
+two-day queued capsule remains the durable retry source.
 
 Preparation initially checks out the immutable executing workflow `github.sha`, never
 a selector output. Before any API access, an inline guard checks the selected immutable
@@ -117,7 +117,7 @@ does not bypass the shared capacity scheduler or claim immediate dispatch during
 open circuit.
 
 Freshly completed inputs and inputs skipped as already reviewed remain until their
-existing seven-day expiry. The cleanup job succeeds without any API call for either
+existing two-day expiry. The cleanup job succeeds without any API call for either
 case, preserving release-tail dependencies. A fresh owner can still be cancelled after
 cleanup, and an already-reviewed report can belong to another still-running drain;
 neither is proof that the recovery input can be deleted. Missing and terminally invalid
@@ -174,17 +174,43 @@ previously made scheduled compatibility recovery fail permanently once a name cr
 records, and would have done the same to the shared capacity circuit.
 
 This durability has an explicit storage/API cost. Admission allows at most 512 MiB per
-input: one 16-target generation can retain up to 8 GiB for seven days (up to 56 GiB with
+input: one 16-target generation can retain up to 8 GiB for two days (up to 16 GiB with
 one such generation daily), excluding reports, caches and one-day prepared wrappers.
 This is a per-input/per-wave bound, not a repository-wide aggregate storage cap. The
 16-target queue regression observes 17 unique owner lookups per settled generic sweep
 (16 report owners plus one shared curator); the real client memoizes those owner GETs.
 At the existing 48 daily sweeps, a still-current retained generation therefore adds
-816 owner GETs/day versus an empty input queue, plus any additional artifact-list pages.
+816 owner GETs/day versus an empty input queue, plus its bounded listing reads (below).
 Historical non-current generations do not trigger those owner reads. Each fresh completion
 avoids its previous cleanup metadata GET and DELETE, but that does not establish net API
 or storage savings. Retention itself adds no runner, dispatch or polling loop; the possible
 older-marker expiry retry above must not be counted as guaranteed zero added inference.
+
+## Queue listing, probe queue and capsule retention
+
+Measured on 2026-10-12, `GET /repos/{owner}/{repo}/actions/artifacts` returned HTTP 500 for this
+repository even with `per_page=1` (since at least 2026-10-11T18:27Z), so every scheduled sweep and
+every capacity fan-out failed. The newest 200 curator runs alone held 441 live capsules (22.6 GB);
+the 157 that were reviewed waited a median 0.36 h, 1.03 h at p99 and 2.92 h at most, and none
+waited a day. Name-filtered and per-run listings kept working. Therefore:
+
+- `visual_review_queue.py` never reads the repository-wide listing. A sweep or fan-out lists the
+  curator workflow's runs at the current `master` SHA (`?head_sha=`, at most 10 pages), then the
+  artifacts of each terminal successful/failed run (`/actions/runs/{id}/artifacts`, at most 10
+  pages each), and looks up each eligible key's report and attempt marker plus the generation's
+  block and certificate by exact name. Reaching a bound, or more than 512 pending keys, fails
+  closed. Every capsule and marker is still authenticated against its owner run as before. The
+  curator only uploads a capsule for its own SHA, so this reads the complete eligible queue; a
+  capsule whose name disagreed with its producer SHA would still be admitted by its exact wake.
+- The capacity probe's `quick-skin-claude-capacity-probe` lock, shared with the optional-mod
+  reviewer, uses `queue: max`. The default concurrency queue keeps one pending job and cancels the
+  rest, which cancelled 15 of the 17 drain wakes of one wave; every queued probe now runs in turn
+  and rechecks the fresh shared marker before probing.
+- Only the transient queue capsule `visual-review-input-*` was shortened, from seven to two days.
+  Two days cover the longest observed wait, a five-hour Claude usage window, 30-minute retry
+  cooldowns and sweep cadence with over a day to spare. Reports, generation blocks, anchor
+  certificates and verdict caches are evidence and keep their retention; prepared wrappers,
+  attempt markers and capacity markers already retained one day.
 
 ## Observable model attempts and local retry waits
 
