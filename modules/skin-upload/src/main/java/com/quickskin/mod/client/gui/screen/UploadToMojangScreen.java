@@ -215,17 +215,13 @@ public class UploadToMojangScreen extends Screen {
     //?}
         // Render parent screen in background
         if (this.parent != null) {
-            //? if <26.1 {
-            this.parent.render(graphics, -1, -1, partialTicks);
-            //?} else {
-            GuiCompat.extractParent(this.parent, graphics, partialTicks);
-            //?}
+            BlurHandler.renderParent(this.parent, graphics, partialTicks);
         }
 
         //? if <1.21.6 {
         graphics.flush();
         //?}
-        BlurHandler.renderBlur();
+        BlurHandler.renderBlur(graphics);
 
         // Draw lighter overlay over entire screen (so blur is more visible)
         graphics.fill(0, 0, this.width, this.height, 0x60000000);

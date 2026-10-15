@@ -28,6 +28,13 @@ public class ClientConfig {
     private static final int MAX_CAPE_SPEED_ENTRIES = 4096;
     private static volatile ClientConfig instance;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    /**
+     * Version of the stored settings. A file written before a version existed reads as 0; each
+     * step in {@link #migrate()} brings an older file up to date once.
+     */
+    static final int CURRENT_CONFIG_VERSION = 1;
+
+    public int configVersion = 0;
 
     // GUI Settings
     public boolean showSkinPreviewOverlay = false;
@@ -85,7 +92,7 @@ public class ClientConfig {
     public String skinSortMode = "LATEST_LAST"; // Skin list sorting mode
 
     // Menu Background Style
-    public String menuBackgroundStyle = "opaque_stars"; // "opaque_stars" or "vanilla_blur"
+    public String menuBackgroundStyle = "vanilla_blur"; // "vanilla_blur" or "opaque_stars"
 
     // --- NEW --- Modpack Settings
     public boolean enablePlayerOwnSkinSystem = true; // When enabled, automatically downloads and protects the player's own skin.
@@ -126,9 +133,11 @@ public class ClientConfig {
         if (Files.exists(configPath)) {
             try {
                 String json = BoundedFileReader.readUtf8(configPath, MAX_CONFIG_BYTES);
-                ClientConfig config = GSON.fromJson(json, ClientConfig.class);
+                ClientConfig config = parse(json);
                 if (config != null) {
-                    config.normalize();
+                    if (config.migrate()) {
+                        config.save();
+                    }
                     return config;
                 }
                 QuickSkinInfo.LOGGER.warn("Client config {} contained JSON null; using defaults", configPath);
@@ -139,8 +148,36 @@ public class ClientConfig {
 
         // Return default config and save it
         ClientConfig config = new ClientConfig();
+        config.configVersion = CURRENT_CONFIG_VERSION;
         config.save();
         return config;
+    }
+
+    /** Parses stored settings without migrating them; null for a JSON {@code null}. */
+    static ClientConfig parse(String json) {
+        ClientConfig config = GSON.fromJson(json, ClientConfig.class);
+        if (config != null) {
+            config.normalize();
+        }
+        return config;
+    }
+
+    /**
+     * Brings settings written by an older version up to date.
+     *
+     * @return whether anything changed, so the caller saves the file once
+     */
+    boolean migrate() {
+        if (configVersion >= CURRENT_CONFIG_VERSION) {
+            return false;
+        }
+        if (configVersion < 1) {
+            // 1: the blurred vanilla background replaces the starred one as the default. Every
+            // earlier file stored the old default whether or not the player chose it.
+            menuBackgroundStyle = BackgroundStyle.VANILLA_BLUR.getId();
+        }
+        configVersion = CURRENT_CONFIG_VERSION;
+        return true;
     }
 
     /**
@@ -332,7 +369,7 @@ public class ClientConfig {
             capeAnimationSpeeds.remove(capeAnimationSpeeds.keySet().iterator().next());
         }
         if (skinSortMode == null) skinSortMode = "LATEST_LAST";
-        if (menuBackgroundStyle == null) menuBackgroundStyle = "opaque_stars";
+        if (menuBackgroundStyle == null) menuBackgroundStyle = BackgroundStyle.VANILLA_BLUR.getId();
         activeSkinHash = validHashOrEmpty(activeSkinHash);
         activeCpmModelHash = validHashOrEmpty(activeCpmModelHash);
         if (!("auto".equals(activeModelType) || "classic".equals(activeModelType)
