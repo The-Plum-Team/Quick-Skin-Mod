@@ -219,7 +219,7 @@ public class RotationArcWidget extends AbstractWidget {
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
         RenderSystem.disableBlend();
         //?} else {
-        int color = (Math.round(alpha * 255.0f) << 24) | 0xFFFFFF;
+        int color = Math.round(alpha * 255.0f) << 24 | 0xFFFFFF;
             //? if <1.21.6 {
         graphics.blit(RenderType::guiTextured, texture, x, y, 0.0f, 0.0f, width, height,
                 TEXTURE_WIDTH, TEXTURE_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, color);

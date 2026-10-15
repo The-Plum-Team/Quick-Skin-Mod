@@ -23,8 +23,8 @@ import com.quickskin.mod.client.gui.widget.ImportTileButton;
 //? if <1.21 {
 //?} else {
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
-import com.quickskin.mod.client.gui.widget.SearchField;
 //?}
+import com.quickskin.mod.client.gui.widget.SearchField;
 import com.quickskin.mod.client.gui.widget.SkinEntry;
 import com.quickskin.mod.client.gui.widget.SkinListWidget;
 import com.quickskin.mod.client.services.CooldownService;
