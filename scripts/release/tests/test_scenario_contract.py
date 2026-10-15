@@ -900,7 +900,7 @@ class ScenarioContractTest(unittest.TestCase):
                     "skin_menu_screen",
                     "styled_buttons_vanilla_background",
                     0.02,
-                    (0.1, 0.1, 0.26, 0.45),
+                    (0.25, 0.12, 0.35, 0.5),
                 ),
                 (
                     "local_skin_apply",
@@ -985,7 +985,7 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertIsInstance(opaque, scenario_contract.OpaqueStarsProbe)
         assert isinstance(opaque, scenario_contract.OpaqueStarsProbe)
         self.assertEqual("skin_menu_screen", opaque.step)
-        self.assertEqual((0.10, 0.10, 0.26, 0.45), opaque.region)
+        self.assertEqual((0.25, 0.12, 0.35, 0.50), opaque.region)
         self.assertEqual((32.0, 64, 0.10), (
             opaque.maximum_mean_luma,
             opaque.bright_luma,
@@ -1008,14 +1008,14 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "skin_menu_screen",
                     "skin column counter",
-                    (12, 64, 98, 90),
+                    (16, 96, 120, 156),
                     175,
                     200,
                 ),
                 (
                     "skin_menu_screen",
                     "player name tag",
-                    (680, 198, 920, 226),
+                    (600, 116, 1000, 162),
                     175,
                     100,
                 ),

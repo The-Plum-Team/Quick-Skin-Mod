@@ -25,6 +25,7 @@ import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 //?}
 import com.quickskin.mod.client.gui.util.FileDialogHelper;
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.util.GuiScalingUtils;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
@@ -110,18 +111,30 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private static final Identifier VIGNETTE_LOCATION = Identifier.withDefaultNamespace("textures/misc/vignette.png");
 //?}
 
-    // Base dimensions (will be scaled)
-    private static final int BASE_CAPE_DISPLAY_SIZE = 64;
-    private static final int BASE_CAPE_PADDING = 8;
-    private static final int BASE_SCROLL_SPEED = 20;
     private static final int ACTION_BUTTON_SIZE = 11;
     private static final int HEADER_HEIGHT = 20;
 
-    // Responsive grid constraints
-    private static final int MIN_GRID_WIDTH = 300;
-    private static final int MAX_GRID_WIDTH = 600;
-    private static final int MIN_GRID_HEIGHT = 200;
-    private static final int MAX_GRID_HEIGHT = 500;
+    // Layout, in GUI units of the menu's own scale (see MenuGuiScale)
+    private static final int MARGIN = 8;
+    private static final int CONTROL_HEIGHT = 20;
+    private static final int BUTTON_SPACING = 8;
+    private static final int MAX_BUTTON_WIDTH = 150;
+    /** Room right of the grid for its scrollbar. */
+    private static final int SCROLLBAR_ROOM = 12;
+    /** A cape tile is this share of the canvas height, within the bounds below. */
+    private static final float CAPE_SIZE_SHARE = 0.15f;
+    private static final int MIN_CAPE_SIZE = 32;
+    private static final int MAX_CAPE_SIZE = 64;
+    /** The player preview's column is this share of the canvas width, within the bounds below. */
+    private static final float PREVIEW_WIDTH_SHARE = 0.26f;
+    private static final int MIN_PREVIEW_WIDTH = 80;
+    private static final int MAX_PREVIEW_WIDTH = 170;
+    /** Height of the drawn player per unit of model scale: a player is 1.8 blocks, plus the hat and a margin. */
+    private static final float MODEL_HEIGHT_PER_SCALE = 2.0f;
+    /** The drawn player's width per unit of model scale, arms included. */
+    private static final float MODEL_WIDTH_PER_SCALE = 1.2f;
+    /** The largest model scale, so the model stays in proportion with the tiles and buttons. */
+    private static final float MAX_MODEL_SCALE = 120.0f;
 
     // Adaptive dimensions
     private int capeDisplaySize;
@@ -134,10 +147,6 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
     private PlayerWidget playerWidget;
     private SpeedSlider animationSpeedSlider;
-
-    // Model position offsets from grid edge (base offset + config offset when config is 0)
-    private static final int MODEL_OFFSET_X = 95; // Was 80, now 80 + 15 = 95
-    private static final int MODEL_OFFSET_Y = 121; // Was 85, now 85 + 36 = 121
 
     // Picks up capes copied into the uploads folder from outside the game
     private final LocalAssetFolderWatch localAssetWatch = new LocalAssetFolderWatch();
@@ -153,13 +162,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private static final int STATUS_BAND_FRAME = 5;
     private static final int STATUS_BAND_MARGIN = 2;
 
-    // Player widget positioning
-    private int playerWidgetX, playerWidgetY;
-
     // Player widget rotation state (preserved across resizes)
     private float savedBodyYaw = 20.0f;
     private float savedTargetRotation = 200.0f; // Default after initial toggleRotation()
-    private int playerWidgetWidth, playerWidgetHeight;
 
     @Nullable
     private CapeEntry selectedCape;
@@ -191,104 +196,83 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             this.savedTargetRotation = this.playerWidget.getTargetYRotation();
         }
 
+        // The menu draws at its own GUI scale, chosen from the window size, so it looks the same
+        // whatever scale the player picked; a window resize runs init() again
+        if (this.minecraft != null) {
+            MenuGuiScale.apply(this.minecraft);
+            this.width = this.minecraft.getWindow().getGuiScaledWidth();
+            this.height = this.minecraft.getWindow().getGuiScaledHeight();
+        }
         super.init();
 
-        // Calculate adaptive dimensions based on screen size
-        calculateAdaptiveDimensions();
+        // The layout is sized from the canvas, which the menu's own scale keeps between about 300
+        // and 450 units tall: Import, Remove and Done along the bottom with the animation speed
+        // slider under them, the player on the right standing above the buttons, and the cape
+        // grid filling the rest
+        int sliderY = this.height - MARGIN - CONTROL_HEIGHT;
+        int bottomY = sliderY - CONTROL_HEIGHT - 4;
+        this.bottomButtonY = bottomY;
 
-        // Calculate responsive grid dimensions
-        int desiredGridWidth = (int)(this.width * 0.55f);
-        this.gridWidth = Mth.clamp(
-                desiredGridWidth,
-                MIN_GRID_WIDTH,
-                Math.min(MAX_GRID_WIDTH, this.width - scaleValue(200))
-        );
+        int previewWidth = Mth.clamp(Math.round(this.width * PREVIEW_WIDTH_SHARE), MIN_PREVIEW_WIDTH, MAX_PREVIEW_WIDTH);
+        int previewX = this.width - MARGIN - previewWidth;
 
-        int gridTopY = scaleValue(40);
-        int bottomButtonY = this.height - scaleValue(60);
+        this.capeDisplaySize = Mth.clamp(Math.round(this.height * CAPE_SIZE_SHARE), MIN_CAPE_SIZE, MAX_CAPE_SIZE);
+        this.capePadding = Math.max(4, this.capeDisplaySize / 8);
+        this.scrollSpeed = Math.max(10, this.capeDisplaySize / 3);
+
+        // The grid takes whole tiles out of the room left of the preview and is centred in it.
         // Keep a band between the grid's frame (5 px below the grid) and the buttons for the
         // import/delete status line, so the message never covers the button labels.
-        int statusBand = Math.max(scaleValue(10), STATUS_BAND_FRAME + this.font.lineHeight + STATUS_BAND_MARGIN * 2);
-        int availableHeight = bottomButtonY - gridTopY - statusBand;
-        this.bottomButtonY = bottomButtonY;
-
-        this.gridHeight = Mth.clamp(
-                availableHeight,
-                MIN_GRID_HEIGHT,
-                MAX_GRID_HEIGHT
-        );
-
-        // Calculate button positions
-        int buttonSpacing = 10;
-        int buttonWidth = Math.min(150, (this.width - 60 - buttonSpacing * 2) / 3);
-        int totalButtonWidth = buttonWidth * 3 + buttonSpacing * 2;
-        int buttonStartX = (this.width - totalButtonWidth) / 2;
-
-        // Calculate grid position (aligned with back button at 25%)
-        int backButtonX = buttonStartX + (buttonWidth + buttonSpacing) * 2;
-        int gridRightEdge = backButtonX + (int)(buttonWidth * 0.25f);
-        this.gridX = gridRightEdge - this.gridWidth;
-        this.gridY = gridTopY;
-
-        // Refine capesPerRow for actual grid width
+        int gridAreaWidth = previewX - SCROLLBAR_ROOM - MARGIN;
+        this.gridWidth = gridAreaWidth;
         refineCapesPerRowForGridWidth();
+        this.gridWidth = Math.min(gridAreaWidth,
+                this.capesPerRow * (this.capeDisplaySize + this.capePadding) + this.capePadding);
+        this.gridX = MARGIN + (gridAreaWidth - this.gridWidth) / 2;
+        this.gridY = MARGIN + 4;
+        int statusBand = STATUS_BAND_FRAME + this.font.lineHeight + STATUS_BAND_MARGIN * 2;
+        this.gridHeight = Math.max(HEADER_HEIGHT + this.capeDisplaySize + this.capePadding * 2,
+                bottomY - statusBand - this.gridY);
+
+        int buttonWidth = Math.min(MAX_BUTTON_WIDTH, (this.width - 2 * MARGIN - BUTTON_SPACING * 2) / 3);
+        int buttonStartX = (this.width - (buttonWidth * 3 + BUTTON_SPACING * 2)) / 2;
 
         // Load capes
         refreshCapeList();
         updateGridDimensions();
 
         // Create buttons
-        int bottomY = this.height - scaleValue(60);
-
         Button importButton = this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                buttonStartX, bottomY, buttonWidth, scaleValue(20),
+                buttonStartX, bottomY, buttonWidth, CONTROL_HEIGHT,
                 Component.translatable("quickskin.button.import_cape"),
                 button -> importCape()
         ));
 
         Button removeButton = this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                buttonStartX + buttonWidth + buttonSpacing, bottomY, buttonWidth, scaleValue(20),
+                buttonStartX + buttonWidth + BUTTON_SPACING, bottomY, buttonWidth, CONTROL_HEIGHT,
                 Component.translatable("quickskin.button.remove_cape"),
                 button -> removeCape()
         ));
 
         Button closeButton = this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createPrimary(
-                buttonStartX + (buttonWidth + buttonSpacing) * 2, bottomY, buttonWidth, scaleValue(20),
+                buttonStartX + (buttonWidth + BUTTON_SPACING) * 2, bottomY, buttonWidth, CONTROL_HEIGHT,
                 Component.translatable("quickskin.button.done"),
                 button -> this.onClose()
         ));
 
         // Create animation speed slider (centered, below buttons)
-        int sliderWidth = 200;
-        int sliderHeight = 20;
+        int sliderWidth = Math.min(200, this.width - 2 * MARGIN);
         int sliderX = (this.width - sliderWidth) / 2;
-        int sliderY = bottomY + scaleValue(20) + 5; // Position below the buttons
-        this.animationSpeedSlider = this.addRenderableWidget(new SpeedSlider(sliderX, sliderY, sliderWidth, sliderHeight));
+        this.animationSpeedSlider = this.addRenderableWidget(new SpeedSlider(sliderX, sliderY, sliderWidth, CONTROL_HEIGHT));
         // Initially hidden - will be shown when an animated cape is selected
         this.animationSpeedSlider.visible = false;
         this.animationSpeedSlider.active = false;
 
-        // Create player preview widget
-        int availableWidthForWidget = this.width - (this.gridX + this.gridWidth) - scaleValue(40);
-        int availableHeightForWidget = bottomY - this.gridY - scaleValue(20);
-
-        int widgetSize = Mth.clamp(
-                Math.min(availableWidthForWidget, availableHeightForWidget),
-                scaleValue(100),
-                scaleValue(200)
-        );
-
-        this.playerWidgetWidth = widgetSize;
-        this.playerWidgetHeight = (int)(widgetSize * 1.8f);
-
-        // Position player widget
-        if (this.playerWidgetX == 0 && this.playerWidgetY == 0) {
-            int gridRight = this.gridX + this.gridWidth;
-            int gridCenter = this.gridY + (this.gridHeight / 2);
-
-            this.playerWidgetX = gridRight + scaleValue(20);
-            this.playerWidgetY = gridCenter - (this.playerWidgetHeight / 2);
-        }
+        // The player stands in its column above the buttons, as large as the column allows
+        int feetY = bottomY - 6;
+        int previewTop = MARGIN + 4;
+        float modelScale = Math.min(MAX_MODEL_SCALE, Math.min(
+                (feetY - previewTop) / MODEL_HEIGHT_PER_SCALE, previewWidth / MODEL_WIDTH_PER_SCALE));
 
         LocalPlayer player = Minecraft.getInstance().player;
 //? if <1.21.11 {
@@ -393,15 +377,12 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         this.playerWidget = addRenderableWidget(new PlayerWidget(
-                this.playerWidgetX, this.playerWidgetY,
-                this.playerWidgetWidth, this.playerWidgetHeight,
+                previewX, previewTop, previewWidth, feetY - previewTop,
                 skinLocation, null, null, modelType));
         this.playerWidget.setContext(com.quickskin.mod.client.gui.widget.PlayerWidget.WidgetContext.CAPE_MENU);
-
-        // Set custom reference point to right side center of capes grid with fixed offset
-        int referenceX = this.gridX + this.gridWidth + MODEL_OFFSET_X;
-        int referenceY = this.gridY + (this.gridHeight / 2) + MODEL_OFFSET_Y;
-        this.playerWidget.setCustomReferencePoint(referenceX, referenceY);
+        // Feet at the bottom centre of the column, no larger than the column allows
+        this.playerWidget.setCustomReferencePoint(previewX + previewWidth / 2, feetY);
+        this.playerWidget.setScaleCap(modelScale);
 
         // Initialize selected cape based on config/currently equipped cape (AFTER widget is created)
         initializeSelectedCape();
@@ -411,31 +392,6 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // Restore saved rotation state
         this.playerWidget.setRotationState(this.savedBodyYaw, this.savedTargetRotation);
-    }
-
-    private void calculateAdaptiveDimensions() {
-        float scale = GuiScalingUtils.getScaleMultiplier(this.width, this.height);
-
-        this.capeDisplaySize = Math.max(48, Math.min(96, Math.round(BASE_CAPE_DISPLAY_SIZE * scale)));
-        this.capePadding = Math.max(4, Math.round(BASE_CAPE_PADDING * scale));
-        this.scrollSpeed = Math.max(10, Math.round(BASE_SCROLL_SPEED * scale));
-
-        int estimatedGridWidth = (int)(this.width * 0.55f);
-        int capeWithPadding = capeDisplaySize + capePadding;
-        this.capesPerRow = Mth.clamp(
-                (estimatedGridWidth - capePadding * 2) / capeWithPadding,
-                2,
-                8
-        );
-
-        if (GuiScalingUtils.isSmallScreen(this.width, this.height)) {
-            this.capesPerRow = Math.max(2, this.capesPerRow - 1);
-            this.capeDisplaySize = Math.round(capeDisplaySize * 0.85f);
-        }
-
-        if (GuiScalingUtils.isLargeScreen(this.width, this.height)) {
-            this.capesPerRow = Math.min(10, this.capesPerRow + 1);
-        }
     }
 
     private void refineCapesPerRowForGridWidth() {
@@ -990,6 +946,11 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
     public void tick() {
         super.tick();
+        // Another mod can put the player's scale back on the window after init(), as some do
+        // whenever a screen opens; take the menu's scale back and lay the menu out again
+        if (this.minecraft != null && MenuGuiScale.apply(this.minecraft)) {
+            rebuildWidgets();
+        }
         if (importMessageTimer > 0) {
             importMessageTimer--;
         }
@@ -2083,6 +2044,15 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         // Disable the default dark background overlay - we render our own custom background
 //?}
+    }
+
+    @Override
+    public void removed() {
+        // The next screen, the cape editor or the world opens at the player's own scale
+        if (this.minecraft != null) {
+            MenuGuiScale.restore(this.minecraft);
+        }
+        super.removed();
     }
 
     @Override

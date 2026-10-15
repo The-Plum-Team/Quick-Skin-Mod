@@ -2113,7 +2113,11 @@ public class PlayerModelRenderer {
                 break;
             case "idle":
             default:
-                setupIdlePose(model, t, lerpFactor);
+                if (playerData.isShowcaseIdle()) {
+                    setupShowcaseIdlePose(model, elapsedTime);
+                } else {
+                    setupIdlePose(model, t, lerpFactor);
+                }
                 break;
         }
 
@@ -2226,6 +2230,51 @@ public class PlayerModelRenderer {
         model.leftLeg.xRot = prevLeftLegRotX;
         model.leftLeg.yRot = 0.0f;
         model.leftLeg.zRot = 0.0f;
+    }
+
+    /**
+     * The skin menu's idle: the player stands squarely facing the viewer with the arms and legs a
+     * little apart, so the whole skin shows, and breathes slowly. The breath lifts the arms a
+     * touch away from the body and lets the head drift, each on its own slow period, so the
+     * motion never looks mechanical. Every angle is a smooth function of time, with no lerped
+     * state, so the stance is the same on every frame for the same time.
+     */
+    private static void setupShowcaseIdlePose(PlayerModel model, float seconds) {
+        MinecraftCompat.INSTANCE.setYoung(model, false);
+        MinecraftCompat.INSTANCE.setCrouching(model, false);
+        MinecraftCompat.INSTANCE.setRiding(model, false);
+        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
+
+        // One breath every ~4 seconds; the head and arm sway drift on slower periods.
+        float breath = (float) Math.sin(seconds * (2.0 * Math.PI / 4.0));
+        float drift = (float) Math.sin(seconds * (2.0 * Math.PI / 7.0));
+        float sway = (float) Math.sin(seconds * (2.0 * Math.PI / 5.5) + 1.3);
+
+        model.head.xRot = -0.02f + breath * 0.02f;
+        model.head.yRot = drift * 0.08f;
+        model.head.zRot = sway * 0.025f;
+
+        model.body.xRot = breath * 0.012f;
+        model.body.yRot = 0.0f;
+        model.body.zRot = 0.0f;
+
+        // Arms held a little away from the body, opening slightly on each breath. Outward is
+        // +zRot for the right arm and -zRot for the left.
+        float armOut = 0.13f + (breath * 0.5f + 0.5f) * 0.035f;
+        model.rightArm.xRot = sway * 0.035f;
+        model.rightArm.yRot = 0.0f;
+        model.rightArm.zRot = armOut;
+        model.leftArm.xRot = -sway * 0.035f;
+        model.leftArm.yRot = 0.0f;
+        model.leftArm.zRot = -armOut;
+
+        // Feet planted apart, in the same outward sense as the arms.
+        model.rightLeg.xRot = 0.0f;
+        model.rightLeg.yRot = 0.0f;
+        model.rightLeg.zRot = 0.07f;
+        model.leftLeg.xRot = 0.0f;
+        model.leftLeg.yRot = 0.0f;
+        model.leftLeg.zRot = -0.07f;
     }
 
     /**

@@ -459,6 +459,8 @@ public class PlayerWidget extends AbstractWidget {
      */
     public void setContext(WidgetContext context) {
         this.context = context;
+        // The skin menu presents the whole skin: a squarely facing stance for its idle.
+        this.previewData.setShowcaseIdle(context == WidgetContext.SKIN_MENU);
 //? if <1.21 {
     }
 

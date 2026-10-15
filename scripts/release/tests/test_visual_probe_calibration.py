@@ -24,13 +24,13 @@ from generate_e2e_cape_fixture import generate as generate_cape_fixture  # noqa:
 # canary for the known 1600x900 Minecraft UI geometry. An intentional oracle change must update
 # both the contract and this independently reviewed reference.
 TEXT_CANARY = {
-    # The menu has no panel: the "Skins N/M" counter heads the left skin column, and the
+    # The menu has no panel: "Skins" over the N/M counter heads the left skin column, and the
     # player's name tag ("Alice") sits above the centred model. A real 1920-wide frame of the
     # counter keeps about 320 glyph pixels above luma 175 after the 1600x900 resize, and a nine
     # letter name about 310, so Alice's five letters clear 100 with room to spare.
     ("full", "client_a", "skin_menu_screen"): (
-        ("skin column counter", (12, 64, 98, 90), 175, 200),
-        ("player name tag", (680, 198, 920, 226), 175, 100),
+        ("skin column counter", (16, 96, 120, 156), 175, 200),
+        ("player name tag", (600, 116, 1000, 162), 175, 100),
     ),
     ("full", "client_a", "cape_menu_screen"): (
         ("cape menu title", (590, 100, 735, 140), 159, 174),
@@ -67,16 +67,16 @@ TEXT_CANARY = {
         ("non-admin server notice", (495, 655, 1105, 688), 175, 1700),
     ),
     # The disabled label is dimmer than ordinary GUI text; both lanes retained 342
-    # glyph pixels above luma 127 for the observed three-digit countdown. The label now sits on
-    # the bottom-centre Confirm button.
+    # glyph pixels above luma 127 for the observed three-digit countdown at GUI size. The label now
+    # sits on the bottom-centre Confirm button, drawn larger, so it keeps at least as many.
     ("server-policy", "client_a", "cooldown_skin_menu"): (
-        ("cooldown button label", (700, 856, 900, 884), 127, 240),
+        ("cooldown button label", (560, 768, 1040, 818), 127, 240),
     ),
 }
 
 OPAQUE_STARS_CANARY = (
     ("full", "client_a", "skin_menu_screen"),
-    (0.10, 0.10, 0.26, 0.45),
+    (0.25, 0.12, 0.35, 0.50),
     32.0,
     64,
     0.10,

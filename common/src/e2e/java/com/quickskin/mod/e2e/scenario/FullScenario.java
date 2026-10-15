@@ -10,6 +10,7 @@ import com.quickskin.mod.client.gui.screen.RenameScreen;
 import com.quickskin.mod.client.gui.screen.SettingsScreen;
 import com.quickskin.mod.client.gui.util.CapeImportProcessor;
 import com.quickskin.mod.client.gui.util.GuiScaleManager;
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
 import com.quickskin.mod.client.services.AnimatedTextureManager;
@@ -119,6 +120,8 @@ public final class FullScenario implements Scenario {
     private static final int ANIMATED_EVIDENCE_FRAME_B = 1;
     /** Previous-poll layout stamp of the open skin menu; {@code Long.MIN_VALUE} = not held yet. */
     private long skinMenuLayoutStamp = Long.MIN_VALUE;
+    /** The player's GUI Scale option before the skin menu opened, which the menu must leave alone. */
+    private final AtomicInteger scaleOptionBeforeSkinMenu = new AtomicInteger();
     volatile String previewCapeHashA;  // set by the cape-preview steps (never applied)
     volatile String previewCapeHashB;
     /** Rendered ticks a pushed preview cape must survive before its screenshot is captured. */
@@ -245,15 +248,16 @@ public final class FullScenario implements Scenario {
                 }));
 
         // 2b. skin menu screenshot ----------------------------------------------------------------
-        // The skin screen's first init() may early-return while GuiScaleManager forces the menu
-        // scale and the display resize re-enters init(); a frame presented before that re-init lays
-        // the drop-zone copy a text row higher than the settled layout, dropping its glyphs out of
-        // the contract's required-gui-text box. So readiness is the SETTLED layout (forced scale
-        // applied + tick-over-tick stable layout stamp), not the bare instanceof, and settleTicks
-        // holds it so the captured last-presented frame really shows it (ticks are not frames:
-        // under software rendering several ticks can share one frame).
+        // Readiness is the SETTLED layout (a tick-over-tick stable layout stamp), not the bare
+        // instanceof, and settleTicks holds it so the captured last-presented frame really shows
+        // it (ticks are not frames: under software rendering several ticks can share one frame).
+        // The menu draws at its own GUI scale on the window only and must never change the
+        // player's GUI Scale option: other mods break when the option changes under them.
         steps.add(Step.of("skin_menu_screen")
-                .action(() -> VanillaShim.setScreen(mc, new PlayerSkinMenuScreen(null)))
+                .action(() -> {
+                    scaleOptionBeforeSkinMenu.set(mc.options.guiScale().get());
+                    VanillaShim.setScreen(mc, new PlayerSkinMenuScreen(null));
+                })
                 .minTicks(30)
                 .ready(() -> skinMenuLayoutSettled(mc))
                 .settleTicks(20)
@@ -262,12 +266,16 @@ public final class FullScenario implements Scenario {
                 .assertion(() -> {
                     if (!(VanillaShim.currentScreen(mc) instanceof PlayerSkinMenuScreen))
                         return Step.Result.fail("skin menu not open: " + screenName(mc));
+                    int option = mc.options.guiScale().get();
+                    if (option != scaleOptionBeforeSkinMenu.get())
+                        return Step.Result.fail("the skin menu changed the GUI Scale option from "
+                                + scaleOptionBeforeSkinMenu.get() + " to " + option);
                     int scale = VanillaShim.guiScale(mc);
-                    if (scale != GuiScaleManager.getOptimalMenuScale())
+                    if (scale != MenuGuiScale.scaleFor(mc))
                         return Step.Result.fail("menu GUI scale never settled: window=" + scale
-                                + " expected=" + GuiScaleManager.getOptimalMenuScale());
-                    return Step.Result.pass(
-                            "PlayerSkinMenuScreen open, layout settled at scale " + scale);
+                                + " expected=" + MenuGuiScale.scaleFor(mc));
+                    return Step.Result.pass("PlayerSkinMenuScreen open, layout settled at the "
+                            + "menu's scale " + scale + " with the GUI Scale option left at " + option);
                 }));
 
         // 2c. external drop -----------------------------------------------------------------------
@@ -1594,11 +1602,11 @@ public final class FullScenario implements Scenario {
     // ===== skin-menu layout settle =============================================================
 
     /**
-     * True once the skin menu is open at the forced GUI scale with a tick-over-tick stable layout.
+     * True once the skin menu is open at its own GUI scale with a tick-over-tick stable layout.
      *
-     * <p>The scale check proves the resizeDisplay()-&gt;second-init() re-entrancy completed; the
-     * stamp must then repeat on the next poll, the same consecutive-tick stability the propagation
-     * observers hold before their captures. The stamp is built only from signals this source set
+     * <p>The scale check proves the menu's scale reached the window; the stamp must then repeat
+     * on the next poll, the same consecutive-tick stability the
+     * propagation observers hold before their captures. The stamp is built only from signals this source set
      * already uses on every version (scaled window dimensions, widget count): the list widget's own
      * geometry accessors are era-preprocessed and would not compile against every lane. Losing the
      * precondition resets the stamp, so a flickering layout is never reported settled.
@@ -1606,7 +1614,7 @@ public final class FullScenario implements Scenario {
     boolean skinMenuLayoutSettled(Minecraft mc) {
         Screen sc = VanillaShim.currentScreen(mc);
         if (!(sc instanceof PlayerSkinMenuScreen)
-                || VanillaShim.guiScale(mc) != GuiScaleManager.getOptimalMenuScale()) {
+                || VanillaShim.guiScale(mc) != MenuGuiScale.scaleFor(mc)) {
             skinMenuLayoutStamp = Long.MIN_VALUE; // precondition lost; demand a fresh hold
             return false;
         }

@@ -1,5 +1,7 @@
 package com.quickskin.mod.client.gui.widget;
 
+import com.mojang.blaze3d.platform.InputConstants;
+import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.common.data.AssetMetadata;
 import net.fabricmc.api.EnvType;
@@ -10,65 +12,109 @@ import net.minecraft.client.gui.GuiGraphics;
 //?} else {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 //?}
-import net.minecraft.client.gui.components.ContainerObjectSelectionList;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarratedElementType;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * Scrollable column of skin tiles on the left of the skin menu
+ * The skin column of the skin menu: a scrollable grid of square skin tiles, a few across, with a
+ * slim scrollbar beside it.
+ *
+ * <p>The mouse wheel scrolls the grid and the scrollbar's thumb can be dragged. A click on a tile
+ * selects its skin, or runs the action under the mouse on the strip a hovered tile shows.
  */
 @Environment(EnvType.CLIENT)
-public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
+public class SkinListWidget extends AbstractWidget {
+
+    /** Space between tiles. */
+    public static final int GAP = 4;
+    /** Space between the tiles and the scrollbar, and the scrollbar's width. */
+    public static final int SCROLLBAR_GAP = 3;
+    public static final int SCROLLBAR_WIDTH = 3;
+    private static final int MIN_THUMB_HEIGHT = 12;
 
     private final PlayerSkinMenuScreen parentScreen;
-    private final Minecraft mc;
-    @org.jetbrains.annotations.Nullable
+    private final int tileSize;
+    /** Tiles per row. */
+    private final int columns;
+    private final List<SkinEntry> entries = new ArrayList<>();
+    @Nullable
+    private SkinEntry selected;
+    @Nullable
     private SkinEntry hoveredEntry;
-    //? if >=1.21 {
-    private int xPosition;
-    private final int itemHeight;
-    //?}
+    private double scrollAmount;
+    private boolean draggingScrollbar;
+    private double scrollbarGrabOffset;
 
-    public SkinListWidget(PlayerSkinMenuScreen parentScreen, Minecraft mc, int width, int height,
-        //? if <1.21 {
-                         int y, int entryHeight) {
-        super(mc, width, height, y, y + height, entryHeight);
-        //?} else {
-                         int y, int x, int entryHeight) {
-        super(mc, width, height, y, entryHeight);
-        //?}
+    public SkinListWidget(PlayerSkinMenuScreen parentScreen, Minecraft mc, int x, int y, int height,
+                          int tileSize, int columns) {
+        super(x, y, widthFor(tileSize, columns), height, Component.translatable("quickskin.menu.skins"));
         this.parentScreen = parentScreen;
-        this.mc = mc;
-        //? if >=1.21 {
-        this.xPosition = x;
-        this.itemHeight = entryHeight;
-        // Set the widget position
-        this.setX(x);
-        //?}
+        this.tileSize = tileSize;
+        this.columns = columns;
+    }
+
+    /** Width of the grid plus its scrollbar, for tiles of the given size. */
+    public static int widthFor(int tileSize, int columns) {
+        return gridWidthFor(tileSize, columns) + SCROLLBAR_GAP + SCROLLBAR_WIDTH;
+    }
+
+    /** Width of the tiles alone, without the scrollbar. */
+    public static int gridWidthFor(int tileSize, int columns) {
+        return columns * tileSize + (columns - 1) * GAP;
     }
 
     /**
      * Add a skin entry to the list
      */
     public void addSkinEntry(AssetMetadata metadata) {
-        this.addEntry(new SkinEntry(this, metadata));
+        entries.add(new SkinEntry(this, metadata));
     }
 
     /**
-     * Clear all entries (public wrapper for protected method)
+     * Clear all entries
      */
     public void clearSkinEntries() {
-        this.clearEntries();
+        entries.clear();
+        selected = null;
+        hoveredEntry = null;
+        scrollAmount = 0;
+    }
+
+    /** The skins in display order. */
+    public List<SkinEntry> children() {
+        return Collections.unmodifiableList(entries);
+    }
+
+    @Nullable
+    public SkinEntry getSelected() {
+        return selected;
+    }
+
+    public void setSelected(@Nullable SkinEntry entry) {
+        this.selected = entry;
     }
 
     /**
      * Make an entry visible by scrolling to it
      */
     public void makeVisible(SkinEntry entry) {
-        //? if <1.21.9 {
-        this.ensureVisible(entry);
-        //?} else {
-        this.scrollToEntry(entry);
-        //?}
+        int index = entries.indexOf(entry);
+        if (index < 0) {
+            return;
+        }
+        int top = rowOffset(index);
+        if (top < scrollAmount) {
+            setScrollAmount(top);
+        } else if (top + tileSize > scrollAmount + height) {
+            setScrollAmount(top + tileSize - height);
+        }
     }
 
     /**
@@ -78,105 +124,198 @@ public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
         parentScreen.onSkinSelected(entry);
     }
 
-    @Override
-    public int getRowWidth() {
-        return SkinEntry.rowWidth(entryTileSize());
-    }
-
-    /** The square tile size of one entry: the row height less vanilla's row padding. */
+    /** The square tile size of one entry. */
     public int entryTileSize() {
-        //? if <1.21 {
-        return this.itemHeight - 4;
-        //?} else {
-        return itemHeight - 4;
-        //?}
-    }
-
-    /** Where a row after the last one would start, scrolled with the list: the import tile's place. */
-    public int contentBottom() {
-        return this.getRowTop(this.getItemCount());
-    }
-
-    //? if <1.21 {
-    @Override
-    public int getRowLeft() {
-        return this.x0 + 4;
-    }
-    //?} else if <26.1 {
-
-    // The column floats over the menu background: no list backdrop or header/footer separators.
-    @Override
-    protected void renderListBackground(GuiGraphics graphics) {
-    }
-
-    @Override
-    protected void renderListSeparators(GuiGraphics graphics) {
-    }
-    //?} else {
-
-    // The column floats over the menu background: no list backdrop or header/footer separators.
-    @Override
-    protected void extractListBackground(GuiGraphicsExtractor graphics) {
-    }
-
-    @Override
-    protected void extractListSeparators(GuiGraphicsExtractor graphics) {
-    }
-    //?}
-
-    /** Records the entry under the mouse this frame, for the screen's tooltip. */
-    void setHoveredEntry(SkinEntry entry) {
-        this.hoveredEntry = entry;
+        return tileSize;
     }
 
     /** The entry the mouse was over in the last drawn frame, or {@code null}. */
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     public SkinEntry getHoveredEntry() {
         return hoveredEntry;
     }
 
+    private int stride() {
+        return tileSize + GAP;
+    }
+
+    /** Distance from the top of the content to the top of an entry's row. */
+    private int rowOffset(int index) {
+        return (index / columns) * stride();
+    }
+
+    private int contentHeight() {
+        int rows = (entries.size() + columns - 1) / columns;
+        return Math.max(0, rows * stride() - GAP);
+    }
+
+    private int maxScroll() {
+        return Math.max(0, contentHeight() - height);
+    }
+
+    private void setScrollAmount(double amount) {
+        scrollAmount = Math.max(0, Math.min(maxScroll(), amount));
+    }
+
+    private int tileX(int index) {
+        return getX() + (index % columns) * stride();
+    }
+
+    private int tileY(int index) {
+        return getY() + rowOffset(index) - (int) Math.round(scrollAmount);
+    }
+
+    private int scrollbarX() {
+        return getX() + gridWidthFor(tileSize, columns) + SCROLLBAR_GAP;
+    }
+
+    private boolean isInViewport(double mouseX, double mouseY) {
+        return mouseX >= getX() && mouseX < getX() + gridWidthFor(tileSize, columns)
+                && mouseY >= getY() && mouseY < getY() + height;
+    }
+
+    private boolean isOnScrollbar(double mouseX, double mouseY) {
+        int x = scrollbarX();
+        // A little slack either side: the bar itself is only a few pixels wide
+        return maxScroll() > 0 && mouseX >= x - 2 && mouseX < x + SCROLLBAR_WIDTH + 2
+                && mouseY >= getY() && mouseY < getY() + height;
+    }
+
+    private int thumbHeight() {
+        int content = Math.max(1, contentHeight());
+        return Math.max(MIN_THUMB_HEIGHT, Math.min(height, height * height / content));
+    }
+
+    private int thumbY() {
+        int max = maxScroll();
+        return getY() + (max == 0 ? 0 : (int) Math.round(scrollAmount * (height - thumbHeight()) / max));
+    }
+
     @Override
-    //? if <1.21.4 {
-    protected int getScrollbarPosition() {
-        //? if <1.21 {
-        return this.x1 - 6;
-        //?} else {
-        return this.getRight() - 6;
-        //?}
+    //? if <26.1 {
+    protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
     //?} else {
-    protected int scrollBarX() {
-        return this.getRight() - 6;
+    protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTicks) {
     //?}
+        setScrollAmount(scrollAmount); // the content may have shrunk since the last frame
+        hoveredEntry = null;
+        boolean mouseInside = isInViewport(mouseX, mouseY) && !draggingScrollbar;
+
+        graphics.enableScissor(getX(), getY(), getX() + gridWidthFor(tileSize, columns), getY() + height);
+        for (int i = 0; i < entries.size(); i++) {
+            int y = tileY(i);
+            if (y + tileSize <= getY() || y >= getY() + height) {
+                continue;
+            }
+            int x = tileX(i);
+            boolean hovered = mouseInside && mouseX >= x && mouseX < x + tileSize
+                    && mouseY >= y && mouseY < y + tileSize;
+            SkinEntry entry = entries.get(i);
+            entry.render(graphics, x, y, tileSize, mouseX, mouseY, hovered, entry == selected);
+            if (hovered) {
+                hoveredEntry = entry;
+            }
+        }
+        graphics.disableScissor();
+
+        // A slim scrollbar beside the tiles, only when they do not all fit
+        if (maxScroll() > 0) {
+            int x = scrollbarX();
+            graphics.fill(x, getY(), x + SCROLLBAR_WIDTH, getY() + height, 0x40FFFFFF);
+            boolean thumbLit = draggingScrollbar || isOnScrollbar(mouseX, mouseY);
+            int thumbY = thumbY();
+            graphics.fill(x, thumbY, x + SCROLLBAR_WIDTH, thumbY + thumbHeight(), thumbLit ? 0xFFFFFFFF : 0xFFB0B0B0);
+        }
     }
 
     @Override
-    //? if <1.21 {
-    protected void renderList(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        hoveredEntry = null;
-        super.renderList(graphics, mouseX, mouseY, partialTicks);
+    //? if <1.21.9 {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
     //?} else {
-    public int getX() {
-        return xPosition;
-    }
-
-    @Override
-    public int getRowLeft() {
-        return xPosition + 4;
-    }
-
-    @Override
-        //? if <26.1 {
-    public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        hoveredEntry = null;
-        super.renderWidget(graphics, mouseX, mouseY, partialTicks);
-        //?} else {
-    public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTicks) {
-        hoveredEntry = null;
-        // Call parent to render the list entries
-        super.extractWidgetRenderState(graphics, mouseX, mouseY, partialTicks);
-        //?}
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean focused) {
+        double mouseX = GuiCompat.mouseX(event);
+        double mouseY = GuiCompat.mouseY(event);
+        int button = GuiCompat.mouseButton(event);
     //?}
+        if (!visible || button != InputConstants.MOUSE_BUTTON_LEFT) {
+            return false;
+        }
+        if (isOnScrollbar(mouseX, mouseY)) {
+            draggingScrollbar = true;
+            int thumbY = thumbY();
+            boolean onThumb = mouseY >= thumbY && mouseY < thumbY + thumbHeight();
+            // Grabbing the thumb keeps its offset; clicking the track centres the thumb there
+            scrollbarGrabOffset = onThumb ? mouseY - thumbY : thumbHeight() / 2.0;
+            dragScrollbarTo(mouseY);
+            return true;
+        }
+        if (!isInViewport(mouseX, mouseY)) {
+            return false;
+        }
+        for (int i = 0; i < entries.size(); i++) {
+            int x = tileX(i);
+            int y = tileY(i);
+            if (mouseX >= x && mouseX < x + tileSize && mouseY >= y && mouseY < y + tileSize) {
+                return entries.get(i).click();
+            }
+        }
+        return false;
+    }
 
+    @Override
+    //? if <1.21.9 {
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    //?} else {
+    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dragX, double dragY) {
+        double mouseY = GuiCompat.mouseY(event);
+    //?}
+        if (draggingScrollbar) {
+            dragScrollbarTo(mouseY);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    //? if <1.21.9 {
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    //?} else {
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+    //?}
+        boolean wasDragging = draggingScrollbar;
+        draggingScrollbar = false;
+        return wasDragging;
+    }
+
+    private void dragScrollbarTo(double mouseY) {
+        int track = height - thumbHeight();
+        if (track <= 0) {
+            return;
+        }
+        double thumbTop = mouseY - scrollbarGrabOffset - getY();
+        setScrollAmount(thumbTop / track * maxScroll());
+    }
+
+    @Override
+    //? if <1.20.2 {
+    public boolean mouseScrolled(double mouseX, double mouseY, double deltaY) {
+    //?} else {
+    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+    //?}
+        if (!visible || maxScroll() == 0 || !isMouseOver(mouseX, mouseY)) {
+            return false;
+        }
+        setScrollAmount(scrollAmount - deltaY * stride() / 2.0);
+        return true;
+    }
+
+    @Override
+    protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {
+        narrationElementOutput.add(NarratedElementType.TITLE, getMessage());
+        if (selected != null) {
+            narrationElementOutput.add(NarratedElementType.USAGE,
+                    Component.literal(selected.getSortName()));
+        }
     }
 
     /**
@@ -184,19 +323,5 @@ public class SkinListWidget extends ContainerObjectSelectionList<SkinEntry> {
      */
     public void requestDeletion(SkinEntry entry) {
         parentScreen.showDeleteConfirmation(entry.getMetadata());
-    }
-
-    /**
-     * Request rename dialog for a skin
-     */
-    public void requestRename(SkinEntry entry) {
-        parentScreen.showRenameDialog(entry.getMetadata());
-    }
-
-    /**
-     * Request upload to Mojang for a skin
-     */
-    public void requestUploadToMojang(SkinEntry entry) {
-        parentScreen.showUploadToMojangDialog(entry.getMetadata());
     }
 }

@@ -14,15 +14,19 @@ import com.quickskin.mod.client.gui.panel.PlayerPreviewPanel;
 import com.quickskin.mod.client.gui.panel.SkinListPanel;
 import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 import com.quickskin.mod.client.gui.util.FileDialogHelper;
-import com.quickskin.mod.client.gui.util.GuiScaleManager;
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.ErrorToast;
+import com.quickskin.mod.client.gui.widget.FieldIconButton;
+import com.quickskin.mod.client.gui.widget.IconButton;
 import com.quickskin.mod.client.gui.widget.ImportTileButton;
 //? if <1.21 {
 //?} else {
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
+import com.quickskin.mod.client.gui.widget.SearchField;
 //?}
 import com.quickskin.mod.client.gui.widget.SkinEntry;
+import com.quickskin.mod.client.gui.widget.SkinListWidget;
 import com.quickskin.mod.client.services.CooldownService;
 import com.quickskin.mod.client.services.LocalAssetFolderWatch;
 import com.quickskin.mod.client.services.LocalAssetManager;
@@ -92,23 +96,27 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     // Layout of the panel-free menu, recomputed by init()
     private static final int MARGIN = 8;
-    private static final int COLUMN_WIDTH = 72;
+    /** The skin grid is three tiles across from this canvas width, two below it... */
+    private static final int MIN_WIDTH_FOR_THREE_COLUMNS = 560;
+    /** ...and four from this one. */
+    private static final int MIN_WIDTH_FOR_FOUR_COLUMNS = 620;
+    private int skinColumnWidth;
     private static final int CONTROL_HEIGHT = 20;
+    /** Height of the search row, its field and its square Search button. */
+    private static final int SEARCH_HEIGHT = ActionButtonsPanel.ICON_BUTTON_SIZE;
+    private static final int SEARCH_GAP = 3;
     private int skinColumnX;
     private int skinHeaderY;
+    /** Bottom edge of the search row, which the name tag keeps its distance from. */
+    private int searchBottom;
     private int skinListBottom;
-
-    // GUI scale management
-    private boolean guiScaleForced = false;
-    private boolean isClosing = false;
-    private boolean openingSubScreen = false;
 
     // Picks up skins copied into the uploads folder from outside the game
     private final LocalAssetFolderWatch localAssetWatch = new LocalAssetFolderWatch();
 
-    // Player preview rotation state (preserved across resizes)
-    private float savedBodyYaw = 20.0f;
-    private float savedTargetRotation = 20.0f;
+    // Player preview rotation state (preserved across resizes); the model starts facing the viewer
+    private float savedBodyYaw = 0.0f;
+    private float savedTargetRotation = 0.0f;
 
     // The look being previewed. Nothing is applied until Confirm; it survives resizes and the
     // sub-screens that return to this instance.
@@ -116,6 +124,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private String pendingHash;
     @Nullable
     private String pendingModelType;
+
+    // Whether the turntable ring has played its appearing animation for this menu
+    private boolean ringIntroPlayed;
 
     // Dragging the model turns it (from 1.21; before, the model widget turns itself)
     private boolean rotatingModel;
@@ -128,7 +139,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     // Mojang search widgets
     private EditBox usernameSearchField;
-    private Button searchButton;
+    private IconButton searchButton;
     private Button sortButton;
     private boolean isSearching = false;
     private long lastEnterKeyAt;
@@ -145,6 +156,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
     public void tick() {
         super.tick();
+        // Another mod can put the player's scale back on the window after init(), as some do
+        // whenever a screen opens; take the menu's scale back and lay the menu out again
+        if (this.minecraft != null && MenuGuiScale.apply(this.minecraft)) {
+            rebuildWidgets();
+        }
         updateConfirmButtonState();
         pollLocalAssetFolder();
     }
@@ -222,16 +238,13 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     @Override
     protected void init() {
-        // Force GUI scale for consistent appearance
-        if (!guiScaleForced && !isClosing) {
-            guiScaleForced = true;
-            int optimalScale = GuiScaleManager.getOptimalMenuScale();
-            if (GuiScaleManager.setMenuGuiScale(optimalScale)) {
-                // Scale was changed and resizeDisplay() was called, which will trigger init() again
-                return;
-            }
+        // The menu draws at its own GUI scale, chosen from the window size, so it looks the same
+        // whatever scale the player picked; a window resize runs init() again
+        if (this.minecraft != null) {
+            MenuGuiScale.apply(this.minecraft);
+            this.width = this.minecraft.getWindow().getGuiScaledWidth();
+            this.height = this.minecraft.getWindow().getGuiScaledHeight();
         }
-
         super.init();
         clearWidgets();
         foregroundControls.clear();
@@ -246,20 +259,31 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             }
         }
 
-        int linkColumnX = this.width - MARGIN - LinkButtonsPanel.buttonSize();
+        // Skins across the skin column: four, or fewer on a canvas too narrow to leave the model and
+        // its buttons room
+        int skinColumns = this.width >= MIN_WIDTH_FOR_FOUR_COLUMNS ? 4
+                : this.width >= MIN_WIDTH_FOR_THREE_COLUMNS ? 3 : 2;
+        int tileSize = SkinListPanel.TILE_SIZE;
 
-        // Player-name search, top centre
-        int searchButtonWidth = 60;
-        int searchFieldWidth = Math.max(80, Math.min(200,
-                linkColumnX - (MARGIN + COLUMN_WIDTH) - 2 * MARGIN - searchButtonWidth - 4));
-        int searchX = (this.width - (searchFieldWidth + 4 + searchButtonWidth)) / 2;
+        // The link buttons share the search row, at the top right
+        int linkRowX = this.width - MARGIN - LinkButtonsPanel.rowWidth();
+
+        // Player-name search, top centre: the field centred over the model and its name tag, then a
+        // square Search button drawn flat like it. The field is as wide as both sides leave room
+        // for: the skin column on the left, the button and the link row on the right.
+        int searchCenterX = this.width / 2;
+        int searchHalfRoom = Math.min(searchCenterX - (MARGIN + SkinListWidget.widthFor(tileSize, skinColumns) + MARGIN),
+                linkRowX - MARGIN - SEARCH_GAP - SEARCH_HEIGHT - searchCenterX);
+        int searchFieldWidth = Math.max(80, Math.min(220, 2 * searchHalfRoom));
+        int searchX = searchCenterX - searchFieldWidth / 2;
         int searchY = MARGIN;
-        usernameSearchField = new EditBox(
+        searchBottom = searchY + SEARCH_HEIGHT;
+        usernameSearchField = new SearchField(
                 this.font,
                 searchX,
                 searchY,
                 searchFieldWidth,
-                CONTROL_HEIGHT,
+                SEARCH_HEIGHT,
                 Component.translatable("quickskin.search.placeholder")
         );
         usernameSearchField.setSuggestion(Component.translatable("quickskin.search.suggestion").getString());
@@ -275,22 +299,41 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         });
         addRenderableWidget(usernameSearchField);
 
-        searchButton = com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                searchX + searchFieldWidth + 4,
+        searchButton = new FieldIconButton(
+                searchX + searchFieldWidth + SEARCH_GAP,
                 searchY,
-                searchButtonWidth,
-                CONTROL_HEIGHT,
+                SEARCH_HEIGHT,
+                "search",
                 Component.translatable("quickskin.button.search"),
                 button -> searchMojangSkin()
         );
+        searchButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.search")));
         addRenderableWidget(searchButton);
         searchButton.active = false;
 
-        // Skin column, left: header with the sort button, the skin tiles, then the import tile
+        // Skin column, left: "Skins" over the counter with the sort button beside them, a grid of
+        // skin tiles with its scrollbar, then the import tile across the bottom of the column
         skinColumnX = MARGIN;
-        skinHeaderY = searchY + CONTROL_HEIGHT + MARGIN;
+        skinHeaderY = searchY + SEARCH_HEIGHT + MARGIN;
+        int listTop = skinHeaderY + CONTROL_HEIGHT + 4;
+        skinListBottom = Math.max(listTop + tileSize, this.height - MARGIN - CONTROL_HEIGHT - 4);
+        skinListPanel = new SkinListPanel(
+                skinColumnX,
+                listTop,
+                skinColumns,
+                skinListBottom - listTop,
+                this.minecraft,
+                this::onSkinSelected
+        );
+        skinListPanel.init(this);
+
+        // The header is as wide as its widest line and the sort button, at least as wide as the tiles
+        String widestCount = skinListPanel.size() + "/" + skinListPanel.size();
+        int headerTextWidth = Math.max(this.font.width(Component.translatable("quickskin.menu.skins")),
+                this.font.width(widestCount));
+        skinColumnWidth = Math.max(SkinListWidget.widthFor(tileSize, skinColumns), headerTextWidth + 4 + CONTROL_HEIGHT);
         sortButton = com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                skinColumnX + COLUMN_WIDTH - CONTROL_HEIGHT,
+                skinColumnX + skinColumnWidth - CONTROL_HEIGHT,
                 skinHeaderY,
                 CONTROL_HEIGHT,
                 CONTROL_HEIGHT,
@@ -302,50 +345,71 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         ));
         addRenderableWidget(sortButton);
 
-        int tileSize = SkinListPanel.ENTRY_HEIGHT - 4;
-        int listTop = skinHeaderY + CONTROL_HEIGHT + 2;
-        skinListBottom = Math.max(listTop + SkinListPanel.ENTRY_HEIGHT, this.height - MARGIN - tileSize - 4);
-        skinListPanel = new SkinListPanel(
-                skinColumnX,
-                listTop,
-                COLUMN_WIDTH,
-                skinListBottom - listTop,
-                this.minecraft,
-                this::onSkinSelected
-        );
-        skinListPanel.init(this);
-
-        importTile = new ImportTileButton(skinColumnX + 4, listTop + 4, tileSize, button -> openImportDialog());
+        importTile = new ImportTileButton(skinColumnX, skinListBottom + 4, SkinListWidget.gridWidthFor(tileSize, skinColumns),
+                CONTROL_HEIGHT, button -> openImportDialog());
         importTile.setTooltip(Tooltip.create(Component.translatable("quickskin.tooltip.import_skin")));
         addRenderableWidget(importTile);
 
-        // Confirm and the rotate control, bottom centre; the model stands on the rotate control
+        // The middle of the menu is sized from the canvas, which the menu's scale keeps between
+        // about 300 and 450 units tall, so it keeps its proportions in any window.
         int centerX = this.width / 2;
-        int confirmY = this.height - MARGIN - CONTROL_HEIGHT;
-        int confirmX = centerX - ActionButtonsPanel.CONFIRM_WIDTH / 2;
-        int rotateY = confirmY - 4 - CONTROL_HEIGHT;
-        int feetY = rotateY - 2;
-        // Room between the search row (plus the name tag) and the feet
-        int modelTop = searchY + CONTROL_HEIGHT + 22;
-        float scaleCap = Math.max(40.0f, (feetY - modelTop) / MODEL_HEIGHT_PER_SCALE);
+        int sideStart = skinColumnX + skinColumnWidth + SIDE_GAP;
+        int sideEnd = this.width - MARGIN;
+
+        // Confirm, bottom centre, growing with the canvas but never over the skin column
+        int confirmHeight = Math.max(MIN_CONFIRM_HEIGHT, Math.min(MAX_CONFIRM_HEIGHT,
+                Math.round(this.height * CONFIRM_HEIGHT_SHARE)));
+        int confirmWidth = Math.min(Math.round(confirmHeight * CONFIRM_ASPECT), 2 * (centerX - sideStart));
+        int confirmY = this.height - MARGIN - confirmHeight;
+        int confirmX = centerX - confirmWidth / 2;
+
+        // The model stands above Confirm inside the turntable ring, below the search row and the
+        // name tag. It fills at most MODEL_HEIGHT_SHARE of the canvas and never outgrows the
+        // buttons around it, which stay at the player's GUI scale.
+        int nameTagHeight = NAME_TAG_GAP + (int) Math.ceil(10 * NAME_TAG_SCALE);
+        int clusterTop = searchBottom + 4;
+        int modelTop = clusterTop + nameTagHeight;
+        float heightCap = Math.min(MAX_MODEL_SCALE, Math.min(
+                (confirmY - RING_CLEARANCE - modelTop) / (MODEL_HEIGHT_PER_SCALE + RING_DEPTH_PER_SCALE),
+                this.height * MODEL_HEIGHT_SHARE / MODEL_HEIGHT_PER_SCALE));
+        // The floating buttons flank it: in a narrow canvas they narrow down to their labels
+        // before the model shrinks to make room for them
+        int sideRoom = Math.min(centerX - sideStart, sideEnd - centerX) - BUTTON_GAP;
+        int buttonWidth = Math.max(
+                ActionButtonsPanel.minimumButtonWidth(this.font),
+                Math.min(PREFERRED_BUTTON_WIDTH, sideRoom - (int) (heightCap * HALF_WIDTH_PER_SCALE)));
+        float widthCap = (sideRoom - buttonWidth) / HALF_WIDTH_PER_SCALE;
+        float scaleCap = Math.max(MIN_MODEL_SCALE, Math.min(heightCap, widthCap));
+        int ringDepth = RING_CLEARANCE + (int) Math.ceil(scaleCap * RING_DEPTH_PER_SCALE);
+        // On a canvas taller than the group needs, centre the name tag, model and Confirm between
+        // the search row and the bottom edge instead of leaving the gap above the head
+        int clusterHeight = nameTagHeight + (int) Math.ceil(scaleCap * MODEL_HEIGHT_PER_SCALE)
+                + ringDepth + confirmHeight;
+        int spare = (this.height - MARGIN) - clusterTop - clusterHeight;
+        if (spare > 0) {
+            confirmY -= spare / 2;
+        }
+        int feetY = confirmY - ringDepth;
 
         playerPreviewPanel = new PlayerPreviewPanel(centerX, feetY, 0, 0);
         playerPreviewPanel.initPlayerWidget(this, centerX, feetY, scaleCap);
         float modelScale = playerPreviewPanel.getPlayerWidget() != null
                 ? playerPreviewPanel.getPlayerWidget().getEffectiveScale() : scaleCap;
         playerPreviewPanel.setModelBox(centerX, feetY, modelScale);
-        playerPreviewPanel.initControls(this, centerX - CONTROL_HEIGHT / 2, rotateY);
+        // The turntable ring lies around the ankles, a little wider than the model
+        int ringRadiusX = (int) (modelScale * 0.55f) + 8;
+        // The ring's appearing animation plays when the menu opens, not on resizes or returns
+        playerPreviewPanel.initControls(this, centerX, feetY - 3, ringRadiusX, !ringIntroPlayed);
+        ringIntroPlayed = true;
 
         // Floating buttons, left and right of the model at shoulder and waist height
-        int halfBody = (int) (modelScale * 0.55f);
-        int gap = 12;
-        int leftX = Math.max(skinColumnX + COLUMN_WIDTH + 6,
-                centerX - halfBody - gap - ActionButtonsPanel.BUTTON_WIDTH);
-        int rightX = Math.min(linkColumnX - 6 - ActionButtonsPanel.BUTTON_WIDTH, centerX + halfBody + gap);
+        int halfBody = (int) (modelScale * HALF_WIDTH_PER_SCALE);
+        int leftX = Math.max(sideStart, centerX - halfBody - BUTTON_GAP - buttonWidth);
+        int rightX = Math.min(sideEnd - buttonWidth, centerX + halfBody + BUTTON_GAP);
         int shoulderY = Math.max(skinHeaderY, feetY - (int) (modelScale * 1.45f));
-        int waistY = Math.max(shoulderY + CONTROL_HEIGHT + 4, feetY - (int) (modelScale * 0.9f));
+        int waistY = Math.max(shoulderY + ActionButtonsPanel.ICON_BUTTON_SIZE + 4, feetY - (int) (modelScale * 0.9f));
         ActionButtonsPanel.Layout layout = new ActionButtonsPanel.Layout(
-                leftX, rightX, shoulderY, waistY, confirmX, confirmY);
+                leftX, rightX, shoulderY, waistY, buttonWidth, confirmX, confirmY, confirmWidth, confirmHeight);
         ActionButtonsPanel.ActionCallbacks callbacks = new ActionButtonsPanel.ActionCallbacks(
                 this::cycleBodyWidth,
                 () -> openWebsite("https://laby.net/skins?order=trending_30d"),
@@ -353,7 +417,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 () -> {
                     // Open cape selection screen
                     if (minecraft != null) {
-                        openingSubScreen = true;
 //? if <26.2 {
                         minecraft.setScreen(new PlayerCapeMenuScreen(this));
 //?} else {
@@ -361,7 +424,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
                     }
                 },
-                this::confirmSelection
+                this::confirmSelection,
+                this::uploadPendingSkin
         );
         actionButtonsPanel = new ActionButtonsPanel(layout);
         actionButtonsPanel.init(this, layout, callbacks);
@@ -369,21 +433,52 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             playerPreviewPanel.addPriorityControl(button);
         }
 
-        // Link column, right edge, vertically centred
-        LinkButtonsPanel linkButtonsPanel = new LinkButtonsPanel(
-                linkColumnX,
-                (this.height - LinkButtonsPanel.columnHeight()) / 2
-        );
+        LinkButtonsPanel linkButtonsPanel = new LinkButtonsPanel(linkRowX, searchY);
         linkButtonsPanel.init(this);
 
         // Restore the previewed look and the active cape
         restoreSavedState();
         updateBodyWidthButton();
+        updateUploadButton();
         updateConfirmButtonState();
     }
 
+    /** The player's name above the model is drawn this much larger than GUI text... */
+    private static final float NAME_TAG_SCALE = 1.5f;
+    /** ...and the layout leaves at least this much room between it and the head. */
+    private static final int NAME_TAG_GAP = 10;
+    /**
+     * Distance from the tag's top to the middle of the name's capitals, in font pixels: the name
+     * is drawn a pixel down the tag and its capitals are seven pixels tall.
+     */
+    private static final float NAME_TAG_CAPITALS_MIDDLE = 4.5f;
+
     /** Height of the drawn player per unit of model scale: a player is 1.8 blocks, plus the hat and a margin. */
     private static final float MODEL_HEIGHT_PER_SCALE = 2.0f;
+    /** Half the drawn player's width per unit of model scale, arms included. */
+    private static final float HALF_WIDTH_PER_SCALE = 0.55f;
+    /** The drawn player is at most this share of the canvas height. */
+    private static final float MODEL_HEIGHT_SHARE = 0.65f;
+    private static final float MIN_MODEL_SCALE = 30.0f;
+    /** The largest model scale, in GUI units, so the model stays in proportion with its buttons. */
+    private static final float MAX_MODEL_SCALE = 120.0f;
+    /** How far the turntable ring reaches below the feet per unit of model scale... */
+    private static final float RING_DEPTH_PER_SCALE = 0.13f;
+    /** ...and the room left between the ring and Confirm. */
+    private static final int RING_CLEARANCE = 6;
+
+    /** Confirm's height is this share of the canvas height, within the bounds below. */
+    private static final float CONFIRM_HEIGHT_SHARE = 0.09f;
+    private static final int MIN_CONFIRM_HEIGHT = 24;
+    private static final int MAX_CONFIRM_HEIGHT = 36;
+    private static final float CONFIRM_ASPECT = 6.25f;
+
+    /** Width of the floating buttons when there is room for it. */
+    private static final int PREFERRED_BUTTON_WIDTH = 104;
+    /** Gap between the floating buttons and the model... */
+    private static final int BUTTON_GAP = 10;
+    /** ...and between them and the side columns. */
+    private static final int SIDE_GAP = 6;
 
     private void openWebsite(String url) {
         if (this.minecraft != null) {
@@ -562,10 +657,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Render the animated background
         this.renderBackgroundEffects(graphics, partialTick);
 
-        // Keep the import tile right after the last skin, or below the column once it scrolls
-        if (importTile != null && skinListPanel != null && skinListPanel.getSkinListWidget() != null) {
-            int afterLast = skinListPanel.getSkinListWidget().contentBottom();
-            importTile.setY(Math.min(Math.max(afterLast, skinListPanel.getY() + 4), skinListBottom + 2));
+        // The turntable ring goes behind the model, which stands inside it
+        if (playerPreviewPanel != null && playerPreviewPanel.getRotationArc() != null) {
+            playerPreviewPanel.getRotationArc().setHighlighted(rotatingModel);
+            playerPreviewPanel.getRotationArc().renderRing(graphics, mouseX, mouseY);
         }
 
 //? if <1.21 {
@@ -621,8 +716,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         }
 
-        renderSkinTooltip(graphics, mouseX, mouseY);
-
         // Render error toasts (on top of everything)
         renderErrorToasts(graphics);
 //? if <1.21.6 {
@@ -630,7 +723,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
     }
 
-    /** "Skins 2/4" above the skin column: the selected position and the number of skins. */
+    /**
+     * "Skins" above the skin column, and under it the selected position and the number of skins,
+     * beside the sort button.
+     */
 //? if <26.1 {
     private void renderSkinHeader(GuiGraphics graphics) {
 //?} else {
@@ -640,13 +736,17 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             return;
         }
         int position = skinListPanel.selectedPosition();
-        Component header = Component.translatable("quickskin.menu.skins_count",
-                position > 0 ? String.valueOf(position) : "-", String.valueOf(skinListPanel.size()));
-        int textY = skinHeaderY + (CONTROL_HEIGHT - 8) / 2;
+        Component label = Component.translatable("quickskin.menu.skins");
+        String count = (position > 0 ? String.valueOf(position) : "-") + "/" + skinListPanel.size();
+        // Two lines filling the sort button's height: the label, then the count a little dimmer
+        int labelY = skinHeaderY + 1;
+        int countY = skinHeaderY + CONTROL_HEIGHT - 8;
 //? if <26.1 {
-        graphics.drawString(this.font, header, skinColumnX + 2, textY, 0xFFFFFFFF);
+        graphics.drawString(this.font, label, skinColumnX, labelY, 0xFFFFFFFF);
+        graphics.drawString(this.font, count, skinColumnX, countY, 0xFFC8C8C8);
 //?} else {
-        graphics.text(this.font, header, skinColumnX + 2, textY, 0xFFFFFFFF);
+        graphics.text(this.font, label, skinColumnX, labelY, 0xFFFFFFFF);
+        graphics.text(this.font, count, skinColumnX, countY, 0xFFC8C8C8);
 //?}
     }
 
@@ -666,65 +766,44 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 : this.minecraft.getUser().getName();
         int textWidth = this.font.width(name);
         int centerX = widget.getLayoutCenterX();
-        int top = widget.getLayoutFeetY() - (int) (widget.getEffectiveScale() * MODEL_HEIGHT_PER_SCALE) - 14;
-        graphics.fill(centerX - textWidth / 2 - 2, top - 1, centerX + (textWidth + 1) / 2 + 2, top + 9, 0x40000000);
-//? if <26.1 {
-        graphics.drawString(this.font, name, centerX - textWidth / 2, top, 0xFFFFFFFF, false);
+        int headTop = widget.getLayoutFeetY() - (int) (widget.getEffectiveScale() * MODEL_HEIGHT_PER_SCALE);
+        // The name's capitals sit halfway between the search row and the head
+        float middle = (searchBottom + headTop) / 2.0f;
+        float top = middle - NAME_TAG_CAPITALS_MIDDLE * NAME_TAG_SCALE;
+//? if <1.21.6 {
+        graphics.pose().pushPose();
+        graphics.pose().translate(centerX, top, 0.0F);
+        graphics.pose().scale(NAME_TAG_SCALE, NAME_TAG_SCALE, 1.0F);
 //?} else {
-        graphics.text(this.font, name, centerX - textWidth / 2, top, 0xFFFFFFFF, false);
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(centerX, top);
+        graphics.pose().scale(NAME_TAG_SCALE, NAME_TAG_SCALE);
 //?}
-    }
-
-    /** The hovered skin's name and model, or what its hover button does. */
+        graphics.fill(-textWidth / 2 - 2, 0, (textWidth + 1) / 2 + 2, 10, 0x40000000);
 //? if <26.1 {
-    private void renderSkinTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+        graphics.drawString(this.font, name, -textWidth / 2, 1, 0xFFFFFFFF, false);
 //?} else {
-    private void renderSkinTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        graphics.text(this.font, name, -textWidth / 2, 1, 0xFFFFFFFF, false);
 //?}
-        if (skinListPanel == null || skinListPanel.getSkinListWidget() == null) {
-            return;
-        }
-        SkinEntry hovered = skinListPanel.getSkinListWidget().getHoveredEntry();
-        if (hovered != null) {
-            com.quickskin.mod.client.gui.GuiCompat.tooltip(graphics, this.font, hovered.tooltipLines(), mouseX, mouseY);
-        }
-    }
-
-    public void setOpeningSubScreen(boolean opening) {
-        this.openingSubScreen = opening;
+//? if <1.21.6 {
+        graphics.pose().popPose();
+//?} else {
+        graphics.pose().popMatrix();
+//?}
     }
 
     @Override
     public void removed() {
         BackgroundRenderer.cleanup();
-        super.removed();
-
-        if (isClosing) {
-            // Normal close via onClose() - safety restore (usually no-op)
-            restoreGuiScaleIfNeeded();
-        } else if (!openingSubScreen) {
-            // External close (Essential bypass) - must restore here
-            isClosing = true;  // Prevent init() from re-forcing during resizeDisplay()
-            restoreGuiScaleIfNeeded();
+        // The next screen, a dialog or the world opens at the player's own scale
+        if (this.minecraft != null) {
+            MenuGuiScale.restore(this.minecraft);
         }
-        // else: sub-screen navigation, skip restore
-
-        // The restore's resizeDisplay() has finished, so the guard is no longer needed. Leaving
-        // it latched would make a later setScreen(this) come back at the user's scale forever:
-        // a dialog that returns to this instance twice (callback plus its own onClose) hits the
-        // external-close branch above, and init() must be able to force the menu scale again.
-        isClosing = false;
-        openingSubScreen = false;
+        super.removed();
     }
 
     @Override
     public void onClose() {
-        // Mark that we're truly closing (not just opening a modal)
-        isClosing = true;
-
-        // Restore GUI scale before closing
-        restoreGuiScaleIfNeeded();
-
         // Return to parent screen (or null to return to game)
         if (this.minecraft != null) {
 //? if <26.2 {
@@ -732,17 +811,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
             this.minecraft.gui.setScreen(parent);
 //?}
-        }
-    }
-
-    /**
-     * Restore the original GUI scale if it was forced by this screen.
-     * This method is idempotent and can be called multiple times safely.
-     */
-    private void restoreGuiScaleIfNeeded() {
-        if (guiScaleForced) {
-            guiScaleForced = false;
-            GuiScaleManager.restoreOriginalGuiScale();
         }
     }
 
@@ -891,21 +959,32 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
         boolean handled = super.mouseClicked(event, focused);
 //?}
-//? if >=1.21 {
         if (!handled && button == InputConstants.MOUSE_BUTTON_LEFT && startModelRotation(mouseX, mouseY)) {
             return true;
         }
-//?}
         return handled;
     }
 
-    /** Starts turning the model when a click lands on it; returns whether it did. */
+    /**
+     * Starts turning the model from a press on the turntable ring or (from 1.21, where the model
+     * takes no clicks itself) on the model.
+     */
     private boolean startModelRotation(double mouseX, double mouseY) {
         if (playerPreviewPanel == null) {
             return false;
         }
         com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
-        if (widget == null || !widget.visible || !playerPreviewPanel.isOverModelBox(mouseX, mouseY)) {
+        if (widget == null || !widget.visible) {
+            return false;
+        }
+        com.quickskin.mod.client.gui.widget.RotationArcWidget arc = playerPreviewPanel.getRotationArc();
+        boolean onArc = arc != null && arc.isOnArc(mouseX, mouseY);
+//? if <1.21 {
+        boolean onModel = false;
+//?} else {
+        boolean onModel = playerPreviewPanel.isOverModelBox(mouseX, mouseY);
+//?}
+        if (!onArc && !onModel) {
             return false;
         }
         rotatingModel = true;
@@ -1118,10 +1197,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                     null
             );
         } else {
-            // The arm width this skin was last confirmed with, unless one is already pending
-            pendingModelType = modelType != null
+            // The arm width this skin was last confirmed with (or detected on import), unless one
+            // is already pending
+            pendingModelType = PlayerPreviewPanel.normalizedModelType(modelType != null
                     ? modelType
-                    : LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash());
+                    : LocalAssetManager.getInstance().getSkinModelPreference(metadata.hash()));
             playerPreviewPanel.previewSkin(
                     metadata,
                     LocalAssetManager.getInstance().getTextureLocation(metadata.hash(), TextureQuality.FULL),
@@ -1129,18 +1209,15 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             );
         }
         updateBodyWidthButton();
+        updateUploadButton();
     }
 
-    /** Body width: Auto, then Wide, then Slim, on the previewed skin only. */
+    /** Body width: Wide or Slim, on the previewed skin only. */
     private void cycleBodyWidth() {
         if (pendingHash == null || pendingModelType == null || playerPreviewPanel == null) {
             return;
         }
-        pendingModelType = switch (PlayerPreviewPanel.normalizedModelType(pendingModelType)) {
-            case "auto" -> "classic";
-            case "classic" -> "slim";
-            default -> "auto";
-        };
+        pendingModelType = "slim".equals(PlayerPreviewPanel.normalizedModelType(pendingModelType)) ? "classic" : "slim";
         playerPreviewPanel.previewModelType(pendingModelType);
         updateBodyWidthButton();
     }
@@ -1152,13 +1229,31 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         String model = pendingModelType != null
                 ? PlayerPreviewPanel.normalizedModelType(pendingModelType)
                 : PlayerPreviewPanel.normalizedModelType(playerPreviewPanel.getCurrentModelType());
-        Component name = Component.translatable(switch (model) {
-            case "auto" -> "quickskin.preview.model.auto";
-            case "slim" -> "quickskin.preview.model.slim";
-            default -> "quickskin.preview.model.wide";
-        });
+        boolean slim = "slim".equals(model);
+        Component name = Component.translatable(slim ? "quickskin.preview.model.slim" : "quickskin.preview.model.wide");
         boolean selectable = pendingHash != null && pendingModelType != null && !playerPreviewPanel.isCpmLook();
-        actionButtonsPanel.updateBodyWidth(name, selectable);
+        actionButtonsPanel.updateBodyWidth(slim, name, selectable);
+    }
+
+    /**
+     * Upload to Mojang works on the previewed skin, for a premium account and a skin rather than a
+     * CPM model.
+     */
+    private void updateUploadButton() {
+        if (actionButtonsPanel == null) {
+            return;
+        }
+        AssetMetadata metadata = pendingHash != null ? LocalAssetManager.getInstance().getMetadata(pendingHash) : null;
+        actionButtonsPanel.setUploadAvailable(com.quickskin.mod.client.util.PremiumDetector.isPremiumAccount()
+                && metadata != null && !metadata.isCpmModel());
+    }
+
+    /** Opens the Upload to Mojang dialog for the previewed skin. */
+    private void uploadPendingSkin() {
+        AssetMetadata metadata = pendingHash != null ? LocalAssetManager.getInstance().getMetadata(pendingHash) : null;
+        if (metadata != null && !metadata.isCpmModel()) {
+            showUploadToMojangDialog(metadata);
+        }
     }
 
     /** Confirm: applies the previewed look and closes the menu. */
@@ -1362,7 +1457,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (minecraft == null) return;
 
         String displayName = truncateFileName(metadata.friendlyName());
-        openingSubScreen = true;
 //? if <26.2 {
         minecraft.setScreen(new DeletionConfirmScreen(
 //?} else {
@@ -1395,7 +1489,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     public void showRenameDialog(AssetMetadata metadata) {
         if (minecraft == null) return;
 
-        openingSubScreen = true;
 //? if <26.2 {
         minecraft.setScreen(new RenameScreen(
 //?} else {
@@ -1420,7 +1513,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     public void showUploadToMojangDialog(AssetMetadata metadata) {
         if (minecraft == null) return;
 
-        openingSubScreen = true;
 //? if <26.2 {
         minecraft.setScreen(new UploadToMojangScreen(
 //?} else {
@@ -1578,6 +1670,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         isSearching = true;
         searchButton.active = false;
         searchButton.setMessage(Component.translatable("quickskin.button.searching"));
+        searchButton.setIcon("searching");
+        searchButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.searching")));
 
         // Fetch skin asynchronously
         MojangApiService.getInstance().fetchSkinByUsername(username)
@@ -1696,6 +1790,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         isSearching = false;
         if (searchButton != null) {
             searchButton.setMessage(Component.translatable("quickskin.button.search"));
+            searchButton.setIcon("search");
+            searchButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.search")));
             searchButton.active = usernameSearchField != null && !usernameSearchField.getValue().trim().isEmpty();
         }
     }

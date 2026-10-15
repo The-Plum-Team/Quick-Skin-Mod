@@ -34,6 +34,7 @@ public class PreviewPlayerData {
 
     // Animation state
     private String currentAnimation; // For future animation support
+    private boolean showcaseIdle;
     private final float animationProgress;
 
     public PreviewPlayerData() {
@@ -190,6 +191,18 @@ public class PreviewPlayerData {
 
     public String getCurrentAnimation() {
         return currentAnimation;
+    }
+
+    /**
+     * Whether "idle" uses the showcase stance: facing the viewer squarely, arms and legs a little
+     * apart, breathing slowly. The skin menu uses it to present the whole skin.
+     */
+    public boolean isShowcaseIdle() {
+        return showcaseIdle;
+    }
+
+    public void setShowcaseIdle(boolean showcaseIdle) {
+        this.showcaseIdle = showcaseIdle;
     }
 
     public void setCurrentAnimation(String currentAnimation) {

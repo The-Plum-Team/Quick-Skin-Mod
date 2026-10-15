@@ -16,12 +16,15 @@ public class DebugOffsetManager {
     private static Path configPath;
 
     // Default offsets for all 4 screens (base offset + config offset when config is 0)
-    private static final int DEFAULT_TITLE_SCREEN_OFFSET_X = -20; // Was -26, now -26 + 6 = -20
-    private static final int DEFAULT_TITLE_SCREEN_OFFSET_Y = -90; // Was -87, now -87 + (-3) = -90
+    // The title and pause previews are centred on the 98-wide Change Skin button (49 - 72) and
+    // stand on the bottom of the rotate and animation buttons above it: the feet are drawn 82
+    // below the 144-high widget's top, and those buttons end 4 above the Change Skin button.
+    private static final int DEFAULT_TITLE_SCREEN_OFFSET_X = -23;
+    private static final int DEFAULT_TITLE_SCREEN_OFFSET_Y = -86;
     private static final int DEFAULT_WORLD_SELECTION_OFFSET_X = 0;
     private static final int DEFAULT_WORLD_SELECTION_OFFSET_Y = -82;
-    private static final int DEFAULT_PAUSE_SCREEN_OFFSET_X = -23; // Was -22, now -22 + (-1) = -23
-    private static final int DEFAULT_PAUSE_SCREEN_OFFSET_Y = -88; // Was -88, stays -88 + 0 = -88
+    private static final int DEFAULT_PAUSE_SCREEN_OFFSET_X = -23;
+    private static final int DEFAULT_PAUSE_SCREEN_OFFSET_Y = -86;
     private static final int DEFAULT_SKIN_MENU_OFFSET_X = 0; // Stays 0 + 0 = 0
     private static final int DEFAULT_SKIN_MENU_OFFSET_Y = -18; // Was -15, now -15 + (-3) = -18
 

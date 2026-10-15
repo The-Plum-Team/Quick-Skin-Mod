@@ -3,6 +3,13 @@ package com.quickskin.mod.client.gui.util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
 
+/**
+ * Changes the player's GUI scale through the option, as the player does, and puts it back.
+ *
+ * <p>No Quick Skin screen changes the option, because other mods break when it changes under
+ * them; the skin menu draws at its own scale through {@link MenuGuiScale} instead. The packaged
+ * E2E harness uses this to shrink the scale for a probe that needs a taller canvas.
+ */
 public class GuiScaleManager {
     private static Integer originalGuiScale = null;
     private static boolean scaleChanged = false;
@@ -73,14 +80,6 @@ public class GuiScaleManager {
 
         } catch (Exception e) {
         }
-    }
-
-    /**
-     * Get the optimal GUI scale for the QuickSkin menu.
-     * Returns 2 for consistent layout.
-     */
-    public static int getOptimalMenuScale() {
-        return 2;
     }
 
 }

@@ -2,7 +2,7 @@ package com.quickskin.mod.e2e.scenario;
 
 import com.quickskin.mod.client.gui.panel.ActionButtonsPanel;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
-import com.quickskin.mod.client.gui.util.GuiScaleManager;
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.services.CapeService;
 import com.quickskin.mod.client.services.CooldownService;
@@ -301,9 +301,9 @@ public final class ServerPolicyScenario implements Scenario {
                         return Step.Result.fail("skin menu not open: " + screenName(mc));
                     }
                     int scale = VanillaShim.guiScale(mc);
-                    if (scale != GuiScaleManager.getOptimalMenuScale()) {
+                    if (scale != MenuGuiScale.scaleFor(mc)) {
                         return Step.Result.fail("menu GUI scale never settled: window=" + scale
-                                + " expected=" + GuiScaleManager.getOptimalMenuScale());
+                                + " expected=" + MenuGuiScale.scaleFor(mc));
                     }
                     String buttonFailure = cooldownButtonFailure(mc);
                     if (buttonFailure != null) return Step.Result.fail(buttonFailure);
@@ -547,7 +547,7 @@ public final class ServerPolicyScenario implements Scenario {
     private boolean skinMenuLayoutSettled(Minecraft mc) {
         Screen sc = VanillaShim.currentScreen(mc);
         if (!(sc instanceof PlayerSkinMenuScreen)
-                || VanillaShim.guiScale(mc) != GuiScaleManager.getOptimalMenuScale()) {
+                || VanillaShim.guiScale(mc) != MenuGuiScale.scaleFor(mc)) {
             skinMenuLayoutStamp = Long.MIN_VALUE;
             return false;
         }

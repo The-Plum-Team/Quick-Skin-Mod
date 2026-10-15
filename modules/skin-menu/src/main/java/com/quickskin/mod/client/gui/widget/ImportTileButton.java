@@ -12,14 +12,14 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
 /**
- * The dashed "+" tile at the end of the skin column. It opens the skin file dialog; dropping files
- * anywhere on the menu imports them too.
+ * The dashed "+" tile across the bottom of the skin column. It opens the skin file dialog; dropping
+ * files anywhere on the menu imports them too.
  */
 @Environment(EnvType.CLIENT)
 public class ImportTileButton extends Button {
 
-    public ImportTileButton(int x, int y, int size, OnPress onPress) {
-        super(x, y, size, size, Component.translatable("quickskin.button.import_skin"), onPress, DEFAULT_NARRATION);
+    public ImportTileButton(int x, int y, int width, int height, OnPress onPress) {
+        super(x, y, width, height, Component.translatable("quickskin.button.import_skin"), onPress, DEFAULT_NARRATION);
     }
 
     @Override
@@ -39,7 +39,7 @@ public class ImportTileButton extends Button {
         drawDashedBorder(graphics, x, y, this.width, this.height, highlight ? 0xFFFFFFFF : 0x90FFFFFF);
 
         // A plus sign drawn from fills, so it stays crisp at every size
-        int arm = Math.max(4, this.width / 5);
+        int arm = Math.max(3, Math.min(this.width, this.height) / 4);
         int thickness = 2;
         int centerX = x + this.width / 2;
         int centerY = y + this.height / 2;

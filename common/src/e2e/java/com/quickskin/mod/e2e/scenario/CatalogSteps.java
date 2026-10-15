@@ -577,11 +577,11 @@ final class CatalogSteps {
                         if (!(tile instanceof Button importTile) || !importTile.visible) {
                             return Step.Result.fail("the skin column's import tile is not built");
                         }
-                        // The menu re-places the tile every frame, right after the last skin.
-                        if (importTile.getY() != list.contentBottom()) {
+                        // The tile closes the skin column, below the grid however few skins it holds.
+                        int listBottom = list.getY() + list.getHeight();
+                        if (importTile.getY() < listBottom) {
                             return Step.Result.fail("import tile at y=" + importTile.getY()
-                                    + " does not follow the only skin (row ends at y="
-                                    + list.contentBottom() + ")");
+                                    + " overlaps the skin grid (grid ends at y=" + listBottom + ")");
                         }
                         if (!toasts(screen).isEmpty()) {
                             return Step.Result.fail("an error toast is still visible: '"
@@ -591,7 +591,7 @@ final class CatalogSteps {
                                 + "' (" + externalPrimary + ", alias " + owner.externalSkinHash
                                 + "): metadata null, no " + RENAMED_NAME + "* file in uploads/skins; "
                                 + "list has exactly 1 entry (protected own skin " + own.hash()
-                                + ", selected) with the import tile right after it; no toast visible");
+                                + ", selected) with the import tile below the grid; no toast visible");
                     } finally {
                         // Later steps expect the defaults: no own-skin protection, LATEST_LAST
                         // sort, and the plaid skin persisted as the active one (primary form, as
@@ -727,14 +727,12 @@ final class CatalogSteps {
 
     /** Type the new name into the real RenameScreen and press its Done button, exactly once. */
     /**
-     * True once the skin menu is open at its forced menu scale with a tick-over-tick stable
-     * layout, exactly like every other skin-menu checkpoint.
+     * True once the skin menu is open at its own GUI scale with a tick-over-tick stable layout,
+     * exactly like every other skin-menu checkpoint.
      *
      * <p>These catalog checkpoints deliberately run on the menu instance a user keeps open across
-     * the Rename and Delete dialogs. Coming back from a dialog must not change the menu's scale:
-     * the dialogs return to the same instance, and the menu keeps forcing its scale for as long
-     * as it is shown. A menu that came back at the user's scale is therefore a product defect this
-     * precondition refuses to settle on, not a layout to wait out.</p>
+     * the Rename and Delete dialogs, which return to that same instance: each dialog opens at the
+     * player's scale, and the menu must take its own scale back when it returns.</p>
      */
     private boolean menuLayoutStable(Minecraft mc) {
         return owner.skinMenuLayoutSettled(mc);

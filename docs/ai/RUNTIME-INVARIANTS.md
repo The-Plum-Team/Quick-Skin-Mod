@@ -421,10 +421,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Catalog evidence drives the real rename, sort, own-skin, and delete paths of the skin menu,
   never the service alone. The protected own-skin row must be pinned first, highlighted purple,
   and refuse deletion with the real error toast; a stale saved skin id whose file vanished must
-  fall back to the vanilla default without a manual reset. The menu instance that returns from a
-  Rename or Delete dialog must still hold its forced menu scale: a dialog returns to its parent
-  exactly once, and `removed()` never leaves the close guard latched, so the catalog checkpoints
-  settle only at that scale rather than tolerating the user's scale.
+  fall back to the vanilla default without a manual reset. The catalog checkpoints run on the
+  menu instance that the Rename and Delete dialogs return to.
+- No Quick Skin screen writes the player's GUI Scale option or calls `resizeDisplay()`: other mods
+  break when the option changes or the display resizes under them. The skin and cape menus draw
+  at their own scale, chosen from the window size so they look the same at any option, by setting
+  only the window's scale while they are shown (`MenuGuiScale`), and put back the option's scale
+  in `removed()`, so every dialog, other screen and the world open at the player's own scale. The
+  skin menu's packaged checkpoint asserts both the menu's scale on the window and the unchanged
+  option.
 - GUI cape import evidence must go through `CapeImportWorkflow` from the real drop entry point:
   a translucent user cape with a transparent elytra area must be saved with the vanilla elytra
   composited in, keep its half-transparent face in-world and on the equipped wings, and the menu

@@ -1678,15 +1678,15 @@
               "capture": {
                 "title": "Skin menu",
                 "review_tier": "key",
-                "expectation": "The Quick Skin skin menu is open without a panel: a column of skin face tiles under a Skins counter with a sort button and a dashed + import tile on the left, the player-name search field at the top, the large player model in the middle with the player's name above it, floating Body, Edit Skin (disabled), Skin Websites and Cape buttons around the model, a Confirm button at the bottom and a column of link icons on the right, all over a dark, subtly starred background; there is no bright blur, radial wash or other background-compositing artifact.",
+                "expectation": "The Quick Skin skin menu is open without a panel: a column of skin face tiles under a Skins counter with a sort button and a dashed + import tile on the left, the player-name search field with a flat search button at the top centre, a row of four link icons (Modrinth, CurseForge, Discord, settings) at the top right, the large player model in the middle on a white turntable ring with the player's name above it, four square icon buttons beside the model (body width and skin websites on its left, upload to Mojang and cape on its right), a large CONFIRM button at the bottom, all over a dark, subtly starred background; there is no bright blur, radial wash or other background-compositing artifact.",
                 "probes": [
                   {
                     "kind": "opaque-stars-background",
                     "region": [
-                      0.1,
-                      0.1,
-                      0.26,
-                      0.45
+                      0.25,
+                      0.12,
+                      0.35,
+                      0.5
                     ],
                     "maximum_mean_luma": 32.0,
                     "bright_luma": 64,
@@ -1696,10 +1696,10 @@
                     "kind": "required-gui-text",
                     "label": "skin column counter",
                     "box": [
-                      12,
-                      64,
-                      98,
-                      90
+                      16,
+                      96,
+                      120,
+                      156
                     ],
                     "minimum_luma_exclusive": 175,
                     "minimum_pixels": 200
@@ -1708,10 +1708,10 @@
                     "kind": "required-gui-text",
                     "label": "player name tag",
                     "box": [
-                      680,
-                      198,
-                      920,
-                      226
+                      600,
+                      116,
+                      1000,
+                      162
                     ],
                     "minimum_luma_exclusive": 175,
                     "minimum_pixels": 100
@@ -1841,7 +1841,7 @@
               "capture": {
                 "title": "External skin deleted",
                 "review_tier": "key",
-                "expectation": "After the real delete confirmation, the renamed external skin's tile is gone; the skin column shows only the protected purple own-skin tile followed by the dashed + import tile.",
+                "expectation": "After the real delete confirmation, the renamed external skin's tile is gone; the skin column shows only the protected purple own-skin tile, with the dashed + import tile at the bottom of the column.",
                 "probes": []
               },
               "requires": [
@@ -3166,7 +3166,7 @@
               "capture": {
                 "title": "Styled buttons over vanilla background",
                 "review_tier": "key",
-                "expectation": "The skin menu is open with Quick Skin's styled buttons (dark translucent fills with light outlines and a green Confirm bar) over Minecraft's translucent in-world overlay instead of the starred background: the daytime world is dimly visible around the floating controls and no star pattern is drawn.",
+                "expectation": "The skin menu is open with Quick Skin's styled buttons (dark translucent fills with light outlines) and its large grey Confirm button over Minecraft's translucent in-world overlay instead of the starred background: the daytime world is dimly visible around the floating controls and no star pattern is drawn.",
                 "probes": []
               },
               "requires": [
@@ -3530,10 +3530,10 @@
               "second_step": "styled_buttons_vanilla_background",
               "minimum_changed_fraction": 0.02,
               "region": [
-                0.1,
-                0.1,
-                0.26,
-                0.45
+                0.25,
+                0.12,
+                0.35,
+                0.5
               ]
             },
             {
@@ -3625,10 +3625,10 @@
                     "kind": "required-gui-text",
                     "label": "cooldown button label",
                     "box": [
-                      700,
-                      856,
-                      900,
-                      884
+                      560,
+                      768,
+                      1040,
+                      818
                     ],
                     "minimum_luma_exclusive": 127,
                     "minimum_pixels": 240

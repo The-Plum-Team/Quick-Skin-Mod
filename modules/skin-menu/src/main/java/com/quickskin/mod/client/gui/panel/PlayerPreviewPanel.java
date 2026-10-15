@@ -3,6 +3,7 @@ package com.quickskin.mod.client.gui.panel;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.util.ButtonFactory;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
+import com.quickskin.mod.client.gui.widget.RotationArcWidget;
 import com.quickskin.mod.common.data.AssetMetadata;
 //? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
@@ -11,7 +12,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 //?}
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
@@ -19,8 +19,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Locale;
 
 /**
- * The player model in the middle of the skin menu, with its rotate control and, on the title
- * screen, the animation selector.
+ * The player model in the middle of the skin menu, with the turntable arc under its feet and, on
+ * the title screen, the animation selector.
  *
  * <p>The panel only previews: it shows whatever skin and arm width the menu has pending and never
  * applies anything to the player. Its own rectangle is the model's box; it draws a CPM model's icon
@@ -31,7 +31,8 @@ public class PlayerPreviewPanel extends AbstractWidget {
     @Nullable
     private PlayerWidget playerWidget;
 
-    private Button rotateButton;
+    @Nullable
+    private RotationArcWidget rotationArc;
     private Button animationToggleButton;
     private final java.util.List<Button> animationButtons = new java.util.ArrayList<>();
     private boolean isAnimationDropdownOpen = false;
@@ -106,22 +107,18 @@ public class PlayerPreviewPanel extends AbstractWidget {
     }
 
     /**
-     * Creates the rotate button at {@code (x, y)} and, on the title screen, the animation selector
-     * beside it, which opens upward.
+     * Creates the turntable ring around the model's feet and, on the title screen, the animation
+     * selector beside its right end, which opens upward. With {@code ringIntro} the ring plays its
+     * appearing animation.
      */
-    public void initControls(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen, int x, int y) {
+    public void initControls(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen,
+                             int centerX, int ringCenterY, int ringRadiusX, boolean ringIntro) {
         int size = 20;
-        rotateButton = ButtonFactory.createRotate(x, y, size, b -> {
-            if (playerWidget != null) {
-                playerWidget.toggleRotation();
-            }
-        });
-        rotateButton.setTooltip(Tooltip.create(Component.translatable("quickskin.preview.rotate")));
-        screen.registerWidget(rotateButton);
+        rotationArc = new RotationArcWidget(centerX, ringCenterY, ringRadiusX, ringIntro);
+        screen.registerWidget(rotationArc);
         //? if <1.21 {
         if (playerWidget != null) {
             playerWidget.clearPriorityWidgets();
-            playerWidget.addPriorityWidget(rotateButton);
         }
         //?}
 
@@ -133,7 +130,8 @@ public class PlayerPreviewPanel extends AbstractWidget {
         if (isInGame) {
             return;
         }
-        int toggleX = x + size + 4;
+        int toggleX = centerX + ringRadiusX + 6;
+        int y = ringCenterY - size / 2;
         animationToggleButton = ButtonFactory.createStyled(
                 toggleX, y, size, size,
                 Component.literal(">"),
@@ -171,6 +169,12 @@ public class PlayerPreviewPanel extends AbstractWidget {
             }
             //?}
         }
+    }
+
+    /** The turntable arc under the model, once {@link #initControls} has created it. */
+    @Nullable
+    public RotationArcWidget getRotationArc() {
+        return rotationArc;
     }
 
     /**
@@ -288,13 +292,9 @@ public class PlayerPreviewPanel extends AbstractWidget {
         return isCpmModel || lastCpmWearing;
     }
 
-    /** The arm width a skin's "auto" choice resolves to, for labelling. */
+    /** The arm width the skin menu offers for a model type: "slim", or "classic" for anything else. */
     public static String normalizedModelType(@Nullable String modelType) {
-        String lower = modelType != null ? modelType.toLowerCase(Locale.ROOT) : "classic";
-        return switch (lower) {
-            case "auto", "slim" -> lower;
-            default -> "classic";
-        };
+        return modelType != null && "slim".equals(modelType.toLowerCase(Locale.ROOT)) ? "slim" : "classic";
     }
 
     private void updateCpmWearingState() {

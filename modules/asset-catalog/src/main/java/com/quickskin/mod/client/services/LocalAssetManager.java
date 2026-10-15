@@ -2033,18 +2033,27 @@ public class LocalAssetManager {
     }
 
     /**
-     * Get model type preference for a skin
+     * Get model type preference for a skin: the arm width chosen in the skin menu, or else the one
+     * detected when the skin was imported. A skin keeps that width until the player picks the
+     * other; "auto" remains only for a hash that names no catalogued skin, or a skin with no
+     * detected width.
      * @param hash Skin hash
-     * @return Model type preference ("auto", "classic", or "slim")
+     * @return Model type preference ("classic" or "slim", or "auto" as above)
      */
     public String getSkinModelPreference(String hash) {
         if (!NetworkSecurity.isValidContentId(hash)) return "auto";
         String primary = catalog.resolve(hash);
         if (primary == null) return "auto";
-        if (skinPreferences == null) {
-            return "auto";
+        String chosen = skinPreferences != null ? skinPreferences.getModelType(primary) : "auto";
+        if ("auto".equals(chosen)) {
+            // Nothing chosen yet, or chosen before the choice was only Wide or Slim: the arm width
+            // detected on import
+            AssetMetadata metadata = getMetadata(primary);
+            if (metadata != null && metadata.skinModel() != null) {
+                return metadata.skinModel();
+            }
         }
-        return skinPreferences.getModelType(primary);
+        return chosen;
     }
 
     /**
