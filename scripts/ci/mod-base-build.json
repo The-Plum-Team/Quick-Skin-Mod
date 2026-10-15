@@ -3,20 +3,48 @@
     "dispatcher": "scripts/ci/mod_base_build_dispatch.py",
     "files": [
       {
+        "path": "architecture/modules.json",
+        "sha256": "c2d1a2c21d2cd4ac9ca3b53808c96e914f4290819f20a8ecc39f21f8b3e62693"
+      },
+      {
+        "path": "e2e/mod-compatibility-contract.json",
+        "sha256": "b156ad35310a77e4698aaad1f723d2062c9023057f0590e07d815876c532caac"
+      },
+      {
+        "path": "e2e/mod_compatibility.py",
+        "sha256": "a97108e2dc7f141016ad0565d777edd69a8c1845f972e3d6c29ede95a339e39b"
+      },
+      {
         "path": "e2e/scenario_contract.py",
         "sha256": "60a15e5020ec1ffd11851c4c36f84fd63f4b4d982c4c8c1ffedbaa7107ed1b69"
       },
       {
+        "path": "e2e/selection.py",
+        "sha256": "d46871197abf26d292c2e49cd3ec33c4e72c36fb1935870ce3730243c3246dde"
+      },
+      {
+        "path": "e2e/visual_similarity.py",
+        "sha256": "043be06d72a90ad22d603e77cce9d8596e9964246904c15a1c21fcec3f6e5a14"
+      },
+      {
+        "path": "scripts/architecture/module_graph.py",
+        "sha256": "0b6d29957ac50f04082e1504954ef84f5ba90ce34d3b21af6c8d8e7a14ae6eb6"
+      },
+      {
+        "path": "scripts/ci/e2e_impact.py",
+        "sha256": "04ff0f55f5ba76d84ec7e26f43f4f588353d4e009fa05525c2f6bbd2f9dea49c"
+      },
+      {
         "path": "scripts/ci/mod_base_build_adapter.py",
-        "sha256": "a733f8953bdf245b607f7665a7960df749a0c3b089b2270e57f22b498fdfeb9d"
+        "sha256": "793d6709bd2dfc4be8b47fc6da2462621ca2ee0b643ecd5552e0ef27e57b72d8"
       },
       {
         "path": "scripts/ci/mod_base_build_candidate.py",
-        "sha256": "42c258bcfb104c64b1971f0b2a08b4b50dfa1fc398c2925a79ba6976f94dba06"
+        "sha256": "cdfa6ef678e2c3d1d46322b44b8dbf655bcc9288e613f2e81e1a2991e769b31e"
       },
       {
         "path": "scripts/ci/mod_base_build_dispatch.py",
-        "sha256": "200b92a5ccbcd7f9829e8e38fc53c98227e45d0f18a52823754f1bcda8ed05ec"
+        "sha256": "70a217b26ab06299597c3823a70113be2cc4777f01a384ee25950479425d1699"
       },
       {
         "path": "scripts/ci/mod_base_build_policy.py",
@@ -68,6 +96,9 @@
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "runtime": {
     "system_profile": "xvfb-mesa"
+  },
+  "runtime_selection": {
+    "input": "changed-paths-v1"
   },
   "scenario_contract": {
     "path": "e2e/scenario-contract.json"

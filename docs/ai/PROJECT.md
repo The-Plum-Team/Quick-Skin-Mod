@@ -113,11 +113,12 @@ the repository.
 
 - Actions artifacts are handoffs, not an archive. Every ordinary upload is retained for one day;
   named seven-day exceptions are automatic-sync packaged evidence/input bundles needed by delayed
-  compatibility review, compatibility plans/evidence/capsules/reports/block markers, queued visual
-  review capsules with their normalized reports and generation-block markers, the mod-compatibility
+  compatibility review, compatibility plans/evidence/capsules/reports/block markers, normalized
+  visual-review reports and generation-block markers, the mod-compatibility
   family handoff `mb-family-handoff--mod-compatibility--<key>--a<attempt>`, and rolling
   exact-policy visual verdict caches. The ordinary public-evidence handoff
-  `mb-handoff--<key>--a<attempt>` keeps the one-day default.
+  `mb-handoff--<key>--a<attempt>` keeps the one-day default. Queued visual-review capsules are a
+  transient queue, not evidence, and retain two days.
   Named 90-day artifact classes include the semantic certificate, the evidence caches
   `mb-cache--<key>--<coverage_sha>`, the lossless anchor
   `mb-anchor--mc1.20.1--<commit>--<run_id>--a<attempt>` of the matrix's unit-test target, the
@@ -140,7 +141,7 @@ the repository.
   Ordinary raw packaged-E2E
   proof retains its one-day window because a concurrent branch attestation may still consume it;
   an automatic synchronization source retains seven days for the post-semantic compatibility wave.
-  Completed and already-reviewed AI queue entries retain seven days so late publication-tail
+  Completed and already-reviewed AI queue entries retain their two days so late publication-tail
   cancellation can recover them; authenticated reports suppress duplicate review while available.
   Terminally invalid entries retain exact-ID cleanup, while transient failures remain for retry.
   Retention is bounded per input, not by an aggregate storage cap; the

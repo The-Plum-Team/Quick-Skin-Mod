@@ -1155,8 +1155,11 @@ jobs:
           if-no-files-found: error
           compression-level: 6
           # Keep this durable bounded entry through late drain cancellation, even after review.
-          # Authenticated reports suppress duplicates; expiry is the recovery/retirement bound.
-          retention-days: 7
+          # Authenticated reports (seven days) suppress duplicates; expiry is the
+          # recovery/retirement bound. Two days cover the longest observed queue wait (under
+          # three hours), a five-hour Claude usage window and the 30-minute retry cooldowns
+          # with over a day to spare; only a current-master capsule is ever eligible anyway.
+          retention-days: 2
 
   request-drain:
     name: Wake every available visual review

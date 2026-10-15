@@ -28,10 +28,15 @@ deltas.
   coherence before it emits the only normalized report eligible for upload. Durable queue state
   must not depend on a pending workflow run: a sanitized marker may cool a failed entry, raw
   provider text must never be uploaded. The final `actions: write` cleanup job must retain fresh
-  and already-reviewed inputs through seven-day expiry, succeeding without deletion so a later
+  and already-reviewed inputs through their two-day expiry, succeeding without deletion so a later
   cancelled report owner can recover the original capsule. Only missing/terminally invalid inputs
   enter exact-ID cleanup; authenticated reports suppress completed-input redispatch. A repository-wide capacity circuit may serialize
-  its tool-free preflight and marker publication independently from the model/cache job. The latter
+  its tool-free preflight and marker publication independently from the model/cache job; its
+  probe lock, shared by both reviewers, also uses `queue: max` so no pending wake is cancelled.
+  Queue sweeps and the capacity fan-out never read the repository-wide artifact listing: they list
+  the curator runs at the current `master` SHA, each run's own artifacts, and every marker by exact
+  name, all bounded and fail-closed. Only the transient queue capsule retains two days; reports,
+  generation blocks, certificates and verdict caches keep their evidence retention. The latter
   serializes ordinary capsules globally so subsequent targets reuse the latest verdicts, with
   at most 32 concurrent calls across ordinary reviewers. Two secretless preparation slots may
   overlap that owner, handing off only the original capsule ZIP by exact run/attempt/id/digest.
@@ -180,9 +185,12 @@ deltas.
   `actions/create-github-app-token` and `actions/deploy-pages`).
 - The shared mod-base Build and packaged E2E adapter is protected policy, adopted beside the legacy
   gates: `scripts/ci/mod-base-build.json` names the dispatcher, the adapter, the policy runner and
-  every module a protected hook imports (the `scripts/ci/mod_base_build_*.py` files,
-  `scripts/release/{matrix,verify_release,artifact_manifest,generate_sbom,release_identity}.py` and
-  `e2e/scenario_contract.py`), each with the SHA-256 of its LF bytes. The kit runs protected hooks
+  every file a protected hook reads or imports (the `scripts/ci/mod_base_build_*.py` files,
+  `scripts/release/{matrix,verify_release,artifact_manifest,generate_sbom,release_identity}.py`,
+  `e2e/scenario_contract.py` and the selection policy's `scripts/ci/e2e_impact.py`,
+  `e2e/{selection,mod_compatibility,visual_similarity}.py`, `e2e/mod-compatibility-contract.json`,
+  `scripts/architecture/module_graph.py` and `architecture/modules.json`), each with the SHA-256 of
+  its LF bytes. The kit runs protected hooks
   from the default branch's copy of exactly those files, so an edit to one of them updates its hash
   in the same commit and changes the policy digest. `site/mod-base-build-activation.json` alone
   decides which kit callers exist. Every mode change is its own pull request, never combined with a
@@ -213,6 +221,23 @@ deltas.
   dispatched native gates no longer count.
   `scripts/ci/tests/test_mod_base_build_adapter.py` holds the plan to the native targets, lanes
   and staged names.
+- `runtime_selection` in `scripts/ci/mod-base-build.json` lets the shared packaged E2E of a pull
+  request run a narrowed scope (mod-base `docs/BUILD-RUNTIME-SELECTION.md`). The adapter's
+  `derive_scope` is the selection policy, and it reads the default branch's copy of its files, never
+  the candidate's: paths the native E2E impact allowlist (`scripts/ci/e2e_impact.py`) calls
+  non-runtime are set aside; if nothing is left every lane runs only `phase0-smoke`; if every
+  remaining path is a Java source of a feature module of `architecture/modules.json` and the native
+  selector (`e2e/selection.py`) proves an `affected` subset, every lane runs that subset and
+  `phase0-smoke`; anything else (a shared `java-library` module or `common`, a resource, a build,
+  harness or workflow file, a path no module owns, a compatibility capture, any doubt) runs every
+  scenario. The kit itself runs in full a pull request that changes the config, any listed adapter
+  file, the matrix, the scenario contract or `gradle.properties`, every push, dispatch and release,
+  a pull request whose base commit has no successful full packaged run under the same kit pin and
+  policy, and the push after a narrowed pull request. A narrowed run's `Packaged E2E gate` says
+  "for a narrowed scope", and its lanes' `verify_runtime` proves exactly the selected scenarios.
+  Editing a listed file (for example `architecture/modules.json` or the compatibility lock) updates
+  its hash in the same commit. To stop narrowing, remove `runtime_selection`; remove it before any
+  kit pin rollback below v1.5.0, whose readers refuse it.
 
 ## Verification
 

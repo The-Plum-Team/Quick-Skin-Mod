@@ -53,6 +53,13 @@ MAX_NAMED_ARTIFACTS = 1_000
 # separate page bound keeps the scan itself bounded and still fails closed.
 MAX_NAMED_PAGES = 200
 MAX_CAPACITY_FANOUT = 256
+# A generic sweep lists the producer runs of the current master generation, then each run's own
+# artifacts, and looks markers up by exact name; GitHub's repository-wide artifact listing is
+# never read (it returned HTTP 500 for this repository from 2026-10-11). Producer runs for one
+# commit stay far below these bounds; reaching one fails closed instead of truncating the queue.
+MAX_PRODUCER_RUN_PAGES = 10
+MAX_RUN_ARTIFACT_PAGES = 10
+MAX_PENDING_KEYS = 512
 REQUEST_ATTEMPTS = 4
 RATE_LIMIT_REQUEST_ATTEMPTS = 4
 MAX_RATE_LIMIT_WAIT_SECONDS = 300
@@ -85,7 +92,7 @@ class Artifact:
 
 
 class QueueApi(Protocol):
-    def list_artifacts(self) -> list[Artifact]: ...
+    def list_generation_inputs(self, generation: str) -> list[Artifact]: ...
 
     def list_artifacts_named(self, name: str) -> list[Artifact]: ...
 
@@ -424,12 +431,20 @@ def list_pending_candidates(
     now: datetime | None = None,
     cooldown: timedelta = timedelta(minutes=DEFAULT_COOLDOWN_MINUTES),
 ) -> list[tuple[Artifact, int]]:
-    """Return every eligible source/target once, with a certifiable legacy anchor first."""
+    """Return every eligible source/target once, with a certifiable legacy anchor first.
 
-    artifacts = api.list_artifacts()
+    Only the current master generation can be eligible, and the protected curator uploads a
+    capsule only from a run whose own SHA is that generation (a legacy name falls back to that
+    SHA), so the sweep reads exactly those producer runs' artifacts plus the exact marker names
+    of their source/target keys. No repository-wide artifact inventory is read.
+    """
+
+    current_master = api.get_branch_sha("master")
+    if not SHA.fullmatch(current_master):
+        raise QueueError("master branch SHA is invalid")
+    artifacts = api.list_generation_inputs(current_master)
     if len(artifacts) > MAX_ARTIFACTS:
         raise QueueError(f"visual review artifact inventory exceeds {MAX_ARTIFACTS}")
-    current_master = api.get_branch_sha("master")
     inputs = [
         artifact for artifact in artifacts
         if INPUT_NAME.fullmatch(artifact.name) and not artifact.expired
@@ -442,6 +457,8 @@ def list_pending_candidates(
         (int(INPUT_NAME.fullmatch(artifact.name).group("source")), input_target(artifact))
         for artifact in inputs
     }
+    if len(candidate_keys) > MAX_PENDING_KEYS:
+        raise QueueError(f"visual review queue exceeds {MAX_PENDING_KEYS} source/target keys")
 
     def related_marker(artifact: Artifact) -> bool:
         for pattern in (REPORT_NAME, ATTEMPT_NAME):
@@ -454,10 +471,21 @@ def list_pending_candidates(
                 return match.group("generation") == current_master
         return False
 
-    # Parse and bound the full repository inventory, but authenticate only markers that can
-    # affect an eligible source/target. Capsule age and its producer's SHA are not filters:
-    # legacy capsules and older protected producers may still own the current generation.
-    markers = [artifact for artifact in artifacts if related_marker(artifact)]
+    # Look up, by exact name, only the markers that can affect an eligible source/target, and
+    # authenticate only those. Capsule age is not a filter: legacy capsules still own the current
+    # generation through their producer SHA.
+    marker_names = {f"visual-review-wave-block-{current_master}",
+                    f"visual-anchor-certification-{current_master}"}
+    for source_run_id, target in candidate_keys:
+        review_key = str(source_run_id) + (f"--{target}" if target is not None else "")
+        marker_names.update({f"visual-review-{review_key}", f"visual-review-attempt-{review_key}"})
+    named_markers: list[Artifact] = []
+    for name in sorted(marker_names):
+        named = api.list_artifacts_named(name)
+        if len(named) > MAX_NAMED_ARTIFACTS:
+            raise QueueError(f"visual review artifact name exceeds {MAX_NAMED_ARTIFACTS}")
+        named_markers.extend(named)
+    markers = [artifact for artifact in named_markers if related_marker(artifact)]
     reviewed = reviewed_entries(api, markers, repository=repository)
     blocked = blocked_generations(api, markers, repository=repository)
     certified = certified_generations(api, markers, repository=repository)
@@ -548,9 +576,9 @@ def select_requested(
     """Authenticate one exact wake without scanning the repository-wide queue.
 
     Direct wakes already carry an immutable artifact id and are isolated by that id's workflow
-    concurrency group. Query only that capsule and the three exact marker names that can make it
+    concurrency group. Query only that capsule and the exact marker names that can make it
     ineligible. Generic scheduled recovery still uses :func:`select_pending` so it can prioritize
-    the oldest source across the complete durable queue.
+    the oldest source across the current generation's complete durable queue.
     """
 
     if requested_artifact_id <= 0:
@@ -752,40 +780,79 @@ class GitHubApi:
         except json.JSONDecodeError as exc:
             raise QueueError("GitHub API returned invalid JSON") from exc
 
-    def list_artifacts(self) -> list[Artifact]:
-        """Return the bounded newest repository window used only for recovery sweeps.
+    def _listing_page(self, path: str, key: str) -> list[Any]:
+        payload = self._request(path)
+        if not isinstance(payload, dict) or not isinstance(payload.get(key), list):
+            raise QueueError(f"{key} listing response is invalid")
+        if len(payload[key]) > 100:
+            raise QueueError(f"{key} listing page exceeds its requested size")
+        return payload[key]
 
-        Exact curator wakes use :meth:`get_artifact` plus name-filtered marker lookups and never
-        enter this path. A sweep must remain useful after the repository itself exceeds the
-        defensive scan window, so a full final page means "bounded window complete", not corrupt
-        evidence. Every artifact that is selected from the window is still authenticated below.
+    def list_generation_inputs(self, generation: str) -> list[Artifact]:
+        """Return the review capsules uploaded by the protected curator runs at ``generation``.
+
+        Used only by recovery sweeps and the capacity fan-out; exact curator wakes use
+        :meth:`get_artifact` plus name-filtered marker lookups. GitHub's repository-wide artifact
+        listing is deliberately not used: it grows with every artifact the repository has ever
+        uploaded and returned HTTP 500 for this repository. The curator workflow is listed by
+        exact head SHA, then each terminal run's own artifacts. Both listings are bounded and fail
+        closed; the caller still authenticates every selected artifact and its owner run.
         """
 
-        artifacts: list[Artifact] = []
-        for page in range(1, 101):
-            query = urllib.parse.urlencode({"per_page": 100, "page": page})
-            payload = self._request(
-                f"/repos/{self.repository}/actions/artifacts?{query}"
+        if not SHA.fullmatch(generation):
+            raise QueueError("generation must be a full commit SHA")
+        workflow = urllib.parse.quote(PREPARE_WORKFLOW.rsplit("/", 1)[-1], safe="")
+        run_ids: list[int] = []
+        for page in range(1, MAX_PRODUCER_RUN_PAGES + 1):
+            query = urllib.parse.urlencode(
+                {"head_sha": generation, "per_page": 100, "page": page}
             )
-            if not isinstance(payload, dict) or not isinstance(
-                payload.get("artifacts"), list
-            ):
-                raise QueueError("artifact inventory response is invalid")
-            batch = payload["artifacts"]
-            artifacts.extend(
-                parse_artifact(item)
-                for item in batch
-                if isinstance(item, dict)
-                and isinstance(item.get("name"), str)
-                and (
-                    item["name"].startswith("visual-review")
-                    or item["name"].startswith("visual-anchor-certification-")
-                )
+            batch = self._listing_page(
+                f"/repos/{self.repository}/actions/workflows/{workflow}/runs?{query}",
+                "workflow_runs",
             )
-            if len(artifacts) > MAX_ARTIFACTS:
-                raise QueueError(f"artifact inventory exceeds {MAX_ARTIFACTS}")
+            for run in batch:
+                if not isinstance(run, dict):
+                    raise QueueError("workflow run listing entry is invalid")
+                run_id = _positive_int(run.get("id"), "workflow_run.id")
+                # Only a terminal successful or failed curator at this exact SHA can own an
+                # eligible capsule; skip every other run before listing its artifacts.
+                if (
+                    run.get("head_sha") == generation
+                    and run.get("status") == "completed"
+                    and run.get("conclusion") in {"success", "failure"}
+                    and run_id not in run_ids
+                ):
+                    run_ids.append(run_id)
             if len(batch) < 100:
-                return artifacts
+                break
+        else:
+            raise QueueError(
+                f"visual review producer runs exceed {MAX_PRODUCER_RUN_PAGES} listing pages"
+            )
+        artifacts: list[Artifact] = []
+        for run_id in run_ids:
+            for page in range(1, MAX_RUN_ARTIFACT_PAGES + 1):
+                query = urllib.parse.urlencode({"per_page": 100, "page": page})
+                batch = self._listing_page(
+                    f"/repos/{self.repository}/actions/runs/{run_id}/artifacts?{query}",
+                    "artifacts",
+                )
+                artifacts.extend(
+                    parse_artifact(item)
+                    for item in batch
+                    if isinstance(item, dict)
+                    and isinstance(item.get("name"), str)
+                    and item["name"].startswith("visual-review-input-")
+                )
+                if len(artifacts) > MAX_ARTIFACTS:
+                    raise QueueError(f"artifact inventory exceeds {MAX_ARTIFACTS}")
+                if len(batch) < 100:
+                    break
+            else:
+                raise QueueError(
+                    f"visual review producer run artifacts exceed {MAX_RUN_ARTIFACT_PAGES} pages"
+                )
         return artifacts
 
     def list_artifacts_named(self, name: str) -> list[Artifact]:
