@@ -648,11 +648,7 @@ public class SettingsScreen extends Screen {
         // Render parent screen in background
     //?}
         if (this.parent != null) {
-            //? if <26.1 {
-            GuiCompat.renderParent(this.parent, graphics, partialTick);
-            //?} else {
-            GuiCompat.extractParent(this.parent, graphics, partialTick);
-            //?}
+            BlurHandler.renderParent(this.parent, graphics, partialTick);
         }
 
         //? if <1.21.6 {
@@ -661,7 +657,7 @@ public class SettingsScreen extends Screen {
         // Disable depth test so the blur/overlay/modal panels render on top of the 3D player widget
         org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
         //?}
-        BlurHandler.renderBlur();
+        BlurHandler.renderBlur(graphics);
 
         // Update keybind button text before rendering
         if (this.selectedKey == KeybindRegistry.OPEN_SKIN_MENU) {

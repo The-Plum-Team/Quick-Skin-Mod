@@ -3164,9 +3164,9 @@
               "id": "styled_buttons_vanilla_background",
               "assertion_required": true,
               "capture": {
-                "title": "Styled buttons over vanilla background",
+                "title": "Styled buttons over blurred vanilla background",
                 "review_tier": "key",
-                "expectation": "The skin menu is open with Quick Skin's styled buttons (dark translucent fills with light outlines) and its large grey Confirm button over Minecraft's translucent in-world overlay instead of the starred background: the daytime world is dimly visible around the floating controls and no star pattern is drawn.",
+                "expectation": "The skin menu is open with Quick Skin's styled buttons (dark translucent fills with light outlines) and its large grey Confirm button over Minecraft's blurred, translucent in-world overlay instead of the starred background: the daytime world is dimly visible around the floating controls but softly blurred, with no sharp terrain edges, and no star pattern is drawn. The menu's own text, buttons and player preview stay sharp.",
                 "probes": []
               },
               "requires": [

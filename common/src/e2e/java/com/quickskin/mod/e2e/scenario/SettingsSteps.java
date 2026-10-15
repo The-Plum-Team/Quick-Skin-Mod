@@ -385,7 +385,7 @@ final class SettingsSteps {
                     try {
                         return backgroundVerdict(mc);
                     } finally {
-                        // Every later dialog step runs with the defaults again.
+                        // Every later dialog step runs with the seeded starred background again.
                         ClientConfig c = ClientConfig.getInstance();
                         c.enableStyledButtons = false;
                         c.setMenuBackgroundStyle(BackgroundStyle.OPAQUE_STARS); // saves
