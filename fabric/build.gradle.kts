@@ -122,7 +122,7 @@ dependencies {
     "common"(project.files(commonProject.tasks.named("jar")))
     "shadowBundle"(project.files(commonProject.tasks.named("transformProductionFabric")))
 
-    "shadowBundle"("org.sejda.imageio:webp-imageio:0.1.6")
+    "shadowBundle"("com.twelvemonkeys.imageio:imageio-webp:3.15.3")
 }
 
 val javaVersion = versionProp("java_version").toInt()
@@ -207,5 +207,6 @@ if (isNoRemap) {
         inputFile.set(shadowJar.get().archiveFile)
     }
 }
+apply(from = rootProject.file("gradle/bundled-library-conventions.gradle.kts"))
 
 apply(from = rootProject.file("gradle/e2e-harness-conventions.gradle.kts"))

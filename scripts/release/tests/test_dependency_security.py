@@ -274,7 +274,7 @@ class DependencySecurityPolicyTest(unittest.TestCase):
                 "architectury-forge",
                 properties["architectury_api_version_1_20_1"],
             ),
-            ("org.sejda.imageio", "webp-imageio", "0.1.6"),
+            ("com.twelvemonkeys.imageio", "imageio-webp", "3.15.3"),
             ("org.junit.jupiter", "junit-jupiter", "5.13.4"),
             ("dev.architectury", "architectury-loom", "1.17.480"),
             ("dev.kikugie", "stonecutter", stonecutter_version),
@@ -531,7 +531,15 @@ class DependencySecurityPolicyTest(unittest.TestCase):
             ]
             self.assertEqual(
                 entries,
-                ["org.sejda.imageio:webp-imageio:0.1.6=shadowBundle", "empty="],
+                [
+                    "com.twelvemonkeys.common:common-image:3.15.3=shadowBundle",
+                    "com.twelvemonkeys.common:common-io:3.15.3=shadowBundle",
+                    "com.twelvemonkeys.common:common-lang:3.15.3=shadowBundle",
+                    "com.twelvemonkeys.imageio:imageio-core:3.15.3=shadowBundle",
+                    "com.twelvemonkeys.imageio:imageio-metadata:3.15.3=shadowBundle",
+                    "com.twelvemonkeys.imageio:imageio-webp:3.15.3=shadowBundle",
+                    "empty=",
+                ],
             )
         self.assertEqual(list(ROOT.glob("**/versions/**/*.lockfile")), [])
 
