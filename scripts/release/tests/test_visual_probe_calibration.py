@@ -24,15 +24,20 @@ from generate_e2e_cape_fixture import generate as generate_cape_fixture  # noqa:
 # canary for the known 1600x900 Minecraft UI geometry. An intentional oracle change must update
 # both the contract and this independently reviewed reference.
 TEXT_CANARY = {
+    # The menu has no panel: "Skins" over the N/M counter heads the left skin column, and the
+    # player's name tag ("Alice") sits above the centred model. A real 1920-wide frame of the
+    # counter keeps about 320 glyph pixels above luma 175 after the 1600x900 resize, and a nine
+    # letter name about 310, so Alice's five letters clear 100 with room to spare.
     ("full", "client_a", "skin_menu_screen"): (
-        ("skin catalog labels", (480, 195, 850, 300), 175, 500),
-        # The E2E import guarantees one entry; the offline Alice skin may add a second. The
-        # drop-zone centers in the remaining list area, so its copy has two legitimate Y offsets.
-        ("skin drop-zone instructions", (560, 440, 745, 523), 175, 300),
+        ("skin column counter", (16, 96, 120, 156), 175, 200),
+        ("player name tag", (600, 116, 1000, 162), 175, 100),
     ),
+    # The cape menu draws at its own scale: "My Capes" heads the frame and the drop zone sits
+    # below it. Every anchor lane keeps about 495 title and 1,087 drop-zone glyph pixels above
+    # luma 159 after the 1600x900 resize.
     ("full", "client_a", "cape_menu_screen"): (
-        ("cape menu title", (590, 100, 735, 140), 159, 174),
-        ("cape drop-zone instructions", (590, 200, 885, 260), 159, 531),
+        ("cape menu title", (505, 35, 650, 75), 159, 300),
+        ("cape drop-zone instructions", (585, 140, 880, 200), 159, 650),
     ),
     ("full", "client_a", "cape_adjust_screen"): (
         ("cape editor title", (675, 20, 925, 50), 75, 400),
@@ -47,9 +52,10 @@ TEXT_CANARY = {
     ("full", "client_a", "cape_fill_color_picker"): (
         ("fill colour hex value", (79, 543, 220, 576), 175, 380),
     ),
-    # Both anchor lanes retain 3,560 bright tooltip pixels in this box.
+    # Every anchor lane retains about 3,570 bright tooltip pixels in this box, and only the
+    # drop-zone copy's 1,087 without the tooltip.
     ("full", "client_a", "cape_tile_tooltip"): (
-        ("cape tile tooltip copy", (765, 190, 1040, 345), 159, 2500),
+        ("cape tile tooltip copy", (600, 125, 875, 290), 159, 2500),
     ),
     ("full", "client_a", "bmo_padded_source_screen"): (
         ("BMO source dimensions", (45, 100, 250, 140), 75, 120),
@@ -64,16 +70,17 @@ TEXT_CANARY = {
         ("server transparency setting label", (305, 234, 780, 268), 175, 1300),
         ("non-admin server notice", (495, 655, 1105, 688), 175, 1700),
     ),
-    # The disabled label is dimmer than ordinary GUI text; both lanes retain 342
-    # glyph pixels above luma 127 for the observed three-digit countdown.
+    # The disabled label is dimmer than ordinary GUI text; both lanes retained 342
+    # glyph pixels above luma 127 for the observed three-digit countdown at GUI size. The label now
+    # sits on the bottom-centre Confirm button, drawn larger, so it keeps at least as many.
     ("server-policy", "client_a", "cooldown_skin_menu"): (
-        ("cooldown button label", (712, 770, 889, 798), 127, 240),
+        ("cooldown button label", (560, 768, 1040, 818), 127, 240),
     ),
 }
 
 OPAQUE_STARS_CANARY = (
     ("full", "client_a", "skin_menu_screen"),
-    (0.03, 0.20, 0.20, 0.80),
+    (0.25, 0.12, 0.35, 0.50),
     32.0,
     64,
     0.10,

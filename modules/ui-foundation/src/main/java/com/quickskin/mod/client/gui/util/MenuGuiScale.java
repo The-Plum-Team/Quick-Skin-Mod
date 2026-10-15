@@ -1,0 +1,70 @@
+package com.quickskin.mod.client.gui.util;
+
+import net.minecraft.client.Minecraft;
+
+/**
+ * Gives a menu its own GUI scale, chosen from the window size, so it looks the same whatever GUI
+ * Scale the player picked.
+ *
+ * <p>Only the window's current scale changes, while the menu is shown. The player's GUI Scale
+ * option is never written, and nothing goes through {@code resizeDisplay()}, whose framebuffer
+ * resize and option change other mods react to. Rendering, the mouse and scissoring all read the
+ * window's scale, so they follow the menu's scale together; {@link #restore} puts back the scale
+ * the player's options give when the menu goes away.
+ */
+public final class MenuGuiScale {
+    /** The menus are laid out for a GUI canvas of at least about this size... */
+    private static final int TARGET_GUI_WIDTH = 520;
+    private static final int TARGET_GUI_HEIGHT = 300;
+    /** ...and Minecraft allows no scale whose canvas is smaller than this. */
+    private static final int MIN_GUI_WIDTH = 320;
+    private static final int MIN_GUI_HEIGHT = 240;
+
+    private MenuGuiScale() {
+    }
+
+    /**
+     * Sets the window to the menu's scale for its current size.
+     *
+     * @return whether the scale changed, which changes the scaled screen size
+     */
+    public static boolean apply(Minecraft minecraft) {
+        var window = minecraft.getWindow();
+        int scale = scaleFor(minecraft);
+        // getGuiScale() is a double before 1.21.8 and an int from it; both compare and convert
+        double current = window.getGuiScale();
+        if (current == scale) {
+            return false;
+        }
+        window.setGuiScale(scale);
+        return true;
+    }
+
+    /** The menu's scale for the window's current size. */
+    public static int scaleFor(Minecraft minecraft) {
+        var window = minecraft.getWindow();
+        return forFramebuffer(window.getWidth(), window.getHeight());
+    }
+
+    /** Puts back the scale the player's GUI Scale option gives, as {@code resizeDisplay()} computes it. */
+    public static void restore(Minecraft minecraft) {
+        var window = minecraft.getWindow();
+        int scale = window.calculateScale(minecraft.options.guiScale().get(),
+                minecraft.options.forceUnicodeFont().get());
+        double current = window.getGuiScale();
+        if (current != scale) {
+            window.setGuiScale(scale);
+        }
+    }
+
+    /**
+     * The menu's scale for a framebuffer of the given size, in pixels: the largest scale that
+     * still leaves the target canvas, so the menu keeps about the same proportions in any window.
+     * It is at least 2 wherever Minecraft allows it, so text stays readable in small windows.
+     */
+    static int forFramebuffer(int width, int height) {
+        int fitting = Math.min(width / TARGET_GUI_WIDTH, height / TARGET_GUI_HEIGHT);
+        int largestAllowed = Math.max(1, Math.min(width / MIN_GUI_WIDTH, height / MIN_GUI_HEIGHT));
+        return Math.min(largestAllowed, Math.max(2, fitting));
+    }
+}

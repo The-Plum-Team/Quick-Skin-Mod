@@ -43,22 +43,26 @@ class PackagedRuntimeVisualContractTest(unittest.TestCase):
                 for x in range(10, width, 32):
                     draw.rectangle((x, y, x + 3, y + 3), fill=(12, 12, 12))
 
-        # A representative dark menu panel with several substantial control colours keeps the
-        # fixture non-blank without touching the left-side background region under test.
+        # A representative panel-free menu with several substantial control colours keeps the
+        # fixture non-blank without touching the bare background region under test: the skin
+        # column of face tiles on the left, the model and its floating buttons in the middle, the
+        # link row at the top right and Confirm at the bottom.
         draw = ImageDraw.Draw(image)
-        draw.rectangle((160, 35, 480, 325), fill=(5, 5, 5), outline=(105, 105, 105), width=2)
-        draw.rectangle((174, 70, 350, 94), fill=(25, 25, 25), outline=(150, 150, 150))
-        draw.rectangle((174, 104, 350, 130), fill=(95, 8, 130), outline=(170, 70, 170))
-        draw.rectangle((180, 170, 345, 250), fill=(28, 28, 28), outline=(170, 170, 170))
-        draw.rectangle((365, 145, 445, 270), fill=(35, 65, 115))
-        draw.rectangle((174, 285, 460, 310), fill=(85, 85, 85), outline=(185, 185, 185))
+        for top in (40, 58, 76):
+            draw.rectangle((4, top, 20, top + 16), fill=(95, 8, 130), outline=(170, 70, 170))
+        draw.rectangle((270, 90, 370, 325), fill=(35, 65, 115))
+        draw.rectangle((231, 137, 252, 158), fill=(25, 25, 25), outline=(150, 150, 150))
+        draw.rectangle((387, 137, 408, 158), fill=(25, 25, 25), outline=(150, 150, 150))
+        draw.rectangle((527, 9, 630, 31), fill=(28, 28, 28), outline=(170, 170, 170))
+        draw.rectangle((222, 304, 418, 331), fill=(85, 85, 85), outline=(185, 185, 185))
         if not missing_text:
-            # Bright glyph-like strokes inside the two required skin-menu text regions. The
-            # surrounding fixture remains below the probe's luma threshold.
-            for y, right in ((82, 252), (88, 268), (108, 244), (114, 260)):
-                draw.line((200, y, right, y), fill=(255, 255, 255), width=2)
-            for y, right in ((194, 276), (199, 288), (204, 270)):
-                draw.line((230, y, right, y), fill=(255, 255, 255), width=2)
+            # Bright glyph-like strokes inside the two required skin-menu text regions (the
+            # column counter and the name tag). The surrounding fixture remains below the probe's
+            # luma threshold.
+            for y, right in ((42, 30), (45, 34), (48, 26)):
+                draw.line((8, y, right, y), fill=(255, 255, 255), width=1)
+            for y, right in ((52, 340), (55, 352)):
+                draw.line((300, y, right, y), fill=(255, 255, 255), width=1)
         image = image.resize(packaged_runtime.SCREENSHOT_SIZE, Image.Resampling.NEAREST)
         path = self.root / name
         image.save(path, format="PNG")

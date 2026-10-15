@@ -8,7 +8,7 @@
       },
       {
         "path": "e2e/mod-compatibility-contract.json",
-        "sha256": "b156ad35310a77e4698aaad1f723d2062c9023057f0590e07d815876c532caac"
+        "sha256": "a69ebe8928a0e0e2fa6147598f3acf38122f184ed05d76da75a384cc0f83065c"
       },
       {
         "path": "e2e/mod_compatibility.py",

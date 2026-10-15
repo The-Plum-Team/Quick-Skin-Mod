@@ -19,9 +19,15 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Panel that manages the skin list widget on the left side of the screen
+ * Panel that manages the skin grid on the left side of the screen
  */
 public class SkinListPanel extends AbstractWidget {
+
+    /** Size of a skin tile: a 24 px face (three pixels per skin texel) inside a 4 px frame. */
+    public static final int TILE_SIZE = 32;
+
+    /** Tiles per row of the grid. */
+    private final int columns;
 
     @Nullable
     private SkinListWidget skinListWidget;
@@ -29,8 +35,9 @@ public class SkinListPanel extends AbstractWidget {
     private final Minecraft minecraft;
     private final Consumer<SkinEntry> onSkinSelectedCallback;
 
-    public SkinListPanel(int x, int y, int width, int height, Minecraft minecraft, Consumer<SkinEntry> onSkinSelectedCallback) {
-        super(x, y, width, height, Component.empty());
+    public SkinListPanel(int x, int y, int columns, int height, Minecraft minecraft, Consumer<SkinEntry> onSkinSelectedCallback) {
+        super(x, y, SkinListWidget.widthFor(TILE_SIZE, columns), height, Component.empty());
+        this.columns = columns;
         this.minecraft = minecraft;
         this.onSkinSelectedCallback = onSkinSelectedCallback;
     }
@@ -40,22 +47,7 @@ public class SkinListPanel extends AbstractWidget {
      */
     public void init(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen) {
         // Create skin list widget
-        skinListWidget = new SkinListWidget(
-            screen,
-            minecraft,
-            width,
-            height,
-            getY(),
-            //? if >=1.21 {
-            getX(), // X position
-            //?}
-            40 // Entry height - matches original
-        );
-        //? if <1.21 {
-        skinListWidget.setLeftPos(getX());
-        skinListWidget.setRenderBackground(false);
-        skinListWidget.setRenderTopAndBottom(false);
-        //?}
+        skinListWidget = new SkinListWidget(screen, minecraft, getX(), getY(), height, TILE_SIZE, columns);
         screen.registerWidget(skinListWidget);
 
         // Load skins from LocalAssetManager
@@ -141,6 +133,17 @@ public class SkinListPanel extends AbstractWidget {
             return null;
         }
         return skinListWidget.getSelected();
+    }
+
+    /** Number of skins in the column. */
+    public int size() {
+        return skinListWidget == null ? 0 : skinListWidget.children().size();
+    }
+
+    /** One-based position of the selected skin, or 0 when none is selected. */
+    public int selectedPosition() {
+        SkinEntry selected = getSelected();
+        return selected == null || skinListWidget == null ? 0 : skinListWidget.children().indexOf(selected) + 1;
     }
 
     @Override

@@ -74,6 +74,8 @@ final class CatalogSteps {
     private final AtomicReference<String> setupFailure = new AtomicReference<>();
     /** Catalog size observed before the own-skin flag flips; an importer run would change it. */
     private final AtomicInteger entriesBeforeOwnSkin = new AtomicInteger(-1);
+    /** {@code ClientConfig.activeSkinHash} when the own-skin step starts. */
+    private final AtomicReference<String> activeSkinBeforeOwnSkin = new AtomicReference<>();
     /** Catalog primary of the external skin, captured before its deletion removes the alias. */
     private final AtomicReference<String> externalPrimaryBeforeDelete = new AtomicReference<>();
     private volatile String restoreMethodUsed;
@@ -282,6 +284,7 @@ final class CatalogSteps {
                 .action(() -> {
                     setupFailure.set(null);
                     entriesBeforeOwnSkin.set(-1);
+                    activeSkinBeforeOwnSkin.set(ClientConfig.getInstance().activeSkinHash);
                     PlayerSkinMenuScreen screen = openMenu(mc);
                     if (screen == null) {
                         setupFailure.set("skin menu not open before own-skin: "
@@ -394,9 +397,11 @@ final class CatalogSteps {
                                 + (appearance == null ? "<none>" : appearance.getSkinId())
                                 + " resolves to " + appliedPrimary + ", expected " + plaidPrimary);
                     }
-                    if (!plaidPrimary.equals(primaryOf(config.activeSkinHash))) {
-                        return Step.Result.fail("config.activeSkinHash=" + config.activeSkinHash
-                                + " does not resolve to " + plaidPrimary);
+                    // Selecting a row only previews it; the saved selection changes on Confirm alone.
+                    String activeBefore = activeSkinBeforeOwnSkin.get();
+                    if (!java.util.Objects.equals(activeBefore, config.activeSkinHash)) {
+                        return Step.Result.fail("config.activeSkinHash changed from " + activeBefore
+                                + " to " + config.activeSkinHash + " without a Confirm");
                     }
                     return Step.Result.pass("plaid skin " + plaidPrimary + " (alias " + owner.skinHash
                             + ") is the own skin: pinned first, selected with the purple own-skin "
@@ -573,8 +578,15 @@ final class CatalogSteps {
                             return Step.Result.fail("own skin is not the selected row after delete: "
                                     + (selected == null ? "<none>" : selected.getMetadata().hash()));
                         }
-                        if (count > 2) {
-                            return Step.Result.fail("drop zone condition (<= 2 entries) does not hold");
+                        Object tile = FullScenario.screenField(screen, "importTile");
+                        if (!(tile instanceof Button importTile) || !importTile.visible) {
+                            return Step.Result.fail("the skin column's import tile is not built");
+                        }
+                        // The tile closes the skin column, below the grid however few skins it holds.
+                        int listBottom = list.getY() + list.getHeight();
+                        if (importTile.getY() < listBottom) {
+                            return Step.Result.fail("import tile at y=" + importTile.getY()
+                                    + " overlaps the skin grid (grid ends at y=" + listBottom + ")");
                         }
                         if (!toasts(screen).isEmpty()) {
                             return Step.Result.fail("an error toast is still visible: '"
@@ -584,7 +596,7 @@ final class CatalogSteps {
                                 + "' (" + externalPrimary + ", alias " + owner.externalSkinHash
                                 + "): metadata null, no " + RENAMED_NAME + "* file in uploads/skins; "
                                 + "list has exactly 1 entry (protected own skin " + own.hash()
-                                + ", selected) so the drop zone (<= 2 entries) is shown; no toast visible");
+                                + ", selected) with the import tile below the grid; no toast visible");
                     } finally {
                         // Later steps expect the defaults: no own-skin protection, LATEST_LAST
                         // sort, and the plaid skin persisted as the active one (primary form, as
@@ -720,14 +732,12 @@ final class CatalogSteps {
 
     /** Type the new name into the real RenameScreen and press its Done button, exactly once. */
     /**
-     * True once the skin menu is open at its forced menu scale with a tick-over-tick stable
-     * layout, exactly like every other skin-menu checkpoint.
+     * True once the skin menu is open at its own GUI scale with a tick-over-tick stable layout,
+     * exactly like every other skin-menu checkpoint.
      *
      * <p>These catalog checkpoints deliberately run on the menu instance a user keeps open across
-     * the Rename and Delete dialogs. Coming back from a dialog must not change the menu's scale:
-     * the dialogs return to the same instance, and the menu keeps forcing its scale for as long
-     * as it is shown. A menu that came back at the user's scale is therefore a product defect this
-     * precondition refuses to settle on, not a layout to wait out.</p>
+     * the Rename and Delete dialogs, which return to that same instance: each dialog opens at the
+     * player's scale, and the menu must take its own scale back when it returns.</p>
      */
     private boolean menuLayoutStable(Minecraft mc) {
         return owner.skinMenuLayoutSettled(mc);

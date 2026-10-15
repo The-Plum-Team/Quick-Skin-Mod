@@ -357,42 +357,42 @@
     ],
     "full.client_a.catalog_delete": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.catalog_delete_protected": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.catalog_own_skin": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.catalog_rename": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.catalog_sort": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.delete_dialog": [
@@ -413,10 +413,10 @@
     ],
     "full.client_a.external_skin_drop": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.hd_cape_no_downscale": [
@@ -541,10 +541,10 @@
     ],
     "full.client_a.skin_menu_screen": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.slim_skin_auto_detect": [
@@ -565,10 +565,10 @@
     ],
     "full.client_a.styled_buttons_vanilla_background": [
       [
-        0.03,
-        0.09,
-        0.97,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.title_screen_splash_order": [
@@ -813,10 +813,10 @@
     ],
     "server-policy.client_a.cooldown_skin_menu": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "server-policy.client_a.transparent_skin_server_policy": [
@@ -1678,15 +1678,15 @@
               "capture": {
                 "title": "Skin menu",
                 "review_tier": "key",
-                "expectation": "The Quick Skin player-skin menu is open with readable catalog labels and drop-zone instructions over a dark, subtly starred background; there is no bright blur, radial wash or other background-compositing artifact.",
+                "expectation": "The Quick Skin skin menu is open without a panel: a column of skin face tiles under a Skins counter with a sort button and a dashed + import tile on the left, the player-name search field with a flat search button at the top centre, a row of four link icons (Modrinth, CurseForge, Discord, settings) at the top right, the large player model in the middle on a white turntable ring with the player's name above it, four square icon buttons beside the model (body width and skin websites on its left, upload to Mojang and cape on its right), a large CONFIRM button at the bottom, all over a dark, subtly starred background; there is no bright blur, radial wash or other background-compositing artifact.",
                 "probes": [
                   {
                     "kind": "opaque-stars-background",
                     "region": [
-                      0.03,
-                      0.2,
-                      0.2,
-                      0.8
+                      0.25,
+                      0.12,
+                      0.35,
+                      0.5
                     ],
                     "maximum_mean_luma": 32.0,
                     "bright_luma": 64,
@@ -1694,27 +1694,27 @@
                   },
                   {
                     "kind": "required-gui-text",
-                    "label": "skin catalog labels",
+                    "label": "skin column counter",
                     "box": [
-                      480,
-                      195,
-                      850,
-                      300
+                      16,
+                      96,
+                      120,
+                      156
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 500
+                    "minimum_pixels": 200
                   },
                   {
                     "kind": "required-gui-text",
-                    "label": "skin drop-zone instructions",
+                    "label": "player name tag",
                     "box": [
-                      560,
-                      440,
-                      745,
-                      523
+                      600,
+                      116,
+                      1000,
+                      162
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 300
+                    "minimum_pixels": 100
                   }
                 ]
               },
@@ -1735,7 +1735,7 @@
               "capture": {
                 "title": "External skin imported",
                 "review_tier": "all",
-                "expectation": "The skin menu shows the externally dropped skin as an available catalog entry without a broken texture.",
+                "expectation": "The skin column shows the externally dropped skin as an extra face tile without a broken texture.",
                 "probes": []
               },
               "requires": [
@@ -1756,7 +1756,7 @@
               "capture": {
                 "title": "Catalog rename",
                 "review_tier": "key",
-                "expectation": "The skin menu lists the externally dropped skin under its new name qs_e2e_renamed after the real rename dialog was confirmed; both catalog rows keep a face thumbnail and a model label, and no row still shows the original dropped filename.",
+                "expectation": "After the real rename dialog was confirmed, the renamed external skin is previewed: its tile is selected in the skin column and the centred model wears it; both skin tiles keep a face thumbnail.",
                 "probes": []
               },
               "requires": [
@@ -1777,7 +1777,7 @@
               "capture": {
                 "title": "Catalog sorted latest first",
                 "review_tier": "all",
-                "expectation": "The skin menu's sort button now shows the Latest First arrow icon and the renamed external skin row is listed above the imported plaid skin row.",
+                "expectation": "The skin column's sort button now shows the Latest First arrow icon and the renamed external skin's tile is listed above the imported plaid skin's tile.",
                 "probes": []
               },
               "requires": [
@@ -1798,7 +1798,7 @@
               "capture": {
                 "title": "Own skin protected",
                 "review_tier": "key",
-                "expectation": "The imported plaid skin is marked as the player's own skin: its selected row is pinned to the top of the catalog and highlighted purple instead of blue, with no delete, rename or upload buttons on the row.",
+                "expectation": "The imported plaid skin is marked as the player's own skin: its selected tile is pinned to the top of the skin column and framed purple instead of blue, and no delete, rename or upload buttons appear beside it.",
                 "probes": []
               },
               "requires": [
@@ -1820,7 +1820,7 @@
               "capture": {
                 "title": "Own skin deletion refused",
                 "review_tier": "all",
-                "expectation": "A red error toast reading Cannot delete your own skin! is visible over the skin menu while the protected purple own-skin row remains in the catalog.",
+                "expectation": "A red error toast reading Cannot delete your own skin! is visible over the skin menu while the protected purple own-skin tile remains in the skin column.",
                 "probes": []
               },
               "requires": [
@@ -1841,7 +1841,7 @@
               "capture": {
                 "title": "External skin deleted",
                 "review_tier": "key",
-                "expectation": "After the real delete confirmation, the renamed external skin row is gone; the catalog shows only the protected purple own-skin row above the drop-zone instructions.",
+                "expectation": "After the real delete confirmation, the renamed external skin's tile is gone; the skin column shows only the protected purple own-skin tile, with the dashed + import tile at the bottom of the column.",
                 "probes": []
               },
               "requires": [
@@ -2125,25 +2125,25 @@
                     "kind": "required-gui-text",
                     "label": "cape menu title",
                     "box": [
-                      590,
-                      100,
-                      735,
-                      140
+                      505,
+                      35,
+                      650,
+                      75
                     ],
                     "minimum_luma_exclusive": 159,
-                    "minimum_pixels": 174
+                    "minimum_pixels": 300
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "cape drop-zone instructions",
                     "box": [
-                      590,
-                      200,
-                      885,
-                      260
+                      585,
+                      140,
+                      880,
+                      200
                     ],
                     "minimum_luma_exclusive": 159,
-                    "minimum_pixels": 531
+                    "minimum_pixels": 650
                   }
                 ]
               },
@@ -2898,10 +2898,10 @@
                     "kind": "required-gui-text",
                     "label": "cape tile tooltip copy",
                     "box": [
-                      765,
-                      190,
-                      1040,
-                      345
+                      600,
+                      125,
+                      875,
+                      290
                     ],
                     "minimum_luma_exclusive": 159,
                     "minimum_pixels": 2500
@@ -3166,7 +3166,7 @@
               "capture": {
                 "title": "Styled buttons over blurred vanilla background",
                 "review_tier": "key",
-                "expectation": "The skin menu is open with Quick Skin's styled buttons (dark translucent fills with light outlines and a green Done bar) over Minecraft's blurred, translucent in-world overlay instead of the starred background: the daytime world is dimly visible behind the panel but softly blurred, with no sharp terrain edges, and no star pattern is drawn. The menu's own text, buttons and player preview stay sharp.",
+                "expectation": "The skin menu is open with Quick Skin's styled buttons (dark translucent fills with light outlines) and its large grey Confirm button over Minecraft's blurred, translucent in-world overlay instead of the starred background: the daytime world is dimly visible around the floating controls but softly blurred, with no sharp terrain edges, and no star pattern is drawn. The menu's own text, buttons and player preview stay sharp.",
                 "probes": []
               },
               "requires": [
@@ -3388,10 +3388,10 @@
               "second_step": "catalog_delete",
               "minimum_changed_fraction": 0.002,
               "region": [
-                0.34,
+                0.0,
+                0.05,
                 0.09,
-                0.66,
-                0.91
+                0.95
               ]
             },
             {
@@ -3530,10 +3530,10 @@
               "second_step": "styled_buttons_vanilla_background",
               "minimum_changed_fraction": 0.02,
               "region": [
-                0.03,
-                0.2,
-                0.2,
-                0.8
+                0.25,
+                0.12,
+                0.35,
+                0.5
               ]
             },
             {
@@ -3619,16 +3619,16 @@
               "capture": {
                 "title": "Skin change on cooldown",
                 "review_tier": "key",
-                "expectation": "The Quick Skin skin menu is open with its full-width Done button disabled and reading On Cooldown followed by a remaining-seconds countdown, because the server enforces a skin-change cooldown after the first change.",
+                "expectation": "The Quick Skin skin menu is open with its Confirm button disabled and reading On Cooldown followed by a remaining-seconds countdown, because the server enforces a skin-change cooldown after the first change.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "cooldown button label",
                     "box": [
-                      712,
-                      770,
-                      889,
-                      798
+                      560,
+                      768,
+                      1040,
+                      818
                     ],
                     "minimum_luma_exclusive": 127,
                     "minimum_pixels": 240
@@ -4597,7 +4597,7 @@
               "capture": {
                 "title": "Skin menu opened through its key binding",
                 "review_tier": "key",
-                "expectation": "The registered key opens the settled skin menu: its catalog is empty apart from the Drop skin files here or click 'Import Skin' drop zone, its search field and buttons are visible, and its player preview wears the UUID-selected vanilla default skin.",
+                "expectation": "The registered key opens the settled skin menu: its skin column holds only the dashed + import tile, its search field and floating buttons are visible, and its large centred player model wears the UUID-selected vanilla default skin.",
                 "probes": []
               }
             },
@@ -4618,7 +4618,7 @@
               "capture": {
                 "title": "Skin menu opened through the vanilla-menu button",
                 "review_tier": "key",
-                "expectation": "The injected Quick Skin button opens the settled skin menu: its catalog is empty apart from the Drop skin files here or click 'Import Skin' drop zone, its search field and buttons are visible, and its player preview wears the UUID-selected vanilla default skin. That the vanilla title screen stays the menu's parent is proven by the runtime evidence.",
+                "expectation": "The injected Quick Skin button opens the settled skin menu: its skin column holds only the dashed + import tile, its search field and floating buttons are visible, and its large centred player model wears the UUID-selected vanilla default skin. That the vanilla title screen stays the menu's parent is proven by the runtime evidence.",
                 "probes": []
               }
             },

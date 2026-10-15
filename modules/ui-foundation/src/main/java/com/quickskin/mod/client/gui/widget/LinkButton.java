@@ -82,9 +82,19 @@ public class LinkButton extends Button {
 
         // Draw the logo texture on top, inset slightly to fit within the rounded border.
         int padding = 2;
+        renderLogo(graphics, this.getX() + padding, this.getY() + padding,
+                this.width - (padding * 2), this.height - (padding * 2));
+    }
+
+    /** Draws the whole logo texture into the given rectangle. */
+    //? if <26.1 {
+    protected void renderLogo(GuiGraphics graphics, int x, int y, int width, int height) {
+    //?} else {
+    protected void renderLogo(GuiGraphicsExtractor graphics, int x, int y, int width, int height) {
+    //?}
         GuiCompat.blit(graphics, this.texture,
-                this.getX() + padding, this.getY() + padding,           // Screen position (x, y) with padding
-                this.width - (padding * 2), this.height - (padding * 2), // Size on screen (width, height) reduced by padding
+                x, y,                                                    // Screen position
+                width, height,                                           // Size on screen
                 0.0F, 0.0F,                                              // Texture UV start
                 this.textureWidth, this.textureHeight,                   // Region in texture to draw (the whole image)
                 this.textureWidth, this.textureHeight                    // Total texture size

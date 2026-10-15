@@ -2,7 +2,7 @@ package com.quickskin.mod.e2e.scenario;
 
 import com.quickskin.mod.client.gui.panel.ActionButtonsPanel;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
-import com.quickskin.mod.client.gui.util.GuiScaleManager;
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.services.CapeService;
 import com.quickskin.mod.client.services.CooldownService;
@@ -52,7 +52,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *       translucent sleeves made solid, the server echoes the appearance (first accepted change),
  *       and the 600 s cooldown starts.</li>
  *   <li>cooldown_skin_menu &mdash; a second, different skin is applied locally; the server drops it
- *       silently, so its sync never completes, and the skin menu's Done button reads
+ *       silently, so its sync never completes, and the skin menu's Confirm button reads
  *       {@code On Cooldown (Ns)} and is inactive.</li>
  *   <li>cape_change_during_cooldown &mdash; a cape change that keeps the server-accepted skin id is
  *       accepted and echoed while the cooldown stays active.</li>
@@ -301,14 +301,14 @@ public final class ServerPolicyScenario implements Scenario {
                         return Step.Result.fail("skin menu not open: " + screenName(mc));
                     }
                     int scale = VanillaShim.guiScale(mc);
-                    if (scale != GuiScaleManager.getOptimalMenuScale()) {
+                    if (scale != MenuGuiScale.scaleFor(mc)) {
                         return Step.Result.fail("menu GUI scale never settled: window=" + scale
-                                + " expected=" + GuiScaleManager.getOptimalMenuScale());
+                                + " expected=" + MenuGuiScale.scaleFor(mc));
                     }
                     String buttonFailure = cooldownButtonFailure(mc);
                     if (buttonFailure != null) return Step.Result.fail(buttonFailure);
-                    Button done = doneButton(mc);
-                    String label = done == null ? null : done.getMessage().getString();
+                    Button confirm = confirmButton(mc);
+                    String label = confirm == null ? null : confirm.getMessage().getString();
                     long remaining = CooldownService.getInstance().getRemainingCooldownSeconds();
 
                     PlayerAppearance app = svc.getAppearance(uuid);
@@ -331,7 +331,7 @@ public final class ServerPolicyScenario implements Scenario {
                                 + "confirmation: " + sync.describe());
                     }
                     return Step.Result.pass("PlayerSkinMenuScreen open at scale " + scale
-                            + "; Done button inactive, label=\"" + label + "\" (cooldown "
+                            + "; Confirm button inactive, label=\"" + label + "\" (cooldown "
                             + remaining + "s remaining); second " + localSkinId
                             + " applied locally but " + pending
                             + "; server-side skin remains the confirmed transparent skin "
@@ -541,13 +541,13 @@ public final class ServerPolicyScenario implements Scenario {
         return String.format(Locale.ROOT, "#%08X", argb);
     }
 
-    // ===== skin menu / Done button ==============================================================
+    // ===== skin menu / Confirm button ===========================================================
 
     /** Same settled-layout predicate as {@code FullScenario.skinMenuLayoutSettled}. */
     private boolean skinMenuLayoutSettled(Minecraft mc) {
         Screen sc = VanillaShim.currentScreen(mc);
         if (!(sc instanceof PlayerSkinMenuScreen)
-                || VanillaShim.guiScale(mc) != GuiScaleManager.getOptimalMenuScale()) {
+                || VanillaShim.guiScale(mc) != MenuGuiScale.scaleFor(mc)) {
             skinMenuLayoutStamp = Long.MIN_VALUE;
             return false;
         }
@@ -560,38 +560,38 @@ public final class ServerPolicyScenario implements Scenario {
         return true;
     }
 
-    private static Button doneButton(Minecraft mc) {
+    private static Button confirmButton(Minecraft mc) {
         if (!(VanillaShim.currentScreen(mc) instanceof PlayerSkinMenuScreen screen)) return null;
         Object panel = FullScenario.screenField(screen, "actionButtonsPanel");
         if (!(panel instanceof ActionButtonsPanel buttons)) return null;
-        return buttons.getDoneButton();
+        return buttons.getConfirmButton();
     }
 
     /**
-     * {@code null} when the Done button is inactive and labelled with the translated
+     * {@code null} when the Confirm button is inactive and labelled with the translated
      * {@code quickskin.cooldown.button} text carrying a positive countdown that agrees with
      * {@link CooldownService}; otherwise a failure description.
      */
     private static String cooldownButtonFailure(Minecraft mc) {
-        Button done = doneButton(mc);
-        if (done == null) return "skin menu Done button not built yet";
-        if (done.active) return "Done button is still active during the cooldown";
-        String label = done.getMessage().getString();
+        Button confirm = confirmButton(mc);
+        if (confirm == null) return "skin menu Confirm button not built yet";
+        if (confirm.active) return "Confirm button is still active during the cooldown";
+        String label = confirm.getMessage().getString();
         String template = Component.translatable("quickskin.cooldown.button", 0).getString();
         String shape = template.replaceAll("[0-9]+", "#");
         if (!label.replaceAll("[0-9]+", "#").equals(shape)) {
-            return "Done label \"" + label + "\" does not match cooldown template \""
+            return "Confirm label \"" + label + "\" does not match cooldown template \""
                     + template + "\"";
         }
         long shown;
         try {
             shown = Long.parseLong(label.replaceAll("[^0-9]+", ""));
         } catch (NumberFormatException e) {
-            return "Done label \"" + label + "\" carries no countdown";
+            return "Confirm label \"" + label + "\" carries no countdown";
         }
         long remaining = CooldownService.getInstance().getRemainingCooldownSeconds();
         if (shown <= 0 || remaining <= 0 || Math.abs(shown - remaining) > 3) {
-            return "Done label countdown " + shown + "s disagrees with CooldownService "
+            return "Confirm label countdown " + shown + "s disagrees with CooldownService "
                     + remaining + "s";
         }
         return null;

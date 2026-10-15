@@ -1,6 +1,7 @@
 package com.quickskin.mod.e2e.scenario;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.quickskin.mod.client.gui.panel.ActionButtonsPanel;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.client.gui.screen.SettingsScreen;
 import com.quickskin.mod.client.gui.widget.PrimaryButton;
@@ -16,6 +17,7 @@ import com.quickskin.mod.e2e.Step;
 import com.quickskin.mod.e2e.VanillaShim;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.client.gui.components.EditBox;
@@ -352,7 +354,7 @@ final class SettingsSteps {
         // 10a6. styled buttons over the vanilla in-world background --------------------------------
         // BackgroundRenderer keeps no static state for its in-world vanilla path (it only lazily
         // builds a panorama renderer on the title screen), so the render route is proven from
-        // pixels: a probe frame is grabbed while the menu holds, and the strip left of the panel
+        // pixels: a probe frame is grabbed while the menu holds, and the bare background strip
         // must show the world through the 0x90 overlay. Under opaque stars that strip is a black
         // fill (luma <= 38 everywhere), so the same metric over the earlier skin-menu capture is
         // the control that proves the probe discriminates.
@@ -512,7 +514,7 @@ final class SettingsSteps {
 
     /**
      * Drives the probe one phase per poll: hold the settled menu, grab the probe frame, measure the
-     * strip left of the panel in it and in the opaque-stars control capture, then stay ready while
+     * bare background strip in it and in the opaque-stars control capture, then stay ready while
      * the contract capture settles. A phase that cannot proceed records a reason and reports ready
      * so the assertion fails with it instead of the step timing out silently.
      */
@@ -536,7 +538,7 @@ final class SettingsSteps {
                 if (shot == null) return false; // async write still in flight
                 int[] region = probeRegion(mc);
                 if (region == null) {
-                    backgroundFailure.set("could not derive the strip left of the skin menu panel");
+                    backgroundFailure.set("could not derive the bare background strip of the skin menu");
                     return true;
                 }
                 backgroundRegion.set(region);
@@ -557,19 +559,56 @@ final class SettingsSteps {
         }
     }
 
-    /** The GUI-coordinate strip {@code {x0,y0,x1,y1}} left of the skin menu panel, upper half. */
+    /**
+     * The GUI-coordinate strip {@code {x0,y0,x1,y1}} of bare menu background in the skin menu's
+     * upper half: right of the skin column (its grid, sort button and import tile), left of the
+     * floating buttons that reach into that half, below the search row.
+     *
+     * <p>The floating buttons are measured one by one: the action panel spans the whole column
+     * the left buttons may use, while the buttons themselves sit at its inner edge beside the
+     * model, so the panel's own left edge lies against the skin column.</p>
+     */
     private static int[] probeRegion(Minecraft mc) {
         Screen screen = VanillaShim.currentScreen(mc);
         if (!(screen instanceof PlayerSkinMenuScreen)) return null;
-        int guiWidth = mc.getWindow().getGuiScaledWidth();
         int guiHeight = mc.getWindow().getGuiScaledHeight();
-        Object panelX = FullScenario.screenField(screen, "panelX");
-        int right = panelX instanceof Integer x ? x : guiWidth / 8;
-        // Keep a margin inside the panel edge so its outline and frosted fill never enter the count.
-        right = Math.min(right - 2, guiWidth - 1);
-        if (right < 8 || guiHeight < 16) return null;
+        Object column = FullScenario.screenField(screen, "skinListPanel");
+        Object actions = FullScenario.screenField(screen, "actionButtonsPanel");
+        Object search = FullScenario.screenField(screen, "usernameSearchField");
+        if (!(column instanceof AbstractWidget list) || !(actions instanceof ActionButtonsPanel panel)
+                || !(search instanceof AbstractWidget field)) {
+            return null;
+        }
         // The upper half faces the locked daytime sky, the strongest light through the overlay.
-        return new int[] {0, 0, right, guiHeight / 2};
+        int top = field.getY() + field.getHeight() + 2;
+        int bottom = guiHeight / 2;
+        // Keep a margin from every control so no outline or fill enters the count.
+        int left = list.getX() + list.getWidth() + 2;
+        for (String name : new String[] {"sortButton", "importTile"}) {
+            if (FullScenario.screenField(screen, name) instanceof AbstractWidget widget) {
+                left = Math.max(left, widget.getX() + widget.getWidth() + 2);
+            }
+        }
+        int right = probeRight(panel, left, top, bottom);
+        if (right - left < 8 || bottom - top < 8) return null;
+        return new int[] {left, top, right, bottom};
+    }
+
+    /**
+     * The right edge of the probe strip: two units left of the nearest visible floating button
+     * that overlaps the strip's rows and lies right of {@code left}, or the screen centre when
+     * none does.
+     */
+    private static int probeRight(ActionButtonsPanel panel, int left, int top, int bottom) {
+        int right = panel.getX() + panel.getWidth() / 2;
+        for (Button button : panel.buttons()) {
+            if (button == null || !button.visible) continue;
+            boolean overlapsRows = button.getY() < bottom && button.getY() + button.getHeight() > top;
+            if (overlapsRows && button.getX() > left) {
+                right = Math.min(right, button.getX() - 2);
+            }
+        }
+        return right;
     }
 
     /** {@code {brightPixels, sampledPixels}} of a GUI-coordinate region in a captured frame. */
@@ -628,7 +667,7 @@ final class SettingsSteps {
         long[] counts = backgroundCounts.get();
         int[] region = backgroundRegion.get();
         if (counts == null || region == null)
-            return Step.Result.fail("background probe never measured the strip left of the panel");
+            return Step.Result.fail("background probe never measured the bare background strip");
         if (counts[1] <= 0) return Step.Result.fail("background probe sampled no pixels");
         double fraction = (double) counts[0] / counts[1];
         String where = java.util.Arrays.toString(region);
