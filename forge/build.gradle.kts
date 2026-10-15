@@ -93,7 +93,7 @@ dependencies {
 
     "common"(project.files(commonProject.tasks.named("jar")))
     "shadowBundle"(project.files(commonProject.tasks.named("transformProductionForge")))
-    "shadowBundle"("org.sejda.imageio:webp-imageio:0.1.6")
+    "shadowBundle"("com.twelvemonkeys.imageio:imageio-webp:3.15.3")
 }
 
 val javaVersion = versionProp("java_version").toInt()
@@ -119,12 +119,6 @@ tasks.named<net.fabricmc.loom.task.RemapJarTask>("remapJar") {
     inputFile.set(shadowJar.get().archiveFile)
 }
 
-// FML gives the mod JAR one Java module, so the external library is nested, never merged into it.
-tasks.named<ShadowJar>("shadowJar") {
-    dependencies {
-        exclude(dependency("org.sejda.imageio:webp-imageio"))
-    }
-}
-apply(from = rootProject.file("gradle/fml-nested-library-conventions.gradle.kts"))
+apply(from = rootProject.file("gradle/bundled-library-conventions.gradle.kts"))
 
 apply(from = rootProject.file("gradle/e2e-harness-conventions.gradle.kts"))

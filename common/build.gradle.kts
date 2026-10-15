@@ -185,7 +185,7 @@ dependencies {
     modImpl("net.fabricmc:fabric-loader:${versionProp("fabric_loader_version")}")
     modImpl("dev.architectury:architectury:${versionProp("architectury_api_version")}")
 
-    "implementation"("org.sejda.imageio:webp-imageio:0.1.6")
+    "implementation"("com.twelvemonkeys.imageio:imageio-webp:3.15.3")
 
     "testImplementation"("org.junit.jupiter:junit-jupiter:5.13.4")
     "testRuntimeOnly"("org.junit.platform:junit-platform-launcher:1.13.4")

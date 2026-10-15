@@ -181,7 +181,7 @@ dependencies {
 
     "common"(project.files(commonProject.tasks.named("jar")))
     "shadowBundle"(project.files(commonProject.tasks.named("transformProductionNeoForge")))
-    "shadowBundle"("org.sejda.imageio:webp-imageio:0.1.6")
+    "shadowBundle"("com.twelvemonkeys.imageio:imageio-webp:3.15.3")
 
     "testImplementation"("org.junit.jupiter:junit-jupiter:5.13.4")
     "testRuntimeOnly"("org.junit.platform:junit-platform-launcher:1.13.4")
@@ -228,13 +228,7 @@ if (isNoRemap) {
     }
 }
 
-// FML gives the mod JAR one Java module, so the external library is nested, never merged into it.
-tasks.named<ShadowJar>("shadowJar") {
-    dependencies {
-        exclude(dependency("org.sejda.imageio:webp-imageio"))
-    }
-}
-apply(from = rootProject.file("gradle/fml-nested-library-conventions.gradle.kts"))
+apply(from = rootProject.file("gradle/bundled-library-conventions.gradle.kts"))
 
 extensions.extraProperties["quickSkinE2ESourceSet"] = e2eSourceSet
 extensions.extraProperties["quickSkinE2ELoaderLabel"] = "NeoForge"
