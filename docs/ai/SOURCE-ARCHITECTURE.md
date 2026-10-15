@@ -493,7 +493,9 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   live `master` SHA immediately before model admission. An exact wake may select only its requested
   authenticated artifact and queries only that immutable capsule plus its exact report, cooldown,
   generation-block, and current-generation identities; it does not rescan the repository-wide
-  queue. Transient GitHub API and installation-rate-limit responses
+  queue. It reports `owner_settling` when an ineligible capsule's curator run has not completed
+  yet, and only that state makes the drain repeat its bounded selection.
+  Transient GitHub API and installation-rate-limit responses
   receive bounded backoff before the durable wake is allowed to fail visibly. Queue state
   lives in Actions artifacts rather than pending workflow runs, so GitHub concurrency coalescing
   cannot lose a review. Exact artifact IDs define drain concurrency groups: duplicate wakes cannot

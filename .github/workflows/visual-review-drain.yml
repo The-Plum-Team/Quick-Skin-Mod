@@ -87,7 +87,9 @@ jobs:
               [[ "$REQUESTED_ARTIFACT_NAME" =~ ^visual-review-input-[1-9][0-9]*$ ]]
             fi
             # The enqueue workflow dispatches from its final job, just before its own run settles.
-            # Poll only that authenticated wake long enough for completed-run provenance to exist.
+            # Poll only that authenticated wake long enough for completed-run provenance to exist,
+            # and only while the selector reports that owner still settling: a duplicate wake of
+            # an already-reviewed capsule repeated the whole exact selection twelve times.
             attempts=12
             direct=true
             requested_arguments=(--requested-artifact-id "$REQUESTED_ARTIFACT_ID")
@@ -123,7 +125,7 @@ jobs:
               break
             fi
             if [[ "$selector_status" -eq 0 ]] && \
-                grep -qx 'eligible=true' "$queue_output"; then
+                ! grep -qx 'owner_settling=true' "$queue_output"; then
               break
             fi
             if (( attempt < attempts )); then
@@ -417,7 +419,8 @@ jobs:
           fi
 
   # Also fans out a stranded backlog found by a sweep (resume_queue), but only once Claude
-  # capacity is ready, so a subscription pause still drains one capsule per sweep.
+  # capacity is ready, so a subscription pause still drains one capsule per sweep. A fresh probe
+  # without that request fans out only while no other drain run is active.
   resume-capacity-queue:
     name: Wake every capsule after capacity returns
     needs:
@@ -459,10 +462,33 @@ jobs:
           GITHUB_API_RETRY_ATTEMPTS: "10"
           GITHUB_API_RETRY_MAX_DELAY_SECONDS: "60"
           GH_TOKEN: ${{ github.token }}
+          RESUME_QUEUE: ${{ needs.select.outputs.resume_queue }}
         run: |
           set -euo pipefail
           source scripts/ci/github_api_retry.sh
           [[ "$CURRENT_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ -z "$RESUME_QUEUE" || "$RESUME_QUEUE" == true || "$RESUME_QUEUE" == false ]]
+          if [[ "$RESUME_QUEUE" != true ]]; then
+            # A fresh probe alone does not prove a stranded backlog. On 2026-10-15 the first of 17
+            # curator wakes probed and redispatched the 16 capsules whose own exact wakes were
+            # already queued behind the probe lock: 33 drain runs for 17 capsules. Only a sweep's
+            # resume request, or a probe while no other drain run is queued or running, fans out;
+            # otherwise the live wakes own their capsules and the sweeps recover any remainder.
+            [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+            active=''
+            if ! active="$(github_api_retry \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/visual-review-drain.yml/runs?per_page=50" \
+                --jq "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID and
+                  (.status == \"requested\" or .status == \"waiting\" or .status == \"pending\" or
+                   .status == \"queued\" or .status == \"in_progress\"))] | length")"; then
+              active=''
+            fi
+            if [[ "$active" != 0 ]]; then
+              printf 'Capacity fan-out skipped: other drain runs are active (%s); their exact wakes own their capsules.\n' \
+                "${active:-unknown}" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
           pending="$RUNNER_TEMP/visual-review-capacity-pending.json"
           selector_status=0
           if python3 scripts/ci/visual_review_queue.py \

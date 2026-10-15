@@ -655,12 +655,38 @@ def select_requested(
     return requested, source_run_id
 
 
+def requested_owner_settling(api: QueueApi, *, requested_artifact_id: int) -> bool:
+    """Return whether an ineligible exact wake may still become eligible within its short poll.
+
+    The curator dispatches its wakes from its final job, so a wake can be selected before the
+    curator run that owns the capsule has completed. Only that owner justifies polling the exact
+    selection again. An already-reviewed, blocked, cooling, superseded, missing or foreign capsule
+    stays ineligible far longer than the poll lasts; on 2026-10-15 sixteen duplicate wakes of
+    already-reviewed capsules repeated the complete exact selection up to twelve times each.
+    """
+
+    if requested_artifact_id <= 0:
+        raise QueueError("requested artifact id must be a positive integer")
+    requested = api.get_artifact(requested_artifact_id)
+    if requested is None or requested.expired or INPUT_NAME.fullmatch(requested.name) is None:
+        return False
+    run = api.get_run(requested.run_id)
+    return bool(
+        isinstance(run, dict)
+        and run.get("id") == requested.run_id
+        and run.get("path") == PREPARE_WORKFLOW
+        and run.get("status") in ACTIVE_RUN_STATUSES
+        and run.get("conclusion") is None
+    )
+
+
 class GitHubApi:
     def __init__(self, *, repository: str, token: str, api_url: str) -> None:
         self.repository = repository
         self.token = token
         self.api_url = api_url.rstrip("/")
         self._runs: dict[int, dict[str, Any]] = {}
+        self._artifacts: dict[int, Artifact | None] = {}
         self._branches: dict[str, str] = {}
         self._pulls: dict[int, dict[str, Any]] = {}
 
@@ -897,11 +923,15 @@ class GitHubApi:
     def get_artifact(self, artifact_id: int) -> Artifact | None:
         if artifact_id <= 0:
             raise QueueError("artifact id must be a positive integer")
+        if artifact_id in self._artifacts:
+            return self._artifacts[artifact_id]
         payload = self._request(
             f"/repos/{self.repository}/actions/artifacts/{artifact_id}",
             missing_ok=True,
         )
-        return None if payload is None else parse_artifact(payload)
+        artifact = None if payload is None else parse_artifact(payload)
+        self._artifacts[artifact_id] = artifact
+        return artifact
 
     def get_run(self, run_id: int) -> dict[str, Any]:
         cached = self._runs.get(run_id)
@@ -1019,9 +1049,18 @@ def main(argv: list[str] | None = None) -> int:
             if args.requested_artifact_id is not None
             else select_pending(api, **selection_arguments)
         )
+        owner_settling = (
+            selected is None
+            and args.requested_artifact_id is not None
+            and requested_owner_settling(
+                api, requested_artifact_id=args.requested_artifact_id
+            )
+        )
         with args.github_output.open("a", encoding="utf-8") as output:
             if selected is None:
                 output.write("eligible=false\n")
+                if args.requested_artifact_id is not None:
+                    output.write(f"owner_settling={str(owner_settling).lower()}\n")
                 return 0
             artifact, source_run_id = selected
             output.write("eligible=true\n")

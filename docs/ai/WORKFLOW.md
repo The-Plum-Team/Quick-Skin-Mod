@@ -152,7 +152,11 @@ deltas.
   workflow is queued or running treats it as stranded: the compatibility recovery requests every
   pending source at once (without a continuation chain), and the drain sweep's exact wake carries
   `resume_queue` so a capacity-ready review fans the whole queue out; otherwise both keep their
-  single-entry recovery so a live review is never requested twice. QS-owned sweeps keep distinct
+  single-entry recovery so a live review is never requested twice. A freshly ready capacity probe
+  without that request fans the queue out only while no other drain run is queued or running, and
+  an exact wake repeats its selection only while the curator run that owns its capsule has not
+  completed; an already-reviewed, blocked, cooling or superseded capsule is selected once
+  ([visual-review pipeline](../ci/VISUAL-REVIEW-PIPELINE.md#wake-storm-of-2026-10-15)). QS-owned sweeps keep distinct
   minutes (drain `:21/:51`, compatibility review `:26/:56`, feature coverage `:34`, wake recovery
   `:41`, target status `:11`), away from the managed gate-status `:17` and Pages `:43` schedules
   and the `:03`-step release verifier.
