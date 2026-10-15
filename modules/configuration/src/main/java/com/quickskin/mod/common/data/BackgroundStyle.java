@@ -26,6 +26,6 @@ public enum BackgroundStyle {
                 return style;
             }
         }
-        return OPAQUE_STARS; // default
+        return VANILLA_BLUR; // default
     }
 }

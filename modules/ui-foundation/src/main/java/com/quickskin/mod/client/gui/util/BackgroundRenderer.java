@@ -100,7 +100,7 @@ public class BackgroundRenderer {
     }
 
     /**
-     * Renders opaque black background with star pattern and vignette (current default)
+     * Renders opaque black background with star pattern and vignette
      */
     //? if <26.1 {
     private static void renderOpaqueStarsBackground(Screen screen, GuiGraphics graphics, float partialTick) {
@@ -239,8 +239,8 @@ public class BackgroundRenderer {
     }
 
     /**
-     * Renders vanilla-style background - shows panorama on title screen,
-     * or transparent overlay when in-game to show the world behind
+     * Renders the default vanilla-style background: the world in-game, or the panorama on the
+     * title screen, blurred and then darkened under a translucent overlay
      */
     //? if <26.1 {
     private static void renderBlurredBackground(Screen screen, GuiGraphics graphics, float partialTick) {
@@ -251,7 +251,8 @@ public class BackgroundRenderer {
 
         // Check if player is in a world
         if (minecraft != null && minecraft.player != null && minecraft.level != null) {
-            // In-game: render semi-transparent overlay to show the world behind
+            // In-game: blur the world behind, then a semi-transparent overlay over it
+            BlurHandler.blurBehindMenu(graphics);
             graphics.fill(0, 0, screen.width, screen.height, 0x90000000);
         } else {
             // Title screen: render the panorama background
@@ -280,6 +281,8 @@ public class BackgroundRenderer {
             GuiCompat.extractPanorama(panoramaRenderer, graphics, screen.width, screen.height);
                 //?}
             //?}
+
+            BlurHandler.blurBehindMenu(graphics);
 
             // Render panorama overlay (darkens the panorama like in title screen)
             //? if <1.21 {
