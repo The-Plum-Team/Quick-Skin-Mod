@@ -557,9 +557,9 @@ final class SkinFidelitySteps {
                                 disableFailure = "Disable Skin Transparency was already selected before the press";
                                 return true;
                             }
-                            // onClose persists the checkbox into ClientConfig, flags the reload, and
-                            // hands the screen back to Minecraft; Screen.removed() then runs the
-                            // production reloadSkinsForTransparencyChange() on this same tick.
+                            // The press already saved the checkbox into ClientConfig and ran the
+                            // production reloadSkinsForTransparencyChange(); onClose re-applies it
+                            // and hands the screen back to Minecraft.
                             settings.onClose();
                             disablePhase.set(1);
                             return false;
