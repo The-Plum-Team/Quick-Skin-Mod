@@ -219,7 +219,11 @@ class ConfigTest(unittest.TestCase):
                                                 CONFIG.images["webp_method"]))
         family = CONFIG.family(FAMILY)
         self.assertEqual(compatibility_evidence.PROJECTION_IMAGE_POLICY, family["image_policy"])
-        self.assertEqual(sorted(collect_compatibility.REVIEW_EVENTS), family["producer"]["events"])
+        # Only a run that can publish is a producer: a scheduled sweep would only fill the kit's window of
+        # producer runs at the head and push a wave's earlier handoffs out of it.
+        self.assertEqual(sorted(collect_compatibility.PUBLICATION_EVENTS), family["producer"]["events"])
+        self.assertLess(collect_compatibility.PUBLICATION_EVENTS, collect_compatibility.REVIEW_EVENTS)
+        self.assertNotIn("schedule", family["producer"]["events"])
         self.assertEqual(collect_compatibility.REVIEW_WORKFLOW, family["producer"]["workflow"])
         self.assertTrue(family["carry_forward"])
 
