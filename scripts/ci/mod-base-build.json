@@ -4,7 +4,7 @@
     "files": [
       {
         "path": "architecture/modules.json",
-        "sha256": "c2d1a2c21d2cd4ac9ca3b53808c96e914f4290819f20a8ecc39f21f8b3e62693"
+        "sha256": "8776752f21972b3c163d26d81b08b59ae26c27dfa0f904e49db11c045fdbf2eb"
       },
       {
         "path": "e2e/mod-compatibility-contract.json",
@@ -68,7 +68,7 @@
       },
       {
         "path": "scripts/release/verify_release.py",
-        "sha256": "a9921094d6729af40dd28411bf00a1084551d74b95a829daf6f0551ec71d4289"
+        "sha256": "efc7fd70699dfb112bfccef5ce67cfb284392d5ecd15acd6ac5d807c2fe00e42"
       }
     ],
     "path": "scripts/ci/mod_base_build_adapter.py",
