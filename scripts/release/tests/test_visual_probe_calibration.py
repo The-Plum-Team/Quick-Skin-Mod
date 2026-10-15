@@ -32,9 +32,12 @@ TEXT_CANARY = {
         ("skin column counter", (16, 96, 120, 156), 175, 200),
         ("player name tag", (600, 116, 1000, 162), 175, 100),
     ),
+    # The cape menu draws at its own scale: "My Capes" heads the frame and the drop zone sits
+    # below it. Every anchor lane keeps about 495 title and 1,087 drop-zone glyph pixels above
+    # luma 159 after the 1600x900 resize.
     ("full", "client_a", "cape_menu_screen"): (
-        ("cape menu title", (590, 100, 735, 140), 159, 174),
-        ("cape drop-zone instructions", (590, 200, 885, 260), 159, 531),
+        ("cape menu title", (505, 35, 650, 75), 159, 300),
+        ("cape drop-zone instructions", (585, 140, 880, 200), 159, 650),
     ),
     ("full", "client_a", "cape_adjust_screen"): (
         ("cape editor title", (675, 20, 925, 50), 75, 400),
@@ -49,9 +52,10 @@ TEXT_CANARY = {
     ("full", "client_a", "cape_fill_color_picker"): (
         ("fill colour hex value", (79, 543, 220, 576), 175, 380),
     ),
-    # Both anchor lanes retain 3,560 bright tooltip pixels in this box.
+    # Every anchor lane retains about 3,570 bright tooltip pixels in this box, and only the
+    # drop-zone copy's 1,087 without the tooltip.
     ("full", "client_a", "cape_tile_tooltip"): (
-        ("cape tile tooltip copy", (765, 190, 1040, 345), 159, 2500),
+        ("cape tile tooltip copy", (600, 125, 875, 290), 159, 2500),
     ),
     ("full", "client_a", "bmo_padded_source_screen"): (
         ("BMO source dimensions", (45, 100, 250, 140), 75, 120),

@@ -2125,25 +2125,25 @@
                     "kind": "required-gui-text",
                     "label": "cape menu title",
                     "box": [
-                      590,
-                      100,
-                      735,
-                      140
+                      505,
+                      35,
+                      650,
+                      75
                     ],
                     "minimum_luma_exclusive": 159,
-                    "minimum_pixels": 174
+                    "minimum_pixels": 300
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "cape drop-zone instructions",
                     "box": [
-                      590,
-                      200,
-                      885,
-                      260
+                      585,
+                      140,
+                      880,
+                      200
                     ],
                     "minimum_luma_exclusive": 159,
-                    "minimum_pixels": 531
+                    "minimum_pixels": 650
                   }
                 ]
               },
@@ -2898,10 +2898,10 @@
                     "kind": "required-gui-text",
                     "label": "cape tile tooltip copy",
                     "box": [
-                      765,
-                      190,
-                      1040,
-                      345
+                      600,
+                      125,
+                      875,
+                      290
                     ],
                     "minimum_luma_exclusive": 159,
                     "minimum_pixels": 2500
