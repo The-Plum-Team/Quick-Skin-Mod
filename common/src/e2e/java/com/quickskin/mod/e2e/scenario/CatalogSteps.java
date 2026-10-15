@@ -74,6 +74,8 @@ final class CatalogSteps {
     private final AtomicReference<String> setupFailure = new AtomicReference<>();
     /** Catalog size observed before the own-skin flag flips; an importer run would change it. */
     private final AtomicInteger entriesBeforeOwnSkin = new AtomicInteger(-1);
+    /** {@code ClientConfig.activeSkinHash} when the own-skin step starts. */
+    private final AtomicReference<String> activeSkinBeforeOwnSkin = new AtomicReference<>();
     /** Catalog primary of the external skin, captured before its deletion removes the alias. */
     private final AtomicReference<String> externalPrimaryBeforeDelete = new AtomicReference<>();
     private volatile String restoreMethodUsed;
@@ -282,6 +284,7 @@ final class CatalogSteps {
                 .action(() -> {
                     setupFailure.set(null);
                     entriesBeforeOwnSkin.set(-1);
+                    activeSkinBeforeOwnSkin.set(ClientConfig.getInstance().activeSkinHash);
                     PlayerSkinMenuScreen screen = openMenu(mc);
                     if (screen == null) {
                         setupFailure.set("skin menu not open before own-skin: "
@@ -394,9 +397,11 @@ final class CatalogSteps {
                                 + (appearance == null ? "<none>" : appearance.getSkinId())
                                 + " resolves to " + appliedPrimary + ", expected " + plaidPrimary);
                     }
-                    if (!plaidPrimary.equals(primaryOf(config.activeSkinHash))) {
-                        return Step.Result.fail("config.activeSkinHash=" + config.activeSkinHash
-                                + " does not resolve to " + plaidPrimary);
+                    // Selecting a row only previews it; the saved selection changes on Confirm alone.
+                    String activeBefore = activeSkinBeforeOwnSkin.get();
+                    if (!java.util.Objects.equals(activeBefore, config.activeSkinHash)) {
+                        return Step.Result.fail("config.activeSkinHash changed from " + activeBefore
+                                + " to " + config.activeSkinHash + " without a Confirm");
                     }
                     return Step.Result.pass("plaid skin " + plaidPrimary + " (alias " + owner.skinHash
                             + ") is the own skin: pinned first, selected with the purple own-skin "

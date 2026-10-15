@@ -1,6 +1,7 @@
 package com.quickskin.mod.e2e.scenario;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.quickskin.mod.client.gui.panel.ActionButtonsPanel;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.client.gui.screen.SettingsScreen;
 import com.quickskin.mod.client.gui.widget.PrimaryButton;
@@ -560,7 +561,12 @@ final class SettingsSteps {
 
     /**
      * The GUI-coordinate strip {@code {x0,y0,x1,y1}} of bare menu background in the skin menu's
-     * upper half: right of the skin column, left of the floating buttons, below the search row.
+     * upper half: right of the skin column (its grid, sort button and import tile), left of the
+     * floating buttons that reach into that half, below the search row.
+     *
+     * <p>The floating buttons are measured one by one: the action panel spans the whole column
+     * the left buttons may use, while the buttons themselves sit at its inner edge beside the
+     * model, so the panel's own left edge lies against the skin column.</p>
      */
     private static int[] probeRegion(Minecraft mc) {
         Screen screen = VanillaShim.currentScreen(mc);
@@ -569,18 +575,40 @@ final class SettingsSteps {
         Object column = FullScenario.screenField(screen, "skinListPanel");
         Object actions = FullScenario.screenField(screen, "actionButtonsPanel");
         Object search = FullScenario.screenField(screen, "usernameSearchField");
-        if (!(column instanceof AbstractWidget list) || !(actions instanceof AbstractWidget buttons)
+        if (!(column instanceof AbstractWidget list) || !(actions instanceof ActionButtonsPanel panel)
                 || !(search instanceof AbstractWidget field)) {
             return null;
         }
+        // The upper half faces the locked daytime sky, the strongest light through the overlay.
+        int top = field.getY() + field.getHeight() + 2;
+        int bottom = guiHeight / 2;
         // Keep a margin from every control so no outline or fill enters the count.
         int left = list.getX() + list.getWidth() + 2;
-        int right = buttons.getX() - 2;
-        int top = field.getY() + field.getHeight() + 2;
-        // The upper half faces the locked daytime sky, the strongest light through the overlay.
-        int bottom = guiHeight / 2;
+        for (String name : new String[] {"sortButton", "importTile"}) {
+            if (FullScenario.screenField(screen, name) instanceof AbstractWidget widget) {
+                left = Math.max(left, widget.getX() + widget.getWidth() + 2);
+            }
+        }
+        int right = probeRight(panel, left, top, bottom);
         if (right - left < 8 || bottom - top < 8) return null;
         return new int[] {left, top, right, bottom};
+    }
+
+    /**
+     * The right edge of the probe strip: two units left of the nearest visible floating button
+     * that overlaps the strip's rows and lies right of {@code left}, or the screen centre when
+     * none does.
+     */
+    private static int probeRight(ActionButtonsPanel panel, int left, int top, int bottom) {
+        int right = panel.getX() + panel.getWidth() / 2;
+        for (Button button : panel.buttons()) {
+            if (button == null || !button.visible) continue;
+            boolean overlapsRows = button.getY() < bottom && button.getY() + button.getHeight() > top;
+            if (overlapsRows && button.getX() > left) {
+                right = Math.min(right, button.getX() - 2);
+            }
+        }
+        return right;
     }
 
     /** {@code {brightPixels, sampledPixels}} of a GUI-coordinate region in a captured frame. */
