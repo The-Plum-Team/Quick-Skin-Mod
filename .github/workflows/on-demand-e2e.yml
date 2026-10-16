@@ -779,7 +779,7 @@ jobs:
       - name: Upload stable public evidence for this Minecraft target
         id: handoff
         if: steps.identity.outputs.publish == 'true'
-        uses: The-Plum-Team/mod-base/actions/prepare-evidence@1b0c78bae4e484980a30a51a6bd2b52975029518 # v1.6.1
+        uses: The-Plum-Team/mod-base/actions/prepare-evidence@acb01ca4f625a5d27f1c1a709a416d9725bef64f # v1.7.0
         with:
           e2e-root: e2e-out
           key: ${{ matrix.bundle_key }}
@@ -816,7 +816,7 @@ jobs:
     # default-branch Pages workflow, which re-authenticates every handoff from scratch.
     steps:
       - name: Dispatch the exact producer run to the protected Pages publisher
-        uses: The-Plum-Team/mod-base/actions/notify-pages@1b0c78bae4e484980a30a51a6bd2b52975029518 # v1.6.1
+        uses: The-Plum-Team/mod-base/actions/notify-pages@acb01ca4f625a5d27f1c1a709a416d9725bef64f # v1.7.0
         with:
           operation: deploy
           run-id: ${{ github.run_id }}
