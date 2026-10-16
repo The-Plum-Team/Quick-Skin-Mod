@@ -70,11 +70,11 @@ TEXT_CANARY = {
         ("server transparency setting label", (305, 234, 780, 268), 175, 1300),
         ("non-admin server notice", (495, 655, 1105, 688), 175, 1700),
     ),
-    # The disabled label is dimmer than ordinary GUI text; both lanes retained 342
-    # glyph pixels above luma 127 for the observed three-digit countdown at GUI size. The label now
-    # sits on the bottom-centre Confirm button, drawn larger, so it keeps at least as many.
+    # The disabled label is dimmer than ordinary GUI text. It sits on the bottom-centre Confirm
+    # button in the blocky button font: both 1.20.1 lanes kept 9,959 glyph pixels above luma 127,
+    # all within x 573-1025 and y 733-765, for the observed three-digit countdown.
     ("server-policy", "client_a", "cooldown_skin_menu"): (
-        ("cooldown button label", (560, 768, 1040, 818), 127, 240),
+        ("cooldown button label", (560, 725, 1040, 775), 127, 240),
     ),
 }
 
