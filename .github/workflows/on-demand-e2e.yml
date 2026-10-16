@@ -489,6 +489,10 @@ jobs:
           selection-sha256: ${{ needs.feature-policy.outputs.selection_sha256 }}
           evidence-name: packaged-e2e-${{ matrix.id }}
           evidence-retention-days: '7'
+          # The bundle is this run's: a master dispatch takes it from the push Build of this exact
+          # SHA or compiles it above, never from a pull request, so it may publish an installed
+          # server when the writer policy approves the event.
+          runtime-store-writer: "true"
 
   required-gate:
     # A pull request to master gets "Packaged E2E gate" from the gate App alone (mod-base

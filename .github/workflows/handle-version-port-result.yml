@@ -623,6 +623,10 @@ jobs:
           EXPECTED_SHA: ${{ github.event.client_payload.head_sha }}
         run: |
           set -euo pipefail
+          # The candidate's own tests run below; they get no Actions service or GitHub token.
+          unset GH_TOKEN GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL \
+            ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL \
+            ACTIONS_CACHE_URL ACTIONS_RESULTS_URL
           [[ "$(git rev-parse HEAD)" == "$EXPECTED_SHA" ]]
           python3 "$RUNNER_TEMP/protected-ai-patch-policy.py" patch \
             --mode repair --patch "$RUNNER_TEMP/ai-repair/ai-repair.patch"

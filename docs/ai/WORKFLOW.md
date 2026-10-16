@@ -160,6 +160,13 @@ deltas.
   minutes (drain `:21/:51`, compatibility review `:26/:56`, feature coverage `:34`, wake recovery
   `:41`, target status `:11`), away from the managed gate-status `:17` and Pages `:43` schedules
   and the `:03`-step release verifier.
+- Only a job that builds and runs exclusively protected-`master` code may write an Actions cache
+  ([dependency security](../../DEPENDENCY-SECURITY.md#actions-cache-writers)). A job that launches
+  a pull request's JARs, a candidate checkout or another run's artifact restores read-only under
+  every trigger, and the step that runs those bytes unsets the Actions runtime, cache and results
+  variables. Add a cache save only to a job in the reviewed writer list of
+  `scripts/ci/tests/test_workflow_security.py`, never to a `repository_dispatch` job such as the
+  optional-mod wave.
 - Historical schema-2 port/anchor certificates remain available only for historical recovery;
   schema 3 retires automatic version ports. Never reuse a partial feature proof as either a
   complete shared baseline or a historical full-anchor certificate.

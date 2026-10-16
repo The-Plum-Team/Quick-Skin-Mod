@@ -260,7 +260,7 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   `e2e/runtime_store_cache.py` derives that transport identity, always the exact server recipe
   digest and never a commit, and names the immutable directories that may travel;
   `scripts/ci/runtime_store_cache_policy.py` is the fail-closed writer policy that admits only a
-  protected `master` dispatch. A restore that fails validation is a cache miss and a fresh
+  job declaring `runtime-store-writer` in a `workflow_dispatch` on protected `master`. A restore that fails validation is a cache miss and a fresh
   install. See [ADR 0008](../architecture/decisions/0008-transport-the-installed-loader-server-between-jobs.md).
 - `e2e/visual_evidence.py` reads successful `result.json` reports, verifies the scenario-contract
   hash and exact graph, bounded printable passed-assertion messages, PNG containment, full decode,

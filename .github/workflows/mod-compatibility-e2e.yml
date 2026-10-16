@@ -587,6 +587,9 @@ jobs:
           python3 scripts/ci/cpm_fixture_secret.py materialize \
             --output "$RUNNER_TEMP/qsm-protected-cpm-fixture/complex-model.bin"
 
+      # Restore-only on purpose: when the merge reused its pull request, runtime_sha is that PR's
+      # tested merge and the bundle is the JARs its pull_request run built. This job therefore never
+      # passes runtime-store-writer, and repository_dispatch is not a writer event either.
       - name: Run the activation probe and complete packaged suite
         uses: ./.github/actions/run-packaged-e2e
         with:
