@@ -26,9 +26,10 @@ import java.util.Locale;
  * depth. The face lightens
  * under the mouse and sinks onto the lip while pressed; a selected button, such as one whose menu
  * is open, keeps a bright border. Its label is drawn in upper case in Quick Skin's own blocky pixel
- * font with a drop shadow, at the largest whole multiple of the GUI size whose capitals fill at most
- * seven tenths of the face (three at most), so its pixels stay crisp; a label too long for the face
- * is drawn smaller.
+ * font with a drop shadow, at the largest whole number of screen pixels per font pixel whose capitals
+ * fill at most five eighths of the room inside the border (one to three GUI pixels), so its pixels
+ * stay crisp while it grows in steps finer than the GUI scale; a label too long for the face is drawn
+ * smaller. {@link #heightForLabel} sizes a button around a chosen label size instead.
  */
 @Environment(EnvType.CLIENT)
 public class ConfirmButton extends Button {
@@ -48,16 +49,21 @@ public class ConfirmButton extends Button {
     private static final int MAX_LABEL_SCALE = 3;
     /** Room the label leaves at the face's sides, together. */
     private static final int LABEL_MARGIN = 16;
-    /** The capitals fill at most this share of the face's height. */
-    private static final float MAX_CAPITALS_SHARE = 0.7f;
+    /**
+     * The room inside the border is at least this many times the capitals' height: they fill five
+     * eighths of it, with three sixteenths above and below.
+     */
+    private static final float ROOM_PER_CAPITALS = 1.6f;
+    /** Outline, border and lip around the room inside the border, together. */
+    private static final int FRAME_HEIGHT = 4 + LIP_HEIGHT;
     /** Height of the font's capitals, in font pixels. */
-    private static final int CAPITALS_HEIGHT = 9;
+    private static final int CAPITALS_HEIGHT = 10;
     /**
      * Distance from the text origin to the middle of the font's capitals, in font pixels. A bitmap
-     * glyph's top is drawn 7 - ascent below the origin: with an ascent of 12, the three rows kept
-     * for accents start at -5 and the capitals run from -2 to 7, on the default font's baseline.
+     * glyph's top is drawn 7 - ascent below the origin: with an ascent of 14, the four rows kept
+     * for accents start at -7 and the capitals run from -3 to 7, on the default font's baseline.
      */
-    private static final float CAPITALS_MIDDLE = 2.5f;
+    private static final float CAPITALS_MIDDLE = 2.0f;
 
     /**
      * The label's font: Quick Skin's own blocky capitals, digits and accented Latin letters, from
@@ -88,12 +94,39 @@ public class ConfirmButton extends Button {
 
     /** The width at which a button of the given height shows the label at its full size. */
     public static int fittingWidth(net.minecraft.client.gui.Font font, Component label, int height) {
-        return font.width(labelText(label)) * labelScale(height - 2 - LIP_HEIGHT) + LABEL_MARGIN;
+        double guiScale = guiScale();
+        int pixels = labelPixels(height - FRAME_HEIGHT, guiScale);
+        return (int) Math.ceil(font.width(labelText(label)) * pixels / guiScale) + LABEL_MARGIN;
     }
 
-    /** The whole scale whose capitals fill at most MAX_CAPITALS_SHARE of a face this tall. */
-    private static int labelScale(int faceHeight) {
-        return Math.max(1, Math.min(MAX_LABEL_SCALE, (int) (faceHeight * MAX_CAPITALS_SHARE / CAPITALS_HEIGHT)));
+    /**
+     * The height of a button that draws its label at the crisp size nearest to the given number of
+     * GUI pixels per font pixel, with the label's usual room above and below. It follows the GUI
+     * scale, so the label keeps the same share of the button in every window.
+     */
+    public static int heightForLabel(float guiPixelsPerFontPixel) {
+        double guiScale = guiScale();
+        int pixels = Math.max((int) Math.round(guiScale), (int) Math.round(guiScale * guiPixelsPerFontPixel));
+        // Rounding up keeps labelPixels() at this size: the room only gets bigger
+        int room = (int) Math.ceil(CAPITALS_HEIGHT * ROOM_PER_CAPITALS * pixels / guiScale - 1e-4);
+        return room + FRAME_HEIGHT;
+    }
+
+    /**
+     * The whole number of screen pixels per font pixel whose capitals fill at most 1 /
+     * ROOM_PER_CAPITALS of this much room inside the border, between one and MAX_LABEL_SCALE GUI
+     * pixels.
+     */
+    private static int labelPixels(int room, double guiScale) {
+        int smallest = (int) Math.round(guiScale);
+        int fitting = (int) Math.floor(room * guiScale / (CAPITALS_HEIGHT * ROOM_PER_CAPITALS) + 1e-4);
+        return Math.max(smallest, Math.min(MAX_LABEL_SCALE * smallest, fitting));
+    }
+
+    private static double guiScale() {
+        // getGuiScale() is a double before 1.21.8 and an int from it; both convert
+        double scale = Minecraft.getInstance().getWindow().getGuiScale();
+        return Math.max(1.0, scale);
     }
 
     private static Component labelText(Component label) {
@@ -149,11 +182,14 @@ public class ConfirmButton extends Button {
         int textWidth = Math.max(1, minecraft.font.width(text));
         int faceHeight = faceBottom - faceTop;
         int room = this.width - LABEL_MARGIN;
-        int wholeScale = labelScale(faceHeight);
-        while (wholeScale > 1 && textWidth * wholeScale > room) {
-            wholeScale--;
+        double guiScale = guiScale();
+        int smallest = (int) Math.round(guiScale);
+        int pixels = labelPixels(faceHeight - 2, guiScale);
+        while (pixels > smallest && textWidth * pixels / guiScale > room) {
+            pixels--;
         }
-        float scale = textWidth * wholeScale > room ? room / (float) textWidth : wholeScale;
+        float crispScale = (float) (pixels / guiScale);
+        float scale = textWidth * crispScale > room ? room / (float) textWidth : crispScale;
         // Centre the capitals themselves on the face, above the lip, on whole pixels; the eye
         // ignores the shadow
         float textX = Math.round(this.getX() + (this.width - textWidth * scale) / 2.0f);

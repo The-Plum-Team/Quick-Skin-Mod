@@ -28,8 +28,11 @@ public class ActionButtonsPanel extends AbstractWidget {
     /** Side of the square icon buttons, every floating button but the website choices. */
     public static final int ICON_BUTTON_SIZE = 24;
     private static final int SPACING = 2;
-    /** Height of the website choices in their bubble. */
-    private static final int CHOICE_HEIGHT = 20;
+    /**
+     * The website choices draw their labels at the crisp size nearest to this many GUI pixels per
+     * font pixel (one at GUI scales 2 and 3, 1.25 at 4, 1.2 at 5) and take their height from it.
+     */
+    private static final float CHOICE_LABEL_SCALE = 1.15f;
     /** Room between the bubble's edge and its choices. */
     private static final int BUBBLE_PADDING = 4;
     /** Gap between the bubble's pointer and the button it points at. */
@@ -101,9 +104,10 @@ public class ActionButtonsPanel extends AbstractWidget {
         screen.registerWidget(websitesButton);
 
         // The bubble is registered first, so that its choices are drawn over it
+        int choiceHeight = ConfirmButton.heightForLabel(CHOICE_LABEL_SCALE);
         int choiceWidth = choiceWidth(screen.getFont());
         int bubbleWidth = bubbleWidth(choiceWidth);
-        int bubbleHeight = 2 * CHOICE_HEIGHT + SPACING + 2 * BUBBLE_PADDING;
+        int bubbleHeight = 2 * choiceHeight + SPACING + 2 * BUBBLE_PADDING;
         int pointerY = layout.waistY() + ICON_FACE_MIDDLE;
         int bubbleX = iconX - POINTER_GAP - bubbleWidth;
         int bubbleY = pointerY - bubbleHeight / 2 + 1;
@@ -113,7 +117,7 @@ public class ActionButtonsPanel extends AbstractWidget {
         int choiceX = bubbleX + BUBBLE_PADDING;
         int choiceY = bubbleY + BUBBLE_PADDING;
         normalWebsiteButton = new ConfirmButton(
-            choiceX, choiceY, choiceWidth, CHOICE_HEIGHT,
+            choiceX, choiceY, choiceWidth, choiceHeight,
             Component.translatable("quickskin.button.website_normal"),
             button -> {
                 setWebsitesOpen(false);
@@ -124,7 +128,7 @@ public class ActionButtonsPanel extends AbstractWidget {
         screen.registerWidget(normalWebsiteButton);
 
         hdWebsiteButton = new ConfirmButton(
-            choiceX, choiceY + CHOICE_HEIGHT + SPACING, choiceWidth, CHOICE_HEIGHT,
+            choiceX, choiceY + choiceHeight + SPACING, choiceWidth, choiceHeight,
             Component.translatable("quickskin.button.website_hd"),
             button -> {
                 setWebsitesOpen(false);
@@ -198,9 +202,10 @@ public class ActionButtonsPanel extends AbstractWidget {
 
     /** The width of the website choices: the wider of the two labels at full size. */
     private static int choiceWidth(net.minecraft.client.gui.Font font) {
+        int choiceHeight = ConfirmButton.heightForLabel(CHOICE_LABEL_SCALE);
         return Math.max(
-                ConfirmButton.fittingWidth(font, Component.translatable("quickskin.button.website_normal"), CHOICE_HEIGHT),
-                ConfirmButton.fittingWidth(font, Component.translatable("quickskin.button.website_hd"), CHOICE_HEIGHT));
+                ConfirmButton.fittingWidth(font, Component.translatable("quickskin.button.website_normal"), choiceHeight),
+                ConfirmButton.fittingWidth(font, Component.translatable("quickskin.button.website_hd"), choiceHeight));
     }
 
     private static int bubbleWidth(int choiceWidth) {
