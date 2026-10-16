@@ -3,14 +3,14 @@
     {
       "type": "space",
       "advances": {
-        " ": 4
+        " ": 3
       }
     },
     {
       "type": "bitmap",
       "file": "quickskin:font/confirm.png",
-      "height": 14,
-      "ascent": 12,
+      "height": 18,
+      "ascent": 14,
       "chars": [
         "ABCDEFGHIJKLMNOP",
         "QRSTUVWXYZ012345",
