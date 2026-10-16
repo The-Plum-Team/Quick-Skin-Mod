@@ -46,7 +46,10 @@ repositories.withType<MavenArtifactRepository>().configureEach {
                 "net.neoforged.accesstransformers", "cpw.mods", "net.minecraftforge",
             ).forEach { includeGroup(it) }
         }
-        repositoryHost == "repo.maven.apache.org" -> content {
+        // Google's mirror of Maven Central, declared right after every mavenCentral(), takes
+        // Central's filter.
+        repositoryHost == "repo.maven.apache.org" ||
+            (repositoryHost == "maven-central.storage-download.googleapis.com" && url.path == "/maven2/") -> content {
             excludeGroupByRegex("dev\\.architectury(\\..*)?")
             excludeGroupByRegex("net\\.fabricmc(\\..*)?")
             excludeGroupByRegex("com\\.mojang(\\..*)?")

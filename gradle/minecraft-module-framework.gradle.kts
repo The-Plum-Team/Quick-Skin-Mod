@@ -12,7 +12,11 @@ check(configurations.toList().all { it.dependencies.isEmpty() }) {
 }
 val moduleConfigurations = configurations.names.toSet()
 apply(plugin = if (noRemap) "dev.architectury.loom-no-remap" else "dev.architectury.loom")
-repositories { mavenCentral() }
+repositories {
+    mavenCentral()
+    // Google's mirror of Maven Central, for a transient 404 from Central (DEPENDENCY-SECURITY.md).
+    maven("https://maven-central.storage-download.googleapis.com/maven2/") { name = "GoogleMavenCentralMirror" }
+}
 apply(from = rootProject.file("gradle/repository-policy.gradle.kts"))
 dependencies {
     add("minecraft", "net.minecraft:minecraft:${project.name}")
