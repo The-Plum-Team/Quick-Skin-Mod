@@ -96,6 +96,121 @@ def upload_artifact_steps() -> list[tuple[str, str, str]]:
     return uploads
 
 
+# Only these jobs may save an Actions cache. Each one builds and runs exclusively code from the
+# protected master tree of its own run; a cache entry written from a master context is restored by
+# every later run of the repository, so a job that launches bytes built anywhere else (a pull
+# request's JARs, a candidate checkout, another run's artifact) must restore read-only.
+TRUSTED_CACHE_WRITERS = {
+    ("on-demand-e2e.yml", "e2e"): (
+        "a master dispatch launches the bundle of this exact SHA's push Build or of its own compile"
+    ),
+    ("release.yml", "runtime-behavior"): (
+        "a master rehearsal launches the release bundle its own build job made from github.sha"
+    ),
+    ("build-gate.yml", "compile"): (
+        "build-matrix.yml:target compiles github.sha from source; gradle_cache_policy.py lets only a"
+        " push or workflow_dispatch on protected master save Gradle home"
+    ),
+}
+# The runtime-store writers among them: each launches a packaged bundle, its own run's.
+RUNTIME_STORE_WRITERS = (("on-demand-e2e.yml", "e2e"), ("release.yml", "runtime-behavior"))
+CACHE_SAVING_ACTIONS = ("actions/cache@", "actions/cache/save@")
+PROTECTED_CHECKOUT_REFS = frozenset({"${{ github.sha }}", "master"})
+
+
+def workflow_jobs(text: str) -> dict[str, str]:
+    """Return every top-level job block of one workflow by its id."""
+
+    body = text.split("\njobs:\n", 1)[1]
+    jobs: dict[str, str] = {}
+    for match in re.finditer(r"(?ms)^  ([A-Za-z0-9_-]+):\n(.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)", body):
+        jobs[match.group(1)] = match.group(0)
+    return jobs
+
+
+def workflow_triggers(text: str) -> set[str]:
+    trigger_block = text.split("\non:\n", 1)[1].split("\n\n", 1)[0]
+    return set(re.findall(r"(?m)^  ([a-z_]+):", trigger_block))
+
+
+def gradle_cache_gated_by_writer_input(block: str) -> bool:
+    """Whether setup-gradle stays read-only unless the workflow's ``cache-writer`` input is true."""
+
+    return (
+        "cache-read-only: ${{ steps.gradle-cache.outputs.read_only }}" in block
+        and "CACHE_WRITER: ${{ inputs.cache-writer }}" in block
+        and re.search(r'(?m)^\s+read_only=true\n\s+if \[\[ "\$CACHE_WRITER" == true \]\]; then$', block)
+        is not None
+    )
+
+
+def cache_save_reasons(
+    block: str,
+    *,
+    visited: frozenset[str] = frozenset(),
+    cache_writer_input: bool = False,
+) -> list[str]:
+    """Return why a job can save an Actions cache; empty when it can only restore or never caches.
+
+    ``cache_writer_input`` is the ``cache-writer`` input of a called workflow; a job read on its own
+    sees the input's default, false.
+    """
+
+    reasons = [action for action in CACHE_SAVING_ACTIONS if f"uses: {action}" in block]
+    if "gradle/actions/setup-gradle@" in block and not re.search(
+        r"(?m)^\s+cache-(?:disabled|read-only): true$", block
+    ):
+        if not gradle_cache_gated_by_writer_input(block):
+            reasons.append("setup-gradle without cache-disabled or cache-read-only")
+        elif cache_writer_input:
+            reasons.append("setup-gradle with cache-writer")
+    for composite in re.findall(r"(?m)^\s+(?:-\s+)?uses: \./\.github/actions/([A-Za-z0-9_-]+)$", block):
+        action = (COMPOSITE_ACTIONS / composite / "action.yml").read_text(encoding="utf-8")
+        if composite == "run-packaged-e2e":
+            # Its only save is gated on the explicit writer input (and then on the writer policy).
+            if re.search(r'(?m)^\s+runtime-store-writer: "?true"?$', block):
+                reasons.append("run-packaged-e2e with runtime-store-writer")
+        elif any(action_use in action for action_use in CACHE_SAVING_ACTIONS):
+            reasons.append(f"composite {composite} saves a cache")
+    for callee in re.findall(r"(?m)^    uses: \./\.github/workflows/([A-Za-z0-9_.-]+\.yml)$", block):
+        if callee in visited:
+            continue
+        text = (WORKFLOWS / callee).read_text(encoding="utf-8")
+        writer_input = re.search(r"(?m)^      cache-writer: true$", block) is not None
+        for name, callee_block in workflow_jobs(text).items():
+            reasons.extend(
+                f"{callee}:{name}: {reason}"
+                for reason in cache_save_reasons(
+                    callee_block, visited=visited | {callee}, cache_writer_input=writer_input
+                )
+            )
+    return reasons
+
+
+def foreign_bytes_reasons(block: str) -> list[str]:
+    """Return why a job may execute bytes not built from its own protected checkout."""
+
+    reasons: list[str] = []
+    if "uses: ./.github/actions/run-packaged-e2e" in block:
+        reasons.append("launches a downloaded packaged bundle")
+    for ref in re.findall(r"(?m)^\s+ref: (.+)$", block):
+        if ref.strip() not in PROTECTED_CHECKOUT_REFS:
+            reasons.append(f"checks out {ref.strip()}")
+    if "actions/download-artifact@" in block and re.search(r"(?m)^\s+run-id: ", block):
+        reasons.append("downloads another run's artifact")
+    return reasons
+
+
+def cache_writing_jobs() -> dict[tuple[str, str], list[str]]:
+    writers: dict[tuple[str, str], list[str]] = {}
+    for workflow in workflow_paths():
+        for name, block in workflow_jobs(workflow.read_text(encoding="utf-8")).items():
+            reasons = cache_save_reasons(block)
+            if reasons:
+                writers[(workflow.name, name)] = reasons
+    return writers
+
+
 class WorkflowSecurityTest(unittest.TestCase):
     def test_confirmed_visual_defects_stop_shared_generations_without_blocking_prs(self):
         script = step_script("visual-review-drain.yml", "review",
@@ -270,9 +385,15 @@ class WorkflowSecurityTest(unittest.TestCase):
             self.assertIn(step, action)
             pinned = action.split(step, 1)[1][:40]
             self.assertRegex(pinned, r"^[0-9a-f]{40}$")
-        # Publishing is restricted to a protected generation the policy approves.
+        # Publishing is restricted to a declared writer job in a generation the policy approves.
         self.assertIn("steps.server-store-policy.outputs.read-only == 'false'", action)
         self.assertIn("steps.server-store.outputs.transported == 'true'", action)
+        self.assertIn("inputs.runtime-store-writer == 'true' &&", action)
+        self.assertIn('--writer-job "$RUNTIME_STORE_WRITER"', action)
+        self.assertIn("RUNTIME_STORE_WRITER: ${{ inputs.runtime-store-writer }}", action)
+        writer_input = action.split("  runtime-store-writer:\n", 1)[1].split("\n\nruns:", 1)[0]
+        self.assertIn('default: "false"', writer_input)
+        self.assertEqual(action.count("actions/cache/save@"), 1)
         # Machine-local run state must never travel: its OS locks and device/inode identities
         # are meaningless on another runner.
         sys.path.insert(0, str(ROOT / "e2e"))
@@ -436,6 +557,152 @@ class WorkflowSecurityTest(unittest.TestCase):
                 if identity in retention_overrides:
                     observed_overrides.add(identity)
         self.assertEqual(observed_overrides, set(retention_overrides))
+
+    def test_only_jobs_running_exclusively_protected_master_code_can_save_a_cache(self) -> None:
+        writers = cache_writing_jobs()
+        self.assertEqual(set(TRUSTED_CACHE_WRITERS), set(writers), writers)
+        for workflow in workflow_paths():
+            for name, block in workflow_jobs(workflow.read_text(encoding="utf-8")).items():
+                foreign = foreign_bytes_reasons(block)
+                saves = cache_save_reasons(block)
+                with self.subTest(workflow=workflow.name, job=name):
+                    if (workflow.name, name) in TRUSTED_CACHE_WRITERS:
+                        continue
+                    # A job that executes downloaded or unprotected bytes holds the job's cache
+                    # scope; it must never save into it.
+                    self.assertFalse(foreign and saves, (foreign, saves))
+
+    def test_trusted_cache_writers_launch_only_their_own_master_built_bundle(self) -> None:
+        if str(ROOT / "scripts" / "ci") not in sys.path:
+            sys.path.insert(0, str(ROOT / "scripts" / "ci"))
+        import runtime_store_cache_policy as policy
+        import staged_build_bundle
+
+        self.assertEqual(frozenset({"workflow_dispatch"}), policy.WRITER_EVENTS)
+        self.assertEqual("master", policy.WRITER_BRANCH)
+        for (workflow, job), reason in TRUSTED_CACHE_WRITERS.items():
+            if (workflow, job) not in RUNTIME_STORE_WRITERS:
+                continue
+            block = job_block(workflow, job)
+            with self.subTest(workflow=workflow, job=job, reason=reason):
+                self.assertEqual(["ref: ${{ github.sha }}"], re.findall(r"ref: .+", block))
+                self.assertIn("source-sha: ${{ github.sha }}", block)
+                self.assertNotIn("run-id:", block)
+                text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+                # Only workflow_dispatch can pass the policy, so the other triggers stay read-only.
+                self.assertIn("workflow_dispatch", workflow_triggers(text))
+        self.assertIn("bundle-name: e2e-input-bundle", job_block("on-demand-e2e.yml", "e2e"))
+        self.assertIn("name: e2e-input-bundle", job_block("on-demand-e2e.yml", "build"))
+        self.assertIn(
+            "bundle-name: release-${{ needs.build.outputs.release_id }}",
+            job_block("release.yml", "runtime-behavior"),
+        )
+        # A master dispatch takes its bundle only from the push Build of the same SHA on master
+        # (or compiles it in the same run), never from a pull request's Build.
+        source = staged_build_bundle.source_from_environment(
+            {
+                "GITHUB_REPOSITORY": "The-Plum-Team/Quick-Skin-Mod",
+                "GITHUB_SHA": "a" * 40,
+                "GITHUB_EVENT_NAME": "workflow_dispatch",
+                "GITHUB_REF_NAME": "master",
+            },
+            {},
+        )
+        self.assertEqual(("push", "master", "a" * 40, None), (source.event, source.branch, source.head,
+                                                              source.pull_request))
+
+    def test_the_optional_mod_wave_restores_read_only_and_the_detector_would_see_a_save(self) -> None:
+        if str(ROOT / "scripts" / "ci") not in sys.path:
+            sys.path.insert(0, str(ROOT / "scripts" / "ci"))
+        import runtime_store_cache_policy as policy
+
+        text = (WORKFLOWS / "mod-compatibility-e2e.yml").read_text(encoding="utf-8")
+        lane = job_block("mod-compatibility-e2e.yml", "compatibility-e2e")
+        # It checks out the reused pull request's tested merge and launches that run's JARs.
+        self.assertIn("ref: ${{ needs.admit.outputs.runtime_sha }}", lane)
+        self.assertTrue(foreign_bytes_reasons(lane))
+        self.assertEqual([], cache_save_reasons(lane))
+        self.assertNotRegex(text, r"(?m)^\s+runtime-store-writer:")
+        self.assertEqual({"repository_dispatch"}, workflow_triggers(text))
+        self.assertFalse(workflow_triggers(text) & policy.WRITER_EVENTS)
+        # The detector is not vacuous: a writer input or a direct save in this job is caught.
+        opted_in = lane.replace(
+            "          evidence-retention-days: \"7\"\n",
+            "          evidence-retention-days: \"7\"\n          runtime-store-writer: \"true\"\n",
+        )
+        self.assertNotEqual(lane, opted_in)
+        self.assertTrue(cache_save_reasons(opted_in))
+        direct = lane + "      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0\n"
+        self.assertTrue(cache_save_reasons(direct))
+        gradle = lane + "      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0\n"
+        self.assertTrue(cache_save_reasons(gradle))
+
+    def test_the_gradle_home_writer_compiles_only_protected_master_source(self) -> None:
+        if str(ROOT / "scripts" / "ci") not in sys.path:
+            sys.path.insert(0, str(ROOT / "scripts" / "ci"))
+        import gradle_cache_policy as policy
+
+        writer = job_block("build-gate.yml", "compile")
+        self.assertEqual(
+            ["build-matrix.yml:target: setup-gradle with cache-writer"], cache_save_reasons(writer)
+        )
+        # The callee compiles github.sha from source and launches nothing downloaded.
+        matrix = (WORKFLOWS / "build-matrix.yml").read_text(encoding="utf-8")
+        self.assertEqual({"workflow_call"}, workflow_triggers(matrix))
+        for name, block in workflow_jobs(matrix).items():
+            with self.subTest(job=name):
+                self.assertEqual([], foreign_bytes_reasons(block))
+        target = job_block("build-matrix.yml", "target")
+        self.assertNotIn("actions/download-artifact@", target)
+        self.assertTrue(gradle_cache_gated_by_writer_input(target))
+        self.assertEqual([], cache_save_reasons(target))
+        # Build gate also runs on pull requests and release branches; the policy keeps those
+        # read-only (a pull request's write would in any case be scoped to its own ref).
+        self.assertEqual(
+            {"pull_request", "push", "workflow_dispatch"},
+            workflow_triggers((WORKFLOWS / "build-gate.yml").read_text(encoding="utf-8")),
+        )
+        self.assertEqual(frozenset({"push", "workflow_dispatch"}), policy.WRITER_EVENTS)
+        decide = dict(ref_name="master", ref_type="branch", ref_protected=True, release_branch="x")
+        self.assertFalse(policy.is_read_only(event_name="push", **decide))
+        self.assertFalse(policy.is_read_only(event_name="workflow_dispatch", **decide))
+        for event_name in ("pull_request", "pull_request_target", "repository_dispatch", "workflow_run"):
+            with self.subTest(event_name=event_name):
+                self.assertTrue(policy.is_read_only(event_name=event_name, **decide))
+        self.assertTrue(
+            policy.is_read_only(
+                event_name="push", ref_name="fabric-and-neoforge-1", ref_type="branch",
+                ref_protected=True, release_branch="x",
+            )
+        )
+        # Packaged E2E's own compile calls the same workflow without the input: restore-only.
+        compile_e2e = job_block("on-demand-e2e.yml", "compile")
+        self.assertIn("uses: ./.github/workflows/build-matrix.yml", compile_e2e)
+        self.assertEqual([], cache_save_reasons(compile_e2e))
+        # The detector is not vacuous: the same caller with the input is a writer.
+        opted_in = compile_e2e.replace(
+            "uses: ./.github/workflows/build-matrix.yml\n",
+            "uses: ./.github/workflows/build-matrix.yml\n    with:\n      cache-writer: true\n",
+        )
+        self.assertTrue(cache_save_reasons(opted_in))
+
+    def test_candidate_code_runs_without_actions_service_or_token_variables(self) -> None:
+        variables = ("ACTIONS_RUNTIME_TOKEN", "ACTIONS_CACHE_URL", "ACTIONS_RESULTS_URL", "GITHUB_TOKEN")
+        action = (COMPOSITE_ACTIONS / "run-packaged-e2e" / "action.yml").read_text(encoding="utf-8")
+        minecraft = action.split("    - name: Run contract-declared packaged scenarios\n", 1)[1].split(
+            "\n    - name:", 1
+        )[0]
+        repair = step_script("handle-version-port-result.yml", "validate-repair",
+                             "Revalidate the exact patch in isolation")
+        for name, script, launch in (
+            ("packaged Minecraft", minecraft, "xvfb-run --auto-servernum"),
+            ("version-port candidate tests", repair, "python3 -m unittest discover"),
+        ):
+            with self.subTest(name=name):
+                unset = script.index("unset ")
+                self.assertLess(unset, script.index(launch))
+                for variable in variables:
+                    self.assertIn(variable, script[unset : script.index(launch)])
 
     def test_gradle_cache_writes_are_limited_to_protected_master_builds(self) -> None:
         build = job_block("build-matrix.yml", "target")

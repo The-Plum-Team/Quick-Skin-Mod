@@ -281,7 +281,8 @@ ignores. Installer hashes and runtime/version facts remain matrix-owned; the sta
 production and harness JAR hashes remain manifest-owned. `RuntimeStore` is never uploaded as
 evidence. The installed Forge/NeoForge server keeps its own store and is the one piece of runtime
 material transported between GitHub jobs, under its exact recipe digest and only from a protected
-`master` generation, because its installer downloads unpinned Maven libraries on every install.
+`master` dispatch that launches a bundle its own run built, because its installer downloads
+unpinned Maven libraries on every install. The optional-mod wave restores it read-only.
 The client install stays job-local. Forge and NeoForge server installation retry bounded transient Maven failures
 in a fresh isolated directory each time and publish only a complete tree with its launcher script,
 so an incomplete download can never contaminate the next attempt. That install now runs once per

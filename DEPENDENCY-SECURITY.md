@@ -54,6 +54,38 @@ checksum change, never by relaxing the mode: see
   validation rejects a missing or stale serial. A missing lane, lock, component, JAR checksum,
   or manifest binding stops staging and all later publication jobs.
 
+## Actions cache writers
+
+An Actions cache is executable supply-chain input too: an entry written from a `master` context is
+restored by every later run of the repository, pull requests included. Only a job that builds and
+runs exclusively protected-`master` code may write one. A job that launches bytes built anywhere
+else (a pull request's JARs, a candidate checkout, another run's artifact) restores read-only, even
+when a trusted trigger such as `repository_dispatch`, `workflow_run`, `schedule` or
+`pull_request_target` gives it a `master`-scoped token. Steps that execute such bytes also unset
+`ACTIONS_RUNTIME_TOKEN`, `ACTIONS_CACHE_URL` and `ACTIONS_RESULTS_URL`. That is defence in depth
+only: a process with the runner user's privileges can still read the token from the runner itself.
+Keeping every save out of such a job stops the workflow from writing; only running those bytes in a
+separate unprivileged account, as the mod-base kit's fenced Build does, would take the capability
+away from them.
+
+- Gradle home is written only by the native Build's target jobs (`build-matrix.yml`, called by
+  `build-gate.yml` with `cache-writer: true`), and `scripts/ci/gradle_cache_policy.py` admits only
+  a `push` or `workflow_dispatch` on protected `master`. Those jobs check out `github.sha`, compile
+  it from source and launch nothing downloaded. Every other context restores read-only: pull
+  requests (whose writes GitHub would scope to the pull request's own ref anyway), release
+  branches, Packaged E2E's own compile, which does not pass `cache-writer`, and Release.
+- The installed Forge/NeoForge server (`runtime-store-v1|…`) is the other written family. The
+  packaged-runtime action saves it only when its job passes `runtime-store-writer: "true"` and
+  `scripts/ci/runtime_store_cache_policy.py` approves the run: a `workflow_dispatch` on protected
+  `master`. Packaged E2E and the release rehearsal are the declared writers; both launch a bundle
+  their own run built from `master` (a `master` dispatch of Packaged E2E takes the push Build of the
+  same SHA, never a pull request's). The optional-mod wave is a `repository_dispatch` that launches
+  the original pull request's JARs whenever the merge reused that pull request, so it restores
+  read-only.
+- `scripts/ci/tests/test_workflow_security.py` holds every workflow to this rule: the set of jobs
+  that can save a cache equals its reviewed list of trusted writers, and no job that launches a
+  downloaded bundle or checks out a ref other than `github.sha` can save one.
+
 ## Offline CycloneDX validation boundary
 
 The current SBOM validator deliberately checks the deterministic CycloneDX 1.6 subset emitted by

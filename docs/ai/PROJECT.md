@@ -161,10 +161,14 @@ the repository.
   `master` may write. Release branches restore their last known branch cache read-only; pull
   requests, ephemeral branches, Packaged E2E, and Release are also read-only. This bounds immutable
   generations without making the release-branch inventory another cache-policy input.
+- Only a job that builds and runs exclusively protected-`master` code may write an Actions cache
+  ([dependency security](../../DEPENDENCY-SECURITY.md#actions-cache-writers)).
 - Packaged runtime owns the second cache family, the installed Forge/NeoForge server, keyed by its
-  exact recipe digest rather than a commit. Only a protected `master` dispatch may publish an
-  entry; every other context restores read-only, with no prefix fallback, and a restore that fails
-  the store's own validation is a cache miss and a fresh install. Retention is the platform's
+  exact recipe digest rather than a commit. Only a declared writer job (Packaged E2E and the
+  release rehearsal, which launch a bundle their own `master` run built) in a `workflow_dispatch`
+  on protected `master` may publish an entry; every other context, the optional-mod wave included,
+  restores read-only, with no prefix fallback, and a restore that fails the store's own validation
+  is a cache miss and a fresh install. Retention is the platform's
   unused-entry expiry: a recipe that leaves the matrix is never restored again. The cache pruner
   stays narrow and must never read the release matrix.
 - `e2e/full-validation-baseline.json` is an intentionally runtime-impacting marker for an explicitly
