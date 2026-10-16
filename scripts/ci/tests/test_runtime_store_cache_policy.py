@@ -19,19 +19,29 @@ class RuntimeStoreCachePolicyTest(unittest.TestCase):
             "ref_name": "master",
             "ref_type": "branch",
             "ref_protected": True,
+            "writer_job": True,
         }
         values.update(changes)
         return policy.is_read_only(**values)  # type: ignore[arg-type]
 
-    def test_only_a_protected_master_dispatch_may_write(self) -> None:
+    def test_only_a_declared_writer_job_in_a_protected_master_dispatch_may_write(self) -> None:
         self.assertFalse(self.decide())
-        self.assertFalse(self.decide(event_name="repository_dispatch"))
+        self.assertTrue(self.decide(writer_job=False))
+
+    def test_a_repository_dispatch_never_writes(self) -> None:
+        # The optional-mod wave runs on repository_dispatch from master and may launch the JARs
+        # that a pull_request run built, so it restores read-only even if a job claims to write.
+        self.assertTrue(self.decide(event_name="repository_dispatch"))
+        self.assertTrue(self.decide(event_name="repository_dispatch", writer_job=False))
+        self.assertEqual(frozenset({"workflow_dispatch"}), policy.WRITER_EVENTS)
 
     def test_every_other_context_restores_read_only(self) -> None:
         for changes in (
             {"event_name": "pull_request"},
             {"event_name": "push"},
             {"event_name": "schedule"},
+            {"event_name": "workflow_run"},
+            {"event_name": "pull_request_target"},
             {"ref_protected": False},
             {"ref_type": "tag"},
             {"ref_name": "feature/topic"},
@@ -52,6 +62,8 @@ class RuntimeStoreCachePolicyTest(unittest.TestCase):
             {"ref_type": ""},
             {"ref_protected": "true"},
             {"ref_protected": 1},
+            {"writer_job": "true"},
+            {"writer_job": None},
         ):
             with self.subTest(**changes), self.assertRaises(policy.PolicyError):
                 self.decide(**changes)
@@ -69,10 +81,32 @@ class RuntimeStoreCachePolicyTest(unittest.TestCase):
                     "branch",
                     "--ref-protected",
                     "true",
+                    "--writer-job",
+                    "true",
                 ]
             )
         self.assertEqual(0, code)
         self.assertEqual("false\n", stdout.getvalue())
+
+        for event_name, writer_job in (("workflow_dispatch", "false"), ("repository_dispatch", "true")):
+            stdout = io.StringIO()
+            with self.subTest(event_name=event_name, writer_job=writer_job), redirect_stdout(stdout):
+                code = policy.main(
+                    [
+                        "--event-name",
+                        event_name,
+                        "--ref-name",
+                        "master",
+                        "--ref-type",
+                        "branch",
+                        "--ref-protected",
+                        "true",
+                        "--writer-job",
+                        writer_job,
+                    ]
+                )
+            self.assertEqual(0, code)
+            self.assertEqual("true\n", stdout.getvalue())
 
         stdout = io.StringIO()
         with redirect_stdout(stdout):
@@ -85,6 +119,8 @@ class RuntimeStoreCachePolicyTest(unittest.TestCase):
                     "--ref-type",
                     "branch",
                     "--ref-protected",
+                    "false",
+                    "--writer-job",
                     "false",
                 ]
             )
@@ -102,6 +138,8 @@ class RuntimeStoreCachePolicyTest(unittest.TestCase):
                     "--ref-type",
                     "branch",
                     "--ref-protected",
+                    "true",
+                    "--writer-job",
                     "true",
                 ]
             )

@@ -7,6 +7,16 @@ Date: 2026-09-08
 Accepted. Supersedes the "Do not upload `RuntimeStore` from GitHub-hosted jobs" consequence of
 [ADR 0003](0003-standardize-packaged-e2e-platform.md); every other part of that decision stands.
 
+Amended 2026-10-16: a `repository_dispatch` no longer writes. The optional-mod wave is repository
+dispatched on `master`, and when the merge reused its pull request it launches the JARs that the
+original `pull_request` run built, which restores caches from the pull request's own scope.
+Generation `bf00609a` showed it: compatibility run 38778954738 checked out the tested merge
+`734fb1b3` and saved `runtime-store-v1|linux|x86_64|191578f9…` into `master`'s scope. A writer must
+now also be a job that declares `runtime-store-writer` because it launches a bundle its own
+`master` run built (Packaged E2E and the release rehearsal), and the step that runs Minecraft unsets
+the Actions runtime, cache and results variables. The rule is in
+[dependency security](../../../DEPENDENCY-SECURITY.md#actions-cache-writers).
+
 ## Context
 
 Both the Forge and the NeoForge installer download their own Maven libraries while installing a

@@ -270,6 +270,9 @@ jobs:
           scenarios: ${{ matrix.scenarios }}
           release-target: ${{ needs.build.outputs.target }}
           evidence-name: release-behavior-${{ matrix.id }}
+          # The release bundle is built by this run from github.sha. Only a rehearsal dispatched on
+          # protected master passes the writer policy; a tag run restores read-only.
+          runtime-store-writer: "true"
 
   stage-github-release:
     name: Stage exact GitHub Release assets
