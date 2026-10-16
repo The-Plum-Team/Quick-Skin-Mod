@@ -212,6 +212,54 @@ waited a day. Name-filtered and per-run listings kept working. Therefore:
   certificates and verdict caches are evidence and keep their retention; prepared wrappers,
   attempt markers and capacity markers already retained one day.
 
+## Wake storm of 2026-10-15
+
+After the push of `1def0269` to `master`, the repository's Actions token budget (5,000 core
+requests per hour here) ran out at about 19:19 UTC. Read from the exact run logs:
+
+- The curator run 38790242686 curated 17 capsules and its `request-drain` job sent 17 exact
+  wakes at 19:13:27–19:13:35 (`dispatched=17`). No capacity marker was fresh, so every wake
+  queued a probe behind the shared probe lock.
+- The first wake, run 38792130673, probed, found capacity ready and its `resume-capacity-queue`
+  job (19:14:12–19:14:34) redispatched every other pending capsule: 16 more drain runs at
+  19:14:28–19:14:33, each for an artifact ID whose own exact wake was already queued or running.
+  33 drain runs served 17 capsules.
+- The same wake's review confirmed a defect at 19:16:45 and published the generation block.
+  One duplicate (38792263418) had started at 19:14:38 and reviewed the capsule whose own wake the
+  guard had deferred. The other 15 waited in their artifacts' concurrency groups and then found
+  their capsules reviewed or blocked. The selection loop repeated any ineligible exact selection
+  up to twelve times, so they ran 102 exact selections (six of them twelve each) at about six
+  REST requests apiece: roughly 610 requests that could not admit a review.
+- The background admission guard read `GET /rate_limit` 33 times. 30 reads reported 585 to 783
+  of 5,000 used (84–88 % left) between 19:13:36 and 19:19:54; the other three reported 3,959
+  (19:13:36), 4,890 (19:18:31) and 5,000 (19:19:34) used. The first `API rate limit exceeded for
+  installation` answered the Pages run 38790217642 at 19:18:46 and failed its 34 cache refreshes;
+  every lane of the shared packaged E2E 38788756576 then failed in `Fetch the sealed Build
+  bundle` (19:19:52–19:23:19), turning the commit's packaged gate red. The window reset at about
+  19:28. The guard's reading therefore did not track the exhausted budget in 30 of 33 cases; it is
+  kept because its deferrals were correct, but it cannot be the only bound.
+
+Two rules now keep a wave to one drain run per capsule and one selection per terminal wake:
+
+- A freshly ready probe fans the queue out only while no other drain run is queued or running
+  (one listing of the drain workflow's runs, the check a sweep already makes before it asks for
+  `resume_queue`). An unreadable listing skips the fan-out. A sweep's explicit `resume_queue`
+  keeps its own decision. A capsule whose wake settled while capacity was paused is still
+  recovered by the next sweep, which fans the backlog out when no drain is active.
+- The exact selector reports `owner_settling=true` only while the curator run that owns the
+  requested capsule has not completed, and the drain repeats its selection only then. An
+  already-reviewed, blocked, cooling, superseded, missing or foreign capsule is selected once:
+  seven requests for a reviewed duplicate (`ExactWakeSettlingTest` pins them). Selector errors
+  are still retried within the same twelve attempts.
+
+Replayed on the incident, these remove the 16 duplicate runs and their roughly 610 wasted
+selection requests. The capsule whose wake the guard deferred then waits for the next sweep, as
+every guard deferral already does. The 17 exact wakes, their probes, preparations and reviews are
+unchanged, and so are every authentication, the live-head recheck before model admission and the
+first-defect block.
+Editing `visual-review-drain.yml` changes the cache-producing workflow, so the first ordinary
+wave after this change restores no historical verdict shard (one cold wave, as above).
+
 ## Observable model attempts and local retry waits
 
 The runner retains telemetry schema 1 and the existing six model-attempt counters.
