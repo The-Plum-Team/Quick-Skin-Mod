@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterator, Mapping
@@ -572,6 +573,20 @@ def server_runtime_recipe(
     )
 
 
+# Mirrors and CDNs serving runtime dependencies answer single runners with a 5xx or a reset
+# connection now and then; one such answer used to fail a whole packaged generation.
+DOWNLOAD_ATTEMPTS = 3
+DOWNLOAD_RETRY_DELAY_SECONDS = 10
+
+
+def _transient_download_error(exc: BaseException) -> bool:
+    """True for a failure a later attempt can cure: a 5xx, 408 or 429, a timeout or a reset."""
+
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code >= 500 or exc.code in (408, 429)
+    return isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError, socket.timeout))
+
+
 def download(url: str, destination: Path, expected_sha256: str) -> Path:
     if not url.startswith("https://"):
         raise RuntimeFailure(f"refusing non-HTTPS runtime download: {url}")
@@ -587,12 +602,24 @@ def download(url: str, destination: Path, expected_sha256: str) -> Path:
         url,
         headers={"User-Agent": "The-Plum-Team/Quick-Skin-Mod packaged-e2e"},
     )
-    try:
-        with urllib.request.urlopen(request, timeout=120) as response, temporary.open("wb") as out:
-            shutil.copyfileobj(response, out)
-    except Exception as exc:
-        temporary.unlink(missing_ok=True)
-        raise RuntimeFailure(f"failed to download {url}: {exc}") from exc
+    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        try:
+            with (
+                urllib.request.urlopen(request, timeout=120) as response,
+                temporary.open("wb") as out,
+            ):
+                shutil.copyfileobj(response, out)
+            break
+        except Exception as exc:
+            temporary.unlink(missing_ok=True)
+            if attempt == DOWNLOAD_ATTEMPTS or not _transient_download_error(exc):
+                raise RuntimeFailure(f"failed to download {url}: {exc}") from exc
+            print(
+                f"download attempt {attempt}/{DOWNLOAD_ATTEMPTS} of {url} failed: {exc}; retrying",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(DOWNLOAD_RETRY_DELAY_SECONDS * attempt)
     if sha256(temporary) != expected_sha256:
         actual = sha256(temporary)
         temporary.unlink(missing_ok=True)
