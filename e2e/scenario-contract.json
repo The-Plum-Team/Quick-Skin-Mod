@@ -3626,9 +3626,9 @@
                     "label": "cooldown button label",
                     "box": [
                       560,
-                      768,
+                      725,
                       1040,
-                      818
+                      775
                     ],
                     "minimum_luma_exclusive": 127,
                     "minimum_pixels": 240
