@@ -87,6 +87,24 @@ pluginManagement {
                 excludeGroupByRegex("dev\\.kikugie(\\..*)?")
             }
         }
+        // Google's mirror of Maven Central, under Central's filter: a transient 404 from Central to
+        // one runner falls through to the same path here. Verification checksums name artifacts,
+        // not repositories, so every file it serves is checked exactly as one from Central.
+        maven("https://maven-central.storage-download.googleapis.com/maven2/") {
+            name = "GoogleMavenCentralMirror"
+            content {
+                excludeGroupByRegex("net\\.fabricmc(\\..*)?")
+                excludeGroupByRegex("dev\\.architectury(\\..*)?")
+                excludeGroup("architectury-plugin")
+                excludeGroup("com.github.architectury")
+                excludeGroupByRegex("com\\.mojang(\\..*)?")
+                excludeGroupByRegex("net\\.minecraftforge(\\..*)?")
+                excludeGroupByRegex("de\\.oceanlabs\\.mcp(\\..*)?")
+                excludeGroupByRegex("org\\.spongepowered(\\..*)?")
+                excludeGroupByRegex("net\\.neoforged(\\..*)?")
+                excludeGroupByRegex("dev\\.kikugie(\\..*)?")
+            }
+        }
         gradlePluginPortal {
             content {
                 excludeGroupByRegex("net\\.fabricmc(\\..*)?")

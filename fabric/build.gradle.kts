@@ -57,6 +57,8 @@ extensions.configure<ArchitectPluginExtension>("architectury") {
 
 repositories {
     mavenCentral()
+    // Google's mirror of Maven Central, for a transient 404 from Central (DEPENDENCY-SECURITY.md).
+    maven("https://maven-central.storage-download.googleapis.com/maven2/") { name = "GoogleMavenCentralMirror" }
 }
 apply(from = rootProject.file("gradle/repository-policy.gradle.kts"))
 

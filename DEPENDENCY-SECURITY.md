@@ -15,7 +15,10 @@ checksum change, never by relaxing the mode: see
 ## Enforcement layers
 
 - `gradle/wrapper/gradle-wrapper.properties` pins the Gradle distribution with SHA-256, and the
-  repository also records the wrapper JAR and distribution checksums.
+  repository also records the wrapper JAR and distribution checksums. The wrapper downloads the
+  distribution from GitHub's release mirror (`github.com/gradle/gradle-distributions`), whose zip
+  has the same SHA-256 as the `services.gradle.org` one, and retries a failed download three times
+  with a backoff starting at ten seconds.
 - `settings.gradle.kts` routes plugin groups only to their expected Fabric, Architectury, Mojang,
   Forge, NeoForge, Kikugie, Maven Central, or Gradle Plugin Portal repositories. Central and the
   Plugin Portal explicitly reject ecosystem groups owned by the specialist repositories.
@@ -35,6 +38,11 @@ checksum change, never by relaxing the mode: see
   exactly as it checks files from the upstream repositories. `-Pplum.mavenMirror=false` (or
   `ORG_GRADLE_PROJECT_plum.mavenMirror=false` in the environment) is the emergency switch: it
   leaves the mirror out of both places, so every group resolves from its upstream repositories.
+- Google's mirror of Maven Central (`https://maven-central.storage-download.googleapis.com/maven2/`)
+  follows every `mavenCentral()` declaration, in `settings.gradle.kts` and in every project, under
+  Central's content filter, so a transient 404 from Central to one runner falls through to the same
+  path there. Verification checksums name artifacts, not repositories: every file it serves is
+  checked exactly as one from Central, and it needs no metadata of its own.
 - `gradle/verification-metadata.xml` verifies both artifacts and Maven/Gradle metadata with
   SHA-256. It covers settings and build plugins plus the resolvable common, test, Fabric, Forge,
   NeoForge, Minecraft, mappings, transform, runtime, native, and E2E classpaths of every target in
