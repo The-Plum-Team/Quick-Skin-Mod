@@ -29,10 +29,12 @@ public class ActionButtonsPanel extends AbstractWidget {
     public static final int ICON_BUTTON_SIZE = 24;
     private static final int SPACING = 2;
     /**
-     * The website choices draw their labels at the crisp size nearest to this many GUI pixels per
-     * font pixel (one at GUI scales 2 and 3, 1.25 at 4, 1.2 at 5) and take their height from it.
+     * The website choices draw their labels at this many GUI pixels per font pixel and take their
+     * height from it. One is crisp at every GUI scale, so the bubble, and the room it leaves the
+     * model beside it, keep the same proportions in every window; a fraction would round to a
+     * different size at each scale (1.15 gives one at scale 3 but 1.25 at scale 4).
      */
-    private static final float CHOICE_LABEL_SCALE = 1.15f;
+    private static final float CHOICE_LABEL_SCALE = 1.0f;
     /** Room between the bubble's edge and its choices. */
     private static final int BUBBLE_PADDING = 4;
     /** Gap between the bubble's pointer and the button it points at. */

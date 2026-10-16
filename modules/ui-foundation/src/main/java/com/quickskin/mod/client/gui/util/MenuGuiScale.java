@@ -16,6 +16,8 @@ public final class MenuGuiScale {
     /** The menus are laid out for a GUI canvas of at least about this size... */
     private static final int TARGET_GUI_WIDTH = 520;
     private static final int TARGET_GUI_HEIGHT = 300;
+    /** ...and look as intended at this height, the canvas of a 1080p window at scale 3. */
+    private static final int REFERENCE_GUI_HEIGHT = 360;
     /** ...and Minecraft allows no scale whose canvas is smaller than this. */
     private static final int MIN_GUI_WIDTH = 320;
     private static final int MIN_GUI_HEIGHT = 240;
@@ -58,13 +60,21 @@ public final class MenuGuiScale {
     }
 
     /**
-     * The menu's scale for a framebuffer of the given size, in pixels: the largest scale that
-     * still leaves the target canvas, so the menu keeps about the same proportions in any window.
+     * The menu's scale for a framebuffer of the given size, in pixels: of the scales that still
+     * leave the target canvas, the one whose canvas comes nearest the reference height, so the
+     * menu keeps about the proportions it has at 1080p in any window. Taking the largest fitting
+     * scale instead would shrink a 4K canvas to 548x308, which draws everything a sixth larger.
      * It is at least 2 wherever Minecraft allows it, so text stays readable in small windows.
      */
     static int forFramebuffer(int width, int height) {
         int fitting = Math.min(width / TARGET_GUI_WIDTH, height / TARGET_GUI_HEIGHT);
+        double ideal = Math.min((double) width / TARGET_GUI_WIDTH, (double) height / REFERENCE_GUI_HEIGHT);
+        int nearest = (int) Math.floor(ideal);
+        // Nearest by ratio: a canvas a fifth too tall is as far off as one a fifth too short
+        if (nearest + 1 <= fitting && ideal * ideal > nearest * (nearest + 1.0)) {
+            nearest++;
+        }
         int largestAllowed = Math.max(1, Math.min(width / MIN_GUI_WIDTH, height / MIN_GUI_HEIGHT));
-        return Math.min(largestAllowed, Math.max(2, fitting));
+        return Math.min(largestAllowed, Math.max(2, nearest));
     }
 }
