@@ -1,6 +1,6 @@
 {
   "coverage_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-  "observed_at": "2026-10-16T15:34:42Z",
+  "observed_at": "2026-10-16T15:35:03Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -24,10 +24,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -85,7 +85,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -100,21 +100,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -146,10 +160,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -207,7 +221,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -222,21 +236,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -268,10 +296,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -329,7 +357,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -344,21 +372,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -390,10 +432,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -451,7 +493,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -466,21 +508,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -512,10 +568,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -573,7 +629,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -588,21 +644,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -634,10 +704,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -695,7 +765,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -710,21 +780,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -756,10 +840,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -817,7 +901,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -832,21 +916,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -878,10 +976,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -939,7 +1037,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -954,21 +1052,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -1000,10 +1112,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -1061,7 +1173,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -1076,21 +1188,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -1122,10 +1248,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -1183,7 +1309,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -1198,21 +1324,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -1244,10 +1384,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -1305,7 +1445,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -1320,21 +1460,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -1366,10 +1520,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -1427,7 +1581,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -1442,21 +1596,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -1488,10 +1656,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -1549,7 +1717,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -1564,21 +1732,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -1610,10 +1792,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -1671,7 +1853,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -1686,21 +1868,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -1732,10 +1928,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -1793,7 +1989,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -1808,21 +2004,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -1854,10 +2064,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -1915,7 +2125,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -1930,21 +2140,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
@@ -1976,10 +2200,10 @@
         ],
         "generation": {
           "attempt": 1,
-          "conclusion": null,
+          "conclusion": "success",
           "id": 38924953319,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "in_progress",
+          "status": "completed",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38924953319/attempts/1"
         },
         "jobs": [
@@ -2037,7 +2261,7 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "expected_jobs": [
@@ -2052,21 +2276,35 @@
           "conclusion": null,
           "id": 38925068259,
           "sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e",
-          "status": "queued",
+          "status": "in_progress",
           "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/attempts/1"
         },
         "jobs": [
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117054404724,
             "name": "Classify packaged runtime impact",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054404724"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054545179,
+            "name": "Resolve the exact source Build bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054545179"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 117054546115,
+            "name": "Build immutable E2E input bundle",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/38925068259/job/117054546115"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
-        "state": "pending",
+        "state": "running",
         "tested_sha": "fa78f0c53c2ac88ec677d1c712a77f0cf7de332e"
       },
       "java": [
