@@ -8,7 +8,8 @@ The kit runs it in a disposable account whose ``HOME`` lies directly below the w
   ``verify_build``, ``verify_runtime``) runs from the protected copy of the adapter. It reads
   ``<root>/validation-input/`` and the sealed exports (``<root>/sealed-build/``,
   ``<root>/sealed-runtime/``) and writes ``$HOME/validation/``. ``derive_scope`` also reads the
-  kit's ``MB_SCOPE_INPUT``, and a narrowed lane's ``derive_runtime`` and ``verify_runtime`` its
+  kit's ``MB_SCOPE_INPUT`` and the module graph and optional-mod lock of ``validation-input/``
+  (two plan inputs), and a narrowed lane's ``derive_runtime`` and ``verify_runtime`` its
   ``MB_RUNTIME_SCOPE``;
 * a candidate hook (``policy``, ``build_target``, ``run_lane``) runs from the tested checkout, its
   working directory, and writes ``$HOME/export/`` (``scripts/ci/mod_base_build_candidate.py`` and
@@ -35,7 +36,7 @@ UNIT_NAMES = {"build_target": "MB_TARGET_ID", "verify_target": "MB_TARGET_ID", "
               "run_lane": "MB_LANE_ID", "verify_runtime": "MB_LANE_ID"}
 CANDIDATE_HOOKS = ("policy", "build_target", "run_lane")
 KIT_FILES = ("ci-envelope.json", "ci-runtime-envelope.json")
-INPUT_NAMES = ("inventory", "scenario-contract", adapter.PROPERTIES_INPUT)
+INPUT_NAMES = ("inventory", "scenario-contract", *adapter.EXTRA_INPUTS)
 MAX_PLAN_BYTES = 4 * 1024 * 1024
 #: The kit's cap on its ``derive_scope`` input line (mod-base ``MAX_CI_SCOPE_BYTES``).
 MAX_SCOPE_INPUT_BYTES = 64 * 1024
@@ -86,17 +87,17 @@ def _protected_inputs(root: Path) -> tuple[adapter.Mod, dict[str, bytes]]:
     return mod, raw
 
 
-def _plan(root: Path, mod: adapter.Mod) -> dict[str, Any]:
-    """The protected plan, which must bind every candidate file this hook was given and hold
-    exactly the units this adapter derives from them."""
+def _plan(root: Path, mod: adapter.Mod, raw: dict[str, bytes]) -> dict[str, Any]:
+    """The protected plan, which must bind every candidate file this hook was given (``raw``) and
+    hold exactly the units this adapter derives from them."""
 
     plan = adapter.decode(_read(root / "validation-input", "ci-plan.json", max_bytes=MAX_PLAN_BYTES), "plan",
                           max_bytes=MAX_PLAN_BYTES)
     identity = plan["identity"]
     if (identity["inventory_sha256"], identity["scenario_sha256"]) != (mod.inventory_sha256, mod.contract_sha256):
         raise adapter.AdapterError("the plan was not derived from this matrix and scenario contract")
-    if plan["plan_inputs"] != [{"name": adapter.PROPERTIES_INPUT, "sha256": mod.properties_sha256}]:
-        raise adapter.AdapterError("the plan was not derived from this gradle.properties")
+    if plan["plan_inputs"] != [{"name": name, "sha256": adapter.sha256(raw[name])} for name in adapter.EXTRA_INPUTS]:
+        raise adapter.AdapterError("the plan was not derived from these gradle.properties, module graph and lock")
     derived = adapter.derive_plan(mod)
     if {"targets": plan["targets"], "lanes": plan["lanes"]} != derived:
         raise adapter.AdapterError("the plan differs from what this adapter derives from its inputs")
@@ -111,8 +112,8 @@ def _unit(plan: dict[str, Any], kind: str, unit: str) -> dict[str, Any]:
 
 
 def _verify_targets(root: Path, output: Output, hook: str, unit: str | None) -> None:
-    mod, _ = _protected_inputs(root)
-    plan = _plan(root, mod)
+    mod, raw = _protected_inputs(root)
+    plan = _plan(root, mod, raw)
     sealed = root / "sealed-build"
     planned = {entry["path"] for target in plan["targets"] for entry in target["outputs"]}
     present = _files(sealed) - set(KIT_FILES)
@@ -132,8 +133,8 @@ def _verify_targets(root: Path, output: Output, hook: str, unit: str | None) -> 
 
 
 def _verify_runtime(root: Path, output: Output, lane: str) -> None:
-    mod, _ = _protected_inputs(root)
-    plan = _plan(root, mod)
+    mod, raw = _protected_inputs(root)
+    plan = _plan(root, mod, raw)
     entry = _unit(plan, "lanes", lane)
     production = [item["path"] for item in _unit(plan, "targets", entry["target_id"])["outputs"]
                   if item["lane_id"] == lane and item["role"] == "production"]
@@ -161,21 +162,22 @@ def _hook(hook: str, unit: str | None, root: Path, output: Output) -> None:
         mod, _ = _protected_inputs(root)
         output.write("plan.json", adapter.encode(adapter.derive_plan(mod)))
     elif hook == "derive_scope":
-        mod, _ = _protected_inputs(root)
-        plan = _plan(root, mod)
+        mod, raw = _protected_inputs(root)
+        plan = _plan(root, mod, raw)
         scope_input = adapter.decode(os.environ["MB_SCOPE_INPUT"].encode("utf-8"), "MB_SCOPE_INPUT",
                                      max_bytes=MAX_SCOPE_INPUT_BYTES)
         if type(scope_input) is not dict or scope_input.get("format") != adapter.SCOPE_INPUT_FORMAT:
             raise adapter.AdapterError(f"the scope input is not of the {adapter.SCOPE_INPUT_FORMAT} format")
-        scope, reason = adapter.derive_scope(mod, plan, scope_input.get("changed_paths"))
+        scope, reason = adapter.derive_scope(mod, plan, scope_input.get("changed_paths"),
+                                             graph=raw[adapter.GRAPH_INPUT], lock=raw[adapter.LOCK_INPUT])
         selected = scope["lanes"][0]["scenarios"] if scope["lanes"] else []
         print(f"quick-skin derive_scope: {reason}: {len(selected)} of "
               f"{len(plan['lanes'][0]['obligations']) if plan['lanes'] else 0} scenarios per lane "
               f"({','.join(name.removeprefix('scenario/') for name in selected)})", flush=True)
         output.write("scope.json", adapter.encode(scope))
     elif hook == "derive_runtime":
-        mod, _ = _protected_inputs(root)
-        entry = _unit(_plan(root, mod), "lanes", unit)
+        mod, raw = _protected_inputs(root)
+        entry = _unit(_plan(root, mod, raw), "lanes", unit)
         obligations = adapter.lane_scope(os.environ.get("MB_RUNTIME_SCOPE"), unit, entry["obligations"])
         output.write("runtime.json", adapter.encode({"values": adapter.runtime_values(mod, unit, obligations)}))
     elif hook in ("verify_target", "verify_build"):

@@ -251,7 +251,10 @@ class BuildConfigTests(unittest.TestCase):
         self.assertEqual((data["repository"], data["profile"]), (REPOSITORY, "quick-skin"))
         self.assertEqual((data["inventory"]["path"], data["scenario_contract"]["path"], data["plan_inputs"]),
                          (adapter.INVENTORY_PATH, adapter.CONTRACT_PATH,
-                          [{"name": adapter.PROPERTIES_INPUT, "path": adapter.PROPERTIES_PATH}]))
+                          [{"name": adapter.PROPERTIES_INPUT, "path": adapter.PROPERTIES_PATH},
+                           {"name": adapter.LOCK_INPUT, "path": adapter.LOCK_PATH},
+                           {"name": adapter.GRAPH_INPUT, "path": adapter.GRAPH_PATH}]))
+        self.assertEqual(tuple(item["name"] for item in data["plan_inputs"]), adapter.EXTRA_INPUTS)
         self.assertEqual(data["bundle"]["path"], "build/release")
         self.assertEqual(data["runtime"], {"system_profile": "xvfb-mesa"})
 
@@ -267,7 +270,7 @@ class BuildConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             controller = protected_copy(Path(directory))
             probe = ("import json, sys; sys.path.insert(0, sys.argv[1]); import mod_base_build_adapter as a; "
-                     "a._native_release_modules(); a._native_selection_modules(); import mod_compatibility; "
+                     "a._native_release_modules(); a._native_selection_modules(); "
                      "import mod_base_build_dispatch; "
                      "print(json.dumps(sorted(m.__file__ for m in list(sys.modules.values()) "
                      "if (getattr(m, '__file__', None) or '').startswith(sys.argv[2]))))")
@@ -278,8 +281,12 @@ class BuildConfigTests(unittest.TestCase):
         listed = {item["path"] for item in config_document()["adapter"]["files"]}
         self.assertLessEqual(loaded, listed)
         self.assertIn("scripts/release/matrix.py", loaded)
-        self.assertLessEqual({"e2e/selection.py", "scripts/architecture/module_graph.py", "scripts/ci/e2e_impact.py",
-                              "e2e/mod_compatibility.py"}, loaded)
+        self.assertLessEqual({"e2e/selection.py", "scripts/architecture/module_graph.py", "scripts/ci/e2e_impact.py"},
+                             loaded)
+        # The selector gets the lock's references from the adapter and never imports the native
+        # lock module (or the visual metrics it imports), so neither is policy.
+        self.assertEqual(loaded & {"e2e/mod_compatibility.py", "e2e/visual_similarity.py"}, set())
+        self.assertEqual(listed & {"e2e/mod_compatibility.py", "e2e/visual_similarity.py"}, set())
 
     def test_the_config_enables_the_changed_paths_selection(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -288,8 +295,12 @@ class BuildConfigTests(unittest.TestCase):
         self.assertIn("derive_scope", self.kit.adapter.OPTIONAL_HOOKS)
         self.assertIn("derive_scope", adapter.HOOKS)
         listed = {item["path"] for item in config_document()["adapter"]["files"]}
-        # Whatever the selection reads is an adapter file, so a pull request that changes it runs in full.
-        self.assertLessEqual({adapter.GRAPH_PATH, "e2e/mod-compatibility-contract.json"}, listed)
+        # The documents the selection reads are plan inputs, not policy: the kit binds them in the
+        # plan, and a pull request that changes one is a selection input the kit runs in full.
+        self.assertEqual(listed & {adapter.GRAPH_PATH, adapter.LOCK_PATH}, set())
+        from mod_base.build_ci.scope import selection_inputs
+        self.assertLessEqual({adapter.GRAPH_PATH, adapter.LOCK_PATH, "e2e/selection.py", "scripts/ci/e2e_impact.py",
+                              "scripts/architecture/module_graph.py"}, selection_inputs(config.data))
 
     def test_the_contexts_follow_the_activation_mode(self) -> None:
         """Q4 shadow publishes distinct names, so no required check can be met by them. The Q5
@@ -418,8 +429,10 @@ class PlanTests(unittest.TestCase):
         identity = self.plan["identity"]
         self.assertEqual(identity["inventory_sha256"], hashlib.sha256(git_bytes(ROOT / adapter.INVENTORY_PATH)).hexdigest())
         self.assertEqual(identity["scenario_sha256"], hashlib.sha256(git_bytes(ROOT / adapter.CONTRACT_PATH)).hexdigest())
-        self.assertEqual(self.plan["plan_inputs"], [{"name": adapter.PROPERTIES_INPUT, "sha256": hashlib.sha256(
-            git_bytes(ROOT / adapter.PROPERTIES_PATH)).hexdigest()}])
+        self.assertEqual(self.plan["plan_inputs"], [
+            {"name": name, "sha256": hashlib.sha256(git_bytes(ROOT / path)).hexdigest()}
+            for name, path in ((adapter.PROPERTIES_INPUT, adapter.PROPERTIES_PATH), (adapter.LOCK_INPUT, adapter.LOCK_PATH),
+                               (adapter.GRAPH_INPUT, adapter.GRAPH_PATH))])
 
     def test_runtime_values_are_the_native_rows(self) -> None:
         rows = {row["artifact_node"]: row
@@ -647,16 +660,71 @@ class RuntimeScopeTests(unittest.TestCase):
         self.assert_every_lane([self.HUD, "modules/image-core/src/main/java/io/github/quickskin/image/Png.java"],
                                self.every, "shared-module")
 
-    def test_a_missing_or_malformed_change_list_runs_every_scenario(self) -> None:
-        self.assertEqual(adapter.scope_selection(self.mod, []), (None, "missing-change-input"))
-        self.assertEqual(adapter.scope_selection(self.mod, None), (None, "missing-change-input"))
-        self.assertEqual(adapter.scope_selection(self.mod, ["docs/../README.md"]),
-                         (None, "selection-unavailable: ImpactError"))
+    GRAPH = git_bytes(ROOT / adapter.GRAPH_PATH)
+    LOCK = git_bytes(ROOT / adapter.LOCK_PATH)
 
-    def test_a_missing_protected_graph_runs_every_scenario(self) -> None:
-        with mock.patch.object(adapter, "GRAPH_PATH", "architecture/missing.json"):
-            self.assertEqual(adapter.scope_selection(self.mod, [self.HUD]), (None, "selection-unavailable: AdapterError"))
-            self.assertEqual(adapter.scope_selection(self.mod, ["README.md"]), (["phase0-smoke"], "non-runtime-only"))
+    def select(self, paths: Any, *, graph: bytes | None = None, lock: bytes | None = None) -> tuple[Any, str]:
+        return adapter.scope_selection(self.mod, paths, graph=self.GRAPH if graph is None else graph,
+                                       lock=self.LOCK if lock is None else lock)
+
+    def test_a_missing_or_malformed_change_list_runs_every_scenario(self) -> None:
+        self.assertEqual(self.select([]), (None, "missing-change-input"))
+        self.assertEqual(self.select(None), (None, "missing-change-input"))
+        self.assertEqual(self.select(["docs/../README.md"]), (None, "selection-unavailable: ImpactError"))
+
+    def test_an_empty_or_malformed_graph_runs_every_scenario(self) -> None:
+        for graph in (b"", b"{}", b"x" * (adapter.MAX_GRAPH_BYTES + 1)):
+            with self.subTest(graph=graph[:8]):
+                self.assertEqual(self.select([self.HUD], graph=graph)[0], None)
+                self.assertTrue(self.select([self.HUD], graph=graph)[1].startswith("selection-unavailable: "))
+                self.assertEqual(self.select(["README.md"], graph=graph), (["phase0-smoke"], "non-runtime-only"))
+
+    def test_the_lock_references_are_the_native_ones(self) -> None:
+        """The adapter's narrow lock reader gives the selector exactly what the native one reads
+        from the fully validated lock, for the native schema version."""
+
+        import mod_compatibility
+        self.assertEqual(adapter.LOCK_SCHEMA_VERSION, mod_compatibility.SCHEMA_VERSION)
+        self.assertEqual(adapter.MAX_LOCK_BYTES, mod_compatibility.MAX_CONTRACT_BYTES)
+        self.assertEqual(adapter.CAPTURE_ID_PATTERN, mod_compatibility.CAPTURE_ID.pattern.strip("^$"))
+        self.assertEqual(tuple(sorted(vars(mod_compatibility.CompatibilityReferenceCaptures(
+            baseline_with_mod="a.b.c", apply_local_skin_with_mod="a.b.d")))), adapter.LOCK_REFERENCE_KEYS)
+        self.assertEqual(adapter.lock_reference_captures(self.LOCK), selection._lock_reference_captures())
+        self.assertTrue(adapter.lock_reference_captures(self.LOCK))
+        native = selection.select(self.mod.contract, module_graph.load_graph(ROOT), [self.HUD], "pr")
+        given = selection.select(self.mod.contract, module_graph.load_graph(ROOT), [self.HUD], "pr",
+                                 lock_references=adapter.lock_reference_captures(self.LOCK))
+        self.assertEqual(given, native)
+
+    def test_a_lock_it_cannot_read_runs_every_scenario(self) -> None:
+        data = json.loads(self.LOCK)
+        changed = []
+        for edit in (lambda d: d.update(schema_version=adapter.LOCK_SCHEMA_VERSION + 1),
+                     lambda d: d.update(mods=[]),
+                     lambda d: d["mods"][0].pop("reference_captures"),
+                     lambda d: d["mods"][0].update(reference_captures={"baseline_with_mod": "a.b.c"}),
+                     lambda d: d["mods"][0].update(reference_captures={key: "A.B" for key in adapter.LOCK_REFERENCE_KEYS}),
+                     lambda d: d["mods"][0].update(reference_captures={**{key: "a.b.c" for key in adapter.LOCK_REFERENCE_KEYS},
+                                                                       "third": "a.b.c"})):
+            document = json.loads(json.dumps(data))
+            edit(document)
+            changed.append(json.dumps(document).encode())
+        changed += [b"", self.LOCK[:-2], b'{"schema_version": 8, "schema_version": 8}']
+        for lock in changed:
+            with self.subTest(lock=lock[:60]):
+                with self.assertRaises(adapter.AdapterError):
+                    adapter.lock_reference_captures(lock)
+                self.assertEqual(self.select([self.HUD], lock=lock), (None, "selection-unavailable: AdapterError"))
+
+    def test_a_lock_reference_reaches_the_selection(self) -> None:
+        """A capture the lock substitutes is compatibility evidence: once the lock pairs a mod with
+        a HUD capture, a HUD change runs every scenario."""
+
+        self.assertEqual(self.select([self.HUD]), (["phase0-smoke", "full"], "affected-module-coverage"))
+        data = json.loads(self.LOCK)
+        data["mods"][0]["reference_captures"] = {key: "full.client_a.hud_preview_overlay"
+                                                 for key in adapter.LOCK_REFERENCE_KEYS}
+        self.assertEqual(self.select([self.HUD], lock=json.dumps(data).encode()), (None, "compatibility-coverage"))
 
     def test_another_input_format_is_refused(self) -> None:
         value = self.kit.canonical_json({"format": "changed-paths-v2", "changed_paths": ["README.md"]})

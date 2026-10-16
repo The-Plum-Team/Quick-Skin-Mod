@@ -188,12 +188,17 @@ def _lock_reference_captures() -> tuple[str, ...]:
     return tuple(sorted(references))
 
 
-def compatibility_targets(contract: ScenarioContract) -> tuple[tuple[str, str, str], ...]:
+def compatibility_targets(contract: ScenarioContract,
+                          lock_references: Iterable[str] | None = None) -> tuple[tuple[str, str, str], ...]:
     """Every checkpoint whose pixels the published optional-mod evidence depends on: the
     compatibility captures plus the clean reference captures they are paired against, including
-    the references the reviewed mod lock substitutes for particular mods."""
+    the references the reviewed mod lock substitutes for particular mods.
+
+    ``lock_references`` are those lock references when the caller already read them from a lock
+    it was given (the protected Build adapter reads its kit-bound copy); ``None`` loads the lock
+    next to this module."""
     targets: list[tuple[str, str, str]] = []
-    references: set[str] = set(_lock_reference_captures())
+    references: set[str] = set(_lock_reference_captures() if lock_references is None else lock_references)
     for profile in sorted(COMPATIBILITY_EXECUTION_PROFILES):
         for scenario_id in contract.scenarios_for_profile(profile):
             scenario = contract.scenario(scenario_id)
@@ -211,9 +216,9 @@ def compatibility_targets(contract: ScenarioContract) -> tuple[tuple[str, str, s
 
 
 def _compatibility_touched(contract: ScenarioContract, feature_impact: set[str],
-                           bindings: Iterable[str]) -> bool:
+                           bindings: Iterable[str], lock_references: Iterable[str] | None = None) -> bool:
     binding_set = set(bindings)
-    for scenario_id, role_id, step_id in compatibility_targets(contract):
+    for scenario_id, role_id, step_id in compatibility_targets(contract, lock_references):
         step = next((item for item in contract.role(scenario_id, role_id).steps
                      if item.id == step_id), None)
         if step is None:
@@ -244,8 +249,10 @@ def compatibility_affected(contract: ScenarioContract, graph: ModuleGraph,
 
 
 def select(contract: ScenarioContract, graph: ModuleGraph, paths: Iterable[str],
-           profile: str = "pr") -> Selection:
-    """Compute a deterministic local preview; unknown impact expands to the full profile."""
+           profile: str = "pr", *, lock_references: Iterable[str] | None = None) -> Selection:
+    """Compute a deterministic local preview; unknown impact expands to the full profile.
+
+    ``lock_references`` is passed on to :func:`compatibility_targets`."""
     validate_coverage(contract, graph)
     values = list(paths)
     if len(values) > MAX_CHANGED_PATHS:
@@ -267,7 +274,7 @@ def select(contract: ScenarioContract, graph: ModuleGraph, paths: Iterable[str],
         reason = "missing-change-input"
     elif unknown:
         reason = "unknown-path-or-policy-change"
-    elif _compatibility_touched(contract, feature_impact, bindings):
+    elif _compatibility_touched(contract, feature_impact, bindings, lock_references):
         # The optional-mod wave pairs its frames with a complete clean runtime of the same
         # generation, so a change that can move a compatibility capture or its reference keeps
         # the complete profile instead of leaving that evidence missing.

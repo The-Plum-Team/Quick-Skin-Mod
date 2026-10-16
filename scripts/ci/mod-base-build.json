@@ -3,28 +3,12 @@
     "dispatcher": "scripts/ci/mod_base_build_dispatch.py",
     "files": [
       {
-        "path": "architecture/modules.json",
-        "sha256": "c2d1a2c21d2cd4ac9ca3b53808c96e914f4290819f20a8ecc39f21f8b3e62693"
-      },
-      {
-        "path": "e2e/mod-compatibility-contract.json",
-        "sha256": "a69ebe8928a0e0e2fa6147598f3acf38122f184ed05d76da75a384cc0f83065c"
-      },
-      {
-        "path": "e2e/mod_compatibility.py",
-        "sha256": "a97108e2dc7f141016ad0565d777edd69a8c1845f972e3d6c29ede95a339e39b"
-      },
-      {
         "path": "e2e/scenario_contract.py",
         "sha256": "60a15e5020ec1ffd11851c4c36f84fd63f4b4d982c4c8c1ffedbaa7107ed1b69"
       },
       {
         "path": "e2e/selection.py",
-        "sha256": "d46871197abf26d292c2e49cd3ec33c4e72c36fb1935870ce3730243c3246dde"
-      },
-      {
-        "path": "e2e/visual_similarity.py",
-        "sha256": "043be06d72a90ad22d603e77cce9d8596e9964246904c15a1c21fcec3f6e5a14"
+        "sha256": "9341d2cb221579b2b19868399bb2c43ad8258611c688925314048aacbe1a0fba"
       },
       {
         "path": "scripts/architecture/module_graph.py",
@@ -36,7 +20,7 @@
       },
       {
         "path": "scripts/ci/mod_base_build_adapter.py",
-        "sha256": "793d6709bd2dfc4be8b47fc6da2462621ca2ee0b643ecd5552e0ef27e57b72d8"
+        "sha256": "ba1ed7dbfaaecf7b990dd4705fa01667363fbd0d49be3d20358d6e18bf5b4668"
       },
       {
         "path": "scripts/ci/mod_base_build_candidate.py",
@@ -44,7 +28,7 @@
       },
       {
         "path": "scripts/ci/mod_base_build_dispatch.py",
-        "sha256": "70a217b26ab06299597c3823a70113be2cc4777f01a384ee25950479425d1699"
+        "sha256": "dc0adad1c76fa8ab4376bce6c3874ee92cdf6f9ebc2e3ca65bf397e86b06557b"
       },
       {
         "path": "scripts/ci/mod_base_build_policy.py",
@@ -90,6 +74,14 @@
     {
       "name": "gradle-properties",
       "path": "gradle.properties"
+    },
+    {
+      "name": "mod-compatibility-contract",
+      "path": "e2e/mod-compatibility-contract.json"
+    },
+    {
+      "name": "module-graph",
+      "path": "architecture/modules.json"
     }
   ],
   "profile": "quick-skin",
