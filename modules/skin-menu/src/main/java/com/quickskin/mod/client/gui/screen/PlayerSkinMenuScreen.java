@@ -457,8 +457,12 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private static final float MODEL_HEIGHT_PER_SCALE = 2.0f;
     /** Half the drawn player's width per unit of model scale, arms included. */
     private static final float HALF_WIDTH_PER_SCALE = 0.55f;
-    /** The drawn player is at most this share of the canvas height. */
-    private static final float MODEL_HEIGHT_SHARE = 0.65f;
+    /**
+     * The drawn player is at most this share of the canvas height: the share it has at 1080p,
+     * where the buttons beside it limit its width, so taller or wider canvases do not draw it
+     * larger than there.
+     */
+    private static final float MODEL_HEIGHT_SHARE = 0.47f;
     private static final float MIN_MODEL_SCALE = 30.0f;
     /** The largest model scale, in GUI units, so the model stays in proportion with its buttons. */
     private static final float MAX_MODEL_SCALE = 120.0f;
