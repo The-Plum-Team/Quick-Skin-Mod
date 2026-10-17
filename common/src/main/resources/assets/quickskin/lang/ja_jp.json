@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "ユーザー名で検索",
   "quickskin.search.suggestion": "プレイヤー名を入力...",
   "quickskin.tooltip.sorting": "並び替え: %s",
+  "quickskin.tooltip.view_list": "リスト表示",
+  "quickskin.tooltip.view_grid": "グリッド表示",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "新しい順",

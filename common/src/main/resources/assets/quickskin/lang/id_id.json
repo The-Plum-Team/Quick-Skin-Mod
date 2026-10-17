@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "Cari berdasarkan nama pengguna",
   "quickskin.search.suggestion": "Masukkan nama pemain...",
   "quickskin.tooltip.sorting": "Urutan: %s",
+  "quickskin.tooltip.view_list": "Tampilkan sebagai daftar",
+  "quickskin.tooltip.view_grid": "Tampilkan sebagai kisi",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Terbaru Dulu",

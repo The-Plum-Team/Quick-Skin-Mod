@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "البحث باسم المستخدم",
   "quickskin.search.suggestion": "أدخل اسم اللاعب...",
   "quickskin.tooltip.sorting": "الترتيب: %s",
+  "quickskin.tooltip.view_list": "عرض كقائمة",
+  "quickskin.tooltip.view_grid": "عرض كشبكة",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "الأحدث أولاً",

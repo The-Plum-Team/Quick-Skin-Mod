@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "Tìm kiếm theo tên người dùng",
   "quickskin.search.suggestion": "Nhập tên người chơi...",
   "quickskin.tooltip.sorting": "Sắp xếp: %s",
+  "quickskin.tooltip.view_list": "Xem dạng danh sách",
+  "quickskin.tooltip.view_grid": "Xem dạng lưới",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Mới nhất trước",

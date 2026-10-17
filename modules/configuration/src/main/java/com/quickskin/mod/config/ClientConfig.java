@@ -90,6 +90,7 @@ public class ClientConfig {
 
     // Sorting Settings
     public String skinSortMode = "LATEST_LAST"; // Skin list sorting mode
+    public boolean skinListRows = false; // Skin menu shows its skins as cards in rows instead of a grid of tiles
 
     // Menu Background Style
     public String menuBackgroundStyle = "vanilla_blur"; // "vanilla_blur" or "opaque_stars"

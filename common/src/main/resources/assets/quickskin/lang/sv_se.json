@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "Sök efter användarnamn",
   "quickskin.search.suggestion": "Ange en spelares namn...",
   "quickskin.tooltip.sorting": "Sortering: %s",
+  "quickskin.tooltip.view_list": "Visa som lista",
+  "quickskin.tooltip.view_grid": "Visa som rutnät",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Nyaste först",

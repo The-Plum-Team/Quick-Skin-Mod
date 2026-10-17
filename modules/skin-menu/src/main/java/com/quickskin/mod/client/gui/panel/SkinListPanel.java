@@ -19,15 +19,18 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Panel that manages the skin grid on the left side of the screen
+ * Panel that manages the skin column on the left side of the screen: a grid of tiles, or a list of
+ * cards one per row
  */
 public class SkinListPanel extends AbstractWidget {
 
     /** Size of a skin tile: a 24 px face (three pixels per skin texel) inside a 4 px frame. */
     public static final int TILE_SIZE = 32;
 
-    /** Tiles per row of the grid. */
+    /** Tiles per row of the grid, whose width the list's cards span. */
     private final int columns;
+    /** Whether the skins are cards in rows instead of tiles. */
+    private final boolean rows;
 
     @Nullable
     private SkinListWidget skinListWidget;
@@ -35,9 +38,11 @@ public class SkinListPanel extends AbstractWidget {
     private final Minecraft minecraft;
     private final Consumer<SkinEntry> onSkinSelectedCallback;
 
-    public SkinListPanel(int x, int y, int columns, int height, Minecraft minecraft, Consumer<SkinEntry> onSkinSelectedCallback) {
+    public SkinListPanel(int x, int y, int columns, boolean rows, int height, Minecraft minecraft,
+                         Consumer<SkinEntry> onSkinSelectedCallback) {
         super(x, y, SkinListWidget.widthFor(TILE_SIZE, columns), height, Component.empty());
         this.columns = columns;
+        this.rows = rows;
         this.minecraft = minecraft;
         this.onSkinSelectedCallback = onSkinSelectedCallback;
     }
@@ -47,7 +52,7 @@ public class SkinListPanel extends AbstractWidget {
      */
     public void init(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen) {
         // Create skin list widget
-        skinListWidget = new SkinListWidget(screen, minecraft, getX(), getY(), height, TILE_SIZE, columns);
+        skinListWidget = new SkinListWidget(screen, minecraft, getX(), getY(), height, TILE_SIZE, columns, rows);
         screen.registerWidget(skinListWidget);
 
         // Load skins from LocalAssetManager

@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "यूज़रनेम से खोजें",
   "quickskin.search.suggestion": "खिलाड़ी का नाम दर्ज करें...",
   "quickskin.tooltip.sorting": "क्रमबद्ध: %s",
+  "quickskin.tooltip.view_list": "सूची के रूप में दिखाएँ",
+  "quickskin.tooltip.view_grid": "ग्रिड के रूप में दिखाएँ",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "नवीनतम पहले",

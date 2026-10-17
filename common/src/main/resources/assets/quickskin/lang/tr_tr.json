@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "Kullanıcı adına göre ara",
   "quickskin.search.suggestion": "Bir oyuncunun adını gir...",
   "quickskin.tooltip.sorting": "Sıralama: %s",
+  "quickskin.tooltip.view_list": "Liste olarak göster",
+  "quickskin.tooltip.view_grid": "Izgara olarak göster",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Önce En Yeni",

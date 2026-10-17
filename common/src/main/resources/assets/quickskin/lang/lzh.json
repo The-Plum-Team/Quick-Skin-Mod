@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "以名索",
   "quickskin.search.suggestion": "入玩家名...",
   "quickskin.tooltip.sorting": "序：%s",
+  "quickskin.tooltip.view_list": "列而觀之",
+  "quickskin.tooltip.view_grid": "格而觀之",
 
   "_comment_sort": "=== 排序法 ===",
   "quickskin.sort.latest_first": "新者先",

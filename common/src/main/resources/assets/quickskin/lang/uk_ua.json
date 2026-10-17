@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "Пошук за ім'ям користувача",
   "quickskin.search.suggestion": "Введіть ім'я гравця...",
   "quickskin.tooltip.sorting": "Сортування: %s",
+  "quickskin.tooltip.view_list": "Показати списком",
+  "quickskin.tooltip.view_grid": "Показати сіткою",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Спочатку нові",

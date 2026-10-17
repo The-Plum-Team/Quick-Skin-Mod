@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "Search by username",
   "quickskin.search.suggestion": "Enter a player's username...",
   "quickskin.tooltip.sorting": "Sorting: %s",
+  "quickskin.tooltip.view_list": "Show as a list",
+  "quickskin.tooltip.view_grid": "Show as a grid",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Latest First",
