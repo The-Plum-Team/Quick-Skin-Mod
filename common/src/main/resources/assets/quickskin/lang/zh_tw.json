@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "按使用者名稱搜尋",
   "quickskin.search.suggestion": "輸入玩家名稱...",
   "quickskin.tooltip.sorting": "排序：%s",
+  "quickskin.tooltip.view_list": "以清單顯示",
+  "quickskin.tooltip.view_grid": "以網格顯示",
 
   "_comment_sort": "=== 排序模式 ===",
   "quickskin.sort.latest_first": "最新優先",

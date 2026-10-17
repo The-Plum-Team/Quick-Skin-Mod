@@ -23,8 +23,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The skin column of the skin menu: a scrollable grid of square skin tiles, a few across, with a
- * slim scrollbar beside it.
+ * The skin column of the skin menu: a scrollable grid of square skin tiles, a few across, or a list
+ * of skin cards, one per row, with a slim scrollbar beside it.
  *
  * <p>The mouse wheel scrolls the grid and the scrollbar's thumb can be dragged. A click on a tile
  * selects its skin, or runs the action under the mouse on the strip a hovered tile shows.
@@ -34,6 +34,9 @@ public class SkinListWidget extends AbstractWidget {
 
     /** Space between tiles. */
     public static final int GAP = 4;
+    /** Height of a card in the list, and the space between cards. */
+    public static final int ROW_HEIGHT = 42;
+    public static final int ROW_GAP = 3;
     /** Space between the tiles and the scrollbar, and the scrollbar's width. */
     public static final int SCROLLBAR_GAP = 3;
     public static final int SCROLLBAR_WIDTH = 3;
@@ -41,8 +44,10 @@ public class SkinListWidget extends AbstractWidget {
 
     private final PlayerSkinMenuScreen parentScreen;
     private final int tileSize;
-    /** Tiles per row. */
+    /** Tiles per row: the grid's width, which the list's cards span. */
     private final int columns;
+    /** Whether the skins are cards in rows instead of tiles. */
+    private final boolean rows;
     private final List<SkinEntry> entries = new ArrayList<>();
     @Nullable
     private SkinEntry selected;
@@ -53,11 +58,12 @@ public class SkinListWidget extends AbstractWidget {
     private double scrollbarGrabOffset;
 
     public SkinListWidget(PlayerSkinMenuScreen parentScreen, Minecraft mc, int x, int y, int height,
-                          int tileSize, int columns) {
+                          int tileSize, int columns, boolean rows) {
         super(x, y, widthFor(tileSize, columns), height, Component.translatable("quickskin.menu.skins"));
         this.parentScreen = parentScreen;
         this.tileSize = tileSize;
         this.columns = columns;
+        this.rows = rows;
     }
 
     /** Width of the grid plus its scrollbar, for tiles of the given size. */
@@ -112,8 +118,8 @@ public class SkinListWidget extends AbstractWidget {
         int top = rowOffset(index);
         if (top < scrollAmount) {
             setScrollAmount(top);
-        } else if (top + tileSize > scrollAmount + height) {
-            setScrollAmount(top + tileSize - height);
+        } else if (top + entryHeight() > scrollAmount + height) {
+            setScrollAmount(top + entryHeight() - height);
         }
     }
 
@@ -135,18 +141,35 @@ public class SkinListWidget extends AbstractWidget {
         return hoveredEntry;
     }
 
+    private int entryWidth() {
+        return rows ? gridWidthFor(tileSize, columns) : tileSize;
+    }
+
+    private int entryHeight() {
+        return rows ? ROW_HEIGHT : tileSize;
+    }
+
+    private int gap() {
+        return rows ? ROW_GAP : GAP;
+    }
+
+    /** Entries side by side: one card per row in the list. */
+    private int perRow() {
+        return rows ? 1 : columns;
+    }
+
     private int stride() {
-        return tileSize + GAP;
+        return entryHeight() + gap();
     }
 
     /** Distance from the top of the content to the top of an entry's row. */
     private int rowOffset(int index) {
-        return (index / columns) * stride();
+        return (index / perRow()) * stride();
     }
 
     private int contentHeight() {
-        int rows = (entries.size() + columns - 1) / columns;
-        return Math.max(0, rows * stride() - GAP);
+        int rowCount = (entries.size() + perRow() - 1) / perRow();
+        return Math.max(0, rowCount * stride() - gap());
     }
 
     private int maxScroll() {
@@ -158,7 +181,7 @@ public class SkinListWidget extends AbstractWidget {
     }
 
     private int tileX(int index) {
-        return getX() + (index % columns) * stride();
+        return getX() + (index % perRow()) * (tileSize + GAP);
     }
 
     private int tileY(int index) {
@@ -204,14 +227,18 @@ public class SkinListWidget extends AbstractWidget {
         graphics.enableScissor(getX(), getY(), getX() + gridWidthFor(tileSize, columns), getY() + height);
         for (int i = 0; i < entries.size(); i++) {
             int y = tileY(i);
-            if (y + tileSize <= getY() || y >= getY() + height) {
+            if (y + entryHeight() <= getY() || y >= getY() + height) {
                 continue;
             }
             int x = tileX(i);
-            boolean hovered = mouseInside && mouseX >= x && mouseX < x + tileSize
-                    && mouseY >= y && mouseY < y + tileSize;
+            boolean hovered = mouseInside && mouseX >= x && mouseX < x + entryWidth()
+                    && mouseY >= y && mouseY < y + entryHeight();
             SkinEntry entry = entries.get(i);
-            entry.render(graphics, x, y, tileSize, mouseX, mouseY, hovered, entry == selected);
+            if (rows) {
+                entry.renderRow(graphics, x, y, entryWidth(), entryHeight(), mouseX, mouseY, hovered, entry == selected);
+            } else {
+                entry.render(graphics, x, y, tileSize, mouseX, mouseY, hovered, entry == selected);
+            }
             if (hovered) {
                 hoveredEntry = entry;
             }
@@ -255,7 +282,7 @@ public class SkinListWidget extends AbstractWidget {
         for (int i = 0; i < entries.size(); i++) {
             int x = tileX(i);
             int y = tileY(i);
-            if (mouseX >= x && mouseX < x + tileSize && mouseY >= y && mouseY < y + tileSize) {
+            if (mouseX >= x && mouseX < x + entryWidth() && mouseY >= y && mouseY < y + entryHeight()) {
                 return entries.get(i).click();
             }
         }

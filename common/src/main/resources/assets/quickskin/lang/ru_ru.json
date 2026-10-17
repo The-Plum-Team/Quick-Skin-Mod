@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "Поиск по имени пользователя",
   "quickskin.search.suggestion": "Введите имя игрока...",
   "quickskin.tooltip.sorting": "Сортировка: %s",
+  "quickskin.tooltip.view_list": "Показать списком",
+  "quickskin.tooltip.view_grid": "Показать сеткой",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Сначала новые",

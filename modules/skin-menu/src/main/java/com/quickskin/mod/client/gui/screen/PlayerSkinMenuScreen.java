@@ -100,6 +100,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private static final int MIN_WIDTH_FOR_THREE_COLUMNS = 560;
     /** ...and four from this one. */
     private static final int MIN_WIDTH_FOR_FOUR_COLUMNS = 620;
+    /** The list's cards are at least as wide as three tiles, to leave their text some room. */
+    private static final int MIN_LIST_COLUMNS = 3;
     private int skinColumnWidth;
     private static final int CONTROL_HEIGHT = 20;
     /** Height of the search row, its field and its square Search button. */
@@ -141,6 +143,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private EditBox usernameSearchField;
     private IconButton searchButton;
     private Button sortButton;
+    private Button viewButton;
     private boolean isSearching = false;
     private long lastEnterKeyAt;
 
@@ -261,8 +264,12 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // Skins across the skin column: four, or fewer on a canvas too narrow to leave the model and
         // its buttons room
+        boolean listRows = com.quickskin.mod.config.ClientConfig.getInstance().skinListRows;
         int skinColumns = this.width >= MIN_WIDTH_FOR_FOUR_COLUMNS ? 4
                 : this.width >= MIN_WIDTH_FOR_THREE_COLUMNS ? 3 : 2;
+        if (listRows) {
+            skinColumns = Math.max(MIN_LIST_COLUMNS, skinColumns);
+        }
         int tileSize = SkinListPanel.TILE_SIZE;
 
         // The link buttons share the search row, at the top right
@@ -311,8 +318,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         addRenderableWidget(searchButton);
         searchButton.active = false;
 
-        // Skin column, left: "Skins" over the counter with the sort button beside them, a grid of
-        // skin tiles with its scrollbar, then the import tile across the bottom of the column
+        // Skin column, left: "Skins" over the counter with the view and sort buttons beside them, a
+        // grid of skin tiles or a list of skin cards with its scrollbar, then the import tile across
+        // the bottom of the column
         skinColumnX = MARGIN;
         skinHeaderY = searchY + SEARCH_HEIGHT + MARGIN;
         int listTop = skinHeaderY + CONTROL_HEIGHT + 4;
@@ -321,17 +329,19 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 skinColumnX,
                 listTop,
                 skinColumns,
+                listRows,
                 skinListBottom - listTop,
                 this.minecraft,
                 this::onSkinSelected
         );
         skinListPanel.init(this);
 
-        // The header is as wide as its widest line and the sort button, at least as wide as the tiles
+        // The header is as wide as its widest line and its two buttons, at least as wide as the tiles
         String widestCount = skinListPanel.size() + "/" + skinListPanel.size();
         int headerTextWidth = Math.max(this.font.width(Component.translatable("quickskin.menu.skins")),
                 this.font.width(widestCount));
-        skinColumnWidth = Math.max(SkinListWidget.widthFor(tileSize, skinColumns), headerTextWidth + 4 + CONTROL_HEIGHT);
+        skinColumnWidth = Math.max(SkinListWidget.widthFor(tileSize, skinColumns),
+                headerTextWidth + 4 + 2 * CONTROL_HEIGHT + HEADER_BUTTON_GAP);
         sortButton = com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
                 skinColumnX + skinColumnWidth - CONTROL_HEIGHT,
                 skinHeaderY,
@@ -344,6 +354,19 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 Component.translatable("quickskin.tooltip.sorting", Component.translatable(getCurrentSortMode().getTranslationKey()))
         ));
         addRenderableWidget(sortButton);
+
+        // Grid or list: the button shows the view it switches to, drawn by renderSkinHeader
+        viewButton = com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
+                skinColumnX + skinColumnWidth - 2 * CONTROL_HEIGHT - HEADER_BUTTON_GAP,
+                skinHeaderY,
+                CONTROL_HEIGHT,
+                CONTROL_HEIGHT,
+                Component.empty(),
+                button -> toggleListRows()
+        );
+        viewButton.setTooltip(Tooltip.create(Component.translatable(
+                listRows ? "quickskin.tooltip.view_grid" : "quickskin.tooltip.view_list")));
+        addRenderableWidget(viewButton);
 
         importTile = new ImportTileButton(skinColumnX, skinListBottom + 4, SkinListWidget.gridWidthFor(tileSize, skinColumns),
                 CONTROL_HEIGHT, button -> openImportDialog());
@@ -729,7 +752,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /**
      * "Skins" above the skin column, and under it the selected position and the number of skins,
-     * beside the sort button.
+     * beside the view and sort buttons, and the view button's icon.
      */
 //? if <26.1 {
     private void renderSkinHeader(GuiGraphics graphics) {
@@ -752,6 +775,27 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         graphics.text(this.font, label, skinColumnX, labelY, 0xFFFFFFFF);
         graphics.text(this.font, count, skinColumnX, countY, 0xFFC8C8C8);
 //?}
+
+        // The view button's icon, white with a text-like shadow like the sort button's arrow
+        if (viewButton != null) {
+            String[] icon = com.quickskin.mod.config.ClientConfig.getInstance().skinListRows
+                    ? VIEW_GRID_ICON : VIEW_LIST_ICON;
+            int iconX = viewButton.getX() + (viewButton.getWidth() - 9) / 2;
+            int iconY = viewButton.getY() + (viewButton.getHeight() - 9) / 2;
+            for (int pass = 0; pass < 2; pass++) {
+                int offset = pass == 0 ? 1 : 0;
+                int color = pass == 0 ? 0xFF3F3F3F : viewButton.active ? 0xFFFFFFFF : 0xFFA0A0A0;
+                for (int row = 0; row < icon.length; row++) {
+                    for (int column = 0; column < icon[row].length(); column++) {
+                        if (icon[row].charAt(column) == '#') {
+                            int x = iconX + column + offset;
+                            int y = iconY + row + offset;
+                            graphics.fill(x, y, x + 1, y + 1, color);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /** The player's name above the model, like a name tag in the world. */
@@ -1803,6 +1847,29 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     /**
      * Get current skin sort mode
      */
+    /** Space between the view and sort buttons. */
+    private static final int HEADER_BUTTON_GAP = 2;
+    /** The view button's icons, nine pixels square: four tiles, or three rows with a dot each. */
+    private static final String[] VIEW_GRID_ICON = {
+            "####.####", "####.####", "####.####", "####.####", ".........",
+            "####.####", "####.####", "####.####", "####.####"};
+    private static final String[] VIEW_LIST_ICON = {
+            "##.######", "##.######", ".........", ".........", "##.######",
+            "##.######", ".........", ".........", "##.######"};
+
+    /** Switches the skin column between the grid of tiles and the list of cards, and remembers it. */
+    private void toggleListRows() {
+        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+        config.skinListRows = !config.skinListRows;
+        config.save();
+        // The column's width can change with the view, and the layout around it with that
+        rebuildWidgets();
+        if (minecraft != null) {
+            minecraft.getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f));
+        }
+    }
+
     private SkinSortMode getCurrentSortMode() {
         return com.quickskin.mod.config.ClientConfig.getInstance().getSkinSortMode();
     }

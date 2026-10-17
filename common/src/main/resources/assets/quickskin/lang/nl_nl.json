@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "Zoek op gebruikersnaam",
   "quickskin.search.suggestion": "Voer een spelernaam in...",
   "quickskin.tooltip.sorting": "Sortering: %s",
+  "quickskin.tooltip.view_list": "Als lijst tonen",
+  "quickskin.tooltip.view_grid": "Als raster tonen",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Nieuwste eerst",

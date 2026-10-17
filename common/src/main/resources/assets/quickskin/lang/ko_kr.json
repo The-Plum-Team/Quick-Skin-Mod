@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "사용자 이름으로 검색",
   "quickskin.search.suggestion": "플레이어 이름을 입력하세요...",
   "quickskin.tooltip.sorting": "정렬: %s",
+  "quickskin.tooltip.view_list": "목록으로 보기",
+  "quickskin.tooltip.view_grid": "격자로 보기",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "최신순",

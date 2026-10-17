@@ -36,6 +36,8 @@
   "quickskin.search.placeholder": "ค้นหาตามชื่อผู้ใช้",
   "quickskin.search.suggestion": "ป้อนชื่อผู้เล่น...",
   "quickskin.tooltip.sorting": "การเรียงลำดับ: %s",
+  "quickskin.tooltip.view_list": "แสดงเป็นรายการ",
+  "quickskin.tooltip.view_grid": "แสดงเป็นตาราง",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "ล่าสุดก่อน",
