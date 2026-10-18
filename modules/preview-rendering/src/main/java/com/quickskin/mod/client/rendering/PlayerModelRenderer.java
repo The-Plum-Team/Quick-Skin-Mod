@@ -7,6 +7,9 @@ import com.mojang.blaze3d.systems.RenderSystem;
 //?} else {
 //?}
 import com.mojang.blaze3d.vertex.PoseStack;
+//? if <1.21.6 {
+import com.mojang.blaze3d.vertex.VertexConsumer;
+//?}
 import com.mojang.math.Axis;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
 import com.quickskin.mod.platform.MinecraftCompat;
@@ -89,6 +92,13 @@ public class PlayerModelRenderer {
                 : System.currentTimeMillis();
     }
 
+    /**
+     * Vanilla's elytra wings, folded as a standing player wears them: the layer's default pose,
+     * never animated. A preview that asks for them draws them with the cape's texture instead of
+     * the cape, as vanilla does for a player who wears both.
+     */
+    private static ModelPart elytraModel;
+
 //? if <1.21 {
     private static PlayerModel<?> classicModel;
     private static PlayerModel<?> slimModel;
@@ -119,12 +129,14 @@ public class PlayerModelRenderer {
             new LinkedHashMap<>(16, 0.75f, true);
     private static final int MAX_PENDING_CAPES = 128;
 
+    /** {@code elytra} is the wings to draw in the cape's place, or {@code null} for the cape. */
     public record PreviewCapeState(
 //? if <1.21.11 {
-            ResourceLocation texture, PlayerModel bodyModel, PlayerCapeModel capeModel) {
+            ResourceLocation texture, PlayerModel bodyModel, PlayerCapeModel capeModel,
 //?} else {
-            Identifier texture, PlayerModel bodyModel, PlayerCapeModel capeModel) {
+            Identifier texture, PlayerModel bodyModel, PlayerCapeModel capeModel,
 //?}
+            ModelPart elytra) {
     }
 
     private record PreviewCapeKey(
@@ -140,11 +152,11 @@ public class PlayerModelRenderer {
 //? if <1.21.11 {
             PlayerModel bodyModel, ResourceLocation skin, float rotationX, float rotationY, float pivotY,
             int x0, int y0, int x1, int y1, float scale,
-            ResourceLocation texture, PlayerCapeModel playerCapeModel) {
+            ResourceLocation texture, PlayerCapeModel playerCapeModel, ModelPart elytra) {
 //?} else {
             PlayerModel bodyModel, Identifier skin, float rotationX, float rotationY, float pivotY,
             int x0, int y0, int x1, int y1, float scale,
-            Identifier texture, PlayerCapeModel playerCapeModel) {
+            Identifier texture, PlayerCapeModel playerCapeModel, ModelPart elytra) {
 //?}
         synchronized (PENDING_CAPES) {
             PreviewCapeKey key = new PreviewCapeKey(
@@ -153,7 +165,7 @@ public class PlayerModelRenderer {
                 var oldest = PENDING_CAPES.keySet().iterator();
                 if (oldest.hasNext()) PENDING_CAPES.remove(oldest.next());
             }
-            PENDING_CAPES.put(key, new PreviewCapeState(texture, bodyModel, playerCapeModel));
+            PENDING_CAPES.put(key, new PreviewCapeState(texture, bodyModel, playerCapeModel, elytra));
         }
     }
 
@@ -189,10 +201,12 @@ public class PlayerModelRenderer {
     private static final Map<Model.Simple, PreviewCapeState> PENDING_CAPES = new IdentityHashMap<>();
     private static final int MAX_PENDING_CAPES = 128;
 
+    /** {@code elytra} is the wings to draw in the cape's place, or {@code null} for the cape. */
     public record PreviewCapeState(
             Identifier texture,
             PlayerModel bodyModel,
-            PlayerCapeModel capeModel
+            PlayerCapeModel capeModel,
+            ModelPart elytra
     ) {
     }
 
@@ -200,7 +214,8 @@ public class PlayerModelRenderer {
             Model.Simple renderModel,
             Identifier texture,
             PlayerModel bodyModel,
-            PlayerCapeModel playerCapeModel
+            PlayerCapeModel playerCapeModel,
+            ModelPart elytra
     ) {
         if (texture == null || bodyModel == null || playerCapeModel == null) {
             return;
@@ -213,7 +228,7 @@ public class PlayerModelRenderer {
                     PENDING_CAPES.remove(oldest.next());
                 }
             }
-            PENDING_CAPES.put(renderModel, new PreviewCapeState(texture, bodyModel, playerCapeModel));
+            PENDING_CAPES.put(renderModel, new PreviewCapeState(texture, bodyModel, playerCapeModel, elytra));
         }
     }
 
@@ -254,6 +269,7 @@ public class PlayerModelRenderer {
         try {
             classicRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER);
             slimRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM);
+            elytraModel = mc.getEntityModels().bakeLayer(ModelLayers.ELYTRA);
 //? if <1.21.2 {
 //?} else {
             // In MC 1.21.2+, the cape is a separate model (PlayerCapeModel).
@@ -682,7 +698,9 @@ public class PlayerModelRenderer {
         if (!ensureModelsLoaded()) {
             return; // The first resource reload has not filled the entity model set yet
         }
-        if (playerData.isOwnPose()) {
+        // The live player cannot wear wings it may not have, so a preview of the elytra draws its own
+        // model as well
+        if (playerData.isOwnPose() || playerData.isElytraPreview()) {
             renderPlayerModelManual(graphics, x, y, scale, yRotation, playerData, mouseX, mouseY, followMouse);
             return;
         }
@@ -1048,6 +1066,25 @@ public class PlayerModelRenderer {
 //?}
     }
 
+//? if <1.21.6 {
+    /**
+     * The folded elytra wings in the cape's place, where vanilla's wings layer puts them: on the
+     * body, a little behind it.
+     */
+    private static void renderPreviewElytra(
+//? if <1.21.2 {
+            PlayerModel<?> model, PoseStack poseStack, VertexConsumer consumer) {
+//?} else {
+            PlayerModel model, PoseStack poseStack, VertexConsumer consumer) {
+//?}
+        poseStack.pushPose();
+        model.body.translateAndRotate(poseStack);
+        poseStack.translate(0.0, 0.0, 0.125);
+        elytraModel.render(poseStack, consumer, 15728880, OverlayTexture.NO_OVERLAY);
+        poseStack.popPose();
+    }
+
+//?}
     /**
      * Manually render player model without requiring a player entity
      * Used on title screen where no world/player exists
@@ -1244,7 +1281,10 @@ public class PlayerModelRenderer {
 //?}
 //? if <1.21.2 {
 
-            if (finalCapeTexture != null) {
+            if (finalCapeTexture != null && playerData.isElytraPreview()) {
+                renderPreviewElytra(model, poseStack,
+                        bufferSource.getBuffer(CapeRenderTypes.translucent(finalCapeTexture)));
+            } else if (finalCapeTexture != null) {
                 // Now render the cape using the final texture
                 RenderType capeRenderType = CapeRenderTypes.translucent(finalCapeTexture);
                 var capeVertexConsumer = bufferSource.getBuffer(capeRenderType);
@@ -1265,7 +1305,10 @@ public class PlayerModelRenderer {
             }
 //?} else if <1.21.6 {
 
-            if (finalCapeTexture != null) {
+            if (finalCapeTexture != null && playerData.isElytraPreview()) {
+                renderPreviewElytra(model, poseStack,
+                        bufferSource.getBuffer(CapeRenderTypes.translucent(finalCapeTexture)));
+            } else if (finalCapeTexture != null) {
                 RenderType capeRenderType = CapeRenderTypes.translucent(finalCapeTexture);
                 var capeVertexConsumer = bufferSource.getBuffer(capeRenderType);
 
@@ -1282,13 +1325,17 @@ public class PlayerModelRenderer {
         }
 //? if <1.21.6 {
 //?} else if <26.2 {
-        // Force PiP cache invalidation when cape changes by adding imperceptible scale nudge
-        int capeHash = capeTexture != null ? capeTexture.hashCode() : 0;
+        // Force PiP cache invalidation when cape changes by adding imperceptible scale nudge; the
+        // wings drawn in its place are a change too
+        int capeHash = (capeTexture != null ? capeTexture.hashCode() : 0)
+                ^ (playerData.isElytraPreview() ? 0x2A55 : 0);
         float scaleNudge = 0.000004f * (capeHash & 0x3FFF);
         float rotationXNudge = 0.0000001f * ((capeHash >>> 14) & 0x3FFFF);
 //?} else {
-        // Include cape identity in the PiP state so changing only the cape invalidates its cache.
-        int capeHash = capeTexture != null ? capeTexture.hashCode() : 0;
+        // Include cape identity in the PiP state so changing only the cape invalidates its cache;
+        // the wings drawn in its place are a change too.
+        int capeHash = (capeTexture != null ? capeTexture.hashCode() : 0)
+                ^ (playerData.isElytraPreview() ? 0x55 : 0);
         float scaleNudge = 0.000001f * (capeHash & 0xFF);
 //?}
 
@@ -1327,7 +1374,8 @@ public class PlayerModelRenderer {
         );
         registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
-                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel);
+                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel,
+                playerData.isElytraPreview() ? elytraModel : null);
 //?} else if <26.2 {
         float submittedScale = (float)(int) scale + scaleNudge;
         float submittedRotationY = -45.0f + yRotation;
@@ -1345,7 +1393,8 @@ public class PlayerModelRenderer {
         );
         registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
-                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel);
+                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel,
+                playerData.isElytraPreview() ? elytraModel : null);
 //?} else {
         Model.Simple renderModel = new Model.Simple(
                 model.root(), net.minecraft.client.renderer.rendertype.RenderTypes::entityTranslucent);
@@ -1361,7 +1410,8 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
-        registerPendingCape(renderModel, capeTexture, model, capeModel);
+        registerPendingCape(renderModel, capeTexture, model, capeModel,
+                playerData.isElytraPreview() ? elytraModel : null);
 //?}
     }
 

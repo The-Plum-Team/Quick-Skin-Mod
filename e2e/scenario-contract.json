@@ -68,29 +68,29 @@
     "full.client_a.bmo_adjust_screen": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.bmo_padded_source_screen": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.bundled_bmo_cape": [
@@ -112,71 +112,71 @@
     "full.client_a.cape_adjust_opaque_off": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_adjust_opaque_on": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_adjust_screen": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_adjust_zoom_in": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_adjust_zoom_out": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_delete_local": [
@@ -196,43 +196,43 @@
     "full.client_a.cape_editor_ignores_elytra": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_editor_snap_mirror": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_fill_color_picker": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_import_standard": [
@@ -2187,31 +2187,31 @@
               "capture": {
                 "title": "Cape editor",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape-adjustment editor is open with its readable Adjust Cape Image title and Drag to move \u00b7 Scroll to zoom instructions. Its cyan-framed canvas shows the 64x32 test cape: a flat navy base with an orange, green-striped Front panel and labelled Front, Cape Back and Elytra region outlines; there are no grid lines. Beside it are the Output resolution buttons, the Reset Position, Snap and Mirror buttons and the Front and Cape Back preview thumbnails, with the Opaque, Fill and Zoom controls below the canvas and Cancel and Apply Cape buttons at the bottom.",
+                "expectation": "The Quick Skin cape-adjustment editor is open: a slate header strip carries the readable Adjust Cape Image title on the left and the Drag to move \u00b7 Scroll to zoom instructions on the right. Its framed canvas shows the 64x32 test cape: a flat navy base with an orange, green-striped Front panel and labelled Front, Cape Back and Elytra region outlines; there are no grid lines. Under the canvas a Zoom panel holds the source size, a zoom-out button, the zoom slider with its percentage and a zoom-in button. A panel on the right opens with Cape and Elytra view buttons, Cape selected in blue, above a 3D player wearing the cape from behind, then the Resolution buttons 1x to 16x with the output size under them, the Position buttons Center, Snap and Mirror, and the Opaque fill switch with its colour swatch. Cancel and a green Apply Cape button sit at the bottom right.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "cape editor title",
                     "box": [
-                      675,
-                      20,
-                      925,
+                      16,
+                      14,
+                      330,
                       50
                     ],
                     "minimum_luma_exclusive": 75,
-                    "minimum_pixels": 400
+                    "minimum_pixels": 900
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "cape editor instructions",
                     "box": [
-                      300,
-                      624,
-                      780,
-                      672
+                      1100,
+                      14,
+                      1590,
+                      50
                     ],
                     "minimum_luma_exclusive": 75,
-                    "minimum_pixels": 900
+                    "minimum_pixels": 1200
                   }
                 ]
               },
@@ -2278,7 +2278,7 @@
               "capture": {
                 "title": "Cape transparency enabled",
                 "review_tier": "all",
-                "expectation": "The cape editor displays the transparent form of the test cape with the opaque toggle disabled.",
+                "expectation": "The cape editor displays the transparent form of the test cape with the Opaque fill switch off.",
                 "probes": []
               },
               "requires": [
@@ -2301,7 +2301,7 @@
               "capture": {
                 "title": "Cape forced opaque",
                 "review_tier": "all",
-                "expectation": "The cape editor shows the opaque form of the test cape: the toggle reads Opaque: ON, the fill button reads Fill: #FF00FF beside a magenta swatch, and the Front preview thumbnail shows the cape's transparent window filled with opaque magenta inside its yellow border. The canvas above still shows the unmodified source image, whose window remains a checkerboard; the fill is applied to the composed cape, which the runtime evidence proves opaque.",
+                "expectation": "The cape editor shows the opaque form of the test cape: the Opaque fill switch in the right panel is on (green, knob on the right) beside a magenta swatch, and the 3D player preview wears the cape with its transparent window filled with opaque magenta inside its yellow border. The canvas still shows the unmodified source image, whose window remains a checkerboard; the fill is applied to the composed cape, which the runtime evidence proves opaque.",
                 "probes": []
               },
               "requires": [
@@ -2324,7 +2324,7 @@
               "capture": {
                 "title": "Fill colour picker",
                 "review_tier": "all",
-                "expectation": "The cape editor shows its fill-colour popover open over the lower-left of the canvas, directly above the Opaque: ON toggle and the Fill: #FF00FF button: R: 255, G: 0 and B: 255 channel sliders, a hex field reading #FF00FF and a magenta swatch.",
+                "expectation": "The cape editor shows its fill-colour popover open over the lower-left of the canvas, framed like the editor's panels: R: 255, G: 0 and B: 255 labels beside their channel sliders, a hex field reading #FF00FF and a tall magenta swatch. In the right panel the Opaque fill switch is on and its swatch is magenta.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
@@ -2358,7 +2358,7 @@
               "capture": {
                 "title": "Cape zoomed out",
                 "review_tier": "all",
-                "expectation": "At the low zoom position (the Zoom slider reads 32%) the cape editor canvas shows the whole 320x180 night-sky source image small, in a cyan frame over the checkerboard. At this size it covers none of the Front and Cape Back regions, so those preview thumbnails are empty dark tiles.",
+                "expectation": "At the low zoom position (the Zoom panel under the canvas reads 32%) the cape editor canvas shows the whole 320x180 night-sky source image small, in a cyan frame over the checkerboard. At this size it covers none of the Front and Cape Back regions, so the 3D player preview wears an empty, transparent cape.",
                 "probes": []
               },
               "requires": [
@@ -2381,7 +2381,7 @@
               "capture": {
                 "title": "Cape zoomed in",
                 "review_tier": "all",
-                "expectation": "At the high zoom position (the Zoom slider reads 391%) the cape editor canvas is filled by a magnified crop of the night-sky source: dark sky with scattered stars and one dark mountain peak, which also fills the Front and Cape Back preview thumbnails. That this crop differs from the zoomed-out one is proven by the runtime evidence (580 atlas pixels changed).",
+                "expectation": "At the high zoom position (the Zoom panel under the canvas reads 391%) the cape editor canvas is filled by a magnified crop of the night-sky source: dark sky with scattered stars and one dark mountain peak, which also covers the cape the 3D player preview wears. That this crop differs from the zoomed-out one is proven by the runtime evidence (580 atlas pixels changed).",
                 "probes": []
               },
               "requires": [
@@ -2404,7 +2404,7 @@
               "capture": {
                 "title": "Editor snap and mirror",
                 "review_tier": "all",
-                "expectation": "The cape editor shows the night-sky source shifted off-centre by a snapped drag, leaving a checkerboard strip at the right of the canvas, with the Snap button reading Snap: 4px and the Mirror button reading Mirror: ON. With mirroring on, the canvas hides the Cape Back outline and the Cape Back preview thumbnail repeats the Front thumbnail's night-sky art.",
+                "expectation": "The cape editor shows the night-sky source shifted off-centre by a snapped drag, leaving a checkerboard strip at the right of the canvas; in the right panel's Position row the Snap button reads 4px and the Mirror button is highlighted blue because mirroring is on. With mirroring on, the canvas hides the Cape Back outline; that the composed Cape Back repeats the Front's night-sky art is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -2563,31 +2563,31 @@
               "capture": {
                 "title": "Black-padded BMO source",
                 "review_tier": "key",
-                "expectation": "At the editor's 100% reset zoom, Source: 128x64 and Output: 64x32 are both visible: the output selector describes the final atlas, not the imported source. The complete BMO atlas is centred at half size inside that double-sized source, with broad opaque-black padding on all four sides and a checkerboard visible only through transparent source pixels; at this before-crop checkpoint it is intentionally not aligned to the coloured UV guides yet.",
+                "expectation": "At the editor's 100% reset zoom, Source: 128x64 (in the Zoom panel under the canvas) and Output: 64x32 (under the right panel's Resolution buttons) are both visible: the output selector describes the final atlas, not the imported source. The complete BMO atlas is centred at half size inside that double-sized source, with broad opaque-black padding on all four sides and a checkerboard visible only through transparent source pixels; at this before-crop checkpoint it is intentionally not aligned to the coloured UV guides yet.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "BMO source dimensions",
                     "box": [
-                      45,
-                      100,
-                      250,
-                      140
+                      820,
+                      634,
+                      1040,
+                      662
                     ],
-                    "minimum_luma_exclusive": 75,
-                    "minimum_pixels": 120
+                    "minimum_luma_exclusive": 175,
+                    "minimum_pixels": 300
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "BMO output dimensions",
                     "box": [
-                      1035,
-                      100,
-                      1255,
-                      140
+                      1215,
+                      514,
+                      1430,
+                      552
                     ],
-                    "minimum_luma_exclusive": 75,
-                    "minimum_pixels": 120
+                    "minimum_luma_exclusive": 175,
+                    "minimum_pixels": 300
                   }
                 ]
               },
@@ -2611,7 +2611,7 @@
               "capture": {
                 "title": "Black-padded BMO aligned",
                 "review_tier": "key",
-                "expectation": "At 200% zoom, the complete 64x32 BMO atlas fills the crop: the Front, Cape Back and tapered Elytra art align with their coloured guides and the previews are intact. Narrow teal strips between or beside those three highlighted faces are expected auxiliary side, top and bottom UV faces from the same BMO atlas, not leaked padding.",
+                "expectation": "At 200% zoom, the complete 64x32 BMO atlas fills the crop: the Front, Cape Back and tapered Elytra art align with their coloured guides and the 3D player preview wears the aligned cape. Narrow teal strips between or beside those three highlighted faces are expected auxiliary side, top and bottom UV faces from the same BMO atlas, not leaked padding.",
                 "probes": []
               },
               "requires": [
@@ -2833,7 +2833,7 @@
               "capture": {
                 "title": "Editor preview ignores equipped elytra",
                 "review_tier": "all",
-                "expectation": "The cape editor, drawn at a small GUI scale, shows the flat magenta probe cape in its canvas and preview thumbnails, and its 3D player preview wears that magenta cape as an ordinary flat cape with no elytra wings drawn. That the player has an elytra equipped at this moment, and that the preview kept the same cape pixels, is proven by the runtime evidence.",
+                "expectation": "The cape editor shows the flat magenta probe cape in its canvas, and the 3D player preview in its right panel wears that magenta cape as an ordinary flat cape with no elytra wings drawn. That the player has an elytra equipped at this moment, and that the preview kept the same cape pixels, is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [

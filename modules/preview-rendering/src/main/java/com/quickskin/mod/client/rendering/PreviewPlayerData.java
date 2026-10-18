@@ -36,6 +36,7 @@ public class PreviewPlayerData {
     private String currentAnimation; // For future animation support
     private boolean showcaseIdle;
     private boolean ownPose;
+    private boolean elytraPreview;
     private final float animationProgress;
 
     public PreviewPlayerData() {
@@ -217,6 +218,18 @@ public class PreviewPlayerData {
 
     public void setOwnPose(boolean ownPose) {
         this.ownPose = ownPose;
+    }
+
+    /**
+     * Whether the preview draws the cape's texture on folded elytra wings instead of on the cape,
+     * as vanilla does for a player wearing both. Such a preview draws its own model.
+     */
+    public boolean isElytraPreview() {
+        return elytraPreview;
+    }
+
+    public void setElytraPreview(boolean elytraPreview) {
+        this.elytraPreview = elytraPreview;
     }
 
     public void setCurrentAnimation(String currentAnimation) {

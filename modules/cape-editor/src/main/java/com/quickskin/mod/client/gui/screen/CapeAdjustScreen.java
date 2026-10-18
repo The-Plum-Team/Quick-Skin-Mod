@@ -8,7 +8,14 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.util.BackgroundRenderer;
+import com.quickskin.mod.client.gui.util.UiText;
+import com.quickskin.mod.client.gui.widget.CapeEditorStyle;
+import com.quickskin.mod.client.gui.widget.CapeSwatchButton;
+import com.quickskin.mod.client.gui.widget.CapeToggleSwitch;
+import com.quickskin.mod.client.gui.widget.CapeToolButton;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
+import com.quickskin.mod.client.gui.widget.PrimaryButton;
+import com.quickskin.mod.client.gui.widget.StyledButton;
 import com.quickskin.mod.client.rendering.LocalLookPreview;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.AssetMetadata;
@@ -29,6 +36,7 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -67,9 +75,7 @@ public class CapeAdjustScreen extends Screen {
     private static final int[][] RESOLUTIONS = {
             {64, 32}, {128, 64}, {256, 128}, {512, 256}, {1024, 512}
     };
-    private static final String[] RESOLUTION_LABELS = {
-            "64x32", "128x64 (2x)", "256x128 (4x)", "512x256 (8x)", "1024x512 (16x)"
-    };
+    private static final String[] RESOLUTION_LABELS = {"1x", "2x", "4x", "8x", "16x"};
     private int selectedResolution = 0;
 
     // Image positioning in cape-space (target resolution coordinates).
@@ -111,8 +117,8 @@ public class CapeAdjustScreen extends Screen {
     private boolean pickerOpen = false;
     /** Guards the two-way slider/hex-field sync against re-entrant responder callbacks. */
     private boolean syncingPicker = false;
-    private Button opaqueToggleButton;
-    private Button fillColorButton;
+    private CapeToggleSwitch opaqueToggleButton;
+    private CapeSwatchButton fillColorButton;
     private ChannelSlider redSlider;
     private ChannelSlider greenSlider;
     private ChannelSlider blueSlider;
@@ -121,21 +127,51 @@ public class CapeAdjustScreen extends Screen {
     private ZoomSlider zoomSlider;
     // Colour picker popover bounds, computed in init() and used for hit testing + rendering.
     private int pickerX, pickerY, pickerW, pickerH;
-    private int swatchX, swatchY;
     private static final int PICKER_W = 200;
     private static final int PICKER_H = 84;
     private static final int SWATCH_SIZE = 20;
 
-    // Control-row budget. Everything on the row except the two opaque buttons and the zoom slider
-    // is fixed width: the 4px gap between the buttons, the 8px gap before the swatch, the swatch,
-    // and the 6px gap before the slider.
-    private static final int ROW_FIXED_W = 4 + 8 + SWATCH_SIZE + 6;
-    private static final int ZOOM_PREFERRED_W = 76;
-    private static final int ZOOM_MAX_W = 150;
-    /** Absolute floor, reached only where the grid is too narrow to seat all four controls. */
+    // Layout, in GUI pixels
+    private static final int HEADER_H = 22;
+    private static final int HEADER_COLOR = 0xFF2E3A4A;
+    private static final int MARGIN = 8;
+    private static final int CANVAS_FRAME = 3;
+    private static final int PANEL_GAP = 4;
+    private static final int PANEL_PAD = 6;
+    private static final int ZOOM_PANEL_H = 40;
+    private static final int RIGHT_MIN_W = 170;
+    private static final int RIGHT_MAX_W = 210;
+    private static final int FOOTER_BUTTON_H = 20;
+    private static final int SECTION_LABEL_H = 12;
+    private static final int SECTION_GAP = 8;
+    private static final int RES_BUTTON_H = 16;
+    private static final int TOOL_BUTTON_H = 18;
+    private static final int OPAQUE_ROW_H = 16;
+    private static final int SWATCH_BUTTON_SIZE = 16;
+    private static final int SWITCH_W = 24;
+    private static final int SWITCH_H = 14;
+    private static final int ZOOM_STEP_BUTTON = 18;
+    /** Absolute floor, reached only where the canvas is too narrow to seat the zoom row. */
     private static final int ZOOM_FLOOR_W = 20;
-    private static final int CONTROL_MIN_W = 70;
-    private static final int CONTROL_MAX_W = 110;
+    private static final int CHANNEL_LABEL_W = 36;
+    private static final int VIEW_BUTTON_H = 16;
+
+    // Where init() put the canvas, the panels and the right panel's sections
+    private int canvasLeft, canvasTop, canvasAvailW, canvasAvailH;
+    private int frameX0, frameY0, frameX1, frameY1;
+    private int zoomX0, zoomY0, zoomX1, zoomY1;
+    private int panelX0, panelY0, panelX1, panelY1;
+    private int previewX0, previewY0, previewX1, previewY1;
+    private int resolutionLabelY, resolutionButtonsY, outputTextY;
+    private int positionLabelY, toolButtonsY, opaqueRowY;
+    private int zoomPercentX;
+    private CapeToolButton[] resolutionButtons;
+    private CapeToolButton snapButton;
+    private CapeToolButton mirrorButton;
+    private CapeToolButton capeViewButton;
+    private CapeToolButton elytraViewButton;
+    /** Whether the 3D preview wears the cape's texture on elytra wings rather than as the cape. */
+    private boolean elytraView;
     /** Makes opaque-black padding distinguishable from transparent source pixels in evidence. */
     private static final int SOURCE_CHECKER_SIZE = 16;
     private static final int SOURCE_CHECKER_DARK = 0xFF20242A;
@@ -214,211 +250,394 @@ public class CapeAdjustScreen extends Screen {
         Minecraft.getInstance().getTextureManager().register(sourceTextureLocation, sourceDynTexture);
         //?}
 
-        // Calculate grid display area (left 65% of screen, vertically centered)
-        int availW = (int) (this.width * 0.6);
-        int availH = (int) (this.height * 0.65);
-        int capeW = RESOLUTIONS[selectedResolution][0];
-        int capeH = RESOLUTIONS[selectedResolution][1];
-
-        // Scale to fit while maintaining 2:1 aspect
-        double scaleX = (double) availW / capeW;
-        double scaleY = (double) availH / capeH;
-        displayScale = Math.min(scaleX, scaleY);
-
-        gridW = (int) (capeW * displayScale);
-        gridH = (int) (capeH * displayScale);
-        gridX = 20 + (availW - gridW) / 2;
-        gridY = 30 + (availH - gridH) / 2;
-
-        // Center image initially to cover the cape area
-        resetImagePosition();
-
-        // Buttons
-        this.clearWidgets();
-
-        int rightPanelX = gridX + availW + 15;
-        int rightPanelW = this.width - rightPanelX - 10;
-        int btnW = Math.min(rightPanelW, 120);
-
-        // Resolution buttons — disable resolutions larger than the source image
-        // For animated GIFs, cap at 4x (256x128) to avoid lag on servers
-        int resY = gridY;
-        int srcW = sourceImage.getWidth();
-        int srcH = srcFrameHeight;
-        // Max resolution index: 2 (256x128 / 4x) for GIFs, all for static
-        int maxResIndex = (frameCount > 1) ? 2 : RESOLUTIONS.length - 1;
-        for (int i = 0; i < RESOLUTIONS.length; i++) {
-            final int idx = i;
-            Button btn = Button.builder(Component.literal(RESOLUTION_LABELS[i]), b -> {
-                int oldRes = selectedResolution;
-                selectedResolution = idx;
-                // Scale position/zoom proportionally to new resolution
-                double ratio = (double) RESOLUTIONS[idx][0] / RESOLUTIONS[oldRes][0];
-                imgOffsetX *= ratio;
-                imgOffsetY *= ratio;
-                imgScale *= ratio;
-                applySnap();
-                recalculateGrid();
-                // Both ends of the legal range carry the same factor of capeW, so this leaves the
-                // slider exactly where it was — resyncing it is the discipline, not a correction.
-                syncZoomSlider();
-                previewDirty = true;
-            }).bounds(rightPanelX, resY, btnW, 20).build();
-            // Disable if target resolution exceeds source dimensions or GIF cap
-            if (RESOLUTIONS[i][0] > srcW || RESOLUTIONS[i][1] > srcH || i > maxResIndex) {
-                btn.active = false;
-            }
-            this.addRenderableWidget(btn);
-            resY += 24;
-        }
-        // If the currently selected resolution got disabled, fall back to the largest enabled one
-        boolean currentDisabled = RESOLUTIONS[selectedResolution][0] > srcW
-                || RESOLUTIONS[selectedResolution][1] > srcH
-                || selectedResolution > maxResIndex;
-        if (currentDisabled) {
-            for (int i = Math.min(maxResIndex, RESOLUTIONS.length - 1); i >= 0; i--) {
-                if (RESOLUTIONS[i][0] <= srcW && RESOLUTIONS[i][1] <= srcH) {
+        // A resolution larger than the source, or past the animated-cape cap, cannot be chosen: fall
+        // back to the largest one that can
+        if (!isResolutionAvailable(selectedResolution)) {
+            for (int i = maxResolutionIndex(); i >= 0; i--) {
+                if (isResolutionAvailable(i)) {
                     selectedResolution = i;
-                    recalculateGrid();
                     break;
                 }
             }
         }
 
-        // Reset position button
-        this.addRenderableWidget(Button.builder(
-                Component.translatable("quickskin.cape.adjust_reset"),
-                b -> { resetImagePosition(); previewDirty = true; }
-        ).bounds(rightPanelX, resY + 10, btnW, 20).build());
+        layoutPanels();
+        // Center image initially to cover the cape area
+        resetImagePosition();
 
-        // Snap-to-grid toggle button (cycles through snap sizes)
-        this.addRenderableWidget(Button.builder(
-                Component.literal("Snap: " + SNAP_LABELS[snapIndex]),
+        this.clearWidgets();
+        initResolutionControls();
+        initPositionControls();
+        initOpaqueControls();
+        initZoomControls();
+        initFooter();
+        initPlayerPreview();
+    }
+
+    /**
+     * Places the screen's parts: a header strip with the title and the hint; the canvas on the left
+     * with the zoom panel under it; a panel on the right with the previews, then the Resolution,
+     * Position and Opaque fill sections from the bottom up, ending level with the zoom panel; and
+     * Cancel and Apply at the bottom right.
+     */
+    private void layoutPanels() {
+        int footerY = this.height - MARGIN - FOOTER_BUTTON_H;
+        int bodyTop = HEADER_H + MARGIN;
+        int bodyBottom = footerY - MARGIN;
+        int rightWidth = Mth.clamp(this.width * 3 / 10, RIGHT_MIN_W, RIGHT_MAX_W);
+        canvasLeft = MARGIN + CANVAS_FRAME;
+        canvasTop = bodyTop + CANVAS_FRAME;
+        canvasAvailW = Math.max(64, this.width - 3 * MARGIN - rightWidth - 2 * CANVAS_FRAME);
+        canvasAvailH = Math.max(32, bodyBottom - bodyTop - ZOOM_PANEL_H - PANEL_GAP - 2 * CANVAS_FRAME);
+        recalculateGrid();
+
+        frameX0 = gridX - CANVAS_FRAME;
+        frameY0 = gridY - CANVAS_FRAME;
+        frameX1 = gridX + gridW + CANVAS_FRAME;
+        frameY1 = gridY + gridH + CANVAS_FRAME;
+        zoomX0 = frameX0;
+        zoomX1 = frameX1;
+        zoomY0 = frameY1 + PANEL_GAP;
+        zoomY1 = zoomY0 + ZOOM_PANEL_H;
+        // A canvas narrower than its room, on a short window, leaves the right panel the rest
+        panelX0 = frameX1 + MARGIN;
+        panelX1 = this.width - MARGIN;
+        panelY0 = frameY0;
+        panelY1 = zoomY1;
+
+        opaqueRowY = panelY1 - PANEL_PAD - OPAQUE_ROW_H;
+        toolButtonsY = opaqueRowY - SECTION_GAP - TOOL_BUTTON_H;
+        positionLabelY = toolButtonsY - SECTION_LABEL_H;
+        outputTextY = positionLabelY - SECTION_GAP - 9;
+        resolutionButtonsY = outputTextY - 3 - RES_BUTTON_H;
+        resolutionLabelY = resolutionButtonsY - SECTION_LABEL_H;
+        previewX0 = panelX0 + PANEL_PAD;
+        previewX1 = panelX1 - PANEL_PAD;
+        previewY0 = panelY0 + PANEL_PAD;
+        previewY1 = resolutionLabelY - 4;
+    }
+
+    private int maxResolutionIndex() {
+        // Animated capes stop at 4x (256x128) to avoid lag on servers
+        return frameCount > 1 ? 2 : RESOLUTIONS.length - 1;
+    }
+
+    private boolean isResolutionAvailable(int index) {
+        return index <= maxResolutionIndex()
+                && RESOLUTIONS[index][0] <= sourceImage.getWidth()
+                && RESOLUTIONS[index][1] <= srcFrameHeight;
+    }
+
+    /** One button per output size, 1x to 16x, in a row; the chosen one is blue. */
+    private void initResolutionControls() {
+        int x0 = panelX0 + PANEL_PAD;
+        int innerWidth = panelX1 - PANEL_PAD - x0;
+        int gap = 2;
+        int buttonWidth = (innerWidth - gap * (RESOLUTIONS.length - 1)) / RESOLUTIONS.length;
+        resolutionButtons = new CapeToolButton[RESOLUTIONS.length];
+        for (int i = 0; i < RESOLUTIONS.length; i++) {
+            final int index = i;
+            CapeToolButton button = new CapeToolButton(
+                    x0 + i * (buttonWidth + gap), resolutionButtonsY, buttonWidth, RES_BUTTON_H, null,
+                    Component.literal(RESOLUTION_LABELS[i]),
+                    Component.literal(RESOLUTIONS[i][0] + "x" + RESOLUTIONS[i][1]),
+                    b -> selectResolution(index));
+            // No tooltip: the output size under the row names the chosen one
+            button.active = isResolutionAvailable(i);
+            resolutionButtons[i] = this.addRenderableWidget(button);
+        }
+        updateResolutionButtons();
+    }
+
+    private void selectResolution(int index) {
+        int oldRes = selectedResolution;
+        selectedResolution = index;
+        // Scale position/zoom proportionally to new resolution
+        double ratio = (double) RESOLUTIONS[index][0] / RESOLUTIONS[oldRes][0];
+        imgOffsetX *= ratio;
+        imgOffsetY *= ratio;
+        imgScale *= ratio;
+        applySnap();
+        recalculateGrid();
+        // Both ends of the legal range carry the same factor of capeW, so this leaves the
+        // slider exactly where it was — resyncing it is the discipline, not a correction.
+        syncZoomSlider();
+        updateResolutionButtons();
+        previewDirty = true;
+    }
+
+    private void updateResolutionButtons() {
+        if (resolutionButtons == null) {
+            return;
+        }
+        for (int i = 0; i < resolutionButtons.length; i++) {
+            resolutionButtons[i].setSelected(i == selectedResolution);
+        }
+    }
+
+    /**
+     * Center, Snap and Mirror, side by side, each an icon and a short label. Each is as wide as its
+     * label needs, and the rest of the row is shared out evenly; Snap's label is the shortest.
+     */
+    private void initPositionControls() {
+        int x0 = panelX0 + PANEL_PAD;
+        int innerWidth = panelX1 - PANEL_PAD - x0;
+        int gap = 4;
+        Component centerLabel = Component.translatable("quickskin.cape.adjust_center");
+        Component mirrorLabel = Component.translatable("quickskin.cape.adjust_mirror");
+        int snapLabelWidth = 0;
+        for (int i = 0; i < SNAP_LABELS.length; i++) {
+            Component label = i == 0 ? Component.translatable("quickskin.cape.adjust_snap_off")
+                    : Component.literal(SNAP_LABELS[i]);
+            snapLabelWidth = Math.max(snapLabelWidth, this.font.width(label));
+        }
+        int[] widths = {
+                toolButtonWidth(this.font.width(centerLabel)),
+                toolButtonWidth(snapLabelWidth),
+                toolButtonWidth(this.font.width(mirrorLabel))};
+        int spare = innerWidth - 2 * gap - widths[0] - widths[1] - widths[2];
+        for (int i = 0; i < widths.length; i++) {
+            // A narrow panel shares out the shortfall too, and the labels then give way to icons
+            widths[i] += spare / 3 + (i < spare % 3 ? 1 : 0);
+        }
+        int x = x0;
+
+        CapeToolButton reset = new CapeToolButton(x, toolButtonsY, widths[0], TOOL_BUTTON_H,
+                CapeEditorStyle.ICON_CENTER, centerLabel,
+                Component.translatable("quickskin.cape.adjust_reset"),
+                b -> { resetImagePosition(); previewDirty = true; });
+        reset.setTooltip(Tooltip.create(Component.translatable("quickskin.cape.adjust_reset_tip")));
+        this.addRenderableWidget(reset);
+        x += widths[0] + gap;
+
+        // Cycles through the snap sizes
+        snapButton = this.addRenderableWidget(new CapeToolButton(
+                x, toolButtonsY, widths[1], TOOL_BUTTON_H,
+                CapeEditorStyle.ICON_SNAP, snapLabel(), snapMessage(),
                 b -> {
                     snapIndex = (snapIndex + 1) % SNAP_SIZES.length;
-                    b.setMessage(Component.literal("Snap: " + SNAP_LABELS[snapIndex]));
+                    updateSnapButton();
                     applySnap();
                     previewDirty = true;
-                }
-        ).bounds(rightPanelX, resY + 34, btnW, 20).build());
+                }));
+        updateSnapButton();
+        x += widths[1] + gap;
 
-        // Mirror front=back toggle button
-        this.addRenderableWidget(Button.builder(
-                Component.literal("Mirror: " + (mirrorFrontBack ? "ON" : "OFF")),
+        // Mirror front=back toggle
+        mirrorButton = this.addRenderableWidget(new CapeToolButton(
+                x, toolButtonsY, x0 + innerWidth - x, TOOL_BUTTON_H,
+                CapeEditorStyle.ICON_MIRROR, mirrorLabel, mirrorMessage(),
                 b -> {
                     mirrorFrontBack = !mirrorFrontBack;
-                    b.setMessage(Component.literal("Mirror: " + (mirrorFrontBack ? "ON" : "OFF")));
+                    updateMirrorButton();
                     previewDirty = true;
+                }));
+        updateMirrorButton();
+    }
+
+    /** The width a {@link CapeToolButton} needs for its icon and a label {@code labelWidth} wide. */
+    private static int toolButtonWidth(int labelWidth) {
+        return CapeToolButton.contentWidth(labelWidth) + CapeToolButton.TEXT_MARGIN;
+    }
+
+    private Component snapLabel() {
+        return snapIndex == 0
+                ? Component.translatable("quickskin.cape.adjust_snap_off")
+                : Component.literal(SNAP_LABELS[snapIndex]);
+    }
+
+    private Component snapMessage() {
+        return Component.translatable("quickskin.cape.adjust_snap", snapLabel());
+    }
+
+    private void updateSnapButton() {
+        snapButton.setLabel(snapLabel());
+        snapButton.setMessage(snapMessage());
+        snapButton.setTooltip(Tooltip.create(snapMessage().copy().append("\n")
+                .append(Component.translatable("quickskin.cape.adjust_snap_tip"))));
+    }
+
+    private Component mirrorMessage() {
+        return Component.translatable(mirrorFrontBack
+                ? "quickskin.cape.adjust_mirror_on"
+                : "quickskin.cape.adjust_mirror_off");
+    }
+
+    private void updateMirrorButton() {
+        mirrorButton.setSelected(mirrorFrontBack);
+        mirrorButton.setMessage(mirrorMessage());
+        mirrorButton.setTooltip(Tooltip.create(mirrorMessage().copy().append("\n")
+                .append(Component.translatable("quickskin.cape.adjust_mirror_tip"))));
+    }
+
+    /** Zoom out, the zoom slider and its percentage, and zoom in, in the panel under the canvas. */
+    private void initZoomControls() {
+        int rowY = zoomY0 + 18;
+        int x0 = zoomX0 + PANEL_PAD;
+        int x1 = zoomX1 - PANEL_PAD;
+        CapeToolButton zoomOut = new CapeToolButton(x0, rowY, ZOOM_STEP_BUTTON, ZOOM_STEP_BUTTON,
+                CapeEditorStyle.ICON_MINUS, Component.empty(),
+                Component.translatable("quickskin.cape.adjust_zoom_out"), b -> zoomStep(false));
+        zoomOut.setTooltip(Tooltip.create(zoomOut.getMessage()));
+        this.addRenderableWidget(zoomOut);
+        CapeToolButton zoomIn = new CapeToolButton(x1 - ZOOM_STEP_BUTTON, rowY, ZOOM_STEP_BUTTON,
+                ZOOM_STEP_BUTTON, CapeEditorStyle.ICON_PLUS, Component.empty(),
+                Component.translatable("quickskin.cape.adjust_zoom_in"), b -> zoomStep(true));
+        zoomIn.setTooltip(Tooltip.create(zoomIn.getMessage()));
+        this.addRenderableWidget(zoomIn);
+
+        int percentRoom = this.font.width("9999%") + 6;
+        int sliderX = x0 + ZOOM_STEP_BUTTON + 6;
+        int sliderRight = x1 - ZOOM_STEP_BUTTON - 6 - percentRoom;
+        zoomPercentX = sliderRight + 6;
+        zoomSlider = this.addRenderableWidget(new ZoomSlider(
+                sliderX, rowY + 2, Math.max(ZOOM_FLOOR_W, sliderRight - sliderX), 14));
+    }
+
+    /** One step of the zoom buttons: a wheel notch, about the middle of the cape like the slider. */
+    private void zoomStep(boolean zoomIn) {
+        int capeW = RESOLUTIONS[selectedResolution][0];
+        int capeH = RESOLUTIONS[selectedResolution][1];
+        double factor = zoomIn ? CapeZoomRange.WHEEL_STEP : 1.0 / CapeZoomRange.WHEEL_STEP;
+        rescaleAbout(imgScale * factor, capeW / 2.0, capeH / 2.0);
+    }
+
+    private void initFooter() {
+        int footerY = this.height - MARGIN - FOOTER_BUTTON_H;
+        Component applyLabel = Component.translatable("quickskin.cape.adjust_apply");
+        Component cancelLabel = Component.translatable("gui.cancel");
+        int applyWidth = Math.max(90, this.font.width(applyLabel) + 24);
+        int cancelWidth = Math.max(70, this.font.width(cancelLabel) + 24);
+        int applyX = this.width - MARGIN - applyWidth;
+        this.addRenderableWidget(new StyledButton(applyX - 6 - cancelWidth, footerY, cancelWidth,
+                FOOTER_BUTTON_H, cancelLabel, b -> onClose()));
+        this.addRenderableWidget(new PrimaryButton(applyX, footerY, applyWidth, FOOTER_BUTTON_H,
+                applyLabel, b -> applyAndClose()));
+    }
+
+    /**
+     * The top of the right panel: Cape and Elytra buttons choosing what the model wears, and the
+     * player wearing the composed cape, from behind, under them. Without room for them both are
+     * left out.
+     */
+    private void initPlayerPreview() {
+        // A rebuild (a window resize) makes a new model, which takes the preview cape afresh
+        playerWidget = null;
+        lastPlayerWidgetCape = null;
+        capeViewButton = null;
+        elytraViewButton = null;
+        int areaWidth = previewX1 - previewX0;
+        if (previewY1 - previewY0 < 24 + VIEW_BUTTON_H + 4) {
+            return;
+        }
+        initViewButtons();
+        int areaTop = previewY0 + VIEW_BUTTON_H + 4;
+        int areaHeight = previewY1 - areaTop;
+        int modelX0 = previewX0;
+        int modelWidth = areaWidth;
+        if (modelWidth < 30 || areaHeight < 40) {
+            return;
+        }
+
+        //? if <1.21.11 {
+        ResourceLocation skinLocation = null;
+        //?} else {
+        Identifier skinLocation = null;
+        //?}
+        String modelType = "classic";
+        LocalPlayer player = Minecraft.getInstance().player;
+        // The saved skin, unless a CPM model is the latest look choice: then the player's own
+        // skin (the live one in a world, the imported one on the title screen).
+        String previewSkinHash = LocalLookPreview.skinHash(player != null);
+
+        if (!previewSkinHash.isEmpty()) {
+            LocalAssetManager assetManager = LocalAssetManager.getInstance();
+            AssetMetadata metadata = assetManager.getMetadata(previewSkinHash);
+            if (metadata != null) {
+                skinLocation = assetManager.getTextureLocation(previewSkinHash, TextureQuality.FULL);
+                modelType = assetManager.getSkinModelPreference(previewSkinHash);
+                if ("auto".equals(modelType)) {
+                    modelType = metadata.skinModel();
                 }
-        ).bounds(rightPanelX, resY + 58, btnW, 20).build());
-
-        // Apply / Cancel
-        int bottomY = this.height - 30;
-        int totalBtnWidth = 200 + 10 + 80;
-        int btnStartX = (this.width - totalBtnWidth) / 2;
-
-        this.addRenderableWidget(Button.builder(
-                Component.translatable("gui.cancel"),
-                b -> onClose()
-        ).bounds(btnStartX, bottomY, 80, 20).build());
-
-        this.addRenderableWidget(Button.builder(
-                Component.translatable("quickskin.cape.adjust_apply"),
-                b -> applyAndClose()
-        ).bounds(btnStartX + 90, bottomY, 120, 20).build());
-
-        // Opaque-cape toggle + colour picker, under the grid so the right-hand preview column
-        // (2D thumbnails and the 3D player widget) keeps every pixel it has today.
-        initOpaqueControls(bottomY);
-
-        // 3D player model preview (same widget used by PlayerCapeMenuScreen).
-        // Placed below the 2D cape/elytra previews, aligned with the right-panel
-        // column, above the Apply/Cancel bar.
-        int maxPreviewW = Math.min(100, rightPanelW);
-        int previewStartY = gridY + RESOLUTIONS.length * 24 + 100;
-        int estimatedPreviewsBottom = previewStartY
-                + (int) ((maxPreviewW / 2 - 2) * 1.6)   // cape back / front thumbnails
-                + 18
-                + (int) ((maxPreviewW / 2 - 2) * 2.0);  // elytra thumbnail
-        int widgetAreaLeft = rightPanelX;
-        int widgetAreaRight = this.width - 10;
-        int widgetAreaTop = estimatedPreviewsBottom + 15;
-        int widgetAreaBottom = bottomY - 20;
-        int widgetAreaW = widgetAreaRight - widgetAreaLeft;
-        int widgetAreaH = widgetAreaBottom - widgetAreaTop;
-        if (widgetAreaW >= 80 && widgetAreaH >= 120) {
-            int widgetHeight = Mth.clamp(widgetAreaH, 120, 220);
-            int widgetWidth = Mth.clamp((int) (widgetHeight / 1.8f), 70, widgetAreaW);
-            int widgetX = widgetAreaLeft + (widgetAreaW - widgetWidth) / 2;
-            int widgetY = widgetAreaTop;
-
-            //? if <1.21.11 {
-            ResourceLocation skinLocation = null;
+            }
+        }
+        if (skinLocation == null && player != null) {
+            //? if <1.21.9 {
+                //? if <1.21 {
+            skinLocation = player.getSkinTextureLocation();
+                //?} else {
+            skinLocation = player.getSkin().texture();
+                //?}
             //?} else {
-            Identifier skinLocation = null;
+            skinLocation = player.getSkin().body().texturePath();
             //?}
-            String modelType = "classic";
-            LocalPlayer player = Minecraft.getInstance().player;
-            // The saved skin, unless a CPM model is the latest look choice: then the player's own
-            // skin (the live one in a world, the imported one on the title screen).
-            String previewSkinHash = LocalLookPreview.skinHash(player != null);
+            // The player's own skin is drawn, so its model is the player's too.
+            //? if <1.21.9 {
+                //? if <1.21 {
+            String vanillaModel = player.getModelName(); // "default" or "slim"
+            modelType = "slim".equals(vanillaModel) ? "slim" : "classic";
+                //?} else {
+            modelType = "slim".equals(player.getSkin().model().id()) ? "slim" : "classic";
+                //?}
+            //?} else {
+            modelType = player.getSkin().model()
+                    == net.minecraft.world.entity.player.PlayerModelType.SLIM ? "slim" : "classic";
+            //?}
+        }
+        if (skinLocation == null) {
+            //? if <1.21.11 {
+                //? if <1.21 {
+            skinLocation = new ResourceLocation("minecraft", "textures/entity/player/wide/steve.png");
+                //?} else {
+            skinLocation = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/player/wide/steve.png");
+                //?}
+            //?} else {
+            skinLocation = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/player/wide/steve.png");
+            //?}
+            modelType = "classic";
+        }
 
-            if (!previewSkinHash.isEmpty()) {
-                LocalAssetManager assetManager = LocalAssetManager.getInstance();
-                AssetMetadata metadata = assetManager.getMetadata(previewSkinHash);
-                if (metadata != null) {
-                    skinLocation = assetManager.getTextureLocation(previewSkinHash, TextureQuality.FULL);
-                    modelType = assetManager.getSkinModelPreference(previewSkinHash);
-                    if ("auto".equals(modelType)) {
-                        modelType = metadata.skinModel();
-                    }
-                }
-            }
-            if (skinLocation == null && player != null) {
-                //? if <1.21.9 {
-                    //? if <1.21 {
-                skinLocation = player.getSkinTextureLocation();
-                    //?} else {
-                skinLocation = player.getSkin().texture();
-                    //?}
-                //?} else {
-                skinLocation = player.getSkin().body().texturePath();
-                //?}
-                // The player's own skin is drawn, so its model is the player's too.
-                //? if <1.21.9 {
-                    //? if <1.21 {
-                String vanillaModel = player.getModelName(); // "default" or "slim"
-                modelType = "slim".equals(vanillaModel) ? "slim" : "classic";
-                    //?} else {
-                modelType = "slim".equals(player.getSkin().model().id()) ? "slim" : "classic";
-                    //?}
-                //?} else {
-                modelType = player.getSkin().model()
-                        == net.minecraft.world.entity.player.PlayerModelType.SLIM ? "slim" : "classic";
-                //?}
-            }
-            if (skinLocation == null) {
-                //? if <1.21.11 {
-                    //? if <1.21 {
-                skinLocation = new ResourceLocation("minecraft", "textures/entity/player/wide/steve.png");
-                    //?} else {
-                skinLocation = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/player/wide/steve.png");
-                    //?}
-                //?} else {
-                skinLocation = Identifier.fromNamespaceAndPath("minecraft", "textures/entity/player/wide/steve.png");
-                //?}
-                modelType = "classic";
-            }
+        playerWidget = addRenderableWidget(new PlayerWidget(
+                modelX0, areaTop, modelWidth, areaHeight,
+                skinLocation, null, null, modelType));
+        playerWidget.setContext(PlayerWidget.WidgetContext.CAPE_MENU);
+        // Feet on the bottom of the area, no taller than the area
+        playerWidget.setCustomReferencePoint(modelX0 + modelWidth / 2, previewY1 - 2);
+        playerWidget.setScaleCap((areaHeight - 4) / 1.95f);
+        // Face the player's back to the camera so the cape is visible (same default as cape menu).
+        playerWidget.setRotationState(20.0f, 200.0f);
+        playerWidget.setElytraPreview(elytraView);
+    }
 
-            playerWidget = addRenderableWidget(new PlayerWidget(
-                    widgetX, widgetY, widgetWidth, widgetHeight,
-                    skinLocation, null, null, modelType));
-            playerWidget.setContext(PlayerWidget.WidgetContext.CAPE_MENU);
-            int referenceX = widgetX + widgetWidth / 2;
-            int referenceY = widgetY + widgetHeight / 2;
-            playerWidget.setCustomReferencePoint(referenceX, referenceY);
-            // Face the player's back to the camera so the cape is visible (same default as cape menu).
-            playerWidget.setRotationState(20.0f, 200.0f);
+    /** Cape and Elytra, side by side across the panel; the one the model wears is blue. */
+    private void initViewButtons() {
+        int width = previewX1 - previewX0;
+        int half = width / 2;
+        Component capeLabel = Component.translatable("quickskin.cape.adjust_view_cape");
+        Component elytraLabel = Component.translatable("quickskin.cape.adjust_elytra");
+        capeViewButton = this.addRenderableWidget(new CapeToolButton(
+                previewX0, previewY0, half + 1, VIEW_BUTTON_H, CapeEditorStyle.ICON_CAPE,
+                capeLabel, capeLabel, b -> setElytraView(false)));
+        capeViewButton.setTooltip(Tooltip.create(Component.translatable("quickskin.cape.adjust_view_cape_tip")));
+        elytraViewButton = this.addRenderableWidget(new CapeToolButton(
+                previewX0 + half, previewY0, width - half, VIEW_BUTTON_H, CapeEditorStyle.ICON_WINGS,
+                elytraLabel, elytraLabel, b -> setElytraView(true)));
+        elytraViewButton.setTooltip(Tooltip.create(Component.translatable("quickskin.cape.adjust_view_elytra_tip")));
+        updateViewButtons();
+    }
+
+    private void setElytraView(boolean elytra) {
+        elytraView = elytra;
+        if (playerWidget != null) {
+            playerWidget.setElytraPreview(elytra);
+        }
+        updateViewButtons();
+    }
+
+    private void updateViewButtons() {
+        if (capeViewButton != null) {
+            capeViewButton.setSelected(!elytraView);
+            elytraViewButton.setSelected(elytraView);
         }
     }
 
@@ -429,65 +648,45 @@ public class CapeAdjustScreen extends Screen {
     // touches cape pixels on their behalf.
 
     /**
-     * Lay out the opaque toggle, the fill-colour button and the colour picker popover.
+     * Lay out the opaque switch, the fill-colour swatch and the colour picker popover.
      *
-     * <p>The control row goes under the grid, clamped so it can never reach the Apply/Cancel bar on
-     * a short window, which leaves the right-hand column (resolution buttons, the 2D thumbnails and
-     * the 3D player widget) at exactly the coordinates it has today. The picker is a popover drawn
-     * over the lower-left of the grid: the grid is the largest region on screen at every GUI scale,
-     * so the picker always has room without reflowing anything that already exists.
+     * <p>The switch and the swatch end the Opaque fill row at the bottom of the right panel. The
+     * picker is a popover over the canvas's lower-left corner: the canvas holds no controls, so the
+     * popover covers none, and its own widgets draw over its frame. Anchored there, its hex field
+     * keeps the same place at every window size the packaged evidence uses.
      */
-    private void initOpaqueControls(int bottomY) {
-        // The row is budgeted from the grid width, the widest span that still clears the right-hand
-        // column: gridW <= availW, so gridX + gridW always sits 15px left of rightPanelX. There is
-        // no room for a second row — at the GUI scale Minecraft picks by default for both 1280x720
-        // and 854x480 the screen is 427x240, controlsY is already against its Apply/Cancel clamp,
-        // and only about 38px separate the grid from the bar — so the zoom slider shares this one.
-        // The two opaque buttons keep their formulas and their existing 70px floor; the slider then
-        // takes whatever is left up to the grid's right edge. Giving the leftover to the slider
-        // rather than letting it claim a fixed width is what keeps the row out of the right-hand
-        // column on a narrow grid — the column's buttons are registered first, so anything of ours
-        // that reached them would lose the click to Reset Position rather than zoom.
-        int controlW = Mth.clamp((gridW - ZOOM_PREFERRED_W - ROW_FIXED_W) / 2,
-                CONTROL_MIN_W, CONTROL_MAX_W);
-        int controlsY = Math.min(gridY + gridH + 20, bottomY - 24);
-
-        opaqueToggleButton = this.addRenderableWidget(Button.builder(
-                opaqueToggleMessage(),
-                b -> setOpaqueFill(!opaqueFill)
-        ).bounds(gridX, controlsY, controlW, 20).build());
-
-        fillColorButton = this.addRenderableWidget(Button.builder(
-                fillColorMessage(),
-                b -> setPickerOpen(!pickerOpen)
-        ).bounds(gridX + controlW + 4, controlsY, controlW, 20).build());
+    private void initOpaqueControls() {
+        int right = panelX1 - PANEL_PAD;
+        fillColorButton = this.addRenderableWidget(new CapeSwatchButton(
+                right - SWATCH_BUTTON_SIZE, opaqueRowY, SWATCH_BUTTON_SIZE,
+                () -> CapeOpaqueFill.opaque(opaqueFillRgb), fillColorMessage(),
+                b -> setPickerOpen(!pickerOpen)));
         fillColorButton.active = opaqueFill;
+        fillColorButton.setTooltip(Tooltip.create(fillColorMessage()));
 
-        swatchX = Math.min(gridX + 2 * controlW + 12, this.width - SWATCH_SIZE - 4);
-        swatchY = controlsY;
+        opaqueToggleButton = this.addRenderableWidget(new CapeToggleSwitch(
+                right - SWATCH_BUTTON_SIZE - 6 - SWITCH_W, opaqueRowY + 1, SWITCH_W, SWITCH_H,
+                () -> opaqueFill, opaqueToggleMessage(), b -> setOpaqueFill(!opaqueFill)));
+        opaqueToggleButton.setTooltip(Tooltip.create(opaqueToggleMessage()));
 
-        // Zoom slider, last on the row, taking the width between the swatch and the grid's right
-        // edge. 16px tall like the picker's channel sliders, so it clears the "Drag to move ·
-        // Scroll to zoom" hint by as much as the 20px buttons beside it do.
-        int zoomX = Math.min(swatchX + SWATCH_SIZE + 6, this.width - ZOOM_FLOOR_W - 4);
-        int zoomW = Mth.clamp(gridX + gridW - zoomX, ZOOM_FLOOR_W, ZOOM_MAX_W);
-        zoomSlider = this.addRenderableWidget(new ZoomSlider(zoomX, controlsY + 2, zoomW, 16));
-
-        pickerW = Math.min(PICKER_W, Math.max(120, gridW - 8));
+        pickerW = Math.min(PICKER_W, Math.max(140, gridW - 8));
         pickerH = PICKER_H;
         pickerX = gridX + 4;
-        pickerY = Math.max(gridY + 2, gridY + gridH - pickerH - 4);
+        pickerY = Math.max(gridY + 4, gridY + gridH - pickerH - 4);
 
-        int sliderX = pickerX + 5;
-        int sliderW = Math.max(60, pickerW - 10 - SWATCH_SIZE - 5);
+        // Each channel's label goes in a column left of its slider, so the slider's own track runs
+        // the widget's full width and a click lands where its knob is drawn
+        int sliderX = pickerX + PANEL_PAD + CHANNEL_LABEL_W;
+        int sliderW = Math.max(40, pickerW - 2 * PANEL_PAD - CHANNEL_LABEL_W - SWATCH_SIZE - 6);
         redSlider = this.addRenderableWidget(new ChannelSlider(
-                sliderX, pickerY + 5, sliderW, 16, 16, "quickskin.cape.adjust_red"));
+                sliderX, pickerY + 6, sliderW, 14, 16, "quickskin.cape.adjust_red"));
         greenSlider = this.addRenderableWidget(new ChannelSlider(
-                sliderX, pickerY + 23, sliderW, 16, 8, "quickskin.cape.adjust_green"));
+                sliderX, pickerY + 24, sliderW, 14, 8, "quickskin.cape.adjust_green"));
         blueSlider = this.addRenderableWidget(new ChannelSlider(
-                sliderX, pickerY + 41, sliderW, 16, 0, "quickskin.cape.adjust_blue"));
+                sliderX, pickerY + 42, sliderW, 14, 0, "quickskin.cape.adjust_blue"));
 
-        hexField = new EditBox(this.font, sliderX, pickerY + 61, Math.min(74, sliderW), 16,
+        hexField = new EditBox(this.font, pickerX + PANEL_PAD + 1, pickerY + 62,
+                Math.min(80, pickerW - 2 * PANEL_PAD - 2), 16,
                 Component.translatable("quickskin.cape.adjust_hex"));
         hexField.setMaxLength(CapeOpaqueFill.HEX_DIGITS + 1);
         hexField.setValue(CapeOpaqueFill.toHex(opaqueFillRgb));
@@ -518,6 +717,7 @@ public class CapeAdjustScreen extends Screen {
         }
         if (opaqueToggleButton != null) {
             opaqueToggleButton.setMessage(opaqueToggleMessage());
+            opaqueToggleButton.setTooltip(Tooltip.create(opaqueToggleMessage()));
         }
         if (fillColorButton != null) {
             fillColorButton.active = enabled;
@@ -600,6 +800,7 @@ public class CapeAdjustScreen extends Screen {
             }
             if (fillColorButton != null) {
                 fillColorButton.setMessage(fillColorMessage());
+                fillColorButton.setTooltip(Tooltip.create(fillColorMessage()));
             }
             if (hexField != null && hexField != source) {
                 String hex = CapeOpaqueFill.toHex(opaqueFillRgb);
@@ -651,6 +852,16 @@ public class CapeAdjustScreen extends Screen {
         protected void updateMessage() {
             setMessage(Component.translatable(labelKey,
                     String.valueOf(CapeOpaqueFill.channel(opaqueFillRgb, shift))));
+        }
+
+        @Override
+        //? if <26.1 {
+        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        //?} else {
+        public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        //?}
+            CapeEditorStyle.slider(graphics, getX(), getY(), getWidth(), getHeight(), this.value,
+                    this.isHovered() || this.isFocused(), this.active);
         }
 
         @Override
@@ -717,6 +928,16 @@ public class CapeAdjustScreen extends Screen {
                     capeW / 2.0, capeH / 2.0);
         }
 
+        @Override
+        //? if <26.1 {
+        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        //?} else {
+        public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        //?}
+            CapeEditorStyle.slider(graphics, getX(), getY(), getWidth(), getHeight(), this.value,
+                    this.isHovered() || this.isFocused(), this.active);
+        }
+
         /** Drive the slider exactly as a drag does. Only used by the packaged E2E harness. */
         void dragTo(double position) {
             this.value = Mth.clamp(position, 0.0, 1.0);
@@ -761,20 +982,19 @@ public class CapeAdjustScreen extends Screen {
                 sourceImage.getWidth(), srcFrameHeight);
     }
 
+    /** Fits the 2:1 cape grid into the canvas's room at the top left of it. */
     private void recalculateGrid() {
-        int availW = (int) (this.width * 0.6);
-        int availH = (int) (this.height * 0.65);
         int capeW = RESOLUTIONS[selectedResolution][0];
         int capeH = RESOLUTIONS[selectedResolution][1];
 
-        double scaleX = (double) availW / capeW;
-        double scaleY = (double) availH / capeH;
+        double scaleX = (double) canvasAvailW / capeW;
+        double scaleY = (double) canvasAvailH / capeH;
         displayScale = Math.min(scaleX, scaleY);
 
         gridW = (int) (capeW * displayScale);
         gridH = (int) (capeH * displayScale);
-        gridX = 20 + (availW - gridW) / 2;
-        gridY = 30 + (availH - gridH) / 2;
+        gridX = canvasLeft;
+        gridY = canvasTop;
     }
 
     private void resetImagePosition() {
@@ -1063,27 +1283,10 @@ public class CapeAdjustScreen extends Screen {
         }
 
         BackgroundRenderer.renderBackground(this, graphics, partialTick);
+        renderHeader(graphics);
 
-        // Title
-        //? if <26.1 {
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, 10, 0xFFFFFFFF);
-        //?} else {
-        graphics.centeredText(this.font, this.title, this.width / 2, 10, 0xFFFFFFFF);
-        //?}
-
-        // Instructions (centered under grid, underline only the action phrases)
-        Component hintText = Component.literal("Drag to move").withStyle(style -> style.withUnderlined(true))
-                .append(Component.literal(" · "))
-                .append(Component.literal("Scroll to zoom").withStyle(style -> style.withUnderlined(true)));
-        int hintX = gridX + (gridW - this.font.width(hintText)) / 2;
-        //? if <26.1 {
-        graphics.drawString(this.font, hintText, hintX, gridY + gridH + 8, 0xFFFFFFFF);
-        //?} else {
-        graphics.text(this.font, hintText, hintX, gridY + gridH + 8, 0xFFFFFFFF);
-        //?}
-
-        // Draw dark background for the grid area
-        graphics.fill(gridX - 2, gridY - 2, gridX + gridW + 2, gridY + gridH + 2, 0xFF111111);
+        // The canvas, in its frame
+        CapeEditorStyle.panel(graphics, frameX0, frameY0, frameX1, frameY1);
         renderSourceTransparencyBackdrop(graphics);
 
         // Enable scissor to clip the source image to the grid area
@@ -1098,60 +1301,9 @@ public class CapeAdjustScreen extends Screen {
         renderCapeGridOverlay(graphics);
         renderSourceBoundary(graphics);
 
-        // The source and output are intentionally different concepts. Keeping both dimensions
-        // visible prevents a padded 128x64 import targeting a 64x32 atlas from looking like the
-        // editor silently resized or selected the wrong input.
-        //? if <26.1 {
-        graphics.drawString(this.font,
-        //?} else {
-        graphics.text(this.font,
-        //?}
-                Component.translatable("quickskin.cape.adjust_source_dimensions",
-                        sourceDimensions()),
-                gridX, gridY - 14, SOURCE_BOUNDARY_COLOR);
-
-        // Render preview panel
+        renderZoomPanel(graphics);
+        renderSidePanel(graphics);
         renderPreview(graphics);
-
-        // Resolution label
-        int rightPanelX = gridX + (int) (this.width * 0.6) + 15;
-        //? if <26.1 {
-        graphics.drawString(this.font,
-        //?} else {
-        graphics.text(this.font,
-        //?}
-                Component.translatable("quickskin.cape.adjust_output_resolution",
-                        outputDimensions()),
-                rightPanelX, gridY - 14, 0xFFFFFF55);
-
-        // Highlight selected resolution by drawing an outline around its button area
-        int resBtnX = gridX + (int) (this.width * 0.6) + 15;
-        for (int i = 0; i < RESOLUTIONS.length; i++) {
-            if (i == selectedResolution) {
-                int btnW2 = Math.min(this.width - resBtnX - 10, 120);
-                int by = gridY + i * 24;
-                //? if <1.21.9 {
-                graphics.renderOutline(resBtnX - 1, by - 1, btnW2 + 2, 22, 0xFF55FF55);
-                //?} else {
-                drawOutline(graphics, resBtnX - 1, by - 1, btnW2 + 2, 22, 0xFF55FF55);
-                //?}
-            }
-        }
-
-        // Note about GIF resolution cap (to the right of the resolution buttons)
-        if (frameCount > 1) {
-            int btnW3 = Math.min(this.width - resBtnX - 10, 120);
-            int noteX = resBtnX + btnW3 + 8;
-            int noteY = gridY;
-            int noteMaxW = Math.max(60, this.width - noteX - 5);
-            //? if <26.1 {
-            graphics.drawWordWrap(this.font,
-            //?} else {
-            graphics.textWithWordWrap(this.font,
-            //?}
-                    Component.literal("Max 4x for animated capes to optimize performance and avoid server lag."),
-                    noteX, noteY, noteMaxW, 0xFFFFAA00);
-        }
 
         // Drawn before the widget pump so the picker's own sliders and hex field land on top of
         // its backdrop rather than under it.
@@ -1164,41 +1316,109 @@ public class CapeAdjustScreen extends Screen {
         //?}
     }
 
-    /** Swatch beside the control row, plus the picker popover chrome while it is open. */
+    /** The strip across the top: the title on the left, how to use the canvas on the right. */
+    //? if <26.1 {
+    private void renderHeader(GuiGraphics graphics) {
+    //?} else {
+    private void renderHeader(GuiGraphicsExtractor graphics) {
+    //?}
+        graphics.fill(0, 0, this.width, HEADER_H - 1, HEADER_COLOR);
+        graphics.fill(0, HEADER_H - 1, this.width, HEADER_H, CapeEditorStyle.ACCENT);
+        int textY = (HEADER_H - 1 - 8) / 2 + 1;
+        UiText.draw(graphics, this.font, this.title, MARGIN, textY, 0xFFFFFFFF);
+        Component hint = Component.translatable("quickskin.cape.adjust_hint");
+        int hintX = this.width - MARGIN - this.font.width(hint);
+        // The hint gives way on a window too narrow for both
+        if (hintX > MARGIN + this.font.width(this.title) + 12) {
+            UiText.draw(graphics, this.font, hint, hintX, textY, CapeEditorStyle.SECTION_TEXT);
+        }
+    }
+
+    /** A section's name and a rule from it to {@code ruleEnd}. */
+    //? if <26.1 {
+    private void renderSectionLabel(GuiGraphics graphics, Component label, int x, int y, int ruleEnd) {
+    //?} else {
+    private void renderSectionLabel(GuiGraphicsExtractor graphics, Component label, int x, int y, int ruleEnd) {
+    //?}
+        UiText.draw(graphics, this.font, label, x, y, CapeEditorStyle.SECTION_TEXT);
+        int ruleStart = x + this.font.width(label) + 5;
+        if (ruleEnd - ruleStart >= 6) {
+            graphics.fill(ruleStart, y + 4, ruleEnd, y + 5, CapeEditorStyle.RULE);
+        }
+    }
+
+    /**
+     * The panel under the canvas: Zoom with the source's size, then zoom out, the slider, its
+     * percentage and zoom in. The source and output are intentionally different concepts; keeping
+     * both dimensions visible prevents a padded 128x64 import targeting a 64x32 atlas from looking
+     * like the editor silently resized or selected the wrong input.
+     */
+    //? if <26.1 {
+    private void renderZoomPanel(GuiGraphics graphics) {
+    //?} else {
+    private void renderZoomPanel(GuiGraphicsExtractor graphics) {
+    //?}
+        CapeEditorStyle.panel(graphics, zoomX0, zoomY0, zoomX1, zoomY1);
+        Component source = Component.translatable("quickskin.cape.adjust_source_dimensions",
+                sourceDimensions());
+        int sourceX = zoomX1 - PANEL_PAD - this.font.width(source);
+        renderSectionLabel(graphics, Component.translatable("quickskin.cape.adjust_section_zoom"),
+                zoomX0 + PANEL_PAD, zoomY0 + 6, sourceX - 6);
+        UiText.draw(graphics, this.font, source, sourceX, zoomY0 + 6, SOURCE_BOUNDARY_COLOR);
+        if (zoomSlider != null) {
+            UiText.draw(graphics, this.font, zoomPercentText(), zoomPercentX, zoomSlider.getY() + 3,
+                    0xFFE0E0E0);
+        }
+    }
+
+    private String zoomPercentText() {
+        return CapeZoomRange.formatPercent(imgScale, RESOLUTIONS[selectedResolution][0],
+                sourceImage.getWidth(), srcFrameHeight);
+    }
+
+    /** The right panel's frame, its section names and the output size under the resolutions. */
+    //? if <26.1 {
+    private void renderSidePanel(GuiGraphics graphics) {
+    //?} else {
+    private void renderSidePanel(GuiGraphicsExtractor graphics) {
+    //?}
+        CapeEditorStyle.panel(graphics, panelX0, panelY0, panelX1, panelY1);
+        int x0 = panelX0 + PANEL_PAD;
+        int x1 = panelX1 - PANEL_PAD;
+        renderSectionLabel(graphics, Component.translatable("quickskin.cape.adjust_section_resolution"),
+                x0, resolutionLabelY + 1, x1);
+        UiText.drawCentered(graphics, this.font,
+                Component.translatable("quickskin.cape.adjust_output_resolution", outputDimensions()),
+                (x0 + x1) / 2, outputTextY, 0xFFE0E0E0);
+        renderSectionLabel(graphics, Component.translatable("quickskin.cape.adjust_section_position"),
+                x0, positionLabelY + 1, x1);
+        renderSectionLabel(graphics, Component.translatable("quickskin.cape.adjust_section_opaque"),
+                x0, opaqueRowY + 4, opaqueToggleButton != null ? opaqueToggleButton.getX() - 6 : x1);
+    }
+
+    /** The colour picker popover's frame, its channel labels and a large swatch, while it is open. */
     //? if <26.1 {
     private void renderOpaqueControls(GuiGraphics graphics) {
     //?} else {
     private void renderOpaqueControls(GuiGraphicsExtractor graphics) {
     //?}
-        if (!opaqueFill) {
+        if (!opaqueFill || !pickerOpen) {
             return;
         }
-
-        int fillArgb = CapeOpaqueFill.opaque(opaqueFillRgb);
-
-        graphics.fill(swatchX - 1, swatchY - 1,
-                swatchX + SWATCH_SIZE + 1, swatchY + SWATCH_SIZE + 1, 0xFF000000);
-        graphics.fill(swatchX, swatchY, swatchX + SWATCH_SIZE, swatchY + SWATCH_SIZE, fillArgb);
-
-        if (!pickerOpen) {
-            return;
+        CapeEditorStyle.panel(graphics, pickerX, pickerY, pickerX + pickerW, pickerY + pickerH);
+        for (ChannelSlider slider : new ChannelSlider[] {redSlider, greenSlider, blueSlider}) {
+            if (slider != null) {
+                UiText.draw(graphics, this.font, slider.getMessage(), pickerX + PANEL_PAD,
+                        slider.getY() + 3, 0xFFE0E0E0);
+            }
         }
-
-        graphics.fill(pickerX, pickerY, pickerX + pickerW, pickerY + pickerH, 0xF0111111);
-        //? if <1.21.9 {
-        graphics.renderOutline(pickerX, pickerY, pickerW, pickerH, 0x80FFFFFF);
-        //?} else {
-        drawOutline(graphics, pickerX, pickerY, pickerW, pickerH, 0x80FFFFFF);
-        //?}
-
-        int bigSwatchX = pickerX + pickerW - 5 - SWATCH_SIZE;
-        int bigSwatchBottom = pickerY + 57;
-        graphics.fill(bigSwatchX, pickerY + 5, bigSwatchX + SWATCH_SIZE, bigSwatchBottom, fillArgb);
-        //? if <1.21.9 {
-        graphics.renderOutline(bigSwatchX, pickerY + 5, SWATCH_SIZE, bigSwatchBottom - pickerY - 5, 0x80FFFFFF);
-        //?} else {
-        drawOutline(graphics, bigSwatchX, pickerY + 5, SWATCH_SIZE, bigSwatchBottom - pickerY - 5, 0x80FFFFFF);
-        //?}
+        int bigSwatchX = pickerX + pickerW - PANEL_PAD - SWATCH_SIZE;
+        int bigSwatchTop = pickerY + 6;
+        int bigSwatchBottom = pickerY + pickerH - 6;
+        graphics.fill(bigSwatchX, bigSwatchTop, bigSwatchX + SWATCH_SIZE, bigSwatchBottom,
+                CapeEditorStyle.OUTLINE);
+        graphics.fill(bigSwatchX + 1, bigSwatchTop + 1, bigSwatchX + SWATCH_SIZE - 1, bigSwatchBottom - 1,
+                CapeOpaqueFill.opaque(opaqueFillRgb));
     }
 
     //? if <26.1 {
@@ -1316,7 +1536,8 @@ public class CapeAdjustScreen extends Screen {
         int eBotW = (int) (10.0 / 64.0 * gridW);
         int eLX = gridX + (int) (22.0 / 64.0 * gridW);     // left side X
         int eLY = gridY + (int) (2.0 / 32.0 * gridH);      // body strip Y
-        int eLH = (int) (20.0 / 32.0 * gridH);             // body strip H
+        // The strip ends where the dimmed strip under it starts, so rounding leaves no bright line
+        int eLH = gridY + (int) (22.0 / 32.0 * gridH) - eLY; // body strip H
         int eBackX = gridX + (int) (36.0 / 64.0 * gridW);  // back/outer face X
         int eBackW = (int) (10.0 / 64.0 * gridW);
 
@@ -1418,18 +1639,23 @@ public class CapeAdjustScreen extends Screen {
 
         // --- Labels ---
         // Cape front (inner side, against player's body)
+        // A label may reach a cape pixel past each side of its face, into the gap between the two;
+        // a longer one is left out rather than drawn over the next label
+        int labelRoom = (int) (12.0 / 64.0 * gridW);
         String label = Component.translatable("quickskin.cape.adjust_front").getString();
         int labelW = this.font.width(label);
-        //? if <26.1 {
-        graphics.drawString(this.font, label,
-        //?} else {
-        graphics.text(this.font, label,
-        //?}
-                backX + (backW - labelW) / 2, backY + backH / 2 - 4, 0xFF5599FF);
+        if (labelW <= labelRoom) {
+            //? if <26.1 {
+            graphics.drawString(this.font, label,
+            //?} else {
+            graphics.text(this.font, label,
+            //?}
+                    backX + (backW - labelW) / 2, backY + backH / 2 - 4, 0xFF5599FF);
+        }
         // Cape back (outer side, visible from behind) — hidden when mirroring from front
-        if (!mirrorFrontBack) {
-            String frontLabel = Component.translatable("quickskin.cape.adjust_back").getString();
-            int frontLabelW = this.font.width(frontLabel);
+        String frontLabel = Component.translatable("quickskin.cape.adjust_back").getString();
+        int frontLabelW = this.font.width(frontLabel);
+        if (!mirrorFrontBack && frontLabelW <= labelRoom) {
             //? if <26.1 {
             graphics.drawString(this.font, frontLabel,
             //?} else {
@@ -1455,11 +1681,6 @@ public class CapeAdjustScreen extends Screen {
     //?} else {
     private void renderPreview(GuiGraphicsExtractor graphics) {
     //?}
-        int rightPanelX = gridX + (int) (this.width * 0.6) + 15;
-        // Account for resolution buttons + reset + snap button spacing
-        int previewStartY = gridY + RESOLUTIONS.length * 24 + 100;
-        int maxPreviewW = Math.min(100, this.width - rightPanelX - 10);
-
         // Compose texture if dirty
         if (previewDirty) {
             updatePreviewTexture();
@@ -1471,110 +1692,6 @@ public class CapeAdjustScreen extends Screen {
                 && previewTextureLocation != lastPlayerWidgetCape) {
             playerWidget.setCape(previewTextureLocation, null);
             lastPlayerWidgetCape = previewTextureLocation;
-        }
-
-        if (previewTextureLocation == null) return;
-
-        int capeW = RESOLUTIONS[selectedResolution][0];
-        int scale = capeW / 64;
-
-        // --- Cape Back preview (the visible part in-game) ---
-        int backPreviewW = maxPreviewW / 2 - 2;
-        int backPreviewH = (int) (backPreviewW * 1.6); // 10:16 aspect
-
-        if (backPreviewH + previewStartY > this.height - 40) {
-            backPreviewH = this.height - 40 - previewStartY;
-            backPreviewW = (int) (backPreviewH / 1.6);
-        }
-
-        String backLabel = Component.translatable("quickskin.cape.adjust_front").getString();
-        //? if <26.1 {
-        graphics.drawString(this.font, backLabel, rightPanelX, previewStartY - 12, 0xFF5599FF);
-        //?} else {
-        graphics.text(this.font, backLabel, rightPanelX, previewStartY - 12, 0xFF5599FF);
-        //?}
-
-        graphics.fill(rightPanelX - 1, previewStartY - 1,
-                rightPanelX + backPreviewW + 1, previewStartY + backPreviewH + 1, 0xFF333333);
-
-        //? if <1.21.6 {
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        //?}
-        // Cape back UV: (1*s, 1*s) size (10*s, 16*s)
-        GuiCompat.blit(graphics, previewTextureLocation,
-                rightPanelX, previewStartY, backPreviewW, backPreviewH,
-                1 * scale, 1 * scale, 10 * scale, 16 * scale, capeW, capeW / 2);
-
-        // --- Cape Front preview (against the player's body) ---
-        int frontX = rightPanelX + backPreviewW + 6;
-
-        String frontLabel = Component.translatable("quickskin.cape.adjust_back").getString();
-        //? if <26.1 {
-        graphics.drawString(this.font, frontLabel, frontX, previewStartY - 12, 0xFF55FF55);
-        //?} else {
-        graphics.text(this.font, frontLabel, frontX, previewStartY - 12, 0xFF55FF55);
-        //?}
-
-        graphics.fill(frontX - 1, previewStartY - 1,
-                frontX + backPreviewW + 1, previewStartY + backPreviewH + 1, 0xFF333333);
-
-        //? if <1.21.6 {
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        //?}
-        // Cape front UV: (12*s, 1*s) size (10*s, 16*s)
-        GuiCompat.blit(graphics, previewTextureLocation,
-                frontX, previewStartY, backPreviewW, backPreviewH,
-                12 * scale, 1 * scale, 10 * scale, 16 * scale, capeW, capeW / 2);
-
-        // --- Elytra preview (outer/back wing — the visible part in-game) ---
-        // ElytraModel: texOffs(22,0), box 10x20x2, texture 64x32
-        // Back/outer face UV: (36, 2) size (10, 20)
-        int elytraPreviewW = backPreviewW;
-        int elytraPreviewH = (int) (elytraPreviewW * 2.0); // 10:20 aspect
-
-        int elytraY = previewStartY + backPreviewH + 18;
-        if (elytraPreviewH + elytraY > this.height - 40) {
-            elytraPreviewH = this.height - 40 - elytraY;
-            elytraPreviewW = (int) (elytraPreviewH / 2.0);
-        }
-
-        if (elytraPreviewH > 4) {
-            // Elytra outer (back face — what you see from behind)
-            String eOuterLabel = Component.translatable("quickskin.cape.adjust_elytra").getString();
-            //? if <26.1 {
-            graphics.drawString(this.font, eOuterLabel, rightPanelX, elytraY - 12, 0xFFFFAA00);
-            //?} else {
-            graphics.text(this.font, eOuterLabel, rightPanelX, elytraY - 12, 0xFFFFAA00);
-            //?}
-
-            graphics.fill(rightPanelX - 1, elytraY - 1,
-                    rightPanelX + elytraPreviewW + 1, elytraY + elytraPreviewH + 1, 0xFF333333);
-
-            //? if <1.21.6 {
-            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-            //?}
-            // Back/outer wing UV: (36*s, 2*s) size (10*s, 20*s)
-            GuiCompat.blit(graphics, previewTextureLocation,
-                    rightPanelX, elytraY, elytraPreviewW, elytraPreviewH,
-                    36 * scale, 2 * scale, 10 * scale, 20 * scale, capeW, capeW / 2);
-
-            // Mask the preview corners to match the wing silhouette
-            double pColW = elytraPreviewW / 10.0;
-            double pRowH = elytraPreviewH / 20.0;
-            for (int row = 0; row < 20; row++) {
-                int left = CapeElytraSilhouette.wingStartColumn(row);
-                int right = CapeElytraSilhouette.wingEndColumn(row);
-                int rTop = elytraY + (int) (row * pRowH);
-                int rBot = elytraY + (int) ((row + 1) * pRowH);
-                if (left > 0) {
-                    graphics.fill(rightPanelX, rTop,
-                            rightPanelX + (int) (left * pColW), rBot, 0xFF333333);
-                }
-                if (right < 10) {
-                    graphics.fill(rightPanelX + (int) (right * pColW), rTop,
-                            rightPanelX + elytraPreviewW, rBot, 0xFF333333);
-                }
-            }
         }
     }
 

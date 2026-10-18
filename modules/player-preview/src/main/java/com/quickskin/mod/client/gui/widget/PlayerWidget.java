@@ -959,6 +959,14 @@ public class PlayerWidget extends AbstractWidget {
         previewData.setOwnPose(ownPose);
     }
 
+    /**
+     * Shows the cape's texture on folded elytra wings instead of on the cape (see
+     * {@link PreviewPlayerData#isElytraPreview}).
+     */
+    public void setElytraPreview(boolean elytraPreview) {
+        previewData.setElytraPreview(elytraPreview);
+    }
+
     private void setAnimationState(String animation) {
         if (animation != null && !animation.isEmpty()) {
             previewData.setCurrentAnimation(animation);

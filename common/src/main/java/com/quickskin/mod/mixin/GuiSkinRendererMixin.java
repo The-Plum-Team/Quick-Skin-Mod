@@ -148,6 +148,18 @@ public class GuiSkinRendererMixin {
         poseStack.pushPose();
         cape.bodyModel().body.translateAndRotate(poseStack);
         poseStack.translate(0.0, 0.0, 0.125);
+        if (cape.elytra() != null) {
+            // The preview asked for the cape's texture on folded elytra wings, where vanilla's
+            // wings layer puts them
+//? if <26.2 {
+            cape.elytra().render(poseStack, capeConsumer, 15728880, OverlayTexture.NO_OVERLAY);
+//?} else {
+            collector.submitModelPart(cape.elytra(), poseStack, capeRenderType,
+                    15728880, OverlayTexture.NO_OVERLAY, null);
+//?}
+            poseStack.popPose();
+            return;
+        }
 //? if <26.3 {
         poseStack.mulPose(Axis.XP.rotationDegrees(6.0F));
 //?} else {

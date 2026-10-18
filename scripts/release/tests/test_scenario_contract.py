@@ -1036,16 +1036,16 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "cape_adjust_screen",
                     "cape editor title",
-                    (675, 20, 925, 50),
+                    (16, 14, 330, 50),
                     75,
-                    400,
+                    900,
                 ),
                 (
                     "cape_adjust_screen",
                     "cape editor instructions",
-                    (300, 624, 780, 672),
+                    (1100, 14, 1590, 50),
                     75,
-                    900,
+                    1200,
                 ),
                 (
                     "cape_fill_color_picker",
@@ -1057,16 +1057,16 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "bmo_padded_source_screen",
                     "BMO source dimensions",
-                    (45, 100, 250, 140),
-                    75,
-                    120,
+                    (820, 634, 1040, 662),
+                    175,
+                    300,
                 ),
                 (
                     "bmo_padded_source_screen",
                     "BMO output dimensions",
-                    (1035, 100, 1255, 140),
-                    75,
-                    120,
+                    (1215, 514, 1430, 552),
+                    175,
+                    300,
                 ),
                 (
                     "cape_tile_tooltip",
