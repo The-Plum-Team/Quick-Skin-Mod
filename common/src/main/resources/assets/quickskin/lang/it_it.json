@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "Sito web skin HD",
   "quickskin.button.skin_website": "Sito web skin",
   "quickskin.button.cape": "Mantello",
+  "quickskin.button.coming_soon": "Prossimamente",
   "quickskin.button.settings": "Impostazioni",
   "quickskin.button.discord": "Unisciti al nostro Discord!",
   "quickskin.button.curseforge": "Visita la nostra pagina CurseForge",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Ordinamento: %s",
   "quickskin.tooltip.view_list": "Mostra come elenco",
   "quickskin.tooltip.view_grid": "Mostra come griglia",
+  "quickskin.tooltip.delete_mode": "Scegli le skin da eliminare",
+  "quickskin.button.delete_count": "Elimina (%s)",
   "quickskin.screen.delete_many.title": "Eliminare le skin?",
   "quickskin.dialog.confirm_delete_many": "Vuoi davvero eliminare %s skin?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Trascina file skin qui",
   "quickskin.dropzone.skins.sub": "oppure clicca 'Importa skin'",
+  "quickskin.dropzone.skins.click": "o fai clic per importare",
   "quickskin.dropzone.capes.main": "Trascina file mantello qui",
   "quickskin.dropzone.capes.sub": "oppure clicca 'Importa mantello'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Largo",
   "quickskin.preview.model.slim": "Snello",
   "quickskin.preview.rotate": "Ruota anteprima",
+  "quickskin.preview.pose": "Posa: %s",
+  "quickskin.preview.pose.idle": "In piedi",
+  "quickskin.preview.pose.walk": "Camminata",
+  "quickskin.preview.pose.sit": "Seduto",
   "quickskin.preview.narration": "Anteprima giocatore",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

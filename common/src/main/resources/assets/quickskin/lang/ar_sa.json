@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "موقع المظاهر HD",
   "quickskin.button.skin_website": "موقع المظاهر",
   "quickskin.button.cape": "عباءة",
+  "quickskin.button.coming_soon": "قريبًا",
   "quickskin.button.settings": "الإعدادات",
   "quickskin.button.discord": "انضم إلى Discord الخاص بنا!",
   "quickskin.button.curseforge": "قم بزيارة صفحتنا على CurseForge",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "الترتيب: %s",
   "quickskin.tooltip.view_list": "عرض كقائمة",
   "quickskin.tooltip.view_grid": "عرض كشبكة",
+  "quickskin.tooltip.delete_mode": "اختر المظاهر لحذفها",
+  "quickskin.button.delete_count": "حذف (%s)",
   "quickskin.screen.delete_many.title": "حذف المظاهر؟",
   "quickskin.dialog.confirm_delete_many": "هل أنت متأكد من حذف %s مظاهر؟",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "اسحب ملفات المظهر هنا",
   "quickskin.dropzone.skins.sub": "أو انقر على 'استيراد مظهر'",
+  "quickskin.dropzone.skins.click": "أو انقر للاستيراد",
   "quickskin.dropzone.capes.main": "اسحب ملفات العباءة هنا",
   "quickskin.dropzone.capes.sub": "أو انقر على 'استيراد عباءة'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "عريض",
   "quickskin.preview.model.slim": "نحيف",
   "quickskin.preview.rotate": "تدوير المعاينة",
+  "quickskin.preview.pose": "الوضعية: %s",
+  "quickskin.preview.pose.idle": "واقف",
+  "quickskin.preview.pose.walk": "مشي",
+  "quickskin.preview.pose.sit": "جالس",
   "quickskin.preview.narration": "معاينة اللاعب",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

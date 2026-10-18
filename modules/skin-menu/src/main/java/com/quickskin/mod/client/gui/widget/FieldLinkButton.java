@@ -16,7 +16,7 @@ import net.minecraft.resources.Identifier;
 //?}
 
 /**
- * A {@link LinkButton} drawn flat in a {@link SearchField}'s well, like {@link FieldIconButton}:
+ * A {@link LinkButton} drawn flat in a {@link SearchField}'s well:
  * the skin menu's Modrinth, CurseForge, Discord and Settings buttons, on the search row. The logo
  * fills the well inside the border, so the border frames it and lightens under the mouse.
  */

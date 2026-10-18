@@ -35,6 +35,7 @@ public class PreviewPlayerData {
     // Animation state
     private String currentAnimation; // For future animation support
     private boolean showcaseIdle;
+    private boolean ownPose;
     private final float animationProgress;
 
     public PreviewPlayerData() {
@@ -203,6 +204,19 @@ public class PreviewPlayerData {
 
     public void setShowcaseIdle(boolean showcaseIdle) {
         this.showcaseIdle = showcaseIdle;
+    }
+
+    /**
+     * Whether the preview draws its own model in the chosen pose even in a world, instead of the
+     * live player doing whatever the player is doing. The skin menu uses it; the pause menu's
+     * preview keeps the live player.
+     */
+    public boolean isOwnPose() {
+        return ownPose;
+    }
+
+    public void setOwnPose(boolean ownPose) {
+        this.ownPose = ownPose;
     }
 
     public void setCurrentAnimation(String currentAnimation) {

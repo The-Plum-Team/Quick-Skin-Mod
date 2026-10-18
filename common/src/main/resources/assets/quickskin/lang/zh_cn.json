@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "高清皮肤站",
   "quickskin.button.skin_website": "皮肤站",
   "quickskin.button.cape": "披风",
+  "quickskin.button.coming_soon": "即将推出",
   "quickskin.button.settings": "设置",
   "quickskin.button.discord": "加入 Discord 社区！",
   "quickskin.button.curseforge": "前往 CurseForge",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "排序：%s",
   "quickskin.tooltip.view_list": "以列表显示",
   "quickskin.tooltip.view_grid": "以网格显示",
+  "quickskin.tooltip.delete_mode": "选择要删除的皮肤",
+  "quickskin.button.delete_count": "删除 (%s)",
   "quickskin.screen.delete_many.title": "删除皮肤？",
   "quickskin.dialog.confirm_delete_many": "确定要删除 %s 个皮肤吗？",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== 拖放区域 ===",
   "quickskin.dropzone.skins.main": "拖入皮肤文件",
   "quickskin.dropzone.skins.sub": "或点击导入皮肤",
+  "quickskin.dropzone.skins.click": "或点击导入",
   "quickskin.dropzone.capes.main": "拖入披风文件",
   "quickskin.dropzone.capes.sub": "或点击导入披风",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "标准型",
   "quickskin.preview.model.slim": "纤细型",
   "quickskin.preview.rotate": "旋转预览",
+  "quickskin.preview.pose": "姿势：%s",
+  "quickskin.preview.pose.idle": "站立",
+  "quickskin.preview.pose.walk": "行走",
+  "quickskin.preview.pose.sit": "坐下",
   "quickskin.preview.narration": "玩家预览",
 
   "_comment_cooldown": "=== 冷却消息 ===",

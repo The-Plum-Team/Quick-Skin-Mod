@@ -27,7 +27,8 @@ import java.util.List;
  * of skin cards, one per row, with a slim scrollbar beside it.
  *
  * <p>The mouse wheel scrolls the grid and the scrollbar's thumb can be dragged. A click on a tile
- * selects its skin, or runs the action under the mouse on the strip a hovered tile shows.
+ * selects its skin or toggles its favorite star; in the menu's delete mode it marks the skin for
+ * deletion instead.
  */
 @Environment(EnvType.CLIENT)
 public class SkinListWidget extends AbstractWidget {
@@ -123,11 +124,9 @@ public class SkinListWidget extends AbstractWidget {
         }
     }
 
-    /**
-     * Called when a skin is selected
-     */
+    /** Called when the player clicks a skin: wears it at once. */
     public void onSkinSelected(SkinEntry entry) {
-        parentScreen.onSkinSelected(entry);
+        parentScreen.onSkinClicked(entry);
     }
 
     /** The square tile size of one entry. */
@@ -142,7 +141,18 @@ public class SkinListWidget extends AbstractWidget {
     }
 
     private int entryWidth() {
-        return rows ? gridWidthFor(tileSize, columns) : tileSize;
+        return rows ? viewportWidth() : tileSize;
+    }
+
+    /**
+     * Width of the area the skins are drawn in. The list's cards span the widget, which the menu
+     * widens to its header, and leave room for the scrollbar only when it is shown.
+     */
+    private int viewportWidth() {
+        if (!rows) {
+            return gridWidthFor(tileSize, columns);
+        }
+        return maxScroll() > 0 ? width - SCROLLBAR_GAP - SCROLLBAR_WIDTH : width;
     }
 
     private int entryHeight() {
@@ -167,7 +177,8 @@ public class SkinListWidget extends AbstractWidget {
         return (index / perRow()) * stride();
     }
 
-    private int contentHeight() {
+    /** Height of every row of skins, without scrolling. */
+    public int contentHeight() {
         int rowCount = (entries.size() + perRow() - 1) / perRow();
         return Math.max(0, rowCount * stride() - gap());
     }
@@ -189,11 +200,11 @@ public class SkinListWidget extends AbstractWidget {
     }
 
     private int scrollbarX() {
-        return getX() + gridWidthFor(tileSize, columns) + SCROLLBAR_GAP;
+        return getX() + width - SCROLLBAR_WIDTH;
     }
 
     private boolean isInViewport(double mouseX, double mouseY) {
-        return mouseX >= getX() && mouseX < getX() + gridWidthFor(tileSize, columns)
+        return mouseX >= getX() && mouseX < getX() + viewportWidth()
                 && mouseY >= getY() && mouseY < getY() + height;
     }
 
@@ -224,7 +235,7 @@ public class SkinListWidget extends AbstractWidget {
         hoveredEntry = null;
         boolean mouseInside = isInViewport(mouseX, mouseY) && !draggingScrollbar;
 
-        graphics.enableScissor(getX(), getY(), getX() + gridWidthFor(tileSize, columns), getY() + height);
+        graphics.enableScissor(getX(), getY(), getX() + viewportWidth(), getY() + height);
         for (int i = 0; i < entries.size(); i++) {
             int y = tileY(i);
             if (y + entryHeight() <= getY() || y >= getY() + height) {
@@ -345,10 +356,34 @@ public class SkinListWidget extends AbstractWidget {
         }
     }
 
+    /** Marks or unmarks a skin as a favorite. */
+    public void toggleFavorite(SkinEntry entry) {
+        parentScreen.toggleFavorite(entry.getMetadata());
+    }
+
     /**
-     * Request deletion confirmation for a skin
+     * Sets how tall the list is: as tall as its skins while they leave room below for the import
+     * zone, or the whole column, scrolling, once they do not.
      */
-    public void requestDeletion(SkinEntry entry) {
-        parentScreen.showDeleteConfirmation(entry.getMetadata());
+    public void setViewportHeight(int height) {
+        if (this.height != height) {
+            this.height = height;
+            setScrollAmount(scrollAmount);
+        }
+    }
+
+    /** Whether the menu is in its delete mode, where a click marks skins to delete together. */
+    public boolean isDeleteMode() {
+        return parentScreen.isDeleteMode();
+    }
+
+    /** Whether a skin is marked for deletion in the delete mode. */
+    public boolean isMarked(SkinEntry entry) {
+        return parentScreen.isMarkedForDeletion(entry.getMetadata());
+    }
+
+    /** Marks or unmarks a skin for deletion. */
+    public void toggleMarked(SkinEntry entry) {
+        parentScreen.toggleMarkedForDeletion(entry.getMetadata());
     }
 }

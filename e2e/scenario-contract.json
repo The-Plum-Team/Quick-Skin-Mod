@@ -1678,7 +1678,7 @@
               "capture": {
                 "title": "Skin menu",
                 "review_tier": "key",
-                "expectation": "The Quick Skin skin menu is open without a panel: a column of skin face tiles under a Skins counter with a sort button and a dashed + import tile on the left, the player-name search field with a flat search button at the top centre, a row of four link icons (Modrinth, CurseForge, Discord, settings) at the top right, the large player model in the middle on a white turntable ring with the player's name above it, four square icon buttons beside the model (body width and skin websites on its left, upload to Mojang and cape on its right), a large CONFIRM button at the bottom, all over a dark, subtly starred background; there is no bright blur, radial wash or other background-compositing artifact.",
+                "expectation": "The Quick Skin skin menu is open without a panel: a column of skin face tiles under a Skins counter with a sort button and, under them, the import zone (corner marks, a tray icon and Drop skin files here / or click to import) on the left, the player-name search field with a flat search button at the top centre, a row of four link icons (Modrinth, CurseForge, Discord, settings) at the top right, the large player model in the middle on a white turntable ring with the player's name above it, five square icon buttons in a shallow arc beside the model, the middle one of each side standing out (body width, skin websites and a greyed-out coming-soon lock on its left, upload to Mojang and cape on its right), a large CONFIRM button at the bottom, all over a dark, subtly starred background; there is no bright blur, radial wash or other background-compositing artifact.",
                 "probes": [
                   {
                     "kind": "opaque-stars-background",
@@ -1820,7 +1820,7 @@
               "capture": {
                 "title": "Own skin deletion refused",
                 "review_tier": "all",
-                "expectation": "A red error toast reading Cannot delete your own skin! is visible over the skin menu while the protected purple own-skin tile remains in the skin column.",
+                "expectation": "An error toast with a red strip and cross icon, reading Cannot delete your own skin!, is visible in the bottom-right corner of the skin menu while the protected purple own-skin tile remains in the skin column.",
                 "probes": []
               },
               "requires": [
@@ -1841,7 +1841,7 @@
               "capture": {
                 "title": "External skin deleted",
                 "review_tier": "key",
-                "expectation": "After the real delete confirmation, the renamed external skin's tile is gone; the skin column shows only the protected purple own-skin tile, with the dashed + import tile at the bottom of the column.",
+                "expectation": "After the real delete confirmation, the renamed external skin's tile is gone; the skin column shows only the protected purple own-skin tile, with the import zone filling the column below it.",
                 "probes": []
               },
               "requires": [
@@ -4602,7 +4602,7 @@
               "capture": {
                 "title": "Skin menu opened through its key binding",
                 "review_tier": "key",
-                "expectation": "The registered key opens the settled skin menu: its skin column holds only the dashed + import tile, its search field and floating buttons are visible, and its large centred player model wears the UUID-selected vanilla default skin.",
+                "expectation": "The registered key opens the settled skin menu: its skin column holds only the import zone with its tray icon and drop text, its search field and floating buttons are visible, and its large centred player model wears the UUID-selected vanilla default skin.",
                 "probes": []
               }
             },
@@ -4623,7 +4623,7 @@
               "capture": {
                 "title": "Skin menu opened through the vanilla-menu button",
                 "review_tier": "key",
-                "expectation": "The injected Quick Skin button opens the settled skin menu: its skin column holds only the dashed + import tile, its search field and floating buttons are visible, and its large centred player model wears the UUID-selected vanilla default skin. That the vanilla title screen stays the menu's parent is proven by the runtime evidence.",
+                "expectation": "The injected Quick Skin button opens the settled skin menu: its skin column holds only the import zone with its tray icon and drop text, its search field and floating buttons are visible, and its large centred player model wears the UUID-selected vanilla default skin. That the vanilla title screen stays the menu's parent is proven by the runtime evidence.",
                 "probes": []
               }
             },

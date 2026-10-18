@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "高清膚站",
   "quickskin.button.skin_website": "膚站",
   "quickskin.button.cape": "披風",
+  "quickskin.button.coming_soon": "將至",
   "quickskin.button.settings": "設定",
   "quickskin.button.discord": "入 Discord 社！",
   "quickskin.button.curseforge": "往 CurseForge",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "序：%s",
   "quickskin.tooltip.view_list": "列而觀之",
   "quickskin.tooltip.view_grid": "格而觀之",
+  "quickskin.tooltip.delete_mode": "擇膚以刪",
+  "quickskin.button.delete_count": "刪（%s）",
   "quickskin.screen.delete_many.title": "刪眾膚乎？",
   "quickskin.dialog.confirm_delete_many": "誠欲刪%s膚乎？",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== 投擲區 ===",
   "quickskin.dropzone.skins.main": "投膚檔於此",
   "quickskin.dropzone.skins.sub": "或點入膚",
+  "quickskin.dropzone.skins.click": "或擊以入之",
   "quickskin.dropzone.capes.main": "投披風檔於此",
   "quickskin.dropzone.capes.sub": "或點入披風",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "標準型",
   "quickskin.preview.model.slim": "纖細型",
   "quickskin.preview.rotate": "旋觀",
+  "quickskin.preview.pose": "姿：%s",
+  "quickskin.preview.pose.idle": "立",
+  "quickskin.preview.pose.walk": "行",
+  "quickskin.preview.pose.sit": "坐",
   "quickskin.preview.narration": "玩家觀",
 
   "_comment_cooldown": "=== 冷卻訊 ===",

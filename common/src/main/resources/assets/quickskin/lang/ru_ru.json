@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "Сайт HD-скинов",
   "quickskin.button.skin_website": "Сайт скинов",
   "quickskin.button.cape": "Плащ",
+  "quickskin.button.coming_soon": "Скоро",
   "quickskin.button.settings": "Настройки",
   "quickskin.button.discord": "Присоединяйся к нашему Discord!",
   "quickskin.button.curseforge": "Посети нашу страницу на CurseForge",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Сортировка: %s",
   "quickskin.tooltip.view_list": "Показать списком",
   "quickskin.tooltip.view_grid": "Показать сеткой",
+  "quickskin.tooltip.delete_mode": "Выбрать скины для удаления",
+  "quickskin.button.delete_count": "Удалить (%s)",
   "quickskin.screen.delete_many.title": "Удалить скины?",
   "quickskin.dialog.confirm_delete_many": "Удалить скины (%s)?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Перетащите файлы скинов сюда",
   "quickskin.dropzone.skins.sub": "или нажмите 'Импортировать скин'",
+  "quickskin.dropzone.skins.click": "или нажмите, чтобы импортировать",
   "quickskin.dropzone.capes.main": "Перетащите файлы плащей сюда",
   "quickskin.dropzone.capes.sub": "или нажмите 'Импортировать плащ'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Широкая",
   "quickskin.preview.model.slim": "Тонкая",
   "quickskin.preview.rotate": "Повернуть предпросмотр",
+  "quickskin.preview.pose": "Поза: %s",
+  "quickskin.preview.pose.idle": "Стоя",
+  "quickskin.preview.pose.walk": "Ходьба",
+  "quickskin.preview.pose.sit": "Сидя",
   "quickskin.preview.narration": "Предпросмотр игрока",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

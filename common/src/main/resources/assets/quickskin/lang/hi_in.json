@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "HD स्किन वेबसाइट",
   "quickskin.button.skin_website": "स्किन वेबसाइट",
   "quickskin.button.cape": "केप",
+  "quickskin.button.coming_soon": "जल्द आ रहा है",
   "quickskin.button.settings": "सेटिंग्स",
   "quickskin.button.discord": "हमारे Discord में शामिल हों!",
   "quickskin.button.curseforge": "हमारे CurseForge पेज पर जाएं",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "क्रमबद्ध: %s",
   "quickskin.tooltip.view_list": "सूची के रूप में दिखाएँ",
   "quickskin.tooltip.view_grid": "ग्रिड के रूप में दिखाएँ",
+  "quickskin.tooltip.delete_mode": "डिलीट करने के लिए स्किन चुनें",
+  "quickskin.button.delete_count": "डिलीट करें (%s)",
   "quickskin.screen.delete_many.title": "स्किन डिलीट करें?",
   "quickskin.dialog.confirm_delete_many": "क्या आप वाकई %s स्किन डिलीट करना चाहते हैं?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "स्किन फ़ाइलें यहां ड्रॉप करें",
   "quickskin.dropzone.skins.sub": "या 'स्किन इम्पोर्ट करें' पर क्लिक करें",
+  "quickskin.dropzone.skins.click": "या आयात करने के लिए क्लिक करें",
   "quickskin.dropzone.capes.main": "केप फ़ाइलें यहां ड्रॉप करें",
   "quickskin.dropzone.capes.sub": "या 'केप इम्पोर्ट करें' पर क्लिक करें",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "चौड़ा",
   "quickskin.preview.model.slim": "पतला",
   "quickskin.preview.rotate": "पूर्वावलोकन घुमाएं",
+  "quickskin.preview.pose": "मुद्रा: %s",
+  "quickskin.preview.pose.idle": "खड़ा",
+  "quickskin.preview.pose.walk": "चलना",
+  "quickskin.preview.pose.sit": "बैठा",
   "quickskin.preview.narration": "खिलाड़ी पूर्वावलोकन",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

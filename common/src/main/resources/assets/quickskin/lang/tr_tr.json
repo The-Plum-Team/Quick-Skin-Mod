@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "HD Skin Web Sitesi",
   "quickskin.button.skin_website": "Skin Web Sitesi",
   "quickskin.button.cape": "Pelerin",
+  "quickskin.button.coming_soon": "Yakında",
   "quickskin.button.settings": "Ayarlar",
   "quickskin.button.discord": "Discord'umuza Katıl!",
   "quickskin.button.curseforge": "CurseForge sayfamızı ziyaret et",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Sıralama: %s",
   "quickskin.tooltip.view_list": "Liste olarak göster",
   "quickskin.tooltip.view_grid": "Izgara olarak göster",
+  "quickskin.tooltip.delete_mode": "Silinecek skinleri seç",
+  "quickskin.button.delete_count": "Sil (%s)",
   "quickskin.screen.delete_many.title": "Skinler Silinsin mi?",
   "quickskin.dialog.confirm_delete_many": "%s skini silmek istediğinden emin misin?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Skin dosyalarını buraya sürükle",
   "quickskin.dropzone.skins.sub": "veya 'Skin İçe Aktar'a tıkla",
+  "quickskin.dropzone.skins.click": "veya içe aktarmak için tıkla",
   "quickskin.dropzone.capes.main": "Pelerin dosyalarını buraya sürükle",
   "quickskin.dropzone.capes.sub": "veya 'Pelerin İçe Aktar'a tıkla",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Geniş",
   "quickskin.preview.model.slim": "İnce",
   "quickskin.preview.rotate": "Önizlemeyi Döndür",
+  "quickskin.preview.pose": "Poz: %s",
+  "quickskin.preview.pose.idle": "Ayakta",
+  "quickskin.preview.pose.walk": "Yürüme",
+  "quickskin.preview.pose.sit": "Oturma",
   "quickskin.preview.narration": "Oyuncu önizlemesi",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

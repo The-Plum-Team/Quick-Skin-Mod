@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "HD-skinwebsite",
   "quickskin.button.skin_website": "Skinwebsite",
   "quickskin.button.cape": "Cape",
+  "quickskin.button.coming_soon": "Binnenkort",
   "quickskin.button.settings": "Instellingen",
   "quickskin.button.discord": "Word lid van onze Discord!",
   "quickskin.button.curseforge": "Bezoek onze CurseForge-pagina",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Sortering: %s",
   "quickskin.tooltip.view_list": "Als lijst tonen",
   "quickskin.tooltip.view_grid": "Als raster tonen",
+  "quickskin.tooltip.delete_mode": "Kies skins om te verwijderen",
+  "quickskin.button.delete_count": "Verwijderen (%s)",
   "quickskin.screen.delete_many.title": "Skins verwijderen?",
   "quickskin.dialog.confirm_delete_many": "Weet je zeker dat je %s skins wilt verwijderen?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Sleep skinbestanden hier naartoe",
   "quickskin.dropzone.skins.sub": "of klik op 'Skin importeren'",
+  "quickskin.dropzone.skins.click": "of klik om te importeren",
   "quickskin.dropzone.capes.main": "Sleep capebestanden hier naartoe",
   "quickskin.dropzone.capes.sub": "of klik op 'Cape importeren'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Breed",
   "quickskin.preview.model.slim": "Slank",
   "quickskin.preview.rotate": "Voorbeeld draaien",
+  "quickskin.preview.pose": "Houding: %s",
+  "quickskin.preview.pose.idle": "Staan",
+  "quickskin.preview.pose.walk": "Lopen",
+  "quickskin.preview.pose.sit": "Zitten",
   "quickskin.preview.narration": "Spelervoorbeeld",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

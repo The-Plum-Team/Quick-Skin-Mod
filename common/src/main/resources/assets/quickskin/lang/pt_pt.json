@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "Site de Peles HD",
   "quickskin.button.skin_website": "Site de Peles",
   "quickskin.button.cape": "Capa",
+  "quickskin.button.coming_soon": "Brevemente",
   "quickskin.button.settings": "Definições",
   "quickskin.button.discord": "Junta-te ao nosso Discord!",
   "quickskin.button.curseforge": "Visita a nossa página no CurseForge",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Ordenação: %s",
   "quickskin.tooltip.view_list": "Mostrar em lista",
   "quickskin.tooltip.view_grid": "Mostrar em grelha",
+  "quickskin.tooltip.delete_mode": "Selecionar peles para eliminar",
+  "quickskin.button.delete_count": "Eliminar (%s)",
   "quickskin.screen.delete_many.title": "Eliminar Peles?",
   "quickskin.dialog.confirm_delete_many": "Tens a certeza de que queres eliminar %s peles?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Arrasta ficheiros de pele aqui",
   "quickskin.dropzone.skins.sub": "ou clica em 'Importar Pele'",
+  "quickskin.dropzone.skins.click": "ou clica para importar",
   "quickskin.dropzone.capes.main": "Arrasta ficheiros de capa aqui",
   "quickskin.dropzone.capes.sub": "ou clica em 'Importar Capa'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Largo",
   "quickskin.preview.model.slim": "Magro",
   "quickskin.preview.rotate": "Rodar Pré-visualização",
+  "quickskin.preview.pose": "Pose: %s",
+  "quickskin.preview.pose.idle": "Parado",
+  "quickskin.preview.pose.walk": "A andar",
+  "quickskin.preview.pose.sit": "Sentado",
   "quickskin.preview.narration": "Pré-visualização do jogador",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

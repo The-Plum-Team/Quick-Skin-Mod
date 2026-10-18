@@ -120,6 +120,19 @@ public class SkinListPanel extends AbstractWidget {
         }
     }
 
+    /** Scrolls the list to show a skin's entry, without selecting it. */
+    public void reveal(String hash) {
+        if (skinListWidget == null) {
+            return;
+        }
+        for (SkinEntry entry : skinListWidget.children()) {
+            if (entry.getMetadata().hash().equals(hash)) {
+                skinListWidget.makeVisible(entry);
+                return;
+            }
+        }
+    }
+
     /**
      * Get the skin list widget
      */

@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "เว็บไซต์สกิน HD",
   "quickskin.button.skin_website": "เว็บไซต์สกิน",
   "quickskin.button.cape": "ผ้าคลุม",
+  "quickskin.button.coming_soon": "เร็ว ๆ นี้",
   "quickskin.button.settings": "การตั้งค่า",
   "quickskin.button.discord": "เข้าร่วม Discord ของเรา!",
   "quickskin.button.curseforge": "เยี่ยมชมหน้า CurseForge ของเรา",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "การเรียงลำดับ: %s",
   "quickskin.tooltip.view_list": "แสดงเป็นรายการ",
   "quickskin.tooltip.view_grid": "แสดงเป็นตาราง",
+  "quickskin.tooltip.delete_mode": "เลือกสกินที่จะลบ",
+  "quickskin.button.delete_count": "ลบ (%s)",
   "quickskin.screen.delete_many.title": "ลบสกิน?",
   "quickskin.dialog.confirm_delete_many": "แน่ใจหรือไม่ว่าต้องการลบสกิน %s รายการ?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "วางไฟล์สกินที่นี่",
   "quickskin.dropzone.skins.sub": "หรือคลิก 'นำเข้าสกิน'",
+  "quickskin.dropzone.skins.click": "หรือคลิกเพื่อนำเข้า",
   "quickskin.dropzone.capes.main": "วางไฟล์ผ้าคลุมที่นี่",
   "quickskin.dropzone.capes.sub": "หรือคลิก 'นำเข้าผ้าคลุม'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "กว้าง",
   "quickskin.preview.model.slim": "ผอม",
   "quickskin.preview.rotate": "หมุนตัวอย่าง",
+  "quickskin.preview.pose": "ท่าทาง: %s",
+  "quickskin.preview.pose.idle": "ยืน",
+  "quickskin.preview.pose.walk": "เดิน",
+  "quickskin.preview.pose.sit": "นั่ง",
   "quickskin.preview.narration": "ตัวอย่างผู้เล่น",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "Website Skin HD",
   "quickskin.button.skin_website": "Website Skin",
   "quickskin.button.cape": "Áo choàng",
+  "quickskin.button.coming_soon": "Sắp ra mắt",
   "quickskin.button.settings": "Cài đặt",
   "quickskin.button.discord": "Tham gia Discord của chúng tôi!",
   "quickskin.button.curseforge": "Truy cập trang CurseForge của chúng tôi",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Sắp xếp: %s",
   "quickskin.tooltip.view_list": "Xem dạng danh sách",
   "quickskin.tooltip.view_grid": "Xem dạng lưới",
+  "quickskin.tooltip.delete_mode": "Chọn skin để xóa",
+  "quickskin.button.delete_count": "Xóa (%s)",
   "quickskin.screen.delete_many.title": "Xóa Skin?",
   "quickskin.dialog.confirm_delete_many": "Bạn có chắc muốn xóa %s skin?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Thả tệp skin vào đây",
   "quickskin.dropzone.skins.sub": "hoặc nhấp 'Nhập Skin'",
+  "quickskin.dropzone.skins.click": "hoặc nhấp để nhập",
   "quickskin.dropzone.capes.main": "Thả tệp áo choàng vào đây",
   "quickskin.dropzone.capes.sub": "hoặc nhấp 'Nhập Áo choàng'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Rộng",
   "quickskin.preview.model.slim": "Mảnh",
   "quickskin.preview.rotate": "Xoay xem trước",
+  "quickskin.preview.pose": "Tư thế: %s",
+  "quickskin.preview.pose.idle": "Đứng",
+  "quickskin.preview.pose.walk": "Đi bộ",
+  "quickskin.preview.pose.sit": "Ngồi",
   "quickskin.preview.narration": "Xem trước người chơi",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

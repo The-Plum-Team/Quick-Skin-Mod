@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "高畫質皮膚網站",
   "quickskin.button.skin_website": "皮膚網站",
   "quickskin.button.cape": "披風",
+  "quickskin.button.coming_soon": "即將推出",
   "quickskin.button.settings": "設定",
   "quickskin.button.discord": "加入 Discord 社群！",
   "quickskin.button.curseforge": "前往 CurseForge",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "排序：%s",
   "quickskin.tooltip.view_list": "以清單顯示",
   "quickskin.tooltip.view_grid": "以網格顯示",
+  "quickskin.tooltip.delete_mode": "選擇要刪除的皮膚",
+  "quickskin.button.delete_count": "刪除 (%s)",
   "quickskin.screen.delete_many.title": "刪除皮膚？",
   "quickskin.dialog.confirm_delete_many": "確定要刪除 %s 個皮膚嗎？",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== 拖放區域 ===",
   "quickskin.dropzone.skins.main": "將皮膚檔案拖放至此",
   "quickskin.dropzone.skins.sub": "或點選匯入皮膚",
+  "quickskin.dropzone.skins.click": "或點擊以匯入",
   "quickskin.dropzone.capes.main": "將披風檔案拖放至此",
   "quickskin.dropzone.capes.sub": "或點選匯入披風",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "標準型",
   "quickskin.preview.model.slim": "纖細型",
   "quickskin.preview.rotate": "旋轉預覽",
+  "quickskin.preview.pose": "姿勢：%s",
+  "quickskin.preview.pose.idle": "站立",
+  "quickskin.preview.pose.walk": "行走",
+  "quickskin.preview.pose.sit": "坐下",
   "quickskin.preview.narration": "玩家預覽",
 
   "_comment_cooldown": "=== 冷卻訊息 ===",

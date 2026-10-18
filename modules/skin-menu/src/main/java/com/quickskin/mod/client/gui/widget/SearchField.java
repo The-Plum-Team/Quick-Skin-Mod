@@ -10,6 +10,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 //?}
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A text field in the style of {@link ConfirmButton}: a dark well sunk into the same black outline
@@ -20,8 +21,8 @@ import net.minecraft.network.chat.Component;
  * <p>The field is a borderless {@link EditBox} covering the text area, which lies inside the well's
  * padding; this widget draws the well around it and moves the text, which a borderless field draws
  * along its top edge, down to the well's middle. Clicks inside the text area place the cursor as
- * vanilla does, since the text still starts at the widget's left edge. {@link FieldIconButton} and
- * {@link FieldLinkButton} draw the same well, so a button beside the field looks part of it.
+ * vanilla does, since the text still starts at the widget's left edge. {@link FieldLinkButton}
+ * draws the same well, so a link beside the field looks part of it.
  */
 @Environment(EnvType.CLIENT)
 public class SearchField extends EditBox {
@@ -44,10 +45,42 @@ public class SearchField extends EditBox {
     /** Height of a line of Minecraft's font. */
     private static final int LINE_HEIGHT = 8;
 
+    private final Font font;
+    /** The grey hint after the text, before it is cut to the room left in the field. */
+    @Nullable
+    private String fullSuggestion;
+
     /** A field whose well fills the given rectangle. */
     public SearchField(Font font, int x, int y, int width, int height, Component narration) {
         super(font, x + TEXT_PADDING, y, width - 2 * TEXT_PADDING, height, narration);
+        this.font = font;
         setBordered(false);
+    }
+
+    /**
+     * The grey hint after the text. Minecraft draws it uncut, past the field's edge in a narrow
+     * window, so it is cut with an ellipsis to the room the text leaves, each time it is drawn.
+     */
+    @Override
+    public void setSuggestion(@Nullable String suggestion) {
+        this.fullSuggestion = suggestion;
+        super.setSuggestion(suggestion);
+    }
+
+    @Nullable
+    private String fittedSuggestion() {
+        if (fullSuggestion == null || fullSuggestion.isEmpty()) {
+            return fullSuggestion;
+        }
+        int room = this.width - this.font.width(getValue()) - 2;
+        if (this.font.width(fullSuggestion) <= room) {
+            return fullSuggestion;
+        }
+        int ellipsis = this.font.width("...");
+        if (room <= ellipsis) {
+            return "";
+        }
+        return this.font.plainSubstrByWidth(fullSuggestion, room - ellipsis) + "...";
     }
 
     @Override
@@ -67,6 +100,7 @@ public class SearchField extends EditBox {
         int border = isFocused() ? BORDER_FOCUSED : hovered ? BORDER_HOVER : BORDER;
 
         drawWell(graphics, left, top, right, bottom, border, WELL);
+        super.setSuggestion(fittedSuggestion());
 
         // The text in the middle of the well below its shade
         int shift = (this.height - LINE_HEIGHT) / 2 + 1;

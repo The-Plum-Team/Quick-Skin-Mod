@@ -197,7 +197,7 @@ public final class SkinBustRasterizer {
     }
 
     /** Source-over compositing of non-premultiplied ARGB pixels. */
-    static int over(int src, int dst) {
+    public static int over(int src, int dst) {
         int sa = src >>> 24;
         if (sa == 255) {
             return src;

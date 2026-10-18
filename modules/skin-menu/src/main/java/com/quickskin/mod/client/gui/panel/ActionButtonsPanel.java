@@ -19,7 +19,7 @@ import net.minecraft.network.chat.Component;
  *
  * <p>Body width and Upload to Mojang sit at shoulder height, Skin websites and Cape at the waist,
  * left and right of the model, as square icon buttons in Confirm's style at the inner end of their
- * rows. Skin websites opens a bubble to its left, pointing at it, with a Normal and an HD button
+ * rows; the left ones open their tooltips to the left, away from the model. Skin websites opens a bubble to its left, pointing at it, with a Normal and an HD button
  * stacked inside, and stays highlighted while the bubble is open. This panel draws nothing; it only
  * places the buttons.
  */
@@ -40,7 +40,15 @@ public class ActionButtonsPanel extends AbstractWidget {
     /** Gap between the bubble's pointer and the button it points at. */
     private static final int POINTER_GAP = 1;
     /** The middle row of an icon button's face, above its lip, where the bubble points. */
-    private static final int ICON_FACE_MIDDLE = 10;
+    private static final int ICON_FACE_MIDDLE = 11;
+    /**
+     * How far the middle button of each side stands out from the model, so the columns curve
+     * around it in a shallow arc instead of standing as straight rows; less where the column has
+     * no room for it.
+     */
+    public static final int ARC_BULGE = 10;
+    /** The website bubble stays at least this far from the screen's left edge. */
+    private static final int BUBBLE_SCREEN_MARGIN = 2;
 
     private IconButton bodyWidthButton;
     private IconButton websitesButton;
@@ -49,6 +57,7 @@ public class ActionButtonsPanel extends AbstractWidget {
     private Button hdWebsiteButton;
     private IconButton capeButton;
     private IconButton uploadButton;
+    private IconButton comingSoonButton;
     private Button confirmButton;
     private boolean websitesOpen;
 
@@ -65,11 +74,11 @@ public class ActionButtonsPanel extends AbstractWidget {
     ) {}
 
     /**
-     * Where the buttons go: the left and right column x, the shoulder and waist rows and the
-     * floating buttons' width, then Confirm's top-left corner and size. Confirm is larger than the
-     * other buttons: it is the menu's main action.
+     * Where the buttons go: the left and right column x, their three rows and the floating
+     * buttons' width, then Confirm's top-left corner and size. Confirm is larger than the other
+     * buttons: it is the menu's main action.
      */
-    public record Layout(int leftX, int rightX, int shoulderY, int waistY, int buttonWidth,
+    public record Layout(int leftX, int rightX, int shoulderY, int waistY, int bottomY, int buttonWidth,
                          int confirmX, int confirmY, int confirmWidth, int confirmHeight) {}
 
     public ActionButtonsPanel(Layout layout) {
@@ -83,6 +92,12 @@ public class ActionButtonsPanel extends AbstractWidget {
     public void init(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen, Layout layout,
                      ActionCallbacks callbacks) {
         int iconX = layout.leftX() + layout.buttonWidth() - ICON_BUTTON_SIZE;
+        // The middle row stands out as far on both sides. The website bubble opens beside the
+        // left one and may then cover the skin column's edge; it only has to stay on screen
+        int leftBulge = Math.max(0, Math.min(ARC_BULGE,
+                iconX - minimumButtonWidth(screen.getFont()) + ICON_BUTTON_SIZE - BUBBLE_SCREEN_MARGIN));
+        int rightBulge = rightBulge(layout);
+        int websitesX = iconX - leftBulge;
         bodyWidthButton = new IconButton(
             iconX, layout.shoulderY(), ICON_BUTTON_SIZE, "body_wide", Component.empty(),
             button -> callbacks.onBodyWidth().run()
@@ -98,11 +113,11 @@ public class ActionButtonsPanel extends AbstractWidget {
         screen.registerWidget(uploadButton);
 
         websitesButton = new IconButton(
-            iconX, layout.waistY(), ICON_BUTTON_SIZE, "skin_websites",
+            websitesX, layout.waistY(), ICON_BUTTON_SIZE, "skin_websites",
             Component.translatable("quickskin.button.skin_websites"),
             button -> setWebsitesOpen(!websitesOpen)
         );
-        websitesButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.skin_websites")));
+        websitesButton.setTooltipOnLeft(Component.translatable("quickskin.button.skin_websites"));
         screen.registerWidget(websitesButton);
 
         // The bubble is registered first, so that its choices are drawn over it
@@ -111,7 +126,7 @@ public class ActionButtonsPanel extends AbstractWidget {
         int bubbleWidth = bubbleWidth(choiceWidth);
         int bubbleHeight = 2 * choiceHeight + SPACING + 2 * BUBBLE_PADDING;
         int pointerY = layout.waistY() + ICON_FACE_MIDDLE;
-        int bubbleX = iconX - POINTER_GAP - bubbleWidth;
+        int bubbleX = websitesX - POINTER_GAP - bubbleWidth;
         int bubbleY = pointerY - bubbleHeight / 2 + 1;
         websitesBubble = new ChoiceBubble(bubbleX, bubbleY, bubbleWidth, bubbleHeight, pointerY);
         screen.registerWidget(websitesBubble);
@@ -141,12 +156,22 @@ public class ActionButtonsPanel extends AbstractWidget {
         screen.registerWidget(hdWebsiteButton);
 
         capeButton = new IconButton(
-            layout.rightX(), layout.waistY(), ICON_BUTTON_SIZE, "cape",
+            layout.rightX() + rightBulge, layout.waistY(), ICON_BUTTON_SIZE, "cape",
             Component.translatable("quickskin.button.cape"),
             button -> callbacks.onCape().run()
         );
         capeButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.cape")));
         screen.registerWidget(capeButton);
+
+        // A feature still to come: greyed out, it only names itself
+        comingSoonButton = new IconButton(
+            iconX, layout.bottomY(), ICON_BUTTON_SIZE, "coming_soon",
+            Component.translatable("quickskin.button.coming_soon"),
+            button -> { }
+        );
+        comingSoonButton.active = false;
+        comingSoonButton.setTooltipOnLeft(Component.translatable("quickskin.button.coming_soon"));
+        screen.registerWidget(comingSoonButton);
 
         confirmButton = new ConfirmButton(
             layout.confirmX(), layout.confirmY(), layout.confirmWidth(), layout.confirmHeight(),
@@ -168,6 +193,25 @@ public class ActionButtonsPanel extends AbstractWidget {
         hdWebsiteButton.active = open;
     }
 
+    /**
+     * The left column's tooltips, which open to the left so they never cover the model; Skin
+     * websites shows none while its bubble is open beside it.
+     */
+    //? if <26.1 {
+    public void renderLeftTooltips(GuiGraphics graphics, net.minecraft.client.gui.Font font, int mouseX, int mouseY) {
+    //?} else {
+    public void renderLeftTooltips(GuiGraphicsExtractor graphics, net.minecraft.client.gui.Font font, int mouseX, int mouseY) {
+    //?}
+        if (bodyWidthButton == null) {
+            return;
+        }
+        bodyWidthButton.renderTooltipOnLeft(graphics, font, mouseX, mouseY);
+        if (!websitesOpen) {
+            websitesButton.renderTooltipOnLeft(graphics, font, mouseX, mouseY);
+        }
+        comingSoonButton.renderTooltipOnLeft(graphics, font, mouseX, mouseY);
+    }
+
     /** Whether the previewed skin can be uploaded to the player's Mojang account. */
     public void setUploadAvailable(boolean available) {
         if (uploadButton != null) {
@@ -186,15 +230,20 @@ public class ActionButtonsPanel extends AbstractWidget {
         Component name = Component.translatable("quickskin.menu.body_width", modelName);
         bodyWidthButton.setIcon(slim ? "body_slim" : "body_wide");
         bodyWidthButton.setMessage(name);
-        bodyWidthButton.setTooltip(Tooltip.create(name.copy().append("\n")
-                .append(Component.translatable("quickskin.tooltip.body_width"))));
+        bodyWidthButton.setTooltipOnLeft(name.copy().append("\n")
+                .append(Component.translatable("quickskin.tooltip.body_width")));
         bodyWidthButton.active = selectable;
     }
 
     /** Every button this panel places, for keeping the model from taking their clicks. */
     public java.util.List<Button> buttons() {
         return java.util.List.of(bodyWidthButton, uploadButton, websitesButton,
-                normalWebsiteButton, hdWebsiteButton, capeButton, confirmButton);
+                normalWebsiteButton, hdWebsiteButton, capeButton, comingSoonButton, confirmButton);
+    }
+
+    /** How far the right column's middle button stands out, within the room its column has. */
+    public static int rightBulge(Layout layout) {
+        return Math.max(0, Math.min(ARC_BULGE, layout.buttonWidth() - ICON_BUTTON_SIZE));
     }
 
     /** The narrowest column that holds an icon button with the website bubble beside it. */

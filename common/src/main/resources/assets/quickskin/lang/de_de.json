@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "HD-Skin-Website",
   "quickskin.button.skin_website": "Skin-Website",
   "quickskin.button.cape": "Umhang",
+  "quickskin.button.coming_soon": "Demnächst",
   "quickskin.button.settings": "Einstellungen",
   "quickskin.button.discord": "Tritt unserem Discord bei!",
   "quickskin.button.curseforge": "Besuche unsere CurseForge-Seite",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Sortierung: %s",
   "quickskin.tooltip.view_list": "Als Liste anzeigen",
   "quickskin.tooltip.view_grid": "Als Raster anzeigen",
+  "quickskin.tooltip.delete_mode": "Skins zum Löschen auswählen",
+  "quickskin.button.delete_count": "Löschen (%s)",
   "quickskin.screen.delete_many.title": "Skins löschen?",
   "quickskin.dialog.confirm_delete_many": "Möchtest du wirklich %s Skins löschen?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Skin-Dateien hier ablegen",
   "quickskin.dropzone.skins.sub": "oder auf 'Skin importieren' klicken",
+  "quickskin.dropzone.skins.click": "oder klicke zum Importieren",
   "quickskin.dropzone.capes.main": "Umhang-Dateien hier ablegen",
   "quickskin.dropzone.capes.sub": "oder auf 'Umhang importieren' klicken",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Breit",
   "quickskin.preview.model.slim": "Schlank",
   "quickskin.preview.rotate": "Vorschau drehen",
+  "quickskin.preview.pose": "Pose: %s",
+  "quickskin.preview.pose.idle": "Stehen",
+  "quickskin.preview.pose.walk": "Gehen",
+  "quickskin.preview.pose.sit": "Sitzen",
   "quickskin.preview.narration": "Spielervorschau",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

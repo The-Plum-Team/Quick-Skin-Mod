@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "HD-skinwebbplats",
   "quickskin.button.skin_website": "Skinwebbplats",
   "quickskin.button.cape": "Mantel",
+  "quickskin.button.coming_soon": "Kommer snart",
   "quickskin.button.settings": "Inställningar",
   "quickskin.button.discord": "Gå med i vår Discord!",
   "quickskin.button.curseforge": "Besök vår CurseForge-sida",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Sortering: %s",
   "quickskin.tooltip.view_list": "Visa som lista",
   "quickskin.tooltip.view_grid": "Visa som rutnät",
+  "quickskin.tooltip.delete_mode": "Välj skins att ta bort",
+  "quickskin.button.delete_count": "Ta bort (%s)",
   "quickskin.screen.delete_many.title": "Ta bort skins?",
   "quickskin.dialog.confirm_delete_many": "Vill du verkligen ta bort %s skins?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Släpp skinfiler här",
   "quickskin.dropzone.skins.sub": "eller klicka på 'Importera skin'",
+  "quickskin.dropzone.skins.click": "eller klicka för att importera",
   "quickskin.dropzone.capes.main": "Släpp mantelfiler här",
   "quickskin.dropzone.capes.sub": "eller klicka på 'Importera mantel'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Bred",
   "quickskin.preview.model.slim": "Smal",
   "quickskin.preview.rotate": "Rotera förhandsgranskning",
+  "quickskin.preview.pose": "Pose: %s",
+  "quickskin.preview.pose.idle": "Stå",
+  "quickskin.preview.pose.walk": "Gå",
+  "quickskin.preview.pose.sit": "Sitta",
   "quickskin.preview.narration": "Spelareförhandsgranskning",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "Situs Web Skin HD",
   "quickskin.button.skin_website": "Situs Web Skin",
   "quickskin.button.cape": "Jubah",
+  "quickskin.button.coming_soon": "Segera hadir",
   "quickskin.button.settings": "Pengaturan",
   "quickskin.button.discord": "Bergabung dengan Discord kami!",
   "quickskin.button.curseforge": "Kunjungi halaman CurseForge kami",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Urutan: %s",
   "quickskin.tooltip.view_list": "Tampilkan sebagai daftar",
   "quickskin.tooltip.view_grid": "Tampilkan sebagai kisi",
+  "quickskin.tooltip.delete_mode": "Pilih skin untuk dihapus",
+  "quickskin.button.delete_count": "Hapus (%s)",
   "quickskin.screen.delete_many.title": "Hapus Skin?",
   "quickskin.dialog.confirm_delete_many": "Yakin ingin menghapus %s skin?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Letakkan file skin di sini",
   "quickskin.dropzone.skins.sub": "atau klik 'Impor Skin'",
+  "quickskin.dropzone.skins.click": "atau klik untuk mengimpor",
   "quickskin.dropzone.capes.main": "Letakkan file jubah di sini",
   "quickskin.dropzone.capes.sub": "atau klik 'Impor Jubah'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Lebar",
   "quickskin.preview.model.slim": "Ramping",
   "quickskin.preview.rotate": "Putar Pratinjau",
+  "quickskin.preview.pose": "Pose: %s",
+  "quickskin.preview.pose.idle": "Berdiri",
+  "quickskin.preview.pose.walk": "Berjalan",
+  "quickskin.preview.pose.sit": "Duduk",
   "quickskin.preview.narration": "Pratinjau pemain",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

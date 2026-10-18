@@ -682,6 +682,10 @@ public class PlayerModelRenderer {
         if (!ensureModelsLoaded()) {
             return; // The first resource reload has not filled the entity model set yet
         }
+        if (playerData.isOwnPose()) {
+            renderPlayerModelManual(graphics, x, y, scale, yRotation, playerData, mouseX, mouseY, followMouse);
+            return;
+        }
 
         // Get Minecraft instance
         Minecraft mc = Minecraft.getInstance();
@@ -1152,9 +1156,10 @@ public class PlayerModelRenderer {
         // Get buffer source
         MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
 
-        // Render grass block if sitting animation is active AND we're not in a world
-        // When in-game, animations are controlled by the game, so don't render the custom grass block
-        if ("sit".equals(playerData.getCurrentAnimation() != null ? playerData.getCurrentAnimation().toLowerCase(Locale.ROOT) : null) && mc.level == null) {
+        // Render grass block if sitting animation is active AND the pose is the preview's own
+        // When the live player is drawn, animations are controlled by the game, so don't render it
+        if ("sit".equals(playerData.getCurrentAnimation() != null ? playerData.getCurrentAnimation().toLowerCase(Locale.ROOT) : null)
+                && (mc.level == null || playerData.isOwnPose())) {
             renderGrassBlock(poseStack, bufferSource);
         }
 //?} else {

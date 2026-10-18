@@ -397,7 +397,7 @@ final class CatalogSteps {
                                 + (appearance == null ? "<none>" : appearance.getSkinId())
                                 + " resolves to " + appliedPrimary + ", expected " + plaidPrimary);
                     }
-                    // Selecting a row only previews it; the saved selection changes on Confirm alone.
+                    // A row the menu selects itself only previews it; only a click or Confirm wears it.
                     String activeBefore = activeSkinBeforeOwnSkin.get();
                     if (!java.util.Objects.equals(activeBefore, config.activeSkinHash)) {
                         return Step.Result.fail("config.activeSkinHash changed from " + activeBefore

@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "Strona skórek HD",
   "quickskin.button.skin_website": "Strona skórek",
   "quickskin.button.cape": "Peleryna",
+  "quickskin.button.coming_soon": "Wkrótce",
   "quickskin.button.settings": "Ustawienia",
   "quickskin.button.discord": "Dołącz do naszego Discorda!",
   "quickskin.button.curseforge": "Odwiedź naszą stronę CurseForge",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Sortowanie: %s",
   "quickskin.tooltip.view_list": "Pokaż jako listę",
   "quickskin.tooltip.view_grid": "Pokaż jako siatkę",
+  "quickskin.tooltip.delete_mode": "Wybierz skórki do usunięcia",
+  "quickskin.button.delete_count": "Usuń (%s)",
   "quickskin.screen.delete_many.title": "Usunąć skórki?",
   "quickskin.dialog.confirm_delete_many": "Czy na pewno chcesz usunąć skórki (%s)?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Przeciągnij pliki skórek tutaj",
   "quickskin.dropzone.skins.sub": "lub kliknij 'Importuj skórkę'",
+  "quickskin.dropzone.skins.click": "lub kliknij, aby zaimportować",
   "quickskin.dropzone.capes.main": "Przeciągnij pliki peleryn tutaj",
   "quickskin.dropzone.capes.sub": "lub kliknij 'Importuj pelerynę'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Szeroki",
   "quickskin.preview.model.slim": "Smukły",
   "quickskin.preview.rotate": "Obróć podgląd",
+  "quickskin.preview.pose": "Poza: %s",
+  "quickskin.preview.pose.idle": "Stanie",
+  "quickskin.preview.pose.walk": "Chodzenie",
+  "quickskin.preview.pose.sit": "Siedzenie",
   "quickskin.preview.narration": "Podgląd gracza",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

@@ -26,6 +26,7 @@
   "quickskin.button.hd_skin_website": "Сайт HD-скінів",
   "quickskin.button.skin_website": "Сайт скінів",
   "quickskin.button.cape": "Плащ",
+  "quickskin.button.coming_soon": "Незабаром",
   "quickskin.button.settings": "Налаштування",
   "quickskin.button.discord": "Приєднуйся до нашого Discord!",
   "quickskin.button.curseforge": "Відвідай нашу сторінку на CurseForge",
@@ -38,6 +39,8 @@
   "quickskin.tooltip.sorting": "Сортування: %s",
   "quickskin.tooltip.view_list": "Показати списком",
   "quickskin.tooltip.view_grid": "Показати сіткою",
+  "quickskin.tooltip.delete_mode": "Вибрати скіни для видалення",
+  "quickskin.button.delete_count": "Видалити (%s)",
   "quickskin.screen.delete_many.title": "Видалити скіни?",
   "quickskin.dialog.confirm_delete_many": "Видалити скіни (%s)?",
 
@@ -49,6 +52,7 @@
   "_comment_dropzone": "=== Drop Zones ===",
   "quickskin.dropzone.skins.main": "Перетягніть файли скінів сюди",
   "quickskin.dropzone.skins.sub": "або натисніть 'Імпортувати скін'",
+  "quickskin.dropzone.skins.click": "або натисніть, щоб імпортувати",
   "quickskin.dropzone.capes.main": "Перетягніть файли плащів сюди",
   "quickskin.dropzone.capes.sub": "або натисніть 'Імпортувати плащ'",
 
@@ -194,6 +198,10 @@
   "quickskin.preview.model.wide": "Широка",
   "quickskin.preview.model.slim": "Тонка",
   "quickskin.preview.rotate": "Повернути попередній перегляд",
+  "quickskin.preview.pose": "Поза: %s",
+  "quickskin.preview.pose.idle": "Стоячи",
+  "quickskin.preview.pose.walk": "Ходьба",
+  "quickskin.preview.pose.sit": "Сидячи",
   "quickskin.preview.narration": "Попередній перегляд гравця",
 
   "_comment_cooldown": "=== Cooldown Messages ===",

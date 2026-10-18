@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.quickskin.mod.client.gui.util.UiText;
 import com.mojang.blaze3d.platform.InputConstants;
 //? if <26.1 {
 //?} else {
@@ -67,7 +68,9 @@ import net.minecraft.util.Util;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 
 /**
@@ -75,7 +78,8 @@ import java.util.Locale;
  * Opens when K key is pressed
  */
 @Environment(EnvType.CLIENT)
-public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.client.gui.RestylableScreen {
+public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.client.gui.RestylableScreen,
+        MenuGuiScale.Scaled {
     @Override
     public Screen recreateForStyleChange() {
         return new PlayerSkinMenuScreen(null);
@@ -90,6 +94,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private PlayerPreviewPanel playerPreviewPanel;
     private ActionButtonsPanel actionButtonsPanel;
     private ImportTileButton importTile;
+    /** Whether the import zone fills the free space (and needs no tooltip), or is the bar. */
+    private Boolean importZoneShown;
 
     // Controls that stay above the player preview (drawn after it, clicked before it)
     private final List<AbstractWidget> foregroundControls = new ArrayList<>();
@@ -120,12 +126,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private float savedBodyYaw = 0.0f;
     private float savedTargetRotation = 0.0f;
 
-    // The look being previewed. Nothing is applied until Confirm; it survives resizes and the
-    // sub-screens that return to this instance.
+    // The look being previewed. A click on a skin wears it at once; one the menu selects itself
+    // waits for Confirm. It survives resizes and the sub-screens that return to this instance.
     @Nullable
     private String pendingHash;
     @Nullable
     private String pendingModelType;
+    // Whether a click in this visit changed the look, which a server with a cooldown allows once
+    private boolean changedThisVisit;
 
     // Whether the turntable ring has played its appearing animation for this menu
     private boolean ringIntroPlayed;
@@ -142,8 +150,13 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     // Mojang search widgets
     private EditBox usernameSearchField;
     private IconButton searchButton;
-    private Button sortButton;
-    private Button viewButton;
+    private com.quickskin.mod.client.gui.widget.PixelIconButton sortButton;
+    private com.quickskin.mod.client.gui.widget.PixelIconButton viewButton;
+    private com.quickskin.mod.client.gui.widget.PixelIconButton deleteModeButton;
+    // The delete mode: a click marks skins, and the Confirm button deletes them together. Kept on
+    // the screen so it survives resizes and the confirmation dialog returning to this instance.
+    private boolean deleteMode;
+    private final Set<String> markedForDeletion = new LinkedHashSet<>();
     private boolean isSearching = false;
     private long lastEnterKeyAt;
 
@@ -227,6 +240,21 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
         boolean singleplayer = this.minecraft != null && this.minecraft.hasSingleplayerServer();
 //?}
+        com.quickskin.mod.client.gui.widget.ConfirmButton styled =
+                confirmButton instanceof com.quickskin.mod.client.gui.widget.ConfirmButton button ? button : null;
+        if (deleteMode) {
+            // The delete mode turns Confirm into a red Delete (N) for the marked skins
+            int marked = markedForDeletion.size();
+            if (styled != null) styled.setDanger(true);
+            confirmButton.active = marked > 0;
+            confirmButton.setMessage(Component.translatable("quickskin.button.delete_count", marked));
+            confirmButton.setTooltip(null);
+            return;
+        }
+        if (styled != null && styled.isDanger()) {
+            styled.setDanger(false);
+            confirmButton.active = false; // relabelled as Confirm below
+        }
         long remainingSeconds = singleplayer ? 0 : CooldownService.getInstance().getRemainingCooldownSeconds();
         if (remainingSeconds > 0) {
             confirmButton.active = false;
@@ -276,7 +304,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         int linkRowX = this.width - MARGIN - LinkButtonsPanel.rowWidth();
 
         // Player-name search, top centre: the field centred over the model and its name tag, then a
-        // square Search button drawn flat like it. The field is as wide as both sides leave room
+        // square Search button standing flat beside it. The field is as wide as both sides leave room
         // for: the skin column on the left, the button and the link row on the right.
         int searchCenterX = this.width / 2;
         int searchHalfRoom = Math.min(searchCenterX - (MARGIN + SkinListWidget.widthFor(tileSize, skinColumns) + MARGIN),
@@ -341,12 +369,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         int headerTextWidth = Math.max(this.font.width(Component.translatable("quickskin.menu.skins")),
                 this.font.width(widestCount));
         skinColumnWidth = Math.max(SkinListWidget.widthFor(tileSize, skinColumns),
-                headerTextWidth + 4 + 2 * CONTROL_HEIGHT + HEADER_BUTTON_GAP);
-        sortButton = com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                skinColumnX + skinColumnWidth - CONTROL_HEIGHT,
+                headerTextWidth + 4 + 3 * HEADER_BUTTON_WIDTH + 2 * HEADER_BUTTON_GAP);
+        // The header's buttons are drawn like Confirm, each with a pixel icon
+        sortButton = new com.quickskin.mod.client.gui.widget.PixelIconButton(
+                skinColumnX + skinColumnWidth - HEADER_BUTTON_WIDTH,
                 skinHeaderY,
+                HEADER_BUTTON_WIDTH,
                 CONTROL_HEIGHT,
-                CONTROL_HEIGHT,
+                sortIcon(getCurrentSortMode()),
                 Component.literal(getCurrentSortMode().getIcon()),
                 button -> cycleSortMode()
         );
@@ -355,22 +385,43 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         ));
         addRenderableWidget(sortButton);
 
-        // Grid or list: the button shows the view it switches to, drawn by renderSkinHeader
-        viewButton = com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                skinColumnX + skinColumnWidth - 2 * CONTROL_HEIGHT - HEADER_BUTTON_GAP,
+        // Grid or list: the button shows the view it switches to
+        Component viewLabel = Component.translatable(listRows ? "quickskin.tooltip.view_grid" : "quickskin.tooltip.view_list");
+        viewButton = new com.quickskin.mod.client.gui.widget.PixelIconButton(
+                skinColumnX + skinColumnWidth - 2 * HEADER_BUTTON_WIDTH - HEADER_BUTTON_GAP,
                 skinHeaderY,
+                HEADER_BUTTON_WIDTH,
                 CONTROL_HEIGHT,
-                CONTROL_HEIGHT,
-                Component.empty(),
+                listRows ? VIEW_GRID_ICON : VIEW_LIST_ICON,
+                viewLabel,
                 button -> toggleListRows()
         );
-        viewButton.setTooltip(Tooltip.create(Component.translatable(
-                listRows ? "quickskin.tooltip.view_grid" : "quickskin.tooltip.view_list")));
+        viewButton.setTooltip(Tooltip.create(viewLabel));
         addRenderableWidget(viewButton);
 
-        importTile = new ImportTileButton(skinColumnX, skinListBottom + 4, SkinListWidget.gridWidthFor(tileSize, skinColumns),
+        // The delete mode, left of the view button: red while the mode is on
+        Component deleteLabel = Component.translatable("quickskin.tooltip.delete_mode");
+        deleteModeButton = new com.quickskin.mod.client.gui.widget.PixelIconButton(
+                skinColumnX + skinColumnWidth - 3 * HEADER_BUTTON_WIDTH - 2 * HEADER_BUTTON_GAP,
+                skinHeaderY,
+                HEADER_BUTTON_WIDTH,
+                CONTROL_HEIGHT,
+                DELETE_MODE_ICON,
+                deleteLabel,
+                button -> toggleDeleteMode()
+        );
+        updateDeleteModeButton();
+        addRenderableWidget(deleteModeButton);
+
+        // The list's cards and the import tile span the header, from "Skins" to the last button
+        if (listRows && skinListPanel.getSkinListWidget() != null) {
+            skinListPanel.setWidth(skinColumnWidth);
+            skinListPanel.getSkinListWidget().setWidth(skinColumnWidth);
+        }
+        int importWidth = listRows ? skinColumnWidth : SkinListWidget.gridWidthFor(tileSize, skinColumns);
+        importTile = new ImportTileButton(skinColumnX, skinListBottom + 4, importWidth,
                 CONTROL_HEIGHT, button -> openImportDialog());
-        importTile.setTooltip(Tooltip.create(Component.translatable("quickskin.tooltip.import_skin")));
+        importZoneShown = null; // a new tile: its tooltip is set on the first layout
         addRenderableWidget(importTile);
 
         // The middle of the menu is sized from the canvas, which the menu's scale keeps between
@@ -429,10 +480,15 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         int halfBody = (int) (modelScale * HALF_WIDTH_PER_SCALE);
         int leftX = Math.max(sideStart, centerX - halfBody - BUTTON_GAP - buttonWidth);
         int rightX = Math.min(sideEnd - buttonWidth, centerX + halfBody + BUTTON_GAP);
-        int shoulderY = Math.max(skinHeaderY, feetY - (int) (modelScale * 1.45f));
-        int waistY = Math.max(shoulderY + ActionButtonsPanel.ICON_BUTTON_SIZE + 4, feetY - (int) (modelScale * 0.9f));
+        // Three rows from the shoulders down, the last well clear of the turntable ring
+        int rowGap = ActionButtonsPanel.ICON_BUTTON_SIZE + 4;
+        int shoulderY = Math.max(skinHeaderY, feetY - (int) (modelScale * 1.6f));
+        int waistY = Math.max(shoulderY + rowGap, feetY - (int) (modelScale * 1.1f));
+        int bottomY = Math.min(Math.max(waistY + rowGap, feetY - (int) (modelScale * 0.6f)),
+                confirmY - ActionButtonsPanel.ICON_BUTTON_SIZE - 4);
         ActionButtonsPanel.Layout layout = new ActionButtonsPanel.Layout(
-                leftX, rightX, shoulderY, waistY, buttonWidth, confirmX, confirmY, confirmWidth, confirmHeight);
+                leftX, rightX, shoulderY, waistY, bottomY, buttonWidth,
+                confirmX, confirmY, confirmWidth, confirmHeight);
         ActionButtonsPanel.ActionCallbacks callbacks = new ActionButtonsPanel.ActionCallbacks(
                 this::cycleBodyWidth,
                 () -> openWebsite("https://laby.net/skins?order=trending_30d"),
@@ -447,7 +503,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
                     }
                 },
-                this::confirmSelection,
+                this::onConfirmPressed,
                 this::uploadPendingSkin
         );
         actionButtonsPanel = new ActionButtonsPanel(layout);
@@ -455,6 +511,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         for (Button button : actionButtonsPanel.buttons()) {
             playerPreviewPanel.addPriorityControl(button);
         }
+        // The pose button is the right column's third button
+        playerPreviewPanel.initPoseControl(this, rightX, bottomY, ActionButtonsPanel.ICON_BUTTON_SIZE, this.width);
 
         LinkButtonsPanel linkButtonsPanel = new LinkButtonsPanel(linkRowX, searchY);
         linkButtonsPanel.init(this);
@@ -700,6 +758,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         graphics.pose().pushMatrix();
 
 //?}
+        layoutImportZone();
+
         // Render widgets (buttons, etc.)
 //? if <1.21 {
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -743,6 +803,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         }
 
+        if (actionButtonsPanel != null) {
+            actionButtonsPanel.renderLeftTooltips(graphics, this.font, mouseX, mouseY);
+        }
+
         // Render error toasts (on top of everything)
         renderErrorToasts(graphics);
 //? if <1.21.6 {
@@ -752,7 +816,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /**
      * "Skins" above the skin column, and under it the selected position and the number of skins,
-     * beside the view and sort buttons, and the view button's icon.
+     * beside the delete mode, view and sort buttons.
      */
 //? if <26.1 {
     private void renderSkinHeader(GuiGraphics graphics) {
@@ -768,34 +832,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Two lines filling the sort button's height: the label, then the count a little dimmer
         int labelY = skinHeaderY + 1;
         int countY = skinHeaderY + CONTROL_HEIGHT - 8;
-//? if <26.1 {
-        graphics.drawString(this.font, label, skinColumnX, labelY, 0xFFFFFFFF);
-        graphics.drawString(this.font, count, skinColumnX, countY, 0xFFC8C8C8);
-//?} else {
-        graphics.text(this.font, label, skinColumnX, labelY, 0xFFFFFFFF);
-        graphics.text(this.font, count, skinColumnX, countY, 0xFFC8C8C8);
-//?}
-
-        // The view button's icon, white with a text-like shadow like the sort button's arrow
-        if (viewButton != null) {
-            String[] icon = com.quickskin.mod.config.ClientConfig.getInstance().skinListRows
-                    ? VIEW_GRID_ICON : VIEW_LIST_ICON;
-            int iconX = viewButton.getX() + (viewButton.getWidth() - 9) / 2;
-            int iconY = viewButton.getY() + (viewButton.getHeight() - 9) / 2;
-            for (int pass = 0; pass < 2; pass++) {
-                int offset = pass == 0 ? 1 : 0;
-                int color = pass == 0 ? 0xFF3F3F3F : viewButton.active ? 0xFFFFFFFF : 0xFFA0A0A0;
-                for (int row = 0; row < icon.length; row++) {
-                    for (int column = 0; column < icon[row].length(); column++) {
-                        if (icon[row].charAt(column) == '#') {
-                            int x = iconX + column + offset;
-                            int y = iconY + row + offset;
-                            graphics.fill(x, y, x + 1, y + 1, color);
-                        }
-                    }
-                }
-            }
-        }
+        UiText.draw(graphics, this.font, label, skinColumnX, labelY, 0xFFFFFFFF);
+        UiText.draw(graphics, this.font, count, skinColumnX, countY, 0xFFC8C8C8);
     }
 
     /** The player's name above the model, like a name tag in the world. */
@@ -920,9 +958,13 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
         int keyCode = GuiCompat.keyCode(event);
 //?}
-        // Allow ESC to close
+        // ESC leaves the delete mode, and otherwise closes the menu
         if (keyCode == InputConstants.KEY_ESCAPE) {
-            this.onClose();
+            if (deleteMode) {
+                setDeleteMode(false);
+            } else {
+                this.onClose();
+            }
             return true;
         }
         // Enter in the username field submits the search, like clicking Search. A held key
@@ -998,6 +1040,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
 //?}
+        if (playerPreviewPanel != null) {
+            playerPreviewPanel.closePoseListUnlessOver(mouseX, mouseY);
+        }
         // Handle debug positioning mode
         if (com.quickskin.mod.client.rendering.PlayerModelRenderer.handleDebugMousePressed((int)mouseX, (int)mouseY, button)) {
             return true;
@@ -1222,7 +1267,19 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     /**
-     * Called when a skin is selected from the list: previews it. Nothing is applied until Confirm.
+     * Called when the player clicks a skin in the list: previews it and wears it at once, unless
+     * the server's skin-change cooldown is running, when it is only previewed until Confirm.
+     */
+    public void onSkinClicked(SkinEntry entry) {
+        onSkinSelected(entry);
+        if (entry != null && canApplyNow() && applySelection()) {
+            changedThisVisit = true;
+        }
+    }
+
+    /**
+     * Called when the menu selects a skin itself (on opening, after an import, a rename or a
+     * delete): previews it. Nothing is applied until a click or Confirm.
      */
     public void onSkinSelected(SkinEntry entry) {
         if (playerPreviewPanel == null || entry == null) {
@@ -1268,6 +1325,29 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         pendingModelType = "slim".equals(PlayerPreviewPanel.normalizedModelType(pendingModelType)) ? "classic" : "slim";
         playerPreviewPanel.previewModelType(pendingModelType);
         updateBodyWidthButton();
+        // Like a click on a skin, the new arm width is worn at once
+        if (canApplyNow() && applySelection()) {
+            changedThisVisit = true;
+        }
+    }
+
+    /**
+     * Whether a click can wear a look now: always in singleplayer, otherwise outside the cooldown.
+     * A server with a cooldown takes one change per visit to the menu, since its cooldown only
+     * reaches the client after the server accepted that change; later clicks only preview.
+     */
+    private boolean canApplyNow() {
+//? if <26.2 {
+        boolean singleplayer = this.minecraft != null && this.minecraft.isSingleplayer();
+//?} else {
+        boolean singleplayer = this.minecraft != null && this.minecraft.hasSingleplayerServer();
+//?}
+        if (singleplayer) {
+            return true;
+        }
+        com.quickskin.mod.config.ServerConfig server = com.quickskin.mod.config.ClientConfig.getInstance().getServerOverride();
+        boolean serverHasCooldown = server != null && server.skinChangeCooldownSeconds > 0;
+        return !CooldownService.getInstance().isCooldownActive() && !(serverHasCooldown && changedThisVisit);
     }
 
     private void updateBodyWidthButton() {
@@ -1304,7 +1384,142 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
     }
 
-    /** Confirm: applies the previewed look and closes the menu. */
+    /** The Confirm button: deletes the marked skins in the delete mode, and otherwise confirms. */
+    private void onConfirmPressed() {
+        if (deleteMode) {
+            showBulkDeleteConfirmation();
+        } else {
+            confirmSelection();
+        }
+    }
+
+    /** Whether the delete mode is on. */
+    public boolean isDeleteMode() {
+        return deleteMode;
+    }
+
+    /** Whether a skin is marked for deletion. */
+    public boolean isMarkedForDeletion(AssetMetadata metadata) {
+        return markedForDeletion.contains(metadata.hash());
+    }
+
+    /** Marks or unmarks a skin for deletion; the player's own skin cannot be. */
+    public void toggleMarkedForDeletion(AssetMetadata metadata) {
+        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+        if (config.enablePlayerOwnSkinSystem && metadata.hash().equals(config.playerOwnSkinHash)) {
+            showError(Component.translatable("quickskin.error.delete_own_skin"));
+            return;
+        }
+        if (!markedForDeletion.remove(metadata.hash())) {
+            markedForDeletion.add(metadata.hash());
+        }
+        playClick();
+        updateConfirmButtonState();
+    }
+
+    private void toggleDeleteMode() {
+        setDeleteMode(!deleteMode);
+    }
+
+    /** Turns the delete mode on or off; either way no skin is left marked. */
+    private void setDeleteMode(boolean on) {
+        deleteMode = on;
+        updateDeleteModeButton();
+        markedForDeletion.clear();
+        playClick();
+        updateConfirmButtonState();
+    }
+
+    /** The delete mode's button: the bin, or while the mode is on a red button with an X to cancel it. */
+    private void updateDeleteModeButton() {
+        if (deleteModeButton == null) {
+            return;
+        }
+        deleteModeButton.setDanger(deleteMode);
+        deleteModeButton.setIcon(deleteMode ? CANCEL_DELETE_ICON : DELETE_MODE_ICON);
+        Component label = Component.translatable(deleteMode ? "quickskin.button.cancel" : "quickskin.tooltip.delete_mode");
+        deleteModeButton.setMessage(label);
+        deleteModeButton.setTooltip(Tooltip.create(label));
+    }
+
+    private void playClick() {
+        if (minecraft != null) {
+            minecraft.getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f));
+        }
+    }
+
+    /** The faces of skins for the Delete dialog; a skin whose texture is not loaded has none. */
+    private List<DeletionConfirmScreen.Preview> deletePreviews(List<AssetMetadata> skins) {
+        List<DeletionConfirmScreen.Preview> previews = new ArrayList<>();
+        for (AssetMetadata metadata : skins) {
+            DeletionConfirmScreen.Preview preview = deletePreview(metadata);
+            if (preview != null) previews.add(preview);
+        }
+        return previews;
+    }
+
+    /** A skin's face for the Delete dialog, or a CPM model's whole icon. */
+    @Nullable
+    private DeletionConfirmScreen.Preview deletePreview(AssetMetadata metadata) {
+        var texture = LocalAssetManager.getInstance().getTextureLocation(metadata.hash(), TextureQuality.PREVIEW);
+        if (texture == null) {
+            return null;
+        }
+        if (metadata.isCpmModel() || metadata.resolution() == null) {
+            return new DeletionConfirmScreen.Preview(texture, 64, 64, true);
+        }
+        return new DeletionConfirmScreen.Preview(texture,
+                metadata.resolution().getWidth(), metadata.resolution().getHeight(), false);
+    }
+
+    /** Asks before deleting every marked skin that still exists, then leaves the delete mode. */
+    private void showBulkDeleteConfirmation() {
+        if (minecraft == null) return;
+        List<AssetMetadata> skins = new ArrayList<>();
+        for (String hash : markedForDeletion) {
+            AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(hash);
+            if (metadata != null) skins.add(metadata);
+        }
+        if (skins.isEmpty()) {
+            markedForDeletion.clear();
+            return;
+        }
+        Component title = Component.translatable(skins.size() == 1
+                ? "quickskin.screen.delete.title" : "quickskin.screen.delete_many.title");
+        Component message = skins.size() == 1
+                ? Component.translatable("quickskin.dialog.confirm_delete", truncateFileName(skins.get(0).friendlyName()))
+                : Component.translatable("quickskin.dialog.confirm_delete_many", skins.size());
+//? if <26.2 {
+        minecraft.setScreen(new DeletionConfirmScreen(
+//?} else {
+        minecraft.gui.setScreen(new DeletionConfirmScreen(
+//?}
+                this,
+                title,
+                message,
+                (confirmed) -> {
+                    if (confirmed) {
+                        deleteSkins(skins);
+                        deleteMode = false;
+                        markedForDeletion.clear();
+                    }
+                    if (minecraft != null) {
+//? if <26.2 {
+                        minecraft.setScreen(this);
+//?} else {
+                        minecraft.gui.setScreen(this);
+//?}
+                    }
+                },
+                deletePreviews(skins)
+        ));
+    }
+
+    /**
+     * Confirm: applies the previewed look, when a click has not already (a searched player, or a
+     * skin chosen during the cooldown), and closes the menu.
+     */
     private void confirmSelection() {
         applySelection();
         onClose();
@@ -1313,14 +1528,16 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     /**
      * Applies the pending look exactly as choosing it in the list used to: a CPM model through CPM,
      * a skin and its arm width to the player and the saved selection.
+     *
+     * @return whether the look changed
      */
-    private void applySelection() {
+    private boolean applySelection() {
         if (pendingHash == null) {
-            return;
+            return false;
         }
         AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(pendingHash);
         if (metadata == null) {
-            return;
+            return false;
         }
 
         if (metadata.isCpmModel()) {
@@ -1333,7 +1550,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             if (!modelIsTheLook
                     && !com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
                 showError(Component.literal("Unable to select CPM model."));
-                return;
+                return false;
             }
             // The model replaces the applied Quick Skin skin. Withdraw it here and on the
             // server (the cape stays), or other players keep drawing the old skin.
@@ -1349,7 +1566,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                     appearances.applySkin(targetUUID, "", null);
                 }
             }
-            return;
+            return !modelIsTheLook;
         }
 
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
@@ -1373,7 +1590,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         if (isSkinAlreadyActive && !modelChanged) {
-            return;
+            return false;
         }
         if (!isSkinAlreadyActive) {
             com.quickskin.mod.client.compat.CpmModelWorkflow.activateSkin(metadata.hash());
@@ -1394,6 +1611,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                     .applySkin(this.minecraft.player.getUUID(), skinId, modelType);
 //?}
         }
+        return true;
     }
 
     /**
@@ -1471,6 +1689,24 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
      * Refresh the skin list after importing
      */
     /**
+     * Marks or unmarks a skin as a favorite. Favorites are listed first after the player's own
+     * skin, so the list is rebuilt; the selection stays, and the list scrolls to the skin's new place.
+     */
+    public void toggleFavorite(AssetMetadata metadata) {
+        LocalAssetManager assets = LocalAssetManager.getInstance();
+        assets.setFavorite(metadata.hash(), !assets.isFavorite(metadata.hash()));
+        if (skinListPanel == null) {
+            return;
+        }
+        SkinEntry selected = skinListPanel.getSelected();
+        refreshSkinList();
+        if (selected != null) {
+            skinListPanel.setSelected(selected.getMetadata(), false);
+        }
+        skinListPanel.reveal(metadata.hash());
+    }
+
+    /**
      * Refresh the skin list UI
      * Public so it can be called when textures are reloaded
      */
@@ -1487,15 +1723,57 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         errorToasts.add(new ErrorToast(message));
     }
 
+    /** The import zone's least height that holds its icon and text; below it, it is a bar. */
+    private static final int IMPORT_ZONE_MIN_HEIGHT = 64;
+
     /**
-     * Render error toasts
+     * The import zone fills the column under the last skin. While the skins leave at least the
+     * zone's least height free, the list is only as tall as they are and the zone takes the rest;
+     * otherwise the list fills the column, scrolling, and the zone is the bar at its bottom.
      */
+    private void layoutImportZone() {
+        if (skinListPanel == null || importTile == null || skinListPanel.getSkinListWidget() == null) {
+            return;
+        }
+        SkinListWidget list = skinListPanel.getSkinListWidget();
+        int listTop = list.getY();
+        int columnBottom = skinListBottom + 4 + CONTROL_HEIGHT;
+        int fullHeight = skinListBottom - listTop;
+        int content = list.contentHeight();
+        boolean zone = columnBottom - (listTop + content + 4) >= IMPORT_ZONE_MIN_HEIGHT;
+        if (zone) {
+            list.setViewportHeight(content);
+            importTile.setBounds(listTop + content + 4, columnBottom - (listTop + content + 4));
+        } else {
+            list.setViewportHeight(fullHeight);
+            importTile.setBounds(skinListBottom + 4, CONTROL_HEIGHT);
+        }
+        // The zone says what it does; the bar, a plus alone, keeps its tooltip
+        if (importZoneShown == null || zone != importZoneShown) {
+            importZoneShown = zone;
+            importTile.setTooltip(zone ? null : Tooltip.create(Component.translatable("quickskin.tooltip.import_skin")));
+        }
+    }
+
+    /** Space between the toasts, and between them and the screen's corner. */
+    private static final int TOAST_GAP = 4;
+    private static final int TOAST_MARGIN = 8;
+
+    /** The toasts in the bottom-right corner, the newest at the bottom and the older ones above. */
 //? if <26.1 {
     private void renderErrorToasts(GuiGraphics graphics) {
 //?} else {
     private void renderErrorToasts(GuiGraphicsExtractor graphics) {
 //?}
-        errorToasts.removeIf(toast -> !toast.render(graphics, width));
+        errorToasts.removeIf(ErrorToast::isExpired);
+        int x = width - TOAST_MARGIN - ErrorToast.WIDTH;
+        int bottom = height - TOAST_MARGIN;
+        for (int i = errorToasts.size() - 1; i >= 0; i--) {
+            ErrorToast toast = errorToasts.get(i);
+            int top = bottom - toast.height();
+            toast.render(graphics, x, top);
+            bottom = top - TOAST_GAP;
+        }
     }
 
     /**
@@ -1527,7 +1805,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
                     }
                 },
-                true
+                deletePreviews(List.of(metadata))
         ));
     }
 
@@ -1590,37 +1868,47 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         return name.substring(0, 32) + "...";
     }
 
-    /**
-     * Delete a skin from local storage
-     */
+    /** Delete a skin from local storage. */
     private void deleteSkin(AssetMetadata metadata) {
+        deleteSkins(List.of(metadata));
+    }
+
+    /**
+     * Delete skins from local storage, then rescan the catalog once. The player's own skin is
+     * refused; a skin that cannot be deleted shows an error and the others are still deleted.
+     */
+    private void deleteSkins(List<AssetMetadata> skins) {
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-
-        // Prevent deletion of the player's own skin
-        if (config.enablePlayerOwnSkinSystem && metadata.hash().equals(config.playerOwnSkinHash)) {
-            showError(Component.translatable("quickskin.error.delete_own_skin"));
-            return;
-        }
-
-        try {
-            if (!LocalAssetManager.getInstance().deleteAsset(metadata.hash())) {
-                showError(Component.translatable("quickskin.error.delete_failed", metadata.friendlyName()));
-                return;
+        boolean deletedAny = false;
+        boolean wasApplied = false;
+        for (AssetMetadata metadata : skins) {
+            // Prevent deletion of the player's own skin
+            if (config.enablePlayerOwnSkinSystem && metadata.hash().equals(config.playerOwnSkinHash)) {
+                showError(Component.translatable("quickskin.error.delete_own_skin"));
+                continue;
             }
-
-            if (minecraft != null) {
-                minecraft.getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                                SoundEvents.UI_BUTTON_CLICK.value(), 1.0f
-                        )
-                );
+            try {
+                if (!LocalAssetManager.getInstance().deleteAsset(metadata.hash())) {
+                    showError(Component.translatable("quickskin.error.delete_failed", metadata.friendlyName()));
+                    continue;
+                }
+            } catch (RuntimeException e) {
+                showError(Component.translatable("quickskin.error.delete_failed", e.getMessage()));
+                continue;
             }
-
-            boolean wasApplied = metadata.hash().equals(config.activeSkinHash);
+            deletedAny = true;
+            wasApplied |= metadata.hash().equals(config.activeSkinHash);
             if (metadata.hash().equals(pendingHash)) {
                 pendingHash = null;
                 pendingModelType = null;
             }
+        }
+        if (!deletedAny) {
+            return;
+        }
+
+        try {
+            playClick();
 
             // Refresh the asset manager and skin list
             LocalAssetManager.getInstance().discoverLocalAssets();
@@ -1637,7 +1925,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                     }
                 }
             }
-
         } catch (RuntimeException e) {
             showError(Component.translatable("quickskin.error.delete_failed", e.getMessage()));
         }
@@ -1718,7 +2005,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         isSearching = true;
         searchButton.active = false;
         searchButton.setMessage(Component.translatable("quickskin.button.searching"));
-        searchButton.setIcon("searching");
+        searchButton.setLoading(true);
         searchButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.searching")));
 
         // Fetch skin asynchronously
@@ -1781,6 +2068,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
      * Handle the fetched Mojang skin data
      */
     private void handleMojangSkinFetched(MojangApiService.MojangSkinData skinData) {
+        long start = System.nanoTime();
         try {
             // Save the skin image to local storage
             Path skinPath = SkinImporter.saveSkinImage(skinData.image, skinData.username);
@@ -1806,6 +2094,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
                         // Clear the search field
                         usernameSearchField.setValue("");
+                        QuickSkinInfo.LOGGER.info("Skin of '{}' saved and listed in {} ms",
+                                skinData.username, (System.nanoTime() - start) / 1_000_000L);
 
                         // Play success sound
                         if (minecraft != null) {
@@ -1839,6 +2129,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (searchButton != null) {
             searchButton.setMessage(Component.translatable("quickskin.button.search"));
             searchButton.setIcon("search");
+            searchButton.setLoading(false);
             searchButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.search")));
             searchButton.active = usernameSearchField != null && !usernameSearchField.getValue().trim().isEmpty();
         }
@@ -1847,15 +2138,49 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     /**
      * Get current skin sort mode
      */
-    /** Space between the view and sort buttons. */
+    /** Space between the header's buttons. */
     private static final int HEADER_BUTTON_GAP = 2;
-    /** The view button's icons, nine pixels square: four tiles, or three rows with a dot each. */
+    /** Width of the header's buttons: one more than their height, to centre their icons. */
+    private static final int HEADER_BUTTON_WIDTH = CONTROL_HEIGHT + 1;
+    /**
+     * The header buttons' icons, nine pixels square. The buttons are one pixel wider than they
+     * are tall, so an odd-width icon centres exactly on the odd face inside the border. The view
+     * button's: four tiles, or three rows like the list's cards, each a square beside a line and a
+     * shorter line under it.
+     */
     private static final String[] VIEW_GRID_ICON = {
             "####.####", "####.####", "####.####", "####.####", ".........",
             "####.####", "####.####", "####.####", "####.####"};
     private static final String[] VIEW_LIST_ICON = {
-            "##.######", "##.######", ".........", ".........", "##.######",
-            "##.######", ".........", ".........", "##.######"};
+            "##.######", "##.####..", ".........", "##.######", "##.####..",
+            ".........", "##.######", "##.####.."};
+    /** The sort button's icons: an arrow toward the newest skin's end, or A over Z beside an arrow. */
+    private static final String[] SORT_DOWN_ICON = {
+            "....#....", "....#....", "....#....", "....#....", "....#....",
+            ".#######.", "..#####..", "...###...", "....#...."};
+    private static final String[] SORT_UP_ICON = {
+            "....#....", "...###...", "..#####..", ".#######.", "....#....",
+            "....#....", "....#....", "....#....", "....#...."};
+    private static final String[] SORT_ALPHABETICAL_ICON = {
+            ".#....#..", "#.#...#..", "###...#..", "#.#...#..", "###...#..",
+            "..#...#..", ".#..#####", "#....###.", "###...#.."};
+
+    private static String[] sortIcon(SkinSortMode mode) {
+        return switch (mode) {
+            case LATEST_LAST -> SORT_DOWN_ICON;
+            case LATEST_FIRST -> SORT_UP_ICON;
+            case ALPHABETICAL -> SORT_ALPHABETICAL_ICON;
+        };
+    }
+
+    /** The X that cancels the delete mode, on its button while the mode is on. */
+    private static final String[] CANCEL_DELETE_ICON = {
+            "##.....##", "###...###", ".###.###.", "..#####..", "...###...",
+            "..#####..", ".###.###.", "###...###", "##.....##"};
+    /** The delete mode's bin. */
+    private static final String[] DELETE_MODE_ICON = {
+            "...###...", "#########", ".#######.", ".#.#.#.#.", ".#.#.#.#.",
+            ".#.#.#.#.", ".#.#.#.#.", ".#.#.#.#.", ".#######."};
 
     /** Switches the skin column between the grid of tiles and the list of cards, and remembers it. */
     private void toggleListRows() {
@@ -1887,6 +2212,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // Update button appearance
         sortButton.setMessage(Component.literal(nextMode.getIcon()));
+        sortButton.setIcon(sortIcon(nextMode));
         sortButton.setTooltip(Tooltip.create(
                 Component.translatable("quickskin.tooltip.sorting", Component.translatable(nextMode.getTranslationKey()))
         ));
