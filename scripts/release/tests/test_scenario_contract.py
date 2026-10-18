@@ -882,7 +882,7 @@ class ScenarioContractTest(unittest.TestCase):
                     "settings_screen",
                     "settings_keybind_capture",
                     0.00001,
-                    (0.16, 0.25, 0.28, 0.31),
+                    (0.72, 0.21, 0.86, 0.29),
                 ),
                 (
                     "settings_screen",

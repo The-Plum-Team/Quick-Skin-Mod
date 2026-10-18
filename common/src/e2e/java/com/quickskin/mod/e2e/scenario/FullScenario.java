@@ -137,8 +137,11 @@ public final class FullScenario implements Scenario {
     private static final double ZOOM_IN_POSITION = 0.80;
     /** Enough events that each one asks for a sub-pixel offset change, as a real drag does. */
     private static final int ZOOM_DRAG_STEPS = 64;
-    /** The second target resolution, reachable because the zoom source is larger than 128x64. */
-    private static final String RESOLUTION_2X_LABEL = "128x64 (2x)";
+    /**
+     * The second target resolution, reachable because the zoom source is larger than 128x64. The
+     * button shows "2x"; its message, which the harness presses it by, is the output size.
+     */
+    private static final String RESOLUTION_2X_LABEL = "128x64";
     private static final int RESOLUTION_2X_W = 128;
     private final AtomicInteger zoomHoldOut = new AtomicInteger();
     private final AtomicInteger zoomHoldIn = new AtomicInteger();

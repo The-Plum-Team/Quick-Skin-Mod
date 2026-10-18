@@ -3502,10 +3502,10 @@
               "second_step": "settings_keybind_capture",
               "minimum_changed_fraction": 1e-05,
               "region": [
-                0.16,
-                0.25,
-                0.28,
-                0.31
+                0.72,
+                0.21,
+                0.86,
+                0.29
               ]
             },
             {
