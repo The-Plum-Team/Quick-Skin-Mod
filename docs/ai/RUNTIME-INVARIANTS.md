@@ -236,6 +236,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   `RealCameraTextureIdMixin` prefixes Quick Skin skin ids inside Real Camera's own buffer record
   only; it is a fail-open shim without a compatibility lane. Do not rename the registered
   `quickskin:` texture locations for another mod.
+- JourneyMap draws player head icons from a face it crops itself, and no JourneyMap build reaches
+  a Quick Skin skin on its own: 1.20.1 downloads the Mojang skin, 1.21.1 to 1.21.3 accept only
+  Mojang's `HttpTexture`, and every build caches the first face per player for the session.
+  `JourneyMapIgnSkinMixin` (`IgnSkin.getFace`, every build) and `JourneyMapTextureCacheMixin`
+  (`TextureCache.getPlayerSkinLocation`, 1.21.6 and later) answer with `JourneyMapPlayerFaces`:
+  the worn skin's head front with its hat layer, scaled to JourneyMap's 24x24 face, registered
+  under one `quickskin:journeymap_face/<uuid>` id per player that a new skin replaces. Without a
+  Quick Skin skin, or before it has loaded, JourneyMap keeps its own face. They are fail-open
+  shims named by string without a compatibility lane; the face cache is bounded and cleared with
+  the session. Xaero's Minimap and World Map read the player's skin through `PlayerInfo` and the
+  renderer, which Quick Skin already overrides, and need no shim.
 - From Minecraft 1.21.2 onward, the vanilla outer skin parts are children of their matching body
   parts. Preserve their baked local poses; copying the parent pose onto a child applies the pivot
   twice and detaches both the flat outer layers and the 3D Skin Layers geometry in offline previews.
