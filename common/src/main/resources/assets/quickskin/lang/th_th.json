@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "หรือคลิก 'นำเข้าสกิน'",
   "quickskin.dropzone.skins.click": "หรือคลิกเพื่อนำเข้า",
   "quickskin.dropzone.capes.main": "วางไฟล์ผ้าคลุมที่นี่",
-  "quickskin.dropzone.capes.sub": "หรือคลิก 'นำเข้าผ้าคลุม'",
+  "quickskin.dropzone.capes.click": "หรือคลิกเพื่อนำเข้า",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "คุณแน่ใจหรือว่าต้องการลบ \"%s\"?",

@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "या 'स्किन इम्पोर्ट करें' पर क्लिक करें",
   "quickskin.dropzone.skins.click": "या आयात करने के लिए क्लिक करें",
   "quickskin.dropzone.capes.main": "केप फ़ाइलें यहां ड्रॉप करें",
-  "quickskin.dropzone.capes.sub": "या 'केप इम्पोर्ट करें' पर क्लिक करें",
+  "quickskin.dropzone.capes.click": "या आयात करने के लिए क्लिक करें",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "क्या आप वाकई \"%s\" को डिलीट करना चाहते हैं?",

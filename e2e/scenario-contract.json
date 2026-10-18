@@ -2151,7 +2151,7 @@
               "capture": {
                 "title": "Cape menu",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape menu is open with readable My Capes and Default Capes section headings, the drop-zone instructions Drop cape files here or click 'Import Cape' beside the My Capes tiles, the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
+                "expectation": "The Quick Skin cape menu is open with readable My Capes and Default Capes section headings, the import zone beside the My Capes tiles (corner marks and a tray icon beside Drop cape files here / or click to import), the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
                 "probes": [
                   {
                     "kind": "required-gui-text",

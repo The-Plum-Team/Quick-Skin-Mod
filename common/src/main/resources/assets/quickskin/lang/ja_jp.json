@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "または「スキンをインポート」をクリック",
   "quickskin.dropzone.skins.click": "またはクリックしてインポート",
   "quickskin.dropzone.capes.main": "マントファイルをここにドロップ",
-  "quickskin.dropzone.capes.sub": "または「マントをインポート」をクリック",
+  "quickskin.dropzone.capes.click": "またはクリックしてインポート",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "本当に\"%s\"を削除しますか?",

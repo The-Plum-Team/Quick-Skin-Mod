@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "of klik op 'Skin importeren'",
   "quickskin.dropzone.skins.click": "of klik om te importeren",
   "quickskin.dropzone.capes.main": "Sleep capebestanden hier naartoe",
-  "quickskin.dropzone.capes.sub": "of klik op 'Cape importeren'",
+  "quickskin.dropzone.capes.click": "of klik om te importeren",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Weet je zeker dat je \"%s\" wilt verwijderen?",

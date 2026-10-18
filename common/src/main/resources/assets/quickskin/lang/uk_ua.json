@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "або натисніть 'Імпортувати скін'",
   "quickskin.dropzone.skins.click": "або натисніть, щоб імпортувати",
   "quickskin.dropzone.capes.main": "Перетягніть файли плащів сюди",
-  "quickskin.dropzone.capes.sub": "або натисніть 'Імпортувати плащ'",
+  "quickskin.dropzone.capes.click": "або натисніть, щоб імпортувати",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Ви впевнені, що хочете видалити \"%s\"?",

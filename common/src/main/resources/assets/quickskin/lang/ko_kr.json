@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "또는 '스킨 가져오기'를 클릭하세요",
   "quickskin.dropzone.skins.click": "또는 클릭하여 가져오기",
   "quickskin.dropzone.capes.main": "여기에 망토 파일을 드롭하세요",
-  "quickskin.dropzone.capes.sub": "또는 '망토 가져오기'를 클릭하세요",
+  "quickskin.dropzone.capes.click": "또는 클릭하여 가져오기",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "정말로 \"%s\"을(를) 삭제하시겠습니까?",

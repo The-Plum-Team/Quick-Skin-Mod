@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "eller klicka på 'Importera skin'",
   "quickskin.dropzone.skins.click": "eller klicka för att importera",
   "quickskin.dropzone.capes.main": "Släpp mantelfiler här",
-  "quickskin.dropzone.capes.sub": "eller klicka på 'Importera mantel'",
+  "quickskin.dropzone.capes.click": "eller klicka för att importera",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Är du säker på att du vill ta bort \"%s\"?",

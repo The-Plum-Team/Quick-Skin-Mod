@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "atau klik 'Impor Skin'",
   "quickskin.dropzone.skins.click": "atau klik untuk mengimpor",
   "quickskin.dropzone.capes.main": "Letakkan file jubah di sini",
-  "quickskin.dropzone.capes.sub": "atau klik 'Impor Jubah'",
+  "quickskin.dropzone.capes.click": "atau klik untuk mengimpor",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Apakah Anda yakin ingin menghapus \"%s\"?",

@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "أو انقر على 'استيراد مظهر'",
   "quickskin.dropzone.skins.click": "أو انقر للاستيراد",
   "quickskin.dropzone.capes.main": "اسحب ملفات العباءة هنا",
-  "quickskin.dropzone.capes.sub": "أو انقر على 'استيراد عباءة'",
+  "quickskin.dropzone.capes.click": "أو انقر للاستيراد",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "هل أنت متأكد من حذف \"%s\"؟",

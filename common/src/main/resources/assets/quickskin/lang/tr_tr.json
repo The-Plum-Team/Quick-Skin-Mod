@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "veya 'Skin İçe Aktar'a tıkla",
   "quickskin.dropzone.skins.click": "veya içe aktarmak için tıkla",
   "quickskin.dropzone.capes.main": "Pelerin dosyalarını buraya sürükle",
-  "quickskin.dropzone.capes.sub": "veya 'Pelerin İçe Aktar'a tıkla",
+  "quickskin.dropzone.capes.click": "veya içe aktarmak için tıkla",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "\"%s\" dosyasını silmek istediğinden emin misin?",

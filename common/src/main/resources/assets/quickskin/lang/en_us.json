@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "or click 'Import Skin'",
   "quickskin.dropzone.skins.click": "or click to import",
   "quickskin.dropzone.capes.main": "Drop cape files here",
-  "quickskin.dropzone.capes.sub": "or click 'Import Cape'",
+  "quickskin.dropzone.capes.click": "or click to import",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Are you sure you want to delete \"%s\"?",

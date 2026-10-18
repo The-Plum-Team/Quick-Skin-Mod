@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "hoặc nhấp 'Nhập Skin'",
   "quickskin.dropzone.skins.click": "hoặc nhấp để nhập",
   "quickskin.dropzone.capes.main": "Thả tệp áo choàng vào đây",
-  "quickskin.dropzone.capes.sub": "hoặc nhấp 'Nhập Áo choàng'",
+  "quickskin.dropzone.capes.click": "hoặc nhấp để nhập",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Bạn có chắc muốn xóa \"%s\"?",

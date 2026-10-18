@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "或點入膚",
   "quickskin.dropzone.skins.click": "或擊以入之",
   "quickskin.dropzone.capes.main": "投披風檔於此",
-  "quickskin.dropzone.capes.sub": "或點入披風",
+  "quickskin.dropzone.capes.click": "或擊以入之",
 
   "_comment_dialogs": "=== 對話訊 ===",
   "quickskin.dialog.confirm_delete": "確刪「%s」乎？",

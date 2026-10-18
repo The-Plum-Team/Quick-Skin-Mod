@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "或點擊匯入皮膚",
   "quickskin.dropzone.skins.click": "或點擊以匯入",
   "quickskin.dropzone.capes.main": "將披風檔案拖放至此",
-  "quickskin.dropzone.capes.sub": "或點擊匯入披風",
+  "quickskin.dropzone.capes.click": "或點擊以匯入",
 
   "_comment_dialogs": "=== 對話方塊訊息 ===",
   "quickskin.dialog.confirm_delete": "確定要刪除「%s」嗎？",

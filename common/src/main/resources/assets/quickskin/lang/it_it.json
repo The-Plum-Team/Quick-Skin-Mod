@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "oppure clicca 'Importa skin'",
   "quickskin.dropzone.skins.click": "o fai clic per importare",
   "quickskin.dropzone.capes.main": "Trascina file mantello qui",
-  "quickskin.dropzone.capes.sub": "oppure clicca 'Importa mantello'",
+  "quickskin.dropzone.capes.click": "o fai clic per importare",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Sei sicuro di voler eliminare \"%s\"?",

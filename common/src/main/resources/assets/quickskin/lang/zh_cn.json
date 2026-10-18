@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "或点击导入皮肤",
   "quickskin.dropzone.skins.click": "或点击导入",
   "quickskin.dropzone.capes.main": "拖入披风文件",
-  "quickskin.dropzone.capes.sub": "或点击导入披风",
+  "quickskin.dropzone.capes.click": "或点击导入",
 
   "_comment_dialogs": "=== 对话框消息 ===",
   "quickskin.dialog.confirm_delete": "确定要删除「%s」吗？",

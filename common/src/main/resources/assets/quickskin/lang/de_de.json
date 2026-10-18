@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "oder auf 'Skin importieren' klicken",
   "quickskin.dropzone.skins.click": "oder klicke zum Importieren",
   "quickskin.dropzone.capes.main": "Umhang-Dateien hier ablegen",
-  "quickskin.dropzone.capes.sub": "oder auf 'Umhang importieren' klicken",
+  "quickskin.dropzone.capes.click": "oder klicke zum Importieren",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Möchtest du \"%s\" wirklich löschen?",

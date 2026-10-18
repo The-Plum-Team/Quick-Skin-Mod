@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "lub kliknij 'Importuj skórkę'",
   "quickskin.dropzone.skins.click": "lub kliknij, aby zaimportować",
   "quickskin.dropzone.capes.main": "Przeciągnij pliki peleryn tutaj",
-  "quickskin.dropzone.capes.sub": "lub kliknij 'Importuj pelerynę'",
+  "quickskin.dropzone.capes.click": "lub kliknij, aby zaimportować",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Czy na pewno chcesz usunąć \"%s\"?",
