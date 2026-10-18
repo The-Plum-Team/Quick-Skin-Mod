@@ -134,10 +134,9 @@ public class DeletionConfirmScreen extends Screen {
 
         //? if <1.21.6 {
         graphics.flush();
-        //?} else {
-        // Disable depth test so the blur/overlay/modal panels render on top of the 3D player widget
-        org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
         //?}
+        // From 1.21.6 the blur starts a new stratum, which draws the dialog over the 3D player
+        // widget; the GUI is drawn later by the render backend, which may not be OpenGL
         BlurHandler.renderBlur(graphics);
 
         // Draw lighter overlay over entire screen (so blur is more visible)
@@ -172,8 +171,6 @@ public class DeletionConfirmScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTicks);
         //?} else {
         super.extractRenderState(graphics, mouseX, mouseY, partialTicks);
-
-        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
         //?}
     }
 

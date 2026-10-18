@@ -544,10 +544,9 @@ public class SettingsScreen extends Screen {
 
         //? if <1.21.6 {
         graphics.flush();
-        //?} else {
-        // Disable depth test so the blur/overlay/modal panels render on top of the 3D player widget
-        org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
         //?}
+        // From 1.21.6 the blur starts a new stratum, which draws the dialog over the 3D player
+        // widget; the GUI is drawn later by the render backend, which may not be OpenGL
         BlurHandler.renderBlur(graphics);
 
         // Update keybind button text before rendering
@@ -637,8 +636,6 @@ public class SettingsScreen extends Screen {
 
         //? if <1.21.6 {
         graphics.pose().popPose();
-        //?} else {
-        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
         //?}
     }
 
