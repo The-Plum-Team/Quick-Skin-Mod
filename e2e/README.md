@@ -55,7 +55,7 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.3` | `26.3` | Fabric | `25` | `11` |
 | `neoforge-26.3` | `26.3` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `2d7d4f9d30606c5c3a6cf52b842ddef690c1d11bde1ed029f664c920493b3a8d`
+Scenario contract SHA-256: `5226b8bc35c70cecb5e88fd589997fa3ae415cad81aa1f15a4bfdbfc2afc38ba`
 Contract totals: `128` ordered steps, `97` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
@@ -375,7 +375,7 @@ through the real drop workflow (vanilla elytra composited into its transparent e
 the fill-colour picker, snap-and-mirror the editor, and drive the cape menu with real tile clicks:
 selection outline, GIF badge, speed slider, tooltip, scrollbar, delete, the None tile, and Hide
 Built-in Capes. Settings checkpoints capture every tab, the keybind capture state, the non-admin
-server notice, and styled buttons over the vanilla in-world background.
+server notice, and the skin menu's own buttons over the vanilla in-world background.
 
 Two single-client scenarios complement it. `server-policy` is the only lane whose dedicated server
 starts with a non-default `quickskin-server.json`; the seed is declared in the contract's

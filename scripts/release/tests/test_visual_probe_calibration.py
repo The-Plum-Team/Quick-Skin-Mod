@@ -62,13 +62,16 @@ TEXT_CANARY = {
         ("BMO output dimensions", (1035, 100, 1255, 140), 75, 120),
     ),
     ("full", "client_a", "settings_screen"): (
-        ("Open Skin Menu setting label", (445, 235, 655, 265), 175, 300),
+        ("Open Skin Menu setting label", (510, 210, 960, 240), 175, 1100),
     ),
-    # The two anchor lanes are pixel-identical here: 1,752 label pixels and 2,270
-    # notice pixels remain above the threshold after resizing.
     ("full", "client_a", "settings_server_tab"): (
-        ("server transparency setting label", (305, 234, 780, 268), 175, 1300),
-        ("non-admin server notice", (495, 655, 1105, 688), 175, 1700),
+    # The settings tabs sit in a sidebar and each setting is a row whose label starts at the
+    # content's left edge; a label too long for one line wraps onto two inside its row. A 1.21.1
+    # frame keeps 1,620 pixels of "Assign a key to open the skin menu" above the threshold after
+    # the resize, 2,604 of the two-line server transparency label and 1,942 of the notice near
+    # the dialog's bottom.
+        ("server transparency setting label", (510, 196, 1145, 244), 175, 1800),
+        ("non-admin server notice", (685, 728, 1190, 757), 175, 1400),
     ),
     # The disabled label is dimmer than ordinary GUI text. It sits on the bottom-centre Confirm
     # button in the blocky button font: both 1.20.1 lanes kept 9,959 glyph pixels above luma 127,

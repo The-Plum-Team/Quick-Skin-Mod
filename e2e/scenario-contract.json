@@ -2451,7 +2451,12 @@
                 "probes": [
                   {
                     "kind": "translucent-cape-underlay",
-                    "region": [0.43, 0.50, 0.57, 0.74],
+                    "region": [
+                      0.43,
+                      0.5,
+                      0.57,
+                      0.74
+                    ],
                     "minimum_contrast": 4.0,
                     "minimum_band_changes": 5
                   }
@@ -3022,19 +3027,19 @@
               "capture": {
                 "title": "Settings screen",
                 "review_tier": "all",
-                "expectation": "The Quick Skin settings screen is open on its Client tab (tabs Client, GUI Edit, Modpack and Server): a key-binding button reading Not Bound beside the readable Open Skin Menu label, and four checkboxes, Disable Skin Transparency clear, Show Title Screen Preview and Show Pause Menu Preview checked, and Compact Change Skin Button clear, above a Done button.",
+                "expectation": "The Quick Skin settings screen is open on its Client tab (tabs Client, Interface, Modpack and Server): Minecraft's own key-binding button reading Not Bound right of the readable label Assign a key to open the skin menu, then four rows with toggles, Show transparent parts of skins as opaque off, Show your character on the title screen and Show your character in the pause menu on, and Compact the Change Skin button to make it smaller off, with a close X in the slate header. Labels too long for one line wrap onto a second line inside their row.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "Open Skin Menu setting label",
                     "box": [
-                      445,
-                      235,
-                      655,
-                      265
+                      510,
+                      210,
+                      960,
+                      240
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 300
+                    "minimum_pixels": 1100
                   }
                 ]
               },
@@ -3076,9 +3081,9 @@
               "id": "settings_gui_edit_tab",
               "assertion_required": true,
               "capture": {
-                "title": "GUI Edit tab",
+                "title": "Interface tab",
                 "review_tier": "all",
-                "expectation": "The settings GUI Edit tab lists five checkboxes: mini player preview, styled buttons, preview customization, hide built-in capes and vanilla background; the mini preview, styled buttons and vanilla background boxes are checked and the other two are clear.",
+                "expectation": "The settings Interface tab lists four rows with toggles: Show your character in a corner while you play, Allow moving and resizing the previews, Hide the official Minecraft capes and Minecraft's blurred background instead of stars; the first and last toggles are on and the other two are off.",
                 "probes": []
               },
               "requires": [
@@ -3099,7 +3104,7 @@
               "capture": {
                 "title": "Modpack tab",
                 "review_tier": "all",
-                "expectation": "The settings Modpack tab shows the single Enable Player's Own Skin System checkbox.",
+                "expectation": "The settings Modpack tab shows the single Automatically import your account's skin row with its toggle.",
                 "probes": []
               },
               "requires": [
@@ -3120,31 +3125,31 @@
               "capture": {
                 "title": "Server tab as non-admin",
                 "review_tier": "all",
-                "expectation": "The settings Server tab shows the Disable Skin Transparency (Server) checkbox (clear) and the Skin Change Cooldown (seconds) box reading 0, plus the yellow notice Only server admins can change these settings near the bottom of the dialog. That both controls are inactive for this non-admin player is proven by the runtime evidence.",
+                "expectation": "The settings Server tab shows the greyed Turn off Quick Skin's transparency system for every player row, its label on one or two lines, with its toggle off and the Seconds to wait between skin changes box reading 0, plus the yellow notice Only admins can change these settings near the bottom of the dialog. That both controls are inactive for this non-admin player is proven by the runtime evidence.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "server transparency setting label",
                     "box": [
-                      305,
-                      234,
-                      780,
-                      268
+                      510,
+                      196,
+                      1145,
+                      244
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 1300
+                    "minimum_pixels": 1800
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "non-admin server notice",
                     "box": [
-                      495,
-                      655,
-                      1105,
-                      688
+                      685,
+                      728,
+                      1190,
+                      757
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 1700
+                    "minimum_pixels": 1400
                   }
                 ]
               },
@@ -3164,9 +3169,9 @@
               "id": "styled_buttons_vanilla_background",
               "assertion_required": true,
               "capture": {
-                "title": "Styled buttons over blurred vanilla background",
+                "title": "Skin menu over blurred vanilla background",
                 "review_tier": "key",
-                "expectation": "The skin menu is open with Quick Skin's styled buttons (dark translucent fills with light outlines) and its large grey Confirm button over Minecraft's blurred, translucent in-world overlay instead of the starred background: the daytime world is dimly visible around the floating controls but softly blurred, with no sharp terrain edges, and no star pattern is drawn. The menu's own text, buttons and player preview stay sharp.",
+                "expectation": "The skin menu is open with Quick Skin's own grey buttons and its large grey Confirm button over Minecraft's blurred, translucent in-world overlay instead of the starred background: the daytime world is dimly visible around the floating controls but softly blurred, with no sharp terrain edges, and no star pattern is drawn. The menu's own text, buttons and player preview stay sharp.",
                 "probes": []
               },
               "requires": [
@@ -4639,7 +4644,7 @@
               "capture": {
                 "title": "Skin menu rebuilt after changing settings",
                 "review_tier": "key",
-                "expectation": "Closing settings after enabling styled buttons returns to a new skin menu with styled controls and its player preview.",
+                "expectation": "Closing settings after switching on Minecraft's blurred background returns to a new skin menu, drawn over the blurred title panorama instead of stars, with its player preview.",
                 "probes": []
               }
             },
@@ -4660,7 +4665,7 @@
               "capture": {
                 "title": "Cape menu rebuilt after changing settings",
                 "review_tier": "key",
-                "expectation": "Closing settings after disabling styled buttons returns to a new cape menu with vanilla controls and its player preview.",
+                "expectation": "Closing settings after hiding the official Minecraft capes returns to a new cape menu that lists no built-in capes, with its grey Import and Remove buttons, its green Done button and its player preview.",
                 "probes": []
               }
             }

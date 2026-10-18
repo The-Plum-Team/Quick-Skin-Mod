@@ -82,9 +82,6 @@ public class ClientConfig {
     // Transparency Settings
     public boolean disableSkinTransparency = false; // Disable transparency in player skins
 
-    // GUI Style Settings
-    public boolean enableStyledButtons = false; // Enable custom styled buttons with frosted glass aesthetic
-
     // Cape Settings
     public boolean hideBuiltInCapes = false; // Hide built-in Minecraft capes from cape menu
 

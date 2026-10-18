@@ -4,8 +4,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.quickskin.mod.client.gui.screen.PlayerCapeMenuScreen;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.client.gui.screen.SettingsScreen;
-import com.quickskin.mod.client.gui.widget.StyledButton;
 import com.quickskin.mod.client.input.KeybindRegistry;
+import com.quickskin.mod.common.data.BackgroundStyle;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.e2e.Scenario;
 import com.quickskin.mod.e2e.Step;
@@ -107,16 +107,24 @@ public final class FeatureNavigationScenario implements Scenario {
                 });
     }
 
+    /**
+     * Opens settings over a skin or cape menu, changes a setting that menu reads only when it is
+     * built (the skin menu's background, the cape menu's built-in capes) through the real GUI Edit
+     * checkbox, and closes: settings must rebuild its parent through RestylableScreen.
+     */
     private Step settingsReturn(Minecraft mc, boolean skin, String version, String role) {
         AtomicReference<Screen> parent = new AtomicReference<>();
         AtomicReference<String> failure = new AtomicReference<>();
         AtomicInteger phase = new AtomicInteger();
-        boolean targetStyled = skin;
         String name = skin ? "skin_menu_settings_return" : "cape_menu_settings_return";
+        String checkboxField = skin ? "menuBackgroundCheckbox" : "hideBuiltInCapesCheckbox";
         return Step.of(name)
                 .action(() -> {
-                    ClientConfig.getInstance().enableStyledButtons = !targetStyled;
-                    ClientConfig.getInstance().save();
+                    ClientConfig config = ClientConfig.getInstance();
+                    // Start from the opposite of the state the step selects
+                    config.setMenuBackgroundStyle(BackgroundStyle.OPAQUE_STARS);
+                    config.hideBuiltInCapes = false;
+                    config.save();
                     Screen original = skin ? new PlayerSkinMenuScreen(null) : new PlayerCapeMenuScreen(null);
                     parent.set(original);
                     // Settings renders its parent behind the dialog, so initialize the real
@@ -134,13 +142,13 @@ public final class FeatureNavigationScenario implements Scenario {
                     if (current instanceof SettingsScreen settings) {
                         Object tab = FullScenario.screenField(settings, "guiEditTabButton");
                         if (!(tab instanceof Button button)) return false;
-                        Object field = FullScenario.screenField(settings, "enableStyledButtonsCheckbox");
+                        Object field = FullScenario.screenField(settings, checkboxField);
                         if (!(field instanceof Checkbox checkbox) || !settings.children().contains(checkbox)) {
                             if (!VanillaShim.press(button)) failure.set("could not open GUI Edit tab");
                             return failure.get() != null;
                         }
-                        if (checkbox.selected() != targetStyled && !VanillaShim.press(checkbox)) {
-                            failure.set("could not change styled buttons");
+                        if (!checkbox.selected() && !VanillaShim.press(checkbox)) {
+                            failure.set("could not press " + checkboxField);
                             return true;
                         }
                         settings.onClose();
@@ -161,12 +169,17 @@ public final class FeatureNavigationScenario implements Scenario {
                     if (current == null || current == parent.get()
                             || current.getClass() != parent.get().getClass())
                         return Step.Result.fail("settings did not reconstruct its declared parent");
-                    boolean hasStyled = current.children().stream().anyMatch(StyledButton.class::isInstance);
-                    if (hasStyled != targetStyled
-                            || ClientConfig.getInstance().enableStyledButtons != targetStyled)
-                        return Step.Result.fail("reconstructed parent did not apply the selected button style");
+                    ClientConfig config = ClientConfig.getInstance();
+                    String applied = skin
+                            ? "menuBackgroundStyle=" + config.menuBackgroundStyle
+                            : "hideBuiltInCapes=" + config.hideBuiltInCapes;
+                    boolean selected = skin
+                            ? config.getMenuBackgroundStyle() == BackgroundStyle.VANILLA_BLUR
+                            : config.hideBuiltInCapes;
+                    if (!selected)
+                        return Step.Result.fail("the GUI Edit change was not applied: " + applied);
                     return Step.Result.pass("settings reconstructed " + current.getClass().getSimpleName()
-                            + " through its API; styled buttons=" + hasStyled);
+                            + " through its API after " + checkboxField + " was switched on; " + applied);
                 });
     }
 }

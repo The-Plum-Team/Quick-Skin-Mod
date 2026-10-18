@@ -443,8 +443,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   a teal surface with repeated plaid bands visible through it. Atlas alpha alone cannot certify
   framebuffer transparency; a closed cape mesh must cull its opaque inward-facing back surface.
 - Settings evidence must show every tab through the real tab buttons, the keybind capture state,
-  the non-admin server notice with inactive server controls, and styled buttons over the vanilla
-  in-world background; the captured tab must be the tab whose controls the assertion toggles.
+  the non-admin server notice with inactive server controls, and the skin menu's own buttons over
+  the vanilla in-world background; the captured tab must be the tab whose controls the assertion toggles.
 - The `server-policy` scenario is the only place a non-default `quickskin-server.json` exists. Its
   seed comes solely from the contract's `orchestration.server_config`; the orchestrator writes it
   verbatim before the server starts. Evidence must prove the server override reached the client,
