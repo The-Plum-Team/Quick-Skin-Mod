@@ -56,6 +56,7 @@ DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/GuiSkinRendererMixin.java",
     "main:com/quickskin/mod/mixin/PanoramaRendererMixin.java",
     "main:com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
+    "main:com/quickskin/mod/mixin/PreviewSkinSwapPoseMixin.java",
 }
 
 # Third-party integrations remain fail-local in production. Their targets are either selected by
