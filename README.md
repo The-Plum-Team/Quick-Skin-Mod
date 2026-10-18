@@ -97,8 +97,9 @@ certify those images. Version-branch synchronization is retired under the shared
 - Synchronize Quick Skin appearances between players who run Quick Skin when the mod is also
   installed on the server.
 - Use optional integrations with Customizable Player Models (`.cpmmodel`), Ears, 3D Skin Layers,
-  CustomNPCs, Essential, ReplayMod, and FancyMenu (whose layouts can hide, move, and resize the
-  title and pause player preview) when the matching third-party mod is installed.
+  CustomNPCs, Essential, ReplayMod, FancyMenu (whose layouts can hide, move, and resize the
+  title and pause player preview) and JourneyMap (whose player icons show the Quick Skin face)
+  when the matching third-party mod is installed.
 
 Quick Skin does not declare these integrations as required dependencies. If an optional mod or API
 is unavailable, its integration disables itself and normal skin/cape behavior remains available.

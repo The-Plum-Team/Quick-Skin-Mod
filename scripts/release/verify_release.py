@@ -31,6 +31,16 @@ from release_identity import ReleaseIdentityError, derive as derive_release_iden
 WEBP_CLASS = "com/luciad/imageio/webp/WebP.class"
 WEBP_IDENTIFIER = {"group": "org.sejda.imageio", "artifact": "webp-imageio"}
 JARJAR_METADATA = "META-INF/jarjar/metadata.json"
+# The self-contained layout: the WebP reader relocated below Quick Skin's own package
+OWN_DIRECTORIES = ("com/quickskin/", "assets/quickskin/", "data/quickskin/")
+ARCHITECTURY_INJECTED_DIRECTORY = re.compile(
+    r"architectury_inject_quickskin_common_[0-9a-f]{32}_[0-9a-f]{64}[A-Za-z0-9_]*"
+)
+NATIVE_LIBRARY_SUFFIXES = (".so", ".dll", ".dylib", ".jnilib")
+WEBP_READER_CLASS = (
+    "com/quickskin/mod/shadow/twelvemonkeys/imageio/plugins/webp/WebPImageReader.class"
+)
+BUNDLED_LICENSES = ("META-INF/licenses/TwelveMonkeys-LICENSE.txt",)
 
 
 class VerificationError(RuntimeError):
@@ -233,12 +243,20 @@ def verify_webp_packaging(
     artifact: dict[str, Any],
     label: str,
 ) -> None:
-    """Require the WebP decoder merged on Fabric and JarJar-nested on Forge/NeoForge.
+    """Require the WebP decoder merged on Fabric and JarJar-nested on Forge/NeoForge, or relocated.
+
+    A JAR that carries the relocated reader must instead be self-contained
+    (`verify_self_contained`). Both layouts are accepted while the relocated one replaces the
+    other: the shared Build verifies a pull request's JARs with the default branch's copy of
+    this file, so the verifier has to accept the new layout before the change that builds it.
 
     FML loads the mod JAR as one Java module, so a merged copy collides with every other mod
     that ships the same library as its own module.
     """
 
+    if WEBP_READER_CLASS in names:
+        verify_self_contained(names, label)
+        return
     if artifact["loader"] == "fabric":
         require(WEBP_CLASS in names, f"bundled WebP dependency missing from {label}")
         return
@@ -267,6 +285,43 @@ def verify_webp_packaging(
             )
     except (UnicodeDecodeError, json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
         raise VerificationError(f"invalid JarJar metadata in {label}: {exc!r}") from exc
+
+
+def verify_self_contained(names: set[str], label: str) -> None:
+    """Require a release JAR to hold only Quick Skin's own packages.
+
+    FML loads the mod JAR as one Java module, and two modules exporting one package stop the
+    game. A library kept under its upstream package collides with every other mod that ships the
+    same package, so bundled libraries are relocated below `com/quickskin/`, never nested, never
+    native and never registered as a global Java service. Every directory outside META-INF must
+    belong to one of Quick Skin's own namespaces.
+    """
+
+    for name in sorted(names):
+        if name.endswith("/"):
+            continue
+        directory, _, _ = name.rpartition("/")
+        lowered = name.lower()
+        require(not lowered.endswith(".jar"), f"nested JAR {name} in {label}")
+        require(
+            not lowered.endswith(NATIVE_LIBRARY_SUFFIXES), f"native library {name} in {label}"
+        )
+        if not directory:
+            require(not name.endswith(".class"), f"top-level class {name} in {label}")
+        elif directory == "META-INF" or directory.startswith("META-INF/"):
+            require(
+                directory in {"META-INF", "META-INF/licenses"},
+                f"foreign metadata {name} in {label}",
+            )
+        else:
+            require(
+                (directory + "/").startswith(OWN_DIRECTORIES)
+                or ARCHITECTURY_INJECTED_DIRECTORY.fullmatch(directory) is not None,
+                f"package outside Quick Skin's namespace in {label}: {name}",
+            )
+    require(WEBP_READER_CLASS in names, f"relocated WebP decoder missing from {label}")
+    for license_file in BUNDLED_LICENSES:
+        require(license_file in names, f"bundled library license {license_file} missing from {label}")
 
 
 def verify_jar(

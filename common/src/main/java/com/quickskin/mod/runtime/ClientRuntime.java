@@ -5,6 +5,7 @@ import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.compat.CustomNPCsIntegration;
 import com.quickskin.mod.client.compat.EarsCompatIntegration;
+import com.quickskin.mod.client.compat.JourneyMapPlayerFaces;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
 import com.quickskin.mod.client.services.AnimatedTextureManager;
@@ -177,6 +178,7 @@ public final class ClientRuntime implements AutoCloseable {
         runCleanup("clear 3D skin-layer meshes", SkinLayers3DIntegration::clearCache);
         runCleanup("clear local texture registrations", assetManager::clearTextureCache);
         runCleanup("clear CPM bridge textures", CPMCompatIntegration::clearHttpTextureCache);
+        runCleanup("clear JourneyMap player faces", JourneyMapPlayerFaces::clear);
         runCleanup("clear Ears feature metadata", EarsCompatIntegration::clearAllFeatures);
         runCleanup("clear CustomNPCs player tracking", CustomNPCsIntegration::clearTrackedSkins);
         runCleanup("clear cached preview player", PlayerModelRenderer::clearCachedPlayer);
