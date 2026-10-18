@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": "（%s 件未納）",
   "quickskin.cape.error.gif_width": "此 GIF 廣 %s 素，動披風至廣 %s。宜縮之",
   "quickskin.cape.error.gif_frames": "此 GIF 逾 %s 幀，動披風之極也。宜去其數幀",
+  "quickskin.cape.error.gif_editor_frames": "此 GIF 逾 %s 幀，披風編修之極也。請刪其幀",
   "quickskin.cape.error.gif_decoded": "此 GIF 過重，不可為披風：有幀 %s，每幀 %s。是度之動披風，至多 %s 幀；宜減其幀或縮其度",
   "quickskin.cape.error.too_big": "此披風過巨，不能載。宜縮之，若動則減其幀",
   "quickskin.cape.error.dimensions": "此圖 %s，披風每邊至多 %s 素。宜縮之（常披風 64×32）",

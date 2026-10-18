@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s não importadas)",
   "quickskin.cape.error.gif_width": "Este GIF tem %s píxeis de largura e uma capa animada pode ter no máximo %s. Reduz o tamanho",
   "quickskin.cape.error.gif_frames": "Este GIF tem mais de %s fotogramas, o máximo para uma capa animada. Tira alguns fotogramas",
+  "quickskin.cape.error.gif_editor_frames": "Este GIF tem mais de %s fotogramas, o máximo que o editor de capas abre. Remove alguns fotogramas",
   "quickskin.cape.error.gif_decoded": "Este GIF é demasiado pesado para uma capa: tem %s fotogramas de %s. Com esse tamanho, uma capa animada pode ter no máximo %s fotogramas; tira fotogramas ou reduz o tamanho",
   "quickskin.cape.error.too_big": "Esta capa é demasiado grande para carregar. Reduz o tamanho ou, se for animada, tira fotogramas",
   "quickskin.cape.error.dimensions": "Esta imagem tem %s e uma capa pode ter no máximo %s píxeis de lado. Reduz o tamanho (uma capa normal tem 64×32)",

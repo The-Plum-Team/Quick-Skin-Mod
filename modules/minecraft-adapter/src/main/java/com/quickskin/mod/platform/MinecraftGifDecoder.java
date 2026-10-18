@@ -2,13 +2,23 @@ package com.quickskin.mod.platform;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.quickskin.mod.common.util.GifDecoder;
+import com.quickskin.mod.common.util.ScaledGifDecoder;
 import com.quickskin.mod.common.util.StbGifLoader;
+import com.quickskin.mod.common.util.UserFacingIOException;
 
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Set;
 
-/** Converts the selected native-image API into the feature-owned ARGB decoding contract. */
+/**
+ * Converts the selected native-image API into the feature-owned ARGB decoding contract.
+ *
+ * <p>A GIF the native loader refuses only for its size (its canvas, its frames or its decoded
+ * pixels) is decoded again by {@link ScaledGifDecoder}, frame by frame and shrunk, so the cape
+ * editor can open it; every other GIF keeps the native loader's exact pixels.</p>
+ */
 public final class MinecraftGifDecoder implements GifDecoder {
     public static final MinecraftGifDecoder INSTANCE = new MinecraftGifDecoder();
     private static final long MAX_ATLAS_PIXELS = 64L * 1024L * 1024L / 4L;
@@ -16,8 +26,28 @@ public final class MinecraftGifDecoder implements GifDecoder {
     private MinecraftGifDecoder() {
     }
 
+    /** The native loader's refusals that only mean "too big": the scaled decoder takes these. */
+    private static final Set<String> SIZE_REFUSALS = Set.of(
+            "quickskin.cape.error.gif_width",
+            "quickskin.cape.error.gif_frames",
+            "quickskin.cape.error.gif_decoded",
+            "quickskin.cape.error.dimensions",
+            "quickskin.cape.error.too_big");
+
     @Override
     public DecodedGif decode(InputStream input) throws IOException {
+        byte[] data = input.readNBytes(ScaledGifDecoder.MAX_ENCODED_BYTES + 1);
+        try {
+            return decodeNative(new ByteArrayInputStream(data));
+        } catch (UserFacingIOException refused) {
+            if (!SIZE_REFUSALS.contains(refused.userMessage().translationKey())) {
+                throw refused;
+            }
+            return ScaledGifDecoder.INSTANCE.decode(new ByteArrayInputStream(data));
+        }
+    }
+
+    private DecodedGif decodeNative(InputStream input) throws IOException {
         StbGifLoader.GifLoadResult gif = StbGifLoader.loadGif(input);
         if (gif == null) throw new IOException("Invalid GIF image");
         try (gif) {

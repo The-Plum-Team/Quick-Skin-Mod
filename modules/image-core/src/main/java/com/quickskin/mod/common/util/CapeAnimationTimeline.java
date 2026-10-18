@@ -60,7 +60,9 @@ public final class CapeAnimationTimeline {
                 }
             }
         }
-        end = frameCount - 1;
+        // A longer source starts with as many frames as a cape may have, so it can be applied as it
+        // opens; the handles then choose which run to keep
+        end = Math.min(frameCount, MAX_FRAMES) - 1;
         rebuild();
     }
 

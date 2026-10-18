@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s inte importerade)",
   "quickskin.cape.error.gif_width": "Den här GIF:en är %s pixlar bred och en animerad mantel får vara högst %s. Gör den mindre",
   "quickskin.cape.error.gif_frames": "Den här GIF:en har fler än %s bildrutor, det högsta en animerad mantel får ha. Ta bort några",
+  "quickskin.cape.error.gif_editor_frames": "Den här GIF:en har fler än %s bildrutor, det mesta mantelredigeraren öppnar. Ta bort några bildrutor",
   "quickskin.cape.error.gif_decoded": "Den här GIF:en är för tung för en mantel: den har %s bildrutor på %s. I den storleken får en animerad mantel ha högst %s bildrutor; ta bort bildrutor eller gör den mindre",
   "quickskin.cape.error.too_big": "Den här manteln är för stor för att laddas. Gör den mindre eller ta bort bildrutor om den är animerad",
   "quickskin.cape.error.dimensions": "Den här bilden är %s och en mantel får vara högst %s pixlar per sida. Gör den mindre (en vanlig mantel är 64×32)",

@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s not imported)",
   "quickskin.cape.error.gif_width": "This GIF is %s pixels wide and an animated cape can be at most %s. Make it smaller",
   "quickskin.cape.error.gif_frames": "This GIF has more than %s frames, the most an animated cape can have. Remove some frames",
+  "quickskin.cape.error.gif_editor_frames": "This GIF has more than %s frames, the most the cape editor can open. Remove some frames",
   "quickskin.cape.error.gif_decoded": "This GIF is too heavy for a cape: it has %s frames of %s. At that size an animated cape can have at most %s frames; remove frames or make it smaller",
   "quickskin.cape.error.too_big": "This cape is too big to load. Make it smaller or, if it's animated, remove frames",
   "quickskin.cape.error.dimensions": "This image is %s and a cape can be at most %s pixels per side. Make it smaller (a normal cape is 64×32)",

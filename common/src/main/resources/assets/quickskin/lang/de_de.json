@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s nicht importiert)",
   "quickskin.cape.error.gif_width": "Dieses GIF ist %s Pixel breit, ein animierter Umhang darf höchstens %s breit sein. Verkleinere es",
   "quickskin.cape.error.gif_frames": "Dieses GIF hat mehr als %s Bilder, das Maximum für einen animierten Umhang. Entferne einige Bilder",
+  "quickskin.cape.error.gif_editor_frames": "Dieses GIF hat mehr als %s Bilder, die meisten, die der Umhang-Editor öffnet. Entferne einige Bilder",
   "quickskin.cape.error.gif_decoded": "Dieses GIF ist zu schwer für einen Umhang: Es hat %s Bilder in %s. In dieser Größe darf ein animierter Umhang höchstens %s Bilder haben; entferne Bilder oder verkleinere es",
   "quickskin.cape.error.too_big": "Dieser Umhang ist zu groß zum Laden. Verkleinere ihn oder entferne Bilder, wenn er animiert ist",
   "quickskin.cape.error.dimensions": "Dieses Bild ist %s groß, ein Umhang darf höchstens %s Pixel pro Seite haben. Verkleinere es (ein normaler Umhang ist 64×32)",

@@ -125,7 +125,8 @@ native conversion and preserves the allocation-free cached lookup. Server stores
 `Path` supplied by `ServerRuntime`, without importing `MinecraftServer`.
 `cape-import` receives a `GifDecoder` through its workflow constructor. Its API returns a bounded
 ARGB atlas and animation metadata; `MinecraftGifDecoder` in the adapter owns native decoding,
-channel conversion, and native-frame disposal. Keep native image objects out of import processing.
+channel conversion, and native-frame disposal. A GIF it refuses only for its size falls back to
+`ScaledGifDecoder` in `image-core`, which decodes in Java frame by frame and shrinks. Keep native image objects out of import processing.
 
 `ClientFeatureBindings` installs the process-owned links before catalog scans or network callbacks:
 CPM consumes `CpmAssetAccess`, accepted packets target `RemoteAppearanceTarget`, and feature code

@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": "（%s 個はインポートされていません）",
   "quickskin.cape.error.gif_width": "このGIFは幅 %s ピクセルですが、アニメーションマントの幅は %s までです。小さくしてください",
   "quickskin.cape.error.gif_frames": "このGIFは %s フレームを超えています。アニメーションマントの上限です。フレームを減らしてください",
+  "quickskin.cape.error.gif_editor_frames": "このGIFは%sフレームを超えています。マント編集で開けるのはここまでです。フレームを減らしてください",
   "quickskin.cape.error.gif_decoded": "このGIFはマントには重すぎます：%2$s のフレームが %1$s 枚あります。このサイズのアニメーションマントは %3$s 枚までです。フレームを減らすか小さくしてください",
   "quickskin.cape.error.too_big": "このマントは大きすぎて読み込めません。小さくするか、アニメーションならフレームを減らしてください",
   "quickskin.cape.error.dimensions": "この画像は %s ですが、マントの一辺は %s ピクセルまでです。小さくしてください（普通のマントは 64×32）",

@@ -37,6 +37,8 @@ public final class CapeImportProcessor {
     static final long MAX_SOURCE_BYTES = 32L * 1024L * 1024L;
     private static final int MAX_STATIC_DIMENSION = 4096;
     private static final long MAX_ATLAS_PIXELS = 64L * 1024L * 1024L / 4L;
+    /** The most frames a catalogued animated cape may have. */
+    private static final int MAX_ANIMATED_FRAMES = 256;
 
     private CapeImportProcessor() {
     }
@@ -102,8 +104,11 @@ public final class CapeImportProcessor {
             int width = gif.atlas().getWidth();
             int height = gif.atlas().getHeight() / gif.frameCount();
             validateAtlas(width, height, gif.frameCount());
-            return new PreparedCape(source, gif.atlas(), gif.frameCount(), gif.metadata(), true,
-                    width == 64 && height == 32);
+            // A shrunk GIF, or one with more frames than a cape may have, goes through the editor:
+            // only a GIF the catalogue can load as it is may be copied unchanged
+            boolean standard = width == 64 && height == 32 && !gif.resampled()
+                    && gif.frameCount() <= MAX_ANIMATED_FRAMES;
+            return new PreparedCape(source, gif.atlas(), gif.frameCount(), gif.metadata(), true, standard);
         }
     }
 

@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s개는 가져오지 못함)",
   "quickskin.cape.error.gif_width": "이 GIF는 너비가 %s픽셀인데 움직이는 망토는 최대 %s입니다. 크기를 줄이세요",
   "quickskin.cape.error.gif_frames": "이 GIF는 %s프레임을 넘습니다. 움직이는 망토의 최대치입니다. 프레임을 줄이세요",
+  "quickskin.cape.error.gif_editor_frames": "이 GIF는 프레임이 %s개를 넘습니다. 망토 편집기가 열 수 있는 최대치입니다. 프레임을 줄이세요",
   "quickskin.cape.error.gif_decoded": "이 GIF는 망토로 쓰기에 너무 무겁습니다: %2$s 크기의 프레임이 %1$s개 있습니다. 이 크기에서 움직이는 망토는 최대 %3$s프레임입니다. 프레임을 줄이거나 크기를 줄이세요",
   "quickskin.cape.error.too_big": "이 망토는 너무 커서 불러올 수 없습니다. 크기를 줄이거나, 움직이는 망토라면 프레임을 줄이세요",
   "quickskin.cape.error.dimensions": "이 이미지는 %s인데 망토의 한 변은 최대 %s픽셀입니다. 크기를 줄이세요 (보통 망토는 64×32)",

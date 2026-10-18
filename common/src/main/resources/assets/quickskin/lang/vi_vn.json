@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s chưa nhập)",
   "quickskin.cape.error.gif_width": "GIF này rộng %s pixel, còn áo choàng động rộng tối đa %s. Hãy thu nhỏ",
   "quickskin.cape.error.gif_frames": "GIF này có hơn %s khung hình, mức tối đa cho áo choàng động. Hãy bớt khung hình",
+  "quickskin.cape.error.gif_editor_frames": "GIF này có hơn %s khung hình, mức tối đa trình chỉnh sửa áo choàng mở được. Hãy bớt khung hình",
   "quickskin.cape.error.gif_decoded": "GIF này quá nặng để làm áo choàng: có %s khung hình cỡ %s. Ở cỡ đó, áo choàng động có tối đa %s khung hình; hãy bớt khung hình hoặc thu nhỏ",
   "quickskin.cape.error.too_big": "Áo choàng này quá lớn để tải. Hãy thu nhỏ hoặc, nếu là ảnh động, bớt khung hình",
   "quickskin.cape.error.dimensions": "Ảnh này cỡ %s, còn mỗi cạnh áo choàng tối đa %s pixel. Hãy thu nhỏ (áo choàng thường là 64×32)",

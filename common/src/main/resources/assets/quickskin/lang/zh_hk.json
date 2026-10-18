@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": "（%s 件未匯入）",
   "quickskin.cape.error.gif_width": "這個 GIF 闊 %s 像素，而動態披風最闊 %s。請縮小尺寸",
   "quickskin.cape.error.gif_frames": "這個 GIF 超過 %s 格，這是動態披風的上限。請刪掉一些格",
+  "quickskin.cape.error.gif_editor_frames": "呢個 GIF 超過 %s 幀，係披風編輯器開得到嘅上限。請刪走啲幀",
   "quickskin.cape.error.gif_decoded": "這個 GIF 太大，不能做披風：它有 %s 格，每格 %s。這個尺寸下動態披風最多 %s 格；請刪減格數或縮小尺寸",
   "quickskin.cape.error.too_big": "這件披風太大，無法載入。請縮小尺寸，若是動態的請刪減格數",
   "quickskin.cape.error.dimensions": "這張圖片是 %s，而披風每邊最多 %s 像素。請縮小尺寸（一般披風是 64×32）",

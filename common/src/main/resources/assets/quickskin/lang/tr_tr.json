@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s içe aktarılmadı)",
   "quickskin.cape.error.gif_width": "Bu GIF %s piksel genişliğinde, animasyonlu bir pelerin en fazla %s olabilir. Küçült",
   "quickskin.cape.error.gif_frames": "Bu GIF'te %s kareden fazla var, bu animasyonlu pelerin için en fazlası. Birkaç kare çıkar",
+  "quickskin.cape.error.gif_editor_frames": "Bu GIF'te %s kareden fazla var, pelerin düzenleyicisinin açabileceği en fazla bu. Bazı kareleri sil",
   "quickskin.cape.error.gif_decoded": "Bu GIF pelerin için çok ağır: %2$s boyutunda %1$s karesi var. Bu boyutta animasyonlu bir pelerinde en fazla %3$s kare olabilir; kare çıkar ya da küçült",
   "quickskin.cape.error.too_big": "Bu pelerin yüklenemeyecek kadar büyük. Küçült ya da animasyonluysa kare çıkar",
   "quickskin.cape.error.dimensions": "Bu görsel %s ve bir pelerinin her kenarı en fazla %s piksel olabilir. Küçült (normal bir pelerin 64×32'dir)",

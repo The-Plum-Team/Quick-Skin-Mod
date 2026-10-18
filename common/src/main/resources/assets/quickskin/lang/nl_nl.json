@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s niet geïmporteerd)",
   "quickskin.cape.error.gif_width": "Deze GIF is %s pixels breed en een geanimeerde cape mag hoogstens %s breed zijn. Maak hem kleiner",
   "quickskin.cape.error.gif_frames": "Deze GIF heeft meer dan %s frames, het maximum voor een geanimeerde cape. Haal er een paar weg",
+  "quickskin.cape.error.gif_editor_frames": "Deze GIF heeft meer dan %s frames, het maximum dat de cape-editor opent. Haal er frames uit",
   "quickskin.cape.error.gif_decoded": "Deze GIF is te zwaar voor een cape: hij heeft %s frames van %s. Op dat formaat mag een geanimeerde cape hoogstens %s frames hebben; haal frames weg of maak hem kleiner",
   "quickskin.cape.error.too_big": "Deze cape is te groot om te laden. Maak hem kleiner of haal frames weg als hij geanimeerd is",
   "quickskin.cape.error.dimensions": "Deze afbeelding is %s en een cape mag hoogstens %s pixels per zijde zijn. Maak hem kleiner (een gewone cape is 64×32)",

@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (niezaimportowane: %s)",
   "quickskin.cape.error.gif_width": "Ten GIF ma %s pikseli szerokości, a animowana peleryna może mieć najwyżej %s. Zmniejsz go",
   "quickskin.cape.error.gif_frames": "Ten GIF ma więcej niż %s klatek, a tyle najwyżej może mieć animowana peleryna. Usuń część klatek",
+  "quickskin.cape.error.gif_editor_frames": "Ten GIF ma ponad %s klatek, najwięcej, ile otworzy edytor peleryn. Usuń część klatek",
   "quickskin.cape.error.gif_decoded": "Ten GIF jest za ciężki na pelerynę: ma %s klatek w rozmiarze %s. W tym rozmiarze animowana peleryna może mieć najwyżej %s klatek; usuń klatki albo go zmniejsz",
   "quickskin.cape.error.too_big": "Ta peleryna jest za duża, żeby ją wczytać. Zmniejsz ją albo, jeśli jest animowana, usuń klatki",
   "quickskin.cape.error.dimensions": "Ten obraz ma %s, a peleryna może mieć najwyżej %s pikseli na bok. Zmniejsz go (zwykła peleryna ma 64×32)",

@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s non importati)",
   "quickskin.cape.error.gif_width": "Questa GIF è larga %s pixel e un mantello animato può esserlo al massimo %s. Rimpiccioliscila",
   "quickskin.cape.error.gif_frames": "Questa GIF ha più di %s fotogrammi, il massimo per un mantello animato. Togline qualcuno",
+  "quickskin.cape.error.gif_editor_frames": "Questa GIF ha più di %s fotogrammi, il massimo che l'editor dei mantelli apre. Togli dei fotogrammi",
   "quickskin.cape.error.gif_decoded": "Questa GIF è troppo pesante per un mantello: ha %s fotogrammi di %s. A questa dimensione un mantello animato può avere al massimo %s fotogrammi; togli fotogrammi o rimpiccioliscila",
   "quickskin.cape.error.too_big": "Questo mantello è troppo grande da caricare. Rimpiccioliscilo o, se è animato, togli fotogrammi",
   "quickskin.cape.error.dimensions": "Questa immagine è %s e un mantello può avere al massimo %s pixel per lato. Rimpiccioliscila (un mantello normale è 64×32)",

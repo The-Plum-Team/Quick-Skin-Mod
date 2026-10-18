@@ -118,6 +118,17 @@ class CapeAnimationTimelineTest {
         assertTrue(timeline.fitsFrameLimit());
     }
 
+    @Test
+    void aLongerSourceStartsWithTheFramesACapeMayHave() {
+        CapeAnimationTimeline timeline = new CapeAnimationTimeline(600, null);
+        assertEquals(0, timeline.start());
+        assertEquals(CapeAnimationTimeline.MAX_FRAMES - 1, timeline.end());
+        assertTrue(timeline.fitsFrameLimit());
+        timeline.setEnd(599);
+        assertEquals(599, timeline.end());
+        assertFalse(timeline.fitsFrameLimit());
+    }
+
     /** The written timing must pass the same check the server and the catalogue apply. */
     @Test
     void metadataNamesEachAtlasFrameOnceInOrder() {

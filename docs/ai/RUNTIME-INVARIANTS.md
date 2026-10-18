@@ -216,6 +216,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   divided by the chosen speed. Apply writes one atlas frame per entry of that sequence and its own
   timing (one entry per atlas frame, in order, 20 ms to 60 s), and is refused past 256 frames.
   Reopening the cape starts again from the retained source, untrimmed.
+- A GIF import the native loader refuses only for its size (canvas over 2048, more than 256
+  frames, more than 64 MB decoded) is decoded again by `ScaledGifDecoder`: bounded first (32 MB of
+  file, 4096 per side, 1024 frames, 512M composed canvas pixels), then composed one frame at a time
+  and shrunk evenly into an atlas of at most 1024 per side and 64 MB. Such an atlas, like any GIF
+  over 256 frames, always goes through the editor; only a GIF the catalogue loads as it is is
+  copied unchanged.
 - An active Quick Skin cape is authoritative for both the renderer's cape and profile-Elytra
   texture inputs. Never retain an unrelated Mojang/profile Elytra beside a custom cape: vanilla
   gives that dedicated field priority and would otherwise replace only the worn wings when the

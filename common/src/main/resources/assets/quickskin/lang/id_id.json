@@ -119,6 +119,7 @@
   "quickskin.cape.not_imported": " (%s tidak diimpor)",
   "quickskin.cape.error.gif_width": "GIF ini lebarnya %s piksel, sedangkan jubah animasi paling lebar %s. Perkecil",
   "quickskin.cape.error.gif_frames": "GIF ini punya lebih dari %s bingkai, batas untuk jubah animasi. Hapus beberapa bingkai",
+  "quickskin.cape.error.gif_editor_frames": "GIF ini punya lebih dari %s bingkai, batas yang bisa dibuka editor jubah. Hapus beberapa bingkai",
   "quickskin.cape.error.gif_decoded": "GIF ini terlalu berat untuk jubah: ada %s bingkai berukuran %s. Pada ukuran itu jubah animasi paling banyak %s bingkai; kurangi bingkai atau perkecil",
   "quickskin.cape.error.too_big": "Jubah ini terlalu besar untuk dimuat. Perkecil, atau kurangi bingkai jika beranimasi",
   "quickskin.cape.error.dimensions": "Gambar ini berukuran %s, sedangkan sisi jubah paling besar %s piksel. Perkecil (jubah biasa 64×32)",
