@@ -169,7 +169,7 @@ public class CapeAdjustScreen extends Screen {
     private static final int TIMELINE_PANEL_H = 74;
     private static final int TRACK_H = 18;
     /** How far from a trim handle, in GUI pixels, a press still grabs it. */
-    private static final int HANDLE_REACH = 3;
+    private static final int HANDLE_REACH = 6;
     private static final int TRIM_HANDLE = 0xFFFFD040;
     private static final int TRIMMED_DIM = 0xC0101012;
     private static final int FRAMES_FIT = 0xFF6FCF6F;
@@ -686,6 +686,12 @@ public class CapeAdjustScreen extends Screen {
         return trackX0 + 1 + (int) ((long) frame * (trackX1 - trackX0 - 2) / frameCount);
     }
 
+    /** The frame edge nearest {@code mouseX} on the track: 0 is the left end, {@code frameCount} the right. */
+    private int edgeAt(double mouseX) {
+        int inner = Math.max(1, trackX1 - trackX0 - 2);
+        return Mth.clamp((int) Math.round((mouseX - trackX0 - 1) * frameCount / inner), 0, frameCount);
+    }
+
     /** The source frame under {@code mouseX} on the track. */
     private int frameAt(double mouseX) {
         int inner = Math.max(1, trackX1 - trackX0 - 2);
@@ -699,8 +705,9 @@ public class CapeAdjustScreen extends Screen {
     }
 
     /**
-     * A press on the track: near a trim handle it moves that end of the kept frames, anywhere else
-     * it shows the frame under it. Either way playback pauses on the frame being looked at.
+     * A press on the track: near a trim handle, or on the frames it leaves out, it grabs that handle;
+     * on the kept frames it shows the frame under it. Either way playback pauses on the frame being
+     * looked at.
      */
     private void pressTrack(double mouseX) {
         int startX = frameLeft(timeline.start());
@@ -711,6 +718,10 @@ public class CapeAdjustScreen extends Screen {
             // Handles that touch: the side of the press decides
             trackDrag = toEnd < toStart || (toEnd == toStart && mouseX >= startX)
                     ? TrackDrag.END : TrackDrag.START;
+        } else if (mouseX < startX) {
+            trackDrag = TrackDrag.START;
+        } else if (mouseX > endX) {
+            trackDrag = TrackDrag.END;
         } else {
             trackDrag = TrackDrag.SCRUB;
         }
@@ -721,12 +732,13 @@ public class CapeAdjustScreen extends Screen {
     private void dragTrack(double mouseX) {
         int frame = frameAt(mouseX);
         switch (trackDrag) {
+            // A handle sits on a frame edge and follows the cursor to the nearest one
             case START -> {
-                timeline.setStart(frame);
+                timeline.setStart(edgeAt(mouseX));
                 showFrame(timeline.start());
             }
             case END -> {
-                timeline.setEnd(frame);
+                timeline.setEnd(edgeAt(mouseX) - 1);
                 showFrame(timeline.end());
             }
             case SCRUB -> showFrame(Mth.clamp(frame, timeline.start(), timeline.end()));
@@ -1678,8 +1690,13 @@ public class CapeAdjustScreen extends Screen {
             }
         }
         for (int handleX : new int[] {frameLeft(timeline.start()), frameLeft(timeline.end() + 1)}) {
-            graphics.fill(handleX - 2, top - 2, handleX + 1, bottom + 2, CapeEditorStyle.OUTLINE);
-            graphics.fill(handleX - 1, top - 1, handleX, bottom + 1, TRIM_HANDLE);
+            // A wide grip that stands out above and below the track, easy to see and to grab
+            graphics.fill(handleX - 3, top - 3, handleX + 2, bottom + 3, CapeEditorStyle.OUTLINE);
+            graphics.fill(handleX - 2, top - 2, handleX + 1, bottom + 2, TRIM_HANDLE);
+            int mid = (top + bottom) / 2;
+            for (int y = mid - 3; y <= mid + 3; y += 3) {
+                graphics.fill(handleX - 1, y, handleX, y + 1, CapeEditorStyle.OUTLINE);
+            }
         }
         int head = (frameLeft(currentAnimFrame) + frameLeft(currentAnimFrame + 1)) / 2;
         graphics.fill(head, top - 3, head + 1, bottom + 3, 0xFFFFFFFF);
