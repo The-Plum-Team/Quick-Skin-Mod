@@ -35,6 +35,8 @@ public class PreviewPlayerData {
     // Animation state
     private String currentAnimation; // For future animation support
     private boolean showcaseIdle;
+    private boolean ownPose;
+    private boolean elytraPreview;
     private final float animationProgress;
 
     public PreviewPlayerData() {
@@ -203,6 +205,31 @@ public class PreviewPlayerData {
 
     public void setShowcaseIdle(boolean showcaseIdle) {
         this.showcaseIdle = showcaseIdle;
+    }
+
+    /**
+     * Whether the preview draws its own model in the chosen pose even in a world, instead of the
+     * live player doing whatever the player is doing. The skin menu uses it; the pause menu's
+     * preview keeps the live player.
+     */
+    public boolean isOwnPose() {
+        return ownPose;
+    }
+
+    public void setOwnPose(boolean ownPose) {
+        this.ownPose = ownPose;
+    }
+
+    /**
+     * Whether the preview draws the cape's texture on folded elytra wings instead of on the cape,
+     * as vanilla does for a player wearing both. Such a preview draws its own model.
+     */
+    public boolean isElytraPreview() {
+        return elytraPreview;
+    }
+
+    public void setElytraPreview(boolean elytraPreview) {
+        this.elytraPreview = elytraPreview;
     }
 
     public void setCurrentAnimation(String currentAnimation) {

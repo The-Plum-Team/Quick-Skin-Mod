@@ -35,6 +35,7 @@ public class SkinPreferences {
      */
     public static class SkinPreference {
         public String modelType = "auto"; // "auto", "classic", or "slim"
+        public boolean favorite; // listed first, after the player's own skin, and drawn in gold
 
         public SkinPreference() {
             // Default constructor for Gson
@@ -67,6 +68,27 @@ public class SkinPreferences {
             return;
         }
         preferences.computeIfAbsent(hash, k -> new SkinPreference()).modelType = modelType;
+    }
+
+    /** Whether the player marked this skin as a favorite. */
+    public synchronized boolean isFavorite(String hash) {
+        SkinPreference pref = preferences.get(hash);
+        if (pref == null) {
+            String legacy = aliasFallbacks().get(hash);
+            if (legacy != null) pref = preferences.get(legacy);
+        }
+        return pref != null && pref.favorite;
+    }
+
+    /** Marks or unmarks a skin as a favorite. */
+    public synchronized void setFavorite(String hash, boolean favorite) {
+        if (!isHash(hash) || (!preferences.containsKey(hash) && preferences.size() >= MAX_PREFERENCES)) {
+            return;
+        }
+        if (!favorite && !preferences.containsKey(hash)) {
+            return;
+        }
+        preferences.computeIfAbsent(hash, k -> new SkinPreference()).favorite = favorite;
     }
 
     /**

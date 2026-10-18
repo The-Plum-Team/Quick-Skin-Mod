@@ -65,7 +65,9 @@ public class StbGifLoader {
             // Inspect the bounded container before STB reserves the full decoded animation.
             byte[] gifBytes = input.readNBytes(MAX_ENCODED_BYTES + 1);
             if (gifBytes.length == 0 || gifBytes.length > MAX_ENCODED_BYTES) {
-                throw new IOException("Animated cape must be between 1 byte and 32 MB");
+                throw new UserFacingIOException("Animated cape must be between 1 byte and 32 MB",
+                        "quickskin.cape.error.file_size",
+                        (gifBytes.length + 1024L * 1024L - 1) / (1024L * 1024L), MAX_ENCODED_BYTES / (1024 * 1024));
             }
             GifPreflight preflight = inspectGif(gifBytes);
 
@@ -119,16 +121,24 @@ public class StbGifLoader {
 
                 // Hard input caps — reject oversized GIFs before any pixel work
                 if (width > 2048) {
-                    throw new IOException("Animated cape too large: width " + width + " exceeds maximum 2048 pixels.");
+                    throw new UserFacingIOException("Animated cape too large: width " + width
+                            + " exceeds maximum 2048 pixels.", "quickskin.cape.error.gif_width", width, 2048);
                 }
                 if (frameCount > 256) {
-                    throw new IOException("Animated cape too large: " + frameCount + " frames exceeds maximum 256.");
+                    throw new UserFacingIOException("Animated cape too large: " + frameCount
+                            + " frames exceeds maximum 256.", "quickskin.cape.error.gif_frames", 256);
                 }
                 long decodedBytes = (long) frameCount * width * height * 4;
                 long maxBytes = 64L * 1024 * 1024;
                 if (decodedBytes > maxBytes) {
                     long decodedMb = decodedBytes / (1024 * 1024);
-                    throw new IOException("Animated cape too large. Maximum 64 MB when decoded (frames x width x height x 4). Yours is " + decodedMb + " MB. Try reducing resolution or frame count.");
+                    // What the player can act on: the frames this GIF has at its size, and the most
+                    // that size allows
+                    long framesAllowed = maxBytes / Math.max(1L, (long) width * height * 4);
+                    throw new UserFacingIOException("Animated cape too large. Maximum 64 MB when decoded"
+                            + " (frames x width x height x 4). Yours is " + decodedMb + " MB.",
+                            "quickskin.cape.error.gif_decoded", frameCount, width + "×" + height,
+                            framesAllowed);
                 }
                 if (width != preflight.width() || height != preflight.height()
                         || frameCount != preflight.frameCount()) {
@@ -234,14 +244,15 @@ public class StbGifLoader {
         if (data.length < 13
                 || data[0] != 'G' || data[1] != 'I' || data[2] != 'F'
                 || data[3] != '8' || (data[4] != '7' && data[4] != '9') || data[5] != 'a') {
-            throw new IOException("Invalid GIF header");
+            throw new UserFacingIOException("Invalid GIF header", "quickskin.cape.error.invalid_image");
         }
 
         int canvasWidth = readUnsignedShort(data, 6);
         int canvasHeight = readUnsignedShort(data, 8);
         if (canvasWidth < 1 || canvasHeight < 1
                 || canvasWidth > MAX_FRAME_DIMENSION || canvasHeight > MAX_FRAME_DIMENSION) {
-            throw new IOException("Animated cape dimensions exceed 2048 pixels");
+            throw new UserFacingIOException("Animated cape dimensions exceed 2048 pixels",
+                    "quickskin.cape.error.dimensions", canvasWidth + "×" + canvasHeight, MAX_FRAME_DIMENSION);
         }
 
         int packed = data[10] & 0xFF;
@@ -269,7 +280,7 @@ public class StbGifLoader {
                 continue;
             }
             if (marker != 0x2C) {
-                throw new IOException("Invalid GIF block marker");
+                throw new UserFacingIOException("Invalid GIF block marker", "quickskin.cape.error.invalid_image");
             }
 
             requireAvailable(data, offset, 9);
@@ -281,7 +292,8 @@ public class StbGifLoader {
             offset += 9;
             if (width < 1 || height < 1
                     || (long) left + width > canvasWidth || (long) top + height > canvasHeight) {
-                throw new IOException("GIF frame lies outside its canvas");
+                throw new UserFacingIOException("GIF frame lies outside its canvas",
+                        "quickskin.cape.error.invalid_image");
             }
             if ((imagePacked & 0x80) != 0) {
                 offset = skipColorTable(data, offset, imagePacked);
@@ -292,16 +304,23 @@ public class StbGifLoader {
 
             frameCount++;
             if (frameCount > MAX_FRAMES) {
-                throw new IOException("Animated cape exceeds 256 frames");
+                throw new UserFacingIOException("Animated cape exceeds 256 frames",
+                        "quickskin.cape.error.gif_frames", MAX_FRAMES);
             }
         }
 
         if (!trailerFound || frameCount == 0) {
-            throw new IOException("GIF is truncated or has no frames");
+            throw new UserFacingIOException("GIF is truncated or has no frames",
+                    "quickskin.cape.error.invalid_image");
         }
         long decodedBytes = (long) canvasWidth * canvasHeight * frameCount * 4L;
         if (decodedBytes > MAX_DECODED_BYTES) {
-            throw new IOException("Animated cape exceeds 64 MB when decoded");
+            // What the player can act on: the frames this GIF has at its size, and the most that
+            // size allows
+            long framesAllowed = MAX_DECODED_BYTES / ((long) canvasWidth * canvasHeight * 4L);
+            throw new UserFacingIOException("Animated cape exceeds 64 MB when decoded",
+                    "quickskin.cape.error.gif_decoded", frameCount, canvasWidth + "×" + canvasHeight,
+                    framesAllowed);
         }
         return new GifPreflight(canvasWidth, canvasHeight, frameCount);
     }

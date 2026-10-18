@@ -6,6 +6,7 @@ import com.quickskin.mod.client.gui.screen.CapeEntry;
 import com.quickskin.mod.client.gui.screen.DeletionConfirmScreen;
 import com.quickskin.mod.client.gui.screen.PlayerCapeMenuScreen;
 import com.quickskin.mod.client.gui.screen.SettingsScreen;
+import com.quickskin.mod.client.gui.widget.ErrorToast;
 import com.quickskin.mod.client.services.AnimatedTextureManager;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
@@ -540,8 +541,8 @@ final class CapeMenuSteps {
                         return true;
                     }
                     String expected = Component.translatable("quickskin.cape.deleted").getString();
-                    return expected.equals(stringField(screen, "importMessage"))
-                            && intField(screen, "importMessageTimer") > 0
+                    ErrorToast toast = newestToast(screen);
+                    return toast != null && expected.equals(toastText(toast))
                             && contrastGone();
                 })
                 .settleTicks(10)
@@ -555,11 +556,12 @@ final class CapeMenuSteps {
                         return Step.Result.fail("cape menu not open: " + FullScenario.screenName(mc));
                     String contrastId = "local_cape:" + deletedPrimary.get();
                     String expected = Component.translatable("quickskin.cape.deleted").getString();
-                    String message = stringField(screen, "importMessage");
-                    int timer = intField(screen, "importMessageTimer");
-                    if (!expected.equals(message) || timer <= 0)
-                        return Step.Result.fail("deleted message not shown: \"" + message
-                                + "\" timer=" + timer);
+                    ErrorToast toast = newestToast(screen);
+                    String message = toast == null ? null : toastText(toast);
+                    Object kind = toast == null ? null : FullScenario.screenField(toast, "kind");
+                    if (!expected.equals(message) || kind != ErrorToast.Kind.SUCCESS)
+                        return Step.Result.fail("deleted toast not shown: \"" + message
+                                + "\" (" + kind + ")");
                     if (!contrastGone())
                         return Step.Result.fail("catalog still resolves " + contrastId
                                 + " / alias " + owner.previewCapeHashB);
@@ -596,8 +598,8 @@ final class CapeMenuSteps {
                     int[] button = deleteButton.get();
                     return Step.Result.pass("delete button (" + button[0] + "," + button[1]
                             + ") -> DeletionConfirmScreen -> confirm removed " + contrastId
-                            + " (" + path.getFileName() + " gone from uploads/capes); \"" + message
-                            + "\" shown with timer=" + timer + "; active GIF cape still " + gifId
+                            + " (" + path.getFileName() + " gone from uploads/capes); " + kind + " toast \"" + message
+                            + "\" shown; active GIF cape still " + gifId
                             + "; captured frame=" + capturedFrame + " (red motif); playback restored to 100%");
                 }));
 
@@ -638,9 +640,9 @@ final class CapeMenuSteps {
                     List<CapeEntry> local = localCapes(screen);
                     if (local.isEmpty()) return false;
                     AbstractSliderButton slider = speedSlider(screen);
-                    // Let the "Deleted cape" message from the previous step expire first so this
+                    // Let the "Deleted cape" toast from the previous step expire first so this
                     // capture shows only the None selection.
-                    return intField(screen, "importMessageTimer") == 0
+                    return newestToast(screen) == null
                             && isSelected(screen, local.get(0))
                             && ClientConfig.getInstance().activeCapeHash.isEmpty()
                             && !svc.hasActiveCape(uuid)
@@ -916,9 +918,19 @@ final class CapeMenuSteps {
         return value instanceof Double d ? d : Double.NaN;
     }
 
-    private static String stringField(PlayerCapeMenuScreen screen, String name) {
-        Object value = FullScenario.screenField(screen, name);
-        return value instanceof String s ? s : null;
+    /** The newest toast still showing in the cape menu's corner, or {@code null}. */
+    private static ErrorToast newestToast(PlayerCapeMenuScreen screen) {
+        Object toasts = FullScenario.screenField(screen, "toasts");
+        if (!(toasts instanceof List<?> list)) return null;
+        for (int i = list.size() - 1; i >= 0; i--) {
+            if (list.get(i) instanceof ErrorToast toast && !toast.isExpired()) return toast;
+        }
+        return null;
+    }
+
+    private static String toastText(ErrorToast toast) {
+        Object message = FullScenario.screenField(toast, "message");
+        return message instanceof Component component ? component.getString() : String.valueOf(message);
     }
 
     private static Object invokePrivate(PlayerCapeMenuScreen screen, String name,

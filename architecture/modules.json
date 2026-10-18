@@ -86,6 +86,7 @@
       "runtime_only": [],
       "libraries": {
         "test_runtime_only": [
+          "json",
           "webp-imageio"
         ]
       }
@@ -216,7 +217,8 @@
           "fabric-environment"
         ],
         "test_runtime_only": [
-          "json"
+          "json",
+          "webp-imageio"
         ]
       }
     },
@@ -843,6 +845,18 @@
       ],
       "consumers": [
         "appearance-services"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
+    {
+      "id": "uploaded-skin-adoption",
+      "api": "skin-upload",
+      "providers": [
+        "skin-import"
+      ],
+      "consumers": [
+        "skin-upload"
       ],
       "composition": "common",
       "impact": "propagate"

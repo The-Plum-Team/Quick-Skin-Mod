@@ -15,6 +15,13 @@ import java.io.InputStream;
 public interface GifDecoder {
     DecodedGif decode(InputStream input) throws IOException;
 
-    record DecodedGif(BufferedImage atlas, int frameCount, AnimationMetadata metadata) {
+    /**
+     * @param resampled whether the frames are smaller than the GIF's canvas, so the atlas is not
+     *                  the file's own pixels
+     */
+    record DecodedGif(BufferedImage atlas, int frameCount, AnimationMetadata metadata, boolean resampled) {
+        public DecodedGif(BufferedImage atlas, int frameCount, AnimationMetadata metadata) {
+            this(atlas, frameCount, metadata, false);
+        }
     }
 }

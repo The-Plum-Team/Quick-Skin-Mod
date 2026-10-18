@@ -50,6 +50,9 @@ public final class ClientFeatureBindings {
         appearance.configureSkinListener((playerId, texture) ->
                 CustomNPCsIntegration.onSkinApplied(playerId, MinecraftTextures.location(texture)));
         ClientNetworkHandler.configureAppearance(appearance, ClientFeatureBindings::settingsScreenOpen);
+        // A skin uploaded to Mojang becomes the own skin as Mojang keeps it
+        com.quickskin.mod.client.util.MojangSkinUploader.setUploadListener(
+                com.quickskin.mod.client.importing.PlayerOwnSkinBootstrap::adoptUploadedSkin);
         installed = true;
     }
 

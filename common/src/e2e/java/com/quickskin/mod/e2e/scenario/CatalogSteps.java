@@ -397,7 +397,7 @@ final class CatalogSteps {
                                 + (appearance == null ? "<none>" : appearance.getSkinId())
                                 + " resolves to " + appliedPrimary + ", expected " + plaidPrimary);
                     }
-                    // Selecting a row only previews it; the saved selection changes on Confirm alone.
+                    // A row the menu selects itself only previews it; only a click or Confirm wears it.
                     String activeBefore = activeSkinBeforeOwnSkin.get();
                     if (!java.util.Objects.equals(activeBefore, config.activeSkinHash)) {
                         return Step.Result.fail("config.activeSkinHash changed from " + activeBefore
@@ -736,8 +736,8 @@ final class CatalogSteps {
      * exactly like every other skin-menu checkpoint.
      *
      * <p>These catalog checkpoints deliberately run on the menu instance a user keeps open across
-     * the Rename and Delete dialogs, which return to that same instance: each dialog opens at the
-     * player's scale, and the menu must take its own scale back when it returns.</p>
+     * the Rename and Delete dialogs, which return to that same instance: each dialog follows the
+     * menu's scale, and the menu must still have its own scale when it returns.</p>
      */
     private boolean menuLayoutStable(Minecraft mc) {
         return owner.skinMenuLayoutSettled(mc);

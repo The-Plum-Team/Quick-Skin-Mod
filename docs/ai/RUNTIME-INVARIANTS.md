@@ -205,12 +205,23 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Opaque-fill, import fallback, local/network presentation, and animation processing must share
   the same structural mask; content-addressed source bytes remain immutable when only presentation
   requires normalization.
-- A cape saved through the cape editor keeps its original PNG or GIF in
+- A cape saved through the cape editor keeps its original PNG, WebP or GIF in
   `quickskin_cache/cape_editor_sources/<cape content ID>.<ext>` (`CapeEditorSources`). That file
   only reopens `CapeAdjustScreen`: it is never scanned, registered as a texture or animation, or
   substituted for a cape that has none. An edit writes the new metadata and source association
   first, replaces the catalogued PNG in place, and re-points the active cape and its animation
   speed to the new content ID; a source is removed only when no catalogued cape carries its ID.
+- An animated source opens in `CapeAdjustScreen` with a timeline (`CapeAnimationTimeline`): a
+  kept run of its frames, reversed and/or played there and back, each with its own source delay
+  divided by the chosen speed. Apply writes one atlas frame per entry of that sequence and its own
+  timing (one entry per atlas frame, in order, 20 ms to 60 s), and is refused past 256 frames.
+  Reopening the cape starts again from the retained source, untrimmed.
+- A GIF import the native loader refuses only for its size (canvas over 2048, more than 256
+  frames, more than 64 MB decoded) is decoded again by `ScaledGifDecoder`: bounded first (32 MB of
+  file, 4096 per side, 1024 frames, 512M composed canvas pixels), then composed one frame at a time
+  and shrunk evenly into an atlas of at most 1024 per side and 64 MB. Such an atlas, like any GIF
+  over 256 frames, always goes through the editor; only a GIF the catalogue loads as it is is
+  copied unchanged.
 - An active Quick Skin cape is authoritative for both the renderer's cape and profile-Elytra
   texture inputs. Never retain an unrelated Mojang/profile Elytra beside a custom cape: vanilla
   gives that dedicated field priority and would otherwise replace only the worn wings when the
@@ -274,8 +285,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
-- A preview hides everything the previewed player wears or holds. The one exception is the HUD
-  preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
+- A preview hides everything the previewed player wears or holds. The cape editor's Elytra view
+  is no exception: it draws its own model with vanilla's folded wings wearing the edited cape's
+  texture (`PreviewPlayerData.isElytraPreview`), never the elytra the player has equipped. The
+  one exception is the HUD preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
   that model as it does in the world. It exists only on the inline draw before 1.21.6; the
   render-state path keeps blanking both hands, because no TaCZ exists for those versions. TaCZ is
   not a supported integration and has no compatibility lane: recognise its gun type by name only,
@@ -427,21 +440,25 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   break when the option changes or the display resizes under them. The skin and cape menus draw
   at their own scale, chosen from the window size so they look the same at any option, by setting
   only the window's scale while they are shown (`MenuGuiScale`), and put back the option's scale
-  in `removed()`, so every dialog, other screen and the world open at the player's own scale. The
+  in `removed()`, so every other screen and the world open at the player's own scale. A Quick
+  Skin dialog drawn over a menu (Delete, Rename, Settings, Upload to Mojang) takes the menu's
+  scale instead (`MenuGuiScale.follow`), so the menu behind it keeps its size, and puts back the
+  player's scale when it goes away. The
   skin menu's packaged checkpoint asserts both the menu's scale on the window and the unchanged
   option.
 - GUI cape import evidence must go through `CapeImportWorkflow` from the real drop entry point:
   a translucent user cape with a transparent elytra area must be saved with the vanilla elytra
   composited in, keep its half-transparent face in-world and on the equipped wings, and the menu
-  must show its import, cancel, batch-limit, and delete messages. Cape-menu evidence must click
+  must report its import, batch-limit, and delete outcomes as toasts, and a cancelled editor
+  leaves it without one. Cape-menu evidence must click
   real tiles through the screen's mouse handlers so selection, the None tile, the speed slider,
   the GIF badge, the scrollbar, the tooltip, and Hide Built-in Capes are exercised as a user does.
   The worn-cape capture must also pass its contract-owned pixel probe: the yellow border encloses
   a teal surface with repeated plaid bands visible through it. Atlas alpha alone cannot certify
   framebuffer transparency; a closed cape mesh must cull its opaque inward-facing back surface.
 - Settings evidence must show every tab through the real tab buttons, the keybind capture state,
-  the non-admin server notice with inactive server controls, and styled buttons over the vanilla
-  in-world background; the captured tab must be the tab whose controls the assertion toggles.
+  the non-admin server notice with inactive server controls, and the skin menu's own buttons over
+  the vanilla in-world background; the captured tab must be the tab whose controls the assertion toggles.
 - The `server-policy` scenario is the only place a non-default `quickskin-server.json` exists. Its
   seed comes solely from the contract's `orchestration.server_config`; the orchestrator writes it
   verbatim before the server starts. Evidence must prove the server override reached the client,

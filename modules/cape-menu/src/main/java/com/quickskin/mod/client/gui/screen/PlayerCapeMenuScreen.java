@@ -9,7 +9,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 //?} else {
 //?}
 import com.quickskin.mod.platform.QuickSkinInfo;
-import com.quickskin.mod.client.gui.GuiTextColor;
 //? if <26.1 {
 import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 //?} else {
@@ -48,6 +47,8 @@ import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.common.util.SafeImageReader;
 //?} else {
 //?}
+import com.quickskin.mod.common.util.UserFacingIOException;
+import com.quickskin.mod.client.gui.widget.ErrorToast;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -68,6 +69,7 @@ import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPosition
 //?}
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
@@ -89,7 +91,8 @@ import java.util.stream.Collectors;
  * Cape selection menu for QuickSkin with grid-based layout
  */
 @Environment(EnvType.CLIENT)
-public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.client.gui.RestylableScreen {
+public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.client.gui.RestylableScreen,
+        MenuGuiScale.Scaled {
     @Override
     public Screen recreateForStyleChange() {
         return new PlayerCapeMenuScreen(null);
@@ -173,10 +176,13 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private final List<CapeEntry> localCapes = new ArrayList<>(); // Contains "None" and local capes
     private final List<CapeEntry> knownCapes = new ArrayList<>(); // Contains known/default capes
 
-    // Import feedback
-    private String importMessage = "";
-    private int importMessageTimer = 0;
-    private int importMessageColor = 0xFFFFFFFF;
+    /** What the menu has to say (imports, edits, deletions, failures), as toasts in the top-right corner. */
+    private final List<ErrorToast> toasts = new ArrayList<>();
+    /** The "processing" toast of the import or edit under way, taken down once it is done. */
+    @Nullable
+    private ErrorToast processingToast;
+    private static final int TOAST_GAP = 4;
+    private static final int TOAST_MARGIN = 8;
     private CapeImportWorkflow capeImportWorkflow;
     private int capeImportGeneration;
     private int capeEditGeneration;
@@ -221,8 +227,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         this.scrollSpeed = Math.max(10, this.capeDisplaySize / 3);
 
         // The grid takes whole tiles out of the room left of the preview and is centred in it.
-        // Keep a band between the grid's frame (5 px below the grid) and the buttons for the
-        // import/delete status line, so the message never covers the button labels.
+        // Keep a band between the grid's frame (5 px below the grid) and the buttons.
         int gridAreaWidth = previewX - SCROLLBAR_ROOM - MARGIN;
         this.gridWidth = gridAreaWidth;
         refineCapesPerRowForGridWidth();
@@ -597,8 +602,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             return;
         }
 
-        showImportMessage(Component.translatable("quickskin.cape.processing").getString(),
-                GuiTextColor.opaqueRgb(0x55AAFF), 60);
+        showProcessing(Component.translatable("quickskin.cape.processing"));
         startCapeImports(List.of(filePath));
     }
 
@@ -625,16 +629,19 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 client::execute,
 //? if <26.1 {
                 (prepared, apply, cancel) -> client.setScreen(new CapeAdjustScreen(
-                        this, prepared.atlas(), prepared.frameCount(), apply, cancel)),
+                        this, prepared.atlas(), prepared.frameCount(),
+                        prepared.animationMetadata(), apply, cancel)),
 //?} else if <26.2 {
                 (prepared, apply, cancel) -> {
                     client.setScreen(new CapeAdjustScreen(
-                            this, prepared.atlas(), prepared.frameCount(), apply, cancel));
+                            this, prepared.atlas(), prepared.frameCount(),
+                        prepared.animationMetadata(), apply, cancel));
                 },
 //?} else {
                 (prepared, apply, cancel) -> {
                     client.gui.setScreen(new CapeAdjustScreen(
-                            this, prepared.atlas(), prepared.frameCount(), apply, cancel));
+                            this, prepared.atlas(), prepared.frameCount(),
+                        prepared.animationMetadata(), apply, cancel));
                 },
 //?}
                 summary -> completeCapeImports(generation, summary));
@@ -647,28 +654,50 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             return;
         }
         this.capeImportWorkflow = null;
+        dismissProcessing();
 
         if (summary.succeeded() > 0) {
             LocalAssetManager.getInstance().reload();
             refreshCapeList();
             updateGridDimensions();
 
-            String message = summary.succeeded() == 1
-                    ? Component.translatable("quickskin.cape.imported").getString()
-                    : String.format("Imported %d capes", summary.succeeded());
+            MutableComponent message = summary.succeeded() == 1
+                    ? Component.translatable("quickskin.cape.imported")
+                    : Component.translatable("quickskin.cape.imported_many", summary.succeeded());
             int notImported = summary.failed() + summary.cancelled();
             if (notImported > 0) {
-                message += String.format(" (%d not imported)", notImported);
+                message.append(Component.translatable("quickskin.cape.not_imported", notImported));
             }
-            showImportMessage(message,
-                    GuiTextColor.opaqueRgb(notImported == 0 ? 0x55FF55 : 0xFFAA00), 200);
+            showToast(message, notImported == 0 ? ErrorToast.Kind.SUCCESS : ErrorToast.Kind.INFO);
+            if (summary.firstError() != null) {
+                showImportError(summary.firstError(), summary.firstErrorMessage(),
+                        "quickskin.cape.error.import_failed");
+            }
             return;
         }
 
-        String message = summary.firstError() != null
-                ? Component.translatable("quickskin.cape.error", summary.firstError()).getString()
-                : Component.translatable("quickskin.cape.no_valid").getString();
-        showImportMessage(message, GuiTextColor.opaqueRgb(0xFF5555), 200);
+        if (summary.firstError() != null) {
+            showImportError(summary.firstError(), summary.firstErrorMessage(),
+                    "quickskin.cape.error.import_failed");
+        }
+        // Otherwise the player cancelled every editor: nothing went wrong, so nothing to say
+    }
+
+    /**
+     * Tells the player why something failed, in a toast: the failure's own message when it has one
+     * for the player, otherwise {@code fallbackKey}'s; the detail goes to the log either way.
+     */
+    private void showImportError(String detail, @Nullable UserFacingIOException.UserMessage message,
+                                 String fallbackKey) {
+        QuickSkinInfo.LOGGER.warn("Cape import failed: {}", detail);
+        Component text = message != null
+                ? Component.translatable(message.translationKey(), message.args().toArray())
+                : Component.translatable(fallbackKey);
+        showToast(text, ErrorToast.Kind.ERROR);
+    }
+
+    private void showImportError(Throwable error, String fallbackKey) {
+        showImportError(rootMessage(error), UserFacingIOException.find(error), fallbackKey);
     }
 
     /**
@@ -683,8 +712,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         int generation = ++this.capeEditGeneration;
         this.capeEditBusy = true;
-        showImportMessage(Component.translatable("quickskin.cape.processing").getString(),
-                GuiTextColor.opaqueRgb(0x55AAFF), 60);
+        showProcessing(Component.translatable("quickskin.cape.processing"));
         ClientIoExecutor.supplyAsync(() -> {
             try {
                 return CapeImportProcessor.prepare(source, MinecraftGifDecoder.INSTANCE);
@@ -699,21 +727,22 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             }
             if (error != null) {
                 // The source vanished or no longer decodes; never fall back to another image
-                showImportMessage(Component.translatable("quickskin.cape.error", rootMessage(error)).getString(),
-                        GuiTextColor.opaqueRgb(0xFF5555), 200);
+                dismissProcessing();
+                showImportError(error, "quickskin.cape.error.edit_failed");
                 refreshCapeList();
                 return;
             }
-            // Loaded: a cancelled editor must not come back to a stale "processing" message
-            this.importMessageTimer = 0;
+            // Loaded: a cancelled editor must not come back to a stale "processing" toast
+            dismissProcessing();
             com.quickskin.mod.client.gui.GuiCompat.openScreen(new CapeAdjustScreen(
-                    this, prepared.atlas(), prepared.frameCount(),
-                    adjusted -> saveCapeEdit(capeEntry, prepared, adjusted), () -> { }));
+                    this, prepared.atlas(), prepared.frameCount(), prepared.animationMetadata(),
+                    (adjusted, timing) -> saveCapeEdit(capeEntry, prepared, adjusted, timing), () -> { }));
         }));
     }
 
     private void saveCapeEdit(CapeEntry capeEntry, CapeImportProcessor.PreparedCape prepared,
-                              java.awt.image.BufferedImage adjusted) {
+                              java.awt.image.BufferedImage adjusted,
+                              @Nullable com.quickskin.mod.common.data.AnimationMetadata timing) {
         Minecraft client = this.minecraft;
         AssetMetadata localCape = capeEntry.getLocalCape();
         Path capePath = capeEntry.getPath();
@@ -729,19 +758,18 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         java.awt.image.BufferedImage vanillaElytra = getVanillaElytraImage();
 
         this.capeEditBusy = true;
-        showImportMessage(Component.translatable("quickskin.cape.processing").getString(),
-                GuiTextColor.opaqueRgb(0x55AAFF), 60);
+        showProcessing(Component.translatable("quickskin.cape.processing"));
         ClientIoExecutor.supplyAsync(() -> {
             try {
                 CapeImportProcessor.replaceAdjusted(
-                        prepared, adjusted, capePath, cacheDirectory, vanillaElytra);
-                return (String) null;
+                        prepared, adjusted, timing, capePath, cacheDirectory, vanillaElytra);
+                return (Throwable) null;
             } catch (IOException | RuntimeException error) {
-                return rootMessage(error);
+                return error;
             }
         }).whenComplete((error, throwable) -> client.execute(() -> completeCapeEdit(
                 capePath, localCape.hash(), previousId, wasSelected, activeAtApply,
-                throwable != null ? rootMessage(throwable) : error)));
+                throwable != null ? throwable : error)));
     }
 
     /**
@@ -749,11 +777,11 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
      * active cape and its animation speed must follow it to the new content ID.
      */
     private void completeCapeEdit(Path capePath, String previousHash, String previousId,
-                                  boolean wasSelected, String activeAtApply, @Nullable String error) {
+                                  boolean wasSelected, String activeAtApply, @Nullable Throwable error) {
         this.capeEditBusy = false;
+        dismissProcessing();
         if (error != null) {
-            showImportMessage(Component.translatable("quickskin.cape.error", error).getString(),
-                    GuiTextColor.opaqueRgb(0xFF5555), 200);
+            showImportError(error, "quickskin.cape.error.edit_failed");
             return;
         }
 
@@ -793,8 +821,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         releaseEditorSource(previousHash);
 
-        showImportMessage(Component.translatable("quickskin.cape.edited").getString(),
-                GuiTextColor.opaqueRgb(0x55FF55), 200);
+        showToast(Component.translatable("quickskin.cape.edited"), ErrorToast.Kind.SUCCESS);
     }
 
     /**
@@ -929,18 +956,28 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 removeCape();
             }
 
-            showImportMessage(Component.translatable("quickskin.cape.deleted").getString(),
-                    GuiTextColor.opaqueRgb(0x55FF55), 100);
+            showToast(Component.translatable("quickskin.cape.deleted"), ErrorToast.Kind.SUCCESS);
         } catch (Exception e) {
-            showImportMessage(Component.translatable("quickskin.cape.error", e.getMessage()).getString(),
-                    GuiTextColor.opaqueRgb(0xFF5555), 100);
+            showImportError(e, "quickskin.cape.error.delete_failed");
         }
     }
 
-    private void showImportMessage(String message, int argb, int duration) {
-        this.importMessage = message;
-        this.importMessageColor = argb;
-        this.importMessageTimer = duration;
+    private void showToast(Component message, ErrorToast.Kind kind) {
+        toasts.add(new ErrorToast(message, kind));
+    }
+
+    /** Shows what is under way until {@link #dismissProcessing()}, replacing an earlier one. */
+    private void showProcessing(Component message) {
+        dismissProcessing();
+        processingToast = new ErrorToast(message, ErrorToast.Kind.INFO);
+        toasts.add(processingToast);
+    }
+
+    private void dismissProcessing() {
+        if (processingToast != null) {
+            toasts.remove(processingToast);
+            processingToast = null;
+        }
     }
 
     @Override
@@ -950,9 +987,6 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         // whenever a screen opens; take the menu's scale back and lay the menu out again
         if (this.minecraft != null && MenuGuiScale.apply(this.minecraft)) {
             rebuildWidgets();
-        }
-        if (importMessageTimer > 0) {
-            importMessageTimer--;
         }
         pollLocalAssetFolder();
     }
@@ -1073,18 +1107,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         graphics.pose().popMatrix();
 //?}
 
-        // Render import message
-        if (importMessageTimer > 0 && !importMessage.isEmpty()) {
-            // Centred in the band between the grid's frame and the buttons.
-            int frameBottom = this.gridY + this.gridHeight + STATUS_BAND_FRAME;
-            int messageY = frameBottom + Math.max(STATUS_BAND_MARGIN,
-                    (this.bottomButtonY - frameBottom - this.font.lineHeight) / 2);
-//? if <26.1 {
-            graphics.drawCenteredString(this.font, importMessage, this.width / 2, messageY, importMessageColor);
-//?} else {
-            graphics.centeredText(this.font, importMessage, this.width / 2, messageY, importMessageColor);
-//?}
-        }
+        renderToasts(graphics);
 
         // Tooltip logic
         if (isMouseOverGrid(mouseX, mouseY)) {
@@ -1145,6 +1168,36 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 }
             }
         }
+    }
+
+    /** The toasts in the top-right corner, the newest at the top. */
+//? if <26.1 {
+    private void renderToasts(GuiGraphics graphics) {
+//?} else {
+    private void renderToasts(GuiGraphicsExtractor graphics) {
+//?}
+        toasts.removeIf(ErrorToast::isExpired);
+        if (toasts.isEmpty()) {
+            return;
+        }
+//? if <1.21.6 {
+        // Up to 1.21.5 the GUI is depth tested: the model reaches forward to z 250 at most
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, 350.0F);
+//?} else {
+        graphics.nextStratum();
+//?}
+        // The top-right corner, clear of the buttons along the bottom; the newest on top
+        int x = width - TOAST_MARGIN - ErrorToast.WIDTH;
+        int top = TOAST_MARGIN;
+        for (int i = toasts.size() - 1; i >= 0; i--) {
+            ErrorToast toast = toasts.get(i);
+            toast.render(graphics, x, top);
+            top += toast.height() + TOAST_GAP;
+        }
+//? if <1.21.6 {
+        graphics.pose().popPose();
+//?}
     }
 
 //? if <26.1 {
@@ -1946,13 +1999,11 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 .toList();
 
         if (validFiles.isEmpty()) {
-            showImportMessage(Component.translatable("quickskin.cape.no_files").getString(),
-                    GuiTextColor.opaqueRgb(0xFFAA00), 100);
+            showToast(Component.translatable("quickskin.cape.no_files"), ErrorToast.Kind.ERROR);
             return;
         }
 
-        showImportMessage(Component.translatable("quickskin.cape.processing_count", validFiles.size()).getString(),
-                GuiTextColor.opaqueRgb(0x55AAFF), 60);
+        showProcessing(Component.translatable("quickskin.cape.processing_count", validFiles.size()));
         startCapeImports(validFiles);
     }
 

@@ -1,8 +1,10 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.quickskin.mod.client.gui.util.UiText;
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.effect.BlurHandler;
-import com.quickskin.mod.client.gui.util.ButtonFactory;
+import com.quickskin.mod.client.gui.util.DialogFrame;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -33,23 +35,15 @@ public class RenameScreen extends Screen {
     private EditBox nameEditBox;
     private Button confirmButton;
 
-    // Panel styling (same as DeletionConfirmScreen)
-    private static final int PANEL_BG = 0xB0000000;           // Darker semi-transparent background for frosted glass effect
-    private static final int PANEL_OUTLINE = 0x60FFFFFF;      // Subtle white outline
-    // Keep the Stonecutter seam aligned with the release branches; both APIs require opaque ARGB.
-    //? if <1.21.11 {
-    private static final int TITLE_COLOR = 0xFFFFFFFF;        // Opaque white title
-    private static final int MESSAGE_COLOR = 0xFFFFFFFF;      // Opaque white message
-    //?} else {
-    private static final int TITLE_COLOR = 0xFFFFFFFF;        // Opaque white title
-    private static final int MESSAGE_COLOR = 0xFFFFFFFF;      // Opaque white message
-    //?}
+    // A DialogFrame with a blue header and the pencil
+    private static final int MESSAGE_COLOR = 0xFFDDDDDD;
 
     // Panel dimensions
-    private final int panelWidth = 340;
-    private final int panelHeight = 180;
+    private final int panelWidth = 300;
+    private int panelHeight;
     private int panelX;
     private int panelY;
+    private int messageY;
 
     public RenameScreen(Screen parent, Component title, Component message, String initialValue, Consumer<String> callback) {
         super(title);
@@ -61,16 +55,24 @@ public class RenameScreen extends Screen {
 
     @Override
     protected void init() {
+        // Drawn over a menu, the dialog takes the menu's scale so the menu behind keeps its size
+        if (this.minecraft != null) {
+            MenuGuiScale.follow(this.minecraft, this, this.parent);
+        }
         super.init();
 
-        // Calculate centered panel position
+        // The header, the message when there is one, the text box, then the buttons
+        boolean hasMessage = !this.message.getString().isEmpty();
+        this.panelHeight = DialogFrame.HEADER_HEIGHT + 14 + (hasMessage ? 18 : 0) + 20 + 14 + 20 + 12
+                + 2 + DialogFrame.LIP_HEIGHT;
         this.panelX = (this.width - this.panelWidth) / 2;
         this.panelY = (this.height - this.panelHeight) / 2;
+        this.messageY = DialogFrame.bodyTop(this.panelY) + 14;
 
         // Text box dimensions
-        int boxWidth = 260;
+        int boxWidth = this.panelWidth - 32;
         int boxX = this.panelX + (this.panelWidth - boxWidth) / 2;
-        int boxY = this.panelY + 75;
+        int boxY = this.messageY + (hasMessage ? 18 : 0);
 
         this.nameEditBox = new EditBox(this.font, boxX, boxY, boxWidth, 20, this.title);
         this.nameEditBox.setMaxLength(50);
@@ -83,22 +85,22 @@ public class RenameScreen extends Screen {
         // Button dimensions
         int buttonWidth = 120;
         int buttonHeight = 20;
-        int buttonSpacing = 10;
-        int buttonY = this.panelY + this.panelHeight - buttonHeight - 20;
+        int buttonSpacing = 8;
+        int buttonY = boxY + 20 + 14;
 
         // Calculate button positions (centered, side by side)
         int totalButtonWidth = (buttonWidth * 2) + buttonSpacing;
         int buttonStartX = this.panelX + (this.panelWidth - totalButtonWidth) / 2;
 
         // Cancel button (left)
-        this.addRenderableWidget(ButtonFactory.createStyled(
+        this.addRenderableWidget(DialogFrame.button(
             buttonStartX, buttonY, buttonWidth, buttonHeight,
             CommonComponents.GUI_CANCEL,
             (button) -> this.onClose()
         ));
 
         // Confirm button (right)
-        this.confirmButton = this.addRenderableWidget(ButtonFactory.createStyled(
+        this.confirmButton = this.addRenderableWidget(DialogFrame.button(
             buttonStartX + buttonWidth + buttonSpacing, buttonY, buttonWidth, buttonHeight,
             CommonComponents.GUI_DONE,
             (button) -> {
@@ -162,50 +164,13 @@ public class RenameScreen extends Screen {
         // Draw lighter overlay over entire screen (so blur is more visible)
         graphics.fill(0, 0, this.width, this.height, 0x60000000);
 
-        // Draw main panel background with frosted glass effect
-        graphics.fill(this.panelX, this.panelY,
-                     this.panelX + this.panelWidth,
-                     this.panelY + this.panelHeight,
-                     PANEL_BG);
-
-        // Draw subtle outline around panel
-        // Top
-        graphics.fill(this.panelX, this.panelY,
-                     this.panelX + this.panelWidth, this.panelY + 1,
-                     PANEL_OUTLINE);
-        // Bottom
-        graphics.fill(this.panelX, this.panelY + this.panelHeight - 1,
-                     this.panelX + this.panelWidth, this.panelY + this.panelHeight,
-                     PANEL_OUTLINE);
-        // Left
-        graphics.fill(this.panelX, this.panelY,
-                     this.panelX + 1, this.panelY + this.panelHeight,
-                     PANEL_OUTLINE);
-        // Right
-        graphics.fill(this.panelX + this.panelWidth - 1, this.panelY,
-                     this.panelX + this.panelWidth, this.panelY + this.panelHeight,
-                     PANEL_OUTLINE);
-
-        // Draw title (centered)
-        int titleY = this.panelY + 20;
-        //? if <26.1 {
-        graphics.drawCenteredString(this.font, this.title,
-        //?} else {
-        graphics.centeredText(this.font, this.title,
-        //?}
-                                   this.width / 2, titleY,
-                                   TITLE_COLOR);
+        DialogFrame.draw(graphics, this.font, this.panelX, this.panelY, this.panelWidth, this.panelHeight,
+                DialogFrame.Accent.EDIT, DialogFrame.ICON_PENCIL, this.title);
 
         // Draw message if it exists
         if (!this.message.getString().isEmpty()) {
-            int messageY = this.panelY + 45;
-            //? if <26.1 {
-            graphics.drawCenteredString(this.font, this.message,
-            //?} else {
-            graphics.centeredText(this.font, this.message,
-            //?}
-                                       this.width / 2, messageY,
-                                       MESSAGE_COLOR);
+            int messageY = this.messageY;
+            UiText.drawCentered(graphics, this.font, this.message, this.width / 2, messageY, MESSAGE_COLOR);
         }
 
         // Render text box and buttons
@@ -220,6 +185,9 @@ public class RenameScreen extends Screen {
 
     @Override
     public void removed() {
+        if (this.minecraft != null) {
+            MenuGuiScale.leave(this.minecraft, this);
+        }
         super.removed();
         // Cleanup blur resources
         BlurHandler.cleanup();

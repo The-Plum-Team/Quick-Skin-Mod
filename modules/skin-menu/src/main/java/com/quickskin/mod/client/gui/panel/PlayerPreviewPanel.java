@@ -1,8 +1,9 @@
 package com.quickskin.mod.client.gui.panel;
 
 import com.quickskin.mod.client.gui.GuiCompat;
-import com.quickskin.mod.client.gui.util.ButtonFactory;
+import com.quickskin.mod.client.gui.widget.IconButton;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
+import com.quickskin.mod.client.gui.widget.PoseList;
 import com.quickskin.mod.client.gui.widget.RotationArcWidget;
 import com.quickskin.mod.common.data.AssetMetadata;
 //? if <26.1 {
@@ -19,8 +20,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Locale;
 
 /**
- * The player model in the middle of the skin menu, with the turntable arc under its feet and, on
- * the title screen, the animation selector.
+ * The player model in the middle of the skin menu, with the turntable arc under its feet and the
+ * pose selector. The model holds the chosen pose in a world too, rather than copying the player.
  *
  * <p>The panel only previews: it shows whatever skin and arm width the menu has pending and never
  * applies anything to the player. Its own rectangle is the model's box; it draws a CPM model's icon
@@ -33,9 +34,11 @@ public class PlayerPreviewPanel extends AbstractWidget {
 
     @Nullable
     private RotationArcWidget rotationArc;
-    private Button animationToggleButton;
-    private final java.util.List<Button> animationButtons = new java.util.ArrayList<>();
-    private boolean isAnimationDropdownOpen = false;
+    @Nullable
+    private IconButton poseButton;
+    @Nullable
+    private PoseList poseList;
+    private final java.util.List<PoseList.Row> poseRows = new java.util.ArrayList<>();
 
     private String currentModelType = "classic";
 
@@ -107,13 +110,11 @@ public class PlayerPreviewPanel extends AbstractWidget {
     }
 
     /**
-     * Creates the turntable ring around the model's feet and, on the title screen, the animation
-     * selector beside its right end, which opens upward. With {@code ringIntro} the ring plays its
-     * appearing animation.
+     * Creates the turntable ring around the model's feet. With {@code ringIntro} the ring plays
+     * its appearing animation.
      */
     public void initControls(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen,
                              int centerX, int ringCenterY, int ringRadiusX, boolean ringIntro) {
-        int size = 20;
         rotationArc = new RotationArcWidget(centerX, ringCenterY, ringRadiusX, ringIntro);
         screen.registerWidget(rotationArc);
         //? if <1.21 {
@@ -122,53 +123,110 @@ public class PlayerPreviewPanel extends AbstractWidget {
         }
         //?}
 
-        animationButtons.clear();
-        isAnimationDropdownOpen = false;
+        poseButton = null;
+        poseList = null;
+        poseRows.clear();
+    }
 
-        // Animations only show on the title screen, where the model is not the live player.
-        boolean isInGame = net.minecraft.client.Minecraft.getInstance().player != null;
-        if (isInGame) {
+    /**
+     * Adds the pose button at {@code (x, y)}: it opens the list of poses to its right, and its
+     * tooltip names the current pose.
+     */
+    public void initPoseControl(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen,
+                                int x, int y, int size, int screenWidth) {
+        poseButton = new IconButton(x, y, size, "poses", Component.empty(),
+                button -> setPoseListOpen(poseList != null && !poseList.visible));
+        screen.registerWidget(poseButton);
+        addPriorityControl(poseButton);
+
+        java.util.List<String> poses = getAvailableAnimations();
+        net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
+        int listWidth = 70;
+        for (String pose : poses) {
+            listWidth = Math.max(listWidth, font.width(poseName(pose)) + 16);
+        }
+        int listHeight = poses.size() * PoseList.ROW_HEIGHT + 2 * PoseList.FRAME;
+        // Beside the button, centred on it; to its left when the screen has no room on the right
+        int listX = x + size + 4;
+        if (listX + listWidth > screenWidth - 4) {
+            listX = x - 4 - listWidth;
+        }
+        int listY = y + size / 2 - listHeight / 2;
+        poseList = new PoseList(listX, listY, listWidth, poses.size());
+        screen.registerWidget(poseList);
+        for (int i = 0; i < poses.size(); i++) {
+            String pose = poses.get(i);
+            PoseList.Row row = new PoseList.Row(listX + PoseList.FRAME, listY + PoseList.FRAME + i * PoseList.ROW_HEIGHT,
+                    listWidth - 2 * PoseList.FRAME, poseName(pose), button -> selectPose(pose));
+            poseRows.add(row);
+            screen.registerWidget(row);
+            addPriorityControl(row);
+        }
+        setPoseListOpen(false);
+        updatePoseButton();
+    }
+
+    /** Closes the pose list when a click lands outside it and its button. */
+    public void closePoseListUnlessOver(double mouseX, double mouseY) {
+        if (poseList == null || !poseList.visible || poseButton == null) {
             return;
         }
-        int toggleX = centerX + ringRadiusX + 6;
-        int y = ringCenterY - size / 2;
-        animationToggleButton = ButtonFactory.createStyled(
-                toggleX, y, size, size,
-                Component.literal(">"),
-                button -> toggleAnimationDropdown()
-        );
-        screen.registerWidget(animationToggleButton);
-        //? if <1.21 {
-        if (playerWidget != null) {
-            playerWidget.addPriorityWidget(animationToggleButton);
+        // The list itself is inactive, so its bounds are checked here rather than by isMouseOver
+        boolean overList = mouseX >= poseList.getX() && mouseX < poseList.getX() + poseList.getWidth()
+                && mouseY >= poseList.getY() && mouseY < poseList.getY() + poseList.getHeight();
+        if (!overList && !poseButton.isMouseOver(mouseX, mouseY)) {
+            setPoseListOpen(false);
         }
-        //?}
+    }
 
-        java.util.List<String> availableAnimations = getAvailableAnimations();
-        for (int i = 0; i < availableAnimations.size(); i++) {
-            final String animName = availableAnimations.get(i);
-            Button animButton = ButtonFactory.createStyled(
-                    toggleX, y - (i + 1) * 22, size, size,
-                    Component.literal(String.valueOf(i + 1)),
-                    button -> {
-                        if (playerWidget != null) {
-                            playerWidget.setAnimation(animName);
-                            // Save animation state for persistence across all screens
-                            com.quickskin.mod.client.services.PreviewAnimationState.set(animName);
-                        }
-                        toggleAnimationDropdown();
-                    }
-            );
-            animButton.visible = false;
-            animButton.active = false;
-            animationButtons.add(animButton);
-            screen.registerWidget(animButton);
-            //? if <1.21 {
-            if (playerWidget != null) {
-                playerWidget.addPriorityWidget(animButton);
-            }
-            //?}
+    private void selectPose(String pose) {
+        if (playerWidget != null) {
+            playerWidget.setAnimation(pose);
         }
+        // Kept for every preview, across screens
+        com.quickskin.mod.client.services.PreviewAnimationState.set(pose);
+        updatePoseButton();
+        setPoseListOpen(false);
+    }
+
+    private void setPoseListOpen(boolean open) {
+        if (poseList == null || poseButton == null) {
+            return;
+        }
+        poseList.visible = open;
+        poseButton.setSelected(open);
+        // Its tooltip would cover the list
+        poseButton.setTooltip(open ? null
+                : net.minecraft.client.gui.components.Tooltip.create(poseButton.getMessage()));
+        String current = currentPose();
+        java.util.List<String> poses = getAvailableAnimations();
+        for (int i = 0; i < poseRows.size(); i++) {
+            PoseList.Row row = poseRows.get(i);
+            row.visible = open;
+            row.active = open;
+            row.setSelected(poses.get(i).equals(current));
+        }
+    }
+
+    private void updatePoseButton() {
+        if (poseButton == null) {
+            return;
+        }
+        String pose = currentPose();
+        Component tooltip = Component.translatable("quickskin.preview.pose", poseName(pose));
+        poseButton.setMessage(tooltip);
+        if (poseList == null || !poseList.visible) {
+            poseButton.setTooltip(net.minecraft.client.gui.components.Tooltip.create(tooltip));
+        }
+    }
+
+    private static String currentPose() {
+        String pose = com.quickskin.mod.client.services.PreviewAnimationState.get();
+        return pose == null || pose.isEmpty() ? "idle" : pose;
+    }
+
+    private static Component poseName(String pose) {
+        return Component.translatable("quickskin.preview.pose." + pose);
     }
 
     /** The turntable arc under the model, once {@link #initControls} has created it. */
@@ -187,17 +245,6 @@ public class PlayerPreviewPanel extends AbstractWidget {
             playerWidget.addPriorityWidget(control);
         }
         //?}
-    }
-
-    private void toggleAnimationDropdown() {
-        isAnimationDropdownOpen = !isAnimationDropdownOpen;
-        if (animationToggleButton != null) {
-            animationToggleButton.setMessage(Component.literal(isAnimationDropdownOpen ? "×" : ">"));
-        }
-        for (Button button : animationButtons) {
-            button.visible = isAnimationDropdownOpen;
-            button.active = isAnimationDropdownOpen;
-        }
     }
 
     /** Vanilla Minecraft animation states, in button order. */
@@ -311,6 +358,11 @@ public class PlayerPreviewPanel extends AbstractWidget {
     protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
     //?}
         updateCpmWearingState();
+        if (playerWidget != null) {
+            // In a world too the model shows the chosen pose rather than copying what the player
+            // does; only a CPM model needs the live player, which CPM draws it on
+            playerWidget.setOwnPose(!isCpmLook());
+        }
         if (cpmIconLocation == null) {
             return;
         }

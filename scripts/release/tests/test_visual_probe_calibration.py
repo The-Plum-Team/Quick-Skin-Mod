@@ -39,13 +39,14 @@ TEXT_CANARY = {
         ("cape menu title", (505, 35, 650, 75), 159, 300),
         ("cape drop-zone instructions", (585, 140, 880, 200), 159, 650),
     ),
+    # The title and the hint share the editor's header strip, the title from its left edge and
+    # the hint against its right edge. At GUI scale 3 the title spans x=20..252, y=17..37 on a
+    # 1920x1080 framebuffer and x=24..302, y=21..44 on a native 1600x900 one, keeping 1,597 and
+    # 1,845 pixels above luma 75; the hint spans x=1210..1577 and x=1134..1574 on the same rows
+    # with 2,050 and 2,349. Both boxes end above the strip's accent line.
     ("full", "client_a", "cape_adjust_screen"): (
-        ("cape editor title", (675, 20, 925, 50), 75, 400),
-        # Minecraft's effective GUI scale puts the hint at y=627..649 on a 1920x1080
-        # framebuffer and y=645..671 on a native 1600x900 framebuffer. Stop before the
-        # earliest control row and require more bright pixels than those controls contribute,
-        # so the responsive union still fails closed when the hint itself is absent.
-        ("cape editor instructions", (300, 624, 780, 672), 75, 900),
+        ("cape editor title", (16, 14, 330, 50), 75, 900),
+        ("cape editor instructions", (1100, 14, 1590, 50), 75, 1200),
     ),
     # The Fabric and Forge 1920x1080 anchor frames both retain 540 glyph pixels above
     # this threshold after the production 1600x900 resize.
@@ -57,18 +58,26 @@ TEXT_CANARY = {
     ("full", "client_a", "cape_tile_tooltip"): (
         ("cape tile tooltip copy", (600, 125, 875, 290), 159, 2500),
     ),
+    # The source size ends the Zoom panel's heading row under the canvas and the output size sits
+    # under the right panel's resolution buttons. The boxes are the union of the 1920x1080 and
+    # native 1600x900 layouts at GUI scale 3, kept inside the panels (the source box stops at the
+    # Zoom panel's right edge on the 1600x900 layout) and below the resolution buttons' labels;
+    # "Source: 192x128" kept 682 and 1,257 pixels above luma 175 and "Output: 64x32" 679 and 1,119.
     ("full", "client_a", "bmo_padded_source_screen"): (
-        ("BMO source dimensions", (45, 100, 250, 140), 75, 120),
-        ("BMO output dimensions", (1035, 100, 1255, 140), 75, 120),
+        ("BMO source dimensions", (820, 634, 1040, 662), 175, 300),
+        ("BMO output dimensions", (1215, 514, 1430, 552), 175, 300),
     ),
+    # The settings tabs sit in a sidebar and each setting is a row whose label starts at the
+    # content's left edge; a label too long for one line wraps onto two inside its row. A 1.21.1
+    # frame keeps 1,620 pixels of "Assign a key to open the skin menu" above the threshold after
+    # the resize, 2,604 of the two-line server transparency label and 1,942 of the notice near
+    # the dialog's bottom.
     ("full", "client_a", "settings_screen"): (
-        ("Open Skin Menu setting label", (445, 235, 655, 265), 175, 300),
+        ("Open Skin Menu setting label", (510, 210, 960, 240), 175, 1100),
     ),
-    # The two anchor lanes are pixel-identical here: 1,752 label pixels and 2,270
-    # notice pixels remain above the threshold after resizing.
     ("full", "client_a", "settings_server_tab"): (
-        ("server transparency setting label", (305, 234, 780, 268), 175, 1300),
-        ("non-admin server notice", (495, 655, 1105, 688), 175, 1700),
+        ("server transparency setting label", (510, 196, 1145, 244), 175, 1800),
+        ("non-admin server notice", (685, 728, 1190, 757), 175, 1400),
     ),
     # The disabled label is dimmer than ordinary GUI text. It sits on the bottom-centre Confirm
     # button in the blocky button font: both 1.20.1 lanes kept 9,959 glyph pixels above luma 127,
@@ -188,25 +197,29 @@ class VisualProbeCalibrationTest(unittest.TestCase):
     def test_cape_editor_hint_probe_covers_both_real_layouts_but_not_controls(self) -> None:
         key = ("full", "client_a", "cape_adjust_screen")
 
-        def write_frame(name: str, hint_top: int | None) -> Path:
+        def write_frame(name: str, hint: tuple[int, int, int] | None) -> Path:
             image = Image.new("RGB", (1600, 900), (12, 14, 18))
             draw = ImageDraw.Draw(image)
-            draw.rectangle((700, 25, 899, 28), fill=(255, 255, 255))
-            # A narrow slice of the earliest real control row overlaps the responsive union.
-            # It must not be enough to impersonate the missing hint.
-            draw.rectangle((430, 660, 579, 662), fill=(255, 255, 255))
-            if hint_top is not None:
-                # Three separated glyph-like strokes model the hint at each observed Y offset.
-                for y in (hint_top, hint_top + 6, hint_top + 12):
-                    draw.rectangle((330, y, 699, y + 1), fill=(255, 255, 255))
+            # The header strip, its accent line just under both boxes, and the title.
+            draw.rectangle((0, 0, 1599, 50), fill=(46, 58, 74))
+            draw.rectangle((0, 51, 1599, 53), fill=(111, 143, 176))
+            draw.rectangle((30, 22, 249, 33), fill=(255, 255, 255))
+            # The Source label at the Zoom panel's right edge is the nearest other copy; it
+            # must not be enough to impersonate the missing hint.
+            draw.rectangle((860, 640, 1060, 655), fill=(85, 255, 255))
+            if hint is not None:
+                left, top, right = hint
+                # Three separated glyph-like strokes model the hint in each real layout.
+                for y in (top, top + 6, top + 12):
+                    draw.rectangle((left, y, right, y + 1), fill=(255, 255, 255))
             path = self.root / name
             image.save(path, format="PNG")
             return path
 
-        for name, hint_top in (("1920-layout", 627), ("1600-layout", 645)):
+        for name, hint in (("1920-layout", (1210, 19, 1577)), ("1600-layout", (1134, 24, 1574))):
             with self.subTest(layout=name):
                 packaged_runtime.validate_required_gui_text(
-                    write_frame(f"{name}.png", hint_top), *key
+                    write_frame(f"{name}.png", hint), *key
                 )
 
         with self.assertRaisesRegex(

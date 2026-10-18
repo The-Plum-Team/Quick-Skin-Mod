@@ -4,8 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.quickskin.mod.client.gui.panel.ActionButtonsPanel;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
 import com.quickskin.mod.client.gui.screen.SettingsScreen;
-import com.quickskin.mod.client.gui.widget.PrimaryButton;
-import com.quickskin.mod.client.gui.widget.StyledButton;
+import com.quickskin.mod.client.gui.widget.ConfirmButton;
 import com.quickskin.mod.client.gui.widget.TabButton;
 import com.quickskin.mod.client.input.KeybindRegistry;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
@@ -110,14 +109,13 @@ final class SettingsSteps {
         final String starsControlShot = prefix + "full_02b_skin_menu" + suffix;
 
         // 10a. settings screen opens on its Client tab ------------------------------------------
-        // Known starting config: overlay off, vanilla buttons, starred background. The capture is
+        // Known starting config: overlay off, starred background. The capture is
         // the untouched Client tab; nothing is toggled here (the GUI Edit step owns the toggles).
         steps.add(Step.of("settings_screen")
                 .action(() -> {
                     clientHold.set(0);
                     ClientConfig c = ClientConfig.getInstance();
                     c.showSkinPreviewOverlay = false;
-                    c.enableStyledButtons = false;
                     c.menuBackgroundStyle = BackgroundStyle.OPAQUE_STARS.getId();
                     c.save();
                     VanillaShim.setScreen(mc, new SettingsScreen(null));
@@ -141,7 +139,7 @@ final class SettingsSteps {
                             + keybind.getMessage().getString() + "' == OPEN_SKIN_MENU translated key '"
                             + KeybindRegistry.OPEN_SKIN_MENU.getTranslatedKeyMessage().getString()
                             + "' (saveString=" + KeybindRegistry.OPEN_SKIN_MENU.saveString()
-                            + "); config showSkinPreviewOverlay=false enableStyledButtons=false "
+                            + "); config showSkinPreviewOverlay=false "
                             + "menuBackgroundStyle=" + c.menuBackgroundStyle);
                 }));
 
@@ -220,7 +218,7 @@ final class SettingsSteps {
                             + "; the button label re-reads the translated key on its next render");
                 }));
 
-        // 10a3. GUI Edit tab: the five real checkboxes, then persisted through onClose -----------
+        // 10a3. GUI Edit tab: the four real checkboxes, then persisted through onClose -----------
         steps.add(Step.of("settings_gui_edit_tab")
                 .action(() -> {
                     guiEditHold.set(0);
@@ -248,7 +246,7 @@ final class SettingsSteps {
                     if (problem != null) return Step.Result.fail(problem);
                     SettingsScreen s = (SettingsScreen) VanillaShim.currentScreen(mc);
 
-                    // Parent is null, so the styled-button change cannot recreate a parent screen;
+                    // Parent is null, so the background change cannot rebuild a parent screen;
                     // onClose must persist the checkboxes and close to the world.
                     s.onClose();
                     if (VanillaShim.currentScreen(mc) instanceof SettingsScreen)
@@ -256,7 +254,6 @@ final class SettingsSteps {
                     ClientConfig c = ClientConfig.getInstance();
                     List<String> wrong = new ArrayList<>();
                     if (!c.showSkinPreviewOverlay) wrong.add("showSkinPreviewOverlay=false");
-                    if (!c.enableStyledButtons) wrong.add("enableStyledButtons=false");
                     if (c.getMenuBackgroundStyle() != BackgroundStyle.VANILLA_BLUR)
                         wrong.add("menuBackgroundStyle=" + c.menuBackgroundStyle);
                     if (c.enablePlayerPreviewCustomization)
@@ -265,10 +262,10 @@ final class SettingsSteps {
                     if (!wrong.isEmpty())
                         return Step.Result.fail("ClientConfig after onClose: " + wrong);
                     return Step.Result.pass("GUI Edit tab (guiEditTabButton selected) held "
-                            + "showOverlayCheckbox=on enableStyledButtonsCheckbox=on "
+                            + "showOverlayCheckbox=on "
                             + "menuBackgroundCheckbox=on enablePlayerPreviewCustomizationCheckbox=off "
                             + "hideBuiltInCapesCheckbox=off; onClose persisted showSkinPreviewOverlay="
-                            + c.showSkinPreviewOverlay + " enableStyledButtons=" + c.enableStyledButtons
+                            + c.showSkinPreviewOverlay
                             + " menuBackgroundStyle=" + c.menuBackgroundStyle + " ("
                             + c.getMenuBackgroundStyle() + ") enablePlayerPreviewCustomization="
                             + c.enablePlayerPreviewCustomization + " hideBuiltInCapes="
@@ -368,10 +365,9 @@ final class SettingsSteps {
                     backgroundFailure.set(null);
                     owner.enterWorldView(mc);
                     ClientConfig c = ClientConfig.getInstance();
-                    if (!c.enableStyledButtons || c.getMenuBackgroundStyle() != BackgroundStyle.VANILLA_BLUR) {
+                    if (c.getMenuBackgroundStyle() != BackgroundStyle.VANILLA_BLUR) {
                         backgroundFailure.set("GUI Edit persisted state was lost before the skin menu "
-                                + "opened: enableStyledButtons=" + c.enableStyledButtons
-                                + " menuBackgroundStyle=" + c.menuBackgroundStyle);
+                                + "opened: menuBackgroundStyle=" + c.menuBackgroundStyle);
                         return;
                     }
                     VanillaShim.setScreen(mc, new PlayerSkinMenuScreen(null));
@@ -387,7 +383,6 @@ final class SettingsSteps {
                     } finally {
                         // Every later dialog step runs with the seeded starred background again.
                         ClientConfig c = ClientConfig.getInstance();
-                        c.enableStyledButtons = false;
                         c.setMenuBackgroundStyle(BackgroundStyle.OPAQUE_STARS); // saves
                         c.save();
                         owner.enterWorldView(mc);
@@ -449,9 +444,9 @@ final class SettingsSteps {
         if (tabButton == null) return "SettingsScreen.guiEditTabButton not built";
         if (!tabButton.isSelected()) return "guiEditTabButton is not selected";
         String[] names = {
-                "showOverlayCheckbox", "enableStyledButtonsCheckbox", "menuBackgroundCheckbox",
+                "showOverlayCheckbox", "menuBackgroundCheckbox",
                 "enablePlayerPreviewCustomizationCheckbox", "hideBuiltInCapesCheckbox"};
-        boolean[] wanted = {true, true, true, false, false};
+        boolean[] wanted = {true, true, false, false};
         for (int i = 0; i < names.length; i++) {
             Checkbox box = widget(s, names[i], Checkbox.class);
             if (box == null) return "SettingsScreen." + names[i] + " not built";
@@ -643,8 +638,6 @@ final class SettingsSteps {
         if (!(VanillaShim.currentScreen(mc) instanceof PlayerSkinMenuScreen screen))
             return Step.Result.fail("skin menu not open: " + FullScenario.screenName(mc));
         ClientConfig c = ClientConfig.getInstance();
-        if (!c.enableStyledButtons)
-            return Step.Result.fail("enableStyledButtons is false while the styled menu is open");
         if (c.getMenuBackgroundStyle() != BackgroundStyle.VANILLA_BLUR)
             return Step.Result.fail("menuBackgroundStyle=" + c.menuBackgroundStyle
                     + " expected " + BackgroundStyle.VANILLA_BLUR.getId());
@@ -652,17 +645,16 @@ final class SettingsSteps {
             return Step.Result.fail("no player/level: BackgroundRenderer would take the panorama "
                     + "path instead of the in-world overlay");
 
+        // The menu's controls are all Quick Skin's own buttons: none is a plain vanilla Button
         int styled = 0;
-        int primary = 0;
         int plain = 0;
         for (GuiEventListener child : screen.children()) {
-            if (child instanceof StyledButton) styled++;
-            else if (child instanceof PrimaryButton) primary++;
+            if (child instanceof ConfirmButton) styled++;
             else if (child != null && child.getClass() == Button.class) plain++;
         }
-        if (styled == 0)
-            return Step.Result.fail("no StyledButton among the skin menu's children (styled="
-                    + styled + " primary=" + primary + " plainVanillaButton=" + plain + ")");
+        if (styled == 0 || plain > 0)
+            return Step.Result.fail("the skin menu's buttons are not all Quick Skin's styled ones "
+                    + "(ConfirmButton family=" + styled + " plainVanillaButton=" + plain + ")");
 
         long[] counts = backgroundCounts.get();
         int[] region = backgroundRegion.get();
@@ -689,9 +681,8 @@ final class SettingsSteps {
         } else {
             control = "; opaque-stars control frame unavailable";
         }
-        return Step.Result.pass("skin menu open with " + styled + " StyledButton and " + primary
-                + " PrimaryButton children (" + plain + " plain vanilla Button); config "
-                + "enableStyledButtons=true menuBackgroundStyle=" + c.menuBackgroundStyle
+        return Step.Result.pass("skin menu open with " + styled + " styled ConfirmButton-family "
+                + "children and no plain vanilla Button; config menuBackgroundStyle=" + c.menuBackgroundStyle
                 + " with player+level present selects BackgroundRenderer's in-world 0x90 overlay; "
                 + "probe frame shows the world through it: " + counts[0] + " of " + counts[1]
                 + " pixels in GUI strip " + where + " exceed luma " + BRIGHT_LUMA

@@ -92,7 +92,12 @@ provenance for every reused frame. A consumer expecting full evidence must rejec
 report, even when that selection happens to contain all authored steps.
 
 `PlayerOwnSkinBootstrap` belongs to `skin-import`, including its bounded async startup task,
-closed-state guard, and persisted own-skin selection. `SavedAppearanceRestorer` belongs to
+closed-state guard, and persisted own-skin selection. It checks the account's Mojang texture on
+every start, recognising the listed own skin by that texture's address, and lists a new one as the
+own skin, which whoever wore the previous one then wears; the previous one stays in the list.
+`skin-upload` reports every accepted upload with the active texture of Mojang's reply
+(`MojangSkinUploader.UploadListener`), which `ClientFeatureBindings` hands to the bootstrap, since
+Mojang may retouch an uploaded skin (the `uploaded-skin-adoption` binding). `SavedAppearanceRestorer` belongs to
 `appearance-services`. `ClientEvents` admits the session/Replay subject and delegates to those
 features; it owns event registration and teardown wiring. The existing catalog E2E checks inspect
 the actual import owner and exercise the same composed saved-appearance path.
@@ -120,7 +125,8 @@ native conversion and preserves the allocation-free cached lookup. Server stores
 `Path` supplied by `ServerRuntime`, without importing `MinecraftServer`.
 `cape-import` receives a `GifDecoder` through its workflow constructor. Its API returns a bounded
 ARGB atlas and animation metadata; `MinecraftGifDecoder` in the adapter owns native decoding,
-channel conversion, and native-frame disposal. Keep native image objects out of import processing.
+channel conversion, and native-frame disposal. A GIF it refuses only for its size falls back to
+`ScaledGifDecoder` in `image-core`, which decodes in Java frame by frame and shrinks. Keep native image objects out of import processing.
 
 `ClientFeatureBindings` installs the process-owned links before catalog scans or network callbacks:
 CPM consumes `CpmAssetAccess`, accepted packets target `RemoteAppearanceTarget`, and feature code

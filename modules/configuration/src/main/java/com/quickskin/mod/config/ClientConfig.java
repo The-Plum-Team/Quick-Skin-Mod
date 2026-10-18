@@ -82,14 +82,12 @@ public class ClientConfig {
     // Transparency Settings
     public boolean disableSkinTransparency = false; // Disable transparency in player skins
 
-    // GUI Style Settings
-    public boolean enableStyledButtons = false; // Enable custom styled buttons with frosted glass aesthetic
-
     // Cape Settings
     public boolean hideBuiltInCapes = false; // Hide built-in Minecraft capes from cape menu
 
     // Sorting Settings
     public String skinSortMode = "LATEST_LAST"; // Skin list sorting mode
+    public boolean skinListRows = false; // Skin menu shows its skins as cards in rows instead of a grid of tiles
 
     // Menu Background Style
     public String menuBackgroundStyle = "vanilla_blur"; // "vanilla_blur" or "opaque_stars"
@@ -107,6 +105,7 @@ public class ClientConfig {
     public String activeModelType = "auto"; // "auto", "classic", "slim" (deprecated - kept for compatibility)
     public String activeCapeHash = ""; // Active cape hash
     public String playerOwnSkinHash = ""; // Hash of the player's own Mojang skin (protected from deletion)
+    public String playerOwnSkinTexture = ""; // Mojang texture address the own skin was downloaded from
     public String playerOwnSkinAccount = ""; // Launcher account that playerOwnSkinHash was downloaded for
     public AccountSkinPreferences accountSkins = new AccountSkinPreferences(); // Skin selection per launcher account
 
@@ -377,6 +376,9 @@ public class ClientConfig {
         if (activeCapeHash == null || activeCapeHash.length() > 256
                 || activeCapeHash.chars().anyMatch(Character::isISOControl)) activeCapeHash = "";
         playerOwnSkinHash = validHashOrEmpty(playerOwnSkinHash);
+        if (playerOwnSkinTexture == null || playerOwnSkinTexture.length() > 512 || playerOwnSkinHash.isEmpty()) {
+            playerOwnSkinTexture = "";
+        }
         if (!AccountSkinPreferences.isKey(playerOwnSkinAccount)) playerOwnSkinAccount = "";
         if (accountSkins == null) accountSkins = new AccountSkinPreferences();
         accountSkins.normalize();

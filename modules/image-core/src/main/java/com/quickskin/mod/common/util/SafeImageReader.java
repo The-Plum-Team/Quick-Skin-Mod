@@ -26,6 +26,7 @@ public final class SafeImageReader {
     public static final long MAX_PIXELS = 16L * 1024L * 1024L;
     private static final Set<String> PNG_FORMAT = Set.of("png");
     private static final Set<String> SKIN_FORMATS = Set.of("png", "jpeg", "jpg", "webp");
+    private static final Set<String> STILL_CAPE_FORMATS = Set.of("png", "webp");
 
     private SafeImageReader() {
     }
@@ -57,6 +58,26 @@ public final class SafeImageReader {
             throw new IOException("PNG data exceeds the 32 MB limit");
         }
         return readPng(encoded);
+    }
+
+    /**
+     * Decodes an imported still cape, PNG or WebP, under the PNG limits. The format comes from the
+     * bytes, never the file name; an animated WebP gives its first frame.
+     */
+    public static BufferedImage readStillCape(Path source) throws IOException {
+        if (source == null || !Files.isRegularFile(source) || !Files.isReadable(source)) {
+            throw new IOException("Cape image does not exist or is not readable");
+        }
+        byte[] encoded = BoundedFileReader.readBytes(source, (int) MAX_ENCODED_BYTES);
+        if (encoded.length == 0) {
+            throw new IOException("Cape image data must be between 1 byte and 32 MB");
+        }
+        try (ImageInputStream input =
+                     new MemoryCacheImageInputStream(new ByteArrayInputStream(encoded))) {
+            return decode(input, STILL_CAPE_FORMATS, MAX_WIDTH, MAX_HEIGHT, MAX_PIXELS);
+        } catch (RuntimeException exception) {
+            throw new IOException("Invalid cape image", exception);
+        }
     }
 
     /** Decodes an imported PNG/JPEG/WebP skin under the stricter supported-skin policy. */

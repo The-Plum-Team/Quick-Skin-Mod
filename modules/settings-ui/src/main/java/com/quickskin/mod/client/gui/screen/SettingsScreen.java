@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.quickskin.mod.client.gui.effect.BlurHandler;
@@ -7,6 +8,8 @@ import com.quickskin.mod.client.gui.effect.BlurHandler;
 import com.quickskin.mod.client.gui.GuiCompat;
 //?}
 import com.quickskin.mod.client.gui.util.ButtonFactory;
+import com.quickskin.mod.client.gui.util.UiText;
+import com.quickskin.mod.client.gui.util.DialogFrame;
 import com.quickskin.mod.client.gui.widget.TabButton;
 import com.quickskin.mod.client.input.KeybindRegistry;
 import com.quickskin.mod.common.data.BackgroundStyle;
@@ -44,19 +47,63 @@ public class SettingsScreen extends Screen {
     @Nullable
     private final Screen parent;
 
-    // Panel styling - frosted glass effect
-    private static final int PANEL_BG = 0xB0000000;           // Darker semi-transparent background
-    private static final int PANEL_OUTLINE = 0x60FFFFFF;      // Subtle white outline
+    // A DialogFrame with a slate header and the gear; under it the tabs in a sidebar on the left,
+    // each with an icon, and the tab's settings on the right
+    // A dark face for the settings, under a lighter sidebar and the slate header
+    private static final int DIALOG_FACE = 0xFF26272A;
+    private static final int SIDEBAR_BG = 0xFF3A3B3E;
+    private static final int SIDEBAR_EDGE = 0xFF55565B;
+    private static final int SIDEBAR_WIDTH = 112;
+    /** Room around the tabs inside the sidebar. */
+    private static final int INSET = 4;
+
+    // Settings rows: the checkboxes become rows with a toggle on the right
+    private static final int ROW_PADDING = 3;
+    //? if <1.21.6 {
+    /** How far in front of the vanilla checkboxes their rows are drawn. */
+    private static final float ROW_DEPTH = 10.0f;
+    //?}
+    private static final int ROW_BG = DIALOG_FACE;
+    private static final int ROW_HOVER = 0xFF2E2F32;
+    private static final int ROW_LINE = 0xFF323336;
+    private static final int ROW_TEXT = 0xFFE0E0E0;
+    private static final int ROW_TEXT_HOVER = 0xFFFFFFFF;
+    // Dimmer than an active row, but still clearly readable beside its greyed-out toggle
+    private static final int ROW_TEXT_DISABLED = 0xFFC8C8C8;
+    private static final int TOGGLE_WIDTH = 30;
+    private static final int KNOB_SIZE = 14;
+    private static final int TOGGLE_OUTLINE = 0xFF0E0E0F;
+    private static final int TOGGLE_OFF = 0xFF1E1F21;
+    private static final int TOGGLE_OFF_SHADE = 0xFF151617;
+    private static final int TOGGLE_ON = 0xFF3C8A3C;
+    private static final int TOGGLE_ON_HOVER = 0xFF46A046;
+    private static final int TOGGLE_DISABLED = 0xFF2B2C2E;
+    private static final int KNOB_FACE = 0xFF3A3B3E;
+    private static final int KNOB_FACE_HOVER = 0xFF4A4B4F;
+    private static final int KNOB_BORDER = 0xFF6E6F73;
+    private static final int KNOB_BORDER_HOVER = 0xFF8D8E93;
+    private static final int KNOB_DISABLED_BORDER = 0xFF46474A;
+    private static final int KNOB_LIP = 0xFF1C1D1F;
 
     // Tab dimensions
-    private static final int TAB_HEIGHT = 30;
-    private static final int TAB_WIDTH = 100;
-    private static final int TAB_SPACING = 2;
+    private static final int TAB_HEIGHT = 22;
+    private static final int TAB_SPACING = 4;
+
+    // Seven-pixel tab icons
+    private static final String[] CLIENT_ICON = {"..###..", ".#####.", "..###..", ".......", "#######", "#######", "#######"};
+    private static final String[] GUI_EDIT_ICON = {"#######", "#.....#", "#.###.#", "#.....#", "#.##..#", "#.....#", "#######"};
+    private static final String[] MODPACK_ICON = {"...#...", "..###..", ".#####.", "#######", ".#####.", "..###..", "...#..."};
+    private static final String[] SERVER_ICON = {"#######", "#.....#", "#######", ".......", "#######", "#.....#", "#######"};
 
     private int dialogX;
     private int dialogY;
     private int dialogWidth = 480;
     private int dialogHeight = 280;
+    /** Left edge and width of the settings, right of the sidebar. */
+    private int contentX;
+    private int contentWidth;
+    /** The row of the server tab's notice for players who are not admins, near the bottom. */
+    private int noticeY;
 
     private enum Tab {
         GUI_EDIT("quickskin.settings.tab.gui_edit"),
@@ -88,7 +135,6 @@ public class SettingsScreen extends Screen {
     // Client setting widgets
     private Checkbox showOverlayCheckbox;
     private Checkbox disableSkinTransparencyCheckbox;
-    private Checkbox enableStyledButtonsCheckbox;
     private Checkbox enablePlayerPreviewCustomizationCheckbox;
     private Checkbox hideBuiltInCapesCheckbox;
     private Checkbox menuBackgroundCheckbox;
@@ -96,6 +142,7 @@ public class SettingsScreen extends Screen {
     private Checkbox showPausePreviewCheckbox;
     private Checkbox compactChangeSkinButtonCheckbox;
     private Button keybindButton;
+    private AbstractWidget keybindLabel;
 
     // State for keybind editing
     @Nullable
@@ -108,17 +155,22 @@ public class SettingsScreen extends Screen {
     // --- NEW --- Modpack setting widgets
     private Checkbox enablePlayerOwnSkinSystemCheckbox;
 
-    // Styled-button setting when the dialog opened; a change restyles the parent on close
-    private final boolean openedWithStyledButtons;
+    // The settings a menu reads when it is built, as they were when the dialog opened: a change
+    // rebuilds the parent on close
+    private final String openedMenuSettings;
 
     public SettingsScreen(@Nullable Screen parent) {
         super(Component.translatable("quickskin.screen.settings.title"));
         this.parent = parent;
-        this.openedWithStyledButtons = ClientConfig.getInstance().enableStyledButtons;
+        this.openedMenuSettings = menuSettings();
     }
 
     @Override
     protected void init() {
+        // Drawn over a menu, the dialog takes the menu's scale so the menu behind keeps its size
+        if (this.minecraft != null) {
+            MenuGuiScale.follow(this.minecraft, this, this.parent);
+        }
         super.init();
 
         // Clear widget lists to prevent duplication on resize
@@ -129,19 +181,23 @@ public class SettingsScreen extends Screen {
 
         // Make dialog responsive to screen size
         dialogWidth = Math.min(480, this.width - 40);
-        dialogHeight = Math.min(280, this.height - 40);
+        dialogHeight = Math.min(280, this.height - 20);
 
         // Center the dialog
         dialogX = (this.width - dialogWidth) / 2;
         dialogY = (this.height - dialogHeight) / 2;
 
-        // Create tab buttons at the top of the panel
-        int tabY = dialogY;
-        int tabStartX = dialogX;
+        // The tabs in the sidebar, one under another
+        contentX = dialogX + SIDEBAR_WIDTH + 16;
+        contentWidth = dialogWidth - SIDEBAR_WIDTH - 32;
+        noticeY = DialogFrame.bodyBottom(dialogY, dialogHeight) - 22;
+        int tabX = dialogX + 2 + INSET;
+        int tabWidth = SIDEBAR_WIDTH - 2 * INSET;
+        int tabStartY = DialogFrame.bodyTop(dialogY) + INSET + 2;
 
         clientTabButton = (TabButton) ButtonFactory.createTab(
-                tabStartX, tabY,
-                TAB_WIDTH, TAB_HEIGHT,
+                tabX, tabStartY,
+                tabWidth, TAB_HEIGHT,
                 Component.translatable(Tab.CLIENT.getTranslationKey()),
                 activeTab == Tab.CLIENT,
                 btn -> switchTab(Tab.CLIENT)
@@ -149,8 +205,8 @@ public class SettingsScreen extends Screen {
         this.addRenderableWidget(clientTabButton);
 
         guiEditTabButton = (TabButton) ButtonFactory.createTab(
-                tabStartX + TAB_WIDTH + TAB_SPACING, tabY,
-                TAB_WIDTH, TAB_HEIGHT,
+                tabX, tabStartY + TAB_HEIGHT + TAB_SPACING,
+                tabWidth, TAB_HEIGHT,
                 Component.translatable(Tab.GUI_EDIT.getTranslationKey()),
                 activeTab == Tab.GUI_EDIT,
                 btn -> switchTab(Tab.GUI_EDIT)
@@ -158,8 +214,8 @@ public class SettingsScreen extends Screen {
         this.addRenderableWidget(guiEditTabButton);
 
         modpackTabButton = (TabButton) ButtonFactory.createTab(
-                tabStartX + (TAB_WIDTH + TAB_SPACING) * 2, tabY,
-                TAB_WIDTH, TAB_HEIGHT,
+                tabX, tabStartY + (TAB_HEIGHT + TAB_SPACING) * 2,
+                tabWidth, TAB_HEIGHT,
                 Component.translatable(Tab.MODPACK.getTranslationKey()),
                 activeTab == Tab.MODPACK,
                 btn -> switchTab(Tab.MODPACK)
@@ -167,13 +223,17 @@ public class SettingsScreen extends Screen {
         this.addRenderableWidget(modpackTabButton);
 
         serverTabButton = (TabButton) ButtonFactory.createTab(
-                tabStartX + (TAB_WIDTH + TAB_SPACING) * 3, tabY,
-                TAB_WIDTH, TAB_HEIGHT,
+                tabX, tabStartY + (TAB_HEIGHT + TAB_SPACING) * 3,
+                tabWidth, TAB_HEIGHT,
                 Component.translatable(Tab.SERVER.getTranslationKey()),
                 activeTab == Tab.SERVER,
                 btn -> switchTab(Tab.SERVER)
         );
         this.addRenderableWidget(serverTabButton);
+        clientTabButton.setIcon(CLIENT_ICON);
+        guiEditTabButton.setIcon(GUI_EDIT_ICON);
+        modpackTabButton.setIcon(MODPACK_ICON);
+        serverTabButton.setIcon(SERVER_ICON);
 
         // Create settings for all tabs
         createGuiEditSettings();
@@ -181,13 +241,16 @@ public class SettingsScreen extends Screen {
         createServerSettings();
         createModpackSettings();
 
-        // Create Done button
-        Button doneButton = ButtonFactory.createPrimary(
-                dialogX + dialogWidth / 2 - 50, dialogY + dialogHeight - 30, 100, 20,
-                Component.translatable("quickskin.button.done"),
+        // The settings apply as they change, so the dialog closes from an X in its header
+        Component closeLabel = Component.translatable("quickskin.button.close");
+        Button closeButton = new com.quickskin.mod.client.gui.widget.DialogCloseButton(
+                dialogX + dialogWidth - 6 - com.quickskin.mod.client.gui.widget.DialogCloseButton.SIZE,
+                dialogY + (DialogFrame.HEADER_HEIGHT - com.quickskin.mod.client.gui.widget.DialogCloseButton.SIZE) / 2,
+                closeLabel,
                 btn -> this.onClose()
         );
-        this.addRenderableWidget(doneButton);
+        closeButton.setTooltip(Tooltip.create(closeLabel));
+        this.addRenderableWidget(closeButton);
 
         // Show initial tab
         switchTab(activeTab);
@@ -195,13 +258,14 @@ public class SettingsScreen extends Screen {
 
     /**
      * Builds a settings checkbox that runs {@code onChange} every time the user toggles it, so the
-     * setting takes effect immediately instead of waiting for the dialog to close.
+     * setting takes effect immediately instead of waiting for the dialog to close. It spans the
+     * row, which {@link #drawToggleRow} draws over it: a click anywhere on the row toggles it.
      */
     private Checkbox checkbox(int x, int y, String translationKey, boolean selected,
                               @Nullable String tooltipKey, Runnable onChange) {
         Component label = Component.translatable(translationKey);
         //? if <1.21 {
-        Checkbox checkbox = new Checkbox(x, y, 20, 20, label, selected) {
+        Checkbox checkbox = new Checkbox(x, y, contentWidth, 20, label, selected) {
             @Override
             public void onPress() {
                 super.onPress();
@@ -220,33 +284,33 @@ public class SettingsScreen extends Screen {
         if (tooltipKey != null) {
             builder.tooltip(Tooltip.create(Component.translatable(tooltipKey)));
         }
-        return builder.build();
+        Checkbox checkbox = builder.build();
+        // The whole row toggles it, as drawToggleRow shows
+        checkbox.setWidth(contentWidth);
+        return checkbox;
         //?}
     }
+
 
     private void createGuiEditSettings() {
         ClientConfig config = ClientConfig.getInstance();
         int spacing = 30;
         // Settings content area starts below tabs
-        int startY = dialogY + TAB_HEIGHT + 20;
-        int leftColumnX = dialogX + 20;
+        int startY = DialogFrame.bodyTop(dialogY) + 14;
+        int leftColumnX = contentX;
         int currentY = startY;
 
         showOverlayCheckbox = checkbox(leftColumnX, currentY,
                 "quickskin.settings.enable_preview",
-                config.showSkinPreviewOverlay, null, this::applyClientSettings);
+                config.showSkinPreviewOverlay,
+                "quickskin.settings.enable_preview.tooltip", this::applyClientSettings);
         guiEditSettingWidgets.add(showOverlayCheckbox);
-        currentY += spacing;
-
-        enableStyledButtonsCheckbox = checkbox(leftColumnX, currentY,
-                "quickskin.settings.enable_styled_buttons",
-                config.enableStyledButtons, null, this::applyClientSettings);
-        guiEditSettingWidgets.add(enableStyledButtonsCheckbox);
         currentY += spacing;
 
         enablePlayerPreviewCustomizationCheckbox = checkbox(leftColumnX, currentY,
                 "quickskin.settings.enable_preview_custom",
-                config.enablePlayerPreviewCustomization, null, this::applyClientSettings);
+                config.enablePlayerPreviewCustomization,
+                "quickskin.settings.enable_preview_custom.tooltip", this::applyClientSettings);
         guiEditSettingWidgets.add(enablePlayerPreviewCustomizationCheckbox);
         currentY += spacing;
 
@@ -268,47 +332,34 @@ public class SettingsScreen extends Screen {
         ClientConfig config = ClientConfig.getInstance();
         int spacing = 30;
         // Settings content area starts below tabs
-        int startY = dialogY + TAB_HEIGHT + 20;
-        int leftColumnX = dialogX + 20;
-        int rightColumnX = dialogX + dialogWidth / 2 + 10;
+        int startY = DialogFrame.bodyTop(dialogY) + 14;
+        int leftColumnX = contentX;
         int currentLeftY = startY;
-        int currentRightY = startY;
+        // The checkboxes go under the keybind, in the same column
+        int rightColumnX = leftColumnX;
+        int currentRightY = startY + spacing;
 
         // Left Column
         // Keybind button and label
         int keybindButtonWidth = 75;
         int keybindButtonSpacing = 5;
 
-        keybindButton = ButtonFactory.createStyled(
-                leftColumnX, currentLeftY, keybindButtonWidth, 20,
-                KeybindRegistry.OPEN_SKIN_MENU.getTranslatedKeyMessage(),
-                button -> this.selectedKey = KeybindRegistry.OPEN_SKIN_MENU
-        );
+        // Minecraft's own button, as in its Controls screen, so it reads as a key binding
+        keybindButton = Button.builder(KeybindRegistry.OPEN_SKIN_MENU.getTranslatedKeyMessage(),
+                        button -> this.selectedKey = KeybindRegistry.OPEN_SKIN_MENU)
+                .bounds(leftColumnX + contentWidth - keybindButtonWidth, currentLeftY, keybindButtonWidth, 20)
+                .build();
         clientSettingWidgets.add(keybindButton);
 
-        clientSettingWidgets.add(new AbstractWidget(leftColumnX + keybindButtonWidth + keybindButtonSpacing, currentLeftY, 100, 20, Component.translatable("quickskin.settings.keybind_label")) {
+        keybindLabel = new AbstractWidget(leftColumnX, currentLeftY, contentWidth - keybindButtonWidth - keybindButtonSpacing, 20, keybindLabelText()) {
             @Override
             //? if <26.1 {
             public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
             //?} else {
             public void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
             //?}
-                // Draw the string vertically centered with the standard UI text color.
-                //? if <26.1 {
-                guiGraphics.drawString(
-                //?} else {
-                guiGraphics.text(
-                //?}
-                        Minecraft.getInstance().font,
-                        this.getMessage(),
-                        this.getX(),
-                        this.getY() + (this.height - 8) / 2,
-                        //? if <1.21.11 {
-                        0xFFE0E0E0 // Standard opaque light gray text color
-                        //?} else {
-                        0xFFE0E0E0 // Standard light gray text color
-                        //?}
-                );
+                drawRowLabel(guiGraphics, this.getMessage().getString(), this.getX(), this.getWidth(),
+                        this.getY() + this.height / 2, ROW_TEXT);
             }
 
             @Override
@@ -324,24 +375,28 @@ public class SettingsScreen extends Screen {
             //?}
                 return false; // Make the label non-interactive
             }
-        });
+        };
+        clientSettingWidgets.add(keybindLabel);
 
-        // Right Column
+        // Under it, the checkboxes
         disableSkinTransparencyCheckbox = checkbox(rightColumnX, currentRightY,
                 "quickskin.settings.disable_transparency",
-                config.disableSkinTransparency, null, this::applyClientSettings);
+                config.disableSkinTransparency,
+                "quickskin.settings.disable_transparency.tooltip", this::applyClientSettings);
         clientSettingWidgets.add(disableSkinTransparencyCheckbox);
         currentRightY += spacing;
 
         showTitlePreviewCheckbox = checkbox(rightColumnX, currentRightY,
                 "quickskin.settings.show_title_preview",
-                config.showTitleScreenPreview, null, this::applyClientSettings);
+                config.showTitleScreenPreview,
+                "quickskin.settings.show_title_preview.tooltip", this::applyClientSettings);
         clientSettingWidgets.add(showTitlePreviewCheckbox);
         currentRightY += spacing;
 
         showPausePreviewCheckbox = checkbox(rightColumnX, currentRightY,
                 "quickskin.settings.show_pause_preview",
-                config.showPauseMenuPreview, null, this::applyClientSettings);
+                config.showPauseMenuPreview,
+                "quickskin.settings.show_pause_preview.tooltip", this::applyClientSettings);
         clientSettingWidgets.add(showPausePreviewCheckbox);
         currentRightY += spacing;
 
@@ -356,8 +411,8 @@ public class SettingsScreen extends Screen {
         ServerConfig config = ServerConfig.getInstance();
         int spacing = 30;
         // Settings content area starts below tabs
-        int startY = dialogY + TAB_HEIGHT + 20;
-        int leftColumnX = dialogX + 20;
+        int startY = DialogFrame.bodyTop(dialogY) + 14;
+        int leftColumnX = contentX;
         int currentY = startY;
 
         // Check if player has admin permissions
@@ -374,7 +429,8 @@ public class SettingsScreen extends Screen {
 
         serverDisableSkinTransparencyCheckbox = checkbox(leftColumnX, currentY,
                 "quickskin.settings.disable_transparency_server",
-                currentTransparencySetting, null, this::applyServerTransparency);
+                currentTransparencySetting,
+                "quickskin.settings.disable_transparency_server.tooltip", this::applyServerTransparency);
         // Only allow admins to change this setting
         serverDisableSkinTransparencyCheckbox.active = isAdmin;
         serverSettingWidgets.add(serverDisableSkinTransparencyCheckbox);
@@ -386,7 +442,7 @@ public class SettingsScreen extends Screen {
 
         skinChangeCooldownEditBox = new EditBox(
                 this.font,
-                leftColumnX, currentY,
+                leftColumnX + contentWidth - editBoxWidth - 1, currentY,
                 editBoxWidth, 20,
                 Component.translatable("quickskin.settings.cooldown_label")
         );
@@ -396,28 +452,19 @@ public class SettingsScreen extends Screen {
         skinChangeCooldownEditBox.setFilter(text -> text.isEmpty() || text.matches("\\d+"));
         //?}
         skinChangeCooldownEditBox.active = isAdmin;
+        skinChangeCooldownEditBox.setTooltip(Tooltip.create(Component.translatable("quickskin.settings.cooldown_seconds.tooltip")));
         serverSettingWidgets.add(skinChangeCooldownEditBox);
 
         // Label for cooldown EditBox
-        serverSettingWidgets.add(new AbstractWidget(leftColumnX + editBoxWidth + editBoxSpacing, currentY, 200, 20, Component.translatable("quickskin.settings.cooldown_seconds")) {
+        serverSettingWidgets.add(new AbstractWidget(leftColumnX, currentY, contentWidth - editBoxWidth - editBoxSpacing - 1, 20, Component.translatable("quickskin.settings.cooldown_seconds")) {
             @Override
             //? if <26.1 {
             public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-                guiGraphics.drawString(
             //?} else {
             public void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
-                guiGraphics.text(
             //?}
-                        Minecraft.getInstance().font,
-                        this.getMessage(),
-                        this.getX(),
-                        this.getY() + (this.height - 8) / 2,
-                        //? if <1.21.11 {
-                        0xFFE0E0E0
-                        //?} else {
-                        0xFFE0E0E0
-                        //?}
-                );
+                drawRowLabel(guiGraphics, this.getMessage().getString(), this.getX(), this.getWidth(),
+                        this.getY() + this.height / 2, skinChangeCooldownEditBox.active ? ROW_TEXT : ROW_TEXT_DISABLED);
             }
 
             @Override
@@ -439,8 +486,8 @@ public class SettingsScreen extends Screen {
     private void createModpackSettings() {
         ClientConfig config = ClientConfig.getInstance();
         // Settings content area starts below tabs
-        int startY = dialogY + TAB_HEIGHT + 20;
-        int leftColumnX = dialogX + 20;
+        int startY = DialogFrame.bodyTop(dialogY) + 14;
+        int leftColumnX = contentX;
 
         enablePlayerOwnSkinSystemCheckbox = checkbox(leftColumnX, startY,
                 "quickskin.settings.enable_own_skin",
@@ -509,6 +556,7 @@ public class SettingsScreen extends Screen {
         } else {
             this.keybindButton.setMessage(KeybindRegistry.OPEN_SKIN_MENU.getTranslatedKeyMessage());
         }
+        this.keybindLabel.setMessage(keybindLabelText());
         //? if <1.21.6 {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 100); // Move modal forward in Z
@@ -517,24 +565,59 @@ public class SettingsScreen extends Screen {
         // Draw darker overlay over entire screen
         graphics.fill(0, 0, this.width, this.height, 0x60000000);
 
-        // Calculate content panel area (below tabs)
-        int contentPanelY = dialogY + TAB_HEIGHT;
-        int contentPanelHeight = dialogHeight - TAB_HEIGHT;
+        DialogFrame.draw(graphics, this.font, dialogX, dialogY, dialogWidth, dialogHeight,
+                DialogFrame.Accent.SETTINGS, DialogFrame.ICON_GEAR, this.title, DIALOG_FACE);
 
-        // Draw main content panel background with frosted glass styling
-        graphics.fill(dialogX, contentPanelY,
-                dialogX + dialogWidth,
-                contentPanelY + contentPanelHeight,
-                PANEL_BG);
+        // The sidebar behind the tabs, from under the header to the lip
+        int sidebarTop = DialogFrame.bodyTop(dialogY);
+        int sidebarBottom = DialogFrame.bodyBottom(dialogY, dialogHeight);
+        graphics.fill(dialogX + 2, sidebarTop, dialogX + SIDEBAR_WIDTH, sidebarBottom, SIDEBAR_BG);
+        graphics.fill(dialogX + SIDEBAR_WIDTH, sidebarTop, dialogX + SIDEBAR_WIDTH + 1, sidebarBottom, SIDEBAR_EDGE);
 
-        // Draw outline around content panel
-        drawPanelOutline(graphics, dialogX, contentPanelY, dialogWidth, contentPanelHeight, PANEL_OUTLINE);
+        // A line under each row that is not a checkbox: the keybind and the cooldown
+        for (AbstractWidget widget : activeTabWidgets()) {
+            if (widget == keybindButton || widget == skinChangeCooldownEditBox) {
+                int lineY = widget.getY() + widget.getHeight() + ROW_PADDING;
+                graphics.fill(contentX - ROW_PADDING * 2, lineY, contentX + contentWidth + ROW_PADDING * 2, lineY + 1, ROW_LINE);
+            }
+        }
 
-        // Render widgets (buttons, tabs, etc.) - this ensures they render AFTER everything above
+        // Render widgets (buttons, tabs, etc.) - this ensures they render AFTER everything above.
+        // Each row draws its checkbox's label itself, on two lines when it needs them, but the
+        // vanilla checkbox would draw it on one, running past the row's right edge, so its
+        // message is empty while it draws and is put back for narration
+        java.util.Map<Checkbox, Component> labels = new java.util.HashMap<>();
+        for (AbstractWidget widget : activeTabWidgets()) {
+            if (widget instanceof Checkbox checkbox) {
+                labels.put(checkbox, checkbox.getMessage());
+                checkbox.setMessage(Component.empty());
+            }
+        }
         //? if <26.1 {
         super.render(graphics, mouseX, mouseY, partialTick);
         //?} else {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        //?}
+        labels.forEach(Checkbox::setMessage);
+
+        // Each checkbox as a row with a toggle, drawn over the vanilla checkbox under it. Text is
+        // drawn a little in front of fills at the same depth, so before 1.21.6 the rows move
+        // forward to cover the vanilla label; from 1.21.6 a later stratum draws over everything
+        //? if <1.21.6 {
+        graphics.flush();
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, ROW_DEPTH);
+        //?} else {
+        graphics.nextStratum();
+        //?}
+        for (AbstractWidget widget : activeTabWidgets()) {
+            if (widget instanceof Checkbox checkbox) {
+                drawToggleRow(graphics, checkbox);
+            }
+        }
+        //? if <1.21.6 {
+        graphics.flush();
+        graphics.pose().popPose();
         //?}
 
         // Render "Admin-Only" notice for Server tab if not admin (render last to ensure it's on top)
@@ -546,14 +629,9 @@ public class SettingsScreen extends Screen {
             //?}
 
             if (!isAdmin) {
-                int noticeY = dialogY + dialogHeight - 55;
                 Component notice = Component.translatable("quickskin.settings.server_notice");
                 int noticeWidth = this.font.width(notice);
-                //? if <26.1 {
-                graphics.drawString(this.font, notice, dialogX + (dialogWidth - noticeWidth) / 2, noticeY, 0xFFFFCC00, false);
-                //?} else {
-                graphics.text(this.font, notice, dialogX + (dialogWidth - noticeWidth) / 2, noticeY, 0xFFFFCC00, false);
-                //?}
+                UiText.draw(graphics, this.font, notice, contentX + (contentWidth - noticeWidth) / 2, noticeY, 0xFFFFCC00);
             }
         }
 
@@ -564,26 +642,104 @@ public class SettingsScreen extends Screen {
         //?}
     }
 
-    /**
-     * Draws outline around the specified rectangular area
-     */
-    //? if <26.1 {
-    private void drawPanelOutline(GuiGraphics graphics, int x, int y, int width, int height, int color) {
-    //?} else {
-    private void drawPanelOutline(GuiGraphicsExtractor graphics, int x, int y, int width, int height, int color) {
-    //?}
-        // Top
-        graphics.fill(x, y, x + width, y + 1, color);
-        // Bottom
-        graphics.fill(x, y + height - 1, x + width, y + height, color);
-        // Left
-        graphics.fill(x, y, x + 1, y + height, color);
-        // Right
-        graphics.fill(x + width - 1, y, x + width, y + height, color);
+    private List<AbstractWidget> activeTabWidgets() {
+        return switch (activeTab) {
+            case GUI_EDIT -> guiEditSettingWidgets;
+            case CLIENT -> clientSettingWidgets;
+            case SERVER -> serverSettingWidgets;
+            case MODPACK -> modpackSettingWidgets;
+        };
     }
 
     /**
-     * Recreates a screen to apply new styling settings
+     * A checkbox as a settings row: the label on the left, a toggle on the right (a sunk track,
+     * green while on, under a raised knob that slides to the side it is set to), a line under it,
+     * and a lighter row under the mouse. An inactive row is greyed out.
+     */
+    //? if <26.1 {
+    private void drawToggleRow(GuiGraphics graphics, Checkbox checkbox) {
+    //?} else {
+    private void drawToggleRow(GuiGraphicsExtractor graphics, Checkbox checkbox) {
+    //?}
+        boolean on = checkbox.selected();
+        boolean enabled = checkbox.active;
+        boolean hovered = enabled && checkbox.isHovered();
+        int left = contentX - ROW_PADDING * 2;
+        int right = contentX + contentWidth + ROW_PADDING * 2;
+        int top = checkbox.getY() - ROW_PADDING;
+        int bottom = checkbox.getY() + checkbox.getHeight() + ROW_PADDING;
+        graphics.fill(left, top, right, bottom, hovered ? ROW_HOVER : ROW_BG);
+        graphics.fill(left, bottom, right, bottom + 1, ROW_LINE);
+
+        // The toggle, right-aligned
+        int trackRight = contentX + contentWidth;
+        int trackLeft = trackRight - TOGGLE_WIDTH;
+        int middle = checkbox.getY() + checkbox.getHeight() / 2;
+        int trackTop = middle - 7;
+        int trackBottom = middle + 7;
+        graphics.fill(trackLeft, trackTop, trackRight, trackBottom, TOGGLE_OUTLINE);
+        int track = !enabled ? TOGGLE_DISABLED : on ? (hovered ? TOGGLE_ON_HOVER : TOGGLE_ON) : TOGGLE_OFF;
+        graphics.fill(trackLeft + 1, trackTop + 1, trackRight - 1, trackBottom - 1, track);
+        if (!on && enabled) {
+            graphics.fill(trackLeft + 1, trackTop + 1, trackRight - 1, trackTop + 3, TOGGLE_OFF_SHADE);
+        }
+        int knobLeft = on ? trackRight - KNOB_SIZE : trackLeft;
+        int knobTop = middle - KNOB_SIZE / 2 - 1;
+        int knobBottom = knobTop + KNOB_SIZE + 2;
+        graphics.fill(knobLeft, knobTop, knobLeft + KNOB_SIZE, knobBottom, TOGGLE_OUTLINE);
+        graphics.fill(knobLeft + 1, knobBottom - 3, knobLeft + KNOB_SIZE - 1, knobBottom - 1, KNOB_LIP);
+        graphics.fill(knobLeft + 1, knobTop + 1, knobLeft + KNOB_SIZE - 1, knobBottom - 3,
+                !enabled ? KNOB_DISABLED_BORDER : hovered ? KNOB_BORDER_HOVER : KNOB_BORDER);
+        graphics.fill(knobLeft + 2, knobTop + 2, knobLeft + KNOB_SIZE - 2, knobBottom - 4,
+                !enabled ? TOGGLE_DISABLED : hovered ? KNOB_FACE_HOVER : KNOB_FACE);
+
+        // The label, in the room left of the toggle
+        int color = !enabled ? ROW_TEXT_DISABLED : hovered ? ROW_TEXT_HOVER : ROW_TEXT;
+        drawRowLabel(graphics, checkbox.getMessage().getString(), contentX, trackLeft - 8 - contentX, middle, color);
+    }
+
+    /**
+     * A row's label, vertically centred on {@code middle}: on one line when it fits in
+     * {@code room}, else on two, the second cut short if it still does not fit.
+     */
+    //? if <26.1 {
+    private void drawRowLabel(GuiGraphics graphics, String label, int x, int room, int middle, int color) {
+    //?} else {
+    private void drawRowLabel(GuiGraphicsExtractor graphics, String label, int x, int room, int middle, int color) {
+    //?}
+        if (this.font.width(label) <= room) {
+            UiText.draw(graphics, this.font, label, x, middle - 4, color);
+            return;
+        }
+        // Break at the last space that keeps the first line within the room
+        String first = this.font.plainSubstrByWidth(label, room);
+        int space = first.lastIndexOf(' ');
+        if (space > 0 && first.length() < label.length()) {
+            first = first.substring(0, space);
+        }
+        String second = label.substring(first.length()).trim();
+        if (this.font.width(second) > room) {
+            second = this.font.plainSubstrByWidth(second, Math.max(0, room - this.font.width("..."))) + "...";
+        }
+        UiText.draw(graphics, this.font, first, x, middle - 9, color);
+        UiText.draw(graphics, this.font, second, x, middle + 1, color);
+    }
+
+    /** "Assign a key…" while the skin menu has no key, else "Change the key…". */
+    private static Component keybindLabelText() {
+        return Component.translatable(KeybindRegistry.OPEN_SKIN_MENU.isUnbound()
+                ? "quickskin.settings.keybind_assign" : "quickskin.settings.keybind_change");
+    }
+
+    /** The settings a menu reads when it is built, so a change can rebuild the menu behind. */
+    private static String menuSettings() {
+        ClientConfig config = ClientConfig.getInstance();
+        return config.hideBuiltInCapes + "," + config.enablePlayerPreviewCustomization + ","
+                + config.getMenuBackgroundStyle();
+    }
+
+    /**
+     * Rebuilds a menu so it applies the settings it reads when it is built.
      */
     private Screen recreateScreen(Screen screen) {
         if (screen instanceof com.quickskin.mod.client.gui.RestylableScreen restylable) {
@@ -732,6 +888,9 @@ public class SettingsScreen extends Screen {
 
     @Override
     public void removed() {
+        if (this.minecraft != null) {
+            MenuGuiScale.leave(this.minecraft, this);
+        }
         super.removed();
         // Cleanup blur resources
         BlurHandler.cleanup();
@@ -758,7 +917,6 @@ public class SettingsScreen extends Screen {
 
         config.showSkinPreviewOverlay = showOverlayCheckbox.selected();
         config.disableSkinTransparency = disableSkinTransparencyCheckbox.selected();
-        config.enableStyledButtons = enableStyledButtonsCheckbox.selected();
         config.enablePlayerPreviewCustomization = enablePlayerPreviewCustomizationCheckbox.selected();
         config.enablePlayerOwnSkinSystem = enablePlayerOwnSkinSystemCheckbox.selected();
         config.hideBuiltInCapes = hideBuiltInCapesCheckbox.selected();
@@ -821,9 +979,10 @@ public class SettingsScreen extends Screen {
         if (minecraft == null) {
             return;
         }
-        // Restyling the parent needs a new screen, so a styled-button change is applied on close.
+        // A menu reads some settings only when it is built, so a change to them rebuilds the
+        // parent on close
         Screen target = parent;
-        if (parent != null && ClientConfig.getInstance().enableStyledButtons != openedWithStyledButtons) {
+        if (parent != null && !menuSettings().equals(openedMenuSettings)) {
             target = recreateScreen(parent);
         }
         //? if <26.2 {

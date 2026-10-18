@@ -1133,20 +1133,21 @@ public class LocalAssetManager {
     }
 
     /**
-     * Get comparator for sorting assets based on sort mode
+     * Get comparator for sorting assets based on sort mode: the player's own skin first, then the
+     * favorites, each group in the mode's order
      */
     private Comparator<AssetMetadata> getSortComparator(SkinSortMode mode, String playerSkinHash) {
+        Comparator<AssetMetadata> pinned = Comparator
+                .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
+                .thenComparing(meta -> skinPreferences == null || !skinPreferences.isFavorite(meta.hash()));
         return switch (mode) {
-            case LATEST_LAST -> Comparator
-                    .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
+            case LATEST_LAST -> pinned
                     .thenComparing(AssetMetadata::friendlyName);
 
-            case LATEST_FIRST -> Comparator
-                    .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
+            case LATEST_FIRST -> pinned
                     .thenComparing(Comparator.comparing(AssetMetadata::lastModifiedTime).reversed());
 
-            case ALPHABETICAL -> Comparator
-                    .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
+            case ALPHABETICAL -> pinned
                     .thenComparing(AssetMetadata::friendlyName);
         };
     }
@@ -2069,6 +2070,22 @@ public class LocalAssetManager {
             skinPreferences.setModelType(primary, modelType);
             savePreferences();
         }
+    }
+
+    /** Whether the player marked this skin or CPM model as a favorite. */
+    public boolean isFavorite(String hash) {
+        if (!NetworkSecurity.isValidContentId(hash)) return false;
+        String primary = catalog.resolve(hash);
+        return primary != null && skinPreferences != null && skinPreferences.isFavorite(primary);
+    }
+
+    /** Marks or unmarks a skin or CPM model as a favorite, which the skin list shows first. */
+    public void setFavorite(String hash, boolean favorite) {
+        if (!NetworkSecurity.isValidContentId(hash)) return;
+        String primary = catalog.resolve(hash);
+        if (primary == null || skinPreferences == null) return;
+        skinPreferences.setFavorite(primary, favorite);
+        savePreferences();
     }
 
     /**

@@ -5,6 +5,7 @@ import com.quickskin.mod.client.gui.screen.CapeAdjustScreen;
 import com.quickskin.mod.client.gui.screen.CapeEntry;
 import com.quickskin.mod.client.gui.screen.PlayerCapeMenuScreen;
 import com.quickskin.mod.client.gui.util.CapeImportProcessor;
+import com.quickskin.mod.client.gui.widget.ErrorToast;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.AssetMetadata;
@@ -75,16 +76,15 @@ final class CapeEditorSteps {
     private static final double DRAG_CAPE_DY = -5.6;
     /** One file over the workflow's bounded batch, so its first recorded error is the batch cap. */
     private static final int OVERSIZED_BATCH_FILES = 17;
-    private static final String BATCH_LIMIT_ERROR = "Cape import batches are limited to 16 files";
-    /** Ticks a settled import message must hold before the non-capture cancel step advances. */
+    /** The workflow's batch cap, which its first recorded error names. */
+    private static final int BATCH_LIMIT_FILES = 16;
+    /** Ticks a settled toast, or the quiet after a cancel, must hold before the cancel step advances. */
     private static final int MESSAGE_HOLD_TICKS = 5;
     /** Per-channel slack for the one translucent pixel that passes through Java2D compositing. */
     private static final int CHANNEL_TOLERANCE = 2;
 
     private static final int TEAL_RGB = 0x1199AA;
     private static final int BORDER_ARGB = 0xFFEECC22;
-    private static final int IMPORTED_MESSAGE_ARGB = 0xFF55FF55;
-    private static final int ERROR_MESSAGE_ARGB = 0xFFFF5555;
 
     private final FullScenario owner;
     private volatile String translucentCapeHash;
@@ -551,10 +551,9 @@ final class CapeEditorSteps {
             phase.set(1);
             return false;
         }
-        String message = menuString(menu, "importMessage");
-        int timer = menuInt(menu, "importMessageTimer");
+        Object toast = newestToast(menu);
         String imported = Component.translatable("quickskin.cape.imported").getString();
-        if (!imported.equals(message) || timer <= 0) return false;
+        if (toast == null || !imported.equals(toastText(toast))) return false;
         Set<String> gained = new HashSet<>(capeHashes());
         gained.removeAll(before.get());
         if (gained.size() != 1) {
@@ -614,16 +613,15 @@ final class CapeEditorSteps {
             return Step.Result.fail("elytra pixel " + Integer.toHexString(elytra)
                     + " is not an opaque vanilla elytra pixel");
 
-        String message = menuString(menu, "importMessage");
-        int colour = menuInt(menu, "importMessageColor");
-        int timer = menuInt(menu, "importMessageTimer");
+        // The outcome is a toast in the menu's corner, in the player's language
+        Object toast = newestToast(menu);
+        String message = toast == null ? null : toastText(toast);
+        Object kind = toast == null ? null : FullScenario.screenField(toast, "kind");
         String imported = Component.translatable("quickskin.cape.imported").getString();
-        if (!imported.equals(message) || timer <= 0)
-            return Step.Result.fail("import message '" + message + "' (timer " + timer
-                    + ") expected '" + imported + "'");
-        if (colour != IMPORTED_MESSAGE_ARGB)
-            return Step.Result.fail("import message colour " + Integer.toHexString(colour)
-                    + " expected " + Integer.toHexString(IMPORTED_MESSAGE_ARGB));
+        if (!imported.equals(message))
+            return Step.Result.fail("import toast '" + message + "' expected '" + imported + "'");
+        if (kind != ErrorToast.Kind.SUCCESS)
+            return Step.Result.fail("import toast is a " + kind + " toast, expected SUCCESS");
         if (!menuListsCape(menu, hash))
             return Step.Result.fail("the menu's localCapes list does not contain local_cape:" + hash);
 
@@ -631,8 +629,8 @@ final class CapeEditorSteps {
                 + " (" + differing + " pixels changed by the vanilla elytra composite); probe ("
                 + TestAssets.TRANSLUCENT_CAPE_PROBE_X + "," + TestAssets.TRANSLUCENT_CAPE_PROBE_Y
                 + ") alpha=" + probeAlpha + " teal, border " + Integer.toHexString(border)
-                + ", elytra pixel " + Integer.toHexString(elytra) + " opaque; message '" + message
-                + "' colour " + Integer.toHexString(colour) + "; listed under My Capes");
+                + ", elytra pixel " + Integer.toHexString(elytra) + " opaque; " + kind + " toast '" + message
+                + "'; listed under My Capes");
     }
 
     // ----- translucent_cape_worn -----------------------------------------------------------------
@@ -736,10 +734,10 @@ final class CapeEditorSteps {
         final List<Path> oversizedBatch = new ArrayList<>();
         volatile Set<String> before;
         volatile PlayerCapeMenuScreen menu;
-        volatile String cancelMessage;
-        volatile int cancelColour;
+        /** The newest toast the menu showed after the editor's Cancel, or {@code null}. */
+        volatile String cancelToast;
         volatile String batchMessage;
-        volatile int batchColour;
+        volatile Object batchKind;
     }
 
     private Step buildImportCancel(Minecraft mc) {
@@ -807,13 +805,22 @@ final class CapeEditorSteps {
                 }
                 case 2 -> {
                     if (current != record.menu) return false;
-                    String message = menuString(record.menu, "importMessage");
-                    String expected = Component.translatable("quickskin.cape.no_valid").getString();
-                    if (!expected.equals(message) || menuInt(record.menu, "importMessageTimer") <= 0) {
+                    // A cancel is no failure: once its "processing" toast is gone the menu stays quiet
+                    Object toast = newestToast(record.menu);
+                    if (toast != null) {
+                        record.cancelToast = toastText(toast);
+                        String processing = Component.translatable("quickskin.cape.processing_count", 1)
+                                .getString();
+                        if (!processing.equals(record.cancelToast)) {
+                            failure.set("the editor's Cancel left the toast '" + record.cancelToast + "'");
+                            return true;
+                        }
+                        hold.set(0);
                         return false;
                     }
-                    record.cancelMessage = message;
-                    record.cancelColour = menuInt(record.menu, "importMessageColor");
+                    record.cancelToast = null;
+                    if (hold.incrementAndGet() < MESSAGE_HOLD_TICKS) return false;
+                    hold.set(0);
                     if (record.oversizedBatch.size() != OVERSIZED_BATCH_FILES) {
                         failure.set("oversized batch has " + record.oversizedBatch.size() + " files");
                         return true;
@@ -827,15 +834,15 @@ final class CapeEditorSteps {
                         hold.set(0);
                         return false;
                     }
-                    String message = menuString(record.menu, "importMessage");
-                    String expected = Component.translatable(
-                            "quickskin.cape.error", BATCH_LIMIT_ERROR).getString();
-                    if (!expected.equals(message) || menuInt(record.menu, "importMessageTimer") <= 0) {
+                    // A failure is a toast in the menu's corner, in the player's language
+                    Object toast = newestToast(record.menu);
+                    String expected = batchLimitError();
+                    if (toast == null || !expected.equals(toastText(toast))) {
                         hold.set(0);
                         return false;
                     }
-                    record.batchMessage = message;
-                    record.batchColour = menuInt(record.menu, "importMessageColor");
+                    record.batchMessage = toastText(toast);
+                    record.batchKind = FullScenario.screenField(toast, "kind");
                     return hold.incrementAndGet() >= MESSAGE_HOLD_TICKS;
                 }
             }
@@ -861,29 +868,23 @@ final class CapeEditorSteps {
                 return Step.Result.fail("cancelled/failed imports changed the catalog: gained="
                         + gained + " lost=" + lost);
             }
-            String noValid = Component.translatable("quickskin.cape.no_valid").getString();
-            if (!noValid.equals(record.cancelMessage))
-                return Step.Result.fail("cancel message '" + record.cancelMessage
-                        + "' expected '" + noValid + "'");
-            if (record.cancelColour != ERROR_MESSAGE_ARGB)
-                return Step.Result.fail("cancel message colour " + Integer.toHexString(record.cancelColour)
-                        + " expected " + Integer.toHexString(ERROR_MESSAGE_ARGB));
-            String batchError = Component.translatable("quickskin.cape.error", BATCH_LIMIT_ERROR).getString();
+            if (record.cancelToast != null)
+                return Step.Result.fail("the editor's Cancel left the toast '" + record.cancelToast + "'");
+            String batchError = batchLimitError();
             if (!batchError.equals(record.batchMessage))
-                return Step.Result.fail("batch message '" + record.batchMessage
+                return Step.Result.fail("batch toast '" + record.batchMessage
                         + "' expected '" + batchError + "'");
-            if (record.batchColour != ERROR_MESSAGE_ARGB)
-                return Step.Result.fail("batch message colour " + Integer.toHexString(record.batchColour)
-                        + " expected " + Integer.toHexString(ERROR_MESSAGE_ARGB));
-            String live = menuString(record.menu, "importMessage");
-            if (!batchError.equals(live))
-                return Step.Result.fail("live import message '" + live + "' expected '" + batchError + "'");
+            if (record.batchKind != ErrorToast.Kind.ERROR)
+                return Step.Result.fail("batch toast is a " + record.batchKind + " toast, expected ERROR");
+            Object live = newestToast(record.menu);
+            if (live == null || !batchError.equals(toastText(live)))
+                return Step.Result.fail("live batch toast '" + (live == null ? null : toastText(live))
+                        + "' expected '" + batchError + "'");
             return Step.Result.pass("editor opened by the real workflow for a "
                     + TestAssets.ZOOM_SOURCE_W + "x" + TestAssets.ZOOM_SOURCE_H
-                    + " source and its Cancel produced '" + record.cancelMessage + "'; a "
-                    + OVERSIZED_BATCH_FILES + "-file drop produced '" + record.batchMessage
-                    + "'; both in " + Integer.toHexString(ERROR_MESSAGE_ARGB)
-                    + "; catalog unchanged (" + after.size() + " capes); cape menu open again");
+                    + " source and its Cancel left the menu without a toast; a "
+                    + OVERSIZED_BATCH_FILES + "-file drop produced the error toast '" + record.batchMessage
+                    + "'; catalog unchanged (" + after.size() + " capes); cape menu open again");
         } finally {
             owner.enterWorldView(mc);
         }
@@ -921,14 +922,24 @@ final class CapeEditorSteps {
         return false;
     }
 
-    private static String menuString(PlayerCapeMenuScreen menu, String field) {
-        Object value = FullScenario.screenField(menu, field);
-        return value == null ? null : String.valueOf(value);
+    private static String batchLimitError() {
+        return Component.translatable("quickskin.cape.error.batch_count",
+                String.valueOf(OVERSIZED_BATCH_FILES), String.valueOf(BATCH_LIMIT_FILES)).getString();
     }
 
-    private static int menuInt(PlayerCapeMenuScreen menu, String field) {
-        Object value = FullScenario.screenField(menu, field);
-        return value instanceof Integer i ? i : Integer.MIN_VALUE;
+    /** The newest toast still showing in the cape menu's corner, or {@code null}. */
+    private static Object newestToast(PlayerCapeMenuScreen menu) {
+        Object toasts = FullScenario.screenField(menu, "toasts");
+        if (!(toasts instanceof List<?> list)) return null;
+        for (int i = list.size() - 1; i >= 0; i--) {
+            if (list.get(i) instanceof ErrorToast toast && !toast.isExpired()) return toast;
+        }
+        return null;
+    }
+
+    private static String toastText(Object toast) {
+        Object message = FullScenario.screenField(toast, "message");
+        return message instanceof Component component ? component.getString() : String.valueOf(message);
     }
 
     private static boolean adjustBoolean(CapeAdjustScreen screen, String name) throws Exception {
