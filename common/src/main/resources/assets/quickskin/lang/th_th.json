@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ อัปเดตผ้าคลุมแล้ว",
   "quickskin.cape.invalid_ratio": "⚠ ไฟล์ผ้าคลุมไม่ถูกต้อง (ต้องมีอัตราส่วน 2:1 หรือเป็นแถบภาพเคลื่อนไหว)",
   "quickskin.cape.error": "⚠ ข้อผิดพลาด: %s",
-  "quickskin.cape.no_files": "ไม่พบไฟล์ PNG หรือ GIF",
+  "quickskin.cape.no_files": "ไม่พบไฟล์ PNG, WebP หรือ GIF",
   "quickskin.cape.processing_count": "กำลังประมวลผล %s ไฟล์...",
   "quickskin.cape.no_valid": "⚠ ไม่พบผ้าคลุมที่ถูกต้อง (ต้องมีอัตราส่วน 2:1 หรือเป็นแถบภาพเคลื่อนไหว)",
   "quickskin.cape.error_processing": "ข้อผิดพลาดในการประมวลผลไฟล์: %s",

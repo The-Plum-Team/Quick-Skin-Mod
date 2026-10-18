@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ 망토를 수정했습니다",
   "quickskin.cape.invalid_ratio": "⚠ 잘못된 망토 파일 (2:1 비율 또는 애니메이션 스트립이어야 함)",
   "quickskin.cape.error": "⚠ 오류: %s",
-  "quickskin.cape.no_files": "PNG 또는 GIF 파일을 찾을 수 없습니다",
+  "quickskin.cape.no_files": "PNG, WebP 또는 GIF 파일을 찾을 수 없습니다",
   "quickskin.cape.processing_count": "%s개의 파일 처리 중...",
   "quickskin.cape.no_valid": "⚠ 유효한 망토를 찾을 수 없음 (2:1 비율 또는 애니메이션 스트립이어야 함)",
   "quickskin.cape.error_processing": "파일 처리 오류: %s",

@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ 更新成功",
   "quickskin.cape.invalid_ratio": "⚠ 无效的披风文件（需为 2:1 比例或动画条）",
   "quickskin.cape.error": "⚠ 错误：%s",
-  "quickskin.cape.no_files": "未找到 PNG 或 GIF 文件",
+  "quickskin.cape.no_files": "未找到 PNG、WebP 或 GIF 文件",
   "quickskin.cape.processing_count": "正在处理 「%s」 个文件...",
   "quickskin.cape.no_valid": "⚠ 未找到有效披风（需为 2:1 比例或动画条）",
   "quickskin.cape.error_processing": "处理文件出错：%s",

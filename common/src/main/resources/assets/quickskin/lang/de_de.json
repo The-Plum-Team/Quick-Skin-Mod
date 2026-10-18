@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Umhang aktualisiert",
   "quickskin.cape.invalid_ratio": "⚠ Ungültige Umhang-Datei (muss 2:1-Verhältnis oder Animationsstreifen sein)",
   "quickskin.cape.error": "⚠ Fehler: %s",
-  "quickskin.cape.no_files": "Keine PNG- oder GIF-Dateien gefunden",
+  "quickskin.cape.no_files": "Keine PNG-, WebP- oder GIF-Dateien gefunden",
   "quickskin.cape.processing_count": "Verarbeite %s Datei(en)...",
   "quickskin.cape.no_valid": "⚠ Keine gültigen Umhänge gefunden (müssen 2:1-Verhältnis oder Animationsstreifen sein)",
   "quickskin.cape.error_processing": "Fehler beim Verarbeiten der Dateien: %s",

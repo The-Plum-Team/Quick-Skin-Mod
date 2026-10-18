@@ -23,7 +23,7 @@ import java.util.Locale;
 @Environment(EnvType.CLIENT)
 public final class CapeEditorSources {
     private static final String DIRECTORY = "cape_editor_sources";
-    private static final String[] EXTENSIONS = {".png", ".gif"};
+    private static final String[] EXTENSIONS = {".png", ".gif", ".webp"};
 
     private CapeEditorSources() {
     }
@@ -56,10 +56,10 @@ public final class CapeEditorSources {
         if (!NetworkSecurity.isValidStrongContentId(contentId)) {
             throw new IOException("Could not compute cape content hash");
         }
-        boolean gif = source.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".gif");
-        Path target = resolve(cacheDirectory, contentId, gif ? ".gif" : ".png");
-        Path other = resolve(cacheDirectory, contentId, gif ? ".png" : ".gif");
-        if (target == null || other == null) {
+        String name = source.getFileName().toString().toLowerCase(Locale.ROOT);
+        String extension = name.endsWith(".gif") ? ".gif" : name.endsWith(".webp") ? ".webp" : ".png";
+        Path target = resolve(cacheDirectory, contentId, extension);
+        if (target == null) {
             throw new IOException("Cape editor source cache is not initialized");
         }
 
@@ -78,7 +78,15 @@ public final class CapeEditorSources {
                 Files.deleteIfExists(temporary);
             }
         }
-        Files.deleteIfExists(other);
+        // One source per cape: drop one kept under another extension
+        for (String other : EXTENSIONS) {
+            if (!other.equals(extension)) {
+                Path otherPath = resolve(cacheDirectory, contentId, other);
+                if (otherPath != null) {
+                    Files.deleteIfExists(otherPath);
+                }
+            }
+        }
         return target;
     }
 

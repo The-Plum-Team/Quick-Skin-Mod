@@ -216,7 +216,8 @@
           "fabric-environment"
         ],
         "test_runtime_only": [
-          "json"
+          "json",
+          "webp-imageio"
         ]
       }
     },
@@ -848,7 +849,6 @@
       "impact": "propagate"
     },
     {
-    {
       "id": "uploaded-skin-adoption",
       "api": "skin-upload",
       "providers": [
@@ -860,6 +860,7 @@
       "composition": "common",
       "impact": "propagate"
     },
+    {
       "id": "gif-decoder",
       "api": "image-core",
       "providers": [

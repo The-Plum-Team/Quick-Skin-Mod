@@ -50,22 +50,24 @@ public class FileDialogHelper {
     //?}
 
     /**
-     * Opens a file dialog to select a PNG image or CPM model
+     * Opens a file dialog to select a PNG, WebP or JPG image or a CPM model
      * @param title Dialog title
      * @param onFileSelected Callback on selection; cancellation invokes no callback
      */
     public static void openSkinFileDialog(String title, Consumer<Path> onFileSelected) {
         if (!DIALOG_OPEN.compareAndSet(false, true)) return;
-        if (openMobileDialog(title, Set.of("png", "cpmmodel"), false,
+        if (openMobileDialog(title, Set.of("png", "webp", "jpg", "cpmmodel"), false,
                 paths -> onFileSelected.accept(paths.get(0)))) return;
         //? if >=26.3 {
-        openSdlDialog(title, "Skin Files (PNG, CPM Model)", "png;cpmmodel", false,
+        openSdlDialog(title, "Skin Files (PNG, WebP, JPG, CPM Model)", "png;webp;jpg;cpmmodel", false,
                 paths -> onFileSelected.accept(paths.get(0)));
         //?} else {
         ClientIoExecutor.runAsync(() -> {
             try (MemoryStack stack = stackPush()) {
-                PointerBuffer filters = stack.mallocPointer(2);
+                PointerBuffer filters = stack.mallocPointer(4);
                 filters.put(stack.UTF8("*.png"));
+                filters.put(stack.UTF8("*.webp"));
+                filters.put(stack.UTF8("*.jpg"));
                 filters.put(stack.UTF8("*.cpmmodel"));
                 filters.flip();
 
@@ -73,7 +75,7 @@ public class FileDialogHelper {
                     title,
                     "",
                     filters,
-                    "Skin Files (PNG, CPM Model)",
+                    "Skin Files (PNG, WebP, JPG, CPM Model)",
                     false
                 );
 
@@ -90,22 +92,23 @@ public class FileDialogHelper {
     }
 
     /**
-     * Opens a file dialog to select PNG or GIF images (capes)
+     * Opens a file dialog to select PNG, WebP or GIF images (capes)
      * @param title Dialog title
      * @param onFileSelected Callback when file is selected (null if cancelled)
      */
     public static void openCapeFileDialog(String title, Consumer<Path> onFileSelected) {
         if (!DIALOG_OPEN.compareAndSet(false, true)) return;
-        if (openMobileDialog(title, Set.of("png", "gif"), false,
+        if (openMobileDialog(title, Set.of("png", "webp", "gif"), false,
                 paths -> onFileSelected.accept(paths.get(0)))) return;
         //? if >=26.3 {
-        openSdlDialog(title, "PNG/GIF Images", "png;gif", false,
+        openSdlDialog(title, "PNG/WebP/GIF Images", "png;webp;gif", false,
                 paths -> onFileSelected.accept(paths.get(0)));
         //?} else {
         ClientIoExecutor.runAsync(() -> {
             try (MemoryStack stack = stackPush()) {
-                PointerBuffer filters = stack.mallocPointer(2);
+                PointerBuffer filters = stack.mallocPointer(3);
                 filters.put(stack.UTF8("*.png"));
+                filters.put(stack.UTF8("*.webp"));
                 filters.put(stack.UTF8("*.gif"));
                 filters.flip();
 
@@ -113,7 +116,7 @@ public class FileDialogHelper {
                     title,
                     "",
                     filters,
-                    "PNG/GIF Images",
+                    "PNG/WebP/GIF Images",
                     false
                 );
 

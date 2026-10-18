@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Updated cape",
   "quickskin.cape.invalid_ratio": "⚠ Invalid cape file (must be 2:1 ratio or animation strip)",
   "quickskin.cape.error": "⚠ Error: %s",
-  "quickskin.cape.no_files": "No PNG or GIF files found",
+  "quickskin.cape.no_files": "No PNG, WebP or GIF files found",
   "quickskin.cape.processing_count": "Processing %s file(s)...",
   "quickskin.cape.no_valid": "⚠ No valid capes found (must be 2:1 ratio or animation strip)",
   "quickskin.cape.error_processing": "Error processing files: %s",

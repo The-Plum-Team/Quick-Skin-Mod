@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Mantel uppdaterad",
   "quickskin.cape.invalid_ratio": "⚠ Ogiltig mantelfil (måste ha 2:1-förhållande eller animationsremsa)",
   "quickskin.cape.error": "⚠ Fel: %s",
-  "quickskin.cape.no_files": "Inga PNG- eller GIF-filer hittades",
+  "quickskin.cape.no_files": "Inga PNG-, WebP- eller GIF-filer hittades",
   "quickskin.cape.processing_count": "Bearbetar %s fil(er)...",
   "quickskin.cape.no_valid": "⚠ Inga giltiga mantlar hittades (måste ha 2:1-förhållande eller animationsremsa)",
   "quickskin.cape.error_processing": "Fel vid bearbetning av filer: %s",

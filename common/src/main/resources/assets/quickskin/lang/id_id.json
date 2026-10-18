@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Jubah diperbarui",
   "quickskin.cape.invalid_ratio": "⚠ File jubah tidak valid (harus rasio 2:1 atau strip animasi)",
   "quickskin.cape.error": "⚠ Kesalahan: %s",
-  "quickskin.cape.no_files": "Tidak ada file PNG atau GIF yang ditemukan",
+  "quickskin.cape.no_files": "Tidak ada file PNG, WebP atau GIF yang ditemukan",
   "quickskin.cape.processing_count": "Memproses %s file...",
   "quickskin.cape.no_valid": "⚠ Tidak ada jubah yang valid ditemukan (harus rasio 2:1 atau strip animasi)",
   "quickskin.cape.error_processing": "Kesalahan memproses file: %s",

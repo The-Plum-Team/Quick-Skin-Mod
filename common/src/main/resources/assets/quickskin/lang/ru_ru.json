@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Плащ обновлён",
   "quickskin.cape.invalid_ratio": "⚠ Неверный файл плаща (должен иметь соотношение 2:1 или анимационную полосу)",
   "quickskin.cape.error": "⚠ Ошибка: %s",
-  "quickskin.cape.no_files": "Не найдено файлов PNG или GIF",
+  "quickskin.cape.no_files": "Не найдено файлов PNG, WebP или GIF",
   "quickskin.cape.processing_count": "Обработка %s файла(-ов)...",
   "quickskin.cape.no_valid": "⚠ Не найдено допустимых плащей (должны иметь соотношение 2:1 или анимационную полосу)",
   "quickskin.cape.error_processing": "Ошибка обработки файлов: %s",

@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Mantello aggiornato",
   "quickskin.cape.invalid_ratio": "⚠ File mantello non valido (deve avere rapporto 2:1 o striscia di animazione)",
   "quickskin.cape.error": "⚠ Errore: %s",
-  "quickskin.cape.no_files": "Nessun file PNG o GIF trovato",
+  "quickskin.cape.no_files": "Nessun file PNG, WebP o GIF trovato",
   "quickskin.cape.processing_count": "Elaborazione di %s file...",
   "quickskin.cape.no_valid": "⚠ Nessun mantello valido trovato (deve avere rapporto 2:1 o striscia di animazione)",
   "quickskin.cape.error_processing": "Errore nell'elaborazione dei file: %s",

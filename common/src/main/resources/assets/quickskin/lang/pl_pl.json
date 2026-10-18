@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Peleryna zaktualizowana",
   "quickskin.cape.invalid_ratio": "⚠ Nieprawidłowy plik peleryny (musi mieć proporcje 2:1 lub pasek animacji)",
   "quickskin.cape.error": "⚠ Błąd: %s",
-  "quickskin.cape.no_files": "Nie znaleziono plików PNG lub GIF",
+  "quickskin.cape.no_files": "Nie znaleziono plików PNG, WebP lub GIF",
   "quickskin.cape.processing_count": "Przetwarzanie %s pliku(-ów)...",
   "quickskin.cape.no_valid": "⚠ Nie znaleziono prawidłowych peleryn (muszą mieć proporcje 2:1 lub pasek animacji)",
   "quickskin.cape.error_processing": "Błąd podczas przetwarzania plików: %s",

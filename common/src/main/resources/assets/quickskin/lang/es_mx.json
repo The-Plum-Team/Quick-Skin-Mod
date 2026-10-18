@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Capa actualizada",
   "quickskin.cape.invalid_ratio": "⚠ Archivo de capa inválido (debe tener proporción 2:1 o tira de animación)",
   "quickskin.cape.error": "⚠ Error: %s",
-  "quickskin.cape.no_files": "No se encontraron archivos PNG o GIF",
+  "quickskin.cape.no_files": "No se encontraron archivos PNG, WebP o GIF",
   "quickskin.cape.processing_count": "Procesando %s archivo(s)...",
   "quickskin.cape.no_valid": "⚠ No se encontraron capas válidas (deben tener proporción 2:1 o tira de animación)",
   "quickskin.cape.error_processing": "Error al procesar archivos: %s",

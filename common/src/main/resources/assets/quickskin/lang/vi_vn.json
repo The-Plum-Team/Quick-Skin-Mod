@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Đã cập nhật áo choàng",
   "quickskin.cape.invalid_ratio": "⚠ Tệp áo choàng không hợp lệ (phải có tỷ lệ 2:1 hoặc dải hoạt hình)",
   "quickskin.cape.error": "⚠ Lỗi: %s",
-  "quickskin.cape.no_files": "Không tìm thấy tệp PNG hoặc GIF",
+  "quickskin.cape.no_files": "Không tìm thấy tệp PNG, WebP hoặc GIF",
   "quickskin.cape.processing_count": "Đang xử lý %s tệp...",
   "quickskin.cape.no_valid": "⚠ Không tìm thấy áo choàng hợp lệ (phải có tỷ lệ 2:1 hoặc dải hoạt hình)",
   "quickskin.cape.error_processing": "Lỗi khi xử lý tệp: %s",

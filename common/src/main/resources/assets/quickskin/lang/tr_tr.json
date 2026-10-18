@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Pelerin güncellendi",
   "quickskin.cape.invalid_ratio": "⚠ Geçersiz pelerin dosyası (2:1 oranında veya animasyon şeridi olmalı)",
   "quickskin.cape.error": "⚠ Hata: %s",
-  "quickskin.cape.no_files": "PNG veya GIF dosyası bulunamadı",
+  "quickskin.cape.no_files": "PNG, WebP veya GIF dosyası bulunamadı",
   "quickskin.cape.processing_count": "%s dosya işleniyor...",
   "quickskin.cape.no_valid": "⚠ Geçerli pelerin bulunamadı (2:1 oranında veya animasyon şeridi olmalı)",
   "quickskin.cape.error_processing": "Dosyalar işlenirken hata: %s",

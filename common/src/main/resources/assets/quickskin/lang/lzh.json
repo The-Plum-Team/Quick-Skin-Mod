@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ 更成",
   "quickskin.cape.invalid_ratio": "⚠ 無效披風檔（需為 2:1 比或動畫條）",
   "quickskin.cape.error": "⚠ 誤：%s",
-  "quickskin.cape.no_files": "未得 PNG 或 GIF 檔",
+  "quickskin.cape.no_files": "未得 PNG、WebP 或 GIF 檔",
   "quickskin.cape.processing_count": "處理 %s 檔中...",
   "quickskin.cape.no_valid": "⚠ 未得有效披風（需為 2:1 比或動畫條）",
   "quickskin.cape.error_processing": "處理檔時誤：%s",

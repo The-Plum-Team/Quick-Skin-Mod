@@ -27,10 +27,11 @@ class CapeImportProcessorTest {
     Path temporaryDirectory;
 
     @Test
-    void acceptsOnlyPngAndGifFileNames() {
+    void acceptsOnlyPngWebpAndGifFileNames() {
         assertTrue(CapeImportProcessor.isSupported(Path.of("cape.PNG")));
         assertTrue(CapeImportProcessor.isSupported(Path.of("animated.GiF")));
-        assertFalse(CapeImportProcessor.isSupported(Path.of("cape.webp")));
+        assertTrue(CapeImportProcessor.isSupported(Path.of("cape.WebP")));
+        assertFalse(CapeImportProcessor.isSupported(Path.of("cape.jpg")));
         assertFalse(CapeImportProcessor.isSupported(null));
     }
 
@@ -47,6 +48,23 @@ class CapeImportProcessorTest {
         assertEquals(64, prepared.atlas().getWidth());
         assertEquals(32, prepared.atlas().getHeight());
         assertEquals(1, prepared.frameCount());
+        assertFalse(prepared.gif());
+        assertTrue(prepared.standardFormat());
+    }
+
+    @Test
+    void preparesAValidStandardWebp() throws IOException {
+        // A lossless 64x32 WebP, transparent but for an opaque red cape face at (1,1)-(10,16)
+        Path source = temporaryDirectory.resolve("cape.webp");
+        Files.write(source, java.util.Base64.getDecoder().decode(
+                "UklGRiwAAABXRUJQVlA4TCAAAAAvP8AHEA8wHoM8HvMf8CDSthmbf8Nnh+MR/Z8A7qzrBg=="));
+
+        CapeImportProcessor.PreparedCape prepared = preparePng(source);
+
+        assertEquals(64, prepared.atlas().getWidth());
+        assertEquals(32, prepared.atlas().getHeight());
+        assertEquals(0xFFC81E1E, prepared.atlas().getRGB(5, 8));
+        assertEquals(0, prepared.atlas().getRGB(40, 20) >>> 24);
         assertFalse(prepared.gif());
         assertTrue(prepared.standardFormat());
     }

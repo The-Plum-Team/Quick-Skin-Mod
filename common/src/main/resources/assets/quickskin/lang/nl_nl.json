@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ Cape bijgewerkt",
   "quickskin.cape.invalid_ratio": "⚠ Ongeldig capebestand (moet 2:1-verhouding of animatiestrip zijn)",
   "quickskin.cape.error": "⚠ Fout: %s",
-  "quickskin.cape.no_files": "Geen PNG- of GIF-bestanden gevonden",
+  "quickskin.cape.no_files": "Geen PNG-, WebP- of GIF-bestanden gevonden",
   "quickskin.cape.processing_count": "%s bestand(en) verwerken...",
   "quickskin.cape.no_valid": "⚠ Geen geldige capes gevonden (moeten 2:1-verhouding of animatiestrip zijn)",
   "quickskin.cape.error_processing": "Fout bij verwerken van bestanden: %s",

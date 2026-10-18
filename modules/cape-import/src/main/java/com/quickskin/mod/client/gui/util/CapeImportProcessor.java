@@ -55,7 +55,7 @@ public final class CapeImportProcessor {
             return false;
         }
         String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
-        return name.endsWith(".png") || name.endsWith(".gif");
+        return name.endsWith(".png") || name.endsWith(".gif") || name.endsWith(".webp");
     }
 
     public static PreparedCape prepare(Path source, GifDecoder gifDecoder) throws IOException {
@@ -63,7 +63,7 @@ public final class CapeImportProcessor {
             throw new IOException("Cape file does not exist or is not readable");
         }
         if (!isSupported(source)) {
-            throw new IOException("Only PNG and GIF cape files are supported");
+            throw new IOException("Only PNG, WebP and GIF cape files are supported");
         }
 
         long sourceBytes = Files.size(source);
@@ -76,7 +76,8 @@ public final class CapeImportProcessor {
             return prepareGif(source, gifDecoder);
         }
 
-        BufferedImage image = SafeImageReader.readPng(source);
+        // A still cape, PNG or WebP, is saved as a PNG like every other catalogued cape
+        BufferedImage image = SafeImageReader.readStillCape(source);
         validateAtlas(image.getWidth(), image.getHeight(), 1);
         return new PreparedCape(source, image, 1, null, false,
                 image.getWidth() == 64 && image.getHeight() == 32);

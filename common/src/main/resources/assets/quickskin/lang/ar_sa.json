@@ -118,7 +118,7 @@
   "quickskin.cape.edited": "✓ تم تحديث العباءة",
   "quickskin.cape.invalid_ratio": "⚠ ملف عباءة غير صالح (يجب أن يكون بنسبة 2:1 أو شريط رسوم متحركة)",
   "quickskin.cape.error": "⚠ خطأ: %s",
-  "quickskin.cape.no_files": "لم يتم العثور على ملفات PNG أو GIF",
+  "quickskin.cape.no_files": "لم يتم العثور على ملفات PNG، WebP أو GIF",
   "quickskin.cape.processing_count": "جارٍ معالجة %s ملف...",
   "quickskin.cape.no_valid": "⚠ لم يتم العثور على عباءات صالحة (يجب أن تكون بنسبة 2:1 أو شريط رسوم متحركة)",
   "quickskin.cape.error_processing": "خطأ في معالجة الملفات: %s",
