@@ -71,7 +71,7 @@ public final class CapeImportProcessor {
         long sourceBytes = Files.size(source);
         if (sourceBytes <= 0 || sourceBytes > MAX_SOURCE_BYTES) {
             throw new UserFacingIOException("Cape file must be between 1 byte and 32 MB",
-                    "quickskin.cape.error.file_size", MAX_SOURCE_BYTES / (1024 * 1024));
+                    "quickskin.cape.error.file_size", megabytes(sourceBytes), MAX_SOURCE_BYTES / (1024 * 1024));
         }
 
         boolean gif = source.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".gif");
@@ -434,6 +434,11 @@ public final class CapeImportProcessor {
         Files.createDirectories(directory);
     }
 
+    /** A size in megabytes as the player reads it: rounded up, so a file just over a limit shows over it. */
+    private static long megabytes(long bytes) {
+        return (bytes + 1024L * 1024L - 1) / (1024L * 1024L);
+    }
+
     private static void validateAtlas(int width, int frameHeight, int frameCount) throws IOException {
         if (width < 1 || frameHeight < 1 || frameCount < 1) {
             throw new UserFacingIOException("Cape has invalid dimensions",
@@ -441,7 +446,7 @@ public final class CapeImportProcessor {
         }
         if (width > MAX_STATIC_DIMENSION || frameHeight > MAX_STATIC_DIMENSION) {
             throw new UserFacingIOException("Cape dimensions exceed 4096 pixels",
-                    "quickskin.cape.error.dimensions", MAX_STATIC_DIMENSION);
+                    "quickskin.cape.error.dimensions", width + "×" + frameHeight, MAX_STATIC_DIMENSION);
         }
         long pixels = (long) width * frameHeight * frameCount;
         if (pixels > MAX_ATLAS_PIXELS) {

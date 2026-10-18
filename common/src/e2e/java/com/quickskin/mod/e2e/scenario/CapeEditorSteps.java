@@ -925,7 +925,7 @@ final class CapeEditorSteps {
 
     private static String batchLimitError() {
         return Component.translatable("quickskin.cape.error.batch_count",
-                String.valueOf(BATCH_LIMIT_FILES)).getString();
+                String.valueOf(OVERSIZED_BATCH_FILES), String.valueOf(BATCH_LIMIT_FILES)).getString();
     }
 
     /** The newest toast still showing in the cape menu's corner, or {@code null}. */

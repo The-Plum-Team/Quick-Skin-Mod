@@ -58,7 +58,7 @@ public class ErrorToast {
     private static final long FADE_IN = 300;
     private static final long FADE_OUT = 500;
     /** Width of every toast, so a stack lines up. */
-    public static final int WIDTH = 160;
+    public static final int WIDTH = 200;
     /** The coloured strip on the left, holding the icon. */
     private static final int STRIP_WIDTH = 18;
     private static final int TEXT_PADDING = 6;

@@ -1207,7 +1207,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         if (imageFiles.isEmpty() && cpmModelFiles.isEmpty()) {
-            showError(Component.literal("Unsupported file format. Use PNG, WebP, JPG, or .cpmmodel."));
+            showError(Component.translatable("quickskin.error.unsupported_format"));
             return;
         }
 
@@ -1218,7 +1218,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (!cpmModelFiles.isEmpty()
                 && !com.quickskin.mod.client.compat.CPMCompatIntegration.isAvailable()) {
 //?}
-            showError(Component.literal("CPM mod required for .cpmmodel files."));
+            showError(Component.translatable("quickskin.error.cpm_required"));
             cpmModelFiles.clear();
         }
 
@@ -1549,7 +1549,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                             == com.quickskin.mod.client.compat.CpmLook.Owner.QUICK_SKIN_MODEL;
             if (!modelIsTheLook
                     && !com.quickskin.mod.client.compat.CpmModelWorkflow.activateModel(metadata)) {
-                showError(Component.literal("Unable to select CPM model."));
+                showError(Component.translatable("quickskin.error.cpm_select_failed"));
                 return false;
             }
             // The model replaces the applied Quick Skin skin. Withdraw it here and on the
@@ -1662,7 +1662,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 if (com.quickskin.mod.client.compat.CpmModelWorkflow.isModelFile(filePath)) {
 //?}
                     if (!com.quickskin.mod.client.compat.CPMCompatIntegration.isAvailable()) {
-                        showError(Component.literal("CPM mod required for .cpmmodel files."));
+                        showError(Component.translatable("quickskin.error.cpm_required"));
                         return;
                     }
                     metadata = SkinImporter.importCpmModel(filePath);
@@ -1893,7 +1893,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                     continue;
                 }
             } catch (RuntimeException e) {
-                showError(Component.translatable("quickskin.error.delete_failed", e.getMessage()));
+                QuickSkinInfo.LOGGER.warn("Unable to delete skin {}", metadata.friendlyName(), e);
+                showError(Component.translatable("quickskin.error.delete_failed", metadata.friendlyName()));
                 continue;
             }
             deletedAny = true;
@@ -1926,7 +1927,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 }
             }
         } catch (RuntimeException e) {
-            showError(Component.translatable("quickskin.error.delete_failed", e.getMessage()));
+            // The skins are deleted; only refreshing the list after them failed
+            QuickSkinInfo.LOGGER.warn("Unable to refresh the skin list after deleting skins", e);
         }
     }
 
@@ -2106,16 +2108,20 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                             );
                         }
                     } else {
-                        showError(Component.translatable("quickskin.error.load_metadata_failed"));
+                        QuickSkinInfo.LOGGER.warn("The saved skin of '{}' has no catalogue entry", skinData.username);
+                        showError(Component.translatable("quickskin.error.save_searched_skin", skinData.username));
                     }
                 } else {
-                    showError(Component.translatable("quickskin.error.compute_hash_failed"));
+                    QuickSkinInfo.LOGGER.warn("Unable to hash the saved skin of '{}'", skinData.username);
+                    showError(Component.translatable("quickskin.error.save_searched_skin", skinData.username));
                 }
             } else {
-                showError(Component.translatable("quickskin.error.save_image_failed"));
+                QuickSkinInfo.LOGGER.warn("Unable to save the skin of '{}'", skinData.username);
+                showError(Component.translatable("quickskin.error.save_searched_skin", skinData.username));
             }
         } catch (Exception e) {
-            showError(Component.translatable("quickskin.error.generic", e.getMessage()));
+            QuickSkinInfo.LOGGER.warn("Unable to save the skin of '{}'", skinData.username, e);
+            showError(Component.translatable("quickskin.error.save_searched_skin", skinData.username));
         } finally {
             resetSearchButton();
         }

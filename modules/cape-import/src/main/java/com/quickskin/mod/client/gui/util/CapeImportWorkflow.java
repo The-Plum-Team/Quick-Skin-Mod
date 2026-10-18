@@ -95,7 +95,7 @@ public final class CapeImportWorkflow {
             for (Path source : sources) {
                 if (pending.size() >= MAX_BATCH_FILES) {
                     reject("Cape import batches are limited to 16 files",
-                            UserMessage.of("quickskin.cape.error.batch_count", MAX_BATCH_FILES));
+                            UserMessage.of("quickskin.cape.error.batch_count", sources.size(), MAX_BATCH_FILES));
                     continue;
                 }
                 try {

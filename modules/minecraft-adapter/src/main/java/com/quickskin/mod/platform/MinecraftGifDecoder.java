@@ -27,8 +27,12 @@ public final class MinecraftGifDecoder implements GifDecoder {
             int width = gif.frameWidth();
             int height = gif.frameHeight();
             int frameCount = gif.frames().length;
-            if (width < 1 || height < 1 || width > 4096 || height > 4096
-                    || (long) width * height * frameCount > MAX_ATLAS_PIXELS) {
+            if (width > 4096 || height > 4096) {
+                throw new com.quickskin.mod.common.util.UserFacingIOException(
+                        "Animated cape dimensions exceed 4096 pixels",
+                        "quickskin.cape.error.dimensions", width + "×" + height, 4096);
+            }
+            if (width < 1 || height < 1 || (long) width * height * frameCount > MAX_ATLAS_PIXELS) {
                 throw new com.quickskin.mod.common.util.UserFacingIOException(
                         "Animated cape dimensions exceed the decoded-image limit",
                         "quickskin.cape.error.too_big");
