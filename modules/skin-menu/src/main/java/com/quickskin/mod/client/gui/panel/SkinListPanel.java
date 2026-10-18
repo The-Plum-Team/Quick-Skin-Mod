@@ -83,9 +83,19 @@ public class SkinListPanel extends AbstractWidget {
             return;
         }
 
-        // Clear and reload
+        // Clear and reload, keeping the selected skin selected wherever it lands
+        SkinEntry selected = skinListWidget.getSelected();
+        String selectedHash = selected != null ? selected.getMetadata().hash() : null;
         skinListWidget.clearSkinEntries();
         loadSkins();
+        if (selectedHash != null) {
+            for (SkinEntry entry : skinListWidget.children()) {
+                if (entry.getMetadata().hash().equals(selectedHash)) {
+                    skinListWidget.setSelected(entry);
+                    break;
+                }
+            }
+        }
     }
 
     /**

@@ -1698,11 +1698,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (skinListPanel == null) {
             return;
         }
-        SkinEntry selected = skinListPanel.getSelected();
         refreshSkinList();
-        if (selected != null) {
-            skinListPanel.setSelected(selected.getMetadata(), false);
-        }
         skinListPanel.reveal(metadata.hash());
     }
 
@@ -2223,9 +2219,13 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 Component.translatable("quickskin.tooltip.sorting", Component.translatable(nextMode.getTranslationKey()))
         ));
 
-        // Refresh the skin list with new sorting
+        // Refresh the skin list with new sorting; the selected skin stays selected and in view
         if (skinListPanel != null) {
             skinListPanel.refresh();
+            SkinEntry selected = skinListPanel.getSelected();
+            if (selected != null) {
+                skinListPanel.reveal(selected.getMetadata().hash());
+            }
         }
 
         // Play click sound
