@@ -25,6 +25,11 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
     private static final String ETF_PLAYER_TEXTURE_MIXIN = "EtfPlayerTextureMixin";
     private static final String REPLAY_MOD_COMPAT_MIXIN = "ReplayModCompatMixin";
     private static final String REAL_CAMERA_TEXTURE_ID_MIXIN = "RealCameraTextureIdMixin";
+    private static final List<String> JOURNEYMAP_MIXINS = List.of(
+            "JourneyMapIgnSkinMixin",
+            "JourneyMapTextureCacheMixin"
+    );
+    private static final String JOURNEYMAP_IGN_SKIN = "journeymap/client/texture/IgnSkin.class";
 
     private static final String TACZ_PREVIEW_ANIMATION_MIXIN = "TaczPreviewAnimationMixin";
     private static final String TACZ_ANIMATION_MANAGER =
@@ -84,6 +89,11 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // resource gate could only switch the shim off by mistake (see the CPM note above).
         if (mixinNamed(mixinClassName, REAL_CAMERA_TEXTURE_ID_MIXIN)) {
             return true;
+        }
+        // JourneyMap's targets are @Pseudo and resource-gated like TaCZ's, so a client without
+        // JourneyMap logs nothing for them. Its classes are visible here on Fabric and NeoForge alike.
+        if (JOURNEYMAP_MIXINS.stream().anyMatch(name -> mixinNamed(mixinClassName, name))) {
+            return classFileExists(JOURNEYMAP_IGN_SKIN);
         }
         return false;
     }
