@@ -1,6 +1,6 @@
 {
   "coverage_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3",
-  "observed_at": "2026-10-18T20:37:31Z",
+  "observed_at": "2026-10-18T21:05:52Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -119,16 +119,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577399,
+            "name": "neoforge-26_3--26_3--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577399"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577477,
+            "name": "fabric-26_3--26_3--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577477"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -255,16 +269,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577400,
+            "name": "fabric-26_2--26_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577400"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577469,
+            "name": "neoforge-26_2--26_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577469"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -391,16 +419,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577455,
+            "name": "neoforge-26_1_2--26_1_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577455"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577540,
+            "name": "fabric-26_1_2--26_1_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577540"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -527,16 +569,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577350,
+            "name": "fabric-26_1_1--26_1_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577350"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577393,
+            "name": "neoforge-26_1_1--26_1_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577393"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -663,16 +719,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577415,
+            "name": "fabric-26_1--26_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577415"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577454,
+            "name": "neoforge-26_1--26_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577454"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -799,16 +869,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577360,
+            "name": "fabric-1_21_11--1_21_11--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577360"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577363,
+            "name": "neoforge-1_21_11--1_21_11--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577363"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -935,16 +1019,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577370,
+            "name": "neoforge-1_21_10--1_21_10--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577370"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577452,
+            "name": "fabric-1_21_10--1_21_10--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577452"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -1071,16 +1169,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577493,
+            "name": "fabric-1_21_9--1_21_9--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577493"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577521,
+            "name": "neoforge-1_21_9--1_21_9--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577521"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -1207,16 +1319,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577340,
+            "name": "fabric-1_21_8--1_21_8--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577340"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577490,
+            "name": "neoforge-1_21_8--1_21_8--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577490"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -1343,16 +1469,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577395,
+            "name": "fabric-1_21_7--1_21_7--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577395"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577495,
+            "name": "neoforge-1_21_7--1_21_7--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577495"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -1479,16 +1619,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577235,
+            "name": "neoforge-1_21_6--1_21_6--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577235"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577291,
+            "name": "fabric-1_21_6--1_21_6--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577291"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -1615,16 +1769,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577262,
+            "name": "fabric-1_21_5--1_21_5--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577262"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577310,
+            "name": "neoforge-1_21_5--1_21_5--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577310"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -1751,16 +1919,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577252,
+            "name": "fabric-1_21_4--1_21_4--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577252"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577348,
+            "name": "neoforge-1_21_4--1_21_4--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577348"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -1887,16 +2069,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577242,
+            "name": "neoforge-1_21_3--1_21_3--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577242"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577321,
+            "name": "fabric-1_21_3--1_21_3--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577321"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -2023,16 +2219,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577243,
+            "name": "neoforge-1_21_2--1_21_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577243"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577266,
+            "name": "fabric-1_21_2--1_21_2--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577266"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -2159,16 +2369,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577281,
+            "name": "fabric-1_21_1--1_21_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577281"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577312,
+            "name": "neoforge-1_21_1--1_21_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577312"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
@@ -2295,16 +2519,30 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783302736"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 117783457237,
             "name": "Build immutable E2E input bundle",
-            "status": "queued",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783457237"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577245,
+            "name": "forge-1_20_1--1_20_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577245"
+          },
+          {
+            "conclusion": "success",
+            "id": 117783577283,
+            "name": "fabric-1_20_1--1_20_1--pr-behavior - contract scenarios",
+            "status": "completed",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39164058362/job/117783577283"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are queued.",
+        "reason": "All target jobs and shared prerequisites passed.",
         "reused": false,
-        "state": "pending",
+        "state": "success",
         "tested_sha": "a380343dc20f2c12b844466e157fc06a0d91f7e3"
       },
       "java": [
