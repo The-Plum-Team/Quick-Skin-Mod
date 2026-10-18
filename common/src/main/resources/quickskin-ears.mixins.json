@@ -14,7 +14,9 @@
     "TaczPreviewAnimationMixin",
     "CpmRenderDepthMixin",
     "CpmSubmitCollectorMixin",
-    "RealCameraTextureIdMixin"
+    "RealCameraTextureIdMixin",
+    "JourneyMapIgnSkinMixin",
+    "JourneyMapTextureCacheMixin"
   ],
   "injectors": {
     "defaultRequire": 0
