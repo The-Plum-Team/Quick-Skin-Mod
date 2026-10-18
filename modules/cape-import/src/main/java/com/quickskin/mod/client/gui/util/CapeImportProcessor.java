@@ -135,15 +135,33 @@ public final class CapeImportProcessor {
             Path metadataDirectory,
             BufferedImage vanillaElytra
     ) throws IOException {
+        return saveAdjusted(prepared, adjustedAtlas, null, targetDirectory, metadataDirectory, vanillaElytra);
+    }
+
+    /**
+     * Saves an editor import as a new catalogued cape.
+     *
+     * @param timing the timing the editor chose for an animated atlas, one entry per frame in
+     *               order, or {@code null} to keep the source's own
+     */
+    public static Path saveAdjusted(
+            PreparedCape prepared,
+            BufferedImage adjustedAtlas,
+            AnimationMetadata timing,
+            Path targetDirectory,
+            Path metadataDirectory,
+            BufferedImage vanillaElytra
+    ) throws IOException {
         if (adjustedAtlas == null) {
             throw new IOException("Cape adjustment produced no image");
         }
         requireDirectory(targetDirectory);
 
         int frameCount = adjustedFrameCount(adjustedAtlas);
+        AnimationMetadata metadata = adjustedTiming(prepared, timing, frameCount);
         BufferedImage finalAtlas = compositeElytraIfNeeded(adjustedAtlas, frameCount, vanillaElytra);
         return savePngUnique(prepared.source(), finalAtlas, targetDirectory,
-                metadataDirectory, frameCount > 1 ? prepared.animationMetadata() : null);
+                metadataDirectory, metadata);
     }
 
     /**
@@ -161,6 +179,18 @@ public final class CapeImportProcessor {
             Path cacheDirectory,
             BufferedImage vanillaElytra
     ) throws IOException {
+        return replaceAdjusted(prepared, adjustedAtlas, null, existingCape, cacheDirectory, vanillaElytra);
+    }
+
+    /** {@link #replaceAdjusted(PreparedCape, BufferedImage, Path, Path, BufferedImage)} with the editor's timing. */
+    public static Path replaceAdjusted(
+            PreparedCape prepared,
+            BufferedImage adjustedAtlas,
+            AnimationMetadata timing,
+            Path existingCape,
+            Path cacheDirectory,
+            BufferedImage vanillaElytra
+    ) throws IOException {
         if (adjustedAtlas == null) {
             throw new IOException("Cape adjustment produced no image");
         }
@@ -171,14 +201,14 @@ public final class CapeImportProcessor {
         }
 
         int frameCount = adjustedFrameCount(adjustedAtlas);
+        AnimationMetadata metadata = adjustedTiming(prepared, timing, frameCount);
         BufferedImage finalAtlas = compositeElytraIfNeeded(adjustedAtlas, frameCount, vanillaElytra);
         Path temporary = Files.createTempFile(
                 existingCape.getParent(), ".quickskin-cape-", ".png.tmp");
         try {
             writePng(finalAtlas, temporary);
             SafeImageReader.readPng(temporary);
-            saveMetadata(cacheDirectory, temporary,
-                    frameCount > 1 ? prepared.animationMetadata() : null);
+            saveMetadata(cacheDirectory, temporary, metadata);
             boolean hadSource = CapeEditorSources.find(cacheDirectory, HashUtil.computeAssetContentId(
                     BoundedFileReader.readBytes(temporary, (int) MAX_SOURCE_BYTES), "cape")) != null;
             Path retained = CapeEditorSources.retain(cacheDirectory, temporary, prepared.source());
@@ -198,6 +228,25 @@ public final class CapeImportProcessor {
         } finally {
             Files.deleteIfExists(temporary);
         }
+    }
+
+    /**
+     * The timing saved with an adjusted atlas: none for one frame, the editor's when it chose one
+     * (which must then name exactly the atlas's frames), and otherwise the source's.
+     */
+    private static AnimationMetadata adjustedTiming(
+            PreparedCape prepared, AnimationMetadata timing, int frameCount) throws IOException {
+        if (frameCount <= 1) {
+            return null;
+        }
+        if (timing == null) {
+            return prepared.animationMetadata();
+        }
+        if (timing.frameCount() != frameCount || timing.frames() == null
+                || timing.frames().size() != frameCount) {
+            throw new IOException("Cape animation timing does not match the adjusted frames");
+        }
+        return timing;
     }
 
     private static int adjustedFrameCount(BufferedImage adjustedAtlas) throws IOException {

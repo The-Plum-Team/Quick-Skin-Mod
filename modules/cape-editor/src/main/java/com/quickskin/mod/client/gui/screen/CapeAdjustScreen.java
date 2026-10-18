@@ -18,8 +18,10 @@ import com.quickskin.mod.client.gui.widget.PrimaryButton;
 import com.quickskin.mod.client.gui.widget.StyledButton;
 import com.quickskin.mod.client.rendering.LocalLookPreview;
 import com.quickskin.mod.client.services.LocalAssetManager;
+import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.TextureQuality;
+import com.quickskin.mod.common.util.CapeAnimationTimeline;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.CapeOpaqueFill;
 import com.quickskin.mod.common.util.CapeZoomRange;
@@ -50,6 +52,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 
 import java.awt.image.BufferedImage;
+import java.util.Locale;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -65,7 +69,7 @@ public class CapeAdjustScreen extends Screen {
 
     private final Screen parent;
     private final BufferedImage sourceImage;
-    private final Consumer<BufferedImage> onApply; // Callback with composed cape
+    private final BiConsumer<BufferedImage, AnimationMetadata> onApply; // The composed cape and its timing
     private final Runnable onCancel;
     private boolean completed;
     private final int frameCount;
@@ -103,9 +107,16 @@ public class CapeAdjustScreen extends Screen {
     private double dragStartX, dragStartY;
     private double dragStartOffsetX, dragStartOffsetY;
 
-    // Animation playback (for multi-frame GIFs)
+    // Animation playback (for multi-frame GIFs): the source frame on the canvas and the model
     private int currentAnimFrame = 0;
     private long animStartTime = 0;
+    /** Which of an animated source's frames the cape keeps and how they play; null for a still. */
+    private final CapeAnimationTimeline timeline;
+    private boolean playing = true;
+    /** What a press on the timeline track is moving, until the button is released. */
+    private TrackDrag trackDrag = TrackDrag.NONE;
+
+    private enum TrackDrag { NONE, START, END, SCRUB }
 
     // Mirror: copy cape back region to front
     private boolean mirrorFrontBack = false;
@@ -155,6 +166,17 @@ public class CapeAdjustScreen extends Screen {
     private static final int ZOOM_FLOOR_W = 20;
     private static final int CHANNEL_LABEL_W = 36;
     private static final int VIEW_BUTTON_H = 16;
+    private static final int TIMELINE_PANEL_H = 74;
+    private static final int TRACK_H = 18;
+    /** How far from a trim handle, in GUI pixels, a press still grabs it. */
+    private static final int HANDLE_REACH = 3;
+    private static final int TRIM_HANDLE = 0xFFFFD040;
+    private static final int TRIMMED_DIM = 0xC0101012;
+    private static final int FRAMES_FIT = 0xFF6FCF6F;
+    private static final int FRAMES_OVER = 0xFFFF6060;
+    /** The track's thumbnails: one sheet, this many to a row, each this tall. */
+    private static final int THUMB_COLUMNS = 16;
+    private static final int THUMB_H = 24;
 
     // Where init() put the canvas, the panels and the right panel's sections
     private int canvasLeft, canvasTop, canvasAvailW, canvasAvailH;
@@ -165,6 +187,14 @@ public class CapeAdjustScreen extends Screen {
     private int resolutionLabelY, resolutionButtonsY, outputTextY;
     private int positionLabelY, toolButtonsY, opaqueRowY;
     private int zoomPercentX;
+    private int timelineX0, timelineY0, timelineX1, timelineY1;
+    private int trackX0, trackX1, trackY0;
+    private CapeToolButton playButton;
+    private CapeToolButton reverseButton;
+    private CapeToolButton pingPongButton;
+    private CapeToolButton slowerButton;
+    private CapeToolButton fasterButton;
+    private PrimaryButton applyButton;
     private CapeToolButton[] resolutionButtons;
     private CapeToolButton snapButton;
     private CapeToolButton mirrorButton;
@@ -195,6 +225,14 @@ public class CapeAdjustScreen extends Screen {
     private DynamicTexture previewDynTexture;
     private boolean previewDirty = true;
 
+    // Every source frame, small, for the timeline track
+    //? if <1.21.11 {
+    private ResourceLocation thumbsLocation;
+    //?} else {
+    private Identifier thumbsLocation;
+    //?}
+    private int thumbW, thumbTexW, thumbTexH;
+
     // 3D player model preview (mirrors the main cape menu)
     private PlayerWidget playerWidget;
     //? if <1.21.11 {
@@ -218,23 +256,40 @@ public class CapeAdjustScreen extends Screen {
             Consumer<BufferedImage> onApply,
             Runnable onCancel
     ) {
+        this(parent, sourceImage, frameCount, null, (cape, timing) -> onApply.accept(cape), onCancel);
+    }
+
+    /**
+     * @param timing an animated source's own frame timing, or {@code null}
+     * @param onApply takes the composed cape and, when it has more than one frame, the timing the
+     *                timeline chose for it, one entry per atlas frame
+     */
+    public CapeAdjustScreen(
+            Screen parent,
+            BufferedImage sourceImage,
+            int frameCount,
+            AnimationMetadata timing,
+            BiConsumer<BufferedImage, AnimationMetadata> onApply,
+            Runnable onCancel
+    ) {
         super(Component.translatable("quickskin.cape.adjust_title"));
         this.parent = parent;
         this.sourceImage = sourceImage;
         this.frameCount = Math.max(1, frameCount);
         this.srcFrameHeight = sourceImage.getHeight() / this.frameCount;
+        this.timeline = this.frameCount > 1 ? new CapeAnimationTimeline(this.frameCount, timing) : null;
         this.onApply = onApply;
         this.onCancel = onCancel != null ? onCancel : () -> {};
     }
 
     @Override
     protected void init() {
-        // Register source image as texture (first frame only for animation strips)
+        // Register source image as texture (the frame showing, for animation strips)
         if (sourceTextureLocation != null) {
             Minecraft.getInstance().getTextureManager().release(sourceTextureLocation);
         }
         BufferedImage displayFrame = (frameCount > 1)
-                ? sourceImage.getSubimage(0, 0, sourceImage.getWidth(), srcFrameHeight)
+                ? sourceImage.getSubimage(0, currentAnimFrame * srcFrameHeight, sourceImage.getWidth(), srcFrameHeight)
                 : sourceImage;
         NativeImage nativeImage = convertToNativeImage(displayFrame);
         sourceDynTexture = MinecraftTextureUploads.create(() -> "quickskin_cape_adjust_source", nativeImage);
@@ -271,39 +326,55 @@ public class CapeAdjustScreen extends Screen {
         initOpaqueControls();
         initZoomControls();
         initFooter();
+        initTimelineControls();
         initPlayerPreview();
+        buildTimelineThumbnails();
     }
 
     /**
      * Places the screen's parts: a header strip with the title and the hint; the canvas on the left
      * with the zoom panel under it; a panel on the right with the previews, then the Resolution,
      * Position and Opaque fill sections from the bottom up, ending level with the zoom panel; and
-     * Cancel and Apply at the bottom right.
+     * Cancel and Apply at the bottom right. An animated source adds the timeline under the zoom
+     * panel, down to the bottom of the window; the canvas gives up the height, and the right panel
+     * then ends above Cancel and Apply.
      */
     private void layoutPanels() {
         int footerY = this.height - MARGIN - FOOTER_BUTTON_H;
         int bodyTop = HEADER_H + MARGIN;
         int bodyBottom = footerY - MARGIN;
         int rightWidth = Mth.clamp(this.width * 3 / 10, RIGHT_MIN_W, RIGHT_MAX_W);
+        // An animation's timeline goes under the zoom panel, down to the bottom beside Cancel and Apply
+        int leftBottom = timeline != null ? this.height - MARGIN : bodyBottom;
+        int timelineRoom = timeline != null ? PANEL_GAP + TIMELINE_PANEL_H : 0;
         canvasLeft = MARGIN + CANVAS_FRAME;
         canvasTop = bodyTop + CANVAS_FRAME;
         canvasAvailW = Math.max(64, this.width - 3 * MARGIN - rightWidth - 2 * CANVAS_FRAME);
-        canvasAvailH = Math.max(32, bodyBottom - bodyTop - ZOOM_PANEL_H - PANEL_GAP - 2 * CANVAS_FRAME);
+        canvasAvailH = Math.max(32,
+                leftBottom - bodyTop - ZOOM_PANEL_H - PANEL_GAP - timelineRoom - 2 * CANVAS_FRAME);
         recalculateGrid();
 
         frameX0 = gridX - CANVAS_FRAME;
         frameY0 = gridY - CANVAS_FRAME;
         frameX1 = gridX + gridW + CANVAS_FRAME;
         frameY1 = gridY + gridH + CANVAS_FRAME;
-        zoomX0 = frameX0;
-        zoomX1 = frameX1;
+        // Under a canvas made narrow by the timeline, the panels keep the column's whole width
+        zoomX0 = timeline != null ? MARGIN : frameX0;
+        zoomX1 = timeline != null ? MARGIN + canvasAvailW + 2 * CANVAS_FRAME : frameX1;
         zoomY0 = frameY1 + PANEL_GAP;
         zoomY1 = zoomY0 + ZOOM_PANEL_H;
+        timelineX0 = zoomX0;
+        timelineX1 = zoomX1;
+        timelineY0 = zoomY1 + PANEL_GAP;
+        timelineY1 = timelineY0 + TIMELINE_PANEL_H;
+        trackX0 = timelineX0 + PANEL_PAD;
+        trackX1 = timelineX1 - PANEL_PAD;
+        trackY0 = timelineY0 + 18;
         // A canvas narrower than its room, on a short window, leaves the right panel the rest
-        panelX0 = frameX1 + MARGIN;
+        panelX0 = zoomX1 + MARGIN;
         panelX1 = this.width - MARGIN;
         panelY0 = frameY0;
-        panelY1 = zoomY1;
+        panelY1 = timeline != null ? bodyBottom : zoomY1;
 
         opaqueRowY = panelY1 - PANEL_PAD - OPAQUE_ROW_H;
         toolButtonsY = opaqueRowY - SECTION_GAP - TOOL_BUTTON_H;
@@ -511,8 +582,191 @@ public class CapeAdjustScreen extends Screen {
         int applyX = this.width - MARGIN - applyWidth;
         this.addRenderableWidget(new StyledButton(applyX - 6 - cancelWidth, footerY, cancelWidth,
                 FOOTER_BUTTON_H, cancelLabel, b -> onClose()));
-        this.addRenderableWidget(new PrimaryButton(applyX, footerY, applyWidth, FOOTER_BUTTON_H,
-                applyLabel, b -> applyAndClose()));
+        applyButton = this.addRenderableWidget(new PrimaryButton(applyX, footerY, applyWidth,
+                FOOTER_BUTTON_H, applyLabel, b -> applyAndClose()));
+    }
+
+    /**
+     * The row at the bottom of the timeline: Play or Pause, Reverse and There and back, then the
+     * speed with slower and faster. Reverse and There and back are as wide as their labels need,
+     * and give way to their icons where the column is too narrow.
+     */
+    private void initTimelineControls() {
+        playButton = null;
+        reverseButton = null;
+        pingPongButton = null;
+        slowerButton = null;
+        fasterButton = null;
+        if (timeline == null) {
+            return;
+        }
+        int rowY = timelineY1 - PANEL_PAD - TOOL_BUTTON_H;
+        int x0 = timelineX0 + PANEL_PAD;
+        int x1 = timelineX1 - PANEL_PAD;
+        playButton = this.addRenderableWidget(new CapeToolButton(x0, rowY, TOOL_BUTTON_H, TOOL_BUTTON_H,
+                CapeEditorStyle.ICON_PAUSE, Component.empty(), playMessage(), b -> setPlaying(!playing)));
+
+        fasterButton = this.addRenderableWidget(new CapeToolButton(x1 - ZOOM_STEP_BUTTON, rowY,
+                ZOOM_STEP_BUTTON, TOOL_BUTTON_H, CapeEditorStyle.ICON_PLUS, Component.empty(),
+                Component.translatable("quickskin.cape.adjust_faster"),
+                b -> { timeline.speedUp(); timelineChanged(); }));
+        fasterButton.setTooltip(Tooltip.create(fasterButton.getMessage()));
+        slowerButton = this.addRenderableWidget(new CapeToolButton(
+                fasterButton.getX() - 3 - ZOOM_STEP_BUTTON, rowY, ZOOM_STEP_BUTTON, TOOL_BUTTON_H,
+                CapeEditorStyle.ICON_MINUS, Component.empty(),
+                Component.translatable("quickskin.cape.adjust_slower"),
+                b -> { timeline.slowDown(); timelineChanged(); }));
+        slowerButton.setTooltip(Tooltip.create(slowerButton.getMessage()));
+
+        Component reverseLabel = Component.translatable("quickskin.cape.adjust_reverse");
+        Component pingPongLabel = Component.translatable("quickskin.cape.adjust_ping_pong");
+        int gap = 4;
+        int left = playButton.getX() + TOOL_BUTTON_H + gap;
+        int right = slowerButton.getX() - 6 - this.font.width("×0.25") - 6;
+        int[] widths = {
+                toolButtonWidth(this.font.width(reverseLabel)),
+                toolButtonWidth(this.font.width(pingPongLabel))};
+        int room = Math.max(2 * TOOL_BUTTON_H, right - left - gap);
+        if (widths[0] + widths[1] > room) {
+            widths[0] = room * widths[0] / (widths[0] + widths[1]);
+            widths[1] = room - widths[0];
+        }
+        reverseButton = this.addRenderableWidget(new CapeToolButton(left, rowY, widths[0], TOOL_BUTTON_H,
+                CapeEditorStyle.ICON_REVERSE, reverseLabel, reverseLabel,
+                b -> { timeline.setReversed(!timeline.isReversed()); timelineChanged(); }));
+        reverseButton.setTooltip(Tooltip.create(Component.translatable("quickskin.cape.adjust_reverse_tip")));
+        pingPongButton = this.addRenderableWidget(new CapeToolButton(left + widths[0] + gap, rowY,
+                widths[1], TOOL_BUTTON_H, CapeEditorStyle.ICON_PING_PONG, pingPongLabel, pingPongLabel,
+                b -> { timeline.setPingPong(!timeline.isPingPong()); timelineChanged(); }));
+        pingPongButton.setTooltip(Tooltip.create(Component.translatable("quickskin.cape.adjust_ping_pong_tip")));
+        updateTimelineControls();
+    }
+
+    private Component playMessage() {
+        return Component.translatable(playing ? "quickskin.cape.adjust_pause" : "quickskin.cape.adjust_play");
+    }
+
+    private void setPlaying(boolean play) {
+        playing = play;
+        // Playing starts the animation again from its first kept frame
+        animStartTime = 0;
+        updateTimelineControls();
+    }
+
+    /** After a change to what the timeline keeps or how it plays. */
+    private void timelineChanged() {
+        animStartTime = 0;
+        if (!playing) {
+            showFrame(Mth.clamp(currentAnimFrame, timeline.start(), timeline.end()));
+        }
+        updateTimelineControls();
+    }
+
+    private void updateTimelineControls() {
+        if (timeline == null) {
+            return;
+        }
+        if (playButton != null) {
+            playButton.setIcon(playing ? CapeEditorStyle.ICON_PAUSE : CapeEditorStyle.ICON_PLAY);
+            playButton.setMessage(playMessage());
+            playButton.setTooltip(Tooltip.create(playMessage()));
+            reverseButton.setSelected(timeline.isReversed());
+            pingPongButton.setSelected(timeline.isPingPong());
+            slowerButton.active = timeline.canSlowDown();
+            fasterButton.active = timeline.canSpeedUp();
+        }
+        // A cape with more frames than an animated cape may have cannot be applied
+        if (applyButton != null) {
+            applyButton.active = timeline.fitsFrameLimit();
+        }
+    }
+
+    /** The left edge of source frame {@code frame} on the track; {@code frameCount} is its right end. */
+    private int frameLeft(int frame) {
+        return trackX0 + 1 + (int) ((long) frame * (trackX1 - trackX0 - 2) / frameCount);
+    }
+
+    /** The source frame under {@code mouseX} on the track. */
+    private int frameAt(double mouseX) {
+        int inner = Math.max(1, trackX1 - trackX0 - 2);
+        return Mth.clamp((int) Math.floor((mouseX - trackX0 - 1) * frameCount / inner), 0, frameCount - 1);
+    }
+
+    private boolean isOnTrack(double mouseX, double mouseY) {
+        return timeline != null
+                && mouseX >= trackX0 - HANDLE_REACH && mouseX <= trackX1 + HANDLE_REACH
+                && mouseY >= trackY0 - 3 && mouseY <= trackY0 + TRACK_H + 3;
+    }
+
+    /**
+     * A press on the track: near a trim handle it moves that end of the kept frames, anywhere else
+     * it shows the frame under it. Either way playback pauses on the frame being looked at.
+     */
+    private void pressTrack(double mouseX) {
+        int startX = frameLeft(timeline.start());
+        int endX = frameLeft(timeline.end() + 1);
+        double toStart = Math.abs(mouseX - startX);
+        double toEnd = Math.abs(mouseX - endX);
+        if (Math.min(toStart, toEnd) <= HANDLE_REACH) {
+            // Handles that touch: the side of the press decides
+            trackDrag = toEnd < toStart || (toEnd == toStart && mouseX >= startX)
+                    ? TrackDrag.END : TrackDrag.START;
+        } else {
+            trackDrag = TrackDrag.SCRUB;
+        }
+        setPlaying(false);
+        dragTrack(mouseX);
+    }
+
+    private void dragTrack(double mouseX) {
+        int frame = frameAt(mouseX);
+        switch (trackDrag) {
+            case START -> {
+                timeline.setStart(frame);
+                showFrame(timeline.start());
+            }
+            case END -> {
+                timeline.setEnd(frame);
+                showFrame(timeline.end());
+            }
+            case SCRUB -> showFrame(Mth.clamp(frame, timeline.start(), timeline.end()));
+            default -> { }
+        }
+        updateTimelineControls();
+    }
+
+    /** Every source frame shrunk to {@link #THUMB_H} tall, on one sheet the track draws from. */
+    private void buildTimelineThumbnails() {
+        if (timeline == null || thumbsLocation != null) {
+            return;
+        }
+        thumbW = Mth.clamp((int) Math.round(THUMB_H * (double) sourceImage.getWidth() / srcFrameHeight), 8, 48);
+        int rows = (frameCount + THUMB_COLUMNS - 1) / THUMB_COLUMNS;
+        thumbTexW = thumbW * Math.min(frameCount, THUMB_COLUMNS);
+        thumbTexH = THUMB_H * rows;
+        BufferedImage sheet = new BufferedImage(thumbTexW, thumbTexH, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = sheet.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        for (int i = 0; i < frameCount; i++) {
+            int x = (i % THUMB_COLUMNS) * thumbW;
+            int y = (i / THUMB_COLUMNS) * THUMB_H;
+            g.drawImage(sourceImage, x, y, x + thumbW, y + THUMB_H,
+                    0, i * srcFrameHeight, sourceImage.getWidth(), (i + 1) * srcFrameHeight, null);
+        }
+        g.dispose();
+        DynamicTexture texture = MinecraftTextureUploads.create(
+                () -> "quickskin_cape_adjust_frames", convertToNativeImage(sheet));
+        //? if <1.21.4 {
+        thumbsLocation = Minecraft.getInstance().getTextureManager()
+                .register("quickskin/cape_adjust_frames", texture);
+        //?} else if <1.21.11 {
+        thumbsLocation = ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "cape_adjust_frames");
+        Minecraft.getInstance().getTextureManager().register(thumbsLocation, texture);
+        //?} else {
+        thumbsLocation = Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "cape_adjust_frames");
+        Minecraft.getInstance().getTextureManager().register(thumbsLocation, texture);
+        //?}
     }
 
     /**
@@ -993,7 +1247,8 @@ public class CapeAdjustScreen extends Screen {
 
         gridW = (int) (capeW * displayScale);
         gridH = (int) (capeH * displayScale);
-        gridX = canvasLeft;
+        // Made shorter by the timeline, the canvas sits in the middle of its column
+        gridX = timeline != null ? canvasLeft + (canvasAvailW - gridW) / 2 : canvasLeft;
         gridY = canvasTop;
     }
 
@@ -1095,16 +1350,20 @@ public class CapeAdjustScreen extends Screen {
     }
 
     /**
-     * Advance the animation frame and update the source texture in-place.
+     * Advance the animation as the cape will play it: the kept frames, in their order, each for its
+     * own delay at the chosen speed.
      */
     private void tickAnimation() {
+        if (timeline == null || !playing) return;
         long now = System.currentTimeMillis();
         if (animStartTime == 0) animStartTime = now;
+        showFrame(timeline.sourceFrameAt(now - animStartTime));
+    }
 
-        // ~100ms per frame (10 FPS preview)
-        int newFrame = (int) ((now - animStartTime) / 100) % frameCount;
-        if (newFrame != currentAnimFrame) {
-            currentAnimFrame = newFrame;
+    /** Puts source frame {@code frame} on the canvas and on the model. */
+    private void showFrame(int frame) {
+        if (frame != currentAnimFrame) {
+            currentAnimFrame = frame;
             updateSourceFrame();
             previewDirty = true;
         }
@@ -1302,6 +1561,7 @@ public class CapeAdjustScreen extends Screen {
         renderSourceBoundary(graphics);
 
         renderZoomPanel(graphics);
+        renderTimelinePanel(graphics);
         renderSidePanel(graphics);
         renderPreview(graphics);
 
@@ -1368,6 +1628,80 @@ public class CapeAdjustScreen extends Screen {
         if (zoomSlider != null) {
             UiText.draw(graphics, this.font, zoomPercentText(), zoomPercentX, zoomSlider.getY() + 3,
                     0xFFE0E0E0);
+        }
+    }
+
+    /**
+     * The timeline under the zoom panel: Animation with the frame count against the limit, the
+     * track of every source frame with the trimmed ones dimmed, the two trim handles and the
+     * playhead, the kept range and the length of one loop under it, and the speed beside its
+     * buttons.
+     */
+    //? if <26.1 {
+    private void renderTimelinePanel(GuiGraphics graphics) {
+    //?} else {
+    private void renderTimelinePanel(GuiGraphicsExtractor graphics) {
+    //?}
+        if (timeline == null) {
+            return;
+        }
+        CapeEditorStyle.panel(graphics, timelineX0, timelineY0, timelineX1, timelineY1);
+        int x0 = timelineX0 + PANEL_PAD;
+        int x1 = timelineX1 - PANEL_PAD;
+        boolean fits = timeline.fitsFrameLimit();
+        Component count = Component.translatable("quickskin.cape.adjust_frames",
+                timeline.outputFrameCount(), CapeAnimationTimeline.MAX_FRAMES);
+        int countX = x1 - this.font.width(count);
+        renderSectionLabel(graphics, Component.translatable("quickskin.cape.adjust_section_animation"),
+                x0, timelineY0 + 6, countX - 6);
+        UiText.draw(graphics, this.font, count, countX, timelineY0 + 6, fits ? FRAMES_FIT : FRAMES_OVER);
+
+        int top = trackY0;
+        int bottom = trackY0 + TRACK_H;
+        graphics.fill(trackX0, top, trackX1, bottom, CapeEditorStyle.OUTLINE);
+        //? if <1.21.6 {
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        //?}
+        for (int i = 0; i < frameCount; i++) {
+            int left = frameLeft(i);
+            int right = frameLeft(i + 1);
+            if (right <= left) {
+                continue;
+            }
+            if (thumbsLocation != null) {
+                GuiCompat.blit(graphics, thumbsLocation, left, top + 1, right - left, TRACK_H - 2,
+                        (i % THUMB_COLUMNS) * thumbW, (i / THUMB_COLUMNS) * THUMB_H, thumbW, THUMB_H,
+                        thumbTexW, thumbTexH);
+            }
+            if (i < timeline.start() || i > timeline.end()) {
+                graphics.fill(left, top + 1, right, bottom - 1, TRIMMED_DIM);
+            }
+        }
+        for (int handleX : new int[] {frameLeft(timeline.start()), frameLeft(timeline.end() + 1)}) {
+            graphics.fill(handleX - 2, top - 2, handleX + 1, bottom + 2, CapeEditorStyle.OUTLINE);
+            graphics.fill(handleX - 1, top - 1, handleX, bottom + 1, TRIM_HANDLE);
+        }
+        int head = (frameLeft(currentAnimFrame) + frameLeft(currentAnimFrame + 1)) / 2;
+        graphics.fill(head, top - 3, head + 1, bottom + 3, 0xFFFFFFFF);
+
+        int infoY = bottom + 4;
+        if (!fits) {
+            UiText.drawCentered(graphics, this.font, Component.translatable("quickskin.cape.adjust_frames_over"),
+                    (x0 + x1) / 2, infoY, FRAMES_OVER);
+        } else {
+            UiText.draw(graphics, this.font,
+                    Component.translatable("quickskin.cape.adjust_trim_start", timeline.start() + 1),
+                    x0, infoY, CapeEditorStyle.SECTION_TEXT);
+            Component end = Component.translatable("quickskin.cape.adjust_trim_end", timeline.end() + 1);
+            UiText.draw(graphics, this.font, end, x1 - this.font.width(end), infoY, CapeEditorStyle.SECTION_TEXT);
+            String seconds = String.format(Locale.ROOT, "%.1f", timeline.durationMs() / 1000.0);
+            UiText.drawCentered(graphics, this.font, Component.translatable("quickskin.cape.adjust_duration", seconds),
+                    (x0 + x1) / 2, infoY, CapeEditorStyle.MUTED_TEXT);
+        }
+        if (slowerButton != null) {
+            String speed = timeline.speedLabel();
+            UiText.draw(graphics, this.font, speed, slowerButton.getX() - 6 - this.font.width(speed),
+                    slowerButton.getY() + 5, 0xFFE0E0E0);
         }
     }
 
@@ -1732,13 +2066,15 @@ public class CapeAdjustScreen extends Screen {
         int drawW = scaledSourcePixels(srcW);
         int drawH = scaledSourcePixels(srcFrameHeight);
 
-        BufferedImage cape = new BufferedImage(capeW, capeH * frameCount, BufferedImage.TYPE_INT_ARGB);
+        // One atlas frame per frame the timeline keeps, in playing order
+        int[] frames = timeline != null ? timeline.sequence() : new int[] {0};
+        BufferedImage cape = new BufferedImage(capeW, capeH * frames.length, BufferedImage.TYPE_INT_ARGB);
         java.awt.Graphics2D g = cape.createGraphics();
         g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
                 java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
-        for (int i = 0; i < frameCount; i++) {
-            int srcY = i * srcFrameHeight;
+        for (int i = 0; i < frames.length; i++) {
+            int srcY = frames[i] * srcFrameHeight;
             int dstYOffset = i * capeH;
             // Draw this frame at the user's chosen position/scale in cape space
             g.drawImage(sourceImage,
@@ -1749,11 +2085,11 @@ public class CapeAdjustScreen extends Screen {
         g.dispose();
 
         if (mirrorFrontBack) {
-            for (int i = 0; i < frameCount; i++) {
+            for (int i = 0; i < frames.length; i++) {
                 mirrorBackToFront(cape, i * capeH);
             }
         }
-        for (int i = 0; i < frameCount; i++) {
+        for (int i = 0; i < frames.length; i++) {
             finalizeCapeFrame(cape, i * capeH, capeH);
         }
 
@@ -1784,6 +2120,11 @@ public class CapeAdjustScreen extends Screen {
             return true;
         }
 
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && isOnTrack(mouseX, mouseY)) {
+            pressTrack(mouseX);
+            return true;
+        }
+
         // Start dragging if clicked inside the grid area
         if (button == InputConstants.MOUSE_BUTTON_LEFT && mouseX >= gridX && mouseX <= gridX + gridW
                 && mouseY >= gridY && mouseY <= gridY + gridH) {
@@ -1804,6 +2145,10 @@ public class CapeAdjustScreen extends Screen {
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
         int button = GuiCompat.mouseButton(event);
     //?}
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && trackDrag != TrackDrag.NONE) {
+            trackDrag = TrackDrag.NONE;
+            return true;
+        }
         if (button == InputConstants.MOUSE_BUTTON_LEFT && isDragging) {
             isDragging = false;
             previewDirty = true;
@@ -1825,6 +2170,10 @@ public class CapeAdjustScreen extends Screen {
         double mouseY = GuiCompat.mouseY(event);
         int button = GuiCompat.mouseButton(event);
     //?}
+        if (trackDrag != TrackDrag.NONE && button == InputConstants.MOUSE_BUTTON_LEFT) {
+            dragTrack(mouseX);
+            return true;
+        }
         if (isDragging && button == InputConstants.MOUSE_BUTTON_LEFT) {
             // Convert display-space drag to cape-space
             double deltaX = (mouseX - dragStartX) / displayScale;
@@ -1891,9 +2240,14 @@ public class CapeAdjustScreen extends Screen {
     }
 
     private void applyAndClose() {
+        if (timeline != null && !timeline.fitsFrameLimit()) {
+            return;
+        }
         BufferedImage composedCape = composeCapeImage();
+        AnimationMetadata timing = timeline != null && timeline.outputFrameCount() > 1
+                ? timeline.toMetadata() : null;
         completed = true;
-        onApply.accept(composedCape);
+        onApply.accept(composedCape, timing);
         onClose();
     }
 
@@ -1914,6 +2268,10 @@ public class CapeAdjustScreen extends Screen {
         if (previewTextureLocation != null) {
             Minecraft.getInstance().getTextureManager().release(previewTextureLocation);
             previewTextureLocation = null;
+        }
+        if (thumbsLocation != null) {
+            Minecraft.getInstance().getTextureManager().release(thumbsLocation);
+            thumbsLocation = null;
         }
 
         if (this.minecraft != null) {

@@ -45,6 +45,14 @@ public final class CapeEditorStyle {
             ".#####.", "#######", "#######", "#######", "#######", "#######", ".#####."};
     public static final String[] ICON_WINGS = {
             "##...##", "###.###", "###.###", "###.###", ".##.##.", ".##.##.", "..#.#.."};
+    public static final String[] ICON_PLAY = {
+            "#......", "###....", "#####..", "#######", "#####..", "###....", "#......"};
+    public static final String[] ICON_PAUSE = {
+            "##..##.", "##..##.", "##..##.", "##..##.", "##..##.", "##..##.", "##..##."};
+    public static final String[] ICON_REVERSE = {
+            "..#....", ".##....", "#######", ".##...#", "..#...#", "......#", "..#####"};
+    public static final String[] ICON_PING_PONG = {
+            "..#....", ".######", "..#...#", "#.....#", "#...#..", "######.", "....#.."};
     public static final int ICON_SIZE = 7;
 
     private CapeEditorStyle() {

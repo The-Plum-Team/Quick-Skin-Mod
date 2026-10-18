@@ -211,6 +211,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   substituted for a cape that has none. An edit writes the new metadata and source association
   first, replaces the catalogued PNG in place, and re-points the active cape and its animation
   speed to the new content ID; a source is removed only when no catalogued cape carries its ID.
+- An animated source opens in `CapeAdjustScreen` with a timeline (`CapeAnimationTimeline`): a
+  kept run of its frames, reversed and/or played there and back, each with its own source delay
+  divided by the chosen speed. Apply writes one atlas frame per entry of that sequence and its own
+  timing (one entry per atlas frame, in order, 20 ms to 60 s), and is refused past 256 frames.
+  Reopening the cape starts again from the retained source, untrimmed.
 - An active Quick Skin cape is authoritative for both the renderer's cape and profile-Elytra
   texture inputs. Never retain an unrelated Mojang/profile Elytra beside a custom cape: vanilla
   gives that dedicated field priority and would otherwise replace only the worn wings when the

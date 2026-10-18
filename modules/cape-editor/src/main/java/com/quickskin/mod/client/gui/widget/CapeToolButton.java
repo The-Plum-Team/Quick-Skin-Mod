@@ -28,7 +28,7 @@ public class CapeToolButton extends CapeEditorButton {
     private static final int TEXT_DISABLED = 0xFF6E6F73;
 
     @Nullable
-    private final String[] icon;
+    private String[] icon;
     private Component label;
     private boolean selected;
 
@@ -47,6 +47,11 @@ public class CapeToolButton extends CapeEditorButton {
     /** What the button shows beside its icon; its message stays the full description. */
     public void setLabel(Component label) {
         this.label = label;
+    }
+
+    /** Swaps the icon, as Play does for Pause. */
+    public void setIcon(@Nullable String[] icon) {
+        this.icon = icon;
     }
 
     public void setSelected(boolean selected) {

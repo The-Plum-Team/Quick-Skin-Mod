@@ -1,6 +1,7 @@
 package com.quickskin.mod.client.gui.util;
 
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
+import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.util.GifDecoder;
 import com.quickskin.mod.common.util.UserFacingIOException;
 import com.quickskin.mod.common.util.UserFacingIOException.UserMessage;
@@ -15,6 +16,7 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /** Sequential state machine for a bounded batch of cape imports. */
@@ -51,9 +53,13 @@ public final class CapeImportWorkflow {
 
     @FunctionalInterface
     public interface AdjustmentHandler {
+        /**
+         * @param apply takes the adjusted atlas and, for an animated one, the timing chosen for
+         *              its frames ({@code null} keeps the source's)
+         */
         void request(
                 CapeImportProcessor.PreparedCape prepared,
-                Consumer<BufferedImage> apply,
+                BiConsumer<BufferedImage, AnimationMetadata> apply,
                 Runnable cancel
         );
     }
@@ -199,9 +205,9 @@ public final class CapeImportWorkflow {
         try {
             adjustmentHandler.request(
                     result.prepared(),
-                    adjusted -> {
+                    (adjusted, timing) -> {
                         if (!answered.compareAndSet(false, true)) return;
-                        saveAdjusted(result.prepared(), adjusted);
+                        saveAdjusted(result.prepared(), adjusted, timing);
                     },
                     () -> {
                         if (!answered.compareAndSet(false, true)) return;
@@ -217,11 +223,11 @@ public final class CapeImportWorkflow {
     }
 
     private void saveAdjusted(
-            CapeImportProcessor.PreparedCape prepared, BufferedImage adjusted) {
+            CapeImportProcessor.PreparedCape prepared, BufferedImage adjusted, AnimationMetadata timing) {
         ClientIoExecutor.supplyAsync(() -> {
             try {
                 Path saved = CapeImportProcessor.saveAdjusted(
-                        prepared, adjusted, targetDirectory, metadataDirectory, vanillaElytra);
+                        prepared, adjusted, timing, targetDirectory, metadataDirectory, vanillaElytra);
                 try {
                     CapeEditorSources.retain(metadataDirectory, saved, prepared.source());
                 } catch (IOException | RuntimeException ignored) {

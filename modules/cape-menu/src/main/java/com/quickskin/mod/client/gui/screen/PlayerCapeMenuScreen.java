@@ -632,16 +632,19 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 client::execute,
 //? if <26.1 {
                 (prepared, apply, cancel) -> client.setScreen(new CapeAdjustScreen(
-                        this, prepared.atlas(), prepared.frameCount(), apply, cancel)),
+                        this, prepared.atlas(), prepared.frameCount(),
+                        prepared.animationMetadata(), apply, cancel)),
 //?} else if <26.2 {
                 (prepared, apply, cancel) -> {
                     client.setScreen(new CapeAdjustScreen(
-                            this, prepared.atlas(), prepared.frameCount(), apply, cancel));
+                            this, prepared.atlas(), prepared.frameCount(),
+                        prepared.animationMetadata(), apply, cancel));
                 },
 //?} else {
                 (prepared, apply, cancel) -> {
                     client.gui.setScreen(new CapeAdjustScreen(
-                            this, prepared.atlas(), prepared.frameCount(), apply, cancel));
+                            this, prepared.atlas(), prepared.frameCount(),
+                        prepared.animationMetadata(), apply, cancel));
                 },
 //?}
                 summary -> completeCapeImports(generation, summary));
@@ -739,13 +742,14 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             // Loaded: a cancelled editor must not come back to a stale "processing" message
             this.importMessageTimer = 0;
             com.quickskin.mod.client.gui.GuiCompat.openScreen(new CapeAdjustScreen(
-                    this, prepared.atlas(), prepared.frameCount(),
-                    adjusted -> saveCapeEdit(capeEntry, prepared, adjusted), () -> { }));
+                    this, prepared.atlas(), prepared.frameCount(), prepared.animationMetadata(),
+                    (adjusted, timing) -> saveCapeEdit(capeEntry, prepared, adjusted, timing), () -> { }));
         }));
     }
 
     private void saveCapeEdit(CapeEntry capeEntry, CapeImportProcessor.PreparedCape prepared,
-                              java.awt.image.BufferedImage adjusted) {
+                              java.awt.image.BufferedImage adjusted,
+                              @Nullable com.quickskin.mod.common.data.AnimationMetadata timing) {
         Minecraft client = this.minecraft;
         AssetMetadata localCape = capeEntry.getLocalCape();
         Path capePath = capeEntry.getPath();
@@ -766,7 +770,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         ClientIoExecutor.supplyAsync(() -> {
             try {
                 CapeImportProcessor.replaceAdjusted(
-                        prepared, adjusted, capePath, cacheDirectory, vanillaElytra);
+                        prepared, adjusted, timing, capePath, cacheDirectory, vanillaElytra);
                 return (Throwable) null;
             } catch (IOException | RuntimeException error) {
                 return error;
