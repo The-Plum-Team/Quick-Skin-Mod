@@ -119,16 +119,20 @@ public class StbGifLoader {
 
                 // Hard input caps — reject oversized GIFs before any pixel work
                 if (width > 2048) {
-                    throw new IOException("Animated cape too large: width " + width + " exceeds maximum 2048 pixels.");
+                    throw new UserFacingIOException("Animated cape too large: width " + width
+                            + " exceeds maximum 2048 pixels.", "quickskin.cape.error.gif_width", 2048);
                 }
                 if (frameCount > 256) {
-                    throw new IOException("Animated cape too large: " + frameCount + " frames exceeds maximum 256.");
+                    throw new UserFacingIOException("Animated cape too large: " + frameCount
+                            + " frames exceeds maximum 256.", "quickskin.cape.error.gif_frames", 256);
                 }
                 long decodedBytes = (long) frameCount * width * height * 4;
                 long maxBytes = 64L * 1024 * 1024;
                 if (decodedBytes > maxBytes) {
                     long decodedMb = decodedBytes / (1024 * 1024);
-                    throw new IOException("Animated cape too large. Maximum 64 MB when decoded (frames x width x height x 4). Yours is " + decodedMb + " MB. Try reducing resolution or frame count.");
+                    throw new UserFacingIOException("Animated cape too large. Maximum 64 MB when decoded"
+                            + " (frames x width x height x 4). Yours is " + decodedMb + " MB.",
+                            "quickskin.cape.error.gif_decoded", decodedMb, 64);
                 }
                 if (width != preflight.width() || height != preflight.height()
                         || frameCount != preflight.frameCount()) {
@@ -292,7 +296,8 @@ public class StbGifLoader {
 
             frameCount++;
             if (frameCount > MAX_FRAMES) {
-                throw new IOException("Animated cape exceeds 256 frames");
+                throw new UserFacingIOException("Animated cape exceeds 256 frames",
+                        "quickskin.cape.error.gif_frames", MAX_FRAMES);
             }
         }
 

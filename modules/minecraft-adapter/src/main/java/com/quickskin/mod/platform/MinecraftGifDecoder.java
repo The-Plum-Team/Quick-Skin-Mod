@@ -29,7 +29,9 @@ public final class MinecraftGifDecoder implements GifDecoder {
             int frameCount = gif.frames().length;
             if (width < 1 || height < 1 || width > 4096 || height > 4096
                     || (long) width * height * frameCount > MAX_ATLAS_PIXELS) {
-                throw new IOException("Animated cape dimensions exceed the decoded-image limit");
+                throw new com.quickskin.mod.common.util.UserFacingIOException(
+                        "Animated cape dimensions exceed the decoded-image limit",
+                        "quickskin.cape.error.too_big");
             }
             BufferedImage atlas = new BufferedImage(width, Math.multiplyExact(height, frameCount),
                     BufferedImage.TYPE_INT_ARGB);

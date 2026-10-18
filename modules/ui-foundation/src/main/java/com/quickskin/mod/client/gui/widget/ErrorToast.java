@@ -15,10 +15,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A toast in the skin menu's bottom-right corner, stacked with the others above the newest: a
- * card in the Confirm style on a one-pixel lip, with a strip on its left in the colour of its
- * kind and that kind's icon. Every toast is as wide as the others; a longer message takes more
- * lines. It fades in, shows for a few seconds and fades out.
+ * A toast in a menu's bottom-right corner (the skin and cape menus), stacked with the others above
+ * the newest: a card in the Confirm style on a one-pixel lip, with a strip on its left in the
+ * colour of its kind and that kind's icon. Every toast is as wide as the others; a longer message
+ * takes more lines. It fades in, shows for a few seconds, longer for a longer message, and fades
+ * out.
  */
 @Environment(EnvType.CLIENT)
 public class ErrorToast {
@@ -45,9 +46,15 @@ public class ErrorToast {
     private final Component message;
     private final Kind kind;
     private final long creationTime;
+    private final long displayDuration;
     private List<String> lines;
 
-    private static final long DISPLAY_DURATION = 3000; // 3 seconds
+    /** How long a short message shows... */
+    private static final long DISPLAY_DURATION = 3000;
+    /** ...and how much longer each character past {@link #SHORT_MESSAGE} keeps one, up to a limit. */
+    private static final int SHORT_MESSAGE = 40;
+    private static final long PER_EXTRA_CHARACTER = 50;
+    private static final long MAX_DISPLAY_DURATION = 8000;
     private static final long FADE_IN = 300;
     private static final long FADE_OUT = 500;
     /** Width of every toast, so a stack lines up. */
@@ -77,11 +84,13 @@ public class ErrorToast {
         this.message = message;
         this.kind = kind;
         this.creationTime = System.currentTimeMillis();
+        int extra = Math.max(0, message.getString().length() - SHORT_MESSAGE);
+        this.displayDuration = Math.min(MAX_DISPLAY_DURATION, DISPLAY_DURATION + extra * PER_EXTRA_CHARACTER);
     }
 
     /** Whether the toast has finished showing. */
     public boolean isExpired() {
-        return System.currentTimeMillis() - creationTime > DISPLAY_DURATION;
+        return System.currentTimeMillis() - creationTime > displayDuration;
     }
 
     /** The toast's height: its message's lines, at least one icon's room. */
@@ -101,14 +110,14 @@ public class ErrorToast {
     public boolean render(GuiGraphicsExtractor guiGraphics, int x, int y) {
     //?}
         long elapsed = System.currentTimeMillis() - creationTime;
-        if (elapsed > DISPLAY_DURATION) {
+        if (elapsed > displayDuration) {
             return false;
         }
         float alpha = 1.0f;
         if (elapsed < FADE_IN) {
             alpha = elapsed / (float) FADE_IN;
-        } else if (elapsed > DISPLAY_DURATION - FADE_OUT) {
-            alpha = (DISPLAY_DURATION - elapsed) / (float) FADE_OUT;
+        } else if (elapsed > displayDuration - FADE_OUT) {
+            alpha = (displayDuration - elapsed) / (float) FADE_OUT;
         }
         alpha = Math.max(0.05f, Math.min(1.0f, alpha));
 

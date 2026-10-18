@@ -6,6 +6,7 @@ import com.quickskin.mod.common.util.HashUtil;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.common.util.GifDecoder;
+import com.quickskin.mod.common.util.UserFacingIOException;
 import com.quickskin.mod.networking.NetworkSecurity;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -63,12 +64,14 @@ public final class CapeImportProcessor {
             throw new IOException("Cape file does not exist or is not readable");
         }
         if (!isSupported(source)) {
-            throw new IOException("Only PNG, WebP and GIF cape files are supported");
+            throw new UserFacingIOException("Only PNG, WebP and GIF cape files are supported",
+                    "quickskin.cape.error.unsupported");
         }
 
         long sourceBytes = Files.size(source);
         if (sourceBytes <= 0 || sourceBytes > MAX_SOURCE_BYTES) {
-            throw new IOException("Cape file must be between 1 byte and 32 MB");
+            throw new UserFacingIOException("Cape file must be between 1 byte and 32 MB",
+                    "quickskin.cape.error.file_size", MAX_SOURCE_BYTES / (1024 * 1024));
         }
 
         boolean gif = source.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".gif");
@@ -77,7 +80,12 @@ public final class CapeImportProcessor {
         }
 
         // A still cape, PNG or WebP, is saved as a PNG like every other catalogued cape
-        BufferedImage image = SafeImageReader.readStillCape(source);
+        BufferedImage image;
+        try {
+            image = SafeImageReader.readStillCape(source);
+        } catch (IOException unreadable) {
+            throw new UserFacingIOException(unreadable.getMessage(), "quickskin.cape.error.invalid_image");
+        }
         validateAtlas(image.getWidth(), image.getHeight(), 1);
         return new PreparedCape(source, image, 1, null, false,
                 image.getWidth() == 64 && image.getHeight() == 32);
@@ -89,7 +97,7 @@ public final class CapeImportProcessor {
             GifDecoder.DecodedGif gif = gifDecoder.decode(input);
             if (gif == null || gif.atlas() == null || gif.frameCount() < 1 || gif.metadata() == null
                     || gif.atlas().getHeight() % gif.frameCount() != 0) {
-                throw new IOException("Invalid GIF image");
+                throw new UserFacingIOException("Invalid GIF image", "quickskin.cape.error.invalid_image");
             }
             int width = gif.atlas().getWidth();
             int height = gif.atlas().getHeight() / gif.frameCount();
@@ -428,14 +436,17 @@ public final class CapeImportProcessor {
 
     private static void validateAtlas(int width, int frameHeight, int frameCount) throws IOException {
         if (width < 1 || frameHeight < 1 || frameCount < 1) {
-            throw new IOException("Cape has invalid dimensions");
+            throw new UserFacingIOException("Cape has invalid dimensions",
+                    "quickskin.cape.error.invalid_image");
         }
         if (width > MAX_STATIC_DIMENSION || frameHeight > MAX_STATIC_DIMENSION) {
-            throw new IOException("Cape dimensions exceed 4096 pixels");
+            throw new UserFacingIOException("Cape dimensions exceed 4096 pixels",
+                    "quickskin.cape.error.dimensions", MAX_STATIC_DIMENSION);
         }
         long pixels = (long) width * frameHeight * frameCount;
         if (pixels > MAX_ATLAS_PIXELS) {
-            throw new IOException("Cape requires more than 64 MB of decoded pixels");
+            throw new UserFacingIOException("Cape requires more than 64 MB of decoded pixels",
+                    "quickskin.cape.error.too_big");
         }
     }
 }
