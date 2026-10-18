@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "Pelerin işleniyor...",
-  "quickskin.cape.imported": "✓ Pelerin içe aktarıldı",
-  "quickskin.cape.deleted": "✓ Pelerin silindi",
-  "quickskin.cape.edited": "✓ Pelerin güncellendi",
+  "quickskin.cape.imported": "Pelerin içe aktarıldı",
+  "quickskin.cape.deleted": "Pelerin silindi",
+  "quickskin.cape.edited": "Pelerin güncellendi",
   "quickskin.cape.invalid_ratio": "⚠ Geçersiz pelerin dosyası (2:1 oranında veya animasyon şeridi olmalı)",
   "quickskin.cape.imported_many": "%s pelerin içe aktarıldı",
   "quickskin.cape.not_imported": " (%s içe aktarılmadı)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "Bu pelerin silinemedi. Dosyanın başka bir programda açık olmadığını kontrol et",
   "quickskin.cape.no_files": "PNG, WebP veya GIF dosyası bulunamadı",
   "quickskin.cape.processing_count": "%s dosya işleniyor...",
-  "quickskin.cape.no_valid": "⚠ Geçerli pelerin bulunamadı (2:1 oranında veya animasyon şeridi olmalı)",
   "quickskin.cape.error_processing": "Dosyalar işlenirken hata: %s",
   "quickskin.cape.error_directory": "Hata: Pelerin dizini oluşturulamadı",
 

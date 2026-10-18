@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "Procesando capa...",
-  "quickskin.cape.imported": "✓ Capa importada",
-  "quickskin.cape.deleted": "✓ Capa borrada",
-  "quickskin.cape.edited": "✓ Capa actualizada",
+  "quickskin.cape.imported": "Capa importada",
+  "quickskin.cape.deleted": "Capa borrada",
+  "quickskin.cape.edited": "Capa actualizada",
   "quickskin.cape.invalid_ratio": "⚠ Archivo de capa inválido (debe tener proporción 2:1 o tira de animación)",
   "quickskin.cape.imported_many": "%s capas importadas",
   "quickskin.cape.not_imported": " (%s sin importar)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "No se pudo borrar esta capa. Revisa que el archivo no esté abierto en otro programa",
   "quickskin.cape.no_files": "No se encontraron archivos PNG, WebP o GIF",
   "quickskin.cape.processing_count": "Procesando %s archivo(s)...",
-  "quickskin.cape.no_valid": "⚠ No se encontraron capas válidas (deben tener proporción 2:1 o tira de animación)",
   "quickskin.cape.error_processing": "Error al procesar archivos: %s",
   "quickskin.cape.error_directory": "Error: No se pudo crear el directorio de capas",
 

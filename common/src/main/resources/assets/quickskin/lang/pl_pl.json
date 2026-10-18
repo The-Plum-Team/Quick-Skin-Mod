@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "Przetwarzanie peleryny...",
-  "quickskin.cape.imported": "✓ Peleryna zaimportowana",
-  "quickskin.cape.deleted": "✓ Peleryna usunięta",
-  "quickskin.cape.edited": "✓ Peleryna zaktualizowana",
+  "quickskin.cape.imported": "Peleryna zaimportowana",
+  "quickskin.cape.deleted": "Peleryna usunięta",
+  "quickskin.cape.edited": "Peleryna zaktualizowana",
   "quickskin.cape.invalid_ratio": "⚠ Nieprawidłowy plik peleryny (musi mieć proporcje 2:1 lub pasek animacji)",
   "quickskin.cape.imported_many": "Zaimportowano peleryny: %s",
   "quickskin.cape.not_imported": " (niezaimportowane: %s)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "Nie udało się usunąć tej peleryny. Sprawdź, czy plik nie jest otwarty w innym programie",
   "quickskin.cape.no_files": "Nie znaleziono plików PNG, WebP lub GIF",
   "quickskin.cape.processing_count": "Przetwarzanie %s pliku(-ów)...",
-  "quickskin.cape.no_valid": "⚠ Nie znaleziono prawidłowych peleryn (muszą mieć proporcje 2:1 lub pasek animacji)",
   "quickskin.cape.error_processing": "Błąd podczas przetwarzania plików: %s",
   "quickskin.cape.error_directory": "Błąd: Nie można utworzyć katalogu peleryn",
 

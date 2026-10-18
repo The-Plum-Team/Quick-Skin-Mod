@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== 披风导入/管理消息 ===",
   "quickskin.cape.processing": "处理中...",
-  "quickskin.cape.imported": "✓ 导入成功",
-  "quickskin.cape.deleted": "✓ 删除成功",
-  "quickskin.cape.edited": "✓ 更新成功",
+  "quickskin.cape.imported": "导入成功",
+  "quickskin.cape.deleted": "删除成功",
+  "quickskin.cape.edited": "更新成功",
   "quickskin.cape.invalid_ratio": "⚠ 无效的披风文件（需为 2:1 比例或动画条）",
   "quickskin.cape.imported_many": "已导入 %s 件披风",
   "quickskin.cape.not_imported": "（%s 件未导入）",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "无法删除这件披风。请检查文件是否在其他程序中打开",
   "quickskin.cape.no_files": "未找到 PNG、WebP 或 GIF 文件",
   "quickskin.cape.processing_count": "正在处理 「%s」 个文件...",
-  "quickskin.cape.no_valid": "⚠ 未找到有效披风（需为 2:1 比例或动画条）",
   "quickskin.cape.error_processing": "处理文件出错：%s",
   "quickskin.cape.error_directory": "无法创建披风目录",
 

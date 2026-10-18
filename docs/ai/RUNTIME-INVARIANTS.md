@@ -449,7 +449,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - GUI cape import evidence must go through `CapeImportWorkflow` from the real drop entry point:
   a translucent user cape with a transparent elytra area must be saved with the vanilla elytra
   composited in, keep its half-transparent face in-world and on the equipped wings, and the menu
-  must show its import, cancel, batch-limit, and delete messages. Cape-menu evidence must click
+  must report its import, batch-limit, and delete outcomes as toasts, and a cancelled editor
+  leaves it without one. Cape-menu evidence must click
   real tiles through the screen's mouse handlers so selection, the None tile, the speed slider,
   the GIF badge, the scrollbar, the tooltip, and Hide Built-in Capes are exercised as a user does.
   The worn-cape capture must also pass its contract-owned pixel probe: the yellow border encloses

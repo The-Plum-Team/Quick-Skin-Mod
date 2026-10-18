@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "جارٍ معالجة العباءة...",
-  "quickskin.cape.imported": "✓ تم استيراد العباءة",
-  "quickskin.cape.deleted": "✓ تم حذف العباءة",
-  "quickskin.cape.edited": "✓ تم تحديث العباءة",
+  "quickskin.cape.imported": "تم استيراد العباءة",
+  "quickskin.cape.deleted": "تم حذف العباءة",
+  "quickskin.cape.edited": "تم تحديث العباءة",
   "quickskin.cape.invalid_ratio": "⚠ ملف عباءة غير صالح (يجب أن يكون بنسبة 2:1 أو شريط رسوم متحركة)",
   "quickskin.cape.imported_many": "تم استيراد %s عباءات",
   "quickskin.cape.not_imported": " (لم يُستورد %s)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "تعذّر حذف هذه العباءة. تأكد أن الملف غير مفتوح في برنامج آخر",
   "quickskin.cape.no_files": "لم يتم العثور على ملفات PNG، WebP أو GIF",
   "quickskin.cape.processing_count": "جارٍ معالجة %s ملف...",
-  "quickskin.cape.no_valid": "⚠ لم يتم العثور على عباءات صالحة (يجب أن تكون بنسبة 2:1 أو شريط رسوم متحركة)",
   "quickskin.cape.error_processing": "خطأ في معالجة الملفات: %s",
   "quickskin.cape.error_directory": "خطأ: تعذر إنشاء دليل العباءات",
 

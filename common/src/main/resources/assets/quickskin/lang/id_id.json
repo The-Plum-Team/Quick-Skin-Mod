@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "Memproses jubah...",
-  "quickskin.cape.imported": "✓ Jubah diimpor",
-  "quickskin.cape.deleted": "✓ Jubah dihapus",
-  "quickskin.cape.edited": "✓ Jubah diperbarui",
+  "quickskin.cape.imported": "Jubah diimpor",
+  "quickskin.cape.deleted": "Jubah dihapus",
+  "quickskin.cape.edited": "Jubah diperbarui",
   "quickskin.cape.invalid_ratio": "⚠ File jubah tidak valid (harus rasio 2:1 atau strip animasi)",
   "quickskin.cape.imported_many": "%s jubah diimpor",
   "quickskin.cape.not_imported": " (%s tidak diimpor)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "Jubah ini tidak bisa dihapus. Pastikan berkasnya tidak terbuka di program lain",
   "quickskin.cape.no_files": "Tidak ada file PNG, WebP atau GIF yang ditemukan",
   "quickskin.cape.processing_count": "Memproses %s file...",
-  "quickskin.cape.no_valid": "⚠ Tidak ada jubah yang valid ditemukan (harus rasio 2:1 atau strip animasi)",
   "quickskin.cape.error_processing": "Kesalahan memproses file: %s",
   "quickskin.cape.error_directory": "Kesalahan: Tidak dapat membuat direktori jubah",
 

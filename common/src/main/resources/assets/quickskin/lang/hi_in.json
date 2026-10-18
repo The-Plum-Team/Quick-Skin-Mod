@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "केप प्रोसेस हो रही है...",
-  "quickskin.cape.imported": "✓ केप इम्पोर्ट हुई",
-  "quickskin.cape.deleted": "✓ केप डिलीट हुई",
-  "quickskin.cape.edited": "✓ केप अपडेट हुई",
+  "quickskin.cape.imported": "केप इम्पोर्ट हुई",
+  "quickskin.cape.deleted": "केप डिलीट हुई",
+  "quickskin.cape.edited": "केप अपडेट हुई",
   "quickskin.cape.invalid_ratio": "⚠ अमान्य केप फ़ाइल (2:1 अनुपात या एनिमेशन स्ट्रिप होनी चाहिए)",
   "quickskin.cape.imported_many": "%s लबादे आयात किए गए",
   "quickskin.cape.not_imported": " (%s आयात नहीं हुए)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "यह लबादा हटाया नहीं जा सका। जाँचें कि फ़ाइल किसी दूसरे प्रोग्राम में खुली तो नहीं है",
   "quickskin.cape.no_files": "कोई PNG, WebP या GIF फ़ाइल नहीं मिली",
   "quickskin.cape.processing_count": "%s फ़ाइल(एं) प्रोसेस हो रही हैं...",
-  "quickskin.cape.no_valid": "⚠ कोई मान्य केप नहीं मिली (2:1 अनुपात या एनिमेशन स्ट्रिप होनी चाहिए)",
   "quickskin.cape.error_processing": "फ़ाइलों को प्रोसेस करने में त्रुटि: %s",
   "quickskin.cape.error_directory": "त्रुटि: केप निर्देशिका नहीं बनाई जा सकी",
 

@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "Traitement de la cape...",
-  "quickskin.cape.imported": "✓ Cape importée",
-  "quickskin.cape.deleted": "✓ Cape supprimée",
-  "quickskin.cape.edited": "✓ Cape mise à jour",
+  "quickskin.cape.imported": "Cape importée",
+  "quickskin.cape.deleted": "Cape supprimée",
+  "quickskin.cape.edited": "Cape mise à jour",
   "quickskin.cape.invalid_ratio": "⚠ Fichier de cape invalide (doit avoir un ratio 2:1 ou être une bande d'animation)",
   "quickskin.cape.imported_many": "%s capes importées",
   "quickskin.cape.not_imported": " (%s non importées)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "Cette cape n'a pas pu être supprimée. Vérifie que le fichier n'est pas ouvert dans un autre programme",
   "quickskin.cape.no_files": "Aucun fichier PNG, WebP ou GIF trouvé",
   "quickskin.cape.processing_count": "Traitement de %s fichier(s)...",
-  "quickskin.cape.no_valid": "⚠ Aucune cape valide trouvée (doit avoir un ratio 2:1 ou être une bande d'animation)",
   "quickskin.cape.error_processing": "Erreur lors du traitement des fichiers : %s",
   "quickskin.cape.error_directory": "Erreur : Impossible de créer le dossier des capes",
 

@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "マントを処理中...",
-  "quickskin.cape.imported": "✓ マントをインポートしました",
-  "quickskin.cape.deleted": "✓ マントを削除しました",
-  "quickskin.cape.edited": "✓ マントを更新しました",
+  "quickskin.cape.imported": "マントをインポートしました",
+  "quickskin.cape.deleted": "マントを削除しました",
+  "quickskin.cape.edited": "マントを更新しました",
   "quickskin.cape.invalid_ratio": "⚠ 無効なマントファイル(2:1の比率またはアニメーションストリップである必要があります)",
   "quickskin.cape.imported_many": "%s 個のマントをインポートしました",
   "quickskin.cape.not_imported": "（%s 個はインポートされていません）",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "このマントを削除できませんでした。ファイルが他のプログラムで開かれていないか確認してください",
   "quickskin.cape.no_files": "PNG、WebPまたはGIFファイルが見つかりません",
   "quickskin.cape.processing_count": "%s個のファイルを処理中...",
-  "quickskin.cape.no_valid": "⚠ 有効なマントが見つかりません(2:1の比率またはアニメーションストリップである必要があります)",
   "quickskin.cape.error_processing": "ファイルの処理中にエラーが発生しました: %s",
   "quickskin.cape.error_directory": "エラー: マントディレクトリを作成できませんでした",
 

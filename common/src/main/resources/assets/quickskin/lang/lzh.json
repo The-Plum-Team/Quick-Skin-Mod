@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== 披風入理訊 ===",
   "quickskin.cape.processing": "處理中...",
-  "quickskin.cape.imported": "✓ 入成",
-  "quickskin.cape.deleted": "✓ 刪成",
-  "quickskin.cape.edited": "✓ 更成",
+  "quickskin.cape.imported": "入成",
+  "quickskin.cape.deleted": "刪成",
+  "quickskin.cape.edited": "更成",
   "quickskin.cape.invalid_ratio": "⚠ 無效披風檔（需為 2:1 比或動畫條）",
   "quickskin.cape.imported_many": "已納披風 %s 件",
   "quickskin.cape.not_imported": "（%s 件未納）",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "此披風不能除。宜察其檔未啟於他程式",
   "quickskin.cape.no_files": "未得 PNG、WebP 或 GIF 檔",
   "quickskin.cape.processing_count": "處理 %s 檔中...",
-  "quickskin.cape.no_valid": "⚠ 未得有效披風（需為 2:1 比或動畫條）",
   "quickskin.cape.error_processing": "處理檔時誤：%s",
   "quickskin.cape.error_directory": "未能建披風目錄",
 

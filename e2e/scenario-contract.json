@@ -2425,7 +2425,7 @@
               "capture": {
                 "title": "Cape imported through the menu",
                 "review_tier": "key",
-                "expectation": "The cape menu shows the green \u2713 Imported cape message above its buttons and a new My Capes tile for a teal-and-yellow cape imported through the real import workflow.",
+                "expectation": "The cape menu shows a green-striped Imported cape toast in its top-right corner and a new My Capes tile for a teal-and-yellow cape imported through the real import workflow.",
                 "probes": []
               },
               "requires": [
@@ -2944,7 +2944,7 @@
               "capture": {
                 "title": "Local cape deleted",
                 "review_tier": "key",
-                "expectation": "The cape menu shows the green \u2713 Deleted cape message above its buttons, and My Capes no longer contains a red-and-black striped contrast cape tile: the real delete confirmation removed it, as the runtime evidence proves. The animated GIF tile keeps its yellow selection outline.",
+                "expectation": "The cape menu shows a green-striped Deleted cape toast in its top-right corner, and My Capes no longer contains a red-and-black striped contrast cape tile: the real delete confirmation removed it, as the runtime evidence proves. The animated GIF tile keeps its yellow selection outline.",
                 "probes": []
               },
               "requires": [

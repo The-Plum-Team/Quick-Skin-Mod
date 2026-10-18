@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "Обробка плаща...",
-  "quickskin.cape.imported": "✓ Плащ імпортовано",
-  "quickskin.cape.deleted": "✓ Плащ видалено",
-  "quickskin.cape.edited": "✓ Плащ оновлено",
+  "quickskin.cape.imported": "Плащ імпортовано",
+  "quickskin.cape.deleted": "Плащ видалено",
+  "quickskin.cape.edited": "Плащ оновлено",
   "quickskin.cape.invalid_ratio": "⚠ Невірний файл плаща (повинен мати співвідношення 2:1 або анімаційну смугу)",
   "quickskin.cape.imported_many": "Імпортовано плащів: %s",
   "quickskin.cape.not_imported": " (не імпортовано: %s)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "Не вдалося видалити цей плащ. Перевірте, чи не відкритий файл в іншій програмі",
   "quickskin.cape.no_files": "Не знайдено файлів PNG, WebP або GIF",
   "quickskin.cape.processing_count": "Обробка %s файла(-ів)...",
-  "quickskin.cape.no_valid": "⚠ Не знайдено дійсних плащів (повинні мати співвідношення 2:1 або анімаційну смугу)",
   "quickskin.cape.error_processing": "Помилка обробки файлів: %s",
   "quickskin.cape.error_directory": "Помилка: не вдалося створити каталог плащів",
 

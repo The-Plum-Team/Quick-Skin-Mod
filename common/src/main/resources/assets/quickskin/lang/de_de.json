@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "Umhang wird verarbeitet...",
-  "quickskin.cape.imported": "✓ Umhang importiert",
-  "quickskin.cape.deleted": "✓ Umhang gelöscht",
-  "quickskin.cape.edited": "✓ Umhang aktualisiert",
+  "quickskin.cape.imported": "Umhang importiert",
+  "quickskin.cape.deleted": "Umhang gelöscht",
+  "quickskin.cape.edited": "Umhang aktualisiert",
   "quickskin.cape.invalid_ratio": "⚠ Ungültige Umhang-Datei (muss 2:1-Verhältnis oder Animationsstreifen sein)",
   "quickskin.cape.imported_many": "%s Umhänge importiert",
   "quickskin.cape.not_imported": " (%s nicht importiert)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "Dieser Umhang konnte nicht gelöscht werden. Prüfe, ob die Datei in einem anderen Programm geöffnet ist",
   "quickskin.cape.no_files": "Keine PNG-, WebP- oder GIF-Dateien gefunden",
   "quickskin.cape.processing_count": "Verarbeite %s Datei(en)...",
-  "quickskin.cape.no_valid": "⚠ Keine gültigen Umhänge gefunden (müssen 2:1-Verhältnis oder Animationsstreifen sein)",
   "quickskin.cape.error_processing": "Fehler beim Verarbeiten der Dateien: %s",
   "quickskin.cape.error_directory": "Fehler: Umhang-Verzeichnis konnte nicht erstellt werden",
 

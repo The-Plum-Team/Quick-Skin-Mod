@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "กำลังประมวลผลผ้าคลุม...",
-  "quickskin.cape.imported": "✓ นำเข้าผ้าคลุมแล้ว",
-  "quickskin.cape.deleted": "✓ ลบผ้าคลุมแล้ว",
-  "quickskin.cape.edited": "✓ อัปเดตผ้าคลุมแล้ว",
+  "quickskin.cape.imported": "นำเข้าผ้าคลุมแล้ว",
+  "quickskin.cape.deleted": "ลบผ้าคลุมแล้ว",
+  "quickskin.cape.edited": "อัปเดตผ้าคลุมแล้ว",
   "quickskin.cape.invalid_ratio": "⚠ ไฟล์ผ้าคลุมไม่ถูกต้อง (ต้องมีอัตราส่วน 2:1 หรือเป็นแถบภาพเคลื่อนไหว)",
   "quickskin.cape.imported_many": "นำเข้าผ้าคลุมแล้ว %s ผืน",
   "quickskin.cape.not_imported": " (ไม่ได้นำเข้า %s)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "ลบผ้าคลุมนี้ไม่ได้ ตรวจดูว่าไฟล์ไม่ได้เปิดอยู่ในโปรแกรมอื่น",
   "quickskin.cape.no_files": "ไม่พบไฟล์ PNG, WebP หรือ GIF",
   "quickskin.cape.processing_count": "กำลังประมวลผล %s ไฟล์...",
-  "quickskin.cape.no_valid": "⚠ ไม่พบผ้าคลุมที่ถูกต้อง (ต้องมีอัตราส่วน 2:1 หรือเป็นแถบภาพเคลื่อนไหว)",
   "quickskin.cape.error_processing": "ข้อผิดพลาดในการประมวลผลไฟล์: %s",
   "quickskin.cape.error_directory": "ข้อผิดพลาด: ไม่สามารถสร้างไดเรกทอรีผ้าคลุมได้",
 

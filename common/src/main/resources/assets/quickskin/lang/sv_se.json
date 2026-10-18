@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "Bearbetar mantel...",
-  "quickskin.cape.imported": "✓ Mantel importerad",
-  "quickskin.cape.deleted": "✓ Mantel borttagen",
-  "quickskin.cape.edited": "✓ Mantel uppdaterad",
+  "quickskin.cape.imported": "Mantel importerad",
+  "quickskin.cape.deleted": "Mantel borttagen",
+  "quickskin.cape.edited": "Mantel uppdaterad",
   "quickskin.cape.invalid_ratio": "⚠ Ogiltig mantelfil (måste ha 2:1-förhållande eller animationsremsa)",
   "quickskin.cape.imported_many": "%s mantlar importerade",
   "quickskin.cape.not_imported": " (%s inte importerade)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "Manteln kunde inte tas bort. Kontrollera att filen inte är öppen i ett annat program",
   "quickskin.cape.no_files": "Inga PNG-, WebP- eller GIF-filer hittades",
   "quickskin.cape.processing_count": "Bearbetar %s fil(er)...",
-  "quickskin.cape.no_valid": "⚠ Inga giltiga mantlar hittades (måste ha 2:1-förhållande eller animationsremsa)",
   "quickskin.cape.error_processing": "Fel vid bearbetning av filer: %s",
   "quickskin.cape.error_directory": "Fel: Kunde inte skapa mantelkatalog",
 

@@ -111,9 +111,9 @@
 
   "_comment_cape": "=== Cape Import/Management Messages ===",
   "quickskin.cape.processing": "Đang xử lý áo choàng...",
-  "quickskin.cape.imported": "✓ Đã nhập áo choàng",
-  "quickskin.cape.deleted": "✓ Đã xóa áo choàng",
-  "quickskin.cape.edited": "✓ Đã cập nhật áo choàng",
+  "quickskin.cape.imported": "Đã nhập áo choàng",
+  "quickskin.cape.deleted": "Đã xóa áo choàng",
+  "quickskin.cape.edited": "Đã cập nhật áo choàng",
   "quickskin.cape.invalid_ratio": "⚠ Tệp áo choàng không hợp lệ (phải có tỷ lệ 2:1 hoặc dải hoạt hình)",
   "quickskin.cape.imported_many": "Đã nhập %s áo choàng",
   "quickskin.cape.not_imported": " (%s chưa nhập)",
@@ -133,7 +133,6 @@
   "quickskin.cape.error.delete_failed": "Không xóa được áo choàng này. Hãy kiểm tra tệp không đang mở trong chương trình khác",
   "quickskin.cape.no_files": "Không tìm thấy tệp PNG, WebP hoặc GIF",
   "quickskin.cape.processing_count": "Đang xử lý %s tệp...",
-  "quickskin.cape.no_valid": "⚠ Không tìm thấy áo choàng hợp lệ (phải có tỷ lệ 2:1 hoặc dải hoạt hình)",
   "quickskin.cape.error_processing": "Lỗi khi xử lý tệp: %s",
   "quickskin.cape.error_directory": "Lỗi: Không thể tạo thư mục áo choàng",
 
